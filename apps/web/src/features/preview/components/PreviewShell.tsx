@@ -1,13 +1,110 @@
 import React, { useState } from "react";
 
+import { useRenderedPreview } from "../../chem-preview/hooks/useRenderedPreview";
+
 interface PreviewShellProps {
   html: string;
   json: string;
   docxBridge: string;
   source: string;
+  documentId?: string;
+  onEditStructure?: (blockId: string, smiles?: string) => void;
 }
 
-type OutputTab = "preview" | "json" | "docxBridge";
+type OutputTab = "preview" | "inspect" | "json" | "docxBridge";
+
+// ─── Molecule block parser ────────────────────────────────────────────────────
+
+interface MoleculeBlockInfo {
+  blockId: string;
+  smiles?: string;
+}
+
+const parseMoleculeBlocks = (source: string): MoleculeBlockInfo[] => {
+  const lines = source.split(/\r?\n/);
+  const blocks: MoleculeBlockInfo[] = [];
+  let inBlock = false;
+  let currentId = "";
+  let currentSmiles: string | undefined;
+
+  for (const line of lines) {
+    if (!inBlock) {
+      const openMatch = /^:::molecule(?:\s+#(\S+))?/.exec(line);
+      if (openMatch) {
+        inBlock = true;
+        currentId = openMatch[1] ?? `mol-${blocks.length + 1}`;
+        currentSmiles = undefined;
+      }
+    } else {
+      const smilesMatch = /^\s*smiles\s*:\s*(.+)/.exec(line);
+      if (smilesMatch) {
+        currentSmiles = smilesMatch[1]?.trim();
+      }
+      if (/^:::$/.test(line)) {
+        blocks.push({ blockId: currentId, smiles: currentSmiles });
+        inBlock = false;
+      }
+    }
+  }
+
+  return blocks;
+};
+
+// ─── Structure card ───────────────────────────────────────────────────────────
+
+const StructureCard = ({
+  blockId,
+  smiles,
+  onEdit,
+}: {
+  blockId: string;
+  smiles?: string;
+  onEdit?: () => void;
+}) => {
+  const previewState = useRenderedPreview(smiles);
+
+  return (
+    <div className="structure-card">
+      <div className="structure-card-toolbar">
+        <span style={{ fontSize: "0.72rem", color: "var(--muted)", marginRight: "auto" }}>
+          #{blockId}
+        </span>
+        {onEdit && (
+          <button
+            type="button"
+            className="structure-edit-btn"
+            onClick={onEdit}
+            title="Open Ketcher to edit this structure"
+          >
+            ✏ Edit structure
+          </button>
+        )}
+      </div>
+      <div className="structure-card-body">
+        {!smiles && (
+          <p className="structure-card-placeholder">No SMILES – add a smiles: field to the block</p>
+        )}
+        {smiles && previewState.phase === "loading" && (
+          <p className="structure-card-placeholder">Rendering…</p>
+        )}
+        {smiles && previewState.phase === "error" && (
+          <p className="structure-card-placeholder" style={{ color: "var(--warning)" }}>
+            Render failed: {previewState.errorMessage}
+          </p>
+        )}
+        {smiles && previewState.phase === "success" && previewState.svg && (
+          // eslint-disable-next-line react/no-danger
+          <div dangerouslySetInnerHTML={{ __html: previewState.svg }} />
+        )}
+        {smiles && previewState.phase === "idle" && (
+          <p className="structure-card-placeholder">{smiles}</p>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const PREVIEW_FRAME_STYLE = `
   :root {
@@ -92,10 +189,21 @@ const parseFileNameFromContentDisposition = (value: string | null): string | und
   }
 };
 
-const PreviewShell = ({ html, json, docxBridge, source }: PreviewShellProps) => {
+// ─── Main component ───────────────────────────────────────────────────────────
+
+const PreviewShell = ({
+  html,
+  json,
+  docxBridge,
+  source,
+  documentId = "default",
+  onEditStructure,
+}: PreviewShellProps) => {
   const [activeTab, setActiveTab] = useState<OutputTab>("preview");
   const [exportingDocx, setExportingDocx] = useState(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
+
+  const moleculeBlocks = parseMoleculeBlocks(source);
 
   const handleExportDocx = async () => {
     setExportingDocx(true);
@@ -158,6 +266,14 @@ const PreviewShell = ({ html, json, docxBridge, source }: PreviewShellProps) => 
             <button
               type="button"
               className="tab-button"
+              data-active={activeTab === "inspect"}
+              onClick={() => setActiveTab("inspect")}
+            >
+              Structures
+            </button>
+            <button
+              type="button"
+              className="tab-button"
               data-active={activeTab === "json"}
               onClick={() => setActiveTab("json")}
             >
@@ -186,7 +302,7 @@ const PreviewShell = ({ html, json, docxBridge, source }: PreviewShellProps) => 
       {exportMessage ? <p className="status-text shrink-0">{exportMessage}</p> : null}
 
       <div className="detail-card min-h-0 flex-1">
-        {activeTab === "preview" ? (
+        {activeTab === "preview" && (
           <div className="detail-card-body preview-canvas h-full">
             <iframe
               title="chemd-preview"
@@ -196,7 +312,32 @@ const PreviewShell = ({ html, json, docxBridge, source }: PreviewShellProps) => 
               srcDoc={toSandboxedSrcDoc(html)}
             />
           </div>
-        ) : (
+        )}
+
+        {activeTab === "inspect" && (
+          <div className="detail-card-body h-full scroll-area" style={{ padding: "1rem" }}>
+            {moleculeBlocks.length === 0 ? (
+              <p style={{ color: "var(--muted)", fontSize: "0.84rem" }}>
+                No molecule blocks in the current document.
+              </p>
+            ) : (
+              moleculeBlocks.map((block) => (
+                <StructureCard
+                  key={block.blockId}
+                  blockId={block.blockId}
+                  smiles={block.smiles}
+                  onEdit={
+                    onEditStructure
+                      ? () => onEditStructure(block.blockId, block.smiles)
+                      : undefined
+                  }
+                />
+              ))
+            )}
+          </div>
+        )}
+
+        {(activeTab === "json" || activeTab === "docxBridge") && (
           <div className="detail-card-body h-full">
             <div className="code-surface h-full">
               <pre className="code-block scroll-area">
@@ -211,4 +352,3 @@ const PreviewShell = ({ html, json, docxBridge, source }: PreviewShellProps) => 
 };
 
 export default PreviewShell;
-

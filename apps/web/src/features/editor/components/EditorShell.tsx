@@ -7,13 +7,16 @@ interface EditorShellProps {
   lineCount: number;
   profileId: string;
   onSourceChange?: (nextSource: string) => void;
+  /** Optional toolbar slot rendered next to the inline meta chips. */
+  toolbar?: React.ReactNode;
 }
 
 export const EditorShell = ({
   source,
   lineCount,
   profileId,
-  onSourceChange
+  onSourceChange,
+  toolbar
 }: EditorShellProps) => (
   <section className="workspace-panel workspace-panel-editor panel-stack min-h-0">
     <div className="panel-header panel-toolbar shrink-0 items-center">
@@ -24,6 +27,7 @@ export const EditorShell = ({
       <div className="panel-inline-meta">
         <span className="toolbar-chip">{lineCount} lines</span>
         <span className="toolbar-chip">YAML {profileId}</span>
+        {toolbar}
       </div>
     </div>
 
