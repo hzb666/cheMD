@@ -104,6 +104,18 @@ importers:
 
   packages/core: {}
 
+  packages/exporter-training:
+    dependencies:
+      '@chemd/core':
+        specifier: workspace:*
+        version: link:../core
+      '@chemd/parser':
+        specifier: workspace:*
+        version: link:../parser
+      '@chemd/resolver':
+        specifier: workspace:*
+        version: link:../resolver
+
   packages/parser:
     dependencies:
       '@chemd/core':
