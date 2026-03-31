@@ -1,0 +1,11 @@
+export const FRONTMATTER_PATTERN = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
+export const FRONTMATTER_KEY_VALUE_PATTERN = /^([a-z][a-z0-9_]*):(?:\s*(.*))?$/;
+export const FRONTMATTER_BLOCK_SCALAR_PATTERN = /^[>|][+-]?$/;
+export const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+export const BLOCK_START_PATTERN = /^:::(\w+)(?:\s+(.*))?$/;
+export const KEY_VALUE_PATTERN = /^([a-z][a-z0-9_]*):\s*(.*)$/;
+export const ID_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
+export const REFERENCE_PATTERN = /@([a-zA-Z][a-zA-Z0-9_-]*)(?:\.([a-zA-Z][a-zA-Z0-9_-]*))?/g;
+export const INLINE_CHEM_VALUE_PATTERN = /:chem\[([^\]\r\n]+)\]/g;
+export const INLINE_CODE_VALUE_PATTERN = /`([^`\r\n]+)`/g;
+export const MARKDOWN_LINK_PATTERN = /\[([^\]\r\n]+)\]\(((?:[^()\r\n]|\([^()\r\n]*\))+?)\)/g;
