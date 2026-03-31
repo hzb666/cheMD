@@ -146,31 +146,34 @@ const PreviewShell = ({ html, json, docxBridge, source }: PreviewShellProps) => 
       <div className="panel-header panel-toolbar shrink-0 items-center">
         <div className="panel-heading-inline">
           <p className="panel-kicker">Preview</p>
-          <div className="tab-strip" role="tablist" aria-label="Output views">
-            <button
-              type="button"
-              className="tab-button"
-              data-active={activeTab === "preview"}
-              onClick={() => setActiveTab("preview")}
-            >
-              Preview
-            </button>
-            <button
-              type="button"
-              className="tab-button"
-              data-active={activeTab === "json"}
-              onClick={() => setActiveTab("json")}
-            >
-              JSON
-            </button>
-            <button
-              type="button"
-              className="tab-button"
-              data-active={activeTab === "docxBridge"}
-              onClick={() => setActiveTab("docxBridge")}
-            >
-              DOCX
-            </button>
+          <div className="tab-strip-container">
+            <div className="tab-strip" role="tablist" aria-label="Output views">
+              <button
+                type="button"
+                className="tab-button"
+                data-active={activeTab === "preview"}
+                onClick={() => setActiveTab("preview")}
+              >
+                Preview
+              </button>
+              <button
+                type="button"
+                className="tab-button"
+                data-active={activeTab === "json"}
+                onClick={() => setActiveTab("json")}
+              >
+                JSON
+              </button>
+              <button
+                type="button"
+                className="tab-button"
+                data-active={activeTab === "docxBridge"}
+                onClick={() => setActiveTab("docxBridge")}
+              >
+                DOCX
+              </button>
+            </div>
+            <span className="tab-indicator" data-active-tab={activeTab} aria-hidden />
           </div>
         </div>
         <button

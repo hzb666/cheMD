@@ -73,10 +73,7 @@ const Page = () => {
           <div className="workspace-toolbar">
             <div className="flex min-w-0 items-center gap-3 overflow-hidden">
               <img src={logoSrc} alt="chemd logo" className="workspace-logo shrink-0 object-contain" />
-              <div className="min-w-0">
-                <p className="workspace-eyebrow">Chemd</p>
-                <p className="workspace-title truncate">{result.document.meta.title}</p>
-              </div>
+              <p className="workspace-title truncate">{result.document.meta.title}</p>
             </div>
             <span
               className="status-pill shrink-0"
@@ -107,5 +104,4 @@ const Page = () => {
 };
 
 export default Page;
-
 

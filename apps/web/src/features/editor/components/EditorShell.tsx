@@ -19,7 +19,6 @@ export const EditorShell = ({
     <div className="panel-header panel-toolbar shrink-0 items-center">
       <div className="panel-heading-cluster">
         <p className="panel-kicker">Editor</p>
-        <p className="panel-meta">Markdown source</p>
       </div>
       <div className="panel-inline-meta">
         <span className="toolbar-chip">{lineCount} lines</span>

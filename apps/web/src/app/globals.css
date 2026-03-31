@@ -112,6 +112,7 @@ select:disabled {
   font-size: 0.9rem;
   font-weight: 540;
   line-height: 1.2;
+  letter-spacing: -0.005em;
 }
 
 .status-pill {
@@ -181,7 +182,7 @@ select:disabled {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 0.38rem;
+  gap: 0.22rem;
 }
 
 .panel-kicker {
@@ -236,20 +237,67 @@ select:disabled {
 }
 
 .tab-strip {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   flex-wrap: nowrap;
   gap: 0.32rem;
 }
 
+.tab-strip-container {
+  position: relative;
+  display: inline-flex;
+  min-height: 1.98rem;
+  align-items: center;
+  padding: 0.1rem;
+  border: 1px solid var(--panel-border);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.tab-indicator {
+  position: absolute;
+  top: 0.1rem;
+  bottom: 0.1rem;
+  left: 0.1rem;
+  width: calc((100% - 0.2rem - 0.64rem) / 3);
+  border-radius: 7px;
+  background: var(--panel-bg-elevated);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+  pointer-events: none;
+  transition:
+    transform 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.tab-indicator[data-active-tab="json"] {
+  transform: translateX(calc(100% + 0.32rem));
+}
+
+.tab-indicator[data-active-tab="docxBridge"] {
+  transform: translateX(calc((100% + 0.32rem) * 2));
+}
+
 .tab-button {
+  position: relative;
+  z-index: 1;
   padding: 0 0.54rem;
+  border-color: transparent;
+  background: transparent;
+  transition:
+    color 180ms ease,
+    border-color 180ms ease,
+    background-color 180ms ease;
 }
 
 .tab-button[data-active="true"] {
-  border-color: var(--panel-border-strong);
-  background: var(--panel-bg-elevated);
+  border-color: transparent;
+  background: transparent;
   color: var(--ink);
+  font-weight: 560;
 }
 
 .button-primary {
