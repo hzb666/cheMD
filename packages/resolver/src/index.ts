@@ -69,9 +69,11 @@ const getIndexedValue = <TValue>(
 const buildObjectIndex = (children: ChemdNode[], diagnostics: Diagnostic[]): Record<string, ObjectNode> => {
   const index: Record<string, ObjectNode> = Object.create(null) as Record<string, ObjectNode>;
   const queue = [...children];
+  let cursor = 0;
 
-  while (queue.length > 0) {
-    const child = queue.shift() as ChemdNode;
+  while (cursor < queue.length) {
+    const child = queue[cursor];
+    cursor += 1;
     if (!isObjectNode(child) || !child.id) {
       queue.push(...getNestedNodes(child));
       continue;
@@ -120,9 +122,11 @@ const buildTemplateIndex = (children: ChemdNode[], diagnostics: Diagnostic[]): R
 
 const validateNodes = (children: ChemdNode[], diagnostics: Diagnostic[]) => {
   const queue = [...children];
+  let cursor = 0;
 
-  while (queue.length > 0) {
-    const child = queue.shift() as ChemdNode;
+  while (cursor < queue.length) {
+    const child = queue[cursor];
+    cursor += 1;
     queue.push(...getNestedNodes(child));
 
     if (!isObjectNode(child)) {

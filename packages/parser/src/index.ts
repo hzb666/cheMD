@@ -53,7 +53,11 @@ const isValidIsoDateValue = (value: string): boolean => {
     && parsed.getUTCMonth() === month - 1
     && parsed.getUTCDate() === day;
 };
-const BLOCK_START_PATTERN = /^:::([a-z][a-z0-9_]*)(?:-(\d+))?(?:\s+(.*))?$/;
+const BLOCK_TYPE_PATTERN = "[a-z][a-z0-9_]*";
+const BLOCK_START_PATTERN = new RegExp(`^:::(${BLOCK_TYPE_PATTERN})(?:-(\\d+))?(?:\\s+(.*))?$`);
+const COL_INLINE_BRACE_BLOCK_PATTERN = new RegExp(
+  `^col:\\s*\\{:::(${BLOCK_TYPE_PATTERN})(?:-\\d+)?(?:\\s+.*)?$`
+);
 const KEY_VALUE_PATTERN = /^([a-z][a-z0-9_]*):\s*(.*)$/;
 const ID_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
 const REFERENCE_PATTERN = /@([a-zA-Z][a-zA-Z0-9_-]*)(?:\.([a-zA-Z][a-zA-Z0-9_-]*))?/g;
@@ -1121,6 +1125,18 @@ interface ParseChildrenResult {
   nextIndex: number;
 }
 
+const resolveHeaderArg = (
+  blockType: string,
+  columnsArg: string | undefined,
+  rawHeaderArg: string | undefined
+): string | undefined => {
+  if (blockType === "col" && columnsArg) {
+    return columnsArg;
+  }
+
+  return rawHeaderArg;
+};
+
 const collectBraceBlockLines = (
   lines: string[],
   startIndex: number
@@ -1146,14 +1162,12 @@ const parseColChildren = (lines: string[], diagnostics: Diagnostic[]): ChemdNode
 
   while (index < lines.length) {
     const line = lines[index].trim();
-    const colLineMatch = line.match(/^col:\s*(.*)$/);
-
-    if (!colLineMatch) {
+    if (!line.startsWith("col:")) {
       index += 1;
       continue;
     }
 
-    const value = colLineMatch[1].trim();
+    const value = line.slice(4).trim();
     if (value.startsWith("{:::")) {
       const braceHeader = value.slice(1).trim();
       const braceBlockLines = [braceHeader];
@@ -1197,7 +1211,7 @@ const collectStructuredBlockLines = (
     const trimmed = line.trim();
 
     if (blockType === "col") {
-      if (trimmed.match(/^col:\s*\{:::[a-z][a-z0-9_]*(?:-\d+)?(?:\s+.*)?$/)) {
+      if (trimmed.match(COL_INLINE_BRACE_BLOCK_PATTERN)) {
         braceDepth += 1;
       } else if (trimmed === ":::}" && braceDepth > 0) {
         braceDepth -= 1;
@@ -1269,7 +1283,7 @@ const parseChildren = (
     flushMarkdown();
 
     const [, blockType, blockColumnsArg, blockHeaderArg] = blockMatch;
-    const headerArg = blockType === "col" && blockColumnsArg ? blockColumnsArg : blockHeaderArg;
+    const headerArg = resolveHeaderArg(blockType, blockColumnsArg, blockHeaderArg);
     index += 1;
 
     if (blockType === "template") {
@@ -1331,8 +1345,6 @@ export const parseChemd = (source: string) => {
     renderSelection: parsed.renderSelection
   });
 };
-
-
 
 
 
