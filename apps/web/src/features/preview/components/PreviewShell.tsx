@@ -144,7 +144,7 @@ const PreviewShell = ({ html, json, docxBridge, source }: PreviewShellProps) => 
   return (
     <section className="workspace-panel workspace-panel-output panel-stack min-h-0">
       <div className="panel-header panel-toolbar shrink-0 items-center">
-        <div className="panel-heading-cluster">
+        <div className="panel-heading-inline">
           <p className="panel-kicker">Preview</p>
           <div className="tab-strip" role="tablist" aria-label="Output views">
             <button
@@ -211,4 +211,3 @@ const PreviewShell = ({ html, json, docxBridge, source }: PreviewShellProps) => 
 };
 
 export default PreviewShell;
-

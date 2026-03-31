@@ -14,6 +14,7 @@ describe("Page", () => {
     expect(html).toContain("DOCX");
     expect(html).toContain("Export");
     expect(html).toContain("YAML publication-acs");
+    expect(html).toContain("panel-heading-inline");
     expect(html).toContain("chemd-source-editor");
     expect(html).toContain("chem-inline");
     expect(html).toContain("chemd-block--reaction");
