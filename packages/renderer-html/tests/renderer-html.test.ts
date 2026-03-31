@@ -424,8 +424,38 @@ const sample = "@meta.project :chem[H2O]";
     expect(html).toContain("<tbody>");
     expect(html).toContain("<td style=\"text-align:right\">63%</td>");
   });
-});
 
+  it("renders col layout with nested molecule and text columns", () => {
+    const document = createDocument(
+      { id: "exp-col-html", title: "Col HTML Test", date: "2026-03-30" },
+      {
+        children: [
+          {
+            type: "col",
+            columns: 2,
+            children: [
+              {
+                type: "molecule",
+                smiles: "CCO",
+                name: "Ethanol"
+              },
+              createMarkdownNode("63%")
+            ]
+          }
+        ]
+      }
+    );
+
+    const html = renderHtml(document, resolveRenderProfile({ profileId: "eln-default" }));
+
+    expect(html).toContain('class="chemd-block chemd-block--col"');
+    expect(html).toContain('data-columns="2"');
+    expect(html).toContain('class="chemd-col-grid"');
+    expect(html).toContain('class="chemd-col-item"');
+    expect(html).toContain("chemd-block chemd-block--molecule");
+    expect(html).toContain(">63%<");
+  });
+});
 
 
 

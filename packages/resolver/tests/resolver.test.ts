@@ -383,4 +383,33 @@ After expansion.`);
       resolved.children.some((child): child is MarkdownNode => child.type === "markdown" && child.value === "After expansion.")
     ).toBe(true);
   });
+
+  it("resolves nested references inside col blocks", () => {
+    const doc = parseChemd(`---
+id: exp-col-resolve
+title: Col Resolve Test
+date: 2026-03-30
+---
+
+:::result #res-main
+yield: 63%
+:::
+
+:::col-2
+col: Yield
+col: @res-main.yield
+:::
+`);
+
+    const resolved = resolveChemd(doc);
+    const col = resolved.children.find((child) => child.type === "col");
+    const colMarkdown = col?.type === "col"
+      ? col.children.find(
+          (child): child is MarkdownNode => child.type === "markdown" && child.value === "@res-main.yield"
+        )
+      : undefined;
+
+    expect(col?.type).toBe("col");
+    expect(colMarkdown?.references[0]?.resolution).toMatchObject({ status: "resolved", value: "63%" });
+  });
 });

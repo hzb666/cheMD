@@ -25,6 +25,7 @@ import {
   type SampleNode,
   type StructuredNode,
   type TemplateNode,
+  type ColNode,
   type UseNode
 } from "@chemd/core";
 import { LineCounter, isMap, isScalar, isSeq, parseDocument } from "yaml";
@@ -52,7 +53,7 @@ const isValidIsoDateValue = (value: string): boolean => {
     && parsed.getUTCMonth() === month - 1
     && parsed.getUTCDate() === day;
 };
-const BLOCK_START_PATTERN = /^:::(\w+)(?:\s+(.*))?$/;
+const BLOCK_START_PATTERN = /^:::([a-z][a-z0-9_]*)(?:-(\d+))?(?:\s+(.*))?$/;
 const KEY_VALUE_PATTERN = /^([a-z][a-z0-9_]*):\s*(.*)$/;
 const ID_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
 const REFERENCE_PATTERN = /@([a-zA-Z][a-zA-Z0-9_-]*)(?:\.([a-zA-Z][a-zA-Z0-9_-]*))?/g;
@@ -68,7 +69,8 @@ const BLOCK_FIELDS: Record<string, Set<string>> = {
   analysis: new Set(["type", "instrument", "solvent", "frequency", "method", "data", "notes"]),
   sample: new Set(["name", "sample_id", "batch", "purity", "supplier", "notes"]),
   template: new Set(["bind", "params", "description"]),
-  use: new Set([])
+  use: new Set([]),
+  col: new Set([])
 };
 
 const createFrontmatterDiagnostic = (
@@ -1022,13 +1024,37 @@ const createMarkdownFromText = (value: string, diagnostics: Diagnostic[]) =>
     tokenizeMarkdownLinks(value, diagnostics)
   );
 
+const parseColColumns = (blockType: string, headerArg: string | undefined, diagnostics: Diagnostic[]): number => {
+  const trimmed = headerArg?.trim() ?? "";
+  const fallback = 1;
+
+  if (blockType !== "col") {
+    return fallback;
+  }
+
+  const matched = trimmed.match(/^(\d+)$/);
+  const columns = matched ? Number.parseInt(matched[1], 10) : NaN;
+  if (!Number.isFinite(columns) || columns < 1) {
+    diagnostics.push({
+      code: "W_INVALID_COL_COLUMNS",
+      severity: "warning",
+      message: `Invalid column count on col block: ${trimmed || "(empty)"}, fallback to 1`
+    });
+    return fallback;
+  }
+
+  return columns;
+};
+
 const parseStructuredBlock = (
   blockType: string,
   headerArg: string | undefined,
   lines: string[],
-  diagnostics: Diagnostic[]
+  diagnostics: Diagnostic[],
+  bodyChildren?: ChemdNode[]
 ): StructuredNode | undefined => {
-  if (!["molecule", "reaction", "result", "analysis", "sample", "use"].includes(blockType)) {
+  const normalizedBlockType = blockType === "mol" ? "molecule" : blockType;
+  if (!["molecule", "reaction", "result", "analysis", "sample", "use", "col"].includes(normalizedBlockType)) {
     diagnostics.push({
       code: "W_UNKNOWN_BLOCK",
       severity: "warning",
@@ -1037,7 +1063,7 @@ const parseStructuredBlock = (
     return undefined;
   }
 
-  if (blockType === "use") {
+  if (normalizedBlockType === "use") {
     const template = headerArg?.trim() ?? "";
     const fields = parseKeyValueLines(blockType, lines, diagnostics);
     const values = Object.fromEntries(
@@ -1051,6 +1077,14 @@ const parseStructuredBlock = (
     } satisfies UseNode;
   }
 
+  if (normalizedBlockType === "col") {
+    return {
+      type: "col",
+      columns: parseColColumns(normalizedBlockType, headerArg, diagnostics),
+      children: bodyChildren ?? []
+    } satisfies ColNode;
+  }
+
   const id = headerArg?.trim().startsWith("#") ? headerArg.trim().slice(1) : undefined;
 
   if (id && !ID_PATTERN.test(id)) {
@@ -1062,9 +1096,9 @@ const parseStructuredBlock = (
     });
   }
 
-  const fields = parseKeyValueLines(blockType, lines, diagnostics);
+  const fields = parseKeyValueLines(normalizedBlockType, lines, diagnostics);
 
-  switch (blockType) {
+  switch (normalizedBlockType) {
     case "molecule":
       return { type: "molecule", id, ...fields } as MoleculeNode;
     case "reaction":
@@ -1086,6 +1120,109 @@ interface ParseChildrenResult {
   children: ChemdNode[];
   nextIndex: number;
 }
+
+const collectBraceBlockLines = (
+  lines: string[],
+  startIndex: number
+): { lines: string[]; nextIndex: number; terminated: boolean } => {
+  const collected: string[] = [];
+  let index = startIndex;
+
+  while (index < lines.length) {
+    const line = lines[index];
+    if (line.trim() === ":::}") {
+      return { lines: collected, nextIndex: index + 1, terminated: true };
+    }
+    collected.push(line);
+    index += 1;
+  }
+
+  return { lines: collected, nextIndex: index, terminated: false };
+};
+
+const parseColChildren = (lines: string[], diagnostics: Diagnostic[]): ChemdNode[] => {
+  const children: ChemdNode[] = [];
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index].trim();
+    const colLineMatch = line.match(/^col:\s*(.*)$/);
+
+    if (!colLineMatch) {
+      index += 1;
+      continue;
+    }
+
+    const value = colLineMatch[1].trim();
+    if (value.startsWith("{:::")) {
+      const braceHeader = value.slice(1).trim();
+      const braceBlockLines = [braceHeader];
+      const collected = collectBraceBlockLines(lines, index + 1);
+      braceBlockLines.push(...collected.lines);
+      if (!collected.terminated) {
+        diagnostics.push({
+          code: "W_UNTERMINATED_BRACE_BLOCK",
+          severity: "warning",
+          message: "Unterminated brace block inside col block"
+        });
+      }
+
+      const parsed = parseChildren(braceBlockLines, diagnostics);
+      children.push(...parsed.children);
+      index = collected.nextIndex;
+      continue;
+    }
+
+    if (value) {
+      children.push(createMarkdownFromText(value, diagnostics));
+    }
+    index += 1;
+  }
+
+  return children;
+};
+
+const collectStructuredBlockLines = (
+  blockType: string,
+  lines: string[],
+  diagnostics: Diagnostic[],
+  startIndex: number
+): { blockLines: string[]; nextIndex: number } => {
+  const blockLines: string[] = [];
+  let index = startIndex;
+  let braceDepth = 0;
+
+  while (index < lines.length) {
+    const line = lines[index];
+    const trimmed = line.trim();
+
+    if (blockType === "col") {
+      if (trimmed.match(/^col:\s*\{:::[a-z][a-z0-9_]*(?:-\d+)?(?:\s+.*)?$/)) {
+        braceDepth += 1;
+      } else if (trimmed === ":::}" && braceDepth > 0) {
+        braceDepth -= 1;
+      }
+    }
+
+    if (trimmed === ":::" && (blockType !== "col" || braceDepth === 0)) {
+      index += 1;
+      return { blockLines, nextIndex: index };
+    }
+
+    blockLines.push(line);
+    index += 1;
+  }
+
+  if (blockType === "col" && braceDepth > 0) {
+    diagnostics.push({
+      code: "W_UNTERMINATED_BRACE_BLOCK",
+      severity: "warning",
+      message: "Unterminated brace block inside col block"
+    });
+  }
+
+  return { blockLines, nextIndex: index };
+};
 
 const parseChildren = (
   lines: string[],
@@ -1131,7 +1268,8 @@ const parseChildren = (
 
     flushMarkdown();
 
-    const [, blockType, headerArg] = blockMatch;
+    const [, blockType, blockColumnsArg, blockHeaderArg] = blockMatch;
+    const headerArg = blockType === "col" && blockColumnsArg ? blockColumnsArg : blockHeaderArg;
     index += 1;
 
     if (blockType === "template") {
@@ -1158,17 +1296,11 @@ const parseChildren = (
       continue;
     }
 
-    const blockLines: string[] = [];
-    while (index < lines.length && lines[index].trim() !== ":::") {
-      blockLines.push(lines[index]);
-      index += 1;
-    }
+    const { blockLines, nextIndex } = collectStructuredBlockLines(blockType, lines, diagnostics, index);
+    index = nextIndex;
 
-    if (index < lines.length && lines[index].trim() === ":::") {
-      index += 1;
-    }
-
-    const node = parseStructuredBlock(blockType, headerArg, blockLines, diagnostics);
+    const bodyChildren = blockType === "col" ? parseColChildren(blockLines, diagnostics) : undefined;
+    const node = parseStructuredBlock(blockType, headerArg, blockLines, diagnostics, bodyChildren);
 
     if (node) {
       children.push(node);
@@ -1199,9 +1331,6 @@ export const parseChemd = (source: string) => {
     renderSelection: parsed.renderSelection
   });
 };
-
-
-
 
 
 
