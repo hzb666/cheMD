@@ -172,9 +172,10 @@ select:disabled {
 }
 
 .panel-toolbar {
+  height: 2.8rem;
   min-height: 2.8rem;
   align-items: center;
-  padding: 0.52rem 0.9rem;
+  padding: 0 0.9rem;
   border-bottom: 1px solid var(--panel-border);
 }
 
@@ -285,16 +286,14 @@ select:disabled {
   position: relative;
   z-index: 1;
   padding: 0 0.54rem;
-  border-color: transparent;
+  border-width: 0;
   background: transparent;
   transition:
     color 180ms ease,
-    border-color 180ms ease,
     background-color 180ms ease;
 }
 
 .tab-button[data-active="true"] {
-  border-color: transparent;
   background: transparent;
   color: var(--ink);
   font-weight: 560;
@@ -307,9 +306,12 @@ select:disabled {
 }
 
 .button-primary:hover,
-.tab-button:hover,
 .toolbar-chip:hover {
   border-color: var(--panel-border-strong);
+}
+
+.tab-button:hover {
+  color: var(--ink);
 }
 
 .status-text {
