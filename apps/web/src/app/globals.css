@@ -151,6 +151,10 @@ select:disabled {
   border-right: 1px solid var(--panel-border);
 }
 
+.workspace-panel-tree {
+  border-right: 1px solid var(--panel-border);
+}
+
 .workspace-panel-output {
   background: #f5f7fb;
 }
@@ -391,6 +395,36 @@ select:disabled {
   padding: 0.42rem 0.55rem;
 }
 
+.tree-list {
+  margin: 0;
+  padding: 0.8rem;
+  list-style: none;
+}
+
+.tree-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.36rem 0.42rem;
+  border-radius: 7px;
+}
+
+.tree-item:hover {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.tree-kind {
+  color: var(--muted);
+  font-size: 0.73rem;
+  text-transform: capitalize;
+}
+
+.tree-id {
+  color: var(--ink-soft);
+  font-size: 0.73rem;
+}
+
 @media (max-width: 1279px) {
   .workspace-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -398,6 +432,10 @@ select:disabled {
 
   .workspace-panel-editor {
     border-right: 0;
+  }
+
+  .workspace-panel-tree,
+  .workspace-panel-editor {
     border-bottom: 1px solid var(--panel-border);
   }
 }

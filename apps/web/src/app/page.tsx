@@ -12,6 +12,7 @@ import { compileChemd, type CompileResult } from "@chemd/compiler";
 
 import logoMark from "../../../../vision/logo-03.png";
 
+import { DocumentTreePanel } from "../features/document-tree/components/DocumentTreePanel";
 import { EditorShell } from "../features/editor/components/EditorShell";
 import { createCompileScheduler } from "../features/editor/lib/compile-scheduler";
 import { OcrImportButton } from "../features/ocr/components/OcrImportButton";
@@ -127,7 +128,8 @@ const Page = () => {
           </div>
         </header>
 
-        <section className="workspace-grid min-h-0 flex-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:overflow-hidden">
+        <section className="workspace-grid min-h-0 flex-1 xl:grid-cols-[18rem_minmax(0,1fr)_minmax(0,1fr)] xl:overflow-hidden">
+          <DocumentTreePanel source={source} />
           <EditorShell
             source={source}
             lineCount={source.split(/\r?\n/).length}

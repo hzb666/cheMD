@@ -10,6 +10,8 @@ describe("Page", () => {
 
     expect(html).toContain("Editor");
     expect(html).toContain("Preview");
+    expect(html).toContain("Tree");
+    expect(html).toContain("Document outline (MVP)");
     expect(html).toContain("JSON");
     expect(html).toContain("DOCX");
     expect(html).toContain("Export");
