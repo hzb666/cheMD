@@ -1,0 +1,48 @@
+import { NextResponse } from "next/server";
+
+import { callChemServiceNormalize } from "../../../../../server/chem/chem-service-client";
+import { saveStructureRecord } from "../../../../../server/chem/structure-store";
+
+export const runtime = "nodejs";
+
+export const POST = async (request: Request): Promise<Response> => {
+  const body = (await request.json().catch(() => null)) as
+    | { documentId?: unknown; blockId?: unknown; molfile?: unknown; smiles?: unknown }
+    | null;
+
+  if (!body || typeof body !== "object") {
+    return NextResponse.json({ message: "invalid request body" }, { status: 400 });
+  }
+
+  if (typeof body.documentId !== "string" || typeof body.blockId !== "string") {
+    return NextResponse.json({ message: "documentId and blockId are required" }, { status: 400 });
+  }
+
+  const smiles = typeof body.smiles === "string" ? body.smiles : undefined;
+  const molfile = typeof body.molfile === "string" ? body.molfile : undefined;
+
+  if (!smiles && !molfile) {
+    return NextResponse.json({ message: "smiles or molfile is required" }, { status: 400 });
+  }
+
+  try {
+    const normalized = await callChemServiceNormalize({ smiles, molfile });
+    saveStructureRecord({
+      documentId: body.documentId,
+      blockId: body.blockId,
+      smiles: normalized.canonicalSmiles,
+      molfile: normalized.normalizedMolfile,
+      source: "ketcher"
+    });
+
+    return NextResponse.json({
+      blockId: body.blockId,
+      smiles: normalized.canonicalSmiles,
+      molfile: normalized.normalizedMolfile,
+      warnings: normalized.warnings
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "save structure failed";
+    return NextResponse.json({ message }, { status: 502 });
+  }
+};

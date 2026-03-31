@@ -1,10 +1,14 @@
 import React, { useState } from "react";
+import { useEffect } from "react";
+
+import { useRenderedPreview } from "../../chem-preview/hooks/useRenderedPreview";
 
 interface PreviewShellProps {
   html: string;
   json: string;
   docxBridge: string;
   source: string;
+  onEditMolecule?: (blockId: string, smiles: string) => void;
 }
 
 type OutputTab = "preview" | "json" | "docxBridge";
@@ -61,6 +65,20 @@ const PREVIEW_FRAME_STYLE = `
     overflow: hidden;
   }
   .chemd-graphic svg { width: 100%; height: auto; }
+  .chemd-edit-structure {
+    display: inline-flex;
+    min-height: 1.8rem;
+    align-items: center;
+    justify-content: center;
+    margin: 0 0 0.5rem;
+    padding: 0 0.6rem;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    border-radius: 7px;
+    background: #fff;
+    color: #1e293b;
+    font-size: 0.76rem;
+    cursor: pointer;
+  }
   .chem-inline {
     display: inline-block;
     padding: 0.05rem 0.38rem;
@@ -71,8 +89,7 @@ const PREVIEW_FRAME_STYLE = `
   }
 `;
 
-const toSandboxedSrcDoc = (html: string): string =>
-  `<!doctype html><html><head><meta charset="utf-8" /><style>${PREVIEW_FRAME_STYLE}</style></head><body>${html}</body></html>`;
+const toSandboxedSrcDoc = (html: string): string => `<!doctype html><html><head><meta charset="utf-8" /><style>${PREVIEW_FRAME_STYLE}</style></head><body>${html}</body></html>`;
 
 const parseFileNameFromContentDisposition = (value: string | null): string | undefined => {
   if (!value) {
@@ -92,10 +109,33 @@ const parseFileNameFromContentDisposition = (value: string | null): string | und
   }
 };
 
-const PreviewShell = ({ html, json, docxBridge, source }: PreviewShellProps) => {
+const PreviewShell = ({ html, json, docxBridge, source, onEditMolecule }: PreviewShellProps) => {
   const [activeTab, setActiveTab] = useState<OutputTab>("preview");
   const [exportingDocx, setExportingDocx] = useState(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const { hydratedHtml } = useRenderedPreview(html);
+
+  useEffect(() => {
+    if (!onEditMolecule) {
+      return undefined;
+    }
+
+    const handlePreviewMessage = (event: MessageEvent) => {
+      if (event.origin !== "null") {
+        return;
+      }
+      const payload = event.data as { type?: string; blockId?: string; smiles?: string };
+      if (payload?.type !== "chemd:edit-molecule" || !payload.blockId) {
+        return;
+      }
+      onEditMolecule(payload.blockId, payload.smiles ?? "");
+    };
+
+    window.addEventListener("message", handlePreviewMessage);
+    return () => {
+      window.removeEventListener("message", handlePreviewMessage);
+    };
+  }, [onEditMolecule]);
 
   const handleExportDocx = async () => {
     setExportingDocx(true);
@@ -188,14 +228,14 @@ const PreviewShell = ({ html, json, docxBridge, source }: PreviewShellProps) => 
       <div className="detail-card min-h-0 flex-1">
         {activeTab === "preview" ? (
           <div className="detail-card-body preview-canvas h-full">
-            <iframe
-              title="chemd-preview"
-              sandbox="allow-popups"
-              referrerPolicy="no-referrer"
-              className="preview-frame"
-              srcDoc={toSandboxedSrcDoc(html)}
-            />
-          </div>
+             <iframe
+               title="chemd-preview"
+               sandbox="allow-popups allow-scripts"
+               referrerPolicy="no-referrer"
+               className="preview-frame"
+               srcDoc={toSandboxedSrcDoc(hydratedHtml)}
+             />
+           </div>
         ) : (
           <div className="detail-card-body h-full">
             <div className="code-surface h-full">
@@ -211,4 +251,3 @@ const PreviewShell = ({ html, json, docxBridge, source }: PreviewShellProps) => 
 };
 
 export default PreviewShell;
-

@@ -13,6 +13,7 @@ describe("Page", () => {
     expect(html).toContain("JSON");
     expect(html).toContain("DOCX");
     expect(html).toContain("Export");
+    expect(html).toContain("OCR Image");
     expect(html).toContain("YAML publication-acs");
     expect(html).toContain("chemd-source-editor");
     expect(html).toContain("chem-inline");

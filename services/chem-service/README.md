@@ -1,15 +1,16 @@
 # chem-service
 
-Python service placeholder for future `MolScribe + RDKit` integration.
+MVP chemistry HTTP service used by `apps/web` through `/api/chem/*`.
 
-Current scope:
+Current routes:
 
-- Repository skeleton
-- Ruff configuration
-- Minimal Python module for quality-gate validation
+- `GET /healthz`
+- `POST /ocr` (MolScribe fallback response)
+- `POST /normalize` (RDKit fallback response)
+- `POST /render` (SVG fallback response)
+- `GET|POST /structure` (in-memory structure cache, 5 minute TTL)
 
-Future scope:
+Notes:
 
-- OCR routes
-- Normalize routes
-- Render routes
+- This service currently returns safe fallback outputs when MolScribe/RDKit runtime is unavailable.
+- The Next.js app still uses these routes end-to-end for OCR/normalize/render/cache orchestration.
