@@ -1,10 +1,6 @@
 import {
   createDocument,
-  createInlineChemToken,
-  createInlineCodeToken,
   createMarkdownNode,
-  createMarkdownLinkToken,
-  createReferenceToken,
   isKnownRenderOverridePath,
   isRenderOverridePathFormat,
   isValidRenderOverrideValue,
@@ -13,13 +9,8 @@ import {
   type ChemdMeta,
   type ChemdNode,
   type Diagnostic,
-  type InlineChemToken,
-  type InlineCodeToken,
-  type MarkdownLinkToken,
   type MoleculeNode,
   type ReactionNode,
-  type ReferenceKind,
-  type ReferenceToken,
   type RenderSelection,
   type ResultNode,
   type SampleNode,
@@ -28,6 +19,10 @@ import {
   type UseNode
 } from "@chemd/core";
 import { LineCounter, isMap, isScalar, isSeq, parseDocument } from "yaml";
+import { tokenizeInlineChem } from "./inline/tokenize-inline-chem";
+import { tokenizeInlineCode } from "./inline/tokenize-inline-code";
+import { tokenizeMarkdownLinks } from "./inline/tokenize-markdown-links";
+import { tokenizeReferences } from "./inline/tokenize-references";
 
 const DEFAULT_META: ChemdMeta = {
   id: "draft-document",
@@ -55,11 +50,6 @@ const isValidIsoDateValue = (value: string): boolean => {
 const BLOCK_START_PATTERN = /^:::(\w+)(?:\s+(.*))?$/;
 const KEY_VALUE_PATTERN = /^([a-z][a-z0-9_]*):\s*(.*)$/;
 const ID_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
-const REFERENCE_PATTERN = /@([a-zA-Z][a-zA-Z0-9_-]*)(?:\.([a-zA-Z][a-zA-Z0-9_-]*))?/g;
-const INLINE_CHEM_VALUE_PATTERN = /:chem\[([^\]\r\n]+)\]/g;
-const INLINE_CODE_VALUE_PATTERN = /`([^`\r\n]+)`/g;
-const MARKDOWN_LINK_PATTERN = /\[([^\]\r\n]+)\]\(((?:[^()\r\n]|\([^()\r\n]*\))+?)\)/g;
-const ALIAS_NAMES = new Set(["reaction", "result", "product", "sample"]);
 const LIST_FIELDS = new Set(["reactants", "products", "params"]);
 const BLOCK_FIELDS: Record<string, Set<string>> = {
   molecule: new Set(["smiles", "name", "role", "caption", "formula", "amount", "equivalents"]),
@@ -771,52 +761,6 @@ const parseFrontmatter = (
   };
 };
 
-const getOffsetLineColumn = (value: string, offset: number): { line: number; column: number } => {
-  let line = 1;
-  let lineStart = 0;
-
-  for (let index = 0; index < offset; index += 1) {
-    if (value.charCodeAt(index) === 10) {
-      line += 1;
-      lineStart = index + 1;
-    }
-  }
-
-  return {
-    line,
-    column: offset - lineStart + 1
-  };
-};
-
-const getMatchSpan = (
-  value: string,
-  match: RegExpMatchArray
-): {
-  start?: number;
-  end?: number;
-  startLine?: number;
-  startColumn?: number;
-  endLine?: number;
-  endColumn?: number;
-} => {
-  if (typeof match.index !== "number") {
-    return {};
-  }
-
-  const start = match.index;
-  const end = start + match[0].length;
-  const startLocation = getOffsetLineColumn(value, start);
-  const endLocation = getOffsetLineColumn(value, end);
-
-  return {
-    start,
-    end,
-    startLine: startLocation.line,
-    startColumn: startLocation.column,
-    endLine: endLocation.line,
-    endColumn: endLocation.column
-  };
-};
 const splitListValue = (field: string, value: string, diagnostics: Diagnostic[]): string[] => {
   const parts = value.split("|");
   const items: string[] = [];
@@ -839,133 +783,6 @@ const splitListValue = (field: string, value: string, diagnostics: Diagnostic[])
   return items;
 };
 
-const tokenizeReferences = (value: string): ReferenceToken[] => {
-  const references: ReferenceToken[] = [];
-
-  for (const match of value.matchAll(REFERENCE_PATTERN)) {
-    const source = match[1];
-    const field = match[2];
-    let kind: ReferenceKind;
-
-    if (source === "meta" && field) {
-      kind = "meta";
-    } else if (source === "param" && field) {
-      kind = "param_field";
-    } else if (field && ALIAS_NAMES.has(source)) {
-      kind = "alias_field";
-    } else if (field) {
-      kind = "object_field";
-    } else {
-      kind = "object";
-    }
-
-    references.push(
-      createReferenceToken({
-        kind,
-        raw: match[0],
-        source,
-        field,
-        ...getMatchSpan(value, match)
-      })
-    );
-  }
-
-  return references;
-};
-
-const tokenizeInlineChem = (value: string): InlineChemToken[] => {
-  const tokens: InlineChemToken[] = [];
-
-  for (const match of value.matchAll(INLINE_CHEM_VALUE_PATTERN)) {
-    tokens.push(
-      createInlineChemToken({
-        raw: match[0],
-        value: match[1],
-        ...getMatchSpan(value, match)
-      })
-    );
-  }
-
-  return tokens;
-};
-
-const hasControlCharacters = (value: string): boolean =>
-  Array.from(value).some((char) => {
-    const code = char.charCodeAt(0);
-    return code < 32 || code === 127;
-  });
-
-const isSafeMarkdownHref = (href: string): boolean => {
-  const trimmed = href.trim();
-
-  if (!trimmed || hasControlCharacters(trimmed)) {
-    return false;
-  }
-
-  if (
-    trimmed.startsWith("#") ||
-    trimmed.startsWith("/") ||
-    trimmed.startsWith("./") ||
-    trimmed.startsWith("../")
-  ) {
-    return true;
-  }
-
-  const schemeMatch = trimmed.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):/);
-
-  if (!schemeMatch) {
-    return true;
-  }
-
-  const scheme = schemeMatch[1].toLowerCase();
-
-  return ["http", "https", "mailto"].includes(scheme);
-};
-
-const tokenizeInlineCode = (value: string): InlineCodeToken[] => {
-  const tokens: InlineCodeToken[] = [];
-
-  for (const match of value.matchAll(INLINE_CODE_VALUE_PATTERN)) {
-    tokens.push(
-      createInlineCodeToken({
-        raw: match[0],
-        value: match[1],
-        ...getMatchSpan(value, match)
-      })
-    );
-  }
-
-  return tokens;
-};
-
-const tokenizeMarkdownLinks = (value: string, diagnostics: Diagnostic[]): MarkdownLinkToken[] => {
-  const tokens: MarkdownLinkToken[] = [];
-
-  for (const match of value.matchAll(MARKDOWN_LINK_PATTERN)) {
-    const href = match[2].trim();
-    const safe = isSafeMarkdownHref(href);
-
-    if (!safe) {
-      diagnostics.push({
-        code: "W_UNSAFE_LINK_HREF",
-        severity: "warning",
-        message: `Unsafe markdown link href: ${href}`
-      });
-    }
-
-    tokens.push(
-      createMarkdownLinkToken({
-        raw: match[0],
-        label: match[1],
-        href,
-        safe,
-        ...getMatchSpan(value, match)
-      })
-    );
-  }
-
-  return tokens;
-};
 const parseKeyValueLines = (
   blockType: string,
   lines: string[],
@@ -1199,7 +1016,6 @@ export const parseChemd = (source: string) => {
     renderSelection: parsed.renderSelection
   });
 };
-
 
 
 
