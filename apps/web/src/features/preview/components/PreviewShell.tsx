@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useDocxExport } from "../../export-docx/hooks/useDocxExport";
 
 interface PreviewShellProps {
   html: string;
@@ -74,70 +75,11 @@ const PREVIEW_FRAME_STYLE = `
 const toSandboxedSrcDoc = (html: string): string =>
   `<!doctype html><html><head><meta charset="utf-8" /><style>${PREVIEW_FRAME_STYLE}</style></head><body>${html}</body></html>`;
 
-const parseFileNameFromContentDisposition = (value: string | null): string | undefined => {
-  if (!value) {
-    return undefined;
-  }
-
-  const match = value.match(/filename\*?=(?:UTF-8''|")?([^";]+)"?/i);
-  if (!match || !match[1]) {
-    return undefined;
-  }
-
-  const raw = match[1].trim();
-  try {
-    return decodeURIComponent(raw);
-  } catch {
-    return raw;
-  }
-};
-
 const PreviewShell = ({ html, json, docxBridge, source }: PreviewShellProps) => {
   const [activeTab, setActiveTab] = useState<OutputTab>("preview");
-  const [exportingDocx, setExportingDocx] = useState(false);
-  const [exportMessage, setExportMessage] = useState<string | null>(null);
-
-  const handleExportDocx = async () => {
-    setExportingDocx(true);
-    setExportMessage(null);
-
-    try {
-      const response = await fetch("/api/export/docx", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ source })
-      });
-
-      if (!response.ok) {
-        const errorPayload = (await response.json().catch(() => ({}))) as { message?: string };
-        throw new Error(errorPayload.message ?? `DOCX export failed (${response.status})`);
-      }
-
-      const blob = await response.blob();
-      const objectUrl = URL.createObjectURL(blob);
-      const serverFileName = parseFileNameFromContentDisposition(
-        response.headers.get("Content-Disposition")
-      );
-      const anchor = document.createElement("a");
-      anchor.href = objectUrl;
-      if (serverFileName) {
-        anchor.download = serverFileName;
-      }
-      globalThis.document.body.append(anchor);
-      anchor.click();
-      anchor.remove();
-      setTimeout(() => {
-        URL.revokeObjectURL(objectUrl);
-      }, 60000);
-      setExportMessage("DOCX export downloaded.");
-    } catch (error) {
-      setExportMessage(error instanceof Error ? error.message : "DOCX export failed");
-    } finally {
-      setExportingDocx(false);
-    }
-  };
+  const { exportingDocx, exportMessage, exportDocx } = useDocxExport({
+    payload: { source }
+  });
 
   const activeCode = activeTab === "json" ? json : docxBridge;
 
@@ -175,7 +117,7 @@ const PreviewShell = ({ html, json, docxBridge, source }: PreviewShellProps) => 
         </div>
         <button
           type="button"
-          onClick={handleExportDocx}
+          onClick={exportDocx}
           disabled={exportingDocx}
           className="button-primary"
         >
@@ -211,4 +153,3 @@ const PreviewShell = ({ html, json, docxBridge, source }: PreviewShellProps) => 
 };
 
 export default PreviewShell;
-

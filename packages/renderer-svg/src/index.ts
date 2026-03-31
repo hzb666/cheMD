@@ -277,20 +277,20 @@ const sanitizeAdapterOptions = (
 
   const candidate = unsafeOptions as LooseRecord;
   const next: SvgAdapterOptions = {
-    fixedBondLength: normalizeNumber(candidate.fixedBondLength, fallback.fixedBondLength, 4, 120),
-    bondLineWidth: normalizeNumber(candidate.bondLineWidth, fallback.bondLineWidth, 0.6, 8),
-    multipleBondOffset: normalizeNumber(candidate.multipleBondOffset, fallback.multipleBondOffset, 0, 0.8),
-    hashSpacing: normalizeNumber(candidate.hashSpacing, fallback.hashSpacing, 0.5, 8),
-    fixedFontSize: normalizeNumber(candidate.fixedFontSize, fallback.fixedFontSize, 6, 36),
-    atomLabelPadding: normalizeNumber(candidate.atomLabelPadding, fallback.atomLabelPadding, 0, 8),
+    fixedBondLength: normalizeNumber(candidate.fixedBondLength, fallback.fixedBondLength, 4, 80),
+    bondLineWidth: normalizeNumber(candidate.bondLineWidth, fallback.bondLineWidth, 0.6, 6),
+    multipleBondOffset: normalizeNumber(candidate.multipleBondOffset, fallback.multipleBondOffset, 0, 0.5),
+    hashSpacing: normalizeNumber(candidate.hashSpacing, fallback.hashSpacing, 0.5, 6),
+    fixedFontSize: normalizeNumber(candidate.fixedFontSize, fallback.fixedFontSize, 6, 24),
+    atomLabelPadding: normalizeNumber(candidate.atomLabelPadding, fallback.atomLabelPadding, 0, 4),
     monochrome: normalizeBoolean(candidate.monochrome, fallback.monochrome),
     backgroundColor: normalizeColor(candidate.backgroundColor, fallback.backgroundColor),
-    reactionArrowLength: normalizeNumber(candidate.reactionArrowLength, fallback.reactionArrowLength, 24, 240),
-    reactionComponentGap: normalizeNumber(candidate.reactionComponentGap, fallback.reactionComponentGap, 0, 96),
-    reactionPlusGap: normalizeNumber(candidate.reactionPlusGap, fallback.reactionPlusGap, 0, 96),
+    reactionArrowLength: normalizeNumber(candidate.reactionArrowLength, fallback.reactionArrowLength, 24, 180),
+    reactionComponentGap: normalizeNumber(candidate.reactionComponentGap, fallback.reactionComponentGap, 0, 64),
+    reactionPlusGap: normalizeNumber(candidate.reactionPlusGap, fallback.reactionPlusGap, 0, 64),
     showConditionsBelowArrow: normalizeBoolean(candidate.showConditionsBelowArrow, fallback.showConditionsBelowArrow),
     imageFormat: normalizeImageFormat(candidate.imageFormat, fallback.imageFormat),
-    margin: normalizeNumber(candidate.margin, fallback.margin, 0, 96),
+    margin: normalizeNumber(candidate.margin, fallback.margin, 0, 64),
     dpi: normalizeNumber(candidate.dpi, fallback.dpi, 72, 2400),
     transparentBackground: normalizeBoolean(candidate.transparentBackground, fallback.transparentBackground)
   };
@@ -300,7 +300,7 @@ const sanitizeAdapterOptions = (
   }
 
   if (next.bondLineWidth >= next.fixedBondLength) {
-    next.bondLineWidth = clampNumber(next.fixedBondLength * 0.25, 0.6, 8);
+    next.bondLineWidth = clampNumber(next.fixedBondLength * 0.25, 0.6, 6);
   }
 
   const maxAtomLabelPadding = next.fixedFontSize * 0.5;
