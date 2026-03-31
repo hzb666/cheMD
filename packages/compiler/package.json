@@ -1,0 +1,27 @@
+{
+  "name": "@chemd/compiler",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./node": {
+      "node": "./src/node.ts",
+      "default": "./src/node.ts"
+    }
+  },
+  "dependencies": {
+    "@chemd/core": "workspace:*",
+    "@chemd/parser": "workspace:*",
+    "@chemd/render-profile": "workspace:*",
+    "@chemd/renderer-html": "workspace:*",
+    "@chemd/renderer-docx": "workspace:*",
+    "@chemd/renderer-json": "workspace:*",
+    "@chemd/resolver": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --pool=threads",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

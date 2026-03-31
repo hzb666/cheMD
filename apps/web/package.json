@@ -1,0 +1,22 @@
+{
+  "name": "@chemd/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "next build",
+    "dev": "next dev --port 2436",
+    "test": "vitest run --pool=threads",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@chemd/compiler": "workspace:*",
+    "@chemd/core": "workspace:*",
+    "@chemd/render-profile": "workspace:*",
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}
+
+

@@ -1,0 +1,10 @@
+node_modules
+.turbo
+.next
+coverage
+dist
+tmp
+*.tsbuildinfo
+.ruff_cache
+.venv
+__pycache__
