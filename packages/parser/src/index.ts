@@ -13,23 +13,3 @@ export const parseChemd = (source: string) => {
     renderSelection: parsed.renderSelection
   });
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { MarkdownNode, ReactionNode, ResultNode, TemplateNode, UseNode } from "@chemd/core";
+import type { ColNode, MarkdownNode, MoleculeNode, ReactionNode, ResultNode, TemplateNode, UseNode } from "@chemd/core";
 
 import { parseChemd } from "../src";
 
@@ -272,6 +272,32 @@ Outro line.
     expect(template?.body[0]).toMatchObject({ type: "markdown", value: "Intro line." });
     expect(template?.body[1]).toMatchObject({ type: "use", template: "child-summary", values: { note: "nested run" } });
     expect(template?.body[2]).toMatchObject({ type: "markdown", value: "Outro line." });
+  });
+
+  it("parses col-x blocks with nested brace components", () => {
+    const source = `---
+id: exp-col-layout
+title: Col Layout Test
+date: 2026-03-30
+---
+
+:::col-2
+col: {:::mol
+smiles: CCO
+name: Ethanol
+:::}
+col: 63%
+:::`;
+
+    const doc = parseChemd(source);
+    const col = doc.children.find((child): child is ColNode => child.type === "col");
+    const molecule = col?.children.find((child): child is MoleculeNode => child.type === "molecule");
+    const textCol = col?.children.find((child): child is MarkdownNode => child.type === "markdown");
+
+    expect(col?.columns).toBe(2);
+    expect(col?.children).toHaveLength(2);
+    expect(molecule).toMatchObject({ type: "molecule", smiles: "CCO", name: "Ethanol" });
+    expect(textCol?.value).toBe("63%");
   });
 
   it("parses inline chemistry and emits parser diagnostics for invalid fields and list items", () => {
@@ -822,6 +848,5 @@ Body.`;
     expect(nestedStructure?.position?.start.line).toBe(6);
   });
 });
-
 
 
