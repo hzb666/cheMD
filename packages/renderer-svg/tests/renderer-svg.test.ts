@@ -214,6 +214,25 @@ describe("renderReactionSvg", () => {
     expect(svg).toContain('x="344" y="86"');
   });
 
+  it("clamps adapter arrow length to render-profile max range", () => {
+    const options = resolveRenderProfile({ profileId: "eln-default" });
+    const adapterPayload = mapRenderOptionsToAdapterPayload(options);
+    adapterPayload.rdkit.reactionArrowLength = 240;
+
+    const svg = renderReactionSvg(
+      {
+        type: "reaction",
+        id: "rxn-arrow-clamped",
+        reactants: ["A"],
+        products: ["B"]
+      },
+      options,
+      adapterPayload
+    );
+
+    expect(svg).toContain('x2="440"');
+  });
+
   it("renders reaction side fragments with plus separators for multiple species", () => {
     const svg = renderReactionSvg(
       {
