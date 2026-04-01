@@ -17,6 +17,9 @@ describe("Page", () => {
     expect(html).toContain("Export");
     expect(html).toContain("OCR Image");
     expect(html).toContain("YAML publication-acs");
+    expect(html).toContain("panel-heading-inline");
+    expect(html).toContain("tab-strip-container");
+    expect(html).toContain("tab-indicator");
     expect(html).toContain("chemd-source-editor");
     expect(html).toContain("chem-inline");
     expect(html).toContain("chemd-block--reaction");

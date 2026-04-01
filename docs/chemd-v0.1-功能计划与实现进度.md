@@ -350,6 +350,12 @@
 - 这使多行值策略从“仅拒绝 `|` / `>` block scalar”进一步收口为“普通 meta 一律单行标量”。
 - 已补 parser 测试，覆盖隐式多行 scalar 被拒绝且后续键继续解析的路径。
 
+41. 训练数据导出最小主链路（exporter-training）
+- 已新增 `@chemd/exporter-training` 包，按 `chemd-v0.1-training-export-plan` 落地阶段 0/1 的最小实现。
+- 已补齐 v0.1 顶层 schema 与分层类型定义，并实现 `exportTrainingRecordFromDocument` 主 API。
+- 已实现 `source_layer` 快照透传、`semantic_layer` 基础实体映射（含稳定 `entity_id` 与 primary relation）和 `quality_layer.parse_quality`。
+- 已新增 exporter 测试，覆盖最小成功导出链路与 diagnostics 透传/计数行为。
+
 ---
 
 ## 5. 下一阶段建议
@@ -390,7 +396,6 @@
 当前结论：
 
 **项目已具备继续推进 `v0.1 规范收口阶段` 的稳定基础。当前 `优先级 A` 与 `优先级 D` 的一部分已继续推进：frontmatter contract 已进一步收口，Web 已补去抖低优先级重编译与 DOCX 导出接口硬化，下一步可继续补齐更完整 Markdown AST 与更真实化学渲染。**
-
 
 
 

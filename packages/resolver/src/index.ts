@@ -30,6 +30,18 @@ const MAX_TEMPLATE_EXPANDED_NODES = 2000;
 const isObjectNode = (node: ChemdNode): node is ObjectNode =>
   ["molecule", "reaction", "result", "analysis", "sample"].includes(node.type);
 
+const getNestedNodes = (node: ChemdNode): ChemdNode[] => {
+  if (node.type === "col") {
+    return node.children;
+  }
+
+  if (node.type === "template") {
+    return node.body;
+  }
+
+  return [];
+};
+
 const readNodeField = (node: unknown, field: string): unknown => {
   if (!node || typeof node !== "object") {
     return undefined;
@@ -56,9 +68,14 @@ const getIndexedValue = <TValue>(
 
 const buildObjectIndex = (children: ChemdNode[], diagnostics: Diagnostic[]): Record<string, ObjectNode> => {
   const index: Record<string, ObjectNode> = Object.create(null) as Record<string, ObjectNode>;
+  const queue = [...children];
+  let cursor = 0;
 
-  for (const child of children) {
+  while (cursor < queue.length) {
+    const child = queue[cursor];
+    cursor += 1;
     if (!isObjectNode(child) || !child.id) {
+      queue.push(...getNestedNodes(child));
       continue;
     }
 
@@ -69,10 +86,12 @@ const buildObjectIndex = (children: ChemdNode[], diagnostics: Diagnostic[]): Rec
         message: `Duplicate object id: ${child.id}`,
         nodeId: child.id
       });
+      queue.push(...getNestedNodes(child));
       continue;
     }
 
     index[child.id] = child;
+    queue.push(...getNestedNodes(child));
   }
 
   return index;
@@ -102,7 +121,14 @@ const buildTemplateIndex = (children: ChemdNode[], diagnostics: Diagnostic[]): R
 };
 
 const validateNodes = (children: ChemdNode[], diagnostics: Diagnostic[]) => {
-  for (const child of children) {
+  const queue = [...children];
+  let cursor = 0;
+
+  while (cursor < queue.length) {
+    const child = queue[cursor];
+    cursor += 1;
+    queue.push(...getNestedNodes(child));
+
     if (!isObjectNode(child)) {
       continue;
     }
@@ -363,6 +389,17 @@ const resolveTemplateDefinition = (
       return resolveTemplateDefinition(child, document, objectIndex, diagnostics);
     }
 
+    if (child.type === "col") {
+      return {
+        ...child,
+        children: child.children.map((nested) =>
+          nested.type === "markdown"
+            ? resolveMarkdownNode(nested, document, objectIndex, diagnostics, createContext({ template: node }))
+            : nested
+        )
+      };
+    }
+
     return child;
   })
 });
@@ -421,6 +458,19 @@ const expandTemplateChild = (
     }
 
     return [resolveTemplateDefinition(child, document, objectIndex, diagnostics)];
+  }
+
+  if (child.type === "col") {
+    if (!consumeExpansionSlot(diagnostics, guard)) {
+      return [];
+    }
+
+    return [{
+      ...child,
+      children: child.children.flatMap((nested) =>
+        expandTemplateChild(nested, document, objectIndex, templateIndex, diagnostics, context, guard)
+      )
+    }];
   }
 
   if (!consumeExpansionSlot(diagnostics, guard)) {
@@ -498,6 +548,15 @@ const resolveNode = (
 
   if (node.type === "use") {
     return expandUseNode(node, document, objectIndex, templateIndex, diagnostics, guard);
+  }
+
+  if (node.type === "col") {
+    return [{
+      ...node,
+      children: node.children.flatMap((child) =>
+        resolveNode(child, document, objectIndex, templateIndex, diagnostics, guard)
+      )
+    }];
   }
 
   return [node];
