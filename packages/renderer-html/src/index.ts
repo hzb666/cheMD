@@ -2,6 +2,7 @@ import type {
   AnalysisNode,
   ChemdDocument,
   ChemdNode,
+  ColNode,
   MarkdownNode,
   MoleculeNode,
   ReactionNode,
@@ -937,6 +938,24 @@ const renderTemplate = (node: TemplateNode): string =>
     ])}
   </section>`;
 
+const renderCol = (
+  node: ColNode,
+  options: RenderOptions,
+  adapterPayload: RenderAdapterPayload
+): string => {
+  const columns = Math.max(1, node.columns);
+  const items = node.children
+    .map(
+      (child) =>
+        `<div class="chemd-col-item">${renderNode(child, options, adapterPayload)}</div>`
+    )
+    .join("");
+
+  return `<section class="chemd-block chemd-block--col" data-columns="${columns}">
+    <div class="chemd-col-grid" style="--chemd-col-columns:${columns}">${items}</div>
+  </section>`;
+};
+
 const renderNode = (
   node: ChemdNode,
   options: RenderOptions,
@@ -957,6 +976,8 @@ const renderNode = (
       return renderSample(node);
     case "template":
       return renderTemplate(node);
+    case "col":
+      return renderCol(node, options, adapterPayload);
     default:
       return "";
   }
@@ -987,7 +1008,6 @@ export const renderHtml = (
     `</article>`
   ].join("");
 };
-
 
 
 

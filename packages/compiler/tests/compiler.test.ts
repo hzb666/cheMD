@@ -194,6 +194,30 @@ Body.`;
     expect(result.diagnostics.some((diagnostic) => diagnostic.code === "W_UNKNOWN_RENDER_PROFILE_FIELD")).toBe(false);
   });
 
+  it("compiles col-x layout with nested mol block", () => {
+    const source = `---
+id: exp-compile-col
+title: Compile Col Test
+date: 2026-03-30
+---
+
+:::col-2
+col: {:::mol
+smiles: CCO
+name: Ethanol
+:::}
+col: 63%
+:::`;
+
+    const result = compileChemd(source);
+
+    expect(result.document.children.some((child) => child.type === "col")).toBe(true);
+    expect(result.html).toContain('class="chemd-block chemd-block--col"');
+    expect(result.html).toContain('data-columns="2"');
+    expect(result.html).toContain("Ethanol");
+    expect(result.html).toContain(">63%<");
+  });
+
   it("renders markdown blockquote and code fence correctly in compile output", () => {
     const source = `---
 id: exp-compile-markdown
@@ -379,7 +403,6 @@ temperature: 200 °C
     expect(payload.exportHints.pipeline).toBe("html-or-markdown-to-docx");
   });
 });
-
 
 
 
