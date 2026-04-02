@@ -17,6 +17,7 @@ render_profile: publication-acs
 :::reaction #rxn-main
 reactants: CCO | O=O
 products: CC(=O)O
+conditions: Cu catalyst | air | 80 C | 4 h
 temperature: 200 °C
 time: 4 h
 :::
@@ -39,6 +40,7 @@ Yield: @res-main.yield and :chem[H2O]`;
     expect(result.html).toContain("chem-inline");
     expect(result.html).toContain("<svg");
     expect(result.html).toContain("chemd-svg chemd-svg--reaction");
+    expect(result.html).toContain("Cu catalyst | air | 80 C | 4 h");
     const payload = JSON.parse(result.json) as {
       render: {
         profileId: string;
@@ -192,6 +194,30 @@ Body.`;
       })
     );
     expect(result.diagnostics.some((diagnostic) => diagnostic.code === "W_UNKNOWN_RENDER_PROFILE_FIELD")).toBe(false);
+  });
+
+  it("compiles col-x layout with nested mol block", () => {
+    const source = `---
+id: exp-compile-col
+title: Compile Col Test
+date: 2026-03-30
+---
+
+:::col-2
+col: {:::mol
+smiles: CCO
+name: Ethanol
+:::}
+col: 63%
+:::`;
+
+    const result = compileChemd(source);
+
+    expect(result.document.children.some((child) => child.type === "col")).toBe(true);
+    expect(result.html).toContain('class="chemd-block chemd-block--col"');
+    expect(result.html).toContain('data-columns="2"');
+    expect(result.html).toContain("Ethanol");
+    expect(result.html).toContain(">63%<");
   });
 
   it("renders markdown blockquote and code fence correctly in compile output", () => {
@@ -378,8 +404,26 @@ temperature: 200 °C
     expect(payload.document.meta.title).toBe("DOCX Handoff");
     expect(payload.exportHints.pipeline).toBe("html-or-markdown-to-docx");
   });
-});
 
+  it("keeps reaction conditions through compile output", () => {
+    const source = `---
+id: exp-compile-conditions
+title: Compile Conditions Test
+date: 2026-04-02
+---
+
+:::reaction #rxn-main
+reactants: CCO
+products: CC(=O)O
+conditions: Cu catalyst | air | 80 C | 4 h
+:::`;
+
+    const result = compileChemd(source);
+
+    expect(result.html).toContain("Conditions");
+    expect(result.html).toContain("Cu catalyst | air | 80 C | 4 h");
+  });
+});
 
 
 

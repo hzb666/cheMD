@@ -8,3 +8,9 @@ tmp
 .ruff_cache
 .venv
 __pycache__
+.env
+.env.*
+.history
+.playwright-mcp
+**/test/
+**/tests/

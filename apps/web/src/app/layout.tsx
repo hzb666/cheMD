@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import "./globals.css";
+import "../features/playground/styles/playground.css";
 
 export const metadata: Metadata = {
   title: "chemd",

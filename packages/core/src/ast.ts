@@ -88,6 +88,7 @@ export interface ReactionNode {
   id?: string;
   reactants?: string[];
   products?: string[];
+  conditions?: string[];
   name?: string;
   reagents?: string;
   catalyst?: string;
@@ -144,6 +145,12 @@ export interface UseNode {
   values: Record<string, string>;
 }
 
+export interface ColNode {
+  type: "col";
+  columns: number;
+  children: ChemdNode[];
+}
+
 export interface TemplateNode {
   type: "template";
   name: string;
@@ -160,7 +167,8 @@ export type StructuredNode =
   | AnalysisNode
   | SampleNode
   | TemplateNode
-  | UseNode;
+  | UseNode
+  | ColNode;
 
 export type ObjectNode = MoleculeNode | ReactionNode | ResultNode | AnalysisNode | SampleNode;
 

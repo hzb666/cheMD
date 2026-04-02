@@ -20,7 +20,9 @@ const PRIMARY_ALIAS_FIELDS: Record<string, string> = {
   reaction: "primary_reaction",
   result: "primary_result",
   product: "primary_product",
-  sample: "primary_sample"
+  sample: "primary_sample",
+  molecule: "primary_molecule",
+  analysis: "primary_analysis"
 };
 
 const PRIMARY_META_FIELDS = Object.values(PRIMARY_ALIAS_FIELDS);
@@ -29,6 +31,14 @@ const MAX_TEMPLATE_EXPANDED_NODES = 2000;
 
 const isObjectNode = (node: ChemdNode): node is ObjectNode =>
   ["molecule", "reaction", "result", "analysis", "sample"].includes(node.type);
+
+const getNestedNodes = (node: ChemdNode): ChemdNode[] => {
+  if (node.type === "col") {
+    return node.children;
+  }
+
+  return [];
+};
 
 const readNodeField = (node: unknown, field: string): unknown => {
   if (!node || typeof node !== "object") {
@@ -54,25 +64,35 @@ const getIndexedValue = <TValue>(
   key: string
 ): TValue | undefined => (hasOwn(record, key) ? record[key] : undefined);
 
-const buildObjectIndex = (children: ChemdNode[], diagnostics: Diagnostic[]): Record<string, ObjectNode> => {
+const buildObjectIndex = (
+  children: ChemdNode[],
+  diagnostics?: Diagnostic[]
+): Record<string, ObjectNode> => {
   const index: Record<string, ObjectNode> = Object.create(null) as Record<string, ObjectNode>;
+  const queue = [...children];
+  let cursor = 0;
 
-  for (const child of children) {
+  while (cursor < queue.length) {
+    const child = queue[cursor];
+    cursor += 1;
     if (!isObjectNode(child) || !child.id) {
+      queue.push(...getNestedNodes(child));
       continue;
     }
 
     if (hasOwn(index, child.id)) {
-      diagnostics.push({
+      diagnostics?.push({
         code: "E_DUPLICATE_ID",
         severity: "error",
         message: `Duplicate object id: ${child.id}`,
         nodeId: child.id
       });
+      queue.push(...getNestedNodes(child));
       continue;
     }
 
     index[child.id] = child;
+    queue.push(...getNestedNodes(child));
   }
 
   return index;
@@ -102,7 +122,14 @@ const buildTemplateIndex = (children: ChemdNode[], diagnostics: Diagnostic[]): R
 };
 
 const validateNodes = (children: ChemdNode[], diagnostics: Diagnostic[]) => {
-  for (const child of children) {
+  const queue = [...children];
+  let cursor = 0;
+
+  while (cursor < queue.length) {
+    const child = queue[cursor];
+    cursor += 1;
+    queue.push(...getNestedNodes(child));
+
     if (!isObjectNode(child)) {
       continue;
     }
@@ -347,25 +374,49 @@ const resolveMarkdownNode = (
   references: node.references.map((token) => resolveReference(token, document, objectIndex, diagnostics, context))
 });
 
-const resolveTemplateDefinition = (
-  node: TemplateNode,
-  document: ChemdDocument,
-  objectIndex: Record<string, ObjectNode>,
-  diagnostics: Diagnostic[]
-): TemplateNode => ({
-  ...node,
-  body: node.body.map((child) => {
-    if (child.type === "markdown") {
-      return resolveMarkdownNode(child, document, objectIndex, diagnostics, createContext({ template: node }));
-    }
+const cloneNode = (node: ChemdNode): ChemdNode => {
+  if (node.type === "markdown") {
+    return {
+      ...node,
+      references: node.references.map((token) => ({ ...token })),
+      inlineChem: node.inlineChem.map((token) => ({ ...token })),
+      inlineCode: node.inlineCode.map((token) => ({ ...token })),
+      links: node.links.map((token) => ({ ...token }))
+    };
+  }
 
-    if (child.type === "template") {
-      return resolveTemplateDefinition(child, document, objectIndex, diagnostics);
-    }
+  if (node.type === "col") {
+    return {
+      ...node,
+      children: node.children.map((child) => cloneNode(child))
+    };
+  }
 
-    return child;
-  })
-});
+  if (node.type === "template") {
+    return {
+      ...node,
+      bind: { ...node.bind },
+      params: [...node.params],
+      body: node.body.map((child) => cloneNode(child) as TemplateNode["body"][number])
+    };
+  }
+
+  if (node.type === "use") {
+    return {
+      ...node,
+      values: { ...node.values }
+    };
+  }
+
+  const cloned = { ...node } as Record<string, unknown>;
+  for (const [key, value] of Object.entries(cloned)) {
+    if (Array.isArray(value)) {
+      cloned[key] = [...value];
+    }
+  }
+
+  return cloned as unknown as ChemdNode;
+};
 
 const reportExpansionLimit = (diagnostics: Diagnostic[], guard: ExpansionGuard, message: string) => {
   if (guard.limitReached) {
@@ -420,14 +471,27 @@ const expandTemplateChild = (
       return [];
     }
 
-    return [resolveTemplateDefinition(child, document, objectIndex, diagnostics)];
+    return [cloneNode(child)];
+  }
+
+  if (child.type === "col") {
+    if (!consumeExpansionSlot(diagnostics, guard)) {
+      return [];
+    }
+
+    return [{
+      ...child,
+      children: child.children.flatMap((nested) =>
+        expandTemplateChild(nested, document, objectIndex, templateIndex, diagnostics, context, guard)
+      )
+    }];
   }
 
   if (!consumeExpansionSlot(diagnostics, guard)) {
     return [];
   }
 
-  return [child];
+  return [cloneNode(child)];
 };
 
 const expandUseNode = (
@@ -493,11 +557,20 @@ const resolveNode = (
   }
 
   if (node.type === "template") {
-    return [resolveTemplateDefinition(node, document, objectIndex, diagnostics)];
+    return [cloneNode(node)];
   }
 
   if (node.type === "use") {
     return expandUseNode(node, document, objectIndex, templateIndex, diagnostics, guard);
+  }
+
+  if (node.type === "col") {
+    return [{
+      ...node,
+      children: node.children.flatMap((child) =>
+        resolveNode(child, document, objectIndex, templateIndex, diagnostics, guard)
+      )
+    }];
   }
 
   return [node];
@@ -505,18 +578,25 @@ const resolveNode = (
 
 export const resolveChemd = (document: ChemdDocument): ChemdDocument => {
   const diagnostics: Diagnostic[] = [...document.diagnostics];
-  const objectIndex = buildObjectIndex(document.children, diagnostics);
   const templateIndex = buildTemplateIndex(document.children, diagnostics);
+  const objectIndex = buildObjectIndex(document.children);
   const expansionGuard: ExpansionGuard = { expandedNodes: 0, limitReached: false };
+  const resolvedChildren = document.children.flatMap((child) =>
+    resolveNode(child, document, objectIndex, templateIndex, diagnostics, expansionGuard)
+  );
+  const resolvedDocument: ChemdDocument = {
+    ...document,
+    children: resolvedChildren
+  };
+  const resolvedObjectIndex = buildObjectIndex(resolvedChildren, diagnostics);
 
-  validateNodes(document.children, diagnostics);
-  validatePrimaryReferences(document, objectIndex, diagnostics);
+  validateNodes(resolvedChildren, diagnostics);
+  validatePrimaryReferences(resolvedDocument, resolvedObjectIndex, diagnostics);
 
   return {
-    ...document,
+    ...resolvedDocument,
     diagnostics,
-    children: document.children.flatMap((child) =>
-      resolveNode(child, document, objectIndex, templateIndex, diagnostics, expansionGuard)
-    )
+    children: resolvedChildren
   };
 };
+

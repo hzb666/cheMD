@@ -126,6 +126,30 @@ note: stable run
     expect(resolved.children.some((child) => child.type === "use")).toBe(false);
   });
 
+  it("does not emit unresolved param diagnostics for template definitions before use expansion", () => {
+    const doc = parseChemd(`---
+id: exp-3a
+title: Template Param Definition Test
+date: 2026-03-30
+---
+
+:::template quick-summary
+params: note
+
+Note: @param.note
+:::
+`);
+
+    const resolved = resolveChemd(doc);
+    const unresolvedParam = resolved.diagnostics.find(
+      (diagnostic) =>
+        diagnostic.code === "W_UNRESOLVED_REFERENCE" &&
+        diagnostic.message.includes("@param.note")
+    );
+
+    expect(unresolvedParam).toBeUndefined();
+  });
+
   it("expands nested use blocks inside template bodies", () => {
     const doc = parseChemd(`---
 id: exp-3b
@@ -270,6 +294,58 @@ Yield duplicate: @result.yield
     ).toBe(false);
   });
 
+  it("does not validate unused template body objects as top-level document objects", () => {
+    const doc = parseChemd(`---
+id: exp-6a
+title: Template Body Scope Test
+date: 2026-03-30
+---
+
+:::template molecule-fragment
+:::molecule #mol-template
+name: Template molecule only
+:::
+:::
+`);
+
+    const resolved = resolveChemd(doc);
+    const missingField = resolved.diagnostics.find((diagnostic) => diagnostic.code === "E_MISSING_REQUIRED_FIELD");
+    const duplicateId = resolved.diagnostics.find((diagnostic) => diagnostic.code === "E_DUPLICATE_ID");
+
+    expect(missingField).toBeUndefined();
+    expect(duplicateId).toBeUndefined();
+  });
+
+  it("reports duplicate ids introduced by repeated template expansion", () => {
+    const doc = parseChemd(`---
+id: exp-6b
+title: Template Expansion Duplicate Id Test
+date: 2026-03-30
+---
+
+:::template molecule-fragment
+:::molecule #mol-template
+smiles: CCO
+:::
+:::
+
+:::use molecule-fragment
+:::
+
+:::use molecule-fragment
+:::
+`);
+
+    const resolved = resolveChemd(doc);
+    const duplicateId = resolved.diagnostics.find(
+      (diagnostic) =>
+        diagnostic.code === "E_DUPLICATE_ID" &&
+        diagnostic.message.includes("mol-template")
+    );
+
+    expect(duplicateId).toBeDefined();
+  });
+
   it("reports template cycles and keeps unrelated content renderable", () => {
     const doc = parseChemd(`---
 id: exp-7
@@ -383,4 +459,112 @@ After expansion.`);
       resolved.children.some((child): child is MarkdownNode => child.type === "markdown" && child.value === "After expansion.")
     ).toBe(true);
   });
+
+  it("resolves nested references inside col blocks", () => {
+    const doc = parseChemd(`---
+id: exp-col-resolve
+title: Col Resolve Test
+date: 2026-03-30
+---
+
+:::result #res-main
+yield: 63%
+:::
+
+:::col-2
+col: Yield
+col: @res-main.yield
+:::
+`);
+
+    const resolved = resolveChemd(doc);
+    const col = resolved.children.find((child) => child.type === "col");
+    const colMarkdown = col?.type === "col"
+      ? col.children.find(
+          (child): child is MarkdownNode => child.type === "markdown" && child.value === "@res-main.yield"
+        )
+      : undefined;
+
+    expect(col?.type).toBe("col");
+    expect(colMarkdown?.references[0]?.resolution).toMatchObject({ status: "resolved", value: "63%" });
+  });
+
+  it("resolves primary molecule and primary analysis aliases inside templates", () => {
+    const doc = parseChemd(`---
+id: exp-new-primary-aliases
+title: New Primary Aliases
+date: 2026-04-02
+primary_molecule: mol-main
+primary_analysis: ana-main
+---
+
+:::molecule #mol-main
+smiles: CCO
+:::
+
+:::analysis #ana-main
+type: 1H NMR
+data: 7.21 (d, 2H)
+:::
+
+:::template quick-summary
+bind: molecule=primary_molecule | analysis=primary_analysis
+
+SMILES: @molecule.smiles
+Data: @analysis.data
+:::
+
+:::use quick-summary
+:::`);
+
+    const resolved = resolveChemd(doc);
+    const expanded = resolved.children.find(
+      (child): child is MarkdownNode => child.type === "markdown" && child.value.includes("SMILES:")
+    );
+
+    expect(expanded?.references[0]?.resolution).toMatchObject({ status: "resolved", value: "CCO" });
+    expect(expanded?.references[1]?.resolution).toMatchObject({
+      status: "resolved",
+      value: "7.21 (d, 2H)"
+    });
+  });
+
+  it("resolves default molecule and analysis aliases from primary frontmatter", () => {
+    const doc = parseChemd(`---
+id: exp-default-primary-aliases
+title: Default Primary Aliases
+date: 2026-04-02
+primary_molecule: mol-main
+primary_analysis: ana-main
+---
+
+:::molecule #mol-main
+smiles: CCO
+:::
+
+:::analysis #ana-main
+type: 1H NMR
+data: 7.21 (d, 2H)
+:::
+
+SMILES: @molecule.smiles
+Data: @analysis.data`);
+
+    const resolved = resolveChemd(doc);
+    const markdown = resolved.children.find(
+      (child): child is MarkdownNode => child.type === "markdown" && child.value.includes("SMILES:")
+    );
+
+    expect(markdown?.references[0]?.resolution).toMatchObject({ status: "resolved", value: "CCO" });
+    expect(markdown?.references[1]?.resolution).toMatchObject({
+      status: "resolved",
+      value: "7.21 (d, 2H)"
+    });
+    expect(
+      resolved.diagnostics.find(
+        (diagnostic) => diagnostic.code === "W_UNRESOLVED_REFERENCE" && diagnostic.message.includes("@molecule.smiles")
+      )
+    ).toBeUndefined();
+  });
 });
+

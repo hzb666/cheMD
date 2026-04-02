@@ -22,7 +22,8 @@
       "@chemd/renderer-json": ["packages/renderer-json/src/index.ts"],
       "@chemd/renderer-docx": ["packages/renderer-docx/src/index.ts"],
       "@chemd/renderer-svg": ["packages/renderer-svg/src/index.ts"],
-      "@chemd/compiler": ["packages/compiler/src/index.ts"]
+      "@chemd/compiler": ["packages/compiler/src/index.ts"],
+      "@chemd/exporter-training": ["packages/exporter-training/src/index.ts"]
     }
   }
 }

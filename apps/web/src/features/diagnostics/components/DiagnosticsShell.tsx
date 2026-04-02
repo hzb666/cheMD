@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import type { Diagnostic } from "@chemd/core";
 import type { RenderOptions } from "@chemd/render-profile";
+import { useDocxExport } from "../../export-docx/hooks/useDocxExport";
 
 interface DiagnosticsShellProps {
   diagnostics: Diagnostic[];
@@ -14,24 +15,6 @@ type InspectTab = "json" | "docxBridge";
 
 const formatBoolean = (value: boolean) => (value ? "true" : "false");
 
-const parseFileNameFromContentDisposition = (value: string | null): string | undefined => {
-  if (!value) {
-    return undefined;
-  }
-
-  const match = value.match(/filename\*?=(?:UTF-8''|")?([^";]+)"?/i);
-  if (!match || !match[1]) {
-    return undefined;
-  }
-
-  const raw = match[1].trim();
-  try {
-    return decodeURIComponent(raw);
-  } catch {
-    return raw;
-  }
-};
-
 export const DiagnosticsShell = ({
   diagnostics,
   json,
@@ -39,54 +22,13 @@ export const DiagnosticsShell = ({
   source,
   renderOptions
 }: DiagnosticsShellProps) => {
-  const [exportingDocx, setExportingDocx] = useState(false);
-  const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<InspectTab>("json");
-
-  const handleExportDocx = async () => {
-    setExportingDocx(true);
-    setExportMessage(null);
-
-    try {
-      const response = await fetch("/api/export/docx", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          source,
-          profileId: renderOptions.profileId
-        })
-      });
-
-      if (!response.ok) {
-        const errorPayload = (await response.json().catch(() => ({}))) as { message?: string };
-        throw new Error(errorPayload.message ?? `DOCX export failed (${response.status})`);
-      }
-
-      const blob = await response.blob();
-      const objectUrl = URL.createObjectURL(blob);
-      const serverFileName = parseFileNameFromContentDisposition(
-        response.headers.get("Content-Disposition")
-      );
-      const anchor = document.createElement("a");
-      anchor.href = objectUrl;
-      if (serverFileName) {
-        anchor.download = serverFileName;
-      }
-      document.body.append(anchor);
-      anchor.click();
-      anchor.remove();
-      setTimeout(() => {
-        URL.revokeObjectURL(objectUrl);
-      }, 60000);
-      setExportMessage("DOCX export downloaded.");
-    } catch (error) {
-      setExportMessage(error instanceof Error ? error.message : "DOCX export failed");
-    } finally {
-      setExportingDocx(false);
+  const { exportingDocx, exportMessage, exportDocx } = useDocxExport({
+    payload: {
+      source,
+      profileId: renderOptions.profileId
     }
-  };
+  });
 
   const activePayload = activeTab === "json" ? json : docxBridge;
 
@@ -121,7 +63,7 @@ export const DiagnosticsShell = ({
           </div>
           <button
             type="button"
-            onClick={handleExportDocx}
+            onClick={exportDocx}
             disabled={exportingDocx}
             className="button-primary"
           >

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { MarkdownNode, ReactionNode, ResultNode, TemplateNode, UseNode } from "@chemd/core";
+import type { ColNode, MarkdownNode, MoleculeNode, ReactionNode, ResultNode, TemplateNode, UseNode } from "@chemd/core";
 
 import { parseChemd } from "../src";
 
@@ -64,6 +64,7 @@ render_profile: publication-acs
 :::reaction #rxn-main
 reactants: CCO | O=O
 products: CC(=O)O
+conditions: Cu catalyst | air | 80 C | 4 h
 temperature: 200 °C
 time: 4 h
 :::
@@ -92,6 +93,7 @@ The isolated yield was @res-main.yield for @meta.project.`;
       id: "rxn-main",
       reactants: ["CCO", "O=O"],
       products: ["CC(=O)O"],
+      conditions: ["Cu catalyst", "air", "80 C", "4 h"],
       temperature: "200 °C",
       time: "4 h"
     });
@@ -274,6 +276,88 @@ Outro line.
     expect(template?.body[2]).toMatchObject({ type: "markdown", value: "Outro line." });
   });
 
+  it("parses col-x blocks with nested brace components", () => {
+    const source = `---
+id: exp-col-layout
+title: Col Layout Test
+date: 2026-03-30
+---
+
+:::col-2
+col: {:::mol
+smiles: CCO
+name: Ethanol
+:::}
+col: 63%
+:::`;
+
+    const doc = parseChemd(source);
+    const col = doc.children.find((child): child is ColNode => child.type === "col");
+    const molecule = col?.children.find((child): child is MoleculeNode => child.type === "molecule");
+    const textCol = col?.children.find((child): child is MarkdownNode => child.type === "markdown");
+
+    expect(col?.columns).toBe(2);
+    expect(col?.children).toHaveLength(2);
+    expect(molecule).toMatchObject({ type: "molecule", smiles: "CCO", name: "Ethanol" });
+    expect(textCol?.value).toBe("63%");
+  });
+
+  it("emits diagnostics for col-x count mismatches and invalid child lines", () => {
+    const source = `---
+id: exp-col-layout-invalid
+title: Col Layout Invalid Test
+date: 2026-03-30
+---
+
+:::col-2
+plain line
+col: 63%
+:::`;
+
+    const doc = parseChemd(source);
+    const invalidLine = doc.diagnostics.find((diagnostic) => diagnostic.code === "W_INVALID_COL_CHILD");
+    const countMismatch = doc.diagnostics.find((diagnostic) => diagnostic.code === "W_COL_COUNT_MISMATCH");
+
+    expect(invalidLine?.message).toContain("plain line");
+    expect(countMismatch?.message).toContain("expected 2");
+  });
+
+  it("emits diagnostics for unterminated structured blocks", () => {
+    const source = `---
+id: exp-unclosed-block
+title: Unterminated Block Test
+date: 2026-03-30
+---
+
+:::reaction #rxn-main
+reactants: CCO | O=O
+products: CC(=O)O`;
+
+    const doc = parseChemd(source);
+    const unterminated = doc.diagnostics.find((diagnostic) => diagnostic.code === "W_UNTERMINATED_BLOCK");
+
+    expect(unterminated?.message).toContain("reaction");
+  });
+
+  it("rejects numeric suffixes on non-col blocks", () => {
+    const source = `---
+id: exp-invalid-block-suffix
+title: Invalid Block Suffix Test
+date: 2026-04-02
+---
+
+:::result-2 #res-main
+yield: 63%
+:::`;
+
+    const doc = parseChemd(source);
+    const unknownBlock = doc.diagnostics.find((diagnostic) => diagnostic.code === "W_UNKNOWN_BLOCK");
+    const resultNode = doc.children.find((child) => child.type === "result");
+
+    expect(unknownBlock?.message).toContain("result-2");
+    expect(resultNode).toBeUndefined();
+  });
+
   it("parses inline chemistry and emits parser diagnostics for invalid fields and list items", () => {
     const source = `---
 id: exp-diagnostics
@@ -301,6 +385,25 @@ Formula: :chem[H2O]`;
     expectTokenSpan(markdown?.value ?? "", markdown?.inlineChem[0] ?? { raw: ":chem[H2O]" });
     expect(unknownField?.message).toContain("bond_length");
     expect(invalidListItem?.message).toContain("reactants");
+  });
+
+  it("parses reaction conditions as a formal list field", () => {
+    const source = `---
+id: exp-reaction-conditions
+title: Reaction Conditions
+date: 2026-04-02
+---
+
+:::reaction #rxn-main
+reactants: CCO
+products: CC(=O)O
+conditions: Cu catalyst | air | 80 C | 4 h
+:::`;
+
+    const doc = parseChemd(source);
+    const reaction = doc.children.find((child): child is ReactionNode => child.type === "reaction");
+
+    expect(reaction?.conditions).toEqual(["Cu catalyst", "air", "80 C", "4 h"]);
   });
 
 
@@ -821,7 +924,60 @@ Body.`;
     expect(nestedList?.position?.start.line).toBe(5);
     expect(nestedStructure?.position?.start.line).toBe(6);
   });
-});
 
+  it("warns on unknown structured fields without leaking them into the parsed node", () => {
+    const source = `---
+id: exp-unknown-field-pruning
+title: Unknown Field Pruning
+date: 2026-04-02
+---
+
+:::reaction #rxn-main
+reactants: CCO
+products: CC=O
+bond_length: 1.5
+:::`;
+
+    const doc = parseChemd(source);
+    const reaction = doc.children.find((child): child is ReactionNode => child.type === "reaction");
+    const unknownField = doc.diagnostics.find((diagnostic) => diagnostic.code === "W_UNKNOWN_FIELD");
+
+    expect(unknownField?.message).toContain("bond_length");
+    expect(reaction).toBeDefined();
+    expect(reaction).not.toHaveProperty("bond_length");
+  });
+
+  it("tokenizes molecule and analysis aliases as alias_field references", () => {
+    const source = `---
+id: exp-new-aliases
+title: New Aliases
+date: 2026-04-02
+primary_molecule: mol-main
+primary_analysis: ana-main
+---
+
+:::template quick-summary
+bind: molecule=primary_molecule | analysis=primary_analysis
+
+SMILES: @molecule.smiles
+Data: @analysis.data
+:::`;
+
+    const doc = parseChemd(source);
+    const template = doc.children.find((child): child is TemplateNode => child.type === "template");
+    const markdown = template?.body.find((child): child is MarkdownNode => child.type === "markdown");
+
+    expect(markdown?.references[0]).toMatchObject({
+      kind: "alias_field",
+      source: "molecule",
+      field: "smiles"
+    });
+    expect(markdown?.references[1]).toMatchObject({
+      kind: "alias_field",
+      source: "analysis",
+      field: "data"
+    });
+  });
+});
 
 
