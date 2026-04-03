@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 
 import { KetcherFrame } from "./KetcherFrame";
+import { useKetcherBridge } from "../hooks/useKetcherBridge";
 import type { KetcherDialogValue } from "../types";
 
 interface KetcherDialogProps {
@@ -13,16 +14,23 @@ interface KetcherDialogProps {
 export const KetcherDialog = ({ open, value, onClose, onSave }: KetcherDialogProps) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [draftSmiles, setDraftSmiles] = useState("");
-
-  const initialSmiles = useMemo(() => value?.smiles ?? "", [value]);
+  const { exportDraft, importDraft } = useKetcherBridge();
+  const initialValue = useMemo<KetcherDialogValue>(
+    () =>
+      importDraft({
+        smiles: value?.smiles ?? "",
+        molfile: value?.molfile
+      }),
+    [importDraft, value]
+  );
+  const [frameValue, setFrameValue] = useState(initialValue);
 
   useEffect(() => {
     if (open) {
-      setDraftSmiles(initialSmiles);
+      setFrameValue(initialValue);
       setError(null);
     }
-  }, [initialSmiles, open]);
+  }, [initialValue, open]);
 
   if (!open || !value) {
     return null;
@@ -43,15 +51,12 @@ export const KetcherDialog = ({ open, value, onClose, onSave }: KetcherDialogPro
             <button
               type="button"
               className="button-primary"
-              disabled={saving || draftSmiles.trim().length === 0}
+              disabled={saving || (frameValue.smiles.trim().length === 0 && !frameValue.molfile?.trim())}
               onClick={async () => {
                 setSaving(true);
                 setError(null);
                 try {
-                  await onSave({
-                    smiles: draftSmiles.trim(),
-                    molfile: value.molfile
-                  });
+                  await onSave(await exportDraft(frameValue));
                 } catch (nextError) {
                   setError(nextError instanceof Error ? nextError.message : "Save failed");
                 } finally {
@@ -66,13 +71,7 @@ export const KetcherDialog = ({ open, value, onClose, onSave }: KetcherDialogPro
         {error ? <p className="status-text">{error}</p> : null}
         <div className="detail-card" style={{ margin: "0.8rem" }}>
           <div className="detail-card-body" style={{ padding: "0.8rem" }}>
-            <KetcherFrame
-              value={{
-                smiles: draftSmiles,
-                molfile: value.molfile
-              }}
-              onSmilesChange={setDraftSmiles}
-            />
+            <KetcherFrame value={frameValue} onChange={setFrameValue} />
           </div>
         </div>
       </div>

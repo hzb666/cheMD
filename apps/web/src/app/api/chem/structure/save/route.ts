@@ -32,6 +32,7 @@ export const POST = async (request: Request): Promise<Response> => {
   try {
     const normalized = await callChemServiceNormalize({ smiles, molfile });
     saveStructureRecord({
+      kind: "molecule",
       documentId: body.documentId,
       blockId: body.blockId,
       sessionId: body.sessionId,

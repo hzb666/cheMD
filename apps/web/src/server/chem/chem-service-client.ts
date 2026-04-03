@@ -2,6 +2,9 @@ import type {
   NormalizeRequest,
   NormalizeResponse,
   OcrResponse,
+  ReactionOcrResponse,
+  ReactionRenderRequest,
+  ReactionRenderResponse,
   RenderRequest,
   RenderResponse
 } from "./dto";
@@ -30,6 +33,20 @@ export const callChemServiceOcr = async (
   return parseJson<OcrResponse>(response);
 };
 
+export const callChemServiceReactionOcr = async (
+  imageBase64: string,
+  mimeType: string
+): Promise<ReactionOcrResponse> => {
+  const response = await fetch(`${baseUrl}/reaction/ocr`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ imageBase64, mimeType })
+  });
+  return parseJson<ReactionOcrResponse>(response);
+};
+
 export const callChemServiceNormalize = async (
   payload: NormalizeRequest
 ): Promise<NormalizeResponse> => {
@@ -52,4 +69,17 @@ export const callChemServiceRender = async (payload: RenderRequest): Promise<Ren
     body: JSON.stringify(payload)
   });
   return parseJson<RenderResponse>(response);
+};
+
+export const callChemServiceReactionRender = async (
+  payload: ReactionRenderRequest
+): Promise<ReactionRenderResponse> => {
+  const response = await fetch(`${baseUrl}/reaction/render`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+  return parseJson<ReactionRenderResponse>(response);
 };

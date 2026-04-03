@@ -23,6 +23,21 @@ import { useImageOcr } from "../features/ocr/hooks/useImageOcr";
 import { insertMoleculeBlock } from "../features/ocr/lib/insert-molecule-block";
 import { updateMoleculeBlock } from "../features/ocr/lib/update-molecule-block";
 import PreviewShell from "../features/preview/components/PreviewShell";
+import { reactionKetcherShellAdapter } from "../features/reaction-editor/adapters/reaction-ketcher-shell-adapter";
+import { ReactionDialog } from "../features/reaction-editor/components/ReactionDialog";
+import { loadReactionDraft } from "../features/reaction-editor/lib/load-reaction-draft";
+import {
+  createReactionSourceKey,
+  saveStoredReactionDraft
+} from "../features/reaction-editor/lib/reaction-draft-store";
+import { insertReactionBlock } from "../features/reaction-editor/lib/insert-reaction-block";
+import {
+  buildReactionSaveRequest,
+  resolveSavedReactionDraft
+} from "../features/reaction-editor/lib/reaction-save";
+import { updateReactionBlock } from "../features/reaction-editor/lib/update-reaction-block";
+import type { ReactionEditorDraftWithBlockId } from "../features/reaction-editor/types";
+import { useReactionOcr } from "../features/reaction-ocr/hooks/useReactionOcr";
 import { KetcherDialog } from "../features/structure-editor/components/KetcherDialog";
 import { loadStructureDraft } from "../features/structure-editor/lib/load-structure-draft";
 import {
@@ -72,6 +87,7 @@ const Page = () => {
     smiles: string;
     molfile?: string;
   } | null>(null);
+  const [editingReaction, setEditingReaction] = useState<ReactionEditorDraftWithBlockId | null>(null);
   const deferredSource = useDeferredValue(source);
   const schedulerRef = useRef(createCompileScheduler(compilePreview));
   const sourceRef = useRef(sampleSource);
@@ -82,6 +98,12 @@ const Page = () => {
     setSource(nextSource);
   };
   const ocr = useImageOcr({
+    documentId,
+    sessionId,
+    getLatestSource: () => sourceRef.current,
+    onSourceChange: applySourceChange
+  });
+  const reactionOcr = useReactionOcr({
     documentId,
     sessionId,
     getLatestSource: () => sourceRef.current,
@@ -117,9 +139,10 @@ const Page = () => {
   const compileStateTone = !previewIsFresh ? "pending" : diagnosticCount === 0 ? "success" : "warning";
   const logoSrc = typeof logoMark === "string" ? logoMark : logoMark.src;
   const lineCount = source.split(/\r?\n/).length;
+  const ocrBusy = ocr.loading || reactionOcr.loading;
 
-  const applyOcrFile = (file: File) => {
-    if (ocr.loading) {
+  const applyMoleculeOcrFile = (file: File) => {
+    if (ocrBusy) {
       return;
     }
 
@@ -134,6 +157,26 @@ const Page = () => {
         next.action === "create_new"
           ? `OCR created molecule block #${next.blockId}`
           : `OCR updated molecule block #${next.blockId}`
+      );
+    });
+  };
+
+  const applyReactionOcrFile = (file: File) => {
+    if (ocrBusy) {
+      return;
+    }
+
+    void reactionOcr.runOcr(file).then((next) => {
+      if (!next) {
+        if (reactionOcr.error) {
+          setEditorStatus("Reaction OCR failed");
+        }
+        return;
+      }
+      setEditorStatus(
+        next.action === "create_new"
+          ? `OCR created reaction block #${next.blockId}`
+          : `OCR updated reaction block #${next.blockId}`
       );
     });
   };
@@ -211,8 +254,21 @@ const Page = () => {
             source={source}
             lineCount={lineCount}
             profileId={result.renderOptions.profileId}
-            toolbarActions={<OcrImportButton loading={ocr.loading} onPickFile={applyOcrFile} />}
-            statusMessage={ocr.error ?? editorStatus}
+            toolbarActions={(
+              <>
+                <OcrImportButton
+                  loading={ocrBusy}
+                  label="OCR Molecule"
+                  onPickFile={applyMoleculeOcrFile}
+                />
+                <OcrImportButton
+                  loading={ocrBusy}
+                  label="OCR Reaction"
+                  onPickFile={applyReactionOcrFile}
+                />
+              </>
+            )}
+            statusMessage={reactionOcr.error ?? ocr.error ?? editorStatus}
             onSourceChange={applySourceChange}
           />
           <PreviewShell
@@ -220,6 +276,8 @@ const Page = () => {
             json={result.json}
             docxBridge={result.docxBridge}
             source={source}
+            documentId={documentId}
+            sessionId={sessionId}
             previewIsFresh={previewIsFresh}
             onEditMolecule={async (blockId, smiles) => {
               if (!previewIsFresh) {
@@ -241,6 +299,38 @@ const Page = () => {
                   error instanceof Error
                     ? `${error.message}; fallback to preview structure`
                     : "Structure draft load failed; fallback to preview structure"
+                );
+              }
+            }}
+            onEditReaction={async (blockId, reactants, products, conditions) => {
+              if (!previewIsFresh) {
+                setEditorStatus("Preview is updating; wait for compile to finish before editing.");
+                return;
+              }
+
+              try {
+                const draft = await loadReactionDraft({
+                  documentId,
+                  blockId,
+                  sessionId,
+                  fallback: {
+                    reactants,
+                    products,
+                    conditions
+                  }
+                });
+                setEditingReaction(draft);
+              } catch (error) {
+                setEditingReaction({
+                  blockId,
+                  reactants,
+                  products,
+                  conditions
+                });
+                setEditorStatus(
+                  error instanceof Error
+                    ? `${error.message}; fallback to preview reaction`
+                    : "Reaction draft load failed; fallback to preview reaction"
                 );
               }
             }}
@@ -301,7 +391,77 @@ const Page = () => {
             setEditingStructure(null);
           }}
         />
-        <OcrPasteListener enabled={!ocr.loading} onPickFile={applyOcrFile} />
+        <ReactionDialog
+          adapter={reactionKetcherShellAdapter}
+          documentId={documentId}
+          open={Boolean(editingReaction)}
+          value={editingReaction}
+          onClose={() => setEditingReaction(null)}
+          onSave={async (next) => {
+            const response = await fetch("/api/chem/reaction/save", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                documentId,
+                blockId: next.blockId,
+                sessionId,
+                ...buildReactionSaveRequest(next)
+              })
+            });
+
+            const payload = (await response.json().catch(() => null)) as
+              | {
+                  blockId?: string;
+                  reactants?: string[];
+                  products?: string[];
+                  conditions?: string[];
+                  message?: string;
+                }
+              | null;
+            if (
+              !response.ok
+              || !payload?.blockId
+              || !Array.isArray(payload.reactants)
+              || !Array.isArray(payload.products)
+              || !Array.isArray(payload.conditions)
+            ) {
+              throw new Error(payload?.message ?? `Reaction save failed (${response.status})`);
+            }
+
+            const savedDraft = resolveSavedReactionDraft(next, {
+              reactants: payload.reactants,
+              products: payload.products,
+              conditions: payload.conditions
+            });
+            saveStoredReactionDraft({
+              documentId,
+              blockId: payload.blockId,
+              reactants: savedDraft.reactants,
+              products: savedDraft.products,
+              conditions: savedDraft.conditions,
+              sourceReactionKey: createReactionSourceKey(savedDraft)
+            });
+            const latestSource = sourceRef.current;
+            const blockExists = latestSource.includes(`:::reaction #${payload.blockId}`);
+            const nextSource = blockExists
+              ? updateReactionBlock(latestSource, payload.blockId, {
+                  reactants: savedDraft.reactants,
+                  products: savedDraft.products,
+                  conditions: savedDraft.conditions
+                })
+              : insertReactionBlock(latestSource, payload.blockId, {
+                  reactants: savedDraft.reactants,
+                  products: savedDraft.products,
+                  conditions: savedDraft.conditions
+                });
+            applySourceChange(nextSource);
+            setEditorStatus(`Reaction updated for #${payload.blockId}`);
+            setEditingReaction(null);
+          }}
+        />
+        <OcrPasteListener enabled={!ocrBusy} onPickFile={applyMoleculeOcrFile} />
       </div>
     </main>
   );

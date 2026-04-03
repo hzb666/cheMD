@@ -15,8 +15,16 @@ interface PreviewShellProps {
   json: string;
   docxBridge: string;
   source: string;
+  documentId?: string;
+  sessionId?: string;
   previewIsFresh?: boolean;
   onEditMolecule?: (blockId: string, smiles: string) => void | Promise<void>;
+  onEditReaction?: (
+    blockId: string,
+    reactants: string[],
+    products: string[],
+    conditions: string[]
+  ) => void | Promise<void>;
 }
 
 type OutputTab = "preview" | "json" | "docxBridge";
@@ -26,18 +34,21 @@ const PreviewShell = ({
   json,
   docxBridge,
   source,
+  documentId,
+  sessionId,
   previewIsFresh = true,
-  onEditMolecule
+  onEditMolecule,
+  onEditReaction
 }: PreviewShellProps) => {
   const [activeTab, setActiveTab] = useState<OutputTab>("preview");
   const previewFrameRef = useRef<HTMLIFrameElement>(null);
   const { exportingDocx, exportMessage, exportDocx } = useDocxExport({
     payload: { source }
   });
-  const { hydratedHtml } = useRenderedPreview(html);
+  const { hydratedHtml } = useRenderedPreview(html, { documentId, sessionId });
 
   useEffect(() => {
-    if (!onEditMolecule) {
+    if (!onEditMolecule && !onEditReaction) {
       return undefined;
     }
 
@@ -50,14 +61,23 @@ const PreviewShell = ({
       if (!payload) {
         return;
       }
-      void onEditMolecule(payload.blockId, payload.smiles);
+      if (payload.kind === "molecule") {
+        void onEditMolecule?.(payload.blockId, payload.smiles);
+        return;
+      }
+      void onEditReaction?.(
+        payload.blockId,
+        payload.reactants,
+        payload.products,
+        payload.conditions
+      );
     };
 
     window.addEventListener("message", handlePreviewMessage);
     return () => {
       window.removeEventListener("message", handlePreviewMessage);
     };
-  }, [onEditMolecule, previewIsFresh]);
+  }, [onEditMolecule, onEditReaction, previewIsFresh]);
 
   const activeCode = activeTab === "json" ? json : docxBridge;
 

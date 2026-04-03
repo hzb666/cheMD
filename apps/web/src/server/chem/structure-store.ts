@@ -1,4 +1,4 @@
-import type { StructureRecord } from "./dto";
+import type { SaveStructureRecordInput, StructureRecord } from "./dto";
 
 const TTL_MS = 5 * 60 * 1000;
 const MAX_RECORDS = 256;
@@ -27,18 +27,24 @@ const pruneOverflow = (): void => {
   }
 };
 
-export const saveStructureRecord = (
-  input: Omit<StructureRecord, "updatedAt" | "expiresAt" | "kind">
-): StructureRecord => {
+export const saveStructureRecord = (input: SaveStructureRecordInput): StructureRecord => {
   pruneExpired();
   pruneOverflow();
   const now = new Date();
-  const next: StructureRecord = {
-    ...input,
-    kind: "molecule",
+  const timestamps = {
     updatedAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + TTL_MS).toISOString()
   };
+  const next: StructureRecord = input.kind === "reaction"
+    ? {
+        ...input,
+        ...timestamps
+      }
+    : {
+        ...input,
+        kind: "molecule",
+        ...timestamps
+      };
   records.set(toKey(input.documentId, input.blockId, input.sessionId), next);
   return next;
 };

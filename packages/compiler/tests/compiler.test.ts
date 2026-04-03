@@ -362,6 +362,36 @@ products: B
     expect(result.html).toContain('x="372" y="86"');
   });
 
+  it("keeps constrained adapter payload values consistent with compile-time render constraints", () => {
+    const source = `---
+id: exp-compile-adapter-constraints
+title: Compile Adapter Constraints Test
+date: 2026-04-02
+render_profile: eln-default
+render_overrides:
+  structure.bondLength: 4
+  structure.bondLineWidth: 5
+  reaction.componentGap: 8
+  reaction.plusGap: 20
+  export.imageFormat: png
+  export.dpi: 72
+---
+
+:::reaction #rxn-main
+reactants: A
+products: B
+:::`;
+
+    const result = compileChemd(source);
+
+    expect(result.renderOptions.structure.bondLineWidth).toBe(1);
+    expect(result.renderOptions.reaction.plusGap).toBe(8);
+    expect(result.renderOptions.export.dpi).toBe(150);
+    expect(result.renderAdapterPayload.rdkit.bondLineWidth).toBe(1);
+    expect(result.renderAdapterPayload.rdkit.reactionPlusGap).toBe(8);
+    expect(result.renderAdapterPayload.rdkit.dpi).toBe(150);
+  });
+
   it("renders markdown table blocks in compile output", () => {
     const source = `---
 id: exp-compile-table

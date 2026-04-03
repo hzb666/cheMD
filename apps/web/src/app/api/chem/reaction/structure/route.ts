@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getStructureRecord } from "../../../../server/chem/structure-store";
+import { getStructureRecord } from "../../../../../server/chem/structure-store";
 
 export const runtime = "nodejs";
 
@@ -11,23 +11,23 @@ export const GET = async (request: Request): Promise<Response> => {
   const sessionId = url.searchParams.get("sessionId");
 
   if (!documentId || !blockId || !sessionId) {
-    return NextResponse.json({ message: "documentId, blockId, and sessionId are required" }, { status: 400 });
+    return NextResponse.json(
+      { message: "documentId, blockId, and sessionId are required" },
+      { status: 400 }
+    );
   }
 
   const record = getStructureRecord(documentId, blockId, sessionId);
-  if (!record) {
-    return NextResponse.json({ found: false });
-  }
-
-  if (record.kind !== "molecule") {
+  if (!record || record.kind !== "reaction") {
     return NextResponse.json({ found: false });
   }
 
   return NextResponse.json({
     found: true,
-    structure: {
-      smiles: record.smiles,
-      molfile: record.molfile,
+    reaction: {
+      reactants: record.reactants,
+      products: record.products,
+      conditions: record.conditions ?? [],
       source: record.source,
       expiresAt: record.expiresAt
     }

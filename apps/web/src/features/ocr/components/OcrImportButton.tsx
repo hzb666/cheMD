@@ -3,9 +3,10 @@ import React, { useRef } from "react";
 interface OcrImportButtonProps {
   loading: boolean;
   onPickFile: (file: File) => void;
+  label?: string;
 }
 
-export const OcrImportButton = ({ loading, onPickFile }: OcrImportButtonProps) => {
+export const OcrImportButton = ({ loading, onPickFile, label = "OCR Image" }: OcrImportButtonProps) => {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   return (
@@ -16,7 +17,7 @@ export const OcrImportButton = ({ loading, onPickFile }: OcrImportButtonProps) =
         disabled={loading}
         onClick={() => inputRef.current?.click()}
       >
-        {loading ? "Recognizing..." : "OCR Image"}
+        {loading ? "Recognizing..." : label}
       </button>
       <input
         ref={inputRef}

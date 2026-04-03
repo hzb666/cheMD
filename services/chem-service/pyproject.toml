@@ -1,6 +1,21 @@
+[tool.poetry]
+name = "chem-service"
+version = "0.1.0"
+description = "Local chemistry service for chemd web routes"
+authors = ["chemd"]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.14,<3.15"
+flask = "3.1.2"
+rdkit = "^2025.9.6"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.14.0"
+
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
@@ -9,3 +24,7 @@ select = ["E", "F", "I", "UP", "B"]
 quote-style = "double"
 indent-style = "space"
 line-ending = "lf"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

@@ -30,6 +30,7 @@ describe("readPreviewEditMessage", () => {
         true
       )
     ).toEqual({
+      kind: "molecule",
       blockId: "mol-1",
       smiles: "CCO"
     });
@@ -61,8 +62,37 @@ describe("readPreviewEditMessage", () => {
         true
       )
     ).toEqual({
+      kind: "molecule",
       blockId: "mol-1",
       smiles: ""
+    });
+  });
+
+  it("accepts reaction edit messages from the active preview iframe", () => {
+    const previewWindow = {} as Window;
+
+    expect(
+      readPreviewEditMessage(
+        {
+          origin: "null",
+          source: previewWindow,
+          data: {
+            type: "chemd:edit-reaction",
+            blockId: "rxn-1",
+            reactants: ["CCO"],
+            products: ["CC(=O)O"],
+            conditions: ["air"]
+          }
+        },
+        previewWindow,
+        true
+      )
+    ).toEqual({
+      kind: "reaction",
+      blockId: "rxn-1",
+      reactants: ["CCO"],
+      products: ["CC(=O)O"],
+      conditions: ["air"]
     });
   });
 

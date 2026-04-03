@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 
-import {
-  callChemServiceNormalize,
-  callChemServiceOcr
-} from "../../../../server/chem/chem-service-client";
-import { saveStructureRecord } from "../../../../server/chem/structure-store";
+import { callChemServiceReactionOcr } from "../../../../../server/chem/chem-service-client";
+import { saveStructureRecord } from "../../../../../server/chem/structure-store";
 
 export const runtime = "nodejs";
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
@@ -14,11 +11,19 @@ const readFileAsBase64 = async (file: File): Promise<string> => {
   return Buffer.from(arrayBuffer).toString("base64");
 };
 
-const hasPlaceholderStructure = (
-  ocr: Awaited<ReturnType<typeof callChemServiceOcr>>
+const normalizeStringArray = (value: unknown): string[] => (
+  Array.isArray(value)
+    ? value
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0)
+    : []
+);
+
+const hasPlaceholderReaction = (
+  ocr: Awaited<ReturnType<typeof callChemServiceReactionOcr>>
 ): boolean =>
-  ocr.structure?.molfile === "MOLFILE_PLACEHOLDER"
-  || (ocr.warnings ?? []).some((warning) => warning.toLowerCase().includes("placeholder"));
+  (ocr.warnings ?? []).some((warning) => warning.toLowerCase().includes("placeholder"));
 
 export const POST = async (request: Request): Promise<Response> => {
   const formData = await request.formData().catch(() => null);
@@ -36,7 +41,10 @@ export const POST = async (request: Request): Promise<Response> => {
     || typeof blockId !== "string"
     || typeof sessionId !== "string"
   ) {
-    return NextResponse.json({ message: "documentId, blockId, and sessionId are required" }, { status: 400 });
+    return NextResponse.json(
+      { message: "documentId, blockId, and sessionId are required" },
+      { status: 400 }
+    );
   }
 
   if (!(image instanceof File)) {
@@ -53,9 +61,12 @@ export const POST = async (request: Request): Promise<Response> => {
 
   try {
     const imageBase64 = await readFileAsBase64(image);
-    const ocr = await callChemServiceOcr(imageBase64, image.type || "image/png");
+    const ocr = await callChemServiceReactionOcr(imageBase64, image.type || "image/png");
+    const reactants = normalizeStringArray(ocr.reaction?.reactants);
+    const products = normalizeStringArray(ocr.reaction?.products);
+    const conditions = normalizeStringArray(ocr.reaction?.conditions);
 
-    if ((!ocr.structure?.smiles && !ocr.structure?.molfile) || hasPlaceholderStructure(ocr)) {
+    if (reactants.length === 0 || products.length === 0 || hasPlaceholderReaction(ocr)) {
       return NextResponse.json(
         {
           status: "failed",
@@ -67,18 +78,14 @@ export const POST = async (request: Request): Promise<Response> => {
       );
     }
 
-    const normalized = await callChemServiceNormalize({
-      smiles: ocr.structure.smiles,
-      molfile: ocr.structure.molfile
-    });
-
     saveStructureRecord({
-      kind: "molecule",
+      kind: "reaction",
       documentId,
       blockId,
       sessionId,
-      smiles: normalized.canonicalSmiles,
-      molfile: normalized.normalizedMolfile,
+      reactants,
+      products,
+      conditions,
       source: "ocr",
       confidence: ocr.confidence
     });
@@ -87,15 +94,16 @@ export const POST = async (request: Request): Promise<Response> => {
       status: "ok",
       blockId,
       action: "update_existing",
-      structure: {
-        smiles: normalized.canonicalSmiles,
-        molfile: normalized.normalizedMolfile
+      reaction: {
+        reactants,
+        products,
+        conditions
       },
       confidence: ocr.confidence,
-      warnings: [...(ocr.warnings ?? []), ...(normalized.warnings ?? [])]
+      warnings: ocr.warnings ?? []
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "ocr failed";
+    const message = error instanceof Error ? error.message : "reaction ocr failed";
     return NextResponse.json({ message }, { status: 502 });
   }
 };

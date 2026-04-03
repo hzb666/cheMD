@@ -1,6 +1,7 @@
 import type { MoleculeNode, ReactionNode } from "@chemd/core";
 import {
   mapRenderOptionsToAdapterPayload,
+  sanitizeRenderAdapterPayload,
   type RenderAdapterPayload,
   type RenderOptions
 } from "@chemd/render-profile";
@@ -13,8 +14,6 @@ type SmilesParseResult =
   | { status: "ok"; sketch: SmilesSketch }
   | { status: "unsupported"; reason: string; token?: string; index?: number };
 type ReactionFragment = { markup: string; width: number };
-type LooseRecord = Record<string, unknown>;
-
 const escapeXml = (value: string): string =>
   value
     .replaceAll("&", "&amp;")
@@ -27,39 +26,6 @@ const sanitizeId = (value: string | undefined, fallback: string): string => {
   const normalized = value?.replaceAll(/[^a-zA-Z0-9_-]/g, "-").replaceAll(/-+/g, "-").replaceAll(/^-|-$/g, "");
   return normalized && normalized.length > 0 ? normalized : fallback;
 };
-
-const HEX_COLOR_PATTERN = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
-
-const clampNumber = (value: number, min: number, max: number): number =>
-  Math.min(Math.max(value, min), max);
-
-const isFiniteNumber = (value: unknown): value is number =>
-  typeof value === "number" && Number.isFinite(value);
-
-const normalizeNumber = (value: unknown, fallback: number, min: number, max: number): number => {
-  if (!isFiniteNumber(value)) {
-    return fallback;
-  }
-
-  return clampNumber(value, min, max);
-};
-
-const normalizeBoolean = (value: unknown, fallback: boolean): boolean =>
-  typeof value === "boolean" ? value : fallback;
-
-const normalizeColor = (value: unknown, fallback: string): string => {
-  if (typeof value !== "string") {
-    return fallback;
-  }
-
-  const normalized = value.trim();
-  return HEX_COLOR_PATTERN.test(normalized) ? normalized : fallback;
-};
-
-const normalizeImageFormat = (
-  value: unknown,
-  fallback: SvgAdapterOptions["imageFormat"]
-): SvgAdapterOptions["imageFormat"] => (value === "svg" || value === "png" ? value : fallback);
 
 const formatNumber = (value: number): string => {
   if (Number.isInteger(value)) {
@@ -267,60 +233,12 @@ const parseSmilesSketch = (smiles: string | undefined): SmilesParseResult => {
   };
 };
 
-const sanitizeAdapterOptions = (
-  unsafeOptions: unknown,
-  fallback: SvgAdapterOptions
-): SvgAdapterOptions => {
-  if (!unsafeOptions || typeof unsafeOptions !== "object" || Array.isArray(unsafeOptions)) {
-    return fallback;
-  }
-
-  const candidate = unsafeOptions as LooseRecord;
-  const next: SvgAdapterOptions = {
-    fixedBondLength: normalizeNumber(candidate.fixedBondLength, fallback.fixedBondLength, 4, 80),
-    bondLineWidth: normalizeNumber(candidate.bondLineWidth, fallback.bondLineWidth, 0.6, 6),
-    multipleBondOffset: normalizeNumber(candidate.multipleBondOffset, fallback.multipleBondOffset, 0, 0.5),
-    hashSpacing: normalizeNumber(candidate.hashSpacing, fallback.hashSpacing, 0.5, 6),
-    fixedFontSize: normalizeNumber(candidate.fixedFontSize, fallback.fixedFontSize, 6, 24),
-    atomLabelPadding: normalizeNumber(candidate.atomLabelPadding, fallback.atomLabelPadding, 0, 4),
-    monochrome: normalizeBoolean(candidate.monochrome, fallback.monochrome),
-    backgroundColor: normalizeColor(candidate.backgroundColor, fallback.backgroundColor),
-    reactionArrowLength: normalizeNumber(candidate.reactionArrowLength, fallback.reactionArrowLength, 24, 180),
-    reactionComponentGap: normalizeNumber(candidate.reactionComponentGap, fallback.reactionComponentGap, 0, 64),
-    reactionPlusGap: normalizeNumber(candidate.reactionPlusGap, fallback.reactionPlusGap, 0, 64),
-    showConditionsBelowArrow: normalizeBoolean(candidate.showConditionsBelowArrow, fallback.showConditionsBelowArrow),
-    imageFormat: normalizeImageFormat(candidate.imageFormat, fallback.imageFormat),
-    margin: normalizeNumber(candidate.margin, fallback.margin, 0, 64),
-    dpi: normalizeNumber(candidate.dpi, fallback.dpi, 72, 2400),
-    transparentBackground: normalizeBoolean(candidate.transparentBackground, fallback.transparentBackground)
-  };
-
-  if (next.reactionPlusGap > next.reactionComponentGap) {
-    next.reactionPlusGap = next.reactionComponentGap;
-  }
-
-  if (next.bondLineWidth >= next.fixedBondLength) {
-    next.bondLineWidth = clampNumber(next.fixedBondLength * 0.25, 0.6, 6);
-  }
-
-  const maxAtomLabelPadding = next.fixedFontSize * 0.5;
-  if (next.atomLabelPadding > maxAtomLabelPadding) {
-    next.atomLabelPadding = maxAtomLabelPadding;
-  }
-
-  return next;
-};
-
 const resolveAdapterOptions = (
   options: RenderOptions,
   adapterPayload?: RenderAdapterPayload
 ): SvgAdapterOptions => {
-  const fallback = mapRenderOptionsToAdapterPayload(options).rdkit;
-  if (!adapterPayload) {
-    return fallback;
-  }
-
-  return sanitizeAdapterOptions(adapterPayload.rdkit, fallback);
+  const fallback = mapRenderOptionsToAdapterPayload(options);
+  return sanitizeRenderAdapterPayload(adapterPayload, options).rdkit ?? fallback.rdkit;
 };
 
 const renderBackground = (width: number, height: number, adapterOptions: SvgAdapterOptions): string => {

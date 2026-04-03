@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 
-import { callChemServiceRender } from "../../../../server/chem/chem-service-client";
+import {
+  callChemServiceNormalize,
+  callChemServiceRender
+} from "../../../../server/chem/chem-service-client";
 
 export const runtime = "nodejs";
 
@@ -34,16 +37,22 @@ export const POST = async (request: Request): Promise<Response> => {
   }
 
   try {
+    const normalized = await callChemServiceNormalize({ smiles, molfile });
     const rendered = await callChemServiceRender({
       kind: "molecule",
-      smiles,
-      molfile,
+      smiles: normalized.canonicalSmiles || undefined,
+      molfile: normalized.normalizedMolfile,
       renderOptions:
         body.renderOptions && typeof body.renderOptions === "object"
           ? (body.renderOptions as Record<string, unknown>)
           : undefined
     });
-    return NextResponse.json(rendered);
+    return NextResponse.json({
+      ...rendered,
+      canonicalSmiles: normalized.canonicalSmiles,
+      normalizedMolfile: normalized.normalizedMolfile,
+      warnings: [...(normalized.warnings ?? []), ...(rendered.warnings ?? [])]
+    });
   } catch (error) {
     const fallbackLabel = smiles ?? "structure";
     const message = error instanceof Error ? error.message : "render failed";

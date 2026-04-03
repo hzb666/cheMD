@@ -266,6 +266,44 @@ describe("resolveRenderProfile", () => {
     expect(payload.rdkit.reactionComponentGap).toBe(24);
     expect(payload.rdkit.transparentBackground).toBe(true);
   });
+
+  it("sanitizes adapter payload values through the shared render constraints", () => {
+    const payload = mapRenderOptionsToAdapterPayload({
+      profileId: "unsafe-profile",
+      structure: {
+        bondLength: 4,
+        bondLineWidth: 5,
+        multipleBondOffset: -1,
+        hashSpacing: 99,
+        fontSize: 6,
+        atomLabelPadding: 4,
+        monochrome: false,
+        backgroundColor: "#ffffff"
+      },
+      reaction: {
+        arrowLength: 999,
+        componentGap: 8,
+        plusGap: 20,
+        showConditionsBelowArrow: true
+      },
+      export: {
+        imageFormat: "png",
+        margin: -3,
+        dpi: 72,
+        transparentBackground: false
+      }
+    });
+
+    expect(payload.rdkit.fixedBondLength).toBe(4);
+    expect(payload.rdkit.bondLineWidth).toBe(1);
+    expect(payload.rdkit.multipleBondOffset).toBe(0);
+    expect(payload.rdkit.hashSpacing).toBe(6);
+    expect(payload.rdkit.atomLabelPadding).toBe(3);
+    expect(payload.rdkit.reactionArrowLength).toBe(180);
+    expect(payload.rdkit.reactionPlusGap).toBe(8);
+    expect(payload.rdkit.margin).toBe(0);
+    expect(payload.rdkit.dpi).toBe(150);
+  });
   it("clamps out-of-range numeric values and reports diagnostics", () => {
     const resolution = resolveRenderProfileWithDiagnostics({
       profileId: "eln-default",
