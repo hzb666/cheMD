@@ -15,6 +15,6 @@ export const createScopedToken = (prefix: string): string => {
   }
 
   throw new Error(
-    "secure random token generation is unavailable; ensure a modern secure runtime with crypto support"
+    "secure random token generation is unavailable; crypto.randomUUID/getRandomValues is not supported in this runtime"
   );
 };

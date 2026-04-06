@@ -38,6 +38,10 @@ export const useRenderedPreview = (
   const { documentId, sessionId, renderOptions } = options;
   const baseHtml = useMemo(() => injectEditButtons(html), [html]);
   const previewBridgeToken = useMemo(() => {
+    if (typeof window === "undefined") {
+      return "";
+    }
+
     const seed = JSON.stringify({
       htmlLength: baseHtml.length,
       documentId,
