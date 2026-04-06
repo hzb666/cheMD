@@ -13,12 +13,15 @@ export const injectEditButtons = (html: string): string =>
     .replace(/(<section class="chemd-block chemd-block--molecule"[^>]*>)/g, `$1${MOLECULE_EDIT_BUTTON}`)
     .replace(/(<section class="chemd-block chemd-block--reaction"[^>]*>)/g, `$1${REACTION_EDIT_BUTTON}`);
 
-export const buildPreviewBridgeScript = (previewBridgeToken: string): string => `<script>
+export const buildPreviewBridgeScript = (
+  previewBridgeToken: string,
+  parentOrigin: string
+): string => `<script>
 (() => {
   if (window.__chemdBridgeBound) return;
   window.__chemdBridgeBound = true;
   const previewToken = ${JSON.stringify(previewBridgeToken)};
-  const targetOrigin = window.location.origin;
+  const targetOrigin = ${JSON.stringify(parentOrigin)};
   const resolveBlockId = (block, selector, prefix) => {
     const explicitId = String(block.getAttribute("data-node-id") || "").trim();
     if (explicitId) return explicitId;

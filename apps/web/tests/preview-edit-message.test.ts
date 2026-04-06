@@ -171,9 +171,9 @@ describe("readPreviewEditMessage", () => {
   });
 
   it("builds preview bridge script without wildcard postMessage origin", () => {
-    const script = buildPreviewBridgeScript(previewToken);
+    const script = buildPreviewBridgeScript(previewToken, "http://localhost:2436");
 
-    expect(script).toContain("const targetOrigin = window.location.origin;");
+    expect(script).toContain('const targetOrigin = "http://localhost:2436";');
     expect(script).not.toContain('"*"');
   });
 
