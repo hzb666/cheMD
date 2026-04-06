@@ -4,12 +4,16 @@ interface ReactionSaveResponse {
   reactants: string[];
   products: string[];
   conditions: string[];
+  reactionSmiles?: string;
+  rxnfile?: string;
 }
 
 export const buildReactionSaveRequest = (value: ReactionEditorDraft): ReactionSaveResponse => ({
   reactants: value.reactants,
   products: value.products,
-  conditions: value.conditions
+  conditions: value.conditions,
+  reactionSmiles: value.reactionSmiles,
+  rxnfile: value.rxnfile
 });
 
 export const resolveSavedReactionDraft = (
@@ -20,5 +24,9 @@ export const resolveSavedReactionDraft = (
   products: savedPayload.products,
   conditions: savedPayload.conditions.length > 0
     ? savedPayload.conditions
-    : currentDraft.conditions.filter((item) => item.trim().length > 0)
+    : currentDraft.conditions.filter((item) => item.trim().length > 0),
+  reactionSmiles:
+    typeof savedPayload.reactionSmiles === "string" ? savedPayload.reactionSmiles : currentDraft.reactionSmiles,
+  rxnfile:
+    typeof savedPayload.rxnfile === "string" ? savedPayload.rxnfile : currentDraft.rxnfile
 });

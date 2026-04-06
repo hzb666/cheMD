@@ -4,16 +4,19 @@ const STORAGE_KEY_PREFIX = "chemd:reaction-draft";
 
 interface StoredReactionDraft extends ReactionEditorDraft {
   sourceReactionKey?: string;
+  draftReactionKey?: string;
   updatedAt: string;
 }
 
 interface ReactionDraftKey {
   documentId: string;
   blockId: string;
+  sessionId?: string;
 }
 
 interface SaveReactionDraftInput extends ReactionDraftKey, ReactionEditorDraft {
   sourceReactionKey?: string;
+  draftReactionKey?: string;
 }
 
 interface StorageLike {
@@ -22,8 +25,8 @@ interface StorageLike {
   setItem: (key: string, value: string) => void;
 }
 
-const createStorageKey = ({ documentId, blockId }: ReactionDraftKey): string =>
-  `${STORAGE_KEY_PREFIX}:${documentId}:${blockId}`;
+const createStorageKey = ({ documentId, blockId, sessionId }: ReactionDraftKey): string =>
+  `${STORAGE_KEY_PREFIX}:${documentId}:${blockId}:${sessionId ?? "global"}`;
 
 const resolveStorage = (storageImpl?: StorageLike): StorageLike | null => {
   if (storageImpl) {
@@ -48,7 +51,9 @@ export const createReactionSourceKey = (draft: ReactionEditorDraft): string =>
   JSON.stringify({
     reactants: draft.reactants,
     products: draft.products,
-    conditions: draft.conditions
+    conditions: draft.conditions,
+    reactionSmiles: draft.reactionSmiles ?? null,
+    rxnfile: draft.rxnfile ?? null
   });
 
 export const saveStoredReactionDraft = (
@@ -64,7 +69,10 @@ export const saveStoredReactionDraft = (
     reactants: input.reactants,
     products: input.products,
     conditions: input.conditions,
+    reactionSmiles: input.reactionSmiles,
+    rxnfile: input.rxnfile,
     sourceReactionKey: input.sourceReactionKey,
+    draftReactionKey: input.draftReactionKey,
     updatedAt: new Date().toISOString()
   };
 
@@ -78,7 +86,7 @@ export const saveStoredReactionDraft = (
 export const loadStoredReactionDraft = (
   key: ReactionDraftKey,
   storageImpl?: StorageLike
-): (ReactionEditorDraft & { sourceReactionKey?: string }) | null => {
+): (ReactionEditorDraft & { sourceReactionKey?: string; draftReactionKey?: string }) | null => {
   const storage = resolveStorage(storageImpl);
   if (!storage) {
     return null;
@@ -111,8 +119,14 @@ export const loadStoredReactionDraft = (
       reactants: parsed.reactants,
       products: parsed.products,
       conditions: parsed.conditions,
+      reactionSmiles:
+        typeof parsed.reactionSmiles === "string" ? parsed.reactionSmiles : undefined,
+      rxnfile:
+        typeof parsed.rxnfile === "string" ? parsed.rxnfile : undefined,
       sourceReactionKey:
-        typeof parsed.sourceReactionKey === "string" ? parsed.sourceReactionKey : undefined
+        typeof parsed.sourceReactionKey === "string" ? parsed.sourceReactionKey : undefined,
+      draftReactionKey:
+        typeof parsed.draftReactionKey === "string" ? parsed.draftReactionKey : undefined
     };
   } catch {
     try {

@@ -1,3 +1,5 @@
+import type { NormalizedReactionConditions } from "@chemd/core";
+
 export interface StructurePayload {
   smiles: string;
   molfile?: string;
@@ -14,11 +16,14 @@ export interface ReactionPayload {
   reactants: string[];
   products: string[];
   conditions: string[];
+  reactionSmiles?: string;
+  rxnfile?: string;
 }
 
 export interface ReactionOcrResponse {
   status: "ok" | "partial" | "failed";
   reaction?: ReactionPayload;
+  normalized_conditions?: NormalizedReactionConditions;
   confidence?: number;
   warnings: string[];
 }
@@ -59,6 +64,7 @@ export interface RenderResponse {
 export interface ReactionRenderResponse extends RenderResponse {
   renderer?: string;
   reaction?: ReactionPayload;
+  normalized_conditions?: NormalizedReactionConditions;
 }
 
 interface StructureRecordBase {
@@ -85,6 +91,8 @@ export interface ReactionStructureRecord extends StructureRecordBase {
   reactants: string[];
   products: string[];
   conditions?: string[];
+  reactionSmiles?: string;
+  rxnfile?: string;
   smiles?: never;
   molfile?: never;
 }
@@ -96,3 +104,8 @@ export type StructureRecord = MoleculeStructureRecord | ReactionStructureRecord;
 export type SaveStructureRecordInput =
   | (Omit<MoleculeStructureRecord, "updatedAt" | "expiresAt" | "kind"> & { kind?: "molecule" })
   | Omit<ReactionStructureRecord, "updatedAt" | "expiresAt">;
+
+export interface ChemServiceStructureLookupResponse {
+  found: boolean;
+  record?: StructureRecord;
+}

@@ -15,6 +15,7 @@ export const selectTargetMolecule = (
 ): MoleculeTarget | null => {
   const lines = source.split(/\r?\n/);
   const candidates: MoleculeTarget[] = [];
+  let moleculeOrdinal = 0;
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index] ?? "";
@@ -23,7 +24,8 @@ export const selectTargetMolecule = (
       continue;
     }
 
-    const blockId = ensureBlockId(openMatch[1]);
+    moleculeOrdinal += 1;
+    const blockId = ensureBlockId(openMatch[1], "mol", moleculeOrdinal);
     let endLine = index;
 
     for (let scan = index + 1; scan < lines.length; scan += 1) {

@@ -50,6 +50,7 @@ describe("renderer-docx", () => {
             id: "rxn-main",
             reactants: ["CCO", "O=O"],
             products: ["CC(=O)O"],
+            conditions: ["air", "80 C"],
             temperature: "200 °C",
             time: "4 h"
           }
@@ -64,6 +65,7 @@ describe("renderer-docx", () => {
     expect(markdown).toContain("# DOCX Markdown");
     expect(markdown).toContain("### Reaction `rxn-main`");
     expect(markdown).toContain("- Reactants: CCO + O=O");
+    expect(markdown).toContain("- Conditions: air | 80 C");
   });
 });
 

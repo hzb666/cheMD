@@ -9,6 +9,10 @@ import type {
   SampleNode
 } from "@chemd/core";
 
+import {
+  classifyReactionConditions
+} from "@chemd/core";
+
 import type {
   ExportedAnalysisV1,
   ExportedMarkdownBlockV1,
@@ -165,14 +169,7 @@ const buildReaction = (
     yield_raw: node.yield,
     conversion_raw: node.conversion,
     selectivity_raw: node.selectivity,
-    normalized_conditions: compactConditions
-      ? {
-          conditions_text: {
-            raw: compactConditions.join(" | "),
-            normalized: compactConditions
-          }
-        }
-      : {},
+    normalized_conditions: classifyReactionConditions(node),
     normalized_outcome_hints: {},
     text_for_embedding: compactText(
       node.name,

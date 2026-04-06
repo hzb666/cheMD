@@ -4,6 +4,7 @@ import {
   callChemServiceNormalize,
   callChemServiceRender
 } from "../../../../server/chem/chem-service-client";
+import { isCasResolutionError, resolveChemicalNotation } from "../../../../server/chem/cas-resolver";
 
 export const runtime = "nodejs";
 
@@ -37,7 +38,8 @@ export const POST = async (request: Request): Promise<Response> => {
   }
 
   try {
-    const normalized = await callChemServiceNormalize({ smiles, molfile });
+    const resolvedSmiles = smiles ? await resolveChemicalNotation(smiles) : undefined;
+    const normalized = await callChemServiceNormalize({ smiles: resolvedSmiles, molfile });
     const rendered = await callChemServiceRender({
       kind: "molecule",
       smiles: normalized.canonicalSmiles || undefined,
@@ -54,6 +56,10 @@ export const POST = async (request: Request): Promise<Response> => {
       warnings: [...(normalized.warnings ?? []), ...(rendered.warnings ?? [])]
     });
   } catch (error) {
+    if (isCasResolutionError(error)) {
+      return NextResponse.json({ message: error.message, code: error.code }, { status: error.status });
+    }
+
     const fallbackLabel = smiles ?? "structure";
     const message = error instanceof Error ? error.message : "render failed";
     return NextResponse.json({

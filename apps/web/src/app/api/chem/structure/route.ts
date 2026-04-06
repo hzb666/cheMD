@@ -14,7 +14,7 @@ export const GET = async (request: Request): Promise<Response> => {
     return NextResponse.json({ message: "documentId, blockId, and sessionId are required" }, { status: 400 });
   }
 
-  const record = getStructureRecord(documentId, blockId, sessionId);
+  const record = await getStructureRecord(documentId, blockId, sessionId);
   if (!record) {
     return NextResponse.json({ found: false });
   }

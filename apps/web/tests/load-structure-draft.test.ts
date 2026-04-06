@@ -60,7 +60,9 @@ describe("loadStructureDraft", () => {
       storageImpl: storage
     });
 
-    expect(storage.removeItem).toHaveBeenCalledWith("chemd:structure-draft:doc-stale:mol-stale");
+    expect(storage.removeItem).toHaveBeenCalledWith(
+      "chemd:structure-draft:doc-stale:mol-stale:session-stale"
+    );
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/chem/structure?documentId=doc-stale&blockId=mol-stale&sessionId=session-stale"
     );
@@ -129,6 +131,46 @@ describe("loadStructureDraft", () => {
     expect(draft).toEqual({
       blockId: "mol-2",
       smiles: "CCN"
+    });
+  });
+
+  it("does not reuse persisted browser draft from a different session", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        found: false
+      })
+    });
+    const storage = {
+      getItem: vi.fn((key: string) =>
+        key === "chemd:structure-draft:doc-session:mol-session:session-b"
+          ? JSON.stringify({
+              smiles: "CCO",
+              molfile: "persisted-molfile",
+              sourceSmiles: "CCO",
+              updatedAt: "2026-04-02T00:00:00.000Z"
+            })
+          : null
+      ),
+      removeItem: vi.fn(),
+      setItem: vi.fn()
+    };
+
+    const draft = await loadStructureDraft({
+      documentId: "doc-session",
+      blockId: "mol-session",
+      sessionId: "session-a",
+      fallbackSmiles: "CCO",
+      fetchImpl: fetchMock,
+      storageImpl: storage
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/chem/structure?documentId=doc-session&blockId=mol-session&sessionId=session-a"
+    );
+    expect(draft).toEqual({
+      blockId: "mol-session",
+      smiles: "CCO"
     });
   });
 });

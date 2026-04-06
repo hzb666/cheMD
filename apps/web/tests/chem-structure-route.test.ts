@@ -1,9 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { saveStructureRecord } from "../src/server/chem/structure-store";
+const getStructureRecordMock = vi.fn();
+
+vi.mock("../src/server/chem/structure-store", () => ({
+  getStructureRecord: (...args: unknown[]) => getStructureRecordMock(...args)
+}));
 
 describe("GET /api/chem/structure", () => {
+  beforeEach(() => {
+    getStructureRecordMock.mockReset();
+    vi.resetModules();
+  });
+
   it("returns found false when cache misses", async () => {
+    getStructureRecordMock.mockResolvedValueOnce(undefined);
     const { GET } = await import("../src/app/api/chem/structure/route");
     const response = await GET(
       new Request("http://localhost/api/chem/structure?documentId=doc-x&blockId=mol-x&sessionId=session-x")
@@ -15,13 +25,16 @@ describe("GET /api/chem/structure", () => {
   });
 
   it("returns cached record when present", async () => {
-    saveStructureRecord({
+    getStructureRecordMock.mockResolvedValueOnce({
+      kind: "molecule",
       documentId: "doc-1",
       blockId: "mol-1",
       sessionId: "session-1",
       smiles: "CCO",
       molfile: "mock-mol",
-      source: "ocr"
+      source: "ocr",
+      updatedAt: "2026-04-04T00:00:00.000Z",
+      expiresAt: "2026-04-04T00:05:00.000Z"
     });
 
     const { GET } = await import("../src/app/api/chem/structure/route");
@@ -42,13 +55,7 @@ describe("GET /api/chem/structure", () => {
   });
 
   it("does not leak cached drafts across sessions", async () => {
-    saveStructureRecord({
-      documentId: "doc-2",
-      blockId: "mol-2",
-      sessionId: "session-a",
-      smiles: "CCO",
-      source: "ocr"
-    });
+    getStructureRecordMock.mockResolvedValueOnce(undefined);
 
     const { GET } = await import("../src/app/api/chem/structure/route");
     const response = await GET(

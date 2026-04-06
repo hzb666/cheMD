@@ -1,3 +1,5 @@
+import { ensureBlockId } from "../../ocr/lib/ensure-block-id";
+
 import type { ReactionEditorDraft } from "../types";
 
 const REACTION_OPEN_RE = /^:::reaction(?:\s+#([^\s]+))?/;
@@ -15,6 +17,7 @@ export const updateReactionBlock = (
 ): string => {
   const lines = source.split(/\r?\n/);
   const targetOpen = `:::reaction #${blockId}`;
+  let reactionOrdinal = 0;
 
   for (let index = 0; index < lines.length; index += 1) {
     const openLine = lines[index] ?? "";
@@ -23,7 +26,8 @@ export const updateReactionBlock = (
       continue;
     }
 
-    const existingId = (openMatch[1] ?? "").trim().replace(/^#/, "");
+    reactionOrdinal += 1;
+    const existingId = ensureBlockId(openMatch[1], "rxn", reactionOrdinal);
     if (existingId !== blockId) {
       continue;
     }

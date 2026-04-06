@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
 
 import { callChemServiceNormalize } from "../../../../../server/chem/chem-service-client";
+import { isCasResolutionError, resolveChemicalNotation } from "../../../../../server/chem/cas-resolver";
+import { requireMatchingSessionToken } from "../../../../../server/chem/session-guard";
 import { saveStructureRecord } from "../../../../../server/chem/structure-store";
 
 export const runtime = "nodejs";
 
 export const POST = async (request: Request): Promise<Response> => {
+  const sessionError = requireMatchingSessionToken(request);
+  if (sessionError) {
+    return sessionError;
+  }
+
   const body = (await request.json().catch(() => null)) as
     | { documentId?: unknown; blockId?: unknown; sessionId?: unknown; molfile?: unknown; smiles?: unknown }
     | null;
@@ -30,8 +37,9 @@ export const POST = async (request: Request): Promise<Response> => {
   }
 
   try {
-    const normalized = await callChemServiceNormalize({ smiles, molfile });
-    saveStructureRecord({
+    const resolvedSmiles = smiles ? await resolveChemicalNotation(smiles) : undefined;
+    const normalized = await callChemServiceNormalize({ smiles: resolvedSmiles, molfile });
+    await saveStructureRecord({
       kind: "molecule",
       documentId: body.documentId,
       blockId: body.blockId,
@@ -48,6 +56,10 @@ export const POST = async (request: Request): Promise<Response> => {
       warnings: normalized.warnings
     });
   } catch (error) {
+    if (isCasResolutionError(error)) {
+      return NextResponse.json({ message: error.message, code: error.code }, { status: error.status });
+    }
+
     const message = error instanceof Error ? error.message : "save structure failed";
     return NextResponse.json({ message }, { status: 502 });
   }

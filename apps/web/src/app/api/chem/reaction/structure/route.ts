@@ -17,7 +17,7 @@ export const GET = async (request: Request): Promise<Response> => {
     );
   }
 
-  const record = getStructureRecord(documentId, blockId, sessionId);
+  const record = await getStructureRecord(documentId, blockId, sessionId);
   if (!record || record.kind !== "reaction") {
     return NextResponse.json({ found: false });
   }
@@ -28,6 +28,8 @@ export const GET = async (request: Request): Promise<Response> => {
       reactants: record.reactants,
       products: record.products,
       conditions: record.conditions ?? [],
+      reactionSmiles: record.reactionSmiles,
+      rxnfile: record.rxnfile,
       source: record.source,
       expiresAt: record.expiresAt
     }

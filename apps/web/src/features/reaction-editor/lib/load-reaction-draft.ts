@@ -29,9 +29,12 @@ export const loadReactionDraft = async ({
   fetchImpl = fetch,
   storageImpl
 }: LoadReactionDraftOptions): Promise<ReactionEditorDraftWithBlockId> => {
-  const stored = documentId ? loadStoredReactionDraft({ documentId, blockId }, storageImpl) : null;
+  const stored = documentId
+    ? loadStoredReactionDraft({ documentId, blockId, sessionId }, storageImpl)
+    : null;
+  const fallbackReactionKey = createReactionSourceKey(fallback);
   const storedMatchesFallback = stored
-    ? (stored.sourceReactionKey ?? createReactionSourceKey(stored)) === createReactionSourceKey(fallback)
+    ? (stored.sourceReactionKey ?? createReactionSourceKey(stored)) === fallbackReactionKey
     : false;
 
   if (stored && storedMatchesFallback) {
@@ -40,12 +43,15 @@ export const loadReactionDraft = async ({
       reactants: stored.reactants,
       products: stored.products,
       conditions: stored.conditions,
-      sourceReactionKey: stored.sourceReactionKey ?? createReactionSourceKey(fallback)
+      reactionSmiles: stored.reactionSmiles,
+      rxnfile: stored.rxnfile,
+      sourceReactionKey: stored.sourceReactionKey ?? fallbackReactionKey,
+      draftReactionKey: stored.draftReactionKey ?? createReactionSourceKey(stored)
     };
   }
 
   if (stored && !storedMatchesFallback && documentId) {
-    removeStoredReactionDraft({ documentId, blockId }, storageImpl);
+    removeStoredReactionDraft({ documentId, blockId, sessionId }, storageImpl);
   }
 
   if (documentId && sessionId) {
@@ -66,6 +72,8 @@ export const loadReactionDraft = async ({
             reactants?: unknown;
             products?: unknown;
             conditions?: unknown;
+            reactionSmiles?: unknown;
+            rxnfile?: unknown;
           };
         }
       | null;
@@ -80,16 +88,25 @@ export const loadReactionDraft = async ({
       const conditions = isStringArray(payload.reaction?.conditions)
         ? payload.reaction.conditions
         : fallback.conditions;
+      const reactionSmiles =
+        typeof payload.reaction?.reactionSmiles === "string" ? payload.reaction.reactionSmiles : undefined;
+      const rxnfile =
+        typeof payload.reaction?.rxnfile === "string" ? payload.reaction.rxnfile : undefined;
 
       return {
         blockId,
         reactants,
         products,
         conditions,
-        sourceReactionKey: createReactionSourceKey({
+        reactionSmiles,
+        rxnfile,
+        sourceReactionKey: fallbackReactionKey,
+        draftReactionKey: createReactionSourceKey({
           reactants,
           products,
-          conditions
+          conditions,
+          reactionSmiles,
+          rxnfile
         })
       };
     }
@@ -98,6 +115,7 @@ export const loadReactionDraft = async ({
   return {
     blockId,
     ...fallback,
-    sourceReactionKey: createReactionSourceKey(fallback)
+    sourceReactionKey: fallbackReactionKey,
+    draftReactionKey: fallbackReactionKey
   };
 };

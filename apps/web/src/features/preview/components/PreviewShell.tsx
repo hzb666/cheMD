@@ -1,14 +1,13 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React from "react";
+import type { RenderOptions } from "@chemd/render-profile";
 
 import { Button } from "../../../components/ui/button";
 import { Card, CardContent, CardHeader } from "../../../components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../components/ui/tabs";
-import { useRenderedPreview } from "../../chem-preview/hooks/useRenderedPreview";
-import { useDocxExport } from "../../export-docx/hooks/useDocxExport";
-import { readPreviewEditMessage } from "../lib/read-preview-edit-message";
-import { toSandboxedPreviewDocument } from "../styles/preview-document";
+import { DocumentPreview } from "./DocumentPreview";
+import { usePreviewShellController } from "../hooks/usePreviewShellController";
 
 interface PreviewShellProps {
   html: string;
@@ -17,6 +16,7 @@ interface PreviewShellProps {
   source: string;
   documentId?: string;
   sessionId?: string;
+  renderOptions?: RenderOptions;
   previewIsFresh?: boolean;
   onEditMolecule?: (blockId: string, smiles: string) => void | Promise<void>;
   onEditReaction?: (
@@ -27,7 +27,7 @@ interface PreviewShellProps {
   ) => void | Promise<void>;
 }
 
-type OutputTab = "preview" | "json" | "docxBridge";
+type PreviewTabValue = "preview" | "json" | "docxBridge";
 
 const PreviewShell = ({
   html,
@@ -36,50 +36,32 @@ const PreviewShell = ({
   source,
   documentId,
   sessionId,
+  renderOptions,
   previewIsFresh = true,
   onEditMolecule,
   onEditReaction
 }: PreviewShellProps) => {
-  const [activeTab, setActiveTab] = useState<OutputTab>("preview");
-  const previewFrameRef = useRef<HTMLIFrameElement>(null);
-  const { exportingDocx, exportMessage, exportDocx } = useDocxExport({
-    payload: { source }
+  const {
+    activeTab,
+    setActiveTab,
+    previewFrameRef,
+    exportingDocx,
+    exportMessage,
+    exportDocx,
+    hydratedHtml,
+    activeCode
+  } = usePreviewShellController({
+    html,
+    json,
+    docxBridge,
+    source,
+    documentId,
+    sessionId,
+    renderOptions,
+    previewIsFresh,
+    onEditMolecule,
+    onEditReaction
   });
-  const { hydratedHtml } = useRenderedPreview(html, { documentId, sessionId });
-
-  useEffect(() => {
-    if (!onEditMolecule && !onEditReaction) {
-      return undefined;
-    }
-
-    const handlePreviewMessage = (event: MessageEvent) => {
-      const payload = readPreviewEditMessage(
-        event,
-        previewFrameRef.current?.contentWindow ?? null,
-        previewIsFresh
-      );
-      if (!payload) {
-        return;
-      }
-      if (payload.kind === "molecule") {
-        void onEditMolecule?.(payload.blockId, payload.smiles);
-        return;
-      }
-      void onEditReaction?.(
-        payload.blockId,
-        payload.reactants,
-        payload.products,
-        payload.conditions
-      );
-    };
-
-    window.addEventListener("message", handlePreviewMessage);
-    return () => {
-      window.removeEventListener("message", handlePreviewMessage);
-    };
-  }, [onEditMolecule, onEditReaction, previewIsFresh]);
-
-  const activeCode = activeTab === "json" ? json : docxBridge;
 
   return (
     <Card
@@ -109,7 +91,7 @@ const PreviewShell = ({
 
         <Tabs
           value={activeTab}
-          onValueChange={(value) => setActiveTab(value as OutputTab)}
+          onValueChange={(value) => setActiveTab(value as PreviewTabValue)}
           className="flex min-h-0 flex-1 flex-col"
         >
           <div className="panel-toolbar shrink-0">
@@ -142,18 +124,7 @@ const PreviewShell = ({
           </div>
 
           <TabsContent value="preview" className="mt-0 flex min-h-0 flex-1 flex-col">
-            <div className="detail-card min-h-0 flex-1">
-              <div className="detail-card-body preview-canvas h-full">
-                <iframe
-                  ref={previewFrameRef}
-                  title="chemd-preview"
-                  sandbox="allow-scripts"
-                  referrerPolicy="no-referrer"
-                  className="preview-frame"
-                  srcDoc={toSandboxedPreviewDocument(hydratedHtml)}
-                />
-              </div>
-            </div>
+            <DocumentPreview html={hydratedHtml} frameRef={previewFrameRef} />
           </TabsContent>
 
           <TabsContent value="json" className="mt-0 flex min-h-0 flex-1 flex-col">

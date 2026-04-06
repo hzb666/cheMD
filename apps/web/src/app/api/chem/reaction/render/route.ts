@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
+import { classifyReactionConditions } from "@chemd/core";
 
+import {
+  isCasResolutionError,
+  resolveChemicalNotationList
+} from "../../../../../server/chem/cas-resolver";
 import { callChemServiceReactionRender } from "../../../../../server/chem/chem-service-client";
 import type { ReactionPayload, ReactionRenderResponse } from "../../../../../server/chem/dto";
 
@@ -65,13 +70,17 @@ export const POST = async (request: Request): Promise<Response> => {
   const reactants = body.reactants.map((item) => item.trim());
   const products = body.products.map((item) => item.trim());
   const conditions = (body.conditions ?? []).map((item) => item.trim());
-  const reaction = buildReactionPayload(reactants, products, conditions);
-
   try {
+    const [resolvedReactants, resolvedProducts] = await Promise.all([
+      resolveChemicalNotationList(reactants),
+      resolveChemicalNotationList(products)
+    ]);
+    const reaction = buildReactionPayload(resolvedReactants, resolvedProducts, conditions);
+    const normalizedConditions = classifyReactionConditions({ conditions });
     const rendered = await callChemServiceReactionRender({
       kind: "reaction",
-      reactants,
-      products,
+      reactants: resolvedReactants,
+      products: resolvedProducts,
       conditions,
       renderOptions:
         body.renderOptions && typeof body.renderOptions === "object"
@@ -81,16 +90,24 @@ export const POST = async (request: Request): Promise<Response> => {
     const payload: ReactionRenderResponse = {
       ...rendered,
       renderer: rendered.renderer ?? "chem-service",
-      reaction: rendered.reaction ?? reaction
+      reaction: rendered.reaction ?? reaction,
+      normalized_conditions: rendered.normalized_conditions ?? normalizedConditions
     };
     return NextResponse.json(payload);
   } catch (error) {
+    if (isCasResolutionError(error)) {
+      return NextResponse.json({ message: error.message, code: error.code }, { status: error.status });
+    }
+
     const message = error instanceof Error ? error.message : "render failed";
+    const reaction = buildReactionPayload(reactants, products, conditions);
+    const normalizedConditions = classifyReactionConditions({ conditions });
     return NextResponse.json({
       svg: buildFallbackSvg(reactants, products, conditions),
       warnings: [`chem-service unavailable, fallback renderer used: ${message}`],
       renderer: "fallback",
-      reaction
+      reaction,
+      normalized_conditions: normalizedConditions
     });
   }
 };

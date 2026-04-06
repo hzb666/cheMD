@@ -1,26 +1,22 @@
 import { useCallback, useRef, useState } from "react";
 
-import type { OcrApplyResult } from "../types";
+import { buildChemdSessionHeaders } from "../../../lib/chemd-session-token";
+import type { OcrApplyResult, UnifiedOcrRouteResponse } from "../types";
 import { ensureBlockId } from "../lib/ensure-block-id";
 import { insertMoleculeBlock } from "../lib/insert-molecule-block";
 import { selectTargetMolecule } from "../lib/select-target-molecule";
+import { selectTargetReaction } from "../lib/select-target-reaction";
 import { updateMoleculeBlock } from "../lib/update-molecule-block";
 import { saveStoredStructureDraft } from "../../structure-editor/lib/structure-draft-store";
-
+import { insertReactionBlock } from "../../reaction-editor/lib/insert-reaction-block";
+import { saveStoredReactionDraft } from "../../reaction-editor/lib/reaction-draft-store";
+import { updateReactionBlock } from "../../reaction-editor/lib/update-reaction-block";
+ 
 interface UseImageOcrParams {
   documentId: string;
   sessionId: string;
   getLatestSource: () => string;
   onSourceChange: (nextSource: string) => void;
-}
-
-interface OcrApiResponse {
-  status: "ok" | "partial" | "failed";
-  blockId?: string;
-  structure?: {
-    smiles: string;
-    molfile?: string;
-  };
 }
 
 interface UseImageOcrResult {
@@ -53,7 +49,11 @@ export const useImageOcr = ({
 
       try {
         const initialTarget = selectTargetMolecule(getLatestSource());
-        const requestedBlockId = ensureBlockId(initialTarget?.blockId);
+        const initialReactionTarget = selectTargetReaction(getLatestSource());
+        const requestedBlockId = ensureBlockId(
+          initialReactionTarget?.blockId ?? initialTarget?.blockId,
+          initialReactionTarget ? "rxn" : initialTarget ? "mol" : "ocr"
+        );
 
         const formData = new FormData();
         formData.set("documentId", documentId);
@@ -63,6 +63,7 @@ export const useImageOcr = ({
 
         const response = await fetch("/api/chem/ocr", {
           method: "POST",
+          headers: buildChemdSessionHeaders(),
           body: formData
         });
 
@@ -71,25 +72,62 @@ export const useImageOcr = ({
           throw new Error(payload.message ?? `OCR failed (${response.status})`);
         }
 
-        const payload = (await response.json()) as OcrApiResponse;
-        if (!payload.structure?.smiles) {
-          throw new Error("OCR did not return a molecule smiles");
+        const payload = (await response.json()) as UnifiedOcrRouteResponse;
+        const latestSource = getLatestSource();
+
+        if (
+          payload.kind === "reaction"
+          && payload.reaction?.reactants?.length
+          && payload.reaction?.products?.length
+        ) {
+          const target = selectTargetReaction(latestSource, initialReactionTarget?.blockId);
+          const blockId = target?.blockId ?? requestedBlockId;
+          const action = target ? "update_existing" : "create_new";
+          const nextSource = target
+            ? updateReactionBlock(latestSource, blockId, payload.reaction)
+            : insertReactionBlock(latestSource, blockId, payload.reaction);
+
+          saveStoredReactionDraft({
+            documentId,
+            blockId,
+            sessionId,
+            reactants: payload.reaction.reactants,
+            products: payload.reaction.products,
+            conditions: payload.reaction.conditions
+          });
+          onSourceChange(nextSource);
+
+          const result: OcrApplyResult = {
+            nextSource,
+            blockId,
+            action,
+            kind: "reaction",
+            reaction: payload.reaction
+          };
+          setLastResult(result);
+          return result;
         }
 
-        const latestSource = getLatestSource();
+        const structure = payload.kind === "molecule" ? payload.structure : undefined;
+
+        if (!structure?.smiles) {
+          throw new Error("OCR did not return a usable chemistry payload");
+        }
+
         const target = selectTargetMolecule(latestSource, initialTarget?.blockId);
         const blockId = target?.blockId ?? requestedBlockId;
         const action = target ? "update_existing" : "create_new";
         const nextSource = target
-          ? updateMoleculeBlock(latestSource, blockId, payload.structure.smiles)
-          : insertMoleculeBlock(latestSource, blockId, payload.structure.smiles);
+          ? updateMoleculeBlock(latestSource, blockId, structure.smiles)
+          : insertMoleculeBlock(latestSource, blockId, structure.smiles);
 
         saveStoredStructureDraft({
           documentId,
           blockId,
-          smiles: payload.structure.smiles,
-          molfile: payload.structure.molfile,
-          sourceSmiles: payload.structure.smiles
+          sessionId,
+          smiles: structure.smiles,
+          molfile: structure.molfile,
+          sourceSmiles: structure.smiles
         });
         onSourceChange(nextSource);
 
@@ -97,12 +135,13 @@ export const useImageOcr = ({
           nextSource,
           blockId,
           action,
-          smiles: payload.structure.smiles
+          kind: "molecule",
+          smiles: structure.smiles
         };
         setLastResult(result);
         return result;
       } catch (nextError) {
-        setError(nextError instanceof Error ? nextError.message : "OCR failed");
+      setError(nextError instanceof Error ? nextError.message : "OCR failed");
         return null;
       } finally {
         loadingRef.current = false;

@@ -71,6 +71,7 @@ const renderStructuredNode = (node: ChemdDocument["children"][number]): string =
       node.name ? `- Name: ${node.name}` : undefined,
       node.reactants && node.reactants.length > 0 ? `- Reactants: ${node.reactants.join(" + ")}` : undefined,
       node.products && node.products.length > 0 ? `- Products: ${node.products.join(" + ")}` : undefined,
+      node.conditions && node.conditions.length > 0 ? `- Conditions: ${node.conditions.join(" | ")}` : undefined,
       node.temperature ? `- Temperature: ${node.temperature}` : undefined,
       node.time ? `- Time: ${node.time}` : undefined,
       node.solvent ? `- Solvent: ${node.solvent}` : undefined,

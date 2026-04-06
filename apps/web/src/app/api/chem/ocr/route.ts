@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
+import { classifyReactionConditions } from "@chemd/core";
 
 import {
   callChemServiceNormalize,
-  callChemServiceOcr
+  callChemServiceOcr,
+  callChemServiceReactionOcr
 } from "../../../../server/chem/chem-service-client";
+import { requireMatchingSessionToken } from "../../../../server/chem/session-guard";
 import { saveStructureRecord } from "../../../../server/chem/structure-store";
 
 export const runtime = "nodejs";
@@ -20,7 +23,28 @@ const hasPlaceholderStructure = (
   ocr.structure?.molfile === "MOLFILE_PLACEHOLDER"
   || (ocr.warnings ?? []).some((warning) => warning.toLowerCase().includes("placeholder"));
 
+const normalizeStringArray = (value: unknown): string[] => (
+  Array.isArray(value)
+    ? value
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0)
+    : []
+);
+
+const hasPlaceholderReaction = (
+  ocr: Awaited<ReturnType<typeof callChemServiceReactionOcr>>
+): boolean =>
+  (ocr.warnings ?? []).some((warning) => warning.toLowerCase().includes("placeholder"));
+
+const REACTION_OCR_FALLBACK_WARNING = "reaction ocr fallback";
+
 export const POST = async (request: Request): Promise<Response> => {
+  const sessionError = requireMatchingSessionToken(request);
+  if (sessionError) {
+    return sessionError;
+  }
+
   const formData = await request.formData().catch(() => null);
   if (!formData) {
     return NextResponse.json({ message: "invalid form data" }, { status: 400 });
@@ -53,6 +77,40 @@ export const POST = async (request: Request): Promise<Response> => {
 
   try {
     const imageBase64 = await readFileAsBase64(image);
+    const reactionOcr = await callChemServiceReactionOcr(imageBase64, image.type || "image/png");
+    const reactants = normalizeStringArray(reactionOcr.reaction?.reactants);
+    const products = normalizeStringArray(reactionOcr.reaction?.products);
+    const conditions = normalizeStringArray(reactionOcr.reaction?.conditions);
+
+    if (reactants.length > 0 && products.length > 0 && !hasPlaceholderReaction(reactionOcr)) {
+      await saveStructureRecord({
+        kind: "reaction",
+        documentId,
+        blockId,
+        sessionId,
+        reactants,
+        products,
+        conditions,
+        source: "ocr",
+        confidence: reactionOcr.confidence
+      });
+
+      return NextResponse.json({
+        status: "ok",
+        kind: "reaction",
+        blockId,
+        action: "update_existing",
+        reaction: {
+          reactants,
+          products,
+          conditions
+        },
+        normalized_conditions: classifyReactionConditions({ conditions }),
+        confidence: reactionOcr.confidence,
+        warnings: reactionOcr.warnings ?? []
+      });
+    }
+
     const ocr = await callChemServiceOcr(imageBase64, image.type || "image/png");
 
     if ((!ocr.structure?.smiles && !ocr.structure?.molfile) || hasPlaceholderStructure(ocr)) {
@@ -72,7 +130,7 @@ export const POST = async (request: Request): Promise<Response> => {
       molfile: ocr.structure.molfile
     });
 
-    saveStructureRecord({
+    await saveStructureRecord({
       kind: "molecule",
       documentId,
       blockId,
@@ -85,6 +143,7 @@ export const POST = async (request: Request): Promise<Response> => {
 
     return NextResponse.json({
       status: "ok",
+      kind: "molecule",
       blockId,
       action: "update_existing",
       structure: {
@@ -92,7 +151,13 @@ export const POST = async (request: Request): Promise<Response> => {
         molfile: normalized.normalizedMolfile
       },
       confidence: ocr.confidence,
-      warnings: [...(ocr.warnings ?? []), ...(normalized.warnings ?? [])]
+      warnings: [
+        ...(reactionOcr.warnings?.length
+          ? [REACTION_OCR_FALLBACK_WARNING, ...reactionOcr.warnings]
+          : [REACTION_OCR_FALLBACK_WARNING]),
+        ...(ocr.warnings ?? []),
+        ...(normalized.warnings ?? [])
+      ]
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "ocr failed";

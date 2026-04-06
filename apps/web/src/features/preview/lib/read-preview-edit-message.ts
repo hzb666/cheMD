@@ -17,7 +17,8 @@ export type PreviewEditMessage = MoleculePreviewEditMessage | ReactionPreviewEdi
 export const readPreviewEditMessage = (
   event: Pick<MessageEvent, "origin" | "source" | "data">,
   previewWindow: Window | null,
-  previewIsFresh: boolean
+  previewIsFresh: boolean,
+  previewToken: string
 ): PreviewEditMessage | null => {
   if (!previewIsFresh) {
     return null;
@@ -38,8 +39,12 @@ export const readPreviewEditMessage = (
     reactants?: unknown;
     products?: unknown;
     conditions?: unknown;
+    previewToken?: unknown;
   } | null;
   if (typeof payload?.blockId !== "string" || !payload.blockId) {
+    return null;
+  }
+  if (typeof payload?.previewToken !== "string" || payload.previewToken !== previewToken) {
     return null;
   }
 

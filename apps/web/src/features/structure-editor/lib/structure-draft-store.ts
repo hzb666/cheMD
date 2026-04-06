@@ -1,8 +1,8 @@
-import type { KetcherDialogValue } from "../types";
+import type { StructureEditorDraft } from "../types";
 
 const STORAGE_KEY_PREFIX = "chemd:structure-draft";
 
-interface StoredStructureDraft extends KetcherDialogValue {
+interface StoredStructureDraft extends StructureEditorDraft {
   sourceSmiles?: string;
   updatedAt: string;
 }
@@ -10,9 +10,10 @@ interface StoredStructureDraft extends KetcherDialogValue {
 interface StructureDraftKey {
   documentId: string;
   blockId: string;
+  sessionId?: string;
 }
 
-interface SaveStructureDraftInput extends StructureDraftKey, KetcherDialogValue {
+interface SaveStructureDraftInput extends StructureDraftKey, StructureEditorDraft {
   sourceSmiles?: string;
 }
 
@@ -22,8 +23,8 @@ interface StorageLike {
   setItem: (key: string, value: string) => void;
 }
 
-const createStorageKey = ({ documentId, blockId }: StructureDraftKey): string =>
-  `${STORAGE_KEY_PREFIX}:${documentId}:${blockId}`;
+const createStorageKey = ({ documentId, blockId, sessionId }: StructureDraftKey): string =>
+  `${STORAGE_KEY_PREFIX}:${documentId}:${blockId}:${sessionId ?? "global"}`;
 
 const resolveStorage = (storageImpl?: StorageLike): StorageLike | null => {
   if (storageImpl) {
@@ -44,7 +45,7 @@ const resolveStorage = (storageImpl?: StorageLike): StorageLike | null => {
 export const loadStoredStructureDraft = (
   key: StructureDraftKey,
   storageImpl?: StorageLike
-): (KetcherDialogValue & { sourceSmiles?: string }) | null => {
+): (StructureEditorDraft & { sourceSmiles?: string }) | null => {
   const storage = resolveStorage(storageImpl);
   if (!storage) {
     return null;

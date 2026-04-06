@@ -35,7 +35,7 @@ export const loadStructureDraft = async ({
   fetchImpl = fetch,
   storageImpl
 }: LoadStructureDraftOptions): Promise<StructureDraft> => {
-  const stored = loadStoredStructureDraft({ documentId, blockId }, storageImpl);
+  const stored = loadStoredStructureDraft({ documentId, blockId, sessionId }, storageImpl);
   const storedMatchesSource = stored
     ? (stored.sourceSmiles ?? stored.smiles) === fallbackSmiles
     : false;
@@ -47,7 +47,7 @@ export const loadStructureDraft = async ({
     };
   }
   if (stored && !storedMatchesSource) {
-    removeStoredStructureDraft({ documentId, blockId }, storageImpl);
+    removeStoredStructureDraft({ documentId, blockId, sessionId }, storageImpl);
   }
 
   const params = new URLSearchParams({

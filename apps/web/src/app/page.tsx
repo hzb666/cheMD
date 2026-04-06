@@ -1,148 +1,71 @@
 "use client";
 
-import React, {
-  startTransition,
-  useDeferredValue,
-  useEffect,
-  useMemo,
-  useRef,
-  useState
-} from "react";
-import { compileChemd, type CompileResult } from "@chemd/compiler";
+import React from "react";
 
 import logoMark from "../../../../vision/logo-03.png";
 
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Separator } from "../components/ui/separator";
 import { EditorShell } from "../features/editor/components/EditorShell";
-import { createCompileScheduler } from "../features/editor/lib/compile-scheduler";
-import { parseDocumentIdFromSource } from "../features/editor/lib/parse-document-id-from-source";
 import { OcrImportButton } from "../features/ocr/components/OcrImportButton";
 import { OcrPasteListener } from "../features/ocr/components/OcrPasteListener";
+import { ChemEditorDialog } from "../features/chem-editor/components/ChemEditorDialog";
+import type { ChemEditorDraftWithBlockId } from "../features/chem-editor/types";
 import { useImageOcr } from "../features/ocr/hooks/useImageOcr";
-import { insertMoleculeBlock } from "../features/ocr/lib/insert-molecule-block";
-import { updateMoleculeBlock } from "../features/ocr/lib/update-molecule-block";
+import { usePlaygroundDocumentController } from "../features/playground/hooks/usePlaygroundDocumentController";
 import PreviewShell from "../features/preview/components/PreviewShell";
-import { reactionKetcherShellAdapter } from "../features/reaction-editor/adapters/reaction-ketcher-shell-adapter";
-import { ReactionDialog } from "../features/reaction-editor/components/ReactionDialog";
-import { loadReactionDraft } from "../features/reaction-editor/lib/load-reaction-draft";
-import {
-  createReactionSourceKey,
-  saveStoredReactionDraft
-} from "../features/reaction-editor/lib/reaction-draft-store";
-import { insertReactionBlock } from "../features/reaction-editor/lib/insert-reaction-block";
-import {
-  buildReactionSaveRequest,
-  resolveSavedReactionDraft
-} from "../features/reaction-editor/lib/reaction-save";
-import { updateReactionBlock } from "../features/reaction-editor/lib/update-reaction-block";
-import type { ReactionEditorDraftWithBlockId } from "../features/reaction-editor/types";
-import { useReactionOcr } from "../features/reaction-ocr/hooks/useReactionOcr";
-import { KetcherDialog } from "../features/structure-editor/components/KetcherDialog";
-import { loadStructureDraft } from "../features/structure-editor/lib/load-structure-draft";
-import {
-  buildStructureSaveRequest,
-  resolveSavedStructureDraft
-} from "../features/structure-editor/lib/structure-save";
-import { getStructureSessionId } from "../features/structure-editor/lib/structure-session";
-import { saveStoredStructureDraft } from "../features/structure-editor/lib/structure-draft-store";
-
-const sampleSource = `---
-id: exp-2026-03-30-001
-title: Ethanol oxidation to acetic acid
-date: 2026-03-30
-render_profile: publication-acs
-primary_result: res-main
----
-
-# Ethanol oxidation to acetic acid
-
-:::reaction #rxn-main
-reactants: CCO | O=O
-products: CC(=O)O
-conditions: Cu catalyst | air | 80 C | 4 h
-:::
-
-:::result #res-main
-yield: 63%
-:::
-
-:::molecule #mol-main
-smiles: CCO
-:::
-
-Water marker: :chem[H2O]
-Yield: @res-main.yield
-`;
-
-const compilePreview = (source: string): CompileResult => compileChemd(source);
+import { useReactionEditFlow } from "../features/reaction-editor/hooks/useReactionEditFlow";
+import { useStructureEditFlow } from "../features/structure-editor/hooks/useStructureEditFlow";
 
 const Page = () => {
-  const [source, setSource] = useState(sampleSource);
-  const [result, setResult] = useState<CompileResult>(() => compilePreview(sampleSource));
-  const [lastCompiledSource, setLastCompiledSource] = useState(sampleSource);
-  const [editorStatus, setEditorStatus] = useState<string | null>(null);
-  const [editingStructure, setEditingStructure] = useState<{
-    blockId: string;
-    smiles: string;
-    molfile?: string;
-  } | null>(null);
-  const [editingReaction, setEditingReaction] = useState<ReactionEditorDraftWithBlockId | null>(null);
-  const deferredSource = useDeferredValue(source);
-  const schedulerRef = useRef(createCompileScheduler(compilePreview));
-  const sourceRef = useRef(sampleSource);
-  const documentId = useMemo(() => parseDocumentIdFromSource(source), [source]);
-  const sessionId = useMemo(() => getStructureSessionId(), []);
-  const applySourceChange = (nextSource: string) => {
-    sourceRef.current = nextSource;
-    setSource(nextSource);
-  };
+  const {
+    source,
+    result,
+    documentId,
+    sessionId,
+    lineCount,
+    previewIsFresh,
+    compileState,
+    compileStateTone,
+    editorStatus,
+    setEditorStatus,
+    applySourceChange,
+    getLatestSource
+  } = usePlaygroundDocumentController();
   const ocr = useImageOcr({
     documentId,
     sessionId,
-    getLatestSource: () => sourceRef.current,
+    getLatestSource,
     onSourceChange: applySourceChange
   });
-  const reactionOcr = useReactionOcr({
+  const {
+    editingStructure,
+    closeStructureDialog,
+    handleEditMolecule,
+    handleSaveStructure
+  } = useStructureEditFlow({
     documentId,
     sessionId,
-    getLatestSource: () => sourceRef.current,
-    onSourceChange: applySourceChange
+    getLatestSource,
+    applySourceChange,
+    setEditorStatus
   });
-
-  useEffect(() => {
-    sourceRef.current = source;
-  }, [source]);
-
-  useEffect(() => {
-    const scheduler = schedulerRef.current;
-
-    scheduler.schedule(deferredSource, (nextResult) => {
-      startTransition(() => {
-        setResult(nextResult);
-        setLastCompiledSource(deferredSource);
-      });
-    });
-
-    return () => {
-      scheduler.cancel();
-    };
-  }, [deferredSource]);
-
-  const diagnosticCount = result.diagnostics.length;
-  const previewIsFresh = lastCompiledSource === source;
-  const compileState = !previewIsFresh
-    ? "Compiling..."
-    : diagnosticCount === 0
-      ? "Preview synced"
-      : `${diagnosticCount} diagnostics`;
-  const compileStateTone = !previewIsFresh ? "pending" : diagnosticCount === 0 ? "success" : "warning";
+  const {
+    editingReaction,
+    closeReactionDialog,
+    handleEditReaction,
+    handleSaveReaction
+  } = useReactionEditFlow({
+    documentId,
+    sessionId,
+    getLatestSource,
+    applySourceChange,
+    setEditorStatus
+  });
   const logoSrc = typeof logoMark === "string" ? logoMark : logoMark.src;
-  const lineCount = source.split(/\r?\n/).length;
-  const ocrBusy = ocr.loading || reactionOcr.loading;
-
-  const applyMoleculeOcrFile = (file: File) => {
-    if (ocrBusy) {
+  const diagnosticCount = result.diagnostics.length;
+  const applyOcrFile = (file: File) => {
+    if (ocr.loading) {
       return;
     }
 
@@ -153,6 +76,16 @@ const Page = () => {
         }
         return;
       }
+
+      if (next.kind === "reaction") {
+        setEditorStatus(
+          next.action === "create_new"
+            ? `OCR created reaction block #${next.blockId}`
+            : `OCR updated reaction block #${next.blockId}`
+        );
+        return;
+      }
+
       setEditorStatus(
         next.action === "create_new"
           ? `OCR created molecule block #${next.blockId}`
@@ -160,26 +93,24 @@ const Page = () => {
       );
     });
   };
-
-  const applyReactionOcrFile = (file: File) => {
-    if (ocrBusy) {
-      return;
-    }
-
-    void reactionOcr.runOcr(file).then((next) => {
-      if (!next) {
-        if (reactionOcr.error) {
-          setEditorStatus("Reaction OCR failed");
-        }
-        return;
+  const editingChem: ChemEditorDraftWithBlockId | null = editingReaction
+    ? {
+        blockId: editingReaction.blockId,
+        sourceKind: "reaction",
+        kind: "reaction",
+        reactants: editingReaction.reactants,
+        products: editingReaction.products,
+        conditions: editingReaction.conditions
       }
-      setEditorStatus(
-        next.action === "create_new"
-          ? `OCR created reaction block #${next.blockId}`
-          : `OCR updated reaction block #${next.blockId}`
-      );
-    });
-  };
+    : editingStructure
+      ? {
+          blockId: editingStructure.blockId,
+          sourceKind: "molecule",
+          kind: "molecule",
+          smiles: editingStructure.smiles,
+          molfile: editingStructure.molfile
+        }
+      : null;
 
   return (
     <main
@@ -257,18 +188,13 @@ const Page = () => {
             toolbarActions={(
               <>
                 <OcrImportButton
-                  loading={ocrBusy}
-                  label="OCR Molecule"
-                  onPickFile={applyMoleculeOcrFile}
-                />
-                <OcrImportButton
-                  loading={ocrBusy}
-                  label="OCR Reaction"
-                  onPickFile={applyReactionOcrFile}
+                  loading={ocr.loading}
+                  label="OCR"
+                  onPickFile={applyOcrFile}
                 />
               </>
             )}
-            statusMessage={reactionOcr.error ?? ocr.error ?? editorStatus}
+            statusMessage={ocr.error ?? editorStatus}
             onSourceChange={applySourceChange}
           />
           <PreviewShell
@@ -278,190 +204,44 @@ const Page = () => {
             source={source}
             documentId={documentId}
             sessionId={sessionId}
+            renderOptions={result.renderOptions}
             previewIsFresh={previewIsFresh}
-            onEditMolecule={async (blockId, smiles) => {
-              if (!previewIsFresh) {
-                setEditorStatus("Preview is updating; wait for compile to finish before editing.");
-                return;
-              }
-
-              try {
-                const draft = await loadStructureDraft({
-                  documentId,
-                  blockId,
-                  sessionId,
-                  fallbackSmiles: smiles
-                });
-                setEditingStructure(draft);
-              } catch (error) {
-                setEditingStructure({ blockId, smiles });
-                setEditorStatus(
-                  error instanceof Error
-                    ? `${error.message}; fallback to preview structure`
-                    : "Structure draft load failed; fallback to preview structure"
-                );
-              }
-            }}
-            onEditReaction={async (blockId, reactants, products, conditions) => {
-              if (!previewIsFresh) {
-                setEditorStatus("Preview is updating; wait for compile to finish before editing.");
-                return;
-              }
-
-              try {
-                const draft = await loadReactionDraft({
-                  documentId,
-                  blockId,
-                  sessionId,
-                  fallback: {
-                    reactants,
-                    products,
-                    conditions
-                  }
-                });
-                setEditingReaction(draft);
-              } catch (error) {
-                setEditingReaction({
-                  blockId,
-                  reactants,
-                  products,
-                  conditions
-                });
-                setEditorStatus(
-                  error instanceof Error
-                    ? `${error.message}; fallback to preview reaction`
-                    : "Reaction draft load failed; fallback to preview reaction"
-                );
-              }
-            }}
+            onEditMolecule={(blockId, smiles) => handleEditMolecule(blockId, smiles, previewIsFresh)}
+            onEditReaction={(blockId, reactants, products, conditions) =>
+              handleEditReaction(blockId, reactants, products, conditions, previewIsFresh)}
           />
         </section>
 
-        <KetcherDialog
-          open={Boolean(editingStructure)}
-          value={
-            editingStructure
-              ? { smiles: editingStructure.smiles, molfile: editingStructure.molfile }
-              : null
-          }
-          onClose={() => setEditingStructure(null)}
+        <ChemEditorDialog
+          open={Boolean(editingChem)}
+          value={editingChem}
+          onClose={() => {
+            closeStructureDialog();
+            closeReactionDialog();
+          }}
           onSave={async (next) => {
-            if (!editingStructure) {
+            if (next.kind === "reaction") {
+              await handleSaveReaction({
+                blockId: next.blockId,
+                reactants: next.reactants,
+                products: next.products,
+                conditions: next.conditions,
+                sourceReactionKey: editingReaction?.sourceReactionKey,
+                draftReactionKey: editingReaction?.draftReactionKey
+              });
               return;
             }
 
-            const response = await fetch("/api/chem/structure/save", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json"
+            await handleSaveStructure(
+              {
+                smiles: next.smiles,
+                molfile: next.molfile
               },
-              body: JSON.stringify({
-                documentId,
-                blockId: editingStructure.blockId,
-                sessionId,
-                ...buildStructureSaveRequest(next)
-              })
-            });
-
-            const payload = (await response.json().catch(() => null)) as
-              | { smiles?: string; molfile?: string; message?: string }
-              | null;
-            if (!response.ok || !payload?.smiles) {
-              throw new Error(payload?.message ?? `Structure save failed (${response.status})`);
-            }
-
-            const savedDraft = resolveSavedStructureDraft(next, {
-              smiles: payload.smiles,
-              molfile: typeof payload.molfile === "string" ? payload.molfile : undefined
-            });
-            saveStoredStructureDraft({
-              documentId,
-              blockId: editingStructure.blockId,
-              smiles: savedDraft.smiles,
-              molfile: savedDraft.molfile,
-              sourceSmiles: savedDraft.smiles
-            });
-            const latestSource = sourceRef.current;
-            const blockExists = latestSource.includes(`:::molecule #${editingStructure.blockId}`);
-            const nextSource = blockExists
-              ? updateMoleculeBlock(latestSource, editingStructure.blockId, savedDraft.smiles)
-              : insertMoleculeBlock(latestSource, editingStructure.blockId, savedDraft.smiles);
-            applySourceChange(nextSource);
-            setEditorStatus(`Structure updated for #${editingStructure.blockId}`);
-            setEditingStructure(null);
+              next.blockId
+            );
           }}
         />
-        <ReactionDialog
-          adapter={reactionKetcherShellAdapter}
-          documentId={documentId}
-          open={Boolean(editingReaction)}
-          value={editingReaction}
-          onClose={() => setEditingReaction(null)}
-          onSave={async (next) => {
-            const response = await fetch("/api/chem/reaction/save", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json"
-              },
-              body: JSON.stringify({
-                documentId,
-                blockId: next.blockId,
-                sessionId,
-                ...buildReactionSaveRequest(next)
-              })
-            });
-
-            const payload = (await response.json().catch(() => null)) as
-              | {
-                  blockId?: string;
-                  reactants?: string[];
-                  products?: string[];
-                  conditions?: string[];
-                  message?: string;
-                }
-              | null;
-            if (
-              !response.ok
-              || !payload?.blockId
-              || !Array.isArray(payload.reactants)
-              || !Array.isArray(payload.products)
-              || !Array.isArray(payload.conditions)
-            ) {
-              throw new Error(payload?.message ?? `Reaction save failed (${response.status})`);
-            }
-
-            const savedDraft = resolveSavedReactionDraft(next, {
-              reactants: payload.reactants,
-              products: payload.products,
-              conditions: payload.conditions
-            });
-            saveStoredReactionDraft({
-              documentId,
-              blockId: payload.blockId,
-              reactants: savedDraft.reactants,
-              products: savedDraft.products,
-              conditions: savedDraft.conditions,
-              sourceReactionKey: createReactionSourceKey(savedDraft)
-            });
-            const latestSource = sourceRef.current;
-            const blockExists = latestSource.includes(`:::reaction #${payload.blockId}`);
-            const nextSource = blockExists
-              ? updateReactionBlock(latestSource, payload.blockId, {
-                  reactants: savedDraft.reactants,
-                  products: savedDraft.products,
-                  conditions: savedDraft.conditions
-                })
-              : insertReactionBlock(latestSource, payload.blockId, {
-                  reactants: savedDraft.reactants,
-                  products: savedDraft.products,
-                  conditions: savedDraft.conditions
-                });
-            applySourceChange(nextSource);
-            setEditorStatus(`Reaction updated for #${payload.blockId}`);
-            setEditingReaction(null);
-          }}
-        />
-        <OcrPasteListener enabled={!ocrBusy} onPickFile={applyMoleculeOcrFile} />
+        <OcrPasteListener enabled={!ocr.loading} onPickFile={applyOcrFile} />
       </div>
     </main>
   );

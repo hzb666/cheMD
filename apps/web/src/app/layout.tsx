@@ -2,6 +2,8 @@ import React from "react";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
+import "ketcher-react/dist/index.css";
+
 import "./globals.css";
 import "../features/playground/styles/playground.css";
 

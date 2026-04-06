@@ -38,4 +38,72 @@ describe("renderJson", () => {
     expect(payload.render.profileId).toBe("publication-acs");
     expect(payload.render.adapter?.rdkit.fixedBondLength).toBe(options.structure.bondLength);
   });
+
+  it("adds normalized reaction condition fields to JSON output", () => {
+    const document = createDocument(
+      { id: "exp-rxn-json", title: "Reaction JSON Test", date: "2026-04-05" },
+      {
+        children: [
+          {
+            type: "reaction",
+            id: "rxn-main",
+            reactants: ["CCO", "O=O"],
+            products: ["CC(=O)O"],
+            conditions: ["Cu catalyst", "EtOH", "80 C", "4 h", "N2", "Na2CO3"],
+            solvent: "EtOH"
+          }
+        ]
+      }
+    );
+
+    const options = resolveRenderProfile({ profileId: "publication-acs" });
+    const json = renderJson(document, options);
+    const payload = JSON.parse(json) as {
+      document: {
+        children: Array<{
+          type: string;
+          normalized_conditions?: {
+            solvent?: { raw: string; normalized: string };
+            catalyst?: { raw: string; normalized: string };
+            reagents?: { raw: string; normalized: string[] };
+            atmosphere?: { raw: string; normalized: string };
+            temperature?: { raw: string; value: number; unit: string };
+            time?: { raw: string; value: number; unit: string };
+          };
+        }>;
+      };
+    };
+
+    expect(payload.document.children[0]).toMatchObject({
+      type: "reaction",
+      normalized_conditions: {
+        solvent: {
+          raw: "EtOH",
+          normalized: "ethanol"
+        },
+        catalyst: {
+          raw: "Cu catalyst",
+          normalized: "Cu catalyst"
+        },
+        reagents: {
+          raw: "Na2CO3",
+          normalized: ["Na2CO3"]
+        },
+        atmosphere: {
+          raw: "N2",
+          normalized: "nitrogen"
+        },
+        temperature: {
+          raw: "80 C",
+          value: 80,
+          unit: "C"
+        },
+        time: {
+          raw: "4 h",
+          value: 4,
+          unit: "h"
+        }
+      }
+    });
+  });
 });

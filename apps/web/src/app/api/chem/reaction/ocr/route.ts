@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { classifyReactionConditions } from "@chemd/core";
 
 import { callChemServiceReactionOcr } from "../../../../../server/chem/chem-service-client";
+import { requireMatchingSessionToken } from "../../../../../server/chem/session-guard";
 import { saveStructureRecord } from "../../../../../server/chem/structure-store";
 
 export const runtime = "nodejs";
@@ -26,6 +28,11 @@ const hasPlaceholderReaction = (
   (ocr.warnings ?? []).some((warning) => warning.toLowerCase().includes("placeholder"));
 
 export const POST = async (request: Request): Promise<Response> => {
+  const sessionError = requireMatchingSessionToken(request);
+  if (sessionError) {
+    return sessionError;
+  }
+
   const formData = await request.formData().catch(() => null);
   if (!formData) {
     return NextResponse.json({ message: "invalid form data" }, { status: 400 });
@@ -78,7 +85,7 @@ export const POST = async (request: Request): Promise<Response> => {
       );
     }
 
-    saveStructureRecord({
+    await saveStructureRecord({
       kind: "reaction",
       documentId,
       blockId,
@@ -92,6 +99,7 @@ export const POST = async (request: Request): Promise<Response> => {
 
     return NextResponse.json({
       status: "ok",
+      kind: "reaction",
       blockId,
       action: "update_existing",
       reaction: {
@@ -99,6 +107,7 @@ export const POST = async (request: Request): Promise<Response> => {
         products,
         conditions
       },
+      normalized_conditions: classifyReactionConditions({ conditions }),
       confidence: ocr.confidence,
       warnings: ocr.warnings ?? []
     });

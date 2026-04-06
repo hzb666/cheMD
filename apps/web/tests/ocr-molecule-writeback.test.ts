@@ -40,4 +40,24 @@ smiles: CCN
 
     expect(selectTargetMolecule(source)).toBeNull();
   });
+
+  it("assigns a stable synthetic id to a unique molecule block without an explicit id", () => {
+    const source = `:::molecule
+smiles: CCO
+:::`;
+
+    expect(selectTargetMolecule(source)?.blockId).toBe("mol-missing-id-1");
+  });
+
+  it("updates a unique molecule block without an explicit id and promotes it to a stable header id", () => {
+    const source = `:::molecule
+smiles: CCO
+:::`;
+
+    const next = updateMoleculeBlock(source, "mol-missing-id-1", "CCN");
+
+    expect(next).toContain(":::molecule #mol-missing-id-1");
+    expect(next).toContain("smiles: CCN");
+    expect(next).not.toContain("smiles: CCO");
+  });
 });

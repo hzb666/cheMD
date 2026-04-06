@@ -18,8 +18,7 @@ describe("Page", () => {
     expect(html).toContain("JSON");
     expect(html).toContain("DOCX");
     expect(html).toContain("Export");
-    expect(html).toContain("OCR Molecule");
-    expect(html).toContain("OCR Reaction");
+    expect(html).toContain("OCR");
     expect(html).toContain("YAML publication-acs");
     expect(html).toContain("panel-heading-inline");
     expect(html).toContain("tab-strip-container");

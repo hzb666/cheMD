@@ -6,6 +6,7 @@ import {
   createInlineCodeToken,
   createMarkdownLinkToken,
   createMarkdownNode,
+  classifyReactionConditions,
   createReferenceToken,
   getRenderOverrideValueHint,
   isKnownRenderOverridePath,
@@ -143,6 +144,42 @@ describe("core ast helpers", () => {
     expect(isValidRenderOverrideValue("export.imageFormat", "jpg")).toBe(false);
     expect(getRenderOverrideValueHint("export.imageFormat")).toBe('"svg" | "png"');
     expect(getRenderOverrideValueHint("structure.unknownField")).toBeUndefined();
+  });
+
+  it("classifies reaction condition text into structured fields", () => {
+    expect(
+      classifyReactionConditions({
+        conditions: ["Cu catalyst", "EtOH", "80 C", "4 h", "N2", "Na2CO3"],
+        solvent: "EtOH"
+      })
+    ).toMatchObject({
+      solvent: {
+        raw: "EtOH",
+        normalized: "ethanol"
+      },
+      catalyst: {
+        raw: "Cu catalyst",
+        normalized: "Cu catalyst"
+      },
+      reagents: {
+        raw: "Na2CO3",
+        normalized: ["Na2CO3"]
+      },
+      atmosphere: {
+        raw: "N2",
+        normalized: "nitrogen"
+      },
+      temperature: {
+        raw: "80 C",
+        value: 80,
+        unit: "C"
+      },
+      time: {
+        raw: "4 h",
+        value: 4,
+        unit: "h"
+      }
+    });
   });
 });
 

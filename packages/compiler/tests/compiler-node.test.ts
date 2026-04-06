@@ -57,6 +57,7 @@ date: 2026-03-31
 :::reaction #rxn-main
 reactants: CCO | O=O
 products: CC(=O)O
+conditions: air | 80 C
 :::`;
 
     const result = await compileChemdToDocx(source, {
@@ -69,6 +70,7 @@ products: CC(=O)O
     expect(result.compileResult.document.meta.id).toBe("exp-node-docx");
     expect(result.markdown).toContain("# Node DOCX");
     expect(result.markdown).toContain("### Reaction `rxn-main`");
+    expect(result.markdown).toContain("- Conditions: air | 80 C");
     expect(result.outputPath).toContain(".docx");
   });
 
