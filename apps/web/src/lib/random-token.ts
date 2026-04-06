@@ -14,5 +14,7 @@ export const createScopedToken = (prefix: string): string => {
     return `${prefix}-${toHex(bytes)}`;
   }
 
-  throw new Error("secure random token generation is unavailable");
+  throw new Error(
+    "secure random token generation is unavailable; ensure a modern secure runtime with crypto support"
+  );
 };

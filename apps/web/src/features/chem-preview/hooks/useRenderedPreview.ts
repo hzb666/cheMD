@@ -191,10 +191,11 @@ export const useRenderedPreview = (
     };
   }, [baseHtml, documentId, renderOptions, sessionId]);
 
-  const parentOrigin = typeof window === "undefined" ? "null" : window.location.origin;
-
   return {
-    hydratedHtml: `${hydratedHtml}${buildPreviewBridgeScript(previewBridgeToken, parentOrigin)}`,
+    hydratedHtml:
+      typeof window === "undefined"
+        ? hydratedHtml
+        : `${hydratedHtml}${buildPreviewBridgeScript(previewBridgeToken, window.location.origin)}`,
     previewBridgeToken
   };
 };
