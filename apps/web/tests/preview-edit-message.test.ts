@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { buildPreviewBridgeScript } from "../src/features/chem-preview/lib/preview-bridge";
 import { readPreviewEditMessage } from "../src/features/preview/lib/read-preview-edit-message";
+import { createScopedToken } from "../src/lib/random-token";
 
 describe("readPreviewEditMessage", () => {
   const previewToken = "preview-token";
@@ -166,5 +168,37 @@ describe("readPreviewEditMessage", () => {
         previewToken
       )
     ).toBeNull();
+  });
+
+  it("builds preview bridge script without wildcard postMessage origin", () => {
+    const script = buildPreviewBridgeScript(previewToken);
+
+    expect(script).toContain("const targetOrigin = window.location.origin;");
+    expect(script).not.toContain('"*"');
+  });
+
+  it("creates scoped fallback token when crypto UUID API is unavailable", () => {
+    const originalCrypto = globalThis.crypto;
+    const getRandomValues = (array: Uint8Array): Uint8Array => {
+      array.fill(0xab);
+      return array;
+    };
+
+    Object.defineProperty(globalThis, "crypto", {
+      configurable: true,
+      value: {
+        randomUUID: () => "",
+        getRandomValues
+      }
+    });
+
+    try {
+      expect(createScopedToken("scope")).toBe(`scope-${"ab".repeat(16)}`);
+    } finally {
+      Object.defineProperty(globalThis, "crypto", {
+        configurable: true,
+        value: originalCrypto
+      });
+    }
   });
 });

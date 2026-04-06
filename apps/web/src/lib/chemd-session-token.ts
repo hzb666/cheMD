@@ -1,16 +1,11 @@
+import { createScopedToken } from "./random-token";
+
 export const CHEMD_SESSION_TOKEN_COOKIE = "chemd-session-token";
 export const CHEMD_SESSION_TOKEN_HEADER = "x-chemd-session-token";
 
 const SESSION_STORAGE_KEY = "chemd-session-token";
 
-const createSessionToken = (): string => {
-  const randomUuid = globalThis.crypto?.randomUUID?.();
-  if (typeof randomUuid === "string" && randomUuid.length > 0) {
-    return randomUuid;
-  }
-
-  return `chemd-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-};
+const createSessionToken = (): string => createScopedToken("chemd");
 
 const persistSessionTokenCookie = (token: string): void => {
   if (typeof document === "undefined") {
