@@ -1,6 +1,7 @@
 <p align="center">
-  <img src="vision/logo-03.png" alt="chemd logo" width="420" />
+  <img src="vision/logo-01.png" alt="chemd logo" width="520" />
 </p>
+
 
 <p align="center">
   <img src="https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white" alt="TypeScript 5.9" />
@@ -13,21 +14,18 @@
   <img src="https://img.shields.io/badge/Vitest-3.2-6E9F18?logo=vitest&logoColor=white" alt="Vitest 3.2" />
 </p>
 
+
 # chemd
 
+[简体中文](./README.zh-CN.md) | [English](./README.md)
+
 `chemd` is a Markdown-based semantic system for chemistry documents and experimental records.  
-In the current `v0.1` scope, the project is not positioned as a language-only kernel. It is a product prototype centered on `Editor + Preview`, with a document pipeline that supports structured chemistry blocks, references, templates, rendering profiles, OCR-assisted ingestion, chemistry-aware preview, and source write-back.
-
-The repository already contains working product and platform components, but the `v0.1` boundary is intentionally narrow:
-
-- In scope for `v0.1`: `Editor + Preview`, `molecule`, `reaction`, document compilation, preview, export bridge, chemistry service integration
-- Present in code but not part of the formal `v0.1` product scope: `Tree`
-- Present as an implementation track but aligned to `v0.2+`: `training-export`
+The current product prototype is centered on `Editor + Preview`, with a document pipeline that supports structured chemistry blocks, references, templates, rendering profiles, OCR-assisted ingestion, chemistry-aware preview, and source write-back.
 
 ## Table of Contents
 
 - [Overview](#overview)
-- [Product Scope](#product-scope)
+- [Current Focus](#current-focus)
 - [Interaction Flow](#interaction-flow)
 - [Getting Started](#getting-started)
 - [Example Document](#example-document)
@@ -60,11 +58,11 @@ The current prototype supports:
 
 The intended operating model is document-first. OCR, rendering, structure editing, and preview updates all converge back into the Markdown source instead of creating a disconnected UI state.
 
-## Product Scope
+## Current Focus
 
-The formal `v0.1` product scope is a chemistry document prototype rather than a complete ELN platform.
+The current public README focuses on what the repository already supports today. Detailed `v0.1` scope boundaries and milestone decisions are maintained in [`docs/chemd-v0.1-功能计划与实现进度.md`](docs/chemd-v0.1-%E5%8A%9F%E8%83%BD%E8%AE%A1%E5%88%92%E4%B8%8E%E5%AE%9E%E7%8E%B0%E8%BF%9B%E5%BA%A6.md) and [`docs/chemd-v0.1-spec.zh-CN.md`](docs/chemd-v0.1-spec.zh-CN.md).
 
-### Included in `v0.1`
+### Current Product Surface
 
 - Markdown-based chemistry document authoring
 - Structured document compilation
@@ -75,16 +73,6 @@ The formal `v0.1` product scope is a chemistry document prototype rather than a 
 - Chemistry-aware preview hydration
 - Source write-back from preview and structure editing
 - DOCX bridge export
-
-### Explicitly out of scope for `v0.1`
-
-- Full ELN or project management platform features
-- Multi-user authorization and tenant model
-- Full bidirectional DOCX editing
-- A self-developed depiction engine
-- A self-developed OCR model stack
-- Formal productization of `Tree`
-- Formal `training-export` product delivery
 
 ## Interaction Flow
 
@@ -171,21 +159,21 @@ Provider variables are listed in [Environment Variables](#environment-variables)
 
 ```md
 ---
-entry_type: experiment
-id: exp-2026-03-30-001
-title: Ethanol oxidation to acetic acid
-author: zhibin hu
-date: 2026-03-30
-project: oxidation-study
-status: completed
-primary_reaction: rxn-main
-primary_result: res-main
-render_profile: eln-default
-render_overrides:
-  structure.bondLineWidth: 2.1
-tags:
-  - oxidation
-  - copper
+entry_type: experiment # Optional. Document category such as experiment or note.
+id: exp-2026-03-30-001 # Required. Unique document id. Falls back to draft-document when omitted.
+title: Ethanol oxidation to acetic acid # Required. Human-readable document title. Falls back to Untitled chemd document.
+author: zhibin hu # Optional. Record author or owner.
+date: 2026-03-30 # Required. Preferred in YYYY-MM-DD. Falls back to 1970-01-01 when omitted.
+project: oxidation-study # Optional. Project or study grouping label.
+status: completed # Optional. High-level record status for display or downstream processing.
+primary_reaction: rxn-main # Optional. Declares the main reaction object for alias/reference resolution.
+primary_result: res-main # Optional. Declares the main result object for alias/reference resolution.
+render_profile: eln-default # Optional. Render profile id. Falls back to eln-default when omitted or invalid.
+render_overrides: # Optional. One-level render override map applied on top of the selected profile.
+  structure.bondLineWidth: 2.1 # Optional. Example override for structure stroke width.
+tags: # Optional. String array for filtering or lightweight classification.
+  - oxidation # Optional tag item.
+  - copper # Optional tag item.
 ---
 
 This record documents the target transformation @rxn-main and the outcome @res-main.yield.
@@ -229,7 +217,7 @@ The current `v0.1` track is best understood through delivered capabilities and n
 
 ### Current Capabilities
 
-- [x] `Editor + Preview` is the default product surface, and `Tree` is no longer part of the default UI.
+- [x] `Editor + Preview` is the default product surface.
 - [x] The document compilation pipeline `source -> parser -> resolver -> render-profile -> preview/output` is operational.
 - [x] `molecule` and `reaction` are formal first-class objects in the `v0.1` product narrative.
 - [x] References, template definition and invocation, nested expansion, and cycle detection are implemented.
@@ -255,7 +243,6 @@ The current repository should still be described conservatively in a few areas:
 - OCR is available in the product surface, but real accuracy and readiness still depend on external service configuration.
 - `chem-service` is intended as an internal chemistry runtime and should not be treated as a public-facing service.
 - The repository does not currently ship with a production deployment bundle or deployment templates.
-- `training-export` exists in code, but should be treated as a separate track rather than a delivered `v0.1` product feature.
 
 ---
 
@@ -272,7 +259,7 @@ chemd/
 ├── packages/
 │   ├── compiler/               # Orchestration entry point
 │   ├── core/                   # AST, diagnostics, shared contracts
-│   ├── exporter-training/      # Training export implementation, aligned to v0.2+
+│   ├── exporter-training/      # Training export implementation package
 │   ├── parser/                 # Frontmatter, block, and token parsing
 │   ├── render-profile/         # Profiles, overrides, fallback, validation
 │   ├── renderer-docx/          # DOCX bridge output
@@ -341,7 +328,7 @@ The main engineering boundary is stable and intentional:
 | `@chemd/renderer-json` | JSON output | `v0.1` core |
 | `@chemd/renderer-svg` | fallback SVG rendering | `v0.1` core, but fallback-only in positioning |
 | `@chemd/renderer-docx` | DOCX bridge output | `v0.1` core |
-| `@chemd/exporter-training` | training export pipeline | implementation exists, but aligned to `v0.2+` |
+| `@chemd/exporter-training` | training export pipeline | experimental |
 | `apps/web` | product workbench, chemistry facade routes, UI interaction | main product entry point |
 | `services/chem-service` | RDKit-first render, OCR seams, structure cache | downstream chemistry service |
 
@@ -554,7 +541,7 @@ Important operational notes:
 
 ## Project Status
 
-`chemd` is currently best described as a chemistry document product prototype with a converged `Editor + Preview` surface, a stable document compilation core, and an increasingly formal chemistry interaction layer. The repository is beyond the stage of a language-only experiment, but the `v0.1` narrative should remain disciplined: the primary commitment is the document-centric product path around `molecule`, `reaction`, preview, OCR-assisted ingestion, and source write-back.
+`chemd` is currently best described as a chemistry document product prototype with a converged `Editor + Preview` surface, a stable document compilation core, and an increasingly formal chemistry interaction layer.
 
 At the current stage:
 
