@@ -11,11 +11,11 @@ describe("DocumentTreePanel", () => {
         source={`---
 id: exp-doc-001
 ---
-:::reaction #rxn-1
+:::chemd #chem-1
 :::
 :::result #res-1
 :::
-:::molecule #mol-1
+:::chemd #chem-2
 smiles: CCO
 :::
 `}
@@ -24,9 +24,9 @@ smiles: CCO
 
     expect(html).toContain("Document outline (MVP)");
     expect(html).toContain("#exp-doc-001");
-    expect(html).toContain("#rxn-1");
+    expect(html).toContain("#chem-1");
     expect(html).toContain("#res-1");
-    expect(html).toContain("#mol-1");
+    expect(html).toContain("#chem-2");
   });
 });
 

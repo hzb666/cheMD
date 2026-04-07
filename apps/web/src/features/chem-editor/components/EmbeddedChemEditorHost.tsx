@@ -7,6 +7,7 @@ import {
   getChemEditorImportCandidates,
   getChemEditorStructureInput
 } from "../lib/chem-editor-export";
+import { syncKetcherViewport } from "../lib/ketcher-viewport";
 import type { ChemEditorDraft, KetcherBridgeInstance } from "../types";
 
 type KetcherEditorComponent = React.ComponentType<{
@@ -28,6 +29,25 @@ interface EmbeddedChemEditorHostProps {
 
 const KETCHER_STATIC_RESOURCES_URL = "/ketcher";
 
+const applyDraftToEditor = async (
+  instance: Pick<KetcherBridgeInstance, "setMolecule" | "editor">,
+  draft: ChemEditorDraft
+): Promise<string | null> => {
+  const candidates = getChemEditorImportCandidates(draft);
+
+  for (const candidate of candidates) {
+    try {
+      await instance.setMolecule(candidate);
+      syncKetcherViewport(instance);
+      return candidate;
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+};
+
 export const EmbeddedChemEditorHost = ({
   value,
   onChange,
@@ -41,7 +61,7 @@ export const EmbeddedChemEditorHost = ({
   const changeHandlerRef = useRef<(() => void) | null>(null);
   const valueRef = useRef(value);
   const structureInput = useMemo(() => getChemEditorStructureInput(value), [value]);
-  const lastSyncedInputRef = useRef<string | null>(structureInput);
+  const lastSyncedInputRef = useRef<string | null>(null);
 
   useEffect(() => {
     valueRef.current = value;
@@ -108,18 +128,7 @@ export const EmbeddedChemEditorHost = ({
     const applyIncomingValue = async () => {
       applyingRef.current = true;
       try {
-        const candidates = getChemEditorImportCandidates(valueRef.current);
-        let appliedValue: string | null = null;
-
-        for (const candidate of candidates) {
-          try {
-            await instance.setMolecule(candidate);
-            appliedValue = candidate;
-            break;
-          } catch {
-            continue;
-          }
-        }
+        const appliedValue = await applyDraftToEditor(instance, valueRef.current);
 
         if (!cancelled && appliedValue) {
           lastSyncedInputRef.current = appliedValue;
@@ -189,7 +198,6 @@ export const EmbeddedChemEditorHost = ({
             }
 
             ketcherRef.current = instance;
-            lastSyncedInputRef.current = structureInput;
             setIsReady(true);
             onBridgeReady?.(instance);
 

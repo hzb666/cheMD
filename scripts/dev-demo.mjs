@@ -4,11 +4,47 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 export const resolveCommand = (command, platform = process.platform) => {
-  if (platform === "win32" && command === "pnpm") {
-    return "pnpm.cmd";
+  if (platform === "win32") {
+    if (command === "pnpm") {
+      return "pnpm.cmd";
+    }
+
+    if (command === "poetry") {
+      return "poetry.exe";
+    }
   }
 
   return command;
+};
+
+export const resolveChemServiceCommand = (
+  rootDir,
+  platform = process.platform
+) => {
+  const pathModule = platform === "win32" ? path.win32 : path.posix;
+
+  return platform === "win32"
+    ? pathModule.join(rootDir, "services", "chem-service", ".venv", "Scripts", "python.exe")
+    : pathModule.join(rootDir, "services", "chem-service", ".venv", "bin", "python");
+};
+
+export const resolveSpawnInvocation = (
+  command,
+  args,
+  platform = process.platform,
+  comspec = process.env.ComSpec ?? "cmd.exe"
+) => {
+  if (platform === "win32" && command.endsWith(".cmd")) {
+    return {
+      command: comspec,
+      args: ["/d", "/s", "/c", [command, ...args].join(" ")]
+    };
+  }
+
+  return {
+    command,
+    args
+  };
 };
 
 const resolveRootDir = () => path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -26,8 +62,8 @@ export const createDevDemoProcesses = (
   },
   {
     name: "chem-service",
-    command: resolveCommand("poetry", platform),
-    args: ["run", "python", "app.py"],
+    command: resolveChemServiceCommand(rootDir, platform),
+    args: ["app.py"],
     cwd: path.join(rootDir, "services", "chem-service"),
     url: "http://127.0.0.1:18081"
   }
@@ -74,7 +110,11 @@ const run = () => {
   let remaining = processes.length;
 
   for (const processConfig of processes) {
-    const child = spawn(processConfig.command, processConfig.args, {
+    const invocation = resolveSpawnInvocation(
+      processConfig.command,
+      processConfig.args
+    );
+    const child = spawn(invocation.command, invocation.args, {
       cwd: processConfig.cwd,
       stdio: "inherit",
       env: {

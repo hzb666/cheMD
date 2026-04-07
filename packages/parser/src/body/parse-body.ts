@@ -23,10 +23,46 @@ const COL_INLINE_BRACE_BLOCK_PATTERN = new RegExp(
   `^col:\\s*\\{:::(${BLOCK_TYPE_PATTERN})(?:-\\d+)?(?:\\s+.*)?$`
 );
 const ID_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
-const LIST_FIELDS = new Set(["reactants", "products", "conditions", "params"]);
+const LIST_FIELDS = new Set([
+  "reactants",
+  "products",
+  "reactant",
+  "product",
+  "reac",
+  "prod",
+  "conditions",
+  "params"
+]);
 const BLOCK_FIELDS: Record<string, Set<string>> = {
   molecule: new Set(["smiles", "name", "role", "caption", "formula", "amount", "equivalents"]),
   reaction: new Set(["reactants", "products", "conditions", "name", "reagents", "catalyst", "solvent", "temperature", "time", "pressure", "atmosphere", "yield", "conversion", "selectivity", "caption"]),
+  chemd: new Set([
+    "smiles",
+    "cas",
+    "name",
+    "role",
+    "caption",
+    "formula",
+    "amount",
+    "equivalents",
+    "reactants",
+    "products",
+    "reactant",
+    "product",
+    "reac",
+    "prod",
+    "conditions",
+    "reagents",
+    "catalyst",
+    "solvent",
+    "temperature",
+    "time",
+    "pressure",
+    "atmosphere",
+    "yield",
+    "conversion",
+    "selectivity"
+  ]),
   result: new Set(["status", "yield", "conversion", "selectivity", "isolated_mass", "product_state", "purity", "notes"]),
   analysis: new Set(["type", "instrument", "solvent", "frequency", "method", "data", "notes"]),
   sample: new Set(["name", "sample_id", "batch", "purity", "supplier", "notes"]),
@@ -164,6 +200,48 @@ const parseTemplateBind = (value?: string | string[]): Record<string, string> =>
   }, {});
 };
 
+const collectImplicitChemdValue = (lines: string[], diagnostics: Diagnostic[]): string | undefined => {
+  const implicitLines = lines
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !parseKeyValueLine(line));
+
+  if (implicitLines.length === 0) {
+    return undefined;
+  }
+
+  if (implicitLines.length > 1) {
+    diagnostics.push({
+      code: "W_INVALID_CHEMD_IMPLICIT_VALUE",
+      severity: "warning",
+      message: "Multiple implicit chemd values detected; only the first line will be used"
+    });
+  }
+
+  return implicitLines[0];
+};
+
+const pickFirstStringArray = (fields: Record<string, string | string[]>, keys: string[]): string[] | undefined => {
+  for (const key of keys) {
+    const value = fields[key];
+    if (Array.isArray(value)) {
+      return value;
+    }
+  }
+
+  return undefined;
+};
+
+const pickFirstStringValue = (fields: Record<string, string | string[]>, keys: string[]): string | undefined => {
+  for (const key of keys) {
+    const value = fields[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+
+  return undefined;
+};
+
 const createMarkdownFromText = (value: string, diagnostics: Diagnostic[]) =>
   createMarkdownNode(
     value,
@@ -202,9 +280,9 @@ const parseStructuredBlock = (
   diagnostics: Diagnostic[],
   bodyChildren?: ChemdNode[]
 ): StructuredNode | undefined => {
-  const normalizedBlockType = blockType === "mol" ? "molecule" : blockType;
+  const normalizedBlockType = blockType;
 
-  if (!["molecule", "reaction", "result", "analysis", "sample", "use", "col"].includes(normalizedBlockType)) {
+  if (!["chemd", "result", "analysis", "sample", "use", "col"].includes(normalizedBlockType)) {
     diagnostics.push({
       code: "W_UNKNOWN_BLOCK",
       severity: "warning",
@@ -259,11 +337,58 @@ const parseStructuredBlock = (
 
   const fields = parseKeyValueLines(normalizedBlockType, lines, diagnostics);
 
+  if (normalizedBlockType === "chemd") {
+    const reactants = pickFirstStringArray(fields, ["reac", "reactant", "reactants"]) ?? [];
+    const products = pickFirstStringArray(fields, ["prod", "product", "products"]) ?? [];
+    const conditions = Array.isArray(fields.conditions) ? fields.conditions : [];
+    const hasReactionFields =
+      reactants.length > 0
+      || products.length > 0
+      || "reac" in fields
+      || "prod" in fields
+      || "reactant" in fields
+      || "product" in fields
+      || "reactants" in fields
+      || "products" in fields;
+
+    if (hasReactionFields) {
+      return {
+        type: "reaction",
+        id,
+        reactants,
+        products,
+        conditions,
+        name: pickFirstStringValue(fields, ["name"]),
+        reagents: pickFirstStringValue(fields, ["reagents"]),
+        catalyst: pickFirstStringValue(fields, ["catalyst"]),
+        solvent: pickFirstStringValue(fields, ["solvent"]),
+        temperature: pickFirstStringValue(fields, ["temperature"]),
+        time: pickFirstStringValue(fields, ["time"]),
+        pressure: pickFirstStringValue(fields, ["pressure"]),
+        atmosphere: pickFirstStringValue(fields, ["atmosphere"]),
+        yield: pickFirstStringValue(fields, ["yield"]),
+        conversion: pickFirstStringValue(fields, ["conversion"]),
+        selectivity: pickFirstStringValue(fields, ["selectivity"]),
+        caption: pickFirstStringValue(fields, ["caption"])
+      } satisfies ReactionNode;
+    }
+
+    const smiles = pickFirstStringValue(fields, ["smiles", "cas"]) ?? collectImplicitChemdValue(lines, diagnostics);
+
+    return {
+      type: "molecule",
+      id,
+      smiles,
+      name: pickFirstStringValue(fields, ["name"]),
+      role: pickFirstStringValue(fields, ["role"]),
+      caption: pickFirstStringValue(fields, ["caption"]),
+      formula: pickFirstStringValue(fields, ["formula"]),
+      amount: pickFirstStringValue(fields, ["amount"]),
+      equivalents: pickFirstStringValue(fields, ["equivalents"])
+    } satisfies MoleculeNode;
+  }
+
   switch (normalizedBlockType) {
-    case "molecule":
-      return { type: "molecule", id, ...fields } as MoleculeNode;
-    case "reaction":
-      return { type: "reaction", id, ...fields } as ReactionNode;
     case "result":
       return { type: "result", id, ...fields } as ResultNode;
     case "analysis": {

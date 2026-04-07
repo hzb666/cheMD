@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import type { RenderOptions } from "@chemd/render-profile";
 
 import { useRenderedPreview } from "../../chem-preview/hooks/useRenderedPreview";
-import { useDocxExport } from "../../export-docx/hooks/useDocxExport";
 import { readPreviewEditMessage } from "../lib/read-preview-edit-message";
+import type { ChemEditorDraftWithBlockId } from "../../chem-editor/types";
 
 type OutputTab = "preview" | "json" | "docxBridge";
 
@@ -18,13 +18,7 @@ interface UsePreviewShellControllerParams {
   sessionId?: string;
   renderOptions?: RenderOptions;
   previewIsFresh: boolean;
-  onEditMolecule?: (blockId: string, smiles: string) => void | Promise<void>;
-  onEditReaction?: (
-    blockId: string,
-    reactants: string[],
-    products: string[],
-    conditions: string[]
-  ) => void | Promise<void>;
+  onEditChemd?: (draft: ChemEditorDraftWithBlockId) => void | Promise<void>;
 }
 
 export const usePreviewShellController = ({
@@ -36,14 +30,10 @@ export const usePreviewShellController = ({
   sessionId,
   renderOptions,
   previewIsFresh,
-  onEditMolecule,
-  onEditReaction
+  onEditChemd
 }: UsePreviewShellControllerParams) => {
   const [activeTab, setActiveTab] = useState<OutputTab>("preview");
   const previewFrameRef = useRef<HTMLIFrameElement>(null);
-  const { exportingDocx, exportMessage, exportDocx } = useDocxExport({
-    payload: { source }
-  });
   const { hydratedHtml, previewBridgeToken } = useRenderedPreview(html, {
     documentId,
     sessionId,
@@ -51,7 +41,7 @@ export const usePreviewShellController = ({
   });
 
   useEffect(() => {
-    if (!onEditMolecule && !onEditReaction) {
+    if (!onEditChemd) {
       return undefined;
     }
 
@@ -65,31 +55,34 @@ export const usePreviewShellController = ({
       if (!payload) {
         return;
       }
-      if (payload.kind === "molecule") {
-        void onEditMolecule?.(payload.blockId, payload.smiles);
+      if (payload.type === "reaction") {
+        void onEditChemd({
+          blockId: payload.blockId,
+          kind: "reaction",
+          reactants: payload.reactants,
+          products: payload.products,
+          conditions: payload.conditions
+        });
         return;
       }
-      void onEditReaction?.(
-        payload.blockId,
-        payload.reactants,
-        payload.products,
-        payload.conditions
-      );
+
+      void onEditChemd({
+        blockId: payload.blockId,
+        kind: "molecule",
+        smiles: payload.smiles
+      });
     };
 
     window.addEventListener("message", handlePreviewMessage);
     return () => {
       window.removeEventListener("message", handlePreviewMessage);
     };
-  }, [onEditMolecule, onEditReaction, previewBridgeToken, previewIsFresh]);
+  }, [onEditChemd, previewBridgeToken, previewIsFresh]);
 
   return {
     activeTab,
     setActiveTab,
     previewFrameRef,
-    exportingDocx,
-    exportMessage,
-    exportDocx,
     hydratedHtml,
     activeCode: activeTab === "json" ? json : docxBridge
   };

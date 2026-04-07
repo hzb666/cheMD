@@ -1,11 +1,11 @@
 export interface MoleculePreviewEditMessage {
-  kind: "molecule";
+  type: "molecule";
   blockId: string;
   smiles: string;
 }
 
 export interface ReactionPreviewEditMessage {
-  kind: "reaction";
+  type: "reaction";
   blockId: string;
   reactants: string[];
   products: string[];
@@ -35,6 +35,7 @@ export const readPreviewEditMessage = (
   const payload = event.data as {
     type?: unknown;
     blockId?: unknown;
+    draftType?: unknown;
     smiles?: unknown;
     reactants?: unknown;
     products?: unknown;
@@ -48,15 +49,15 @@ export const readPreviewEditMessage = (
     return null;
   }
 
-  if (payload.type === "chemd:edit-molecule") {
+  if (payload.type === "chemd:edit" && payload.draftType === "molecule") {
     return {
-      kind: "molecule",
+      type: "molecule",
       blockId: payload.blockId,
       smiles: typeof payload.smiles === "string" ? payload.smiles : ""
     };
   }
 
-  if (payload.type !== "chemd:edit-reaction") {
+  if (!(payload.type === "chemd:edit" && payload.draftType === "reaction")) {
     return null;
   }
 
@@ -70,12 +71,8 @@ export const readPreviewEditMessage = (
     ? payload.conditions.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
     : [];
 
-  if (reactants.length === 0 || products.length === 0) {
-    return null;
-  }
-
   return {
-    kind: "reaction",
+    type: "reaction",
     blockId: payload.blockId,
     reactants,
     products,

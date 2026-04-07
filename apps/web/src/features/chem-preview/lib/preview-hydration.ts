@@ -48,12 +48,12 @@ export const buildMoleculeRenderRequestPayload = (
   entry: Pick<HydratedMoleculeEntry, "smiles"> & { molfile?: string },
   renderOptions?: RenderOptions
 ): {
-  kind: "molecule";
+  type: "molecule";
   smiles: string;
   molfile?: string;
   renderOptions?: RenderOptions;
 } => ({
-  kind: "molecule",
+  type: "molecule",
   smiles: entry.smiles,
   ...(entry.molfile ? { molfile: entry.molfile } : {}),
   renderOptions
@@ -63,11 +63,13 @@ export const buildReactionRenderRequestPayload = (
   entry: Pick<HydratedReactionEntry, "reactants" | "products" | "conditions">,
   renderOptions?: RenderOptions
 ): {
+  type: "reaction";
   reactants: string[];
   products: string[];
   conditions: string[];
   renderOptions?: RenderOptions;
 } => ({
+  type: "reaction",
   reactants: entry.reactants,
   products: entry.products,
   conditions: entry.conditions,
@@ -101,7 +103,7 @@ export const loadHydratedMoleculeEntry = async (
       blockId: entry.blockId,
       sessionId
     });
-    const response = await fetchImpl(`/api/chem/structure?${params.toString()}`);
+    const response = await fetchImpl(`/api/chem/draft?${params.toString()}`);
     if (!response.ok) {
       return { smiles: entry.smiles };
     }
@@ -109,7 +111,8 @@ export const loadHydratedMoleculeEntry = async (
     const payload = (await response.json().catch(() => null)) as
       | {
           found?: boolean;
-          structure?: {
+          draft?: {
+            type?: unknown;
             smiles?: unknown;
             molfile?: unknown;
           };
@@ -121,12 +124,12 @@ export const loadHydratedMoleculeEntry = async (
 
     return {
       smiles:
-        typeof payload.structure?.smiles === "string" && payload.structure.smiles.trim().length > 0
-          ? payload.structure.smiles
+        typeof payload.draft?.smiles === "string" && payload.draft.smiles.trim().length > 0
+          ? payload.draft.smiles
           : entry.smiles,
       molfile:
-        typeof payload.structure?.molfile === "string" && payload.structure.molfile.trim().length > 0
-          ? payload.structure.molfile
+        typeof payload.draft?.molfile === "string" && payload.draft.molfile.trim().length > 0
+          ? payload.draft.molfile
           : undefined
     };
   } catch {
@@ -143,13 +146,20 @@ const splitListText = (value: string): string[] =>
 export const parseReactionEntries = (html: string): Array<HydratedReactionEntry> => {
   const entries: Array<HydratedReactionEntry> = [];
   const blockPattern =
-    /<section class="chemd-block chemd-block--reaction"[^>]*data-node-id="([^"]*)"[^>]*>[\s\S]*?<dt>Reactants<\/dt><dd>([^<]*)<\/dd>[\s\S]*?<dt>Products<\/dt><dd>([^<]*)<\/dd>(?:[\s\S]*?<dt>Conditions<\/dt><dd>([^<]*)<\/dd>)?/g;
+    /<section class="chemd-block chemd-block--reaction"[^>]*data-node-id="([^"]*)"[^>]*>([\s\S]*?)<\/section>/g;
+  const readField = (blockHtml: string, label: string): string[] => {
+    const fieldPattern = new RegExp(`<dt>${label}<\\/dt><dd>([^<]*)<\\/dd>`, "i");
+    const match = blockHtml.match(fieldPattern);
+    return splitListText(match?.[1] ?? "");
+  };
+
   for (const match of html.matchAll(blockPattern)) {
+    const blockHtml = match[2] || "";
     entries.push({
       blockId: (match[1] || "").trim(),
-      reactants: splitListText(match[2] || ""),
-      products: splitListText(match[3] || ""),
-      conditions: splitListText(match[4] || "")
+      reactants: readField(blockHtml, "Reactants"),
+      products: readField(blockHtml, "Products"),
+      conditions: readField(blockHtml, "Conditions")
     });
   }
   return entries;
@@ -173,7 +183,7 @@ export const loadHydratedReactionEntry = async (
       blockId: entry.blockId,
       sessionId
     });
-    const response = await fetchImpl(`/api/chem/reaction/structure?${params.toString()}`);
+    const response = await fetchImpl(`/api/chem/draft?${params.toString()}`);
     if (!response.ok) {
       return {
         reactants: entry.reactants,
@@ -185,7 +195,8 @@ export const loadHydratedReactionEntry = async (
     const payload = (await response.json().catch(() => null)) as
       | {
           found?: boolean;
-          reaction?: {
+          draft?: {
+            type?: unknown;
             reactants?: unknown;
             products?: unknown;
             conditions?: unknown;
@@ -193,29 +204,39 @@ export const loadHydratedReactionEntry = async (
         }
       | null;
 
-    const reactants = Array.isArray(payload?.reaction?.reactants)
-      ? payload?.reaction?.reactants.filter(
-          (item): item is string => typeof item === "string" && item.trim().length > 0
-        )
-      : [];
-    const products = Array.isArray(payload?.reaction?.products)
-      ? payload?.reaction?.products.filter(
-          (item): item is string => typeof item === "string" && item.trim().length > 0
-        )
-      : [];
-    const conditions = Array.isArray(payload?.reaction?.conditions)
-      ? payload?.reaction?.conditions.filter(
-          (item): item is string => typeof item === "string" && item.trim().length > 0
-        )
-      : [];
-
-    if (!payload?.found || reactants.length === 0 || products.length === 0) {
+    if (!payload?.found || payload.draft?.type !== "reaction") {
       return {
         reactants: entry.reactants,
         products: entry.products,
         conditions: entry.conditions
       };
     }
+
+    const hasReactants = Array.isArray(payload.draft.reactants);
+    const hasProducts = Array.isArray(payload.draft.products);
+    if (!hasReactants || !hasProducts) {
+      return {
+        reactants: entry.reactants,
+        products: entry.products,
+        conditions: entry.conditions
+      };
+    }
+
+    const reactants = Array.isArray(payload?.draft?.reactants)
+      ? payload?.draft?.reactants.filter(
+          (item): item is string => typeof item === "string" && item.trim().length > 0
+        )
+      : [];
+    const products = Array.isArray(payload?.draft?.products)
+      ? payload?.draft?.products.filter(
+          (item): item is string => typeof item === "string" && item.trim().length > 0
+        )
+      : [];
+    const conditions = Array.isArray(payload?.draft?.conditions)
+      ? payload?.draft?.conditions.filter(
+          (item): item is string => typeof item === "string" && item.trim().length > 0
+        )
+      : [];
 
     return {
       reactants,

@@ -6,13 +6,13 @@ import { updateMoleculeBlock } from "../src/features/ocr/lib/update-molecule-blo
 
 describe("ocr molecule writeback", () => {
   it("updates smiles for existing target molecule block", () => {
-    const source = `---\nid: exp-1\n---\n\n:::molecule #mol-a\nsmiles: CCO\n:::`;
+    const source = `---\nid: exp-1\n---\n\n:::chemd #chem-a\nsmiles: CCO\n:::`;
 
     const target = selectTargetMolecule(source);
-    expect(target?.blockId).toBe("mol-a");
+    expect(target?.blockId).toBe("chem-a");
 
-    const next = updateMoleculeBlock(source, "mol-a", "CCN");
-    expect(next).toContain(":::molecule #mol-a");
+    const next = updateMoleculeBlock(source, "chem-a", "CCN");
+    expect(next).toContain(":::chemd #chem-a");
     expect(next).toContain("smiles: CCN");
     expect(next).not.toContain("smiles: CCO");
   });
@@ -21,7 +21,7 @@ describe("ocr molecule writeback", () => {
     const source = `---\nid: exp-2\n---\n\n# note`;
     const next = insertMoleculeBlock(source, "mol-b", "O=C=O");
 
-    expect(next).toContain(":::molecule #mol-b");
+    expect(next).toContain(":::chemd #mol-b");
     expect(next).toContain("smiles: O=C=O");
   });
 
@@ -30,11 +30,11 @@ describe("ocr molecule writeback", () => {
 id: exp-3
 ---
 
-:::molecule #mol-a
+:::chemd #chem-a
 smiles: CCO
 :::
 
-:::molecule #mol-b
+:::chemd #chem-b
 smiles: CCN
 :::`;
 
@@ -42,22 +42,35 @@ smiles: CCN
   });
 
   it("assigns a stable synthetic id to a unique molecule block without an explicit id", () => {
-    const source = `:::molecule
+    const source = `:::chemd
 smiles: CCO
 :::`;
 
-    expect(selectTargetMolecule(source)?.blockId).toBe("mol-missing-id-1");
+    expect(selectTargetMolecule(source)?.blockId).toBe("chem-missing-id-1");
   });
 
   it("updates a unique molecule block without an explicit id and promotes it to a stable header id", () => {
-    const source = `:::molecule
+    const source = `:::chemd
 smiles: CCO
 :::`;
 
-    const next = updateMoleculeBlock(source, "mol-missing-id-1", "CCN");
+    const next = updateMoleculeBlock(source, "chem-missing-id-1", "CCN");
 
-    expect(next).toContain(":::molecule #mol-missing-id-1");
+    expect(next).toContain(":::chemd #chem-missing-id-1");
     expect(next).toContain("smiles: CCN");
     expect(next).not.toContain("smiles: CCO");
+  });
+
+  it("uses overall chemd ordering for anonymous molecule ids in mixed documents", () => {
+    const source = `:::chemd
+reac: N2
+prod: NH3
+:::
+
+:::chemd
+smiles: CCO
+:::`;
+
+    expect(selectTargetMolecule(source)?.blockId).toBe("chem-missing-id-2");
   });
 });

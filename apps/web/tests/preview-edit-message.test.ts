@@ -17,7 +17,8 @@ describe("readPreviewEditMessage", () => {
           origin: "null",
           source: otherWindow,
           data: {
-            type: "chemd:edit-molecule",
+            type: "chemd:edit",
+            draftType: "molecule",
             blockId: "mol-1",
             smiles: "CCO",
             previewToken
@@ -35,7 +36,8 @@ describe("readPreviewEditMessage", () => {
           origin: "null",
           source: previewWindow,
           data: {
-            type: "chemd:edit-molecule",
+            type: "chemd:edit",
+            draftType: "molecule",
             blockId: "mol-1",
             smiles: "CCO",
             previewToken
@@ -46,7 +48,7 @@ describe("readPreviewEditMessage", () => {
         previewToken
       )
     ).toEqual({
-      kind: "molecule",
+      type: "molecule",
       blockId: "mol-1",
       smiles: "CCO"
     });
@@ -61,7 +63,8 @@ describe("readPreviewEditMessage", () => {
           origin: "https://example.com",
           source: previewWindow,
           data: {
-            type: "chemd:edit-molecule",
+            type: "chemd:edit",
+            draftType: "molecule",
             blockId: "mol-1",
             smiles: "CCO",
             previewToken
@@ -79,7 +82,8 @@ describe("readPreviewEditMessage", () => {
           origin: "null",
           source: previewWindow,
           data: {
-            type: "chemd:edit-molecule",
+            type: "chemd:edit",
+            draftType: "molecule",
             blockId: "mol-1",
             smiles: 123,
             previewToken
@@ -90,7 +94,7 @@ describe("readPreviewEditMessage", () => {
         previewToken
       )
     ).toEqual({
-      kind: "molecule",
+      type: "molecule",
       blockId: "mol-1",
       smiles: ""
     });
@@ -105,7 +109,8 @@ describe("readPreviewEditMessage", () => {
           origin: "null",
           source: previewWindow,
           data: {
-            type: "chemd:edit-reaction",
+            type: "chemd:edit",
+            draftType: "reaction",
             blockId: "rxn-1",
             reactants: ["CCO"],
             products: ["CC(=O)O"],
@@ -118,7 +123,7 @@ describe("readPreviewEditMessage", () => {
         previewToken
       )
     ).toEqual({
-      kind: "reaction",
+      type: "reaction",
       blockId: "rxn-1",
       reactants: ["CCO"],
       products: ["CC(=O)O"],
@@ -135,7 +140,8 @@ describe("readPreviewEditMessage", () => {
           origin: "null",
           source: previewWindow,
           data: {
-            type: "chemd:edit-molecule",
+            type: "chemd:edit",
+            draftType: "molecule",
             blockId: "mol-1",
             smiles: "CCO",
             previewToken
@@ -157,7 +163,8 @@ describe("readPreviewEditMessage", () => {
           origin: "null",
           source: previewWindow,
           data: {
-            type: "chemd:edit-molecule",
+            type: "chemd:edit",
+            draftType: "molecule",
             blockId: "mol-1",
             smiles: "CCO",
             previewToken: "other-token"
@@ -175,6 +182,13 @@ describe("readPreviewEditMessage", () => {
 
     expect(script).toContain('const targetOrigin = "http://localhost:2436";');
     expect(script).not.toContain('"*"');
+  });
+
+  it("uses only chemical preview blocks for synthetic preview block ids", () => {
+    const script = buildPreviewBridgeScript(previewToken, "http://localhost:2436");
+
+    expect(script).toContain('const chemicalBlockSelector = ".chemd-block--molecule, .chemd-block--reaction";');
+    expect(script).toContain("document.querySelectorAll(chemicalBlockSelector)");
   });
 
   it("creates scoped fallback token when crypto UUID API is unavailable", () => {

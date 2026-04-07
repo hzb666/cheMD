@@ -8,9 +8,9 @@ primary_result: res-main
 
 # Ethanol oxidation to acetic acid
 
-:::reaction #rxn-main
-reactants: CCO | O=O
-products: CC(=O)O
+:::chemd #chem-rxn-main
+reac: CCO | O=O
+prod: CC(=O)O
 conditions: Cu catalyst | air | 80 C | 4 h
 :::
 
@@ -18,7 +18,7 @@ conditions: Cu catalyst | air | 80 C | 4 h
 yield: 63%
 :::
 
-:::molecule #mol-main
+:::chemd #chem-mol-main
 smiles: CCO
 :::
 

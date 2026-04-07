@@ -4,8 +4,9 @@ export interface ReactionTarget {
   blockId: string;
 }
 
-const REACTION_OPEN_RE = /^:::reaction(?:\s+#([^\s]+))?/;
+const CHEMD_OPEN_RE = /^:::chemd(?:\s+#([^\s]+))?/;
 const REACTION_CLOSE_RE = /^:::$/;
+const REACTION_FIELD_RE = /^\s*(?:reac|prod|reactant|product|reactants|products)\s*:/i;
 
 export const selectTargetReaction = (
   source: string,
@@ -13,24 +14,29 @@ export const selectTargetReaction = (
 ): ReactionTarget | null => {
   const lines = source.split(/\r?\n/);
   const candidates: ReactionTarget[] = [];
-  let reactionOrdinal = 0;
+  let chemdOrdinal = 0;
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index] ?? "";
-    const openMatch = line.match(REACTION_OPEN_RE);
-    if (!openMatch) {
+    const chemdMatch = line.match(CHEMD_OPEN_RE);
+    if (!chemdMatch) {
       continue;
     }
 
-    reactionOrdinal += 1;
-    candidates.push({ blockId: ensureBlockId(openMatch[1], "rxn", reactionOrdinal) });
-
+    let endLine = index;
     for (let scan = index + 1; scan < lines.length; scan += 1) {
       if (REACTION_CLOSE_RE.test(lines[scan] ?? "")) {
-        index = scan;
+        endLine = scan;
         break;
       }
     }
+
+    const blockId = ensureBlockId(chemdMatch[1], "chem", ++chemdOrdinal);
+    const isReaction = lines.slice(index + 1, endLine).some((entry) => REACTION_FIELD_RE.test(entry ?? ""));
+    if (isReaction) {
+      candidates.push({ blockId });
+    }
+    index = endLine;
   }
 
   if (preferredBlockId) {

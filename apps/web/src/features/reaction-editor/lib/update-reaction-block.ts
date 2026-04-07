@@ -2,10 +2,10 @@ import { ensureBlockId } from "../../ocr/lib/ensure-block-id";
 
 import type { ReactionEditorDraft } from "../types";
 
-const REACTION_OPEN_RE = /^:::reaction(?:\s+#([^\s]+))?/;
+const CHEMD_OPEN_RE = /^:::chemd(?:\s+#([^\s]+))?/;
 const BLOCK_CLOSE_RE = /^:::$/;
-const REACTANTS_RE = /^\s*reactants\s*:/i;
-const PRODUCTS_RE = /^\s*products\s*:/i;
+const REACTANTS_RE = /^\s*(?:reac|reactant|reactants)\s*:/i;
+const PRODUCTS_RE = /^\s*(?:prod|product|products)\s*:/i;
 const CONDITIONS_RE = /^\s*conditions\s*:/i;
 
 const joinList = (values: string[]): string => values.join(" | ");
@@ -16,18 +16,17 @@ export const updateReactionBlock = (
   draft: ReactionEditorDraft
 ): string => {
   const lines = source.split(/\r?\n/);
-  const targetOpen = `:::reaction #${blockId}`;
-  let reactionOrdinal = 0;
+  const targetOpen = `:::chemd #${blockId}`;
+  let chemdOrdinal = 0;
 
   for (let index = 0; index < lines.length; index += 1) {
     const openLine = lines[index] ?? "";
-    const openMatch = openLine.match(REACTION_OPEN_RE);
-    if (!openMatch) {
+    const chemdMatch = openLine.match(CHEMD_OPEN_RE);
+    if (!chemdMatch) {
       continue;
     }
 
-    reactionOrdinal += 1;
-    const existingId = ensureBlockId(openMatch[1], "rxn", reactionOrdinal);
+    const existingId = ensureBlockId(chemdMatch[1], "chem", ++chemdOrdinal);
     if (existingId !== blockId) {
       continue;
     }
@@ -57,16 +56,16 @@ export const updateReactionBlock = (
     }
 
     if (reactantsLine >= 0) {
-      lines[reactantsLine] = `reactants: ${joinList(draft.reactants)}`;
+      lines[reactantsLine] = `reac: ${joinList(draft.reactants)}`;
     } else {
-      lines.splice(endLine, 0, `reactants: ${joinList(draft.reactants)}`);
+      lines.splice(endLine, 0, `reac: ${joinList(draft.reactants)}`);
       endLine += 1;
     }
 
     if (productsLine >= 0) {
-      lines[productsLine] = `products: ${joinList(draft.products)}`;
+      lines[productsLine] = `prod: ${joinList(draft.products)}`;
     } else {
-      lines.splice(endLine, 0, `products: ${joinList(draft.products)}`);
+      lines.splice(endLine, 0, `prod: ${joinList(draft.products)}`);
       endLine += 1;
     }
 

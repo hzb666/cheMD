@@ -9,9 +9,9 @@ export const insertReactionBlock = (
 ): string => {
   const trimmed = source.trimEnd();
   const lines = [
-    `:::reaction #${blockId}`,
-    `reactants: ${joinList(draft.reactants)}`,
-    `products: ${joinList(draft.products)}`
+    `:::chemd #${blockId}`,
+    `reac: ${joinList(draft.reactants)}`,
+    `prod: ${joinList(draft.products)}`
   ];
 
   if (draft.conditions.length > 0) {

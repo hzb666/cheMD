@@ -43,7 +43,12 @@ export const ChemEditorDialog = ({
 
   return (
     <div className="dialog-backdrop" role="presentation">
-      <div className="dialog-card" role="dialog" aria-modal="true" aria-label="Edit chemistry">
+      <div
+        className="dialog-card chem-editor-dialog-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Edit chemistry"
+      >
         <div className="panel-header panel-toolbar">
           <div className="panel-heading-cluster">
             <p className="panel-kicker">Chem Editor</p>
@@ -81,8 +86,8 @@ export const ChemEditorDialog = ({
           </div>
         </div>
         {error ? <p className="status-text">{error}</p> : null}
-        <div className="detail-card" style={{ margin: "0.8rem" }}>
-          <div className="detail-card-body" style={{ padding: "0.8rem" }}>
+        <div className="detail-card chem-editor-dialog-body">
+          <div className="detail-card-body chem-editor-dialog-body-inner">
             <ChemEditorFrame
               value={draft}
               onChange={setDraft}

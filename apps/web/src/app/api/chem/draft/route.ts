@@ -19,17 +19,28 @@ export const GET = async (request: Request): Promise<Response> => {
     return NextResponse.json({ found: false });
   }
 
-  if (record.kind !== "molecule") {
-    return NextResponse.json({ found: false });
+  if (record.kind === "reaction") {
+    return NextResponse.json({
+      found: true,
+      draft: {
+        blockId,
+        type: "reaction",
+        reactants: record.reactants,
+        products: record.products,
+        conditions: record.conditions ?? [],
+        reactionSmiles: record.reactionSmiles,
+        rxnfile: record.rxnfile
+      }
+    });
   }
 
   return NextResponse.json({
     found: true,
-    structure: {
+    draft: {
+      blockId,
+      type: "molecule",
       smiles: record.smiles,
-      molfile: record.molfile,
-      source: record.source,
-      expiresAt: record.expiresAt
+      molfile: record.molfile
     }
   });
 };

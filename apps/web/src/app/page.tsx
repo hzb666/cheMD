@@ -6,16 +6,18 @@ import logoMark from "../../../../vision/logo-03.png";
 
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Separator } from "../components/ui/separator";
+import { ThemeToggle } from "../components/theme-toggle";
 import { EditorShell } from "../features/editor/components/EditorShell";
 import { OcrImportButton } from "../features/ocr/components/OcrImportButton";
 import { OcrPasteListener } from "../features/ocr/components/OcrPasteListener";
 import { ChemEditorDialog } from "../features/chem-editor/components/ChemEditorDialog";
-import type { ChemEditorDraftWithBlockId } from "../features/chem-editor/types";
+import { useChemdEditFlow } from "../features/chem-editor/hooks/useChemdEditFlow";
 import { useImageOcr } from "../features/ocr/hooks/useImageOcr";
 import { usePlaygroundDocumentController } from "../features/playground/hooks/usePlaygroundDocumentController";
+import { useDocxExport } from "../features/export-docx/hooks/useDocxExport";
+import { Button } from "../components/ui/button";
 import PreviewShell from "../features/preview/components/PreviewShell";
-import { useReactionEditFlow } from "../features/reaction-editor/hooks/useReactionEditFlow";
-import { useStructureEditFlow } from "../features/structure-editor/hooks/useStructureEditFlow";
+import { Activity, FlaskConical } from "lucide-react";
 
 const Page = () => {
   const {
@@ -38,24 +40,15 @@ const Page = () => {
     getLatestSource,
     onSourceChange: applySourceChange
   });
-  const {
-    editingStructure,
-    closeStructureDialog,
-    handleEditMolecule,
-    handleSaveStructure
-  } = useStructureEditFlow({
-    documentId,
-    sessionId,
-    getLatestSource,
-    applySourceChange,
-    setEditorStatus
+  const { exportingDocx, exportMessage, exportDocx } = useDocxExport({
+    payload: { source }
   });
   const {
-    editingReaction,
-    closeReactionDialog,
-    handleEditReaction,
-    handleSaveReaction
-  } = useReactionEditFlow({
+    editingChemd,
+    closeChemdDialog,
+    handleEditChemd,
+    handleSaveChemd
+  } = useChemdEditFlow({
     documentId,
     sessionId,
     getLatestSource,
@@ -93,92 +86,47 @@ const Page = () => {
       );
     });
   };
-  const editingChem: ChemEditorDraftWithBlockId | null = editingReaction
-    ? {
-        blockId: editingReaction.blockId,
-        sourceKind: "reaction",
-        kind: "reaction",
-        reactants: editingReaction.reactants,
-        products: editingReaction.products,
-        conditions: editingReaction.conditions
-      }
-    : editingStructure
-      ? {
-          blockId: editingStructure.blockId,
-          sourceKind: "molecule",
-          kind: "molecule",
-          smiles: editingStructure.smiles,
-          molfile: editingStructure.molfile
-        }
-      : null;
 
   return (
     <main
       data-playground-shell="workbench"
-      className="playground-page workspace-page min-h-screen overflow-auto xl:h-screen xl:overflow-hidden"
+      className="bg-background min-h-screen overflow-auto xl:h-screen xl:overflow-hidden"
     >
-      <div className="playground-shell flex min-h-0 flex-col xl:h-full">
-        <section className="playground-topbar shrink-0" aria-label="Playground overview">
-          <div className="playground-overview">
-            <Card className="playground-overview-card md:col-span-1">
-              <CardHeader className="gap-4">
-                <div className="playground-brand-row">
-                  <div className="playground-brand min-w-0">
-                    <img src={logoSrc} alt="chemd logo" className="playground-logo object-contain" />
-                    <div className="min-w-0">
-                      <p className="playground-meta-label">Chemd Playground</p>
-                      <CardTitle className="truncate text-xl">{result.document.meta.title}</CardTitle>
-                      <p className="playground-panel-copy text-sm text-muted-foreground">
-                        收口为 Editor + Preview 的 v0.1 原型，并保留 OCR、结构编辑与导出能力。
-                      </p>
-                    </div>
-                  </div>
-                  <span className="playground-status-pill shrink-0" data-state={compileStateTone}>
-                    {compileState}
+      <div className="flex min-h-0 flex-col xl:h-full w-full max-w-[2000px] mx-auto">
+        <header className="sticky top-0 z-30 shrink-0 w-full border-b border-border bg-background">
+          <div className="flex items-center justify-between h-12 px-3 md:px-5">
+            <div className="flex items-center gap-2.5">
+              <img src={logoSrc} alt="chemd logo" className="h-4 w-auto pr-1 object-contain dark:invert" />
+              <h1 className="notion-font-label text-[14px] text-foreground tracking-tight flex items-center gap-1">
+                <FlaskConical className="w-3.5 h-3.5 text-primary" />
+                Chemd Playground
+              </h1>
+            </div>
+
+            <div className="flex items-center gap-3 md:gap-5">
+              <div className="hidden md:flex items-center gap-4 text-[0.8rem] text-muted-foreground mr-2">
+                <div className="notion-font-label text-[14px] text-foreground max-w-[300px] truncate text-right">
+                  {result.document.meta.title || "Untitled Document"}
+                </div>
+                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-accent text-accent-foreground rounded-full notion-font-badge">
+                  <span className="flex h-1.5 w-1.5 rounded-full bg-accent-foreground/50"></span>
+                  YAML: {result.renderOptions.profileId}
+                </div>
+                <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full notion-font-badge ${diagnosticCount === 0 ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400" : "bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400"}`}>
+                  <Activity className="w-3 h-3" />
+                  <span>
+                    {diagnosticCount === 0 ? "Clean compile" : compileState}
                   </span>
                 </div>
-              </CardHeader>
-              <Separator />
-              <CardContent className="pt-6">
-                <div className="playground-meta-grid">
-                  <div className="playground-meta-card">
-                    <p className="playground-meta-label">Render Profile</p>
-                    <p className="playground-meta-value">{result.renderOptions.profileId}</p>
-                  </div>
-                  <div className="playground-meta-card">
-                    <p className="playground-meta-label">Diagnostics</p>
-                    <p className="playground-meta-value">
-                      {diagnosticCount === 0 ? "Clean compile" : compileState}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="playground-overview-card">
-              <CardHeader>
-                <p className="playground-meta-label">Source</p>
-                <CardTitle className="text-base">{lineCount} lines</CardTitle>
-                <p className="playground-panel-copy text-sm text-muted-foreground">
-                  YAML metadata、markdown 源文和 OCR 回填都在同一编辑面板完成。
-                </p>
-              </CardHeader>
-            </Card>
-
-            <Card className="playground-overview-card">
-              <CardHeader>
-                <p className="playground-meta-label">Outputs</p>
-                <CardTitle className="text-base">Preview, JSON, DOCX</CardTitle>
-                <p className="playground-panel-copy text-sm text-muted-foreground">
-                  同一份输入驱动实时预览、JSON 检查和 DOCX 导出。
-                </p>
-              </CardHeader>
-            </Card>
+              </div>
+              <Separator orientation="vertical" className="h-4 hidden md:block" />
+              <ThemeToggle />
+            </div>
           </div>
-        </section>
+        </header>
 
         <section
-          className="workspace-grid min-h-0 flex-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:overflow-hidden"
+          className="flex-1 min-h-0 grid grid-cols-1 xl:grid-cols-2 items-stretch xl:items-start xl:overflow-hidden bg-background"
           aria-label="Playground workbench"
         >
           <EditorShell
@@ -186,15 +134,26 @@ const Page = () => {
             lineCount={lineCount}
             profileId={result.renderOptions.profileId}
             toolbarActions={(
-              <>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void exportDocx()}
+                  disabled={exportingDocx || !previewIsFresh}
+                  className="h-7 px-3 bg-background hover:bg-muted text-foreground border-border rounded font-medium text-[12px] shadow-sm transition-transform active:scale-95"
+                >
+                  {exportingDocx ? "Exporting..." : "Export DOCX"}
+                </Button>
                 <OcrImportButton
                   loading={ocr.loading}
-                  label="OCR"
+                  label="OCR Image"
                   onPickFile={applyOcrFile}
+                  className="h-7 px-3 bg-background hover:bg-muted text-foreground border-border rounded font-medium text-[12px] shadow-sm transition-transform active:scale-95"
                 />
-              </>
+              </div>
             )}
-            statusMessage={ocr.error ?? editorStatus}
+            statusMessage={exportMessage ?? ocr.error ?? editorStatus}
             onSourceChange={applySourceChange}
           />
           <PreviewShell
@@ -206,40 +165,15 @@ const Page = () => {
             sessionId={sessionId}
             renderOptions={result.renderOptions}
             previewIsFresh={previewIsFresh}
-            onEditMolecule={(blockId, smiles) => handleEditMolecule(blockId, smiles, previewIsFresh)}
-            onEditReaction={(blockId, reactants, products, conditions) =>
-              handleEditReaction(blockId, reactants, products, conditions, previewIsFresh)}
+            onEditChemd={(draft) => handleEditChemd(draft, previewIsFresh)}
           />
         </section>
 
         <ChemEditorDialog
-          open={Boolean(editingChem)}
-          value={editingChem}
-          onClose={() => {
-            closeStructureDialog();
-            closeReactionDialog();
-          }}
-          onSave={async (next) => {
-            if (next.kind === "reaction") {
-              await handleSaveReaction({
-                blockId: next.blockId,
-                reactants: next.reactants,
-                products: next.products,
-                conditions: next.conditions,
-                sourceReactionKey: editingReaction?.sourceReactionKey,
-                draftReactionKey: editingReaction?.draftReactionKey
-              });
-              return;
-            }
-
-            await handleSaveStructure(
-              {
-                smiles: next.smiles,
-                molfile: next.molfile
-              },
-              next.blockId
-            );
-          }}
+          open={Boolean(editingChemd)}
+          value={editingChemd}
+          onClose={closeChemdDialog}
+          onSave={handleSaveChemd}
         />
         <OcrPasteListener enabled={!ocr.loading} onPickFile={applyOcrFile} />
       </div>

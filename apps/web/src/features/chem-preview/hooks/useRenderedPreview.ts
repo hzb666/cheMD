@@ -115,18 +115,9 @@ export const useRenderedPreview = (
 
       const reactionPayloads = await Promise.all(
         reactions.map(async (entry) => {
-          if (entry.reactants.length === 0 || entry.products.length === 0) {
-            return {
-              svg: "",
-              reactants: entry.reactants,
-              products: entry.products,
-              conditions: entry.conditions
-            };
-          }
-
           try {
             const hydratedEntry = await loadHydratedReactionEntry(entry, { documentId, sessionId });
-            const response = await fetch("/api/chem/reaction/render", {
+            const response = await fetch("/api/chem/render", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json"

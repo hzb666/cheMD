@@ -1,17 +1,14 @@
 import { createScopedToken } from "../../../lib/random-token";
 
-const MOLECULE_EDIT_BUTTON =
-  '<button type="button" class="chemd-edit-structure" data-action="edit-structure">Edit structure</button>';
-
-const REACTION_EDIT_BUTTON =
-  '<button type="button" class="chemd-edit-reaction" data-action="edit-reaction">Edit reaction</button>';
+const CHEMD_EDIT_BUTTON =
+  '<button type="button" class="chemd-edit-chem" data-action="edit-chem">Edit chemistry</button>';
 
 export const createPreviewBridgeToken = (): string => createScopedToken("preview");
 
 export const injectEditButtons = (html: string): string =>
   html
-    .replace(/(<section class="chemd-block chemd-block--molecule"[^>]*>)/g, `$1${MOLECULE_EDIT_BUTTON}`)
-    .replace(/(<section class="chemd-block chemd-block--reaction"[^>]*>)/g, `$1${REACTION_EDIT_BUTTON}`);
+    .replace(/(<section class="chemd-block chemd-block--molecule"[^>]*>)/g, `$1${CHEMD_EDIT_BUTTON}`)
+    .replace(/(<section class="chemd-block chemd-block--reaction"[^>]*>)/g, `$1${CHEMD_EDIT_BUTTON}`);
 
 export const buildPreviewBridgeScript = (
   previewBridgeToken: string,
@@ -22,21 +19,25 @@ export const buildPreviewBridgeScript = (
   window.__chemdBridgeBound = true;
   const previewToken = ${JSON.stringify(previewBridgeToken)};
   const targetOrigin = ${JSON.stringify(parentOrigin)};
-  const resolveBlockId = (block, selector, prefix) => {
+  const chemicalBlockSelector = ".chemd-block--molecule, .chemd-block--reaction";
+  const resolveBlockId = (block, prefix) => {
     const explicitId = String(block.getAttribute("data-node-id") || "").trim();
     if (explicitId) return explicitId;
-    const blocks = Array.from(document.querySelectorAll(selector));
+    const blocks = Array.from(document.querySelectorAll(chemicalBlockSelector));
     const ordinal = blocks.indexOf(block) + 1;
     return ordinal > 0 ? prefix + "-missing-id-" + ordinal : "";
   };
   window.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
-    const structureButton = target.closest("[data-action='edit-structure']");
-    if (structureButton) {
-      const block = structureButton.closest(".chemd-block--molecule");
+    const editButton = target.closest("[data-action='edit-chem']");
+    if (!editButton) return;
+
+    const moleculeBlock = editButton.closest(".chemd-block--molecule");
+    if (moleculeBlock) {
+      const block = moleculeBlock;
       if (!(block instanceof HTMLElement)) return;
-      const blockId = resolveBlockId(block, ".chemd-block--molecule", "mol");
+      const blockId = resolveBlockId(block, "chem");
       const fields = Array.from(block.querySelectorAll(".chemd-field"));
       let smiles = "";
       for (const field of fields) {
@@ -49,15 +50,16 @@ export const buildPreviewBridgeScript = (
         }
       }
 
-      window.parent.postMessage({ type: "chemd:edit-molecule", blockId, smiles, previewToken }, targetOrigin);
+      window.parent.postMessage(
+        { type: "chemd:edit", draftType: "molecule", blockId, smiles, previewToken },
+        targetOrigin
+      );
       return;
     }
 
-    const reactionButton = target.closest("[data-action='edit-reaction']");
-    if (!reactionButton) return;
-    const reactionBlock = reactionButton.closest(".chemd-block--reaction");
+    const reactionBlock = editButton.closest(".chemd-block--reaction");
     if (!(reactionBlock instanceof HTMLElement)) return;
-    const blockId = resolveBlockId(reactionBlock, ".chemd-block--reaction", "rxn");
+    const blockId = resolveBlockId(reactionBlock, "chem");
     const fields = Array.from(reactionBlock.querySelectorAll(".chemd-field"));
     const readListField = (label) => {
       for (const field of fields) {
@@ -75,7 +77,7 @@ export const buildPreviewBridgeScript = (
     const conditions = readListField("CONDITIONS");
 
     window.parent.postMessage(
-      { type: "chemd:edit-reaction", blockId, reactants, products, conditions, previewToken },
+      { type: "chemd:edit", draftType: "reaction", blockId, reactants, products, conditions, previewToken },
       targetOrigin
     );
   });

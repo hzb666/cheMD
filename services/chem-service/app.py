@@ -5,13 +5,12 @@ from __future__ import annotations
 import importlib
 import json
 import os
-import tempfile
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from html import escape
+from typing import Any
 from urllib import request as urllib_request
 from urllib.error import HTTPError, URLError
-from typing import Any
 
 from flask import Flask, jsonify, request
 
@@ -76,8 +75,12 @@ _MAX_IMAGE_BASE64_LENGTH = _read_int_env(
     "CHEM_SERVICE_MAX_IMAGE_BASE64_LENGTH",
     ((max(_MAX_UPLOAD_BYTES, 1) + 2) // 3) * 4,
 )
-_MOLECULE_OCR_PROVIDER = os.environ.get("CHEM_SERVICE_MOLECULE_OCR_PROVIDER", "placeholder").strip().lower()
-_REACTION_OCR_PROVIDER = os.environ.get("CHEM_SERVICE_REACTION_OCR_PROVIDER", "placeholder").strip().lower()
+_MOLECULE_OCR_PROVIDER = (
+    os.environ.get("CHEM_SERVICE_MOLECULE_OCR_PROVIDER", "placeholder").strip().lower()
+)
+_REACTION_OCR_PROVIDER = (
+    os.environ.get("CHEM_SERVICE_REACTION_OCR_PROVIDER", "placeholder").strip().lower()
+)
 _MOLSCRIBE_API_URL = os.environ.get("CHEM_SERVICE_MOLSCRIBE_API_URL", "").strip()
 _MOLSCRIBE_TIMEOUT_SECONDS = _read_int_env("CHEM_SERVICE_MOLSCRIBE_TIMEOUT_SECONDS", 60)
 _MOLSCRIBE_API_KEY = os.environ.get("CHEM_SERVICE_MOLSCRIBE_API_KEY", "").strip()
@@ -105,7 +108,14 @@ _MOLSCRIBE_HF_FILE = os.environ.get(
 _MOLSCRIBE_DEVICE = os.environ.get("CHEM_SERVICE_MOLSCRIBE_DEVICE", "cpu").strip() or "cpu"
 _CHEM_SERVICE_ACCESS_KEY = os.environ.get("CHEM_SERVICE_ACCESS_KEY", "").strip()
 _CHEM_SERVICE_INTERNAL_ONLY = _read_bool_env("CHEM_SERVICE_INTERNAL_ONLY", True)
-_PROTECTED_PATHS = {"/ocr", "/normalize", "/render", "/reaction/ocr", "/reaction/render", "/structure"}
+_PROTECTED_PATHS = {
+    "/ocr",
+    "/normalize",
+    "/render",
+    "/reaction/ocr",
+    "/reaction/render",
+    "/structure",
+}
 _ALLOWED_ORIGINS = {
     origin.strip()
     for origin in os.environ.get(
@@ -183,7 +193,9 @@ def _request_remote_json(
             body = response.read().decode("utf-8")
     except HTTPError as error:
         body = error.read().decode("utf-8", errors="ignore")
-        raise RuntimeError(f"Remote OCR request failed ({error.code}): {body or error.reason}") from error
+        raise RuntimeError(
+            f"Remote OCR request failed ({error.code}): {body or error.reason}"
+        ) from error
     except URLError as error:
         raise RuntimeError(f"Remote OCR request failed: {error.reason}") from error
 
@@ -266,7 +278,10 @@ def _map_remote_molecule_payload(provider_label: str, payload: dict[str, Any]) -
     if not smiles and not molfile:
         return {
             "status": "failed",
-            "warnings": warnings or [f"{provider_label} remote payload did not contain a structure result."],
+            "warnings": (
+                warnings
+                or [f"{provider_label} remote payload did not contain a structure result."]
+            ),
         }
 
     return _build_remote_molecule_ocr_payload(
@@ -315,7 +330,10 @@ def _load_molscribe_runtime() -> Any | None:
         checkpoint_path = _MOLSCRIBE_CHECKPOINT_PATH
         if not checkpoint_path:
             huggingface_hub = importlib.import_module("huggingface_hub")
-            checkpoint_path = huggingface_hub.hf_hub_download(_MOLSCRIBE_HF_REPO, _MOLSCRIBE_HF_FILE)
+            checkpoint_path = huggingface_hub.hf_hub_download(
+                _MOLSCRIBE_HF_REPO,
+                _MOLSCRIBE_HF_FILE,
+            )
         if not checkpoint_path or not os.path.exists(checkpoint_path):
             return None
         runtime = molscribe_module.MolScribe(
@@ -329,7 +347,10 @@ def _load_molscribe_runtime() -> Any | None:
     return _MOLSCRIBE_RUNTIME
 
 
-def _run_molecule_ocr_with_molscribe(image_bytes: bytes, mime_type: str | None) -> dict[str, Any] | None:
+def _run_molecule_ocr_with_molscribe(
+    image_bytes: bytes,
+    mime_type: str | None,
+) -> dict[str, Any] | None:
     if not _MOLSCRIBE_API_URL:
         return {
             "status": "failed",
@@ -346,7 +367,10 @@ def _run_molecule_ocr_with_molscribe(image_bytes: bytes, mime_type: str | None) 
     )
 
 
-def _run_molecule_ocr_with_decimer(image_bytes: bytes, mime_type: str | None) -> dict[str, Any] | None:
+def _run_molecule_ocr_with_decimer(
+    image_bytes: bytes,
+    mime_type: str | None,
+) -> dict[str, Any] | None:
     if not _DECIMER_API_URL:
         return {
             "status": "failed",
@@ -363,7 +387,10 @@ def _run_molecule_ocr_with_decimer(image_bytes: bytes, mime_type: str | None) ->
     )
 
 
-def _run_molecule_ocr_with_molnextr(image_bytes: bytes, mime_type: str | None) -> dict[str, Any] | None:
+def _run_molecule_ocr_with_molnextr(
+    image_bytes: bytes,
+    mime_type: str | None,
+) -> dict[str, Any] | None:
     if not _MOLNEXTR_API_URL:
         return {
             "status": "failed",
@@ -380,7 +407,10 @@ def _run_molecule_ocr_with_molnextr(image_bytes: bytes, mime_type: str | None) -
     )
 
 
-def _run_molecule_ocr_with_provider(image_bytes: bytes, mime_type: str | None) -> dict[str, Any] | None:
+def _run_molecule_ocr_with_provider(
+    image_bytes: bytes,
+    mime_type: str | None,
+) -> dict[str, Any] | None:
     if _MOLECULE_OCR_PROVIDER in {"", "placeholder", "disabled"}:
         return None
 
@@ -446,9 +476,18 @@ def _map_remote_rxnscribe_payload(payload: dict[str, Any]) -> dict[str, Any]:
 
     normalized_reaction = payload.get("reaction")
     if isinstance(normalized_reaction, dict):
-        reactants = _extract_reaction_text_list(normalized_reaction.get("reactants"), text_key="smiles")
-        products = _extract_reaction_text_list(normalized_reaction.get("products"), text_key="smiles")
-        conditions = _extract_reaction_text_list(normalized_reaction.get("conditions"), text_key="text")
+        reactants = _extract_reaction_text_list(
+            normalized_reaction.get("reactants"),
+            text_key="smiles",
+        )
+        products = _extract_reaction_text_list(
+            normalized_reaction.get("products"),
+            text_key="smiles",
+        )
+        conditions = _extract_reaction_text_list(
+            normalized_reaction.get("conditions"),
+            text_key="text",
+        )
         if reactants and products:
             confidence = payload.get("confidence")
             return {
@@ -458,7 +497,9 @@ def _map_remote_rxnscribe_payload(payload: dict[str, Any]) -> dict[str, Any]:
                     "products": products,
                     "conditions": conditions,
                 },
-                "confidence": float(confidence) if isinstance(confidence, (int, float)) else None,
+                "confidence": (
+                    float(confidence) if isinstance(confidence, (int, float)) else None
+                ),
                 "warnings": _normalize_warning_list(payload.get("warnings")),
             }
 
@@ -471,9 +512,18 @@ def _map_remote_rxnscribe_payload(payload: dict[str, Any]) -> dict[str, Any]:
             if not isinstance(reaction, dict):
                 continue
 
-            reactants = _extract_reaction_text_list(reaction.get("reactants"), text_key="smiles")
-            products = _extract_reaction_text_list(reaction.get("products"), text_key="smiles")
-            conditions = _extract_reaction_text_list(reaction.get("conditions"), text_key="text")
+            reactants = _extract_reaction_text_list(
+                reaction.get("reactants"),
+                text_key="smiles",
+            )
+            products = _extract_reaction_text_list(
+                reaction.get("products"),
+                text_key="smiles",
+            )
+            conditions = _extract_reaction_text_list(
+                reaction.get("conditions"),
+                text_key="text",
+            )
             if reactants and products:
                 confidence = payload.get("confidence")
                 if not isinstance(confidence, (int, float)):
@@ -482,12 +532,14 @@ def _map_remote_rxnscribe_payload(payload: dict[str, Any]) -> dict[str, Any]:
                     "status": "ok",
                     "reaction": {
                         "reactants": reactants,
-                        "products": products,
-                        "conditions": conditions,
-                    },
-                    "confidence": float(confidence) if isinstance(confidence, (int, float)) else None,
-                    "warnings": _normalize_warning_list(payload.get("warnings")),
-                }
+                    "products": products,
+                    "conditions": conditions,
+                },
+                "confidence": (
+                    float(confidence) if isinstance(confidence, (int, float)) else None
+                ),
+                "warnings": _normalize_warning_list(payload.get("warnings")),
+            }
 
     return {
         "status": "failed",
@@ -526,7 +578,10 @@ def _request_remote_reaction_provider(
     }
 
 
-def _run_reaction_ocr_with_rxnscribe(image_bytes: bytes, mime_type: str | None) -> dict[str, Any] | None:
+def _run_reaction_ocr_with_rxnscribe(
+    image_bytes: bytes,
+    mime_type: str | None,
+) -> dict[str, Any] | None:
     if not _RXNSCRIBE_API_URL:
         return {
             "status": "failed",
@@ -543,7 +598,10 @@ def _run_reaction_ocr_with_rxnscribe(image_bytes: bytes, mime_type: str | None) 
     )
 
 
-def _run_reaction_ocr_with_rxnim(image_bytes: bytes, mime_type: str | None) -> dict[str, Any] | None:
+def _run_reaction_ocr_with_rxnim(
+    image_bytes: bytes,
+    mime_type: str | None,
+) -> dict[str, Any] | None:
     if not _RXNIM_API_URL:
         return {
             "status": "failed",
@@ -560,7 +618,10 @@ def _run_reaction_ocr_with_rxnim(image_bytes: bytes, mime_type: str | None) -> d
     )
 
 
-def _run_reaction_ocr_with_rxncaption(image_bytes: bytes, mime_type: str | None) -> dict[str, Any] | None:
+def _run_reaction_ocr_with_rxncaption(
+    image_bytes: bytes,
+    mime_type: str | None,
+) -> dict[str, Any] | None:
     if not _RXNCAPTION_API_URL:
         return {
             "status": "failed",
@@ -577,7 +638,10 @@ def _run_reaction_ocr_with_rxncaption(image_bytes: bytes, mime_type: str | None)
     )
 
 
-def _run_reaction_ocr_with_provider(image_bytes: bytes, mime_type: str | None) -> dict[str, Any] | None:
+def _run_reaction_ocr_with_provider(
+    image_bytes: bytes,
+    mime_type: str | None,
+) -> dict[str, Any] | None:
     if _REACTION_OCR_PROVIDER in {"", "placeholder", "disabled"}:
         return None
 
@@ -621,25 +685,35 @@ def _build_reaction_fallback_svg(
     content_y = 74
     conditions_y = 108 if show_conditions_below_arrow else 34
 
-    return (
-        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 140" role="img"'
-        ' aria-label="Reaction fallback visualization"'
-        f' data-arrow-length="{arrow_length}"'
-        f' data-component-gap="{component_gap}"'
-        f' data-plus-gap="{plus_gap}"'
-        f' data-conditions-position="{conditions_position}">'
-        '<rect x="1" y="1" width="538" height="138" rx="12" fill="#f8fafc" stroke="#cbd5e1"/>'
-        f'<text x="20" y="{content_y}" font-size="20" fill="#0f172a">{escape(reaction_label, quote=True)}</text>'
-        f'<line x1="220" y1="{content_y - 8}" x2="{220 + arrow_length}" y2="{content_y - 8}" stroke="#0f172a" stroke-width="2"/>'
-        f'<polygon points="{220 + arrow_length},{content_y - 8} {220 + arrow_length - 10},{content_y - 14} {220 + arrow_length - 10},{content_y - 2}" fill="#0f172a"/>'
-        f'<text x="20" y="{conditions_y}" font-size="14" fill="#475569">{escape(conditions_label, quote=True)}</text>'
-        "</svg>"
+    return "".join(
+        [
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 140" role="img"',
+            ' aria-label="Reaction fallback visualization"',
+            f' data-arrow-length="{arrow_length}"',
+            f' data-component-gap="{component_gap}"',
+            f' data-plus-gap="{plus_gap}"',
+            f' data-conditions-position="{conditions_position}">',
+            '<rect x="1" y="1" width="538" height="138" rx="12" fill="#f8fafc" stroke="#cbd5e1"/>',
+            f'<text x="20" y="{content_y}" font-size="20" fill="#0f172a">',
+            f"{escape(reaction_label, quote=True)}</text>",
+            f'<line x1="220" y1="{content_y - 8}" ',
+            f'x2="{220 + arrow_length}" y2="{content_y - 8}" ',
+            'stroke="#0f172a" stroke-width="2"/>',
+            f'<polygon points="{220 + arrow_length},{content_y - 8} ',
+            f'{220 + arrow_length - 10},{content_y - 14} ',
+            f'{220 + arrow_length - 10},{content_y - 2}" fill="#0f172a"/>',
+            f'<text x="20" y="{conditions_y}" font-size="14" fill="#475569">',
+            f"{escape(conditions_label, quote=True)}</text>",
+            "</svg>",
+        ]
     )
 
 
-def _coerce_string_list(value: Any) -> list[str] | None:
-    if not isinstance(value, list) or not value:
+def _coerce_string_list(value: Any, *, allow_empty: bool = False) -> list[str] | None:
+    if not isinstance(value, list):
         return None
+    if not value:
+        return [] if allow_empty else None
 
     items: list[str] = []
     for item in value:
@@ -680,7 +754,11 @@ def _build_reaction_render_payload(
             "products": products,
             "conditions": conditions,
         },
-        "warnings": warnings if warnings is not None else ["RDKit reaction render fallback is active."],
+        "warnings": (
+            warnings
+            if warnings is not None
+            else ["RDKit reaction render fallback is active."]
+        ),
     }
 
 
@@ -996,7 +1074,12 @@ def _serialize_structure_record(record: StructureRecord) -> dict[str, Any]:
 def _is_loopback_request() -> bool:
     candidate = request.remote_addr or ""
     normalized = candidate.lower()
-    return normalized in {"127.0.0.1", "::1", "::ffff:127.0.0.1", "localhost"} or normalized.startswith("127.")
+    return normalized in {
+        "127.0.0.1",
+        "::1",
+        "::ffff:127.0.0.1",
+        "localhost",
+    } or normalized.startswith("127.")
 
 
 @app.before_request
@@ -1189,8 +1272,8 @@ def reaction_render() -> Any:
         return ("", 204)
 
     payload = request.get_json(silent=True) or {}
-    reactants = _coerce_string_list(payload.get("reactants"))
-    products = _coerce_string_list(payload.get("products"))
+    reactants = _coerce_string_list(payload.get("reactants"), allow_empty=True)
+    products = _coerce_string_list(payload.get("products"), allow_empty=True)
     conditions = payload.get("conditions")
     render_options = payload.get("renderOptions")
 
@@ -1253,12 +1336,16 @@ def structure() -> Any:
     source = payload.get("source", "manual")
     confidence = payload.get("confidence")
 
-    if not isinstance(document_id, str) or not isinstance(block_id, str) or not isinstance(session_id, str):
+    if (
+        not isinstance(document_id, str)
+        or not isinstance(block_id, str)
+        or not isinstance(session_id, str)
+    ):
         return jsonify({"message": "documentId, blockId, and sessionId are required"}), 400
 
     if kind == "reaction":
-        normalized_reactants = _coerce_string_list(reactants)
-        normalized_products = _coerce_string_list(products)
+        normalized_reactants = _coerce_string_list(reactants, allow_empty=True)
+        normalized_products = _coerce_string_list(products, allow_empty=True)
         if normalized_reactants is None or normalized_products is None:
             return jsonify({"message": "reactants and products are required"}), 400
 

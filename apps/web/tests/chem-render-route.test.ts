@@ -2,15 +2,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const callChemServiceNormalizeMock = vi.fn();
 const callChemServiceRenderMock = vi.fn();
+const callChemServiceReactionRenderMock = vi.fn();
 const resolveChemicalNotationMock = vi.fn();
+const resolveChemicalNotationListMock = vi.fn();
 
 vi.mock("../src/server/chem/chem-service-client", () => ({
   callChemServiceNormalize: (...args: unknown[]) => callChemServiceNormalizeMock(...args),
-  callChemServiceRender: (...args: unknown[]) => callChemServiceRenderMock(...args)
+  callChemServiceRender: (...args: unknown[]) => callChemServiceRenderMock(...args),
+  callChemServiceReactionRender: (...args: unknown[]) => callChemServiceReactionRenderMock(...args)
 }));
 
 vi.mock("../src/server/chem/cas-resolver", () => ({
   resolveChemicalNotation: (...args: unknown[]) => resolveChemicalNotationMock(...args),
+  resolveChemicalNotationList: (...args: unknown[]) => resolveChemicalNotationListMock(...args),
   isCasResolutionError: (error: unknown) =>
     typeof error === "object"
     && error !== null
@@ -22,7 +26,9 @@ describe("POST /api/chem/render", () => {
   beforeEach(() => {
     callChemServiceNormalizeMock.mockReset();
     callChemServiceRenderMock.mockReset();
+    callChemServiceReactionRenderMock.mockReset();
     resolveChemicalNotationMock.mockReset();
+    resolveChemicalNotationListMock.mockReset();
     vi.resetModules();
   });
 
@@ -47,7 +53,7 @@ describe("POST /api/chem/render", () => {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          kind: "molecule",
+          type: "molecule",
           smiles: " CCO ",
           molfile: "legacy-molfile"
         })
@@ -72,6 +78,7 @@ describe("POST /api/chem/render", () => {
     });
     expect(response.status).toBe(200);
     expect(payload).toEqual({
+      type: "molecule",
       svg: "<svg>normalized</svg>",
       canonicalSmiles: "CCO",
       normalizedMolfile: "normalized-molfile",
@@ -100,7 +107,7 @@ describe("POST /api/chem/render", () => {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          kind: "molecule",
+          type: "molecule",
           smiles: "64-17-5"
         })
       })
@@ -130,7 +137,7 @@ describe("POST /api/chem/render", () => {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          kind: "molecule",
+          type: "molecule",
           smiles: "64-17-6"
         })
       })
@@ -158,7 +165,7 @@ describe("POST /api/chem/render", () => {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          kind: "molecule",
+          type: "molecule",
           smiles: "CCO"
         })
       })
@@ -183,7 +190,7 @@ describe("POST /api/chem/render", () => {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          kind: "molecule",
+          type: "molecule",
           smiles: `<script>alert("xss")</script>`
         })
       })
@@ -193,5 +200,54 @@ describe("POST /api/chem/render", () => {
     expect(response.status).toBe(200);
     expect(payload.svg).toContain("&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;");
     expect(payload.svg).not.toContain("<script>");
+  });
+
+  it("renders reaction payloads through the unified route", async () => {
+    resolveChemicalNotationListMock
+      .mockResolvedValueOnce(["CCO"])
+      .mockResolvedValueOnce(["CC=O"]);
+    callChemServiceReactionRenderMock.mockResolvedValueOnce({
+      svg: "<svg>reaction</svg>",
+      warnings: [],
+      renderer: "chem-service",
+      reaction: {
+        reactants: ["CCO"],
+        products: ["CC=O"],
+        conditions: ["air"]
+      }
+    });
+
+    const { POST } = await import("../src/app/api/chem/render/route");
+    const response = await POST(
+      new Request("http://localhost/api/chem/render", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          type: "reaction",
+          reactants: ["64-17-5"],
+          products: ["67-56-1"],
+          conditions: ["air"]
+        })
+      })
+    );
+    const payload = (await response.json()) as { type?: string; svg?: string; reaction?: { reactants?: string[]; products?: string[] } };
+
+    expect(response.status).toBe(200);
+    expect(callChemServiceReactionRenderMock).toHaveBeenCalledWith({
+      kind: "reaction",
+      reactants: ["CCO"],
+      products: ["CC=O"],
+      conditions: ["air"],
+      renderOptions: undefined
+    });
+    expect(payload.type).toBe("reaction");
+    expect(payload.svg).toBe("<svg>reaction</svg>");
+    expect(payload.reaction).toEqual({
+      reactants: ["CCO"],
+      products: ["CC=O"],
+      conditions: ["air"]
+    });
   });
 });

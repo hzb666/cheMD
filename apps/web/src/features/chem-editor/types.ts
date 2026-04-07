@@ -21,6 +21,10 @@ export type ChemEditorDraftWithBlockId = ChemEditorDraft & {
 };
 
 export interface KetcherBridgeInstance {
+  editor?: {
+    zoom?: (value?: number, event?: unknown) => number;
+    centerStruct?: () => void;
+  };
   changeEvent?: {
     add?: (handler: () => void, priority?: number) => void;
     remove?: (handler: () => void) => void;

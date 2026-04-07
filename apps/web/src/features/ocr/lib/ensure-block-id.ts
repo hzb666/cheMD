@@ -3,7 +3,7 @@ const sanitizeId = (value: string): string => value.trim().replace(/^#/, "");
 export const createSyntheticBlockId = (prefix: string, ordinal: number): string =>
   `${prefix}-missing-id-${ordinal}`;
 
-export const ensureBlockId = (rawId?: string, prefix = "mol", ordinal?: number): string => {
+export const ensureBlockId = (rawId?: string, prefix = "chem", ordinal?: number): string => {
   const normalized = typeof rawId === "string" ? sanitizeId(rawId) : "";
   if (normalized) {
     return normalized;

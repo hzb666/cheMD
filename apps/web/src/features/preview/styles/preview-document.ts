@@ -91,7 +91,8 @@ export const PREVIEW_DOCUMENT_STYLE = `
     height: auto;
   }
 
-  .chemd-edit-structure {
+  .chemd-edit-structure,
+  .chemd-edit-chem {
     display: inline-flex;
     min-height: 1.8rem;
     align-items: center;

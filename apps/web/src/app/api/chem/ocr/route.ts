@@ -39,6 +39,9 @@ const hasPlaceholderReaction = (
 
 const REACTION_OCR_FALLBACK_WARNING = "reaction ocr fallback";
 
+const readOptionalFormString = (value: FormDataEntryValue | null): string | undefined =>
+  typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+
 export const POST = async (request: Request): Promise<Response> => {
   const sessionError = requireMatchingSessionToken(request);
   if (sessionError) {
@@ -52,15 +55,25 @@ export const POST = async (request: Request): Promise<Response> => {
 
   const documentId = formData.get("documentId");
   const blockId = formData.get("blockId");
+  const fallbackBlockId = formData.get("fallbackBlockId");
+  const moleculeBlockId = formData.get("moleculeBlockId");
+  const reactionBlockId = formData.get("reactionBlockId");
   const sessionId = formData.get("sessionId");
   const image = formData.get("image");
+  const genericBlockId = readOptionalFormString(blockId);
+  const createBlockId = readOptionalFormString(fallbackBlockId);
+  const preferredMoleculeBlockId = readOptionalFormString(moleculeBlockId);
+  const preferredReactionBlockId = readOptionalFormString(reactionBlockId);
 
   if (
     typeof documentId !== "string"
-    || typeof blockId !== "string"
     || typeof sessionId !== "string"
+    || (!genericBlockId && !createBlockId && !preferredMoleculeBlockId && !preferredReactionBlockId)
   ) {
-    return NextResponse.json({ message: "documentId, blockId, and sessionId are required" }, { status: 400 });
+    return NextResponse.json(
+      { message: "documentId, sessionId, and at least one block id are required" },
+      { status: 400 }
+    );
   }
 
   if (!(image instanceof File)) {
@@ -81,12 +94,14 @@ export const POST = async (request: Request): Promise<Response> => {
     const reactants = normalizeStringArray(reactionOcr.reaction?.reactants);
     const products = normalizeStringArray(reactionOcr.reaction?.products);
     const conditions = normalizeStringArray(reactionOcr.reaction?.conditions);
+    const resolvedReactionBlockId = preferredReactionBlockId ?? genericBlockId ?? createBlockId!;
+    const reactionAction = preferredReactionBlockId || genericBlockId ? "update_existing" : "create_new";
 
     if (reactants.length > 0 && products.length > 0 && !hasPlaceholderReaction(reactionOcr)) {
       await saveStructureRecord({
         kind: "reaction",
         documentId,
-        blockId,
+        blockId: resolvedReactionBlockId,
         sessionId,
         reactants,
         products,
@@ -98,8 +113,8 @@ export const POST = async (request: Request): Promise<Response> => {
       return NextResponse.json({
         status: "ok",
         kind: "reaction",
-        blockId,
-        action: "update_existing",
+        blockId: resolvedReactionBlockId,
+        action: reactionAction,
         reaction: {
           reactants,
           products,
@@ -117,8 +132,8 @@ export const POST = async (request: Request): Promise<Response> => {
       return NextResponse.json(
         {
           status: "failed",
-          blockId,
-          action: "update_existing",
+          blockId: genericBlockId ?? createBlockId ?? preferredMoleculeBlockId ?? preferredReactionBlockId,
+          action: genericBlockId || preferredMoleculeBlockId || preferredReactionBlockId ? "update_existing" : "create_new",
           warnings: ocr.warnings
         },
         { status: 422 }
@@ -129,11 +144,13 @@ export const POST = async (request: Request): Promise<Response> => {
       smiles: ocr.structure.smiles,
       molfile: ocr.structure.molfile
     });
+    const resolvedMoleculeBlockId = preferredMoleculeBlockId ?? genericBlockId ?? createBlockId!;
+    const moleculeAction = preferredMoleculeBlockId || genericBlockId ? "update_existing" : "create_new";
 
     await saveStructureRecord({
       kind: "molecule",
       documentId,
-      blockId,
+      blockId: resolvedMoleculeBlockId,
       sessionId,
       smiles: normalized.canonicalSmiles,
       molfile: normalized.normalizedMolfile,
@@ -144,8 +161,8 @@ export const POST = async (request: Request): Promise<Response> => {
     return NextResponse.json({
       status: "ok",
       kind: "molecule",
-      blockId,
-      action: "update_existing",
+      blockId: resolvedMoleculeBlockId,
+      action: moleculeAction,
       structure: {
         smiles: normalized.canonicalSmiles,
         molfile: normalized.normalizedMolfile

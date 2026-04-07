@@ -1,44 +1,69 @@
 @import "tailwindcss";
 
-:root {
-  color-scheme: light;
-  --background: #f3f6fb;
-  --foreground: #0f172a;
-  --card: #ffffff;
-  --card-foreground: #0f172a;
-  --popover: #ffffff;
-  --popover-foreground: #0f172a;
-  --primary: #0f172a;
-  --primary-foreground: #f8fafc;
-  --secondary: #e2e8f0;
-  --secondary-foreground: #0f172a;
-  --muted: #e2e8f0;
-  --muted-foreground: #475569;
-  --accent: #eff6ff;
-  --accent-foreground: #1e3a8a;
-  --destructive: #dc2626;
-  --destructive-foreground: #f8fafc;
-  --border: #dbe3ee;
-  --input: #dbe3ee;
-  --ring: #2563eb;
-  --radius: 1rem;
-  --font-sans: "Inter", "Segoe UI Variable Text", Aptos, "PingFang SC", "Noto Sans SC", sans-serif;
-  --font-mono: "JetBrains Mono", "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+@plugin "tailwindcss-animate";
 
-  --page-bg: #f3f5f8;
-  --page-bg-soft: #eef2f6;
-  --panel-bg: #f7f9fc;
-  --panel-bg-elevated: #ffffff;
-  --panel-bg-soft: #f8fafc;
-  --panel-border: rgba(15, 23, 42, 0.08);
-  --panel-border-strong: rgba(15, 23, 42, 0.12);
-  --ink: #111827;
-  --ink-soft: #4b5563;
-  --muted-strong: #374151;
-  --success: #15803d;
-  --warning: #b45309;
-  --code-ink: #1f2937;
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: #ffffff;
+  --foreground: rgba(0, 0, 0, 0.95);
+  --card: #ffffff;
+  --card-foreground: rgba(0, 0, 0, 0.95);
+  --popover: #ffffff;
+  --popover-foreground: rgba(0, 0, 0, 0.95);
+  --primary: #0075de;
+  --primary-foreground: #ffffff;
+  --secondary: #f6f5f4;
+  --secondary-foreground: rgba(0, 0, 0, 0.95);
+  --muted: #f6f5f4;
+  --muted-foreground: #615d59;
+  --accent: #f2f9ff;
+  --accent-foreground: #097fe8;
+  --destructive: #dd5b00;
+  --destructive-foreground: #ffffff;
+  --border: rgba(0, 0, 0, 0.1);
+  --input: rgba(0, 0, 0, 0.1);
+  --ring: #097fe8;
+  --radius: 0.25rem;
+
+  --page-bg: var(--background);
+  --page-bg-soft: var(--secondary);
+  --panel-bg: var(--card);
+  --panel-bg-elevated: var(--card);
+  --panel-bg-soft: var(--muted);
+  --panel-border: var(--border);
+  --panel-border-strong: var(--border);
+  --ink: var(--foreground);
+  --ink-soft: var(--muted-foreground);
+  --muted-strong: var(--muted-foreground);
+  --success: #1aae39;
+  --warning: #dd5b00;
+  --code-ink: var(--foreground);
 }
+
+
+.dark {
+  --background: #191919;
+  --foreground: rgba(255, 255, 255, 0.95);
+  --card: #191919;
+  --card-foreground: rgba(255, 255, 255, 0.95);
+  --popover: #191919;
+  --popover-foreground: rgba(255, 255, 255, 0.95);
+  --primary: #0075de;
+  --primary-foreground: #ffffff;
+  --secondary: #31302e;
+  --secondary-foreground: rgba(255, 255, 255, 0.95);
+  --muted: #31302e;
+  --muted-foreground: #a39e98;
+  --accent: #213183;
+  --accent-foreground: #62aef0;
+  --destructive: #dd5b00;
+  --destructive-foreground: #ffffff;
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.1);
+  --ring: #097fe8;
+}
+
 
 @theme inline {
   --color-background: var(--background);
@@ -60,11 +85,41 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-mono);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) + 8px);
+
+  --shadow-notion-card: rgba(0,0,0,0.04) 0px 4px 18px, rgba(0,0,0,0.027) 0px 2.025px 7.84688px, rgba(0,0,0,0.02) 0px 0.8px 2.925px, rgba(0,0,0,0.01) 0px 0.175px 1.04062px;
+  --shadow-notion-deep: rgba(0,0,0,0.01) 0px 1px 3px, rgba(0,0,0,0.02) 0px 3px 7px, rgba(0,0,0,0.02) 0px 7px 15px, rgba(0,0,0,0.04) 0px 14px 28px, rgba(0,0,0,0.05) 0px 23px 52px;
+}
+
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Premium Utilities */
+@layer utilities {
+  .bg-dot-pattern {
+    display: none;
+  }
+  .notion-font-display { font-weight: 700; letter-spacing: -2.125px; line-height: 1.0; }
+  .notion-font-section { font-weight: 700; letter-spacing: -1.5px; line-height: 1.0; }
+  .notion-font-card { font-weight: 700; letter-spacing: -0.25px; line-height: 1.27; }
+  .notion-font-body-large { font-weight: 600; letter-spacing: -0.125px; line-height: 1.40; }
+  .notion-font-body-bold { font-weight: 700; line-height: 1.50; }
+  .notion-font-ui { font-weight: 500; line-height: 1.50; }
+  .notion-font-label { font-weight: 600; line-height: 1.50; }
+  .notion-font-caption { font-weight: 500; line-height: 1.43; }
+  .notion-font-badge { font-weight: 600; letter-spacing: 0.125px; line-height: 1.33; }
+  .notion-shadow-card { box-shadow: var(--shadow-notion-card); }
+  .notion-shadow-deep { box-shadow: var(--shadow-notion-deep); }
 }
 
 * {
@@ -86,6 +141,40 @@ body {
   letter-spacing: -0.01em;
   text-rendering: optimizeLegibility;
   overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+/* Global Unified Scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.3);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.6);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.15);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.4);
 }
 
 button,
@@ -458,26 +547,6 @@ select:disabled {
 .scroll-area {
   overflow: auto;
   scrollbar-gutter: stable;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(15, 23, 42, 0.14) transparent;
-}
-
-.scroll-area::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
-}
-
-.scroll-area::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.scroll-area::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.12);
-}
-
-.scroll-area::-webkit-scrollbar-thumb:hover {
-  background: rgba(15, 23, 42, 0.2);
 }
 
 .dialog-backdrop {
@@ -500,15 +569,37 @@ select:disabled {
   overflow: auto;
 }
 
+.chem-editor-dialog-card {
+  width: min(72rem, 94vw);
+  height: min(calc(100vh - 2rem), 50rem);
+  max-height: calc(100vh - 2rem);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.chem-editor-dialog-body {
+  flex: 1;
+  margin: 0.8rem;
+  min-height: 0;
+}
+
+.chem-editor-dialog-body-inner {
+  height: 100%;
+  padding: 0.8rem;
+}
+
 .ketcher-frame {
   display: flex;
   flex-direction: column;
-  min-height: 32rem;
+  min-height: 0;
+  height: 100%;
 }
 
 .ketcher-host-shell {
   position: relative;
-  min-height: 30rem;
+  min-height: 0;
+  height: 100%;
   border: 1px solid var(--panel-border);
   background:
     linear-gradient(180deg, rgba(248, 250, 252, 0.98) 0%, rgba(241, 245, 249, 0.98) 100%);
@@ -527,11 +618,45 @@ select:disabled {
 }
 
 .ketcher-host-surface {
-  min-height: 30rem;
+  min-height: 0;
+  height: 100%;
 }
 
 .ketcher-host-surface > div {
-  min-height: 30rem;
+  min-height: 0;
+  height: 100%;
+}
+
+.ketcher-frame[data-chem-editor-kind="reaction"] {
+  min-height: 36rem;
+}
+
+.ketcher-frame[data-chem-editor-kind="molecule"] {
+  min-height: 34rem;
+}
+
+.ketcher-frame[data-chem-editor-kind="reaction"] .ketcher-host-shell,
+.ketcher-frame[data-chem-editor-kind="molecule"] .ketcher-host-shell,
+.ketcher-frame[data-chem-editor-kind="reaction"] .ketcher-host-surface,
+.ketcher-frame[data-chem-editor-kind="molecule"] .ketcher-host-surface,
+.ketcher-frame[data-chem-editor-kind="reaction"] .ketcher-host-surface > div,
+.ketcher-frame[data-chem-editor-kind="molecule"] .ketcher-host-surface > div {
+  min-height: inherit;
+}
+
+@media (max-width: 900px) {
+  .chem-editor-dialog-card {
+    width: min(100%, 96vw);
+    height: min(calc(100vh - 1.5rem), 46rem);
+  }
+
+  .chem-editor-dialog-body {
+    margin: 0.55rem;
+  }
+
+  .chem-editor-dialog-body-inner {
+    padding: 0.55rem;
+  }
 }
 
 .ketcher-input {

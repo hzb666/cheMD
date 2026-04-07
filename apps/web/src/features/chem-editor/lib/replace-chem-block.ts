@@ -1,56 +1,83 @@
 import { ensureBlockId } from "../../ocr/lib/ensure-block-id";
 import type { ChemEditorDraft } from "../types";
 
-const MOLECULE_OPEN_RE = /^:::molecule(?:\s+#([^\s]+))?/;
-const REACTION_OPEN_RE = /^:::reaction(?:\s+#([^\s]+))?/;
+const CHEMD_OPEN_RE = /^:::chemd(?:\s+#([^\s]+))?/;
 const BLOCK_CLOSE_RE = /^:::$/;
 
-const serializeChemBlock = (blockId: string, draft: ChemEditorDraft): string => {
+const MOLECULE_METADATA_KEYS = new Set([
+  "name",
+  "role",
+  "caption",
+  "formula",
+  "amount",
+  "equivalents"
+]);
+const REACTION_METADATA_KEYS = new Set([
+  "name",
+  "caption",
+  "reagents",
+  "catalyst",
+  "solvent",
+  "temperature",
+  "time",
+  "pressure",
+  "atmosphere",
+  "yield",
+  "conversion",
+  "selectivity"
+]);
+
+const parseFieldKey = (line: string): string | null => {
+  const match = line.match(/^\s*([a-z][a-z0-9_]*)\s*:/);
+  return match?.[1] ?? null;
+};
+
+const pickPreservedLines = (lines: string[], allowedKeys: Set<string>): string[] =>
+  lines.filter((line) => {
+    const key = parseFieldKey(line);
+    return !key || allowedKeys.has(key);
+  });
+
+const serializeChemBlock = (blockId: string, draft: ChemEditorDraft, existingLines: string[]): string[] => {
   if (draft.kind === "reaction") {
+    const preservedLines = pickPreservedLines(existingLines, REACTION_METADATA_KEYS);
     const lines = [
-      `:::reaction #${blockId}`,
-      `reactants: ${draft.reactants.join(" | ")}`,
-      `products: ${draft.products.join(" | ")}`
+      `:::chemd #${blockId}`,
+      `reac: ${draft.reactants.join(" | ")}`,
+      `prod: ${draft.products.join(" | ")}`
     ];
 
     if (draft.conditions.length > 0) {
       lines.push(`conditions: ${draft.conditions.join(" | ")}`);
     }
 
+    lines.push(...preservedLines);
     lines.push(":::");
-    return lines.join("\n");
+    return lines;
   }
 
   return [
-    `:::molecule #${blockId}`,
+    `:::chemd #${blockId}`,
     `smiles: ${draft.smiles}`,
+    ...pickPreservedLines(existingLines, MOLECULE_METADATA_KEYS),
     ":::"
-  ].join("\n");
+  ];
 };
 
 export const replaceChemBlock = (
   source: string,
   blockId: string,
   draft: ChemEditorDraft
-): string => {
+): string | null => {
   const lines = source.split(/\r?\n/);
-  let moleculeOrdinal = 0;
-  let reactionOrdinal = 0;
+  let chemdOrdinal = 0;
 
   for (let index = 0; index < lines.length; index += 1) {
     const openLine = lines[index] ?? "";
-    const moleculeMatch = openLine.match(MOLECULE_OPEN_RE);
-    const reactionMatch = openLine.match(REACTION_OPEN_RE);
-
-    let existingId: string | null = null;
-    if (moleculeMatch) {
-      moleculeOrdinal += 1;
-      existingId = ensureBlockId(moleculeMatch[1], "mol", moleculeOrdinal);
-    } else if (reactionMatch) {
-      reactionOrdinal += 1;
-      existingId = ensureBlockId(reactionMatch[1], "rxn", reactionOrdinal);
-    }
-
+    const chemdMatch = openLine.match(CHEMD_OPEN_RE);
+    const existingId = chemdMatch
+      ? ensureBlockId(chemdMatch[1], "chem", ++chemdOrdinal)
+      : null;
     if (!existingId || existingId !== blockId) {
       continue;
     }
@@ -63,9 +90,10 @@ export const replaceChemBlock = (
       }
     }
 
-    lines.splice(index, endLine - index + 1, ...serializeChemBlock(blockId, draft).split("\n"));
+    const existingLines = lines.slice(index + 1, endLine);
+    lines.splice(index, endLine - index + 1, ...serializeChemBlock(blockId, draft, existingLines));
     return lines.join("\n");
   }
 
-  return source;
+  return null;
 };

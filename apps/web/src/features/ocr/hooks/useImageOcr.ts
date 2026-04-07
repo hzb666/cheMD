@@ -7,9 +7,7 @@ import { insertMoleculeBlock } from "../lib/insert-molecule-block";
 import { selectTargetMolecule } from "../lib/select-target-molecule";
 import { selectTargetReaction } from "../lib/select-target-reaction";
 import { updateMoleculeBlock } from "../lib/update-molecule-block";
-import { saveStoredStructureDraft } from "../../structure-editor/lib/structure-draft-store";
 import { insertReactionBlock } from "../../reaction-editor/lib/insert-reaction-block";
-import { saveStoredReactionDraft } from "../../reaction-editor/lib/reaction-draft-store";
 import { updateReactionBlock } from "../../reaction-editor/lib/update-reaction-block";
  
 interface UseImageOcrParams {
@@ -48,16 +46,20 @@ export const useImageOcr = ({
       setError(null);
 
       try {
-        const initialTarget = selectTargetMolecule(getLatestSource());
-        const initialReactionTarget = selectTargetReaction(getLatestSource());
-        const requestedBlockId = ensureBlockId(
-          initialReactionTarget?.blockId ?? initialTarget?.blockId,
-          initialReactionTarget ? "rxn" : initialTarget ? "mol" : "ocr"
-        );
+        const initialSource = getLatestSource();
+        const initialTarget = selectTargetMolecule(initialSource);
+        const initialReactionTarget = selectTargetReaction(initialSource);
+        const fallbackBlockId = ensureBlockId(undefined, "chem");
 
         const formData = new FormData();
         formData.set("documentId", documentId);
-        formData.set("blockId", requestedBlockId);
+        formData.set("fallbackBlockId", fallbackBlockId);
+        if (initialTarget?.blockId) {
+          formData.set("moleculeBlockId", initialTarget.blockId);
+        }
+        if (initialReactionTarget?.blockId) {
+          formData.set("reactionBlockId", initialReactionTarget.blockId);
+        }
         formData.set("sessionId", sessionId);
         formData.set("image", file);
 
@@ -80,21 +82,14 @@ export const useImageOcr = ({
           && payload.reaction?.reactants?.length
           && payload.reaction?.products?.length
         ) {
-          const target = selectTargetReaction(latestSource, initialReactionTarget?.blockId);
-          const blockId = target?.blockId ?? requestedBlockId;
+          const blockId = typeof payload.blockId === "string" && payload.blockId.trim().length > 0
+            ? payload.blockId
+            : fallbackBlockId;
+          const target = selectTargetReaction(latestSource, blockId);
           const action = target ? "update_existing" : "create_new";
           const nextSource = target
             ? updateReactionBlock(latestSource, blockId, payload.reaction)
             : insertReactionBlock(latestSource, blockId, payload.reaction);
-
-          saveStoredReactionDraft({
-            documentId,
-            blockId,
-            sessionId,
-            reactants: payload.reaction.reactants,
-            products: payload.reaction.products,
-            conditions: payload.reaction.conditions
-          });
           onSourceChange(nextSource);
 
           const result: OcrApplyResult = {
@@ -114,21 +109,14 @@ export const useImageOcr = ({
           throw new Error("OCR did not return a usable chemistry payload");
         }
 
-        const target = selectTargetMolecule(latestSource, initialTarget?.blockId);
-        const blockId = target?.blockId ?? requestedBlockId;
+        const blockId = typeof payload.blockId === "string" && payload.blockId.trim().length > 0
+          ? payload.blockId
+          : fallbackBlockId;
+        const target = selectTargetMolecule(latestSource, blockId);
         const action = target ? "update_existing" : "create_new";
         const nextSource = target
           ? updateMoleculeBlock(latestSource, blockId, structure.smiles)
           : insertMoleculeBlock(latestSource, blockId, structure.smiles);
-
-        saveStoredStructureDraft({
-          documentId,
-          blockId,
-          sessionId,
-          smiles: structure.smiles,
-          molfile: structure.molfile,
-          sourceSmiles: structure.smiles
-        });
         onSourceChange(nextSource);
 
         const result: OcrApplyResult = {
@@ -141,7 +129,7 @@ export const useImageOcr = ({
         setLastResult(result);
         return result;
       } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "OCR failed");
+        setError(nextError instanceof Error ? nextError.message : "OCR failed");
         return null;
       } finally {
         loadingRef.current = false;

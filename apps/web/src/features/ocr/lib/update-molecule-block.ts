@@ -1,23 +1,22 @@
 import { ensureBlockId } from "./ensure-block-id";
 
-const MOLECULE_OPEN_RE = /^:::molecule(?:\s+#([^\s]+))?/;
+const CHEMD_OPEN_RE = /^:::chemd(?:\s+#([^\s]+))?/;
 const MOLECULE_CLOSE_RE = /^:::$/;
 const SMILES_RE = /^\s*smiles\s*:/i;
 
 export const updateMoleculeBlock = (source: string, blockId: string, smiles: string): string => {
   const lines = source.split(/\r?\n/);
-  const targetOpen = `:::molecule #${blockId}`;
-  let moleculeOrdinal = 0;
+  const targetOpen = `:::chemd #${blockId}`;
+  let chemdOrdinal = 0;
 
   for (let index = 0; index < lines.length; index += 1) {
     const openLine = lines[index] ?? "";
-    const openMatch = openLine.match(MOLECULE_OPEN_RE);
-    if (!openMatch) {
+    const chemdMatch = openLine.match(CHEMD_OPEN_RE);
+    if (!chemdMatch) {
       continue;
     }
 
-    moleculeOrdinal += 1;
-    const existingId = ensureBlockId(openMatch[1], "mol", moleculeOrdinal);
+    const existingId = ensureBlockId(chemdMatch[1], "chem", ++chemdOrdinal);
     if (existingId !== blockId) {
       continue;
     }

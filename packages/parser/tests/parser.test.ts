@@ -50,6 +50,61 @@ const expectTokenSpan = (value: string, token: PositionedMarkdownToken): void =>
 };
 
 describe("parseChemd", () => {
+  it("parses unified chemd blocks into molecule and reaction nodes", () => {
+    const source = `---
+id: exp-chemd
+title: Unified Chemd
+date: 2026-04-08
+---
+
+:::chemd #chem-rxn
+reac: CCO | O=O
+prod: CC(=O)O
+conditions: air | 80 C
+:::
+
+:::chemd #chem-mol
+smiles: CCO
+:::`;
+
+    const doc = parseChemd(source);
+    const reaction = doc.children.find((child): child is ReactionNode => child.type === "reaction");
+    const molecule = doc.children.find((child): child is MoleculeNode => child.type === "molecule");
+
+    expect(reaction).toMatchObject({
+      id: "chem-rxn",
+      reactants: ["CCO", "O=O"],
+      products: ["CC(=O)O"],
+      conditions: ["air", "80 C"]
+    });
+    expect(molecule).toMatchObject({
+      id: "chem-mol",
+      smiles: "CCO"
+    });
+  });
+
+  it("rejects legacy molecule and reaction block types", () => {
+    const source = `---
+id: exp-legacy
+title: Legacy Blocks
+date: 2026-04-08
+---
+
+:::reaction #rxn-main
+reactants: CCO
+products: CC=O
+:::
+
+:::molecule #mol-main
+smiles: CCO
+:::`;
+
+    const doc = parseChemd(source);
+
+    expect(doc.children.some((child) => child.type === "reaction" || child.type === "molecule")).toBe(false);
+    expect(doc.diagnostics.filter((item) => item.code === "W_UNKNOWN_BLOCK")).toHaveLength(2);
+  });
+
   it("parses frontmatter, semantic blocks, and markdown references", () => {
     const source = `---
 id: exp-2026-03-30-001
@@ -61,9 +116,9 @@ render_profile: publication-acs
 
 # Experiment
 
-:::reaction #rxn-main
-reactants: CCO | O=O
-products: CC(=O)O
+:::chemd #rxn-main
+reac: CCO | O=O
+prod: CC(=O)O
 conditions: Cu catalyst | air | 80 C | 4 h
 temperature: 200 °C
 time: 4 h
@@ -284,7 +339,7 @@ date: 2026-03-30
 ---
 
 :::col-2
-col: {:::mol
+col: {:::chemd
 smiles: CCO
 name: Ethanol
 :::}
@@ -329,14 +384,14 @@ title: Unterminated Block Test
 date: 2026-03-30
 ---
 
-:::reaction #rxn-main
-reactants: CCO | O=O
-products: CC(=O)O`;
+:::chemd #rxn-main
+reac: CCO | O=O
+prod: CC(=O)O`;
 
     const doc = parseChemd(source);
     const unterminated = doc.diagnostics.find((diagnostic) => diagnostic.code === "W_UNTERMINATED_BLOCK");
 
-    expect(unterminated?.message).toContain("reaction");
+    expect(unterminated?.message).toContain("chemd");
   });
 
   it("rejects numeric suffixes on non-col blocks", () => {
@@ -365,9 +420,9 @@ title: Diagnostic Test
 date: 2026-03-30
 ---
 
-:::reaction #rxn-main
-reactants: CCO |  | O=O
-products: CC(=O)O
+:::chemd #rxn-main
+reac: CCO |  | O=O
+prod: CC(=O)O
 bond_length: 32
 :::
 
@@ -384,7 +439,7 @@ Formula: :chem[H2O]`;
     expect(markdown?.inlineChem[0]).toMatchObject({ raw: ":chem[H2O]", value: "H2O" });
     expectTokenSpan(markdown?.value ?? "", markdown?.inlineChem[0] ?? { raw: ":chem[H2O]" });
     expect(unknownField?.message).toContain("bond_length");
-    expect(invalidListItem?.message).toContain("reactants");
+    expect(invalidListItem?.message).toContain("reac");
   });
 
   it("parses reaction conditions as a formal list field", () => {
@@ -394,9 +449,9 @@ title: Reaction Conditions
 date: 2026-04-02
 ---
 
-:::reaction #rxn-main
-reactants: CCO
-products: CC(=O)O
+:::chemd #rxn-main
+reac: CCO
+prod: CC(=O)O
 conditions: Cu catalyst | air | 80 C | 4 h
 :::`;
 
@@ -932,9 +987,9 @@ title: Unknown Field Pruning
 date: 2026-04-02
 ---
 
-:::reaction #rxn-main
-reactants: CCO
-products: CC=O
+:::chemd #rxn-main
+reac: CCO
+prod: CC=O
 bond_length: 1.5
 :::`;
 
