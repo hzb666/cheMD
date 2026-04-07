@@ -201,4 +201,24 @@ describe("readPreviewEditMessage", () => {
       });
     }
   });
+
+  it("throws when no secure crypto source is available", () => {
+    const originalCrypto = globalThis.crypto;
+
+    Object.defineProperty(globalThis, "crypto", {
+      configurable: true,
+      value: undefined
+    });
+
+    try {
+      expect(() => createScopedToken("scope")).toThrow(
+        "secure random token generation is unavailable; crypto.randomUUID/getRandomValues is not supported in this runtime"
+      );
+    } finally {
+      Object.defineProperty(globalThis, "crypto", {
+        configurable: true,
+        value: originalCrypto
+      });
+    }
+  });
 });
