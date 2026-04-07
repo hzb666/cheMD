@@ -7,7 +7,16 @@ interface StorageLike {
   setItem: (key: string, value: string) => void;
 }
 
-const createSessionId = (): string => createScopedToken("session");
+const createFallbackSessionId = (): string =>
+  `session-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+
+const createSessionId = (): string => {
+  try {
+    return createScopedToken("session");
+  } catch {
+    return createFallbackSessionId();
+  }
+};
 
 const resolveStorage = (storageImpl?: StorageLike): StorageLike | null => {
   if (storageImpl) {
