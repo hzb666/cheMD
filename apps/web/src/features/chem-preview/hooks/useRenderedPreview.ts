@@ -37,16 +37,29 @@ export const useRenderedPreview = (
 ): UseRenderedPreviewResult => {
   const { documentId, sessionId, renderOptions } = options;
   const baseHtml = useMemo(() => injectEditButtons(html), [html]);
+  const [bridgeReady, setBridgeReady] = useState(false);
   const previewBridgeToken = useMemo(() => {
-    const seed = JSON.stringify({
-      htmlLength: baseHtml.length,
-      documentId,
-      sessionId,
-      renderOptions
-    });
-    return `preview-${seed.length.toString(36)}-${createPreviewBridgeToken()}`;
-  }, [baseHtml, documentId, renderOptions, sessionId]);
+    if (!bridgeReady) {
+      return "";
+    }
+
+    try {
+      const seed = JSON.stringify({
+        htmlLength: baseHtml.length,
+        documentId,
+        sessionId,
+        renderOptions
+      });
+      return `preview-${seed.length.toString(36)}-${createPreviewBridgeToken()}`;
+    } catch {
+      return "";
+    }
+  }, [baseHtml, bridgeReady, documentId, renderOptions, sessionId]);
   const [hydratedHtml, setHydratedHtml] = useState(baseHtml);
+
+  useEffect(() => {
+    setBridgeReady(true);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -192,7 +205,10 @@ export const useRenderedPreview = (
   }, [baseHtml, documentId, renderOptions, sessionId]);
 
   return {
-    hydratedHtml: `${hydratedHtml}${buildPreviewBridgeScript(previewBridgeToken)}`,
+    hydratedHtml:
+      bridgeReady && previewBridgeToken
+        ? `${hydratedHtml}${buildPreviewBridgeScript(previewBridgeToken, window.location.origin)}`
+        : hydratedHtml,
     previewBridgeToken
   };
 };

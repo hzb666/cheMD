@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { buildPreviewBridgeScript } from "../src/features/chem-preview/lib/preview-bridge";
 import { readPreviewEditMessage } from "../src/features/preview/lib/read-preview-edit-message";
+import { createScopedToken } from "../src/lib/random-token";
 
 describe("readPreviewEditMessage", () => {
   const previewToken = "preview-token";
@@ -166,5 +168,57 @@ describe("readPreviewEditMessage", () => {
         previewToken
       )
     ).toBeNull();
+  });
+
+  it("builds preview bridge script without wildcard postMessage origin", () => {
+    const script = buildPreviewBridgeScript(previewToken, "http://localhost:2436");
+
+    expect(script).toContain('const targetOrigin = "http://localhost:2436";');
+    expect(script).not.toContain('"*"');
+  });
+
+  it("creates scoped fallback token when crypto UUID API is unavailable", () => {
+    const originalCrypto = globalThis.crypto;
+    const getRandomValues = (array: Uint8Array): Uint8Array => {
+      array.fill(0xab);
+      return array;
+    };
+
+    Object.defineProperty(globalThis, "crypto", {
+      configurable: true,
+      value: {
+        randomUUID: () => "",
+        getRandomValues
+      }
+    });
+
+    try {
+      expect(createScopedToken("scope")).toBe(`scope-${"ab".repeat(16)}`);
+    } finally {
+      Object.defineProperty(globalThis, "crypto", {
+        configurable: true,
+        value: originalCrypto
+      });
+    }
+  });
+
+  it("throws when no secure crypto source is available", () => {
+    const originalCrypto = globalThis.crypto;
+
+    Object.defineProperty(globalThis, "crypto", {
+      configurable: true,
+      value: undefined
+    });
+
+    try {
+      expect(() => createScopedToken("scope")).toThrow(
+        "secure random token generation is unavailable; crypto.randomUUID/getRandomValues is not supported in this runtime"
+      );
+    } finally {
+      Object.defineProperty(globalThis, "crypto", {
+        configurable: true,
+        value: originalCrypto
+      });
+    }
   });
 });

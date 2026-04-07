@@ -1,28 +1,27 @@
+import { createScopedToken } from "../../../lib/random-token";
+
 const MOLECULE_EDIT_BUTTON =
   '<button type="button" class="chemd-edit-structure" data-action="edit-structure">Edit structure</button>';
 
 const REACTION_EDIT_BUTTON =
   '<button type="button" class="chemd-edit-reaction" data-action="edit-reaction">Edit reaction</button>';
 
-export const createPreviewBridgeToken = (): string => {
-  const randomUuid = globalThis.crypto?.randomUUID?.();
-  if (typeof randomUuid === "string" && randomUuid.length > 0) {
-    return randomUuid;
-  }
-
-  return `preview-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-};
+export const createPreviewBridgeToken = (): string => createScopedToken("preview");
 
 export const injectEditButtons = (html: string): string =>
   html
     .replace(/(<section class="chemd-block chemd-block--molecule"[^>]*>)/g, `$1${MOLECULE_EDIT_BUTTON}`)
     .replace(/(<section class="chemd-block chemd-block--reaction"[^>]*>)/g, `$1${REACTION_EDIT_BUTTON}`);
 
-export const buildPreviewBridgeScript = (previewBridgeToken: string): string => `<script>
+export const buildPreviewBridgeScript = (
+  previewBridgeToken: string,
+  parentOrigin: string
+): string => `<script>
 (() => {
   if (window.__chemdBridgeBound) return;
   window.__chemdBridgeBound = true;
   const previewToken = ${JSON.stringify(previewBridgeToken)};
+  const targetOrigin = ${JSON.stringify(parentOrigin)};
   const resolveBlockId = (block, selector, prefix) => {
     const explicitId = String(block.getAttribute("data-node-id") || "").trim();
     if (explicitId) return explicitId;
@@ -50,7 +49,7 @@ export const buildPreviewBridgeScript = (previewBridgeToken: string): string => 
         }
       }
 
-      window.parent.postMessage({ type: "chemd:edit-molecule", blockId, smiles, previewToken }, "*");
+      window.parent.postMessage({ type: "chemd:edit-molecule", blockId, smiles, previewToken }, targetOrigin);
       return;
     }
 
@@ -77,7 +76,7 @@ export const buildPreviewBridgeScript = (previewBridgeToken: string): string => 
 
     window.parent.postMessage(
       { type: "chemd:edit-reaction", blockId, reactants, products, conditions, previewToken },
-      "*"
+      targetOrigin
     );
   });
 })();
