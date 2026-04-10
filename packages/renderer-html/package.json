@@ -8,8 +8,7 @@
   },
   "dependencies": {
     "@chemd/core": "workspace:*",
-    "@chemd/render-profile": "workspace:*",
-    "@chemd/renderer-svg": "workspace:*"
+    "@chemd/render-profile": "workspace:*"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json --noEmit",

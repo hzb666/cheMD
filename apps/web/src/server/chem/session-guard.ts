@@ -38,6 +38,7 @@ export const requireMatchingSessionToken = (request: Request): Response | null =
     CHEMD_SESSION_TOKEN_COOKIE
   )?.trim();
 
+  // 写操作要求 header 与 cookie 的 token 同值，防止伪造 header 或被动 cookie 穿透。
   if (!headerToken || !cookieToken || headerToken !== cookieToken) {
     return NextResponse.json(
       { message: "matching session token is required for write operations" },

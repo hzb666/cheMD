@@ -1,15 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { createDocument, createMarkdownNode } from "@chemd/core";
-import {
-  mapRenderOptionsToAdapterPayload,
-  resolveRenderProfile
-} from "@chemd/render-profile";
 
 import { renderJson } from "../src";
 
 describe("renderJson", () => {
-  it("serializes document, diagnostics, render options, and adapter payload", () => {
+  it("serializes document and diagnostics without render style metadata", () => {
     const document = createDocument(
       { id: "exp-json", title: "JSON Test", date: "2026-03-30" },
       {
@@ -19,24 +15,16 @@ describe("renderJson", () => {
       }
     );
 
-    const options = resolveRenderProfile({ profileId: "publication-acs" });
-    const adapterPayload = mapRenderOptionsToAdapterPayload(options);
-    const json = renderJson(document, options, adapterPayload);
+    const json = renderJson(document);
     const payload = JSON.parse(json) as {
       document: { meta: { title: string } };
       diagnostics: Array<{ code: string }>;
-      render: {
-        profileId: string;
-        adapter?: {
-          rdkit: { fixedBondLength: number };
-        };
-      };
+      render?: unknown;
     };
 
     expect(payload.document.meta.title).toBe("JSON Test");
     expect(payload.diagnostics[0]?.code).toBe("W_TEST");
-    expect(payload.render.profileId).toBe("publication-acs");
-    expect(payload.render.adapter?.rdkit.fixedBondLength).toBe(options.structure.bondLength);
+    expect(payload.render).toBeUndefined();
   });
 
   it("adds normalized reaction condition fields to JSON output", () => {
@@ -56,8 +44,7 @@ describe("renderJson", () => {
       }
     );
 
-    const options = resolveRenderProfile({ profileId: "publication-acs" });
-    const json = renderJson(document, options);
+    const json = renderJson(document);
     const payload = JSON.parse(json) as {
       document: {
         children: Array<{

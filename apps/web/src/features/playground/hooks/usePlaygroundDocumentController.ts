@@ -9,10 +9,12 @@ import { getStructureSessionId } from "../../structure-editor/lib/structure-sess
 import { sampleSource } from "../lib/sample-source";
 
 const compilePreview = (source: string): CompileResult => compileChemd(source);
+const initialPreviewResult = compilePreview(sampleSource);
 
 export interface PlaygroundDocumentController {
   source: string;
   result: CompileResult;
+  json: string;
   documentId: string;
   sessionId: string;
   lineCount: number;
@@ -27,7 +29,11 @@ export interface PlaygroundDocumentController {
 
 export const usePlaygroundDocumentController = (): PlaygroundDocumentController => {
   const [source, setSource] = useState(sampleSource);
-  const [result, setResult] = useState<CompileResult>(() => compilePreview(sampleSource));
+  const [result, setResult] = useState<CompileResult>(initialPreviewResult);
+  const [jsonState, setJsonState] = useState({
+    source: sampleSource,
+    value: initialPreviewResult.json
+  });
   const [lastCompiledSource, setLastCompiledSource] = useState(sampleSource);
   const [editorStatus, setEditorStatus] = useState<string | null>(null);
   const deferredSource = useDeferredValue(source);
@@ -54,11 +60,58 @@ export const usePlaygroundDocumentController = (): PlaygroundDocumentController 
       startTransition(() => {
         setResult(nextResult);
         setLastCompiledSource(deferredSource);
+        setJsonState((current) =>
+          current.source === deferredSource
+            ? current
+            : {
+                source: deferredSource,
+                value: nextResult.json
+              }
+        );
       });
     });
 
     return () => {
       scheduler.cancel();
+    };
+  }, [deferredSource]);
+
+  useEffect(() => {
+    const abortController = new AbortController();
+
+    void fetch("/api/export/json", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        source: deferredSource
+      }),
+      signal: abortController.signal
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`JSON export failed (${response.status})`);
+        }
+
+        return response.text();
+      })
+      .then((json) => {
+        if (abortController.signal.aborted) {
+          return;
+        }
+
+        startTransition(() => {
+          setJsonState({
+            source: deferredSource,
+            value: json
+          });
+        });
+      })
+      .catch(() => undefined);
+
+    return () => {
+      abortController.abort();
     };
   }, [deferredSource]);
 
@@ -74,6 +127,7 @@ export const usePlaygroundDocumentController = (): PlaygroundDocumentController 
   return {
     source,
     result,
+    json: jsonState.value,
     documentId,
     sessionId,
     lineCount,

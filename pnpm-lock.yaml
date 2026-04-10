@@ -187,20 +187,8 @@ importers:
       '@chemd/render-profile':
         specifier: workspace:*
         version: link:../render-profile
-      '@chemd/renderer-svg':
-        specifier: workspace:*
-        version: link:../renderer-svg
 
   packages/renderer-json:
-    dependencies:
-      '@chemd/core':
-        specifier: workspace:*
-        version: link:../core
-      '@chemd/render-profile':
-        specifier: workspace:*
-        version: link:../render-profile
-
-  packages/renderer-svg:
     dependencies:
       '@chemd/core':
         specifier: workspace:*

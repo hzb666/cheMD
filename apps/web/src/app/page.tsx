@@ -4,7 +4,6 @@ import React from "react";
 
 import logoMark from "../../../../vision/logo-03.png";
 
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Separator } from "../components/ui/separator";
 import { ThemeToggle } from "../components/theme-toggle";
 import { EditorShell } from "../features/editor/components/EditorShell";
@@ -23,12 +22,12 @@ const Page = () => {
   const {
     source,
     result,
+    json,
     documentId,
     sessionId,
     lineCount,
     previewIsFresh,
     compileState,
-    compileStateTone,
     editorStatus,
     setEditorStatus,
     applySourceChange,
@@ -105,8 +104,13 @@ const Page = () => {
 
             <div className="flex items-center gap-3 md:gap-5">
               <div className="hidden md:flex items-center gap-4 text-[0.8rem] text-muted-foreground mr-2">
-                <div className="notion-font-label text-[14px] text-foreground max-w-[300px] truncate text-right">
-                  {result.document.meta.title || "Untitled Document"}
+                <div className="flex max-w-[360px] min-w-0 flex-col items-end text-right">
+                  <div className="notion-font-label text-[14px] text-foreground w-full truncate">
+                    {result.document.meta.title || "Untitled Document"}
+                  </div>
+                  <div className="notion-font-caption text-[14px] text-muted-foreground w-full truncate">
+                    {[result.document.meta.date, result.document.meta.id].filter(Boolean).join(" · ")}
+                  </div>
                 </div>
                 <div className="flex items-center gap-1.5 px-2 py-0.5 bg-accent text-accent-foreground rounded-full notion-font-badge">
                   <span className="flex h-1.5 w-1.5 rounded-full bg-accent-foreground/50"></span>
@@ -141,7 +145,7 @@ const Page = () => {
                   variant="outline"
                   onClick={() => void exportDocx()}
                   disabled={exportingDocx || !previewIsFresh}
-                  className="h-7 px-3 bg-background hover:bg-muted text-foreground border-border rounded font-medium text-[12px] shadow-sm transition-transform active:scale-95"
+                  className="playground-topbar-button notion-font-ui h-8 px-3 text-[13px]"
                 >
                   {exportingDocx ? "Exporting..." : "Export DOCX"}
                 </Button>
@@ -149,7 +153,7 @@ const Page = () => {
                   loading={ocr.loading}
                   label="OCR Image"
                   onPickFile={applyOcrFile}
-                  className="h-7 px-3 bg-background hover:bg-muted text-foreground border-border rounded font-medium text-[12px] shadow-sm transition-transform active:scale-95"
+                  className="playground-topbar-button notion-font-ui h-8 px-3 text-[13px]"
                 />
               </div>
             )}
@@ -158,7 +162,7 @@ const Page = () => {
           />
           <PreviewShell
             html={result.html}
-            json={result.json}
+            json={json}
             docxBridge={result.docxBridge}
             source={source}
             documentId={documentId}

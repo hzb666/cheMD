@@ -48,6 +48,33 @@ const applyDraftToEditor = async (
   return null;
 };
 
+export const initializeEditorInstance = async ({
+  instance,
+  draft,
+  structureInput,
+  syncDraftFromEditor
+}: {
+  instance: Pick<KetcherBridgeInstance, "changeEvent" | "setMolecule" | "editor">;
+  draft: ChemEditorDraft;
+  structureInput: string;
+  syncDraftFromEditor: () => Promise<void>;
+}): Promise<{
+  appliedValue: string | null;
+  changeHandler: () => void;
+}> => {
+  const appliedValue = structureInput ? await applyDraftToEditor(instance, draft) : null;
+  const changeHandler = () => {
+    void syncDraftFromEditor();
+  };
+
+  instance.changeEvent?.add?.(changeHandler);
+
+  return {
+    appliedValue,
+    changeHandler
+  };
+};
+
 export const EmbeddedChemEditorHost = ({
   value,
   onChange,
@@ -56,9 +83,11 @@ export const EmbeddedChemEditorHost = ({
   const [runtime, setRuntime] = useState<KetcherRuntime | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
+  const [editorInstanceVersion, setEditorInstanceVersion] = useState(0);
   const ketcherRef = useRef<KetcherBridgeInstance | null>(null);
   const applyingRef = useRef(false);
   const changeHandlerRef = useRef<(() => void) | null>(null);
+  const hasHydratedInitialValueRef = useRef(false);
   const valueRef = useRef(value);
   const structureInput = useMemo(() => getChemEditorStructureInput(value), [value]);
   const lastSyncedInputRef = useRef<string | null>(null);
@@ -115,7 +144,13 @@ export const EmbeddedChemEditorHost = ({
 
   useEffect(() => {
     const instance = ketcherRef.current;
-    if (!instance || !isReady || applyingRef.current) {
+    if (
+      !instance ||
+      !isReady ||
+      editorInstanceVersion === 0 ||
+      !hasHydratedInitialValueRef.current ||
+      applyingRef.current
+    ) {
       return;
     }
 
@@ -143,7 +178,53 @@ export const EmbeddedChemEditorHost = ({
     return () => {
       cancelled = true;
     };
-  }, [isReady, structureInput]);
+  }, [editorInstanceVersion, isReady, structureInput]);
+
+  useEffect(() => {
+    const instance = ketcherRef.current;
+    if (!instance || !isReady || editorInstanceVersion === 0 || hasHydratedInitialValueRef.current) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const hydrateInitialValue = async () => {
+      applyingRef.current = true;
+      try {
+        const { appliedValue, changeHandler } = await initializeEditorInstance({
+          instance,
+          draft: valueRef.current,
+          structureInput,
+          syncDraftFromEditor
+        });
+
+        if (cancelled) {
+          instance.changeEvent?.remove?.(changeHandler);
+          return;
+        }
+
+        changeHandlerRef.current = changeHandler;
+
+        if (structureInput) {
+          if (appliedValue) {
+            lastSyncedInputRef.current = appliedValue;
+          }
+        } else {
+          lastSyncedInputRef.current = "";
+        }
+      } finally {
+        applyingRef.current = false;
+      }
+
+      hasHydratedInitialValueRef.current = true;
+    };
+
+    void hydrateInitialValue();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [editorInstanceVersion, isReady, structureInput, syncDraftFromEditor]);
 
   useEffect(() => {
     return () => {
@@ -155,6 +236,7 @@ export const EmbeddedChemEditorHost = ({
 
       changeHandlerRef.current = null;
       ketcherRef.current = null;
+      hasHydratedInitialValueRef.current = false;
       onBridgeReady?.(null);
     };
   }, [onBridgeReady]);
@@ -198,15 +280,12 @@ export const EmbeddedChemEditorHost = ({
             }
 
             ketcherRef.current = instance;
+            changeHandlerRef.current = null;
+            hasHydratedInitialValueRef.current = false;
+            lastSyncedInputRef.current = null;
             setIsReady(true);
+            setEditorInstanceVersion((current) => current + 1);
             onBridgeReady?.(instance);
-
-            const handleEditorChange = () => {
-              void syncDraftFromEditor();
-            };
-
-            changeHandlerRef.current = handleEditorChange;
-            instance.changeEvent?.add?.(handleEditorChange);
           }}
           staticResourcesUrl={KETCHER_STATIC_RESOURCES_URL}
           structServiceProvider={structServiceProvider}

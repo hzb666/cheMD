@@ -4,6 +4,14 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@font-face {
+  font-family: "IBM Plex Sans Gutter";
+  src: url("/fonts/IBMPlexSans-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
 :root {
   --background: #ffffff;
   --foreground: rgba(0, 0, 0, 0.95);
@@ -39,6 +47,7 @@
   --success: #1aae39;
   --warning: #dd5b00;
   --code-ink: var(--foreground);
+  --font-editor-gutter: "IBM Plex Sans Gutter", "Segoe UI", sans-serif;
 }
 
 
@@ -144,37 +153,95 @@ body {
   scrollbar-gutter: stable;
 }
 
-/* Global Unified Scrollbars */
+/* =========================================
+   自定义滚动条 - 与 LabStorageManager 对齐
+   特性：轻微圆角，悬浮加粗加深，无上下三角，无交界方框
+   ========================================= */
+
 * {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+  scrollbar-width: auto;
+  scrollbar-color: auto;
 }
 
+/* 1. 针对 Webkit 浏览器 (Chrome, Edge, Safari) */
+
+/* 统一定义滚动条容器物理总宽度 (10px) */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 10px;
+  height: 10px;
+  /* 横向滚动条高度 */
 }
 
-::-webkit-scrollbar-track,
+/* --- 核心：滑块 (Thumb) --- */
+::-webkit-scrollbar-thumb {
+  /* [颜色] 亮色模式初始颜色 */
+  background-color: #cbd5e1;
+  background-clip: padding-box;
+  /* 关键：确保背景只在 border 内部渲染 */
+
+  /* [粗细控制 - 初始] */
+  border: 3px solid transparent;
+  /* 3px透明边框，使色块视觉宽度为 10 - 3*2 = 4px */
+
+  /* [新增强调：轻微圆角] */
+  border-radius: 5px;
+  /* 这里设置略大的值，配合 border 挤压会形成轻微的胶囊感 */
+}
+
+/* [滑块 Hover 状态] */
+::-webkit-scrollbar-thumb:hover {
+  /* [颜色] 悬浮加深 */
+  background-color: #94a3b8;
+
+  /* [粗细控制 - Hover] */
+  border: 1px solid transparent;
+  /* 1px透明边框，色块向外扩张，视觉宽度为 10 - 1*2 = 8px */
+
+  /* [关键：Hover 时必须再次声明圆角] */
+  border-radius: 5px;
+}
+
+/* --- 轨道 (Track) --- */
+::-webkit-scrollbar-track {
+  background: transparent;
+  /* 轨道保持透明 */
+}
+
+/* --- [修正：隐藏所有三角按钮] --- */
+::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* --- [新增强调：删除交界处小方框] --- */
 ::-webkit-scrollbar-corner {
   background: transparent;
+  /* 将死角背景设为透明 */
 }
 
-::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.3);
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 0.6);
-}
-
+/* 2. 暗黑模式适配 (基于 .dark 类名) */
 .dark ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.15);
+  background-color: #475569;
 }
 
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.4);
+  background-color: #64748b;
+}
+
+/* 3. 针对 Firefox 的降级处理 (Firefox 不支持悬浮变粗和Corner控制) */
+/* 仅在浏览器不支持 webkit 滚动条伪元素时应用 */
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    /* Firefox 只能选 standard 或 thin */
+    scrollbar-color: #cbd5e1 transparent;
+    /* 滑块颜色 轨道颜色 */
+  }
+
+  .dark * {
+    scrollbar-color: #475569 transparent;
+  }
 }
 
 button,
@@ -186,6 +253,11 @@ select {
 
 button:not(:disabled) {
   cursor: pointer;
+}
+
+.editor-gutter-font {
+  font-family: var(--font-editor-gutter);
+  font-variant-numeric: tabular-nums;
 }
 
 button:disabled,
@@ -557,7 +629,8 @@ select:disabled {
   align-items: center;
   justify-content: center;
   padding: 1rem;
-  background: rgba(15, 23, 42, 0.38);
+  background: rgba(49, 48, 46, 0.16);
+  backdrop-filter: blur(8px);
 }
 
 .dialog-card {
@@ -567,6 +640,7 @@ select:disabled {
   border: 1px solid var(--panel-border);
   background: var(--panel-bg-elevated);
   overflow: auto;
+  box-shadow: var(--shadow-notion-deep);
 }
 
 .chem-editor-dialog-card {
@@ -576,17 +650,145 @@ select:disabled {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  border-radius: 16px;
+}
+
+.chem-editor-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 3rem;
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--panel-border);
+  background: rgba(246, 245, 244, 0.88);
+}
+
+.chem-editor-dialog-title {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.33;
+  letter-spacing: -0.01em;
+}
+
+.chem-editor-dialog-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .chem-editor-dialog-body {
   flex: 1;
-  margin: 0.8rem;
+  margin: 0;
   min-height: 0;
+  padding: 1rem;
+  background: var(--background);
 }
 
-.chem-editor-dialog-body-inner {
-  height: 100%;
-  padding: 0.8rem;
+.playground-tab-list {
+  display: inline-flex;
+  height: auto;
+  min-height: 0;
+  align-items: center;
+  gap: 0.125rem;
+  padding: 0.125rem;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(246, 245, 244, 0.92);
+}
+
+.playground-tab-trigger,
+.playground-topbar-button {
+  display: inline-flex;
+  min-height: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  font-size: 0.8125rem;
+  line-height: 1.33;
+  font-weight: 500;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease,
+    transform 160ms ease;
+}
+
+.playground-tab-trigger {
+  min-width: 4.6rem;
+  padding: 0 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.playground-tab-trigger[data-state="active"] {
+  background: var(--background);
+  color: var(--foreground);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.03),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.04);
+}
+
+.playground-tab-trigger:hover {
+  color: var(--foreground);
+}
+
+.playground-topbar-button {
+  padding: 0 0.75rem;
+  border: 1px solid var(--panel-border);
+  background: var(--background);
+  color: var(--foreground);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.playground-topbar-button:hover {
+  background: var(--muted);
+  border-color: var(--panel-border-strong);
+}
+
+.playground-topbar-button:active {
+  transform: scale(0.97);
+}
+
+.playground-topbar-button-primary {
+  border-color: color-mix(in srgb, var(--primary) 26%, white);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 6px 18px rgba(0, 117, 222, 0.16);
+}
+
+.playground-topbar-button-primary:hover {
+  background: #005bab;
+  border-color: #005bab;
+}
+
+.playground-topbar-button-primary:disabled {
+  background: color-mix(in srgb, var(--primary) 72%, white);
+  border-color: color-mix(in srgb, var(--primary) 30%, white);
+}
+
+.dark .dialog-backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.dark .chem-editor-dialog-header {
+  background: rgba(49, 48, 46, 0.94);
+}
+
+.dark .playground-tab-list {
+  background: rgba(49, 48, 46, 0.92);
+}
+
+.dark .playground-tab-trigger[data-state="active"] {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.dark .playground-topbar-button {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
 }
 
 .ketcher-frame {
@@ -650,12 +852,12 @@ select:disabled {
     height: min(calc(100vh - 1.5rem), 46rem);
   }
 
-  .chem-editor-dialog-body {
-    margin: 0.55rem;
+  .chem-editor-dialog-header {
+    padding: 0.8rem;
   }
 
-  .chem-editor-dialog-body-inner {
-    padding: 0.55rem;
+  .chem-editor-dialog-body {
+    padding: 0.7rem;
   }
 }
 

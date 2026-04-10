@@ -9,10 +9,85 @@ interface ReactionSmilesParts {
   products: string[];
 }
 
+interface ReactionSmilesParseOptions {
+  rxnfile?: string;
+  fallback?: Pick<ChemEditorReactionDraft, "reactants" | "products">;
+}
+
 const normalizeString = (value: string): string => value.trim();
 
 const normalizeList = (values: string[]): string[] =>
   values.map((item) => item.trim()).filter((item) => item.length > 0);
+
+const RXN_PARTICIPANT_COUNTS_RE = /^\s*(\d+)\s+(\d+)(?:\s+\d+)?\s*$/;
+
+const parseRxnParticipantCounts = (
+  rxnfile: string | undefined
+): { reactants: number; products: number } | null => {
+  if (!rxnfile) {
+    return null;
+  }
+
+  for (const line of rxnfile.split(/\r?\n/)) {
+    const match = line.match(RXN_PARTICIPANT_COUNTS_RE);
+    if (!match) {
+      continue;
+    }
+
+    return {
+      reactants: Number.parseInt(match[1], 10),
+      products: Number.parseInt(match[2], 10)
+    };
+  }
+
+  return null;
+};
+
+const inferFallbackParticipantCount = (
+  sideText: string,
+  fallback: string[]
+): number | undefined => {
+  if (fallback.length > 1) {
+    return fallback.length;
+  }
+
+  if (fallback.length !== 1) {
+    return undefined;
+  }
+
+  if (fallback[0]?.includes(".")) {
+    return 1;
+  }
+
+  const normalizedSide = normalizeString(sideText);
+  return normalizedSide.includes("[") && normalizedSide.includes(".") ? 1 : undefined;
+};
+
+const resolveReactionParticipants = (
+  sideText: string,
+  expectedCount: number | undefined,
+  fallback: string[]
+): string[] => {
+  const normalizedSide = normalizeString(sideText);
+  if (normalizedSide.length === 0) {
+    return [];
+  }
+
+  if (expectedCount === 1) {
+    return [normalizedSide];
+  }
+
+  const components = normalizeList(normalizedSide.split("."));
+  if (expectedCount === undefined || components.length === expectedCount) {
+    return components;
+  }
+
+  if (fallback.length === expectedCount) {
+    return normalizeList(fallback);
+  }
+
+  return components;
+};
 
 export const buildReactionSmiles = ({
   reactants,
@@ -20,11 +95,24 @@ export const buildReactionSmiles = ({
 }: Pick<ChemEditorReactionDraft, "reactants" | "products">): string =>
   `${normalizeList(reactants).join(".")}>>${normalizeList(products).join(".")}`;
 
-export const parseReactionSmiles = (value: string): ReactionSmilesParts => {
+export const parseReactionSmiles = (
+  value: string,
+  options: ReactionSmilesParseOptions = {}
+): ReactionSmilesParts => {
   const [reactantsText = "", productsText = ""] = value.split(">>", 2);
+  const participantCounts = parseRxnParticipantCounts(options.rxnfile);
+
   return {
-    reactants: normalizeList(reactantsText.split(".")),
-    products: normalizeList(productsText.split("."))
+    reactants: resolveReactionParticipants(
+      reactantsText,
+      participantCounts?.reactants ?? inferFallbackParticipantCount(reactantsText, options.fallback?.reactants ?? []),
+      options.fallback?.reactants ?? []
+    ),
+    products: resolveReactionParticipants(
+      productsText,
+      participantCounts?.products ?? inferFallbackParticipantCount(productsText, options.fallback?.products ?? []),
+      options.fallback?.products ?? []
+    )
   };
 };
 
@@ -38,14 +126,23 @@ export const exportChemEditorDraft = async (
       instance.getRxn?.()
     ]);
     const normalizedReactionSmiles = normalizeString(reactionSmiles);
-    const { reactants, products } = parseReactionSmiles(reactionSmiles);
+    const normalizedRxnfile = typeof rxnfile === "string" ? normalizeString(rxnfile) || undefined : undefined;
+    const { reactants, products } = parseReactionSmiles(reactionSmiles, {
+      rxnfile: normalizedRxnfile,
+      fallback: currentDraft.kind === "reaction"
+        ? {
+            reactants: currentDraft.reactants,
+            products: currentDraft.products
+          }
+        : undefined
+    });
     return {
       kind: "reaction",
       reactants,
       products,
       conditions: currentDraft.kind === "reaction" ? currentDraft.conditions : [],
       reactionSmiles: normalizedReactionSmiles,
-      rxnfile: typeof rxnfile === "string" ? normalizeString(rxnfile) || undefined : undefined
+      rxnfile: normalizedRxnfile
     };
   }
 

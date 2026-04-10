@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
+import { Button } from "../../../components/ui/button";
 import { ChemEditorFrame } from "./ChemEditorFrame";
 import { exportChemEditorDraft } from "../lib/chem-editor-export";
 import type {
@@ -15,6 +16,34 @@ interface ChemEditorDialogProps {
   onSave: (next: ChemEditorDraftWithBlockId) => Promise<void>;
 }
 
+export const resolveVisibleChemEditorDraft = ({
+  open,
+  value,
+  draft
+}: {
+  open: boolean;
+  value: ChemEditorDraftWithBlockId | null;
+  draft: ChemEditorDraft | null;
+}): ChemEditorDraft | null => {
+  if (!open || !value) {
+    return null;
+  }
+
+  if (!draft || draft.kind !== value.kind) {
+    return value;
+  }
+
+  if (value.kind === "molecule") {
+    return value.smiles.trim().length > 0 ? value : draft;
+  }
+
+  if (value.reactants.length > 0 || value.products.length > 0) {
+    return value;
+  }
+
+  return draft;
+};
+
 export const ChemEditorDialog = ({
   open,
   value,
@@ -29,15 +58,29 @@ export const ChemEditorDialog = ({
     () => (value ? `${value.blockId}:${value.kind}` : "closed"),
     [value]
   );
+  const visibleDraft = resolveVisibleChemEditorDraft({
+    open,
+    value,
+    draft
+  });
+  const currentDraft = draft ?? visibleDraft;
 
   useEffect(() => {
     if (open && value) {
       setDraft(value);
       setError(null);
+      return;
+    }
+
+    if (!open) {
+      setDraft(null);
+      setError(null);
+      setSaving(false);
+      bridgeRef.current = null;
     }
   }, [open, resetKey, value]);
 
-  if (!open || !value || !draft) {
+  if (!open || !value || !visibleDraft || !currentDraft) {
     return null;
   }
 
@@ -47,28 +90,36 @@ export const ChemEditorDialog = ({
         className="dialog-card chem-editor-dialog-card"
         role="dialog"
         aria-modal="true"
-        aria-label="Edit chemistry"
+        aria-labelledby="chem-editor-dialog-title"
       >
-        <div className="panel-header panel-toolbar">
-          <div className="panel-heading-cluster">
-            <p className="panel-kicker">Chem Editor</p>
-            <p className="panel-meta">Edit one chemical canvas and save as molecule or reaction.</p>
-          </div>
-          <div className="panel-inline-meta">
-            <button type="button" className="tab-button" onClick={onClose} disabled={saving}>
-              Cancel
-            </button>
-            <button
+        <div className="chem-editor-dialog-header">
+          <h2 id="chem-editor-dialog-title" className="chem-editor-dialog-title notion-font-label">
+            Chem Editor
+          </h2>
+          <div className="chem-editor-dialog-actions">
+            <Button
               type="button"
-              className="button-primary"
+              size="sm"
+              variant="outline"
+              className="playground-topbar-button notion-font-ui h-8 px-3 text-[13px]"
+              onClick={onClose}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="default"
+              className="playground-topbar-button playground-topbar-button-primary notion-font-label h-8 px-3 text-[13px]"
               disabled={saving}
               onClick={async () => {
                 setSaving(true);
                 setError(null);
                 try {
                   const nextDraft = bridgeRef.current
-                    ? await exportChemEditorDraft(bridgeRef.current, draft)
-                    : draft;
+                    ? await exportChemEditorDraft(bridgeRef.current, currentDraft)
+                    : currentDraft;
                   await onSave({
                     blockId: value.blockId,
                     sourceKind: value.sourceKind ?? value.kind,
@@ -82,20 +133,23 @@ export const ChemEditorDialog = ({
               }}
             >
               {saving ? "Saving..." : "Save"}
-            </button>
+            </Button>
           </div>
         </div>
-        {error ? <p className="status-text">{error}</p> : null}
-        <div className="detail-card chem-editor-dialog-body">
-          <div className="detail-card-body chem-editor-dialog-body-inner">
-            <ChemEditorFrame
-              value={draft}
-              onChange={setDraft}
-              onBridgeReady={(instance) => {
-                bridgeRef.current = instance;
-              }}
-            />
-          </div>
+        {error ? (
+          <p className="px-4 pt-3 text-[13px] text-[#dd5b00] notion-font-caption">
+            {error}
+          </p>
+        ) : null}
+        <div className="chem-editor-dialog-body">
+          <ChemEditorFrame
+            key={resetKey}
+            value={visibleDraft}
+            onChange={setDraft}
+            onBridgeReady={(instance) => {
+              bridgeRef.current = instance;
+            }}
+          />
         </div>
       </div>
     </div>

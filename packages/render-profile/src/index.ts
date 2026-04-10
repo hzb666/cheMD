@@ -125,8 +125,8 @@ export const BUILTIN_RENDER_PROFILES: RenderProfileRegistry = {
     },
     reaction: {
       arrowLength: 48,
-      componentGap: 16,
-      plusGap: 12,
+      componentGap: 24,
+      plusGap: 20,
       showConditionsBelowArrow: true
     },
     export: {
@@ -150,8 +150,8 @@ export const BUILTIN_RENDER_PROFILES: RenderProfileRegistry = {
     },
     reaction: {
       arrowLength: 48,
-      componentGap: 16,
-      plusGap: 12,
+      componentGap: 24,
+      plusGap: 20,
       showConditionsBelowArrow: true
     },
     export: {
@@ -175,8 +175,8 @@ export const BUILTIN_RENDER_PROFILES: RenderProfileRegistry = {
     },
     reaction: {
       arrowLength: 48,
-      componentGap: 16,
-      plusGap: 12,
+      componentGap: 24,
+      plusGap: 20,
       showConditionsBelowArrow: true
     },
     export: {
@@ -201,8 +201,8 @@ export const BUILTIN_RENDER_PROFILES: RenderProfileRegistry = {
     },
     reaction: {
       arrowLength: 64,
-      componentGap: 20,
-      plusGap: 16,
+      componentGap: 28,
+      plusGap: 24,
       showConditionsBelowArrow: true
     },
     export: {

@@ -6,7 +6,7 @@ import { useRenderedPreview } from "../src/features/chem-preview/hooks/useRender
 
 const RenderedPreviewProbe = () => {
   const { hydratedHtml, previewBridgeToken } = useRenderedPreview(
-    '<section class="chemd-block chemd-block--molecule"><dl class="chemd-field"><dt>SMILES</dt><dd>CCO</dd></dl></section>'
+    '<section class="chemd-block chemd-block--molecule" data-node-id="mol-1" data-smiles="CCO"></section>'
   );
 
   return <div data-html={hydratedHtml} data-token={previewBridgeToken} />;

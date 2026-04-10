@@ -63,22 +63,22 @@ const PreviewShell = ({
       >
         <div className="flex flex-row items-center justify-between shrink-0 h-11 px-4 py-0 border-b border-border bg-background">
           <div className="flex items-center gap-3">
-            <TabsList className="bg-muted p-1 h-auto space-x-1 rounded-md">
+            <TabsList className="playground-tab-list notion-font-ui">
               <TabsTrigger
                 value="preview"
-                className="notion-font-ui text-[13px] px-3 py-1 data-[state=active]:font-semibold data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-foreground text-muted-foreground rounded transition-all"
+                className="playground-tab-trigger notion-font-ui h-8 px-3 py-0 text-[13px] data-[state=active]:font-semibold"
               >
                 Preview
               </TabsTrigger>
               <TabsTrigger
                 value="json"
-                className="notion-font-ui text-[13px] px-3 py-1 data-[state=active]:font-semibold data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-foreground text-muted-foreground rounded transition-all"
+                className="playground-tab-trigger notion-font-ui h-8 px-3 py-0 text-[13px] data-[state=active]:font-semibold"
               >
                 JSON
               </TabsTrigger>
               <TabsTrigger
                 value="docxBridge"
-                className="notion-font-ui text-[13px] px-3 py-1 data-[state=active]:font-semibold data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-foreground text-muted-foreground rounded transition-all"
+                className="playground-tab-trigger notion-font-ui h-8 px-3 py-0 text-[13px] data-[state=active]:font-semibold"
               >
                 DOCX
               </TabsTrigger>
@@ -95,8 +95,7 @@ const PreviewShell = ({
 
           <div className="flex min-h-0 flex-1 flex-col w-full relative">
             <TabsContent value="preview" className="mt-0 flex min-h-0 flex-1 flex-col focus-visible:outline-none absolute inset-0 w-full h-full overflow-auto">
-              {/* Force white/light background for the iframe preview since chemical structure SVGs are often black */}
-              <div className="relative w-full min-h-full bg-white">
+              <div className="relative w-full min-h-full bg-background">
                 <DocumentPreview html={hydratedHtml} frameRef={previewFrameRef} />
               </div>
             </TabsContent>

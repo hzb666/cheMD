@@ -64,8 +64,11 @@ describe("renderer-docx", () => {
     expect(markdown).toContain("project: oxidation-study");
     expect(markdown).toContain("# DOCX Markdown");
     expect(markdown).toContain("### Reaction `rxn-main`");
-    expect(markdown).toContain("- Reactants: CCO + O=O");
-    expect(markdown).toContain("- Conditions: air | 80 C");
+    expect(markdown).toContain("- Temperature: 200 °C");
+    expect(markdown).toContain("- Time: 4 h");
+    expect(markdown).not.toContain("- Reactants:");
+    expect(markdown).not.toContain("- Products:");
+    expect(markdown).not.toContain("- Conditions:");
   });
 });
 

@@ -1,16 +1,28 @@
 import { describe, expect, it } from "vitest";
 
 import { createDocument, createMarkdownNode } from "@chemd/core";
-import { mapRenderOptionsToAdapterPayload, resolveRenderProfile } from "@chemd/render-profile";
+import { resolveRenderProfile } from "@chemd/render-profile";
 
 import { renderHtml } from "../src";
 
 describe("renderHtml", () => {
-  it("renders document metadata, markdown, diagnostics, inline chemistry, and structured blocks", () => {
+  it("renders document header metadata while avoiding duplicate leading title headings", () => {
     const document = createDocument(
-      { id: "exp-html", title: "HTML Test", date: "2026-03-30", project: "oxidation-study" },
+      {
+        id: "exp-html",
+        title: "HTML Test",
+        date: "2026-03-30",
+        time: "14:30",
+        author: "zhibin hu",
+        project: "oxidation-study"
+      },
       {
         children: [
+          createMarkdownNode(
+            "# HTML Test\n\nFormula: :chem[H2O] and Yield: @meta.project",
+            [],
+            [{ type: "inline_chem", raw: ":chem[H2O]", value: "H2O" }]
+          ),
           {
             type: "reaction",
             id: "rxn-main",
@@ -78,12 +90,7 @@ describe("renderHtml", () => {
             params: ["note"],
             description: "Summary block",
             body: []
-          },
-          createMarkdownNode(
-            "Formula: :chem[H2O] and Yield: @meta.project",
-            [],
-            [{ type: "inline_chem", raw: ":chem[H2O]", value: "H2O" }]
-          )
+          }
         ],
         diagnostics: [{ code: "W_TEST", severity: "warning", message: "example warning" }]
       }
@@ -91,18 +98,41 @@ describe("renderHtml", () => {
 
     const html = renderHtml(document, resolveRenderProfile({ profileId: "eln-default" }));
 
-    expect(html).toContain("HTML Test");
     expect(html).toContain('data-profile="eln-default"');
+    expect(html).toContain('<header class="chemd-document-header">');
+    expect(html).toContain('<h1 class="chemd-document-title">HTML Test</h1>');
+    expect(html).not.toContain('<h1 class="chemd-markdown chemd-markdown--h1">HTML Test</h1>');
+    expect(html).toContain('<span class="chemd-document-meta-label">ID:</span>');
+    expect(html).toContain('<span class="chemd-document-meta-value">exp-html</span>');
+    expect(html).toContain('<span class="chemd-document-meta-label">Author:</span>');
+    expect(html).toContain('<span class="chemd-document-meta-value">zhibin hu</span>');
+    expect(html).toContain('<span class="chemd-document-meta-label">Date:</span>');
+    expect(html).toContain('<span class="chemd-document-meta-value">2026-03-30</span>');
+    expect(html).toContain('<span class="chemd-document-meta-label">Time:</span>');
+    expect(html).toContain('<span class="chemd-document-meta-value">14:30</span>');
     expect(html).toContain("chem-inline");
     expect(html).toContain("chemd-block chemd-block--reaction");
     expect(html).toContain("chemd-block chemd-block--result");
     expect(html).toContain("<svg");
-    expect(html).toContain("chemd-svg chemd-svg--reaction");
+    expect(html).toContain('data-chem-render-state="loading"');
+    expect(html).toContain("RDKit reaction rendering in progress");
     expect(html).toContain("Oxidation step");
     expect(html).toContain("TEMPO");
     expect(html).toContain("1 atm");
     expect(html).toContain("O2");
-    expect(html).toContain("Cu catalyst | air | 80 C | 4 h");
+    expect(html).toContain(">Reaction <span class=\"chemd-block-id\">rxn-main</span></h2>");
+    expect(html).toContain(">Molecule <span class=\"chemd-block-id\">mol-main</span></h2>");
+    expect(html).toContain(">Result <span class=\"chemd-block-id\">res-main</span></h2>");
+    expect(html).toContain(">Analysis <span class=\"chemd-block-id\">ana-main</span></h2>");
+    expect(html).toContain(">Sample <span class=\"chemd-block-id\">sample-main</span></h2>");
+    expect(html).toContain('data-reactants="[');
+    expect(html).toContain('data-products="[');
+    expect(html).toContain('data-conditions="[');
+    expect(html).not.toContain("<dt>Reactants</dt>");
+    expect(html).not.toContain("<dt>Products</dt>");
+    expect(html).not.toContain("<dt>Conditions</dt>");
+    expect(html).not.toContain("<dt>SMILES</dt>");
+    expect(html).not.toContain("<dt>ID</dt>");
     expect(html).toContain("91%");
     expect(html).toContain("Main oxidation");
     expect(html).toContain("Acetic acid");
@@ -381,7 +411,7 @@ const sample = "@meta.project :chem[H2O]";
     expect(chemMatches).toHaveLength(1);
     expect(html).toContain("keep @@chem@@");
   });
-  it("uses provided adapter payload for embedded SVG rendering", () => {
+  it("keeps loading placeholder markup stable for reaction blocks", () => {
     const document = createDocument(
       { id: "exp-html-adapter", title: "HTML Adapter Test", date: "2026-03-30" },
       {
@@ -397,11 +427,10 @@ const sample = "@meta.project :chem[H2O]";
     );
 
     const options = resolveRenderProfile({ profileId: "eln-default" });
-    const adapterPayload = mapRenderOptionsToAdapterPayload(resolveRenderProfile({ profileId: "slides-large" }));
-    const html = renderHtml(document, options, adapterPayload);
+    const html = renderHtml(document, options);
 
-    expect(html).toContain('x2="324"');
-    expect(html).toContain('x="344" y="86"');
+    expect(html).toContain('data-chem-kind="reaction"');
+    expect(html).toContain('data-chem-render-state="loading"');
   });
 
   it("renders markdown tables with alignment semantics", () => {

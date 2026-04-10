@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildMoleculeRenderRequestPayload } from "../src/features/chem-preview/hooks/useRenderedPreview";
 
 describe("rendered preview molecule hydration", () => {
-  it("includes renderOptions in the molecule hydration request payload", () => {
+  it("includes renderOptions with transparent background in molecule hydration payload", () => {
     expect(
       buildMoleculeRenderRequestPayload(
         {
@@ -20,7 +20,7 @@ describe("rendered preview molecule hydration", () => {
             fontSize: 10,
             atomLabelPadding: 0,
             monochrome: true,
-            backgroundColor: "#ffffff"
+            backgroundColor: "#00000000"
           },
           reaction: {
             arrowLength: 72,
@@ -32,7 +32,7 @@ describe("rendered preview molecule hydration", () => {
             imageFormat: "svg",
             margin: 12,
             dpi: 600,
-            transparentBackground: false
+            transparentBackground: true
           }
         }
       )
@@ -50,7 +50,7 @@ describe("rendered preview molecule hydration", () => {
           fontSize: 10,
           atomLabelPadding: 0,
           monochrome: true,
-          backgroundColor: "#ffffff"
+          backgroundColor: "#00000000"
         },
         reaction: {
           arrowLength: 72,
@@ -62,7 +62,7 @@ describe("rendered preview molecule hydration", () => {
           imageFormat: "svg",
           margin: 12,
           dpi: 600,
-          transparentBackground: false
+          transparentBackground: true
         }
       }
     });

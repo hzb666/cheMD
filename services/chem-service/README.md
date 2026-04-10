@@ -5,6 +5,7 @@ MVP chemistry HTTP service used by `apps/web` through `/api/chem/*`.
 Environment management:
 
 - Full local demo stack can now be started from the repo root with `pnpm dev`.
+- Add `--reload` to `pnpm dev` when you want the backend to auto-reload on Python file changes.
 - If you only want the frontend shell, use `pnpm dev:web` at the repo root.
 - Use Poetry for local setup.
 - The virtualenv is pinned to `services/chem-service/.venv` via `poetry.toml`.
@@ -20,13 +21,14 @@ Current routes:
 - `POST /ocr` (molecule OCR provider route; placeholder-safe when provider is unavailable)
 - `POST /reaction/ocr` (reaction OCR provider seam reserved; default placeholder failure response)
 - `POST /normalize` (molecule normalization response, RDKit-first with fallback)
-- `POST /render` (molecule SVG response, RDKit-first with fallback)
+- `POST /render` (molecule SVG response plus normalized molecule payload, RDKit-first with fallback)
 - `POST /reaction/render` (reaction SVG response, RDKit-first with fallback)
 - `GET|POST /structure` (session-scoped in-memory molecule structure cache, 5 minute TTL)
 
 Local startup modes:
 
 - Full demo: run `pnpm dev` from the repo root. This starts `@chemd/web` on `http://127.0.0.1:2436` and `chem-service` on `http://127.0.0.1:18081`.
+- Full demo with backend reload: run `pnpm dev --reload` from the repo root. The web app stays on Next.js dev mode, and `chem-service` switches to Flask reload mode.
 - Frontend only: run `pnpm dev:web` from the repo root.
 - Backend only: run `poetry run python app.py` inside `services/chem-service`.
 
@@ -36,6 +38,7 @@ Notes:
 - This service is internal-only by default and should not be exposed directly to the public internet.
 - Preferred deployment model is `apps/web -> chem-service` on a trusted network segment; if that is not true, configure `CHEM_SERVICE_ACCESS_KEY`.
 - If `rdkit` is installed in the Python runtime, `/normalize`, `/render`, and `/reaction/render` will prefer RDKit results before falling back.
+- RDKit reaction SVG post-processing now stacks arrow-top reagents and arrow-bottom render conditions (temperature, time, solvent, light, electrochemistry) into tighter multi-line labels, normalizes Celsius labels to `°C`, can compact short temperature/time tokens with commas, widens reagent/plus spacing, and redraws the arrow with a filled concave-base arrowhead when labels need more space.
 - Molecule OCR can be switched with `CHEM_SERVICE_MOLECULE_OCR_PROVIDER`.
 - Current supported molecule OCR provider keys are `decimer`, `molscribe`, and `molnextr`.
 - Reaction OCR can be switched with `CHEM_SERVICE_REACTION_OCR_PROVIDER`.
@@ -70,7 +73,7 @@ Notes:
 - Blank `smiles` / `molfile` inputs are rejected instead of being coerced into placeholder chemistry.
 - Blank reaction side arrays are rejected; RDKit/fallback reaction SVG is returned only after route validation passes.
 - This service currently returns safe fallback outputs when configured OCR providers or the RDKit runtime are unavailable.
-- The Next.js app still uses these routes end-to-end for OCR/normalize/render/cache orchestration.
+- The Next.js app uses `/render` directly for preview hydration, while `/normalize` remains available for standalone normalization flows.
 - Default CORS only allows `http://127.0.0.1:2436` and `http://localhost:2436`.
 - Protected endpoints are `/ocr`, `/reaction/ocr`, `/normalize`, `/render`, and `/reaction/render`.
 - If `CHEM_SERVICE_ACCESS_KEY` is set, callers must send it as `X-Chem-Service-Key`.
@@ -87,10 +90,3 @@ Notes:
   - `CHEM_SERVICE_PORT`
 - Default OCR upload contract is `5 MiB` raw image size.
 - The base64 limit and `MAX_CONTENT_LENGTH` default are derived from that raw-image limit so web/API defaults stay aligned.
-
-Current local note:
-
-- `MolScribe` currently resolves to `torch==1.13.1` during Poetry dependency resolution.
-- On this machine only `Python 3.14` is installed, and Poetry cannot install that torch build for this interpreter.
-- `/healthz` now also reports `ocr.molecule` and `ocr.reaction` readiness separately so self-host reaction OCR config can be checked before real wiring.
-- Practical next step for self-host providers is to deploy them as standalone HTTP services and point `chem-service` at their URLs rather than embedding model runtimes into the same process.

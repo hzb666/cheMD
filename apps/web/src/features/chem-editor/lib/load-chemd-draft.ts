@@ -8,6 +8,51 @@ interface LoadChemdDraftOptions {
   fetchImpl?: typeof fetch;
 }
 
+const hydrateMoleculeDraft = async (
+  draft: ChemEditorDraftWithBlockId,
+  fetchImpl: typeof fetch
+): Promise<ChemEditorDraftWithBlockId> => {
+  if (draft.kind !== "molecule" || draft.molfile || draft.smiles.trim().length === 0) {
+    return draft;
+  }
+
+  try {
+    const response = await fetchImpl("/api/chem/normalize", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        smiles: draft.smiles
+      })
+    });
+    if (!response.ok) {
+      return draft;
+    }
+
+    const payload = (await response.json().catch(() => null)) as
+      | {
+          canonicalSmiles?: unknown;
+          normalizedMolfile?: unknown;
+        }
+      | null;
+
+    return {
+      ...draft,
+      smiles:
+        typeof payload?.canonicalSmiles === "string" && payload.canonicalSmiles.trim().length > 0
+          ? payload.canonicalSmiles
+          : draft.smiles,
+      molfile:
+        typeof payload?.normalizedMolfile === "string" && payload.normalizedMolfile.trim().length > 0
+          ? payload.normalizedMolfile
+          : draft.molfile
+    };
+  } catch {
+    return draft;
+  }
+};
+
 export const loadChemdDraft = async ({
   documentId,
   blockId,
@@ -44,7 +89,7 @@ export const loadChemdDraft = async ({
     | null;
 
   if (!payload?.found || !payload.draft || payload.draft.blockId !== blockId) {
-    return fallback;
+    return hydrateMoleculeDraft(fallback, fetchImpl);
   }
 
   if (payload.draft.type === "reaction") {
@@ -73,8 +118,9 @@ export const loadChemdDraft = async ({
     };
   }
 
-  return {
+  return hydrateMoleculeDraft({
     blockId,
+    sourceKind: fallback.sourceKind,
     kind: "molecule",
     smiles:
       typeof payload.draft.smiles === "string"
@@ -84,5 +130,5 @@ export const loadChemdDraft = async ({
           : "",
     molfile:
       typeof payload.draft.molfile === "string" ? payload.draft.molfile : undefined
-  };
+  }, fetchImpl);
 };

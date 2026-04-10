@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildReactionRenderErrorMarkup,
   injectEditButtons,
   loadHydratedMoleculeEntry,
   loadHydratedReactionEntry,
@@ -14,11 +15,8 @@ import {
 
 describe("useRenderedPreview helpers", () => {
   it("parses molecule block ids and smiles for backend hydration", () => {
-    const html = `<section class="chemd-block chemd-block--molecule" data-node-id="mol-1">
+    const html = `<section class="chemd-block chemd-block--molecule" data-node-id="mol-1" data-smiles="CCO">
       <div class="chemd-graphic"><svg>fallback</svg></div>
-      <dl>
-        <div class="chemd-field"><dt>SMILES</dt><dd>CCO</dd></div>
-      </dl>
     </section>`;
 
     expect(parseMoleculeEntries(html)).toEqual([
@@ -35,17 +33,13 @@ describe("useRenderedPreview helpers", () => {
     const next = injectEditButtons(html);
 
     expect(next).toContain('data-action="edit-chem"');
-    expect(next).toContain("Edit chemistry");
+    expect(next).toContain('aria-label="Edit chemistry"');
+    expect(next).toContain("<svg");
   });
 
   it("parses reaction fields needed for backend hydration", () => {
-    const html = `<section class="chemd-block chemd-block--reaction" data-node-id="rxn-1">
+    const html = `<section class="chemd-block chemd-block--reaction" data-node-id="rxn-1" data-reactants="[&quot;CCO&quot;,&quot;O=O&quot;]" data-products="[&quot;CC(=O)O&quot;]" data-conditions="[&quot;air&quot;,&quot;80 C&quot;]">
       <div class="chemd-graphic"><svg>fallback</svg></div>
-      <dl>
-        <div class="chemd-field"><dt>Reactants</dt><dd>CCO | O=O</dd></div>
-        <div class="chemd-field"><dt>Products</dt><dd>CC(=O)O</dd></div>
-        <div class="chemd-field"><dt>Conditions</dt><dd>air | 80 C</dd></div>
-      </dl>
     </section>`;
 
     expect(parseReactionEntries(html)).toEqual([
@@ -59,12 +53,8 @@ describe("useRenderedPreview helpers", () => {
   });
 
   it("parses reaction entries even when one side is omitted", () => {
-    const html = `<section class="chemd-block chemd-block--reaction" data-node-id="rxn-open">
+    const html = `<section class="chemd-block chemd-block--reaction" data-node-id="rxn-open" data-products="[&quot;CC(=O)O&quot;]" data-conditions="[&quot;air&quot;]">
       <div class="chemd-graphic"><svg>fallback</svg></div>
-      <dl>
-        <div class="chemd-field"><dt>Products</dt><dd>CC(=O)O</dd></div>
-        <div class="chemd-field"><dt>Conditions</dt><dd>air</dd></div>
-      </dl>
     </section>`;
 
     expect(parseReactionEntries(html)).toEqual([
@@ -190,12 +180,46 @@ describe("useRenderedPreview helpers", () => {
     expect(next).not.toContain("<svg>fallback</svg>");
   });
 
-  it("replaces molecule field text with hydrated SMILES", () => {
+  it("replaces molecule graphics when loading placeholders include data attributes", () => {
     const html = `<section class="chemd-block chemd-block--molecule" data-node-id="mol-1">
+      <div class="chemd-graphic" data-chem-render-state="loading" data-chem-kind="molecule"><svg>fallback</svg></div>
+    </section>`;
+
+    const next = replaceMoleculeGraphics(html, ["<svg>backend-molecule</svg>"]);
+
+    expect(next).toContain("<svg>backend-molecule</svg>");
+    expect(next).not.toContain("<svg>fallback</svg>");
+  });
+
+  it("replaces reaction graphics when loading placeholders include data attributes", () => {
+    const html = `<section class="chemd-block chemd-block--reaction" data-node-id="rxn-1">
+      <div class="chemd-graphic" data-chem-render-state="loading" data-chem-kind="reaction"><svg>fallback</svg></div>
+    </section>`;
+
+    const next = replaceReactionGraphics(html, ["<svg>backend-reaction</svg>"]);
+
+    expect(next).toContain("<svg>backend-reaction</svg>");
+    expect(next).not.toContain("<svg>fallback</svg>");
+  });
+
+  it("builds escaped reaction render error markup for preview replacement", () => {
+    const html = `<section class="chemd-block chemd-block--reaction" data-node-id="rxn-1">
+      <div class="chemd-graphic" data-chem-render-state="loading" data-chem-kind="reaction"><svg>fallback</svg></div>
+    </section>`;
+
+    const next = replaceReactionGraphics(
+      html,
+      [buildReactionRenderErrorMarkup(`Reaction render failed: <bad "input">`)]
+    );
+
+    expect(next).toContain('class="chemd-render-error"');
+    expect(next).toContain("Reaction render failed: &lt;bad &quot;input&quot;&gt;");
+    expect(next).not.toContain("<svg>fallback</svg>");
+  });
+
+  it("replaces molecule field text with hydrated SMILES", () => {
+    const html = `<section class="chemd-block chemd-block--molecule" data-node-id="mol-1" data-smiles="64-17-5">
       <div class="chemd-graphic"><svg>fallback</svg></div>
-      <dl>
-        <div class="chemd-field"><dt>SMILES</dt><dd>64-17-5</dd></div>
-      </dl>
     </section>`;
 
     const next = replaceMoleculeFieldValues(
@@ -203,18 +227,13 @@ describe("useRenderedPreview helpers", () => {
       ["CCO"]
     );
 
-    expect(next).toContain("<dd>CCO</dd>");
-    expect(next).not.toContain("<dd>64-17-5</dd>");
+    expect(next).toContain('data-smiles="CCO"');
+    expect(next).not.toContain('data-smiles="64-17-5"');
   });
 
   it("replaces reaction field text with hydrated participant SMILES", () => {
-    const html = `<section class="chemd-block chemd-block--reaction" data-node-id="rxn-1">
+    const html = `<section class="chemd-block chemd-block--reaction" data-node-id="rxn-1" data-reactants="[&quot;64-17-5&quot;,&quot;O=O&quot;]" data-products="[&quot;67-56-1&quot;]" data-conditions="[&quot;air&quot;]">
       <div class="chemd-graphic"><svg>fallback</svg></div>
-      <dl>
-        <div class="chemd-field"><dt>Reactants</dt><dd>64-17-5 | O=O</dd></div>
-        <div class="chemd-field"><dt>Products</dt><dd>67-56-1</dd></div>
-        <div class="chemd-field"><dt>Conditions</dt><dd>air</dd></div>
-      </dl>
     </section>`;
 
     const next = replaceReactionFieldValues(
@@ -228,9 +247,10 @@ describe("useRenderedPreview helpers", () => {
       ]
     );
 
-    expect(next).toContain("<dd>CCO | O=O</dd>");
-    expect(next).toContain("<dd>CO</dd>");
-    expect(next).not.toContain("<dd>64-17-5 | O=O</dd>");
-    expect(next).not.toContain("<dd>67-56-1</dd>");
+    expect(next).toContain('data-reactants="[&quot;CCO&quot;,&quot;O=O&quot;]"');
+    expect(next).toContain('data-products="[&quot;CO&quot;]"');
+    expect(next).toContain('data-conditions="[&quot;air&quot;]"');
+    expect(next).not.toContain('data-reactants="[&quot;64-17-5&quot;,&quot;O=O&quot;]"');
+    expect(next).not.toContain('data-products="[&quot;67-56-1&quot;]"');
   });
 });

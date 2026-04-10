@@ -54,9 +54,9 @@ title: Node DOCX
 date: 2026-03-31
 ---
 
-:::reaction #rxn-main
-reactants: CCO | O=O
-products: CC(=O)O
+:::chemd #rxn-main
+reac: CCO | O=O
+prod: CC(=O)O
 conditions: air | 80 C
 :::`;
 
@@ -70,7 +70,7 @@ conditions: air | 80 C
     expect(result.compileResult.document.meta.id).toBe("exp-node-docx");
     expect(result.markdown).toContain("# Node DOCX");
     expect(result.markdown).toContain("### Reaction `rxn-main`");
-    expect(result.markdown).toContain("- Conditions: air | 80 C");
+    expect(result.markdown).not.toContain("- Conditions:");
     expect(result.outputPath).toContain(".docx");
   });
 

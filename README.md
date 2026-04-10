@@ -138,6 +138,14 @@ The demo launcher starts:
 - Web: `http://127.0.0.1:2436`
 - `chem-service`: `http://127.0.0.1:18081`
 
+If you want frontend + backend hot reload together, start the stack with:
+
+```bash
+pnpm dev --reload
+```
+
+In this mode the web app still runs with Next.js dev, and `chem-service` runs with Flask reload enabled.
+
 ### Start the web application only
 
 ```bash
@@ -451,6 +459,7 @@ Two practical environment points matter during local setup:
 | --- | --- |
 | `pnpm install` | install workspace dependencies |
 | `pnpm dev` | start the full demo stack: web + `chem-service` |
+| `pnpm dev --reload` | start the full demo stack with backend auto-reload |
 | `pnpm dev:demo` | explicit demo launcher alias |
 | `pnpm dev:web` | start the web workbench only |
 | `pnpm build` | build the monorepo |

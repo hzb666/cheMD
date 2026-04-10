@@ -43,8 +43,8 @@ title: Validation Test
 date: 2026-03-30
 ---
 
-:::reaction #rxn-main
-reactants: CCO | O=O
+:::chemd #rxn-main
+reac: CCO | O=O
 :::
 
 Unknown result: @res-main.yield`);
@@ -90,9 +90,9 @@ primary_reaction: rxn-main
 primary_result: res-main
 ---
 
-:::reaction #rxn-main
-reactants: CCO | O=O
-products: CC(=O)O
+:::chemd #rxn-main
+reac: CCO | O=O
+prod: CC(=O)O
 temperature: 200 °C
 :::
 
@@ -302,7 +302,7 @@ date: 2026-03-30
 ---
 
 :::template molecule-fragment
-:::molecule #mol-template
+:::chemd #mol-template
 name: Template molecule only
 :::
 :::
@@ -324,7 +324,7 @@ date: 2026-03-30
 ---
 
 :::template molecule-fragment
-:::molecule #mol-template
+:::chemd #mol-template
 smiles: CCO
 :::
 :::
@@ -498,7 +498,7 @@ primary_molecule: mol-main
 primary_analysis: ana-main
 ---
 
-:::molecule #mol-main
+:::chemd #mol-main
 smiles: CCO
 :::
 
@@ -538,7 +538,7 @@ primary_molecule: mol-main
 primary_analysis: ana-main
 ---
 
-:::molecule #mol-main
+:::chemd #mol-main
 smiles: CCO
 :::
 

@@ -7,15 +7,19 @@ import type {
   ReactionRenderRequest,
   ReactionRenderResponse,
   RenderRequest,
-  RenderResponse
-  , SaveStructureRecordInput, StructureRecord
+  RenderResponse,
+  SaveStructureRecordInput,
+  StructureRecord
 } from "./dto";
+import { ChemServiceError } from "./chem-service-error";
 
 const baseUrl = process.env.CHEM_SERVICE_BASE_URL ?? "http://127.0.0.1:18081";
 const chemServiceAccessKey = process.env.CHEM_SERVICE_ACCESS_KEY?.trim();
 
 const createChemServiceHeaders = (headers: HeadersInit): Headers => {
   const nextHeaders = new Headers(headers);
+  // 只有服务端 route 能附加内部访问密钥；
+  // 浏览器请求不应直接命中 chem-service。
   if (chemServiceAccessKey) {
     nextHeaders.set("X-Chem-Service-Key", chemServiceAccessKey);
   }
@@ -23,9 +27,23 @@ const createChemServiceHeaders = (headers: HeadersInit): Headers => {
 };
 
 const parseJson = async <T>(response: Response): Promise<T> => {
-  const payload = (await response.json().catch(() => null)) as T | null;
+  // route 层依赖 status/message 决定是直接报错还是回退占位图；
+  // 这里尽量保留 chem-service 的错误语义。
+  const payload = (await response.json().catch(() => null)) as
+    | (T & {
+        message?: unknown;
+        code?: unknown;
+      })
+    | null;
   if (!response.ok || payload == null) {
-    throw new Error(`chem-service request failed (${response.status})`);
+    const message =
+      typeof payload?.message === "string" && payload.message.trim().length > 0
+        ? payload.message.trim()
+        : `chem-service request failed (${response.status})`;
+    throw new ChemServiceError(message, {
+      status: response.status,
+      code: typeof payload?.code === "string" ? payload.code : undefined
+    });
   }
   return payload;
 };

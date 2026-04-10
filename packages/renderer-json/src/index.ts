@@ -5,7 +5,6 @@ import {
   type StructuredNode,
   type TemplateNode
 } from "@chemd/core";
-import type { RenderAdapterPayload, RenderOptions } from "@chemd/render-profile";
 
 const serializeStructuredNode = (node: StructuredNode): unknown => {
   if (node.type === "reaction") {
@@ -35,23 +34,14 @@ const serializeStructuredNode = (node: StructuredNode): unknown => {
 const serializeNode = (node: ChemdNode): unknown =>
   node.type === "markdown" ? node : serializeStructuredNode(node);
 
-export const renderJson = (
-  document: ChemdDocument,
-  options: RenderOptions,
-  adapterPayload?: RenderAdapterPayload
-): string =>
+export const renderJson = (document: ChemdDocument): string =>
   JSON.stringify(
     {
       document: {
         meta: document.meta,
         children: document.children.map(serializeNode)
       },
-      diagnostics: document.diagnostics,
-      render: {
-        profileId: options.profileId,
-        resolvedOptions: options,
-        ...(adapterPayload ? { adapter: adapterPayload } : {})
-      }
+      diagnostics: document.diagnostics
     },
     null,
     2

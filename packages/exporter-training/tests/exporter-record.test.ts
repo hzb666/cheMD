@@ -15,19 +15,19 @@ primary_reaction: rxn-main
 primary_result: res-main
 ---
 
-:::molecule #mol-a
+:::chemd #mol-a
 name: Ethanol
 smiles: CCO
 :::
 
-:::molecule #mol-b
+:::chemd #mol-b
 name: Acetic acid
 smiles: CC(=O)O
 :::
 
-:::reaction #rxn-main
-reactants: @mol-a | O=O
-products: @mol-b
+:::chemd #rxn-main
+reac: @mol-a | O=O
+prod: @mol-b
 conditions: air | 4 h
 temperature: 90 C
 :::
@@ -123,8 +123,8 @@ title: Training Export Errors
 date: 2026-03-31
 ---
 
-:::reaction #rxn-main
-reactants: CCO
+:::chemd #rxn-main
+reac: CCO
 :::
 
 Unknown: @res-missing.yield`;
@@ -154,7 +154,7 @@ yield: 63%
 :::
 
 :::col-2
-col: {:::mol #mol-inline
+col: {:::chemd #mol-inline
 name: Inline Ethanol
 smiles: CCO
 :::}

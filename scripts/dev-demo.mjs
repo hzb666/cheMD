@@ -3,6 +3,9 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+const DEFAULT_CHEM_SERVICE_HOST = "127.0.0.1";
+const DEFAULT_CHEM_SERVICE_PORT = "18081";
+
 export const resolveCommand = (command, platform = process.platform) => {
   if (platform === "win32") {
     if (command === "pnpm") {
@@ -49,25 +52,69 @@ export const resolveSpawnInvocation = (
 
 const resolveRootDir = () => path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
+export const parseDevDemoOptions = (argv = process.argv.slice(2)) => ({
+  reload: argv.includes("--reload")
+});
+
+export const resolveChemServiceServerConfig = (env = process.env) => {
+  const host = env.CHEM_SERVICE_HOST?.trim() || DEFAULT_CHEM_SERVICE_HOST;
+  const rawPort = env.CHEM_SERVICE_PORT?.trim() || DEFAULT_CHEM_SERVICE_PORT;
+  const port = /^\d+$/.test(rawPort) ? rawPort : DEFAULT_CHEM_SERVICE_PORT;
+
+  return {
+    host,
+    port,
+    url: `http://${host}:${port}`
+  };
+};
+
+export const createChemServiceArgs = (
+  options = {},
+  serverConfig = resolveChemServiceServerConfig()
+) => {
+  if (!options.reload) {
+    return ["app.py"];
+  }
+
+  return [
+    "-m",
+    "flask",
+    "--app",
+    "app",
+    "run",
+    "--reload",
+    "--host",
+    serverConfig.host,
+    "--port",
+    serverConfig.port
+  ];
+};
+
 export const createDevDemoProcesses = (
   rootDir = resolveRootDir(),
-  platform = process.platform
-) => [
-  {
-    name: "web",
-    command: resolveCommand("pnpm", platform),
-    args: ["--filter", "@chemd/web", "dev"],
-    cwd: rootDir,
-    url: "http://127.0.0.1:2436"
-  },
-  {
-    name: "chem-service",
-    command: resolveChemServiceCommand(rootDir, platform),
-    args: ["app.py"],
-    cwd: path.join(rootDir, "services", "chem-service"),
-    url: "http://127.0.0.1:18081"
-  }
-];
+  platform = process.platform,
+  options = {},
+  env = process.env
+) => {
+  const chemServiceServerConfig = resolveChemServiceServerConfig(env);
+
+  return [
+    {
+      name: "web",
+      command: resolveCommand("pnpm", platform),
+      args: ["--filter", "@chemd/web", "dev"],
+      cwd: rootDir,
+      url: "http://127.0.0.1:2436"
+    },
+    {
+      name: "chem-service",
+      command: resolveChemServiceCommand(rootDir, platform),
+      args: createChemServiceArgs(options, chemServiceServerConfig),
+      cwd: path.join(rootDir, "services", "chem-service"),
+      url: chemServiceServerConfig.url
+    }
+  ];
+};
 
 const childProcesses = [];
 let shuttingDown = false;
@@ -92,7 +139,8 @@ const terminateChildren = (signal = "SIGINT") => {
 };
 
 const run = () => {
-  const processes = createDevDemoProcesses();
+  const options = parseDevDemoOptions();
+  const processes = createDevDemoProcesses(resolveRootDir(), process.platform, options);
 
   console.log("Starting chemd demo stack...");
   for (const processConfig of processes) {

@@ -19,6 +19,8 @@ describe("Page", () => {
     expect(html).toContain("DOCX");
     expect(html).toContain("Export");
     expect(html).toContain("OCR");
+    expect(html).toContain("2026-03-30");
+    expect(html).toContain("exp-2026-03-30-001");
     expect(html).toContain("YAML: publication-acs");
     expect(html).not.toContain("panel-heading-inline");
     expect(html).not.toContain("tab-strip-container");

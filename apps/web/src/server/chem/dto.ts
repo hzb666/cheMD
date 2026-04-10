@@ -39,6 +39,65 @@ export interface NormalizeResponse {
   warnings: string[];
 }
 
+export interface MoleculeRenderRouteInput {
+  type: "molecule";
+  smiles?: string;
+  molfile?: string;
+  renderOptions?: Record<string, unknown>;
+}
+
+export interface ReactionRenderRouteInput {
+  type: "reaction";
+  reactants: string[];
+  products: string[];
+  conditions: string[];
+  renderOptions?: Record<string, unknown>;
+}
+
+export type ParsedRenderRouteInput = MoleculeRenderRouteInput | ReactionRenderRouteInput;
+
+export interface MoleculeSaveRouteInput {
+  documentId: string;
+  blockId: string;
+  sessionId: string;
+  type: "molecule";
+  smiles?: string;
+  molfile?: string;
+}
+
+export interface ReactionSaveRouteInput {
+  documentId: string;
+  blockId: string;
+  sessionId: string;
+  type: "reaction";
+  reactants: string[];
+  products: string[];
+  conditions: string[];
+  reactionSmiles?: string;
+  rxnfile?: string;
+}
+
+export type ParsedSaveRouteInput = MoleculeSaveRouteInput | ReactionSaveRouteInput;
+
+export interface WritebackTargetFields {
+  blockId?: string;
+  fallbackBlockId?: string;
+  moleculeBlockId?: string;
+  reactionBlockId?: string;
+}
+
+export interface ResolvedWritebackTarget {
+  blockId: string;
+  action: "update_existing" | "create_new";
+}
+
+export interface OcrWritebackInput {
+  documentId: string;
+  sessionId: string;
+  image: File;
+  targets: WritebackTargetFields;
+}
+
 export interface RenderRequest {
   kind: "molecule";
   smiles?: string;

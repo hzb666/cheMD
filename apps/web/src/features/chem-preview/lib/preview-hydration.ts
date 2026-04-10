@@ -34,6 +34,8 @@ interface LoadHydratedReactionEntryOptions {
   fetchImpl?: typeof fetch;
 }
 
+const DRAFT_REQUEST_TIMEOUT_MS = 5000;
+
 const HTML_ESCAPE_MAP: Record<string, string> = {
   "&": "&amp;",
   "<": "&lt;",
@@ -43,6 +45,61 @@ const HTML_ESCAPE_MAP: Record<string, string> = {
 };
 
 const escapeHtml = (value: string): string => value.replace(/[&<>"']/g, (match) => HTML_ESCAPE_MAP[match]);
+const SECTION_ATTR_PATTERN = /([a-zA-Z_:][-a-zA-Z0-9_:.]*)="([^"]*)"/g;
+
+const readSectionAttributes = (sectionTag: string): Record<string, string> => {
+  const attributes: Record<string, string> = {};
+  for (const match of sectionTag.matchAll(SECTION_ATTR_PATTERN)) {
+    attributes[match[1]] = match[2] ?? "";
+  }
+  return attributes;
+};
+
+const readSectionAttribute = (sectionTag: string, attributeName: string): string =>
+  readSectionAttributes(sectionTag)[attributeName] ?? "";
+
+const decodeHtmlEntities = (value: string): string =>
+  value
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+
+const withTransparentRenderOptions = (renderOptions?: RenderOptions): RenderOptions | undefined => {
+  if (!renderOptions) {
+    return undefined;
+  }
+
+  return {
+    ...renderOptions,
+    structure: {
+      ...renderOptions.structure,
+      backgroundColor: "#00000000"
+    },
+    export: {
+      ...renderOptions.export,
+      transparentBackground: true
+    }
+  };
+};
+
+const fetchWithTimeout = async (
+  fetchImpl: typeof fetch,
+  input: string,
+  timeoutMs: number
+): Promise<Response | undefined> => {
+  const controller = new AbortController();
+  const timeoutId = globalThis.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetchImpl(input, { signal: controller.signal });
+  } catch {
+    return undefined;
+  } finally {
+    globalThis.clearTimeout(timeoutId);
+  }
+};
 
 export const buildMoleculeRenderRequestPayload = (
   entry: Pick<HydratedMoleculeEntry, "smiles"> & { molfile?: string },
@@ -56,7 +113,7 @@ export const buildMoleculeRenderRequestPayload = (
   type: "molecule",
   smiles: entry.smiles,
   ...(entry.molfile ? { molfile: entry.molfile } : {}),
-  renderOptions
+  renderOptions: withTransparentRenderOptions(renderOptions)
 });
 
 export const buildReactionRenderRequestPayload = (
@@ -73,17 +130,20 @@ export const buildReactionRenderRequestPayload = (
   reactants: entry.reactants,
   products: entry.products,
   conditions: entry.conditions,
-  renderOptions
+  renderOptions: withTransparentRenderOptions(renderOptions)
 });
 
 export const parseMoleculeEntries = (html: string): Array<{ blockId: string; smiles: string }> => {
   const entries: Array<{ blockId: string; smiles: string }> = [];
-  const blockPattern =
-    /<section class="chemd-block chemd-block--molecule"[^>]*data-node-id="([^"]*)"[^>]*>[\s\S]*?<dt>SMILES<\/dt><dd>([^<]*)<\/dd>/g;
+  const blockPattern = /(<section class="chemd-block chemd-block--molecule"[^>]*>)([\s\S]*?)<\/section>/g;
   for (const match of html.matchAll(blockPattern)) {
+    const sectionTag = match[1] || "";
+    const blockHtml = match[2] || "";
+    const dataSmiles = decodeHtmlEntities(readSectionAttribute(sectionTag, "data-smiles")).trim();
+    const legacyFieldMatch = blockHtml.match(/<dt>SMILES<\/dt><dd>([^<]*)<\/dd>/i);
     entries.push({
-      blockId: (match[1] || "").trim(),
-      smiles: (match[2] || "").trim()
+      blockId: readSectionAttribute(sectionTag, "data-node-id").trim(),
+      smiles: dataSmiles || (legacyFieldMatch?.[1] || "").trim()
     });
   }
   return entries;
@@ -103,8 +163,12 @@ export const loadHydratedMoleculeEntry = async (
       blockId: entry.blockId,
       sessionId
     });
-    const response = await fetchImpl(`/api/chem/draft?${params.toString()}`);
-    if (!response.ok) {
+    const response = await fetchWithTimeout(
+      fetchImpl,
+      `/api/chem/draft?${params.toString()}`,
+      DRAFT_REQUEST_TIMEOUT_MS
+    );
+    if (!response?.ok) {
       return { smiles: entry.smiles };
     }
 
@@ -143,10 +207,27 @@ const splitListText = (value: string): string[] =>
     .map((item) => item.trim())
     .filter((item) => item.length > 0);
 
+const parseJsonStringArray = (value: string): string[] => {
+  if (!value.trim()) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(decodeHtmlEntities(value)) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+  } catch {
+    return [];
+  }
+};
+
 export const parseReactionEntries = (html: string): Array<HydratedReactionEntry> => {
   const entries: Array<HydratedReactionEntry> = [];
   const blockPattern =
-    /<section class="chemd-block chemd-block--reaction"[^>]*data-node-id="([^"]*)"[^>]*>([\s\S]*?)<\/section>/g;
+    /(<section class="chemd-block chemd-block--reaction"[^>]*>)([\s\S]*?)<\/section>/g;
   const readField = (blockHtml: string, label: string): string[] => {
     const fieldPattern = new RegExp(`<dt>${label}<\\/dt><dd>([^<]*)<\\/dd>`, "i");
     const match = blockHtml.match(fieldPattern);
@@ -154,12 +235,16 @@ export const parseReactionEntries = (html: string): Array<HydratedReactionEntry>
   };
 
   for (const match of html.matchAll(blockPattern)) {
+    const sectionTag = match[1] || "";
     const blockHtml = match[2] || "";
+    const dataReactants = parseJsonStringArray(readSectionAttribute(sectionTag, "data-reactants"));
+    const dataProducts = parseJsonStringArray(readSectionAttribute(sectionTag, "data-products"));
+    const dataConditions = parseJsonStringArray(readSectionAttribute(sectionTag, "data-conditions"));
     entries.push({
-      blockId: (match[1] || "").trim(),
-      reactants: readField(blockHtml, "Reactants"),
-      products: readField(blockHtml, "Products"),
-      conditions: readField(blockHtml, "Conditions")
+      blockId: readSectionAttribute(sectionTag, "data-node-id").trim(),
+      reactants: dataReactants.length > 0 ? dataReactants : readField(blockHtml, "Reactants"),
+      products: dataProducts.length > 0 ? dataProducts : readField(blockHtml, "Products"),
+      conditions: dataConditions.length > 0 ? dataConditions : readField(blockHtml, "Conditions")
     });
   }
   return entries;
@@ -183,8 +268,12 @@ export const loadHydratedReactionEntry = async (
       blockId: entry.blockId,
       sessionId
     });
-    const response = await fetchImpl(`/api/chem/draft?${params.toString()}`);
-    if (!response.ok) {
+    const response = await fetchWithTimeout(
+      fetchImpl,
+      `/api/chem/draft?${params.toString()}`,
+      DRAFT_REQUEST_TIMEOUT_MS
+    );
+    if (!response?.ok) {
       return {
         reactants: entry.reactants,
         products: entry.products,
@@ -255,7 +344,7 @@ export const loadHydratedReactionEntry = async (
 export const replaceMoleculeGraphics = (html: string, svgs: string[]): string => {
   let index = 0;
   return html.replace(
-    /(<section class="chemd-block chemd-block--molecule"[\s\S]*?<div class="chemd-graphic">)([\s\S]*?)(<\/div>)/g,
+    /(<section class="chemd-block chemd-block--molecule"[\s\S]*?<div class="chemd-graphic"[^>]*>)([\s\S]*?)(<\/div>)/g,
     (_, open, oldGraphic, close) => {
       const nextSvg = svgs[index] || "";
       index += 1;
@@ -270,7 +359,7 @@ export const replaceMoleculeGraphics = (html: string, svgs: string[]): string =>
 export const replaceReactionGraphics = (html: string, svgs: string[]): string => {
   let index = 0;
   return html.replace(
-    /(<section class="chemd-block chemd-block--reaction"[\s\S]*?<div class="chemd-graphic">)([\s\S]*?)(<\/div>)/g,
+    /(<section class="chemd-block chemd-block--reaction"[\s\S]*?<div class="chemd-graphic"[^>]*>)([\s\S]*?)(<\/div>)/g,
     (_, open, oldGraphic, close) => {
       const nextSvg = svgs[index] || "";
       index += 1;
@@ -282,10 +371,16 @@ export const replaceReactionGraphics = (html: string, svgs: string[]): string =>
   );
 };
 
-const replaceFieldValue = (blockHtml: string, label: string, value: string): string =>
+const replaceSectionAttribute = (blockHtml: string, attributeName: string, value: string): string =>
   blockHtml.replace(
-    new RegExp(`(<dt>${label}</dt><dd>)([\\s\\S]*?)(</dd>)`),
-    (_, open: string, __: string, close: string) => `${open}${escapeHtml(value)}${close}`
+    /<section class="chemd-block chemd-block--[a-z-]+"[^>]*>/,
+    (sectionTag) => {
+      const encodedValue = escapeHtml(value);
+      if (new RegExp(`${attributeName}="[^"]*"`).test(sectionTag)) {
+        return sectionTag.replace(new RegExp(`${attributeName}="[^"]*"`), `${attributeName}="${encodedValue}"`);
+      }
+      return sectionTag.replace(">", ` ${attributeName}="${encodedValue}">`);
+    }
   );
 
 export const replaceMoleculeFieldValues = (html: string, smilesValues: string[]): string => {
@@ -297,7 +392,7 @@ export const replaceMoleculeFieldValues = (html: string, smilesValues: string[])
       return blockHtml;
     }
 
-    return replaceFieldValue(blockHtml, "SMILES", nextSmiles);
+    return replaceSectionAttribute(blockHtml, "data-smiles", nextSmiles);
   });
 };
 
@@ -313,9 +408,9 @@ export const replaceReactionFieldValues = (
       return blockHtml;
     }
 
-    let nextHtml = replaceFieldValue(blockHtml, "Reactants", nextEntry.reactants.join(" | "));
-    nextHtml = replaceFieldValue(nextHtml, "Products", nextEntry.products.join(" | "));
-    nextHtml = replaceFieldValue(nextHtml, "Conditions", nextEntry.conditions.join(" | "));
+    let nextHtml = replaceSectionAttribute(blockHtml, "data-reactants", JSON.stringify(nextEntry.reactants));
+    nextHtml = replaceSectionAttribute(nextHtml, "data-products", JSON.stringify(nextEntry.products));
+    nextHtml = replaceSectionAttribute(nextHtml, "data-conditions", JSON.stringify(nextEntry.conditions));
     return nextHtml;
   });
 };

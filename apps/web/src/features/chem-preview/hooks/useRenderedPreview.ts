@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { RenderOptions } from "@chemd/render-profile";
 
 import {
@@ -31,13 +31,76 @@ interface UseRenderedPreviewOptions {
   renderOptions?: RenderOptions;
 }
 
+interface RenderRequestResult {
+  payload: RenderPayload | null;
+  errorMessage?: string;
+}
+
+const RENDER_REQUEST_TIMEOUT_MS = 8000;
+const subscribeToClientReady = (_onStoreChange: () => void) => () => undefined;
+const HTML_ESCAPE_MAP: Record<string, string> = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  "\"": "&quot;",
+  "'": "&#39;"
+};
+
+const escapeHtml = (value: string): string => value.replace(/[&<>"']/g, (match) => HTML_ESCAPE_MAP[match] ?? match);
+
+export const buildReactionRenderErrorMarkup = (message: string): string => {
+  const normalizedMessage = message.trim() || "Reaction render failed";
+  return `<div class="chemd-render-error" role="alert" aria-live="polite">${escapeHtml(normalizedMessage)}</div>`;
+};
+
+const requestRenderPayload = async (
+  payload: ReturnType<typeof buildMoleculeRenderRequestPayload> | ReturnType<typeof buildReactionRenderRequestPayload>
+): Promise<RenderRequestResult> => {
+  const controller = new AbortController();
+  const timeoutId = globalThis.setTimeout(() => controller.abort(), RENDER_REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch("/api/chem/render", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+    const nextPayload = (await response.json().catch(() => null)) as
+      | (RenderPayload & { message?: unknown })
+      | null;
+    if (!response.ok) {
+      return {
+        payload: nextPayload,
+        errorMessage:
+          typeof nextPayload?.message === "string" && nextPayload.message.trim().length > 0
+            ? nextPayload.message.trim()
+            : `Render request failed (${response.status})`
+      };
+    }
+
+    return {
+      payload: nextPayload
+    };
+  } catch {
+    return {
+      payload: null,
+      errorMessage: "Reaction render failed"
+    };
+  } finally {
+    globalThis.clearTimeout(timeoutId);
+  }
+};
+
 export const useRenderedPreview = (
   html: string,
   options: UseRenderedPreviewOptions = {}
 ): UseRenderedPreviewResult => {
   const { documentId, sessionId, renderOptions } = options;
   const baseHtml = useMemo(() => injectEditButtons(html), [html]);
-  const [bridgeReady, setBridgeReady] = useState(false);
+  const bridgeReady = useSyncExternalStore(subscribeToClientReady, () => true, () => false);
   const previewBridgeToken = useMemo(() => {
     if (!bridgeReady) {
       return "";
@@ -58,10 +121,6 @@ export const useRenderedPreview = (
   const [hydratedHtml, setHydratedHtml] = useState(baseHtml);
 
   useEffect(() => {
-    setBridgeReady(true);
-  }, []);
-
-  useEffect(() => {
     let active = true;
 
     const hydrate = async () => {
@@ -72,7 +131,7 @@ export const useRenderedPreview = (
         return;
       }
 
-      const moleculePayloads = await Promise.all(
+      const moleculePayloadPromise = Promise.all(
         molecules.map(async (entry) => {
           if (!entry.smiles) {
             return {
@@ -83,20 +142,15 @@ export const useRenderedPreview = (
 
           try {
             const hydratedEntry = await loadHydratedMoleculeEntry(entry, { documentId, sessionId });
-            const response = await fetch("/api/chem/render", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json"
-              },
-              body: JSON.stringify(buildMoleculeRenderRequestPayload(hydratedEntry, renderOptions))
-            });
-            if (!response.ok) {
+            const { payload } = await requestRenderPayload(
+              buildMoleculeRenderRequestPayload(hydratedEntry, renderOptions)
+            );
+            if (!payload) {
               return {
                 svg: "",
                 smiles: hydratedEntry.smiles
               };
             }
-            const payload = (await response.json().catch(() => null)) as RenderPayload | null;
             return {
               svg: typeof payload?.svg === "string" ? payload.svg : "",
               smiles:
@@ -113,20 +167,22 @@ export const useRenderedPreview = (
         })
       );
 
-      const reactionPayloads = await Promise.all(
+      const reactionPayloadPromise = Promise.all(
         reactions.map(async (entry) => {
           try {
             const hydratedEntry = await loadHydratedReactionEntry(entry, { documentId, sessionId });
-            const response = await fetch("/api/chem/render", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json"
-              },
-              body: JSON.stringify(
-                buildReactionRenderRequestPayload(hydratedEntry, renderOptions)
-              )
-            });
-            if (!response.ok) {
+            const { payload, errorMessage } = await requestRenderPayload(
+              buildReactionRenderRequestPayload(hydratedEntry, renderOptions)
+            );
+            if (!payload && errorMessage) {
+              return {
+                svg: buildReactionRenderErrorMarkup(errorMessage),
+                reactants: hydratedEntry.reactants,
+                products: hydratedEntry.products,
+                conditions: hydratedEntry.conditions
+              };
+            }
+            if (!payload) {
               return {
                 svg: "",
                 reactants: hydratedEntry.reactants,
@@ -134,9 +190,15 @@ export const useRenderedPreview = (
                 conditions: hydratedEntry.conditions
               };
             }
-            const payload = (await response.json().catch(() => null)) as RenderPayload | null;
+
+            const svg =
+              typeof payload?.svg === "string" && payload.svg.trim().length > 0
+                ? payload.svg
+                : errorMessage
+                  ? buildReactionRenderErrorMarkup(errorMessage)
+                  : "";
             return {
-              svg: typeof payload?.svg === "string" ? payload.svg : "",
+              svg,
               reactants: Array.isArray(payload?.reaction?.reactants)
                 ? payload.reaction.reactants.filter(
                     (item): item is string => typeof item === "string" && item.trim().length > 0
@@ -163,6 +225,10 @@ export const useRenderedPreview = (
           }
         })
       );
+      const [moleculePayloads, reactionPayloads] = await Promise.all([
+        moleculePayloadPromise,
+        reactionPayloadPromise
+      ]);
 
       if (!active) {
         return;

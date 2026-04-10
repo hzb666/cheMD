@@ -14,12 +14,39 @@ export interface ReactionPreviewEditMessage {
 
 export type PreviewEditMessage = MoleculePreviewEditMessage | ReactionPreviewEditMessage;
 
-export const readPreviewEditMessage = (
+export interface MoleculePreviewInventoryHoverMessage {
+  type: "molecule";
+  blockId: string;
+  smiles: string;
+}
+
+export interface ReactionPreviewInventoryHoverMessage {
+  type: "reaction";
+  blockId: string;
+  reactants: string[];
+}
+
+export type PreviewInventoryHoverMessage =
+  | MoleculePreviewInventoryHoverMessage
+  | ReactionPreviewInventoryHoverMessage;
+
+const readPreviewMessagePayload = (
   event: Pick<MessageEvent, "origin" | "source" | "data">,
   previewWindow: Window | null,
   previewIsFresh: boolean,
   previewToken: string
-): PreviewEditMessage | null => {
+):
+  | {
+      type?: unknown;
+      blockId: string;
+      draftType?: unknown;
+      smiles?: unknown;
+      reactants?: unknown;
+      products?: unknown;
+      conditions?: unknown;
+      previewToken: string;
+    }
+  | null => {
   if (!previewIsFresh) {
     return null;
   }
@@ -46,6 +73,27 @@ export const readPreviewEditMessage = (
     return null;
   }
   if (typeof payload?.previewToken !== "string" || payload.previewToken !== previewToken) {
+    return null;
+  }
+
+  const blockId = payload.blockId;
+  const messagePreviewToken = payload.previewToken;
+
+  return {
+    ...payload,
+    blockId,
+    previewToken: messagePreviewToken
+  };
+};
+
+export const readPreviewEditMessage = (
+  event: Pick<MessageEvent, "origin" | "source" | "data">,
+  previewWindow: Window | null,
+  previewIsFresh: boolean,
+  previewToken: string
+): PreviewEditMessage | null => {
+  const payload = readPreviewMessagePayload(event, previewWindow, previewIsFresh, previewToken);
+  if (!payload) {
     return null;
   }
 
@@ -77,5 +125,37 @@ export const readPreviewEditMessage = (
     reactants,
     products,
     conditions
+  };
+};
+
+export const readPreviewInventoryHoverMessage = (
+  event: Pick<MessageEvent, "origin" | "source" | "data">,
+  previewWindow: Window | null,
+  previewIsFresh: boolean,
+  previewToken: string
+): PreviewInventoryHoverMessage | null => {
+  const payload = readPreviewMessagePayload(event, previewWindow, previewIsFresh, previewToken);
+  if (!payload) {
+    return null;
+  }
+
+  if (payload.type === "chemd:inventory-hover" && payload.draftType === "molecule") {
+    return {
+      type: "molecule",
+      blockId: payload.blockId,
+      smiles: typeof payload.smiles === "string" ? payload.smiles.trim() : ""
+    };
+  }
+
+  if (!(payload.type === "chemd:inventory-hover" && payload.draftType === "reaction")) {
+    return null;
+  }
+
+  return {
+    type: "reaction",
+    blockId: payload.blockId,
+    reactants: Array.isArray(payload.reactants)
+      ? payload.reactants.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      : []
   };
 };

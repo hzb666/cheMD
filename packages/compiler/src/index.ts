@@ -59,8 +59,8 @@ export const compileChemd = (source: string, options: CompileOptions = {}): Comp
     : resolvedDocument;
   const renderOptions = renderProfileResolution.options;
   const renderAdapterPayload = mapRenderOptionsToAdapterPayload(renderOptions);
-  const html = renderHtml(document, renderOptions, renderAdapterPayload);
-  const json = renderJson(document, renderOptions, renderAdapterPayload);
+  const html = renderHtml(document, renderOptions);
+  const json = renderJson(document);
   const docxBridge = renderDocxBridge(document, renderOptions, renderAdapterPayload);
 
   return {

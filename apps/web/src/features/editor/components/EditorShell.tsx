@@ -3,8 +3,7 @@
 import React from "react";
 import type { ReactNode } from "react";
 
-import { Label } from "../../../components/ui/label";
-import { Textarea } from "../../../components/ui/textarea";
+import { EditorSurface } from "./EditorSurface";
 
 interface EditorShellProps {
   source: string;
@@ -18,7 +17,7 @@ interface EditorShellProps {
 export const EditorShell = ({
   source,
   lineCount,
-  profileId,
+  profileId: _profileId,
   toolbarActions,
   statusMessage,
   onSourceChange
@@ -45,17 +44,7 @@ export const EditorShell = ({
 
     <div className="flex-1 min-h-0 p-0 relative">
       <div className="h-full relative z-10 bg-background">
-        <Label className="sr-only" htmlFor="chemd-source-editor">
-          Chemd source editor
-        </Label>
-        <Textarea
-          id="chemd-source-editor"
-          className="h-full w-full resize-none p-4 font-mono text-sm leading-relaxed border-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent rounded-none focus-visible:shadow-[inset_0_1px_4px_rgba(0,0,0,0.05)] dark:focus-visible:shadow-[inset_0_1px_4px_rgba(0,0,0,0.25)] transition-shadow duration-200"
-          value={source}
-          onChange={(event) => onSourceChange?.(event.target.value)}
-          spellCheck={false}
-          placeholder="Start typing your chemical markdown..."
-        />
+        <EditorSurface source={source} onSourceChange={onSourceChange} />
       </div>
     </div>
   </div>

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { buildPreviewBridgeScript } from "../src/features/chem-preview/lib/preview-bridge";
-import { readPreviewEditMessage } from "../src/features/preview/lib/read-preview-edit-message";
+import {
+  readPreviewEditMessage,
+  readPreviewInventoryHoverMessage
+} from "../src/features/preview/lib/read-preview-edit-message";
 import { createScopedToken } from "../src/lib/random-token";
 
 describe("readPreviewEditMessage", () => {
@@ -177,6 +180,60 @@ describe("readPreviewEditMessage", () => {
     ).toBeNull();
   });
 
+  it("accepts molecule inventory hover messages from the active preview iframe", () => {
+    const previewWindow = {} as Window;
+
+    expect(
+      readPreviewInventoryHoverMessage(
+        {
+          origin: "null",
+          source: previewWindow,
+          data: {
+            type: "chemd:inventory-hover",
+            draftType: "molecule",
+            blockId: "mol-1",
+            smiles: "CCO",
+            previewToken
+          }
+        },
+        previewWindow,
+        true,
+        previewToken
+      )
+    ).toEqual({
+      type: "molecule",
+      blockId: "mol-1",
+      smiles: "CCO"
+    });
+  });
+
+  it("accepts reaction inventory hover messages from the active preview iframe", () => {
+    const previewWindow = {} as Window;
+
+    expect(
+      readPreviewInventoryHoverMessage(
+        {
+          origin: "null",
+          source: previewWindow,
+          data: {
+            type: "chemd:inventory-hover",
+            draftType: "reaction",
+            blockId: "rxn-1",
+            reactants: ["CCO", "O=O", ""],
+            previewToken
+          }
+        },
+        previewWindow,
+        true,
+        previewToken
+      )
+    ).toEqual({
+      type: "reaction",
+      blockId: "rxn-1",
+      reactants: ["CCO", "O=O"]
+    });
+  });
+
   it("builds preview bridge script without wildcard postMessage origin", () => {
     const script = buildPreviewBridgeScript(previewToken, "http://localhost:2436");
 
@@ -189,6 +246,24 @@ describe("readPreviewEditMessage", () => {
 
     expect(script).toContain('const chemicalBlockSelector = ".chemd-block--molecule, .chemd-block--reaction";');
     expect(script).toContain("document.querySelectorAll(chemicalBlockSelector)");
+  });
+
+  it("accepts svg click targets inside the edit button", () => {
+    const script = buildPreviewBridgeScript(previewToken, "http://localhost:2436");
+
+    expect(script).toContain("if (!(target instanceof Element)) return;");
+    expect(script).not.toContain("if (!(target instanceof HTMLElement)) return;");
+  });
+
+  it("wires inventory hover bridge and iframe popover state handling", () => {
+    const script = buildPreviewBridgeScript(previewToken, "http://localhost:2436");
+
+    expect(script).toContain('const inventoryPopoverClassName = "chemd-inventory-popover";');
+    expect(script).toContain('const hoverDelayMs = 360;');
+    expect(script).toContain('typeof entry?.displayName === "string" && entry.displayName.trim()');
+    expect(script).toContain('type: "chemd:inventory-hover"');
+    expect(script).toContain('payload.type !== "chemd:inventory-state"');
+    expect(script).toContain("window.parent.postMessage(");
   });
 
   it("creates scoped fallback token when crypto UUID API is unavailable", () => {

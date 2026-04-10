@@ -6,6 +6,17 @@ import {
   getChemEditorImportCandidates,
   parseReactionSmiles
 } from "../src/features/chem-editor/lib/chem-editor-export";
+import type { ChemEditorDraft } from "../src/features/chem-editor/types";
+
+const createReactionInstance = (reactionSmiles: string, rxnfile = "") =>
+  ({
+    containsReaction: () => true,
+    getSmiles: async () => reactionSmiles,
+    getRxn: async () => rxnfile,
+    getMolfile: async () => {
+      throw new Error("getMolfile should not be called for reactions");
+    }
+  });
 
 describe("chem editor export", () => {
   it("exports a molecule draft when the ketcher instance does not contain a reaction", async () => {
@@ -84,5 +95,62 @@ describe("chem editor export", () => {
       "CCO.O=O>>CC(=O)O",
       "CCO.O=O>>CC(=O)O"
     ]);
+  });
+
+  it("keeps ionic multi-fragment participants grouped when exporting a reaction draft", async () => {
+    const currentDraft: ChemEditorDraft = {
+      kind: "reaction",
+      reactants: ["O=C([O-])[O-].[K+].[K+]", "CCO"],
+      products: ["CCOC(=O)[O-].[K+].[K+]"],
+      conditions: ["80 C"]
+    };
+
+    const exported = await exportChemEditorDraft(
+      createReactionInstance(
+        "O=C([O-])[O-].[K+].[K+].CCO>>CCOC(=O)[O-].[K+].[K+]",
+        `$RXN
+
+Codex
+
+  2  1
+$MOL`
+      ),
+      currentDraft
+    );
+
+    expect(exported).toMatchObject({
+      kind: "reaction",
+      reactants: ["O=C([O-])[O-].[K+].[K+]", "CCO"],
+      products: ["CCOC(=O)[O-].[K+].[K+]"],
+      conditions: ["80 C"]
+    });
+  });
+
+  it("still splits simple reaction smiles into separate participants when grouping is unambiguous", async () => {
+    const currentDraft: ChemEditorDraft = {
+      kind: "reaction",
+      reactants: ["CCO"],
+      products: ["CC(=O)O"],
+      conditions: []
+    };
+
+    const exported = await exportChemEditorDraft(
+      createReactionInstance(
+        "CCO.O=O>>CC(=O)O",
+        `$RXN
+
+Codex
+
+  2  1
+$MOL`
+      ),
+      currentDraft
+    );
+
+    expect(exported).toMatchObject({
+      kind: "reaction",
+      reactants: ["CCO", "O=O"],
+      products: ["CC(=O)O"]
+    });
   });
 });

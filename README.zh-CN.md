@@ -138,6 +138,14 @@ demo 启动器会拉起：
 - Web：`http://127.0.0.1:2436`
 - `chem-service`：`http://127.0.0.1:18081`
 
+如果你要前后端一起热重载，可以这样启动：
+
+```bash
+pnpm dev --reload
+```
+
+这个模式下，前端继续使用 Next.js dev，`chem-service` 会切换到 Flask reload 模式。
+
 ### 只启动 Web 应用
 
 ```bash
@@ -451,6 +459,7 @@ chemistry service 还会使用：
 | --- | --- |
 | `pnpm install` | 安装 workspace 依赖 |
 | `pnpm dev` | 启动完整 demo 栈：web + `chem-service` |
+| `pnpm dev --reload` | 启动带后端自动重载的完整 demo 栈 |
 | `pnpm dev:demo` | 显式 demo 启动器别名 |
 | `pnpm dev:web` | 只启动 Web 工作台 |
 | `pnpm build` | 构建 monorepo |

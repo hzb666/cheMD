@@ -14,9 +14,9 @@ project: oxidation-study
 render_profile: publication-acs
 ---
 
-:::reaction #rxn-main
-reactants: CCO | O=O
-products: CC(=O)O
+:::chemd #rxn-main
+reac: CCO | O=O
+prod: CC(=O)O
 conditions: Cu catalyst | air | 80 C | 4 h
 temperature: 200 °C
 time: 4 h
@@ -39,20 +39,22 @@ Yield: @res-main.yield and :chem[H2O]`;
     expect(result.html).toContain("Compile Test");
     expect(result.html).toContain("chem-inline");
     expect(result.html).toContain("<svg");
-    expect(result.html).toContain("chemd-svg chemd-svg--reaction");
-    expect(result.html).toContain("Cu catalyst | air | 80 C | 4 h");
+    expect(result.html).toContain('data-chem-render-state="loading"');
+    expect(result.html).toContain("RDKit reaction rendering in progress");
+    expect(result.html).toContain('data-conditions="[&quot;Cu catalyst&quot;,&quot;air&quot;,&quot;80 C&quot;,&quot;4 h&quot;]"');
+    expect(result.html).not.toContain("<dt>Conditions</dt>");
     const payload = JSON.parse(result.json) as {
-      render: {
-        profileId: string;
-        adapter?: {
-          rdkit: { fixedBondLength: number };
+      document: {
+        meta: {
+          title: string;
         };
       };
+      render?: unknown;
     };
 
-    expect(payload.render.profileId).toBe("publication-acs");
+    expect(payload.document.meta.title).toBe("Compile Test");
+    expect(payload.render).toBeUndefined();
     expect(result.renderAdapterPayload.rdkit.fixedBondLength).toBe(result.renderOptions.structure.bondLength);
-    expect(payload.render.adapter?.rdkit.fixedBondLength).toBe(result.renderOptions.structure.bondLength);
     const docxPayload = JSON.parse(result.docxBridge) as {
       render: { profileId: string };
       exportHints: { format: string };
@@ -204,7 +206,7 @@ date: 2026-03-30
 ---
 
 :::col-2
-col: {:::mol
+col: {:::chemd
 smiles: CCO
 name: Ethanol
 :::}
@@ -341,25 +343,21 @@ render_overrides:
   export.dpi: 200
 ---
 
-:::reaction #rxn-contract
-reactants: A
-products: B
+:::chemd #rxn-contract
+reac: A
+prod: B
 :::`;
 
     const result = compileChemd(source);
-    const payload = JSON.parse(result.json) as {
-      render: {
-        adapter?: typeof result.renderAdapterPayload;
-      };
-    };
+    const payload = JSON.parse(result.json) as { render?: unknown };
 
-    expect(payload.render.adapter).toEqual(result.renderAdapterPayload);
+    expect(payload.render).toBeUndefined();
     expect(result.renderAdapterPayload.rdkit.fixedBondLength).toBe(result.renderOptions.structure.bondLength);
     expect(result.renderAdapterPayload.rdkit.bondLineWidth).toBe(result.renderOptions.structure.bondLineWidth);
     expect(result.renderAdapterPayload.rdkit.imageFormat).toBe(result.renderOptions.export.imageFormat);
     expect(result.renderAdapterPayload.rdkit.dpi).toBe(result.renderOptions.export.dpi);
-    expect(result.html).toContain('x2="350"');
-    expect(result.html).toContain('x="372" y="86"');
+    expect(result.html).toContain('data-chem-kind="reaction"');
+    expect(result.html).toContain('data-chem-render-state="loading"');
   });
 
   it("keeps constrained adapter payload values consistent with compile-time render constraints", () => {
@@ -377,9 +375,9 @@ render_overrides:
   export.dpi: 72
 ---
 
-:::reaction #rxn-main
-reactants: A
-products: B
+:::chemd #rxn-main
+reac: A
+prod: B
 :::`;
 
     const result = compileChemd(source);
@@ -419,9 +417,9 @@ title: DOCX Handoff
 date: 2026-03-31
 ---
 
-:::reaction #rxn-main
-reactants: CCO | O=O
-products: CC(=O)O
+:::chemd #rxn-main
+reac: CCO | O=O
+prod: CC(=O)O
 temperature: 200 °C
 :::`;
 
@@ -442,16 +440,16 @@ title: Compile Conditions Test
 date: 2026-04-02
 ---
 
-:::reaction #rxn-main
-reactants: CCO
-products: CC(=O)O
+:::chemd #rxn-main
+reac: CCO
+prod: CC(=O)O
 conditions: Cu catalyst | air | 80 C | 4 h
 :::`;
 
     const result = compileChemd(source);
 
-    expect(result.html).toContain("Conditions");
-    expect(result.html).toContain("Cu catalyst | air | 80 C | 4 h");
+    expect(result.html).toContain('data-conditions="[&quot;Cu catalyst&quot;,&quot;air&quot;,&quot;80 C&quot;,&quot;4 h&quot;]"');
+    expect(result.html).not.toContain("<dt>Conditions</dt>");
   });
 });
 
