@@ -3,8 +3,14 @@ import {
   type ChemdDocument,
   type ChemdNode,
   type ColNode,
+  classifyTlcAnalysis,
+  type InlineChemToken,
+  type InlineCodeToken,
+  type MarkdownLinkToken,
+  type MarkdownNode,
   type MoleculeNode,
   type ReactionNode,
+  type ReferenceToken,
   type StructuredNode,
   type TemplateNode
 } from "@chemd/core";
@@ -15,6 +21,74 @@ import { resolveChemicalNotation, resolveChemicalNotationList } from "./cas-reso
 interface JsonExportOptions {
   fetchImpl?: typeof fetch;
 }
+
+interface SerializedNodeEntry {
+  type: string;
+  value: unknown;
+}
+
+const ARRAY_ITEM_NAME_BY_KEY: Record<string, string> = {
+  diagnostics: "diagnostic",
+  tags: "tag",
+  references: "reference",
+  inlineChem: "inlineChem",
+  inlineCode: "inlineCode",
+  links: "link",
+  reactants: "reactant",
+  products: "product",
+  conditions: "condition",
+  params: "param",
+  lanes: "lane",
+  spots: "spot",
+  mess_regions: "mess_region",
+  normalized: "item"
+};
+
+const ARRAY_ITEM_NAME_BY_PATH: Record<string, string> = {
+  "document.body.*.normalized_conditions.reagents.normalized": "reagent"
+};
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const normalizePathSegment = (segment: string): string =>
+  /^\d{2}_/.test(segment) ? "*" : segment;
+
+const resolveArrayItemName = (path: string[]): string => {
+  const normalizedPath = path.map((segment) => normalizePathSegment(segment)).join(".");
+  const exactMatch = ARRAY_ITEM_NAME_BY_PATH[normalizedPath];
+  if (exactMatch) {
+    return exactMatch;
+  }
+
+  const key = path[path.length - 1];
+  return ARRAY_ITEM_NAME_BY_KEY[key] ?? "item";
+};
+
+const objectifyArrays = (value: unknown, path: string[] = []): unknown => {
+  if (Array.isArray(value)) {
+    const itemName = resolveArrayItemName(path);
+    const keyWidth = Math.max(2, String(value.length).length);
+
+    return Object.fromEntries(
+      value.map((item, index) => [
+        `${String(index + 1).padStart(keyWidth, "0")}_${itemName}`,
+        objectifyArrays(item, path)
+      ])
+    );
+  }
+
+  if (isPlainObject(value)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nestedValue]) => [
+        key,
+        objectifyArrays(nestedValue, [...path, key])
+      ])
+    );
+  }
+
+  return value;
+};
 
 const resolveChemStringSafely = async (
   value: string,
@@ -114,36 +188,114 @@ export const normalizeDocumentForJson = async (
   children: await Promise.all(document.children.map((child) => normalizeNodeForJson(child, options)))
 });
 
-const serializeReactionNodeForJson = (node: ReactionNode): unknown => ({
-  ...node,
-  // 导出补齐 normalized_conditions，固定消费端字段契约。
-  normalized_conditions: classifyReactionConditions(node)
-});
+const serializeReactionNodeForJson = (node: ReactionNode): unknown => {
+  const { type: _type, ...rest } = node;
 
-const serializeStructuredNode = (node: StructuredNode): unknown => {
+  return {
+    ...rest,
+    // 导出补齐 normalized_conditions，固定消费端字段契约。
+    normalized_conditions: classifyReactionConditions(node)
+  };
+};
+
+const stripTokenLocation = <
+  T extends ReferenceToken | InlineChemToken | InlineCodeToken | MarkdownLinkToken
+>(
+  token: T
+): Omit<T, "start" | "end" | "startLine" | "startColumn" | "endLine" | "endColumn"> => {
+  const {
+    start: _start,
+    end: _end,
+    startLine: _startLine,
+    startColumn: _startColumn,
+    endLine: _endLine,
+    endColumn: _endColumn,
+    ...rest
+  } = token;
+
+  return rest;
+};
+
+const serializeMarkdownNodeForJson = (node: MarkdownNode): SerializedNodeEntry => {
+  const { type: _type, ...rest } = node;
+
+  return {
+    type: "markdown",
+    value: {
+      ...rest,
+      references: node.references.map((token) => stripTokenLocation(token)),
+      inlineChem: node.inlineChem.map((token) => stripTokenLocation(token)),
+      inlineCode: node.inlineCode.map((token) => stripTokenLocation(token)),
+      links: node.links.map((token) => stripTokenLocation(token))
+    }
+  };
+};
+
+const serializeStructuredNode = (
+  node: Exclude<StructuredNode, { type: "col" }>
+): SerializedNodeEntry => {
+  const { type, ...rest } = node;
+
   if (node.type === "reaction") {
-    return serializeReactionNodeForJson(node);
+    return {
+      type,
+      value: serializeReactionNodeForJson(node)
+    };
+  }
+
+  if (node.type === "analysis") {
+    return {
+      type,
+      value: {
+        ...rest,
+        ...(node.type_name?.toLowerCase() === "tlc"
+          ? {
+              normalized_tlc: classifyTlcAnalysis(node)
+            }
+          : {})
+      }
+    };
   }
 
   if (node.type === "template") {
     return {
-      ...node,
-      body: node.body.map(serializeNode)
+      type,
+      value: {
+        ...rest,
+        body: serializeBody(node.body)
+      }
     };
+  }
+
+  return {
+    type,
+    value: rest
+  };
+};
+
+const serializeNode = (node: ChemdNode): SerializedNodeEntry[] => {
+  if (node.type === "markdown") {
+    return [serializeMarkdownNodeForJson(node)];
   }
 
   if (node.type === "col") {
-    return {
-      ...node,
-      children: node.children.map(serializeNode)
-    };
+    return node.children.flatMap((child) => serializeNode(child));
   }
 
-  return node;
+  return [serializeStructuredNode(node)];
 };
 
-const serializeNode = (node: ChemdNode): unknown =>
-  node.type === "markdown" ? node : serializeStructuredNode(node);
+const serializeBody = (nodes: ChemdNode[]): Record<string, unknown> => {
+  const entries = nodes.flatMap((node) => serializeNode(node));
+  const keyWidth = Math.max(2, String(entries.length).length);
+
+  return Object.fromEntries(
+    entries.map((entry, index) => [
+      `${String(index + 1).padStart(keyWidth, "0")}_${entry.type}`,
+      entry.value
+    ])
+  );
+};
 
 export const exportNormalizedJson = async (
   source: string,
@@ -152,13 +304,13 @@ export const exportNormalizedJson = async (
   const compileResult = compileChemd(source);
   const document = await normalizeDocumentForJson(compileResult.document, options);
   return JSON.stringify(
-    {
+    objectifyArrays({
       document: {
         meta: document.meta,
-        children: document.children.map(serializeNode)
+        body: serializeBody(document.children)
       },
       diagnostics: document.diagnostics
-    },
+    }),
     null,
     2
   );
