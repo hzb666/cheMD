@@ -21,7 +21,7 @@ export const buildPreviewBridgeScript = (
   const targetOrigin = ${JSON.stringify(parentOrigin)};
   const chemicalBlockSelector = ".chemd-block--molecule, .chemd-block--reaction";
   const inventoryPopoverClassName = "chemd-inventory-popover";
-  const hoverDelayMs = 360;
+  const hoverDelayMs = 300;
   const inventoryStateByBlockId = new Map();
   let activeHoverBlock = null;
   let hoverTimeoutId = 0;
@@ -277,7 +277,6 @@ export const buildPreviewBridgeScript = (
       hideInventoryPopover(activeHoverBlock);
     }
     activeHoverBlock = block;
-    renderInventoryPopover(block, true);
     hoverTimeoutId = window.setTimeout(() => {
       if (activeHoverBlock !== block) {
         return;

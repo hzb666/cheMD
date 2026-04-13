@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useSyncExternalStore } from "react";
+import React, { useLayoutEffect, useRef } from "react";
+import { useTheme } from "next-themes";
 
+import { PREVIEW_THEME_SYNC_MESSAGE_TYPE } from "../lib/preview-theme-sync-script";
 import { toSandboxedPreviewDocument, type PreviewTheme } from "../styles/preview-document";
 
 interface DocumentPreviewProps {
@@ -10,52 +12,50 @@ interface DocumentPreviewProps {
   title?: string;
 }
 
-const subscribeToPreviewTheme = (onStoreChange: () => void): (() => void) => {
-  if (typeof document === "undefined") {
-    return () => undefined;
+const postPreviewTheme = (
+  frame: HTMLIFrameElement | null | undefined,
+  theme: PreviewTheme
+): void => {
+  try {
+    frame?.contentWindow?.postMessage({ type: PREVIEW_THEME_SYNC_MESSAGE_TYPE, theme }, "*");
+  } catch {
+    // Ignore transient iframe reload races.
   }
-
-  const root = document.documentElement;
-  const observer = new MutationObserver(() => {
-    onStoreChange();
-  });
-  observer.observe(root, {
-    attributes: true,
-    attributeFilter: ["class", "data-theme"]
-  });
-
-  return () => {
-    observer.disconnect();
-  };
 };
-
-const readPreviewTheme = (): PreviewTheme =>
-  typeof document !== "undefined" && document.documentElement.classList.contains("dark")
-    ? "dark"
-    : "light";
-
-const readServerPreviewTheme = (): PreviewTheme => "light";
 
 export const DocumentPreview = ({
   html,
   frameRef,
   title = "chemd-preview"
 }: DocumentPreviewProps) => {
-  const previewTheme = useSyncExternalStore(
-    subscribeToPreviewTheme,
-    readPreviewTheme,
-    readServerPreviewTheme
-  );
+  const localFrameRef = useRef<HTMLIFrameElement | null>(null);
+  const activeFrameRef = frameRef ?? localFrameRef;
+  const { resolvedTheme } = useTheme();
+  const previewTheme: PreviewTheme = resolvedTheme === "dark" ? "dark" : "light";
+  const srcDocRef = useRef("");
+  const lastHtmlRef = useRef<string | null>(null);
+
+  if (!srcDocRef.current || lastHtmlRef.current !== html) {
+    srcDocRef.current = toSandboxedPreviewDocument(html, previewTheme);
+    lastHtmlRef.current = html;
+  }
+
+  useLayoutEffect(() => {
+    postPreviewTheme(activeFrameRef.current, previewTheme);
+  }, [activeFrameRef, previewTheme]);
 
   return (
     <div className="relative w-full h-full flex flex-col flex-1">
       <iframe
-        ref={frameRef}
+        ref={activeFrameRef}
         title={title}
         sandbox="allow-scripts"
         referrerPolicy="no-referrer"
         className="absolute inset-0 w-full h-full border-0"
-        srcDoc={toSandboxedPreviewDocument(html, previewTheme)}
+        srcDoc={srcDocRef.current}
+        onLoad={(event) => {
+          postPreviewTheme(event.currentTarget, previewTheme);
+        }}
       />
     </div>
   );

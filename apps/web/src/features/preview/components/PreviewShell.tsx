@@ -4,6 +4,7 @@ import React from "react";
 import type { RenderOptions } from "@chemd/render-profile";
 import type { ChemEditorDraftWithBlockId } from "../../chem-editor/types";
 
+import { CopyIconButton } from "../../../components/copy-icon-button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../components/ui/tabs";
 import { DocumentPreview } from "./DocumentPreview";
 import { usePreviewShellController } from "../hooks/usePreviewShellController";
@@ -84,6 +85,15 @@ const PreviewShell = ({
               </TabsTrigger>
             </TabsList>
           </div>
+          <div className="flex items-center gap-2">
+            {activeTab === "json" ? (
+              <CopyIconButton
+                copyText={activeCode}
+                label="Copy JSON output"
+                className="playground-topbar-button notion-font-ui h-8 w-8 p-0"
+              />
+            ) : null}
+          </div>
         </div>
 
         <div className="flex-1 min-h-0 p-0 flex flex-col relative bg-background">
@@ -101,7 +111,7 @@ const PreviewShell = ({
             </TabsContent>
 
             <TabsContent value="json" className="mt-0 flex min-h-0 flex-1 flex-col focus-visible:outline-none absolute inset-0 w-full h-full">
-              <div className="absolute inset-0 p-6 overflow-auto bg-background">
+              <div className="absolute inset-0 p-6 overflow-auto bg-background" data-preview-code-surface="json">
                 <pre className="font-mono text-[0.85rem] leading-relaxed text-foreground opacity-90">
                   <code>{activeCode}</code>
                 </pre>

@@ -33,6 +33,11 @@ def _render_reaction_annotation_text(
     arrow_y: float,
 ) -> str:
     parts: list[str] = []
+    annotation_attributes = (
+        'class="chemd-reaction-annotation" '
+        'pointer-events="none" '
+        'style="user-select:none;-webkit-user-select:none"'
+    )
     if top_lines:
         top_start_y = (
             arrow_y
@@ -43,8 +48,9 @@ def _render_reaction_annotation_text(
             y = top_start_y + (index * _REACTION_ANNOTATION_LINE_HEIGHT)
             parts.append(
                 f'<text x="{center_x:.1f}" y="{y:.1f}" text-anchor="middle" '
+                f"{annotation_attributes} "
                 'dominant-baseline="text-after-edge" '
-                f'font-size="{_REACTION_ANNOTATION_FONT_SIZE:.0f}" fill="#334155">'
+                f'font-size="{_REACTION_ANNOTATION_FONT_SIZE:.0f}" fill="#000000">'
                 f"{escape(line, quote=True)}</text>"
             )
     if bottom_lines:
@@ -53,8 +59,9 @@ def _render_reaction_annotation_text(
             y = bottom_start_y + (index * _REACTION_ANNOTATION_LINE_HEIGHT)
             parts.append(
                 f'<text x="{center_x:.1f}" y="{y:.1f}" text-anchor="middle" '
+                f"{annotation_attributes} "
                 'dominant-baseline="hanging" '
-                f'font-size="{_REACTION_ANNOTATION_FONT_SIZE:.0f}" fill="#475569">'
+                f'font-size="{_REACTION_ANNOTATION_FONT_SIZE:.0f}" fill="#000000">'
                 f"{escape(line, quote=True)}</text>"
             )
     return "".join(parts)

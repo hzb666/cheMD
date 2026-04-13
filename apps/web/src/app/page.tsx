@@ -93,9 +93,9 @@ const Page = () => {
     >
       <div className="flex min-h-0 flex-col xl:h-full w-full max-w-[2000px] mx-auto">
         <header className="sticky top-0 z-30 shrink-0 w-full border-b border-border bg-background">
-          <div className="flex items-center justify-between h-12 px-3 md:px-5">
+          <div className="flex h-14 items-center justify-between px-3 md:px-5">
             <div className="flex items-center gap-2.5">
-              <img src={logoSrc} alt="chemd logo" className="h-4 w-auto pr-1 object-contain dark:invert" />
+              <img src={logoSrc} alt="chemd logo" className="h-5 w-auto pr-1 object-contain dark:invert" />
               <h1 className="notion-font-label text-[14px] text-foreground tracking-tight flex items-center gap-1">
                 <FlaskConical className="w-3.5 h-3.5 text-primary" />
                 Chemd Playground
@@ -138,7 +138,7 @@ const Page = () => {
             lineCount={lineCount}
             profileId={result.renderOptions.profileId}
             toolbarActions={(
-              <div className="flex items-center gap-2">
+              <>
                 <Button
                   type="button"
                   size="sm"
@@ -155,7 +155,7 @@ const Page = () => {
                   onPickFile={applyOcrFile}
                   className="playground-topbar-button notion-font-ui h-8 px-3 text-[13px]"
                 />
-              </div>
+              </>
             )}
             statusMessage={exportMessage ?? ocr.error ?? editorStatus}
             onSourceChange={applySourceChange}

@@ -27,11 +27,9 @@ export const EditorSurface = ({ source, onSourceChange }: EditorSurfaceProps) =>
   return (
     <div
       className={cn(
-        "relative h-full overflow-hidden bg-background transition-[background-color,box-shadow]",
+        "relative h-full overflow-hidden bg-background transition-[background-color]",
         SURFACE_TRANSITION_CLASS,
-        isFocused
-          ? "bg-background shadow-[inset_0_0_0_1px_rgba(9,127,232,0.16),inset_3px_0_0_rgba(9,127,232,0.14)] dark:shadow-[inset_0_0_0_1px_rgba(98,174,240,0.2),inset_3px_0_0_rgba(98,174,240,0.22)]"
-          : "shadow-none"
+        "shadow-none"
       )}
     >
       <Label className="sr-only" htmlFor="chemd-source-editor">

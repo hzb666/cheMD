@@ -3,6 +3,7 @@
 import React from "react";
 import type { ReactNode } from "react";
 
+import { CopyIconButton } from "../../../components/copy-icon-button";
 import { EditorSurface } from "./EditorSurface";
 
 interface EditorShellProps {
@@ -31,7 +32,14 @@ export const EditorShell = ({
         <h2 className="notion-font-caption text-muted-foreground">Editor</h2>
       </div>
       <div className="flex items-center gap-3">
-        {toolbarActions}
+        <div className="flex items-center gap-2">
+          {toolbarActions}
+          <CopyIconButton
+            copyText={source}
+            label="Copy editor source"
+            className="playground-topbar-button notion-font-ui h-8 w-8 p-0"
+          />
+        </div>
         <span className="notion-font-caption text-muted-foreground opacity-70">{lineCount} lines</span>
       </div>
     </div>
