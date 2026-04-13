@@ -566,5 +566,43 @@ Data: @analysis.data`);
       )
     ).toBeUndefined();
   });
+
+  it("does not require data on tlc analyses and assigns fallback ids to id-less object nodes", () => {
+    const doc = parseChemd(`---
+id: exp-auto-id
+title: Auto Id Test
+date: 2026-04-11
+---
+
+:::result
+yield: 63%
+:::
+
+:::analysis
+type: tlc
+p1: sm 0.60 ^5(4)
+:::
+
+:::procedure
+Add reagent slowly.
+:::
+`);
+
+    const resolved = resolveChemd(doc);
+    const result = resolved.children.find((child) => child.type === "result");
+    const analysis = resolved.children.find((child) => child.type === "analysis");
+    const procedure = resolved.children.find((child) => child.type === "procedure");
+    const missingDataDiagnostic = resolved.diagnostics.find(
+      (diagnostic) =>
+        diagnostic.code === "E_MISSING_REQUIRED_FIELD" &&
+        diagnostic.message.includes("\"data\"") &&
+        diagnostic.message.includes("analysis")
+    );
+
+    expect(result).toMatchObject({ id: "exp-auto-id-result-1" });
+    expect(analysis).toMatchObject({ id: "exp-auto-id-analysis-1" });
+    expect(procedure).toMatchObject({ id: "exp-auto-id-procedure-1" });
+    expect(missingDataDiagnostic).toBeUndefined();
+  });
 });
 

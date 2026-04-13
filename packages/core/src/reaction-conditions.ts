@@ -18,7 +18,6 @@ export interface NormalizedMultiTokenValue {
 }
 
 export interface NormalizedReactionConditions {
-  conditions_text?: NormalizedMultiTokenValue | null;
   solvent?: NormalizedTokenValue | null;
   catalyst?: NormalizedTokenValue | null;
   reagents?: NormalizedMultiTokenValue | null;
@@ -140,14 +139,6 @@ export const classifyReactionConditions = (
   ];
 
   return {
-    ...(conditions.length > 0
-      ? {
-          conditions_text: {
-            raw: conditions.join(" | "),
-            normalized: conditions
-          }
-        }
-      : {}),
     ...(solventRaw
       ? {
           solvent: {

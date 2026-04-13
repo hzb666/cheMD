@@ -77,10 +77,7 @@ Summary: @res-main.yield`;
       target_entity_id: "mol::exp-training-001::mol-b"
     });
     expect(reaction.conditions_raw).toEqual(["air", "4 h"]);
-    expect(reaction.normalized_conditions.conditions_text).toEqual({
-      raw: "air | 4 h",
-      normalized: ["air", "4 h"]
-    });
+    expect(reaction.normalized_conditions).not.toHaveProperty("conditions_text");
 
     const markdown = record.semantic_layer.markdown_blocks.find((item) => item.raw_text.includes("Summary:"));
     expect(markdown?.entity_id).toMatch(/^md::exp-training-001::\d+$/);
@@ -237,5 +234,80 @@ Summary block.`;
 
     expect(first.export_id).toBe(second.export_id);
     expect(first.export_id).toMatch(/^export::exp-training-stable::[a-f0-9]{8}$/);
+  });
+
+  it("keeps procedure and observation in source snapshots while preserving semantic analysis export", () => {
+    const source = `---
+id: exp-training-procedure
+title: Procedure Source Export
+date: 2026-04-11
+---
+
+:::procedure #proc-1
+ref: rxn-main
+将底物溶于无水 THF，冰浴下缓慢滴加试剂。
+:::
+
+:::observation #obs-1
+ref: proc-1
+滴加过程中体系由无色逐渐变为浅黄色，并有轻微放热。
+:::
+
+:::analysis #ana-tlc-1
+type: tlc;; time: 0.5 h;; eluent: PE/EA = 4:1
+p1: sm 0.60 ^5(4) | mess(0.10) 3(2)
+:::
+`;
+
+    const resolved = resolveChemd(parseChemd(source));
+    const record = exportTrainingRecordFromDocument(resolved, {
+      exportedAt: "2026-04-11T00:00:00.000Z",
+      exportId: "export::exp-training-procedure::fixed"
+    });
+
+    expect(record.source_layer.raw_children).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          node_type: "procedure",
+          original_id: "proc-1",
+          raw_payload: expect.objectContaining({
+            type: "procedure",
+            body: "将底物溶于无水 THF，冰浴下缓慢滴加试剂。"
+          })
+        }),
+        expect.objectContaining({
+          node_type: "observation",
+          original_id: "obs-1",
+          raw_payload: expect.objectContaining({
+            type: "observation",
+            body: "滴加过程中体系由无色逐渐变为浅黄色，并有轻微放热。"
+          })
+        })
+      ])
+    );
+
+    expect(record.semantic_layer.analyses).toEqual([
+      expect.objectContaining({
+        original_id: "ana-tlc-1",
+        analysis_type: "tlc",
+        time_raw: "0.5 h",
+        eluent_raw: "PE/EA = 4:1",
+        plate_raw: "silica gel GF254",
+        visualization_raw: "UV 254 nm",
+        normalized_tlc: expect.objectContaining({
+          time: expect.objectContaining({
+            raw: "0.5 h",
+            value: 0.5,
+            unit: "h"
+          }),
+          lanes: [
+            expect.objectContaining({
+              lane_id: "p1",
+              lane_role: "starting_material"
+            })
+          ]
+        })
+      })
+    ]);
   });
 });

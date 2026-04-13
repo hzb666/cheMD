@@ -30,7 +30,7 @@ const MAX_TEMPLATE_EXPANSION_DEPTH = 32;
 const MAX_TEMPLATE_EXPANDED_NODES = 2000;
 
 const isObjectNode = (node: ChemdNode): node is ObjectNode =>
-  ["molecule", "reaction", "result", "analysis", "sample"].includes(node.type);
+  ["molecule", "reaction", "result", "analysis", "procedure", "observation", "sample"].includes(node.type);
 
 const getNestedNodes = (node: ChemdNode): ChemdNode[] => {
   if (node.type === "col") {
@@ -121,6 +121,14 @@ const buildTemplateIndex = (children: ChemdNode[], diagnostics: Diagnostic[]): R
   return index;
 };
 
+const getRequiredFields = (node: ObjectNode): string[] | undefined => {
+  if (node.type === "analysis" && node.type_name?.toLowerCase() === "tlc") {
+    return ["type_name"];
+  }
+
+  return REQUIRED_FIELDS[node.type];
+};
+
 const validateNodes = (children: ChemdNode[], diagnostics: Diagnostic[]) => {
   const queue = [...children];
   let cursor = 0;
@@ -134,7 +142,7 @@ const validateNodes = (children: ChemdNode[], diagnostics: Diagnostic[]) => {
       continue;
     }
 
-    const requiredFields = REQUIRED_FIELDS[child.type];
+    const requiredFields = getRequiredFields(child);
 
     if (!requiredFields) {
       continue;
@@ -152,6 +160,48 @@ const validateNodes = (children: ChemdNode[], diagnostics: Diagnostic[]) => {
     }
   }
 };
+
+const createDefaultObjectId = (
+  documentId: string,
+  type: ObjectNode["type"],
+  counters: Partial<Record<ObjectNode["type"], number>>
+): string => {
+  const nextCount = (counters[type] ?? 0) + 1;
+  counters[type] = nextCount;
+  return `${documentId}-${type}-${nextCount}`;
+};
+
+const assignDefaultObjectIds = (
+  nodes: ChemdNode[],
+  documentId: string,
+  counters: Partial<Record<ObjectNode["type"], number>> = {}
+): ChemdNode[] =>
+  nodes.map((node) => {
+    if (node.type === "col") {
+      return {
+        ...node,
+        children: assignDefaultObjectIds(node.children, documentId, counters)
+      };
+    }
+
+    if (node.type === "template") {
+      return {
+        ...node,
+        body: assignDefaultObjectIds(node.body, documentId, counters) as TemplateNode["body"]
+      };
+    }
+
+    if (!isObjectNode(node)) {
+      return node;
+    }
+
+    return node.id
+      ? node
+      : {
+          ...node,
+          id: createDefaultObjectId(documentId, node.type, counters)
+        };
+  });
 
 const validatePrimaryReferences = (
   document: ChemdDocument,
@@ -588,19 +638,20 @@ export const resolveChemd = (document: ChemdDocument): ChemdDocument => {
   const resolvedChildren = document.children.flatMap((child) =>
     resolveNode(child, environment)
   );
+  const childrenWithDefaultIds = assignDefaultObjectIds(resolvedChildren, document.meta.id);
   const resolvedDocument: ChemdDocument = {
     ...document,
-    children: resolvedChildren
+    children: childrenWithDefaultIds
   };
-  const resolvedObjectIndex = buildObjectIndex(resolvedChildren, diagnostics);
+  const resolvedObjectIndex = buildObjectIndex(childrenWithDefaultIds, diagnostics);
 
-  validateNodes(resolvedChildren, diagnostics);
+  validateNodes(childrenWithDefaultIds, diagnostics);
   validatePrimaryReferences(resolvedDocument, resolvedObjectIndex, diagnostics);
 
   return {
     ...resolvedDocument,
     diagnostics,
-    children: resolvedChildren
+    children: childrenWithDefaultIds
   };
 };
 

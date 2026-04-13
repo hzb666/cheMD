@@ -74,6 +74,30 @@ describe("renderHtml", () => {
             notes: "clean spectrum"
           },
           {
+            type: "procedure",
+            id: "proc-main",
+            ref: "rxn-main",
+            body: "将底物溶于无水 THF，冰浴下缓慢滴加试剂。"
+          },
+          {
+            type: "observation",
+            id: "obs-main",
+            ref: "proc-main",
+            body: "滴加过程中体系由无色逐渐变为浅黄色，并有轻微放热。"
+          },
+          {
+            type: "analysis",
+            id: "ana-tlc",
+            type_name: "tlc",
+            ref: "proc-main",
+            time: "0.5 h",
+            eluent: "PE/EA = 4:1",
+            plate: "silica gel GF254",
+            visualization: "UV 254 nm",
+            p1: "sm 0.60 ^5(4) | mess(0.10) 3(2)",
+            result: "starting material mostly consumed"
+          },
+          {
             type: "sample",
             id: "sample-main",
             name: "Ethanol lot",
@@ -124,6 +148,8 @@ describe("renderHtml", () => {
     expect(html).toContain(">Molecule <span class=\"chemd-block-id\">mol-main</span></h2>");
     expect(html).toContain(">Result <span class=\"chemd-block-id\">res-main</span></h2>");
     expect(html).toContain(">Analysis <span class=\"chemd-block-id\">ana-main</span></h2>");
+    expect(html).toContain(">Procedure <span class=\"chemd-block-id\">proc-main</span></h2>");
+    expect(html).toContain(">Observation <span class=\"chemd-block-id\">obs-main</span></h2>");
     expect(html).toContain(">Sample <span class=\"chemd-block-id\">sample-main</span></h2>");
     expect(html).toContain('data-reactants="[');
     expect(html).toContain('data-products="[');
@@ -143,11 +169,83 @@ describe("renderHtml", () => {
     expect(html).toContain("400 MHz");
     expect(html).toContain("1H");
     expect(html).toContain("clean spectrum");
+    expect(html).toContain("chemd-block chemd-block--procedure");
+    expect(html).toContain("chemd-block chemd-block--observation");
+    expect(html).toContain("将底物溶于无水 THF，冰浴下缓慢滴加试剂。");
+    expect(html).toContain("滴加过程中体系由无色逐渐变为浅黄色，并有轻微放热。");
+    expect(html).toContain("PE/EA = 4:1");
+    expect(html).toContain("silica gel GF254");
+    expect(html).toContain("UV 254 nm");
+    expect(html).toContain('class="chemd-block chemd-block--analysis chemd-block--analysis-tlc"');
+    expect(html).toContain('class="chemd-tlc-lane-label">sm<');
+    expect(html).not.toContain("sm 0.60 ^5(4) | mess(0.10) 3(2)");
+    expect(html).toContain("starting material mostly consumed");
     expect(html).toContain("fresh bottle");
     expect(html).toContain("Summary block");
     expect(html).toContain("200 °C");
     expect(html).toContain("63%");
     expect(html).toContain("example warning");
+  });
+
+  it("renders tlc analyses as a plate with lane labels, baseline, solvent front, and shaped spots", () => {
+    const document = createDocument(
+      { id: "exp-tlc-html", title: "TLC Plate", date: "2026-04-11" },
+      {
+        children: [
+          {
+            type: "analysis",
+            id: "ana-tlc-plate",
+            type_name: "tlc",
+            ref: "proc-main",
+            time: "0.5 h",
+            eluent: "PE/EA = 4:1",
+            result: "pd dominant",
+            p1: "sm 0.78 ^6(8) | mess(0.15) 4(2)",
+            p2: "pd 0.43 3(5)",
+            p3: "3 0.18 v2(1) | base"
+          }
+        ]
+      }
+    );
+
+    const html = renderHtml(document, resolveRenderProfile({ profileId: "eln-default" }));
+
+    expect(html).toContain('class="chemd-tlc"');
+    expect(html).toContain('class="chemd-tlc-plate"');
+    expect(html).toContain('style="--chemd-tlc-lane-count:3;"');
+    expect(html).toContain('class="chemd-tlc-solvent-front"');
+    expect(html).toContain('class="chemd-tlc-baseline"');
+    expect(html).toContain('class="chemd-tlc-lane-label">sm<');
+    expect(html).toContain('class="chemd-tlc-lane-label">pd<');
+    expect(html).toContain('class="chemd-tlc-lane-label">3<');
+    expect(html).toContain('class="chemd-tlc-spot"');
+    expect(html).toContain('data-shape="up"');
+    expect(html).toContain('data-shape="circle"');
+    expect(html).toContain('data-shape="down"');
+    expect(html).toContain('data-size-rank="5"');
+    expect(html).toContain('data-intensity-rank="5"');
+    expect(html).toContain('class="chemd-tlc-mess"');
+    expect(html).toContain('class="chemd-tlc-base-spot"');
+    expect(html).not.toContain("sm 0.78 ^6(8) | mess(0.15) 4(2)");
+  });
+
+  it("preserves explicit line breaks in procedure-style body text", () => {
+    const document = createDocument(
+      { id: "exp-procedure-breaks", title: "Procedure Breaks", date: "2026-04-14" },
+      {
+        children: [
+          {
+            type: "procedure",
+            id: "proc-breaks",
+            body: "First step.\nSecond step."
+          }
+        ]
+      }
+    );
+
+    const html = renderHtml(document, resolveRenderProfile({ profileId: "eln-default" }));
+
+    expect(html).toContain("First step.<br />Second step.");
   });
 
   it("renders markdown headings, lists, and paragraphs with reference replacement", () => {

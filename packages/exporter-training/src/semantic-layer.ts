@@ -10,6 +10,7 @@ import type {
 } from "@chemd/core";
 
 import {
+  classifyTlcAnalysis,
   classifyReactionConditions
 } from "@chemd/core";
 
@@ -230,12 +231,19 @@ const buildAnalysis = (
   source_node_type: "analysis",
   ...(isPrimary ? { is_primary: true } : {}),
   analysis_type: node.type_name,
+  ref_raw: node.ref,
+  time_raw: node.time,
+  eluent_raw: node.eluent,
+  plate_raw: node.plate,
+  visualization_raw: node.visualization,
+  result_raw: node.result,
   instrument: node.instrument,
   solvent: node.solvent,
   frequency: node.frequency,
   method: node.method,
   data_raw: node.data,
   notes: node.notes,
+  normalized_tlc: classifyTlcAnalysis(node) ?? null,
   text_for_embedding: compactText(node.type_name, node.instrument, node.method, node.data, node.notes)
 });
 

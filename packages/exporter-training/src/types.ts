@@ -1,3 +1,5 @@
+import type { NormalizedTlcAnalysis } from "@chemd/core";
+
 export interface ChemdTrainingExportV1 {
   schema_version: "chemd-training-export/v0.1";
   export_id: string;
@@ -48,6 +50,8 @@ export interface SourceNodeSnapshot {
     | "reaction"
     | "result"
     | "analysis"
+    | "procedure"
+    | "observation"
     | "sample"
     | "col"
     | "template"
@@ -135,7 +139,6 @@ export interface ReactionParticipantV1 {
 }
 
 export interface NormalizedReactionConditionsV1 {
-  conditions_text?: NormalizedMultiTokenValue | null;
   solvent?: NormalizedTokenValue | null;
   catalyst?: NormalizedTokenValue | null;
   reagents?: NormalizedMultiTokenValue | null;
@@ -203,12 +206,19 @@ export interface ParsedMeasurementV1 {
 export interface ExportedAnalysisV1 extends ExportedEntityBase {
   source_node_type: "analysis";
   analysis_type?: string;
+  ref_raw?: string;
+  time_raw?: string;
+  eluent_raw?: string;
+  plate_raw?: string;
+  visualization_raw?: string;
+  result_raw?: string;
   instrument?: string;
   solvent?: string;
   frequency?: string;
   method?: string;
   data_raw?: string;
   notes?: string;
+  normalized_tlc?: NormalizedTlcAnalysis | null;
   parsed_measurements?: ParsedMeasurementV1[];
   text_for_embedding?: string;
 }

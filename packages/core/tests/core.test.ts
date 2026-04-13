@@ -7,6 +7,7 @@ import {
   createMarkdownLinkToken,
   createMarkdownNode,
   classifyReactionConditions,
+  classifyTlcAnalysis,
   createReferenceToken,
   getRenderOverrideValueHint,
   isKnownRenderOverridePath,
@@ -147,12 +148,12 @@ describe("core ast helpers", () => {
   });
 
   it("classifies reaction condition text into structured fields", () => {
-    expect(
-      classifyReactionConditions({
+    const normalized = classifyReactionConditions({
         conditions: ["Cu catalyst", "EtOH", "80 C", "4 h", "N2", "Na2CO3"],
         solvent: "EtOH"
-      })
-    ).toMatchObject({
+      });
+
+    expect(normalized).toMatchObject({
       solvent: {
         raw: "EtOH",
         normalized: "ethanol"
@@ -179,6 +180,121 @@ describe("core ast helpers", () => {
         value: 4,
         unit: "h"
       }
+    });
+    expect(normalized).not.toHaveProperty("conditions_text");
+  });
+
+  it("classifies tlc analysis lanes into normalized structures", () => {
+    expect(
+      classifyTlcAnalysis({
+        type: "analysis",
+        id: "ana-tlc",
+        type_name: "tlc",
+        time: "0.5 h",
+        p1: "sm 0.60 ^5(4) | mess(0.10) 3(2)",
+        p2: "pd2 0.20 4(3)",
+        p3: "1 none",
+        p4: "reaction 0.05 v2(1) | base"
+      })
+    ).toMatchObject({
+      time: {
+        raw: "0.5 h",
+        value: 0.5,
+        unit: "h"
+      },
+      plate: {
+        raw: "silica gel GF254",
+        normalized: "silica gel GF254"
+      },
+      visualization: {
+        raw: "UV 254 nm",
+        normalized: "UV 254 nm"
+      },
+      lanes: [
+        {
+          lane_id: "p1",
+          lane_label_raw: "sm",
+          lane_role: "starting_material",
+          has_base: false,
+          is_none: false,
+          spots: [
+            {
+              rf_raw: "0.60",
+              rf: 0.6,
+              shape: "up",
+              size_rank: 5,
+              intensity_rank: 4
+            }
+          ],
+          mess_regions: [
+            {
+              rf_raw: "0.10",
+              rf: 0.1,
+              size_rank: 3,
+              intensity_rank: 2
+            }
+          ]
+        },
+        {
+          lane_id: "p2",
+          lane_label_raw: "pd2",
+          lane_role: "product",
+          lane_index: 2
+        },
+        {
+          lane_id: "p3",
+          lane_label_raw: "1",
+          lane_role: "trial",
+          lane_index: 1,
+          is_none: true,
+          spots: [],
+          mess_regions: []
+        },
+        {
+          lane_id: "p4",
+          lane_label_raw: "reaction",
+          lane_role: "reaction",
+          has_base: true,
+          spots: [
+            {
+              rf_raw: "0.05",
+              rf: 0.05,
+              shape: "down",
+              size_rank: 2,
+              intensity_rank: 1
+            }
+          ]
+        }
+      ]
+    });
+  });
+
+  it("caps tlc spot and mess ranks at five for rendering", () => {
+    expect(
+      classifyTlcAnalysis({
+        type: "analysis",
+        id: "ana-tlc-rank-cap",
+        type_name: "tlc",
+        p1: "sm 0.75 ^8(9) | mess(0.20) 7(6)"
+      })
+    ).toMatchObject({
+      lanes: [
+        {
+          lane_id: "p1",
+          spots: [
+            {
+              size_rank: 5,
+              intensity_rank: 5
+            }
+          ],
+          mess_regions: [
+            {
+              size_rank: 5,
+              intensity_rank: 5
+            }
+          ]
+        }
+      ]
     });
   });
 });

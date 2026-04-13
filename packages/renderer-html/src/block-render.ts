@@ -3,6 +3,8 @@ import type {
   ChemdNode,
   ColNode,
   MoleculeNode,
+  ObservationNode,
+  ProcedureNode,
   ReactionNode,
   ResultNode,
   SampleNode,
@@ -17,10 +19,22 @@ import {
   stringifyAttributeValue,
   stringifyJsonAttributeValue
 } from "./shared";
+import { renderTlcAnalysis } from "./tlc-render";
 
 export interface RenderNodeOptions {
   suppressLeadingMarkdownHeadingText?: string;
 }
+
+const renderBodyText = (value: string | undefined): string =>
+  value
+    ? `<div class="chemd-block-copy"><p>${escapeHtml(value).replace(/\n/g, "<br />")}</p></div>`
+    : "";
+
+const getAnalysisLaneFields = (node: AnalysisNode): Array<[string, string]> =>
+  Object.entries(node)
+    .filter(([key, value]) => /^p\d+$/.test(key) && typeof value === "string" && value.length > 0)
+    .sort(([left], [right]) => left.localeCompare(right, undefined, { numeric: true }))
+    .map(([key, value]) => [key.toUpperCase(), value as string]);
 
 const renderReaction = (node: ReactionNode): string =>
   `<section class="chemd-block chemd-block--reaction" data-node-id="${escapeHtml(node.id ?? "")}" data-reactants="${stringifyJsonAttributeValue(node.reactants ?? [])}" data-products="${stringifyJsonAttributeValue(node.products ?? [])}" data-conditions="${stringifyJsonAttributeValue(node.conditions ?? [])}">
@@ -72,17 +86,40 @@ const renderMolecule = (node: MoleculeNode): string =>
   </section>`;
 
 const renderAnalysis = (node: AnalysisNode): string =>
-  `<section class="chemd-block chemd-block--analysis" data-node-id="${escapeHtml(node.id ?? "")}">
+  node.type_name?.toLowerCase() === "tlc"
+    ? renderTlcAnalysis(node)
+    : `<section class="chemd-block chemd-block--analysis" data-node-id="${escapeHtml(node.id ?? "")}">
     ${renderBlockTitle("Analysis", node.id)}
     ${renderFieldList([
       ["Type", node.type_name],
+      ["Ref", node.ref],
+      ["Time", node.time],
+      ["Eluent", node.eluent],
+      ["Plate", node.plate],
+      ["Visualization", node.visualization],
+      ["Result", node.result],
       ["Instrument", node.instrument],
       ["Solvent", node.solvent],
       ["Frequency", node.frequency],
       ["Method", node.method],
       ["Data", node.data],
-      ["Notes", node.notes]
+      ["Notes", node.notes],
+      ...getAnalysisLaneFields(node)
     ])}
+  </section>`;
+
+const renderProcedure = (node: ProcedureNode): string =>
+  `<section class="chemd-block chemd-block--procedure" data-node-id="${escapeHtml(node.id ?? "")}">
+    ${renderBlockTitle("Procedure", node.id)}
+    ${renderFieldList([["Ref", node.ref]])}
+    ${renderBodyText(node.body)}
+  </section>`;
+
+const renderObservation = (node: ObservationNode): string =>
+  `<section class="chemd-block chemd-block--observation" data-node-id="${escapeHtml(node.id ?? "")}">
+    ${renderBlockTitle("Observation", node.id)}
+    ${renderFieldList([["Ref", node.ref]])}
+    ${renderBodyText(node.body)}
   </section>`;
 
 const renderSample = (node: SampleNode): string =>
@@ -137,6 +174,10 @@ export const renderNode = (
       return renderMolecule(node);
     case "analysis":
       return renderAnalysis(node);
+    case "procedure":
+      return renderProcedure(node);
+    case "observation":
+      return renderObservation(node);
     case "sample":
       return renderSample(node);
     case "template":

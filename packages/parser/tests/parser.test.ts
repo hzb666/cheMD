@@ -331,7 +331,7 @@ Outro line.
     expect(template?.body[2]).toMatchObject({ type: "markdown", value: "Outro line." });
   });
 
-  it("parses col-x blocks with nested brace components", () => {
+  it("parses col-x blocks with simplified brace children", () => {
     const source = `---
 id: exp-col-layout
 title: Col Layout Test
@@ -339,11 +339,13 @@ date: 2026-03-30
 ---
 
 :::col-2
-col: {:::chemd
+col: {
+:::chemd
 smiles: CCO
 name: Ethanol
-:::}
-col: 63%
+:::
+}
+col: {63%}
 :::`;
 
     const doc = parseChemd(source);
@@ -1032,6 +1034,115 @@ Data: @analysis.data
       source: "analysis",
       field: "data"
     });
+  });
+
+  it("parses procedure and observation blocks as natural-language body nodes", () => {
+    const source = `---
+id: exp-procedure-observation
+title: Procedure Observation
+date: 2026-04-11
+---
+
+:::procedure #proc-1
+ref: rxn-main
+将底物溶于无水 THF，冰浴下缓慢滴加试剂。滴加完毕后撤去冰浴，升至室温继续搅拌 2 h。
+::: 
+
+:::observation #obs-1
+ref: proc-1
+滴加过程中体系由无色逐渐变为浅黄色，并有轻微放热。
+:::`;
+
+    const doc = parseChemd(source);
+    const procedure = doc.children.find(
+      (child) => (child as { type: string }).type === "procedure"
+    ) as { id?: string; ref?: string; body?: string } | undefined;
+    const observation = doc.children.find(
+      (child) => (child as { type: string }).type === "observation"
+    ) as { id?: string; ref?: string; body?: string } | undefined;
+
+    expect(procedure).toMatchObject({
+      id: "proc-1",
+      ref: "rxn-main",
+      body: "将底物溶于无水 THF，冰浴下缓慢滴加试剂。滴加完毕后撤去冰浴，升至室温继续搅拌 2 h。"
+    });
+    expect(observation).toMatchObject({
+      id: "obs-1",
+      ref: "proc-1",
+      body: "滴加过程中体系由无色逐渐变为浅黄色，并有轻微放热。"
+    });
+  });
+
+  it("parses tlc analysis fields with double-semicolon delimiters and defaults", () => {
+    const source = `---
+id: exp-tlc-analysis
+title: TLC Analysis
+date: 2026-04-11
+---
+
+:::analysis #ana-tlc-1
+type: tlc;; time: 0.5 h;; eluent: PE/EA = 4:1;; ref: proc-1
+p1: sm 0.60 ^5(4) | mess(0.10) 3(2);; p2: pd2 0.20 4(3);; p3: 1 0.30 4(2) | base
+result: starting material mostly consumed
+:::`;
+
+    const doc = parseChemd(source);
+    const analysis = doc.children.find(
+      (child) => (child as { type: string }).type === "analysis"
+    ) as Record<string, unknown> | undefined;
+
+    expect(analysis).toMatchObject({
+      id: "ana-tlc-1",
+      type_name: "tlc",
+      time: "0.5 h",
+      eluent: "PE/EA = 4:1",
+      ref: "proc-1",
+      plate: "silica gel GF254",
+      visualization: "UV 254 nm",
+      p1: "sm 0.60 ^5(4) | mess(0.10) 3(2)",
+      p2: "pd2 0.20 4(3)",
+      p3: "1 0.30 4(2) | base",
+      result: "starting material mostly consumed"
+    });
+  });
+
+  it("supports double-semicolon-delimited fields on existing structured blocks", () => {
+    const source = `---
+id: exp-semicolon-fields
+title: Semicolon Fields
+date: 2026-04-11
+---
+
+:::result #res-main
+status: success;; yield: 63%;; purity: 98%
+:::`;
+
+    const doc = parseChemd(source);
+    const result = doc.children.find((child): child is ResultNode => child.type === "result");
+
+    expect(result).toMatchObject({
+      id: "res-main",
+      status: "success",
+      yield: "63%",
+      purity: "98%"
+    });
+  });
+
+  it("preserves single semicolons inside literal field values", () => {
+    const source = `---
+id: exp-single-semicolon
+title: Single Semicolon
+date: 2026-04-11
+---
+
+:::result #res-main
+notes: first wash; then dry; finally filter
+:::`;
+
+    const doc = parseChemd(source);
+    const result = doc.children.find((child): child is ResultNode => child.type === "result");
+
+    expect(result?.notes).toBe("first wash; then dry; finally filter");
   });
 });
 

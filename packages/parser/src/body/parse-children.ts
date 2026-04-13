@@ -48,20 +48,59 @@ const parseBraceColChild = (
   index: number
 ): { children: ChemdNode[]; nextIndex: number } => {
   const value = lines[index].trim().slice(4).trim();
-  const braceHeader = value.slice(1).trim();
-  const braceBlockLines = [braceHeader];
-  const collected = collectBraceBlockLines(lines, index + 1);
-  braceBlockLines.push(...collected.lines);
+  if (value.startsWith("{:::")) {
+    const braceHeader = value.slice(1).trim();
+    const braceBlockLines = [braceHeader];
+    const collected = collectBraceBlockLines(lines, index + 1);
+    braceBlockLines.push(...collected.lines);
 
-  if (!collected.terminated) {
-    pushWarning(diagnostics, "W_UNTERMINATED_BRACE_BLOCK", "Unterminated brace block inside col block");
+    if (!collected.terminated) {
+      pushWarning(diagnostics, "W_UNTERMINATED_BRACE_BLOCK", "Unterminated brace block inside col block");
+    }
+
+    // legacy brace block 继续走同一套 structured block 解析，避免旧语法立即失效。
+    const parsed = parseChildren(braceBlockLines, diagnostics);
+    return {
+      children: parsed.children,
+      nextIndex: collected.nextIndex
+    };
   }
 
-  // brace block 继续走同一套 structured block 解析，避免 col 内外出现语义分叉。
+  if (value.endsWith("}") && value.length > 1) {
+    const inlineBody = value.slice(1, -1).trim();
+    const parsed = parseChildren(inlineBody ? [inlineBody] : [], diagnostics);
+    return {
+      children: parsed.children,
+      nextIndex: index + 1
+    };
+  }
+
+  const braceBlockLines: string[] = [];
+  const firstLine = value.slice(1).trimStart();
+  if (firstLine) {
+    braceBlockLines.push(firstLine);
+  }
+
+  let nextIndex = index + 1;
+  while (nextIndex < lines.length) {
+    const line = lines[nextIndex];
+    if (line.trim() === "}") {
+      const parsed = parseChildren(braceBlockLines, diagnostics);
+      return {
+        children: parsed.children,
+        nextIndex: nextIndex + 1
+      };
+    }
+
+    braceBlockLines.push(line);
+    nextIndex += 1;
+  }
+
+  pushWarning(diagnostics, "W_UNTERMINATED_BRACE_BLOCK", "Unterminated brace block inside col block");
   const parsed = parseChildren(braceBlockLines, diagnostics);
   return {
     children: parsed.children,
-    nextIndex: collected.nextIndex
+    nextIndex
   };
 };
 
@@ -85,7 +124,7 @@ const parseColChildren = (lines: string[], diagnostics: Diagnostic[]): ChemdNode
     }
 
     const value = line.slice(4).trim();
-    if (value.startsWith("{:::")) {
+    if (value.startsWith("{")) {
       const parsed = parseBraceColChild(lines, diagnostics, index);
       children.push(...parsed.children);
       index = parsed.nextIndex;
@@ -108,6 +147,7 @@ const parseTemplateBlock = (
   startIndex: number,
   templateName: string
 ): { node: TemplateNode; nextIndex: number; terminatedBlock: boolean } => {
+  const templateFields = new Set(["bind", "params", "description"]);
   const leadingFieldLines: string[] = [];
   let index = startIndex;
 
@@ -116,7 +156,10 @@ const parseTemplateBlock = (
     index += 1;
   }
 
-  const fields = parseKeyValueLines("template", leadingFieldLines, diagnostics);
+  const fields = parseKeyValueLines(leadingFieldLines, diagnostics, {
+    allowField: (key) => templateFields.has(key),
+    blockTypeForDiagnostics: "template"
+  });
   const bodyResult = parseChildren(lines, diagnostics, index, true);
 
   return {

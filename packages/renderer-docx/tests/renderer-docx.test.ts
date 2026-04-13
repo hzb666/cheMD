@@ -53,6 +53,18 @@ describe("renderer-docx", () => {
             conditions: ["air", "80 C"],
             temperature: "200 °C",
             time: "4 h"
+          },
+          {
+            type: "procedure",
+            id: "proc-main",
+            ref: "rxn-main",
+            body: "将底物溶于无水 THF，冰浴下缓慢滴加试剂。"
+          },
+          {
+            type: "observation",
+            id: "obs-main",
+            ref: "proc-main",
+            body: "滴加过程中体系由无色逐渐变为浅黄色，并有轻微放热。"
           }
         ]
       }
@@ -64,6 +76,11 @@ describe("renderer-docx", () => {
     expect(markdown).toContain("project: oxidation-study");
     expect(markdown).toContain("# DOCX Markdown");
     expect(markdown).toContain("### Reaction `rxn-main`");
+    expect(markdown).toContain("### Procedure `proc-main`");
+    expect(markdown).toContain("### Observation `obs-main`");
+    expect(markdown).toContain("- Ref: rxn-main");
+    expect(markdown).toContain("将底物溶于无水 THF，冰浴下缓慢滴加试剂。");
+    expect(markdown).toContain("滴加过程中体系由无色逐渐变为浅黄色，并有轻微放热。");
     expect(markdown).toContain("- Temperature: 200 °C");
     expect(markdown).toContain("- Time: 4 h");
     expect(markdown).not.toContain("- Reactants:");

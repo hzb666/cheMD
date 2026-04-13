@@ -9,9 +9,6 @@ import { tokenizeReferences } from "../inline/tokenize-references";
 
 const BLOCK_TYPE_PATTERN = "[a-z][a-z0-9_]*";
 const BLOCK_START_PATTERN = new RegExp(`^:::(${BLOCK_TYPE_PATTERN})(?:-(\\d+))?(?:\\s+(.*))?$`);
-const COL_INLINE_BRACE_BLOCK_PATTERN = new RegExp(
-  `^col:\\s*\\{:::(${BLOCK_TYPE_PATTERN})(?:-\\d+)?(?:\\s+.*)?$`
-);
 const LIST_FIELDS = new Set([
   "reactants",
   "products",
@@ -22,69 +19,6 @@ const LIST_FIELDS = new Set([
   "conditions",
   "params"
 ]);
-
-const BLOCK_FIELDS: Record<string, Set<string>> = {
-  molecule: new Set(["smiles", "name", "role", "caption", "formula", "amount", "equivalents"]),
-  reaction: new Set([
-    "reactants",
-    "products",
-    "conditions",
-    "name",
-    "reagents",
-    "catalyst",
-    "solvent",
-    "temperature",
-    "time",
-    "pressure",
-    "atmosphere",
-    "yield",
-    "conversion",
-    "selectivity",
-    "caption"
-  ]),
-  chemd: new Set([
-    "smiles",
-    "cas",
-    "name",
-    "role",
-    "caption",
-    "formula",
-    "amount",
-    "equivalents",
-    "reactants",
-    "products",
-    "reactant",
-    "product",
-    "reac",
-    "prod",
-    "conditions",
-    "reagents",
-    "catalyst",
-    "solvent",
-    "temperature",
-    "time",
-    "pressure",
-    "atmosphere",
-    "yield",
-    "conversion",
-    "selectivity"
-  ]),
-  result: new Set([
-    "status",
-    "yield",
-    "conversion",
-    "selectivity",
-    "isolated_mass",
-    "product_state",
-    "purity",
-    "notes"
-  ]),
-  analysis: new Set(["type", "instrument", "solvent", "frequency", "method", "data", "notes"]),
-  sample: new Set(["name", "sample_id", "batch", "purity", "supplier", "notes"]),
-  template: new Set(["bind", "params", "description"]),
-  use: new Set([]),
-  col: new Set([])
-};
 
 const resolveHeaderArg = (
   blockType: string,
@@ -192,34 +126,66 @@ const splitListValue = (field: string, value: string, diagnostics: Diagnostic[])
   return items;
 };
 
+const splitFieldSegments = (line: string): string[] =>
+  line
+    .split(";;")
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0);
+
+const readColBraceState = (trimmed: string): "open" | "close" | "none" => {
+  if (trimmed === "}" || trimmed === ":::}") {
+    return "close";
+  }
+
+  if (!trimmed.startsWith("col:")) {
+    return "none";
+  }
+
+  const value = trimmed.slice(4).trim();
+  if (!value.startsWith("{")) {
+    return "none";
+  }
+
+  return value.endsWith("}") && value.length > 1 ? "none" : "open";
+};
+
+export interface KeyValueParseOptions {
+  allowField?: (key: string) => boolean;
+  listFields?: Set<string>;
+  blockTypeForDiagnostics?: string;
+}
+
 export const parseKeyValueLines = (
-  blockType: string,
   lines: string[],
-  diagnostics: Diagnostic[]
+  diagnostics: Diagnostic[],
+  options: KeyValueParseOptions = {}
 ): Record<string, string | string[]> => {
   const fields: Record<string, string | string[]> = {};
-  const allowedFields = BLOCK_FIELDS[blockType] ?? new Set<string>();
+  const allowField = options.allowField ?? (() => true);
+  const listFields = options.listFields ?? LIST_FIELDS;
 
   for (const line of lines) {
-    const parsed = parseKeyValueLine(line);
-    if (!parsed) {
-      continue;
+    for (const segment of splitFieldSegments(line)) {
+      const parsed = parseKeyValueLine(segment);
+      if (!parsed) {
+        continue;
+      }
+
+      const { key, rawValue } = parsed;
+
+      if (!allowField(key)) {
+        diagnostics.push({
+          code: "W_UNKNOWN_FIELD",
+          severity: "warning",
+          message: `Unknown field "${key}" on ${options.blockTypeForDiagnostics ?? "block"}`
+        });
+        continue;
+      }
+
+      fields[key] = listFields.has(key)
+        ? splitListValue(key, rawValue, diagnostics)
+        : rawValue.trim();
     }
-
-    const { key, rawValue } = parsed;
-
-    if (blockType !== "use" && !allowedFields.has(key)) {
-      diagnostics.push({
-        code: "W_UNKNOWN_FIELD",
-        severity: "warning",
-        message: `Unknown field "${key}" on ${blockType}`
-      });
-      continue;
-    }
-
-    fields[key] = LIST_FIELDS.has(key)
-      ? splitListValue(key, rawValue, diagnostics)
-      : rawValue.trim();
   }
 
   return fields;
@@ -337,9 +303,11 @@ export const collectStructuredBlockLines = (
     const trimmed = line.trim();
 
     if (blockType === "col") {
-      if (trimmed.match(COL_INLINE_BRACE_BLOCK_PATTERN)) {
+      const braceState = readColBraceState(trimmed);
+
+      if (braceState === "open") {
         braceDepth += 1;
-      } else if (trimmed === ":::}" && braceDepth > 0) {
+      } else if (braceState === "close" && braceDepth > 0) {
         braceDepth -= 1;
       }
     }
