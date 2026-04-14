@@ -44,6 +44,7 @@ interface ReactionInventoryResponse {
 }
 
 type InventoryLookupResponse = MoleculeInventoryResponse | ReactionInventoryResponse;
+// Sandboxed srcDoc iframes (without allow-same-origin) use the literal "null" origin.
 const PREVIEW_FRAME_TARGET_ORIGIN = "null";
 
 type InventoryStateMessage =

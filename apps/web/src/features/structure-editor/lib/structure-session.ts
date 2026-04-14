@@ -7,7 +7,15 @@ interface StorageLike {
   setItem: (key: string, value: string) => void;
 }
 
-const createFallbackSessionId = (): string => `session-${Date.now().toString(36)}`;
+const createFallbackSessionId = (): string => {
+  const uuid = globalThis.crypto?.randomUUID?.();
+  if (uuid) {
+    return `session-${uuid}`;
+  }
+
+  const highResNow = typeof globalThis.performance?.now === "function" ? globalThis.performance.now() : 0;
+  return `session-${Date.now().toString(36)}-${Math.floor(highResNow * 1000).toString(36)}`;
+};
 
 const createSessionId = (): string => {
   try {
