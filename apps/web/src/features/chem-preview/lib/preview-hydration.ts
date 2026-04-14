@@ -379,7 +379,7 @@ const replaceSectionAttribute = (blockHtml: string, attributeName: string, value
       if (new RegExp(`${attributeName}="[^"]*"`).test(sectionTag)) {
         return sectionTag.replace(new RegExp(`${attributeName}="[^"]*"`), `${attributeName}="${encodedValue}"`);
       }
-      return sectionTag.replace(">", ` ${attributeName}="${encodedValue}">`);
+      return `${sectionTag.slice(0, -1)} ${attributeName}="${encodedValue}">`;
     }
   );
 

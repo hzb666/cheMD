@@ -44,6 +44,7 @@ interface ReactionInventoryResponse {
 }
 
 type InventoryLookupResponse = MoleculeInventoryResponse | ReactionInventoryResponse;
+const PREVIEW_FRAME_TARGET_ORIGIN = "null";
 
 type InventoryStateMessage =
   | {
@@ -114,7 +115,7 @@ export const usePreviewShellController = ({
   useEffect(() => {
     const postInventoryState = (message: InventoryStateMessage) => {
       try {
-        previewFrameRef.current?.contentWindow?.postMessage(message, "*");
+        previewFrameRef.current?.contentWindow?.postMessage(message, PREVIEW_FRAME_TARGET_ORIGIN);
       } catch {
         // Ignore transient iframe reload races.
       }

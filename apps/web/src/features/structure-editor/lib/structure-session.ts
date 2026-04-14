@@ -7,8 +7,7 @@ interface StorageLike {
   setItem: (key: string, value: string) => void;
 }
 
-const createFallbackSessionId = (): string =>
-  `session-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+const createFallbackSessionId = (): string => `session-${Date.now().toString(36)}`;
 
 const createSessionId = (): string => {
   try {
