@@ -1,55 +1,95 @@
-import { NextResponse } from "next/server";
-
-import { callChemServiceRender } from "../../../../server/chem/chem-service-client";
+import { isKnownCasResolutionError } from "../../../../server/chem/cas-error-guard";
+import { readErrorCode } from "../../../../server/chem/chem-service-error";
+import type { ParsedRenderRouteInput } from "../../../../server/chem/dto";
+import {
+  parseJsonObjectBody,
+  readOptionalObject,
+  readOptionalTrimmedString,
+  readStringArray
+} from "../../../../server/chem/request-parsers";
+import {
+  badRequest,
+  errorResponse,
+  toJsonResponse,
+  upstreamFailure
+} from "../../../../server/chem/route-responses";
+import {
+  renderMoleculeNotation,
+  renderReactionNotation
+} from "../../../../server/chem/render-save-service";
 
 export const runtime = "nodejs";
 
-const HTML_ESCAPE_MAP: Record<string, string> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#39;"
+const parseRenderRouteInput = async (
+  request: Request
+): Promise<ParsedRenderRouteInput | Response> => {
+  const body = await parseJsonObjectBody(request);
+  if (!body) {
+    return badRequest("invalid request body");
+  }
+
+  if (body.type === "reaction") {
+    const reactants = readStringArray(body.reactants, { allowEmptyArray: false });
+    const products = readStringArray(body.products, { allowEmptyArray: false });
+    const conditions = body.conditions === undefined ? [] : readStringArray(body.conditions);
+
+    if (!reactants || !products) {
+      return badRequest("reactants and products must be string arrays");
+    }
+
+    if (body.conditions !== undefined && conditions === null) {
+      return badRequest("conditions must be a string array when provided");
+    }
+
+    return {
+      type: "reaction",
+      reactants,
+      products,
+      conditions: conditions ?? [],
+      renderOptions: readOptionalObject(body.renderOptions)
+    };
+  }
+
+  if (body.type !== "molecule") {
+    return badRequest("type must be molecule or reaction");
+  }
+
+  const smiles = readOptionalTrimmedString(body.smiles);
+  const molfile = readOptionalTrimmedString(body.molfile);
+  if (!smiles && !molfile) {
+    return badRequest("smiles or molfile is required");
+  }
+
+  return {
+    type: "molecule",
+    smiles,
+    molfile,
+    renderOptions: readOptionalObject(body.renderOptions)
+  };
 };
 
-const escapeHtml = (value: string): string => value.replace(/[&<>"']/g, (match) => HTML_ESCAPE_MAP[match]);
-
-const buildFallbackSvg = (label: string): string =>
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 120" role="img" aria-label="Chemical structure fallback visualization"><rect x="1" y="1" width="358" height="118" rx="12" fill="#f8fafc" stroke="#cbd5e1"/><text x="20" y="64" font-size="20" fill="#0f172a">${escapeHtml(label)}</text></svg>`;
-
 export const POST = async (request: Request): Promise<Response> => {
-  const body = (await request.json().catch(() => null)) as
-    | { kind?: unknown; smiles?: unknown; molfile?: unknown; renderOptions?: unknown }
-    | null;
-
-  if (!body || body.kind !== "molecule") {
-    return NextResponse.json({ message: "kind must be molecule" }, { status: 400 });
-  }
-
-  const smiles = typeof body.smiles === "string" ? body.smiles : undefined;
-  const molfile = typeof body.molfile === "string" ? body.molfile : undefined;
-
-  if (!smiles && !molfile) {
-    return NextResponse.json({ message: "smiles or molfile is required" }, { status: 400 });
-  }
-
   try {
-    const rendered = await callChemServiceRender({
-      kind: "molecule",
-      smiles,
-      molfile,
-      renderOptions:
-        body.renderOptions && typeof body.renderOptions === "object"
-          ? (body.renderOptions as Record<string, unknown>)
-          : undefined
-    });
-    return NextResponse.json(rendered);
+    const parsed = await parseRenderRouteInput(request);
+    if (parsed instanceof Response) {
+      return parsed;
+    }
+
+    const result =
+      parsed.type === "reaction"
+        ? await renderReactionNotation(parsed)
+        : await renderMoleculeNotation(parsed);
+
+    return toJsonResponse(result);
   } catch (error) {
-    const fallbackLabel = smiles ?? "structure";
-    const message = error instanceof Error ? error.message : "render failed";
-    return NextResponse.json({
-      svg: buildFallbackSvg(fallbackLabel),
-      warnings: [`chem-service unavailable, fallback renderer used: ${message}`]
-    });
+    if (isKnownCasResolutionError(error)) {
+      return errorResponse(error.status, error.message, { code: error.code });
+    }
+
+    return upstreamFailure(
+      error instanceof Error ? error.message : "render failed",
+      502,
+      readErrorCode(error)
+    );
   }
 };

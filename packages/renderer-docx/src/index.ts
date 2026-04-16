@@ -69,8 +69,6 @@ const renderStructuredNode = (node: ChemdDocument["children"][number]): string =
     const lines = [
       title,
       node.name ? `- Name: ${node.name}` : undefined,
-      node.reactants && node.reactants.length > 0 ? `- Reactants: ${node.reactants.join(" + ")}` : undefined,
-      node.products && node.products.length > 0 ? `- Products: ${node.products.join(" + ")}` : undefined,
       node.temperature ? `- Temperature: ${node.temperature}` : undefined,
       node.time ? `- Time: ${node.time}` : undefined,
       node.solvent ? `- Solvent: ${node.solvent}` : undefined,
@@ -87,7 +85,6 @@ const renderStructuredNode = (node: ChemdDocument["children"][number]): string =
     const lines = [
       title,
       node.name ? `- Name: ${node.name}` : undefined,
-      node.smiles ? `- SMILES: ${node.smiles}` : undefined,
       node.formula ? `- Formula: ${node.formula}` : undefined,
       node.amount ? `- Amount: ${node.amount}` : undefined,
       node.role ? `- Role: ${node.role}` : undefined
@@ -115,10 +112,42 @@ const renderStructuredNode = (node: ChemdDocument["children"][number]): string =
     const lines = [
       title,
       node.type_name ? `- Type: ${node.type_name}` : undefined,
+      node.ref ? `- Ref: ${node.ref}` : undefined,
+      node.time ? `- Time: ${node.time}` : undefined,
+      node.eluent ? `- Eluent: ${node.eluent}` : undefined,
+      node.plate ? `- Plate: ${node.plate}` : undefined,
+      node.visualization ? `- Visualization: ${node.visualization}` : undefined,
+      node.result ? `- Result: ${node.result}` : undefined,
       node.instrument ? `- Instrument: ${node.instrument}` : undefined,
       node.solvent ? `- Solvent: ${node.solvent}` : undefined,
       node.frequency ? `- Frequency: ${node.frequency}` : undefined,
-      node.data ? `- Data: ${node.data}` : undefined
+      node.data ? `- Data: ${node.data}` : undefined,
+      ...Object.entries(node)
+        .filter(([key, value]) => /^p\d+$/.test(key) && typeof value === "string" && value.length > 0)
+        .sort(([left], [right]) => left.localeCompare(right, undefined, { numeric: true }))
+        .map(([key, value]) => `- ${key.toUpperCase()}: ${value}`)
+    ].filter((line): line is string => Boolean(line));
+
+    return lines.join("\n");
+  }
+
+  if (node.type === "procedure") {
+    const title = node.id ? `### Procedure \`${node.id}\`` : "### Procedure";
+    const lines = [
+      title,
+      node.ref ? `- Ref: ${node.ref}` : undefined,
+      node.body
+    ].filter((line): line is string => Boolean(line));
+
+    return lines.join("\n");
+  }
+
+  if (node.type === "observation") {
+    const title = node.id ? `### Observation \`${node.id}\`` : "### Observation";
+    const lines = [
+      title,
+      node.ref ? `- Ref: ${node.ref}` : undefined,
+      node.body
     ].filter((line): line is string => Boolean(line));
 
     return lines.join("\n");

@@ -1,123 +1,61 @@
 "use client";
 
-import React, {
-  startTransition,
-  useDeferredValue,
-  useEffect,
-  useMemo,
-  useRef,
-  useState
-} from "react";
-import { compileChemd, type CompileResult } from "@chemd/compiler";
+import React from "react";
 
 import logoMark from "../../../../vision/logo-03.png";
 
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Separator } from "../components/ui/separator";
+import { ThemeToggle } from "../components/theme-toggle";
 import { EditorShell } from "../features/editor/components/EditorShell";
-import { createCompileScheduler } from "../features/editor/lib/compile-scheduler";
-import { parseDocumentIdFromSource } from "../features/editor/lib/parse-document-id-from-source";
 import { OcrImportButton } from "../features/ocr/components/OcrImportButton";
 import { OcrPasteListener } from "../features/ocr/components/OcrPasteListener";
+import { ChemEditorDialog } from "../features/chem-editor/components/ChemEditorDialog";
+import { useChemdEditFlow } from "../features/chem-editor/hooks/useChemdEditFlow";
 import { useImageOcr } from "../features/ocr/hooks/useImageOcr";
-import { insertMoleculeBlock } from "../features/ocr/lib/insert-molecule-block";
-import { updateMoleculeBlock } from "../features/ocr/lib/update-molecule-block";
+import { usePlaygroundDocumentController } from "../features/playground/hooks/usePlaygroundDocumentController";
+import { useDocxExport } from "../features/export-docx/hooks/useDocxExport";
+import { Button } from "../components/ui/button";
 import PreviewShell from "../features/preview/components/PreviewShell";
-import { KetcherDialog } from "../features/structure-editor/components/KetcherDialog";
-import { loadStructureDraft } from "../features/structure-editor/lib/load-structure-draft";
-import {
-  buildStructureSaveRequest,
-  resolveSavedStructureDraft
-} from "../features/structure-editor/lib/structure-save";
-import { getStructureSessionId } from "../features/structure-editor/lib/structure-session";
-import { saveStoredStructureDraft } from "../features/structure-editor/lib/structure-draft-store";
-
-const sampleSource = `---
-id: exp-2026-03-30-001
-title: Ethanol oxidation to acetic acid
-date: 2026-03-30
-render_profile: publication-acs
-primary_result: res-main
----
-
-# Ethanol oxidation to acetic acid
-
-:::reaction #rxn-main
-reactants: CCO | O=O
-products: CC(=O)O
-conditions: Cu catalyst | air | 80 C | 4 h
-:::
-
-:::result #res-main
-yield: 63%
-:::
-
-:::molecule #mol-main
-smiles: CCO
-:::
-
-Water marker: :chem[H2O]
-Yield: @res-main.yield
-`;
-
-const compilePreview = (source: string): CompileResult => compileChemd(source);
+import { Activity, FlaskConical } from "lucide-react";
 
 const Page = () => {
-  const [source, setSource] = useState(sampleSource);
-  const [result, setResult] = useState<CompileResult>(() => compilePreview(sampleSource));
-  const [lastCompiledSource, setLastCompiledSource] = useState(sampleSource);
-  const [editorStatus, setEditorStatus] = useState<string | null>(null);
-  const [editingStructure, setEditingStructure] = useState<{
-    blockId: string;
-    smiles: string;
-    molfile?: string;
-  } | null>(null);
-  const deferredSource = useDeferredValue(source);
-  const schedulerRef = useRef(createCompileScheduler(compilePreview));
-  const sourceRef = useRef(sampleSource);
-  const documentId = useMemo(() => parseDocumentIdFromSource(source), [source]);
-  const sessionId = useMemo(() => getStructureSessionId(), []);
-  const applySourceChange = (nextSource: string) => {
-    sourceRef.current = nextSource;
-    setSource(nextSource);
-  };
+  const {
+    source,
+    result,
+    json,
+    documentId,
+    sessionId,
+    lineCount,
+    previewIsFresh,
+    compileState,
+    editorStatus,
+    setEditorStatus,
+    applySourceChange,
+    getLatestSource
+  } = usePlaygroundDocumentController();
   const ocr = useImageOcr({
     documentId,
     sessionId,
-    getLatestSource: () => sourceRef.current,
+    getLatestSource,
     onSourceChange: applySourceChange
   });
-
-  useEffect(() => {
-    sourceRef.current = source;
-  }, [source]);
-
-  useEffect(() => {
-    const scheduler = schedulerRef.current;
-
-    scheduler.schedule(deferredSource, (nextResult) => {
-      startTransition(() => {
-        setResult(nextResult);
-        setLastCompiledSource(deferredSource);
-      });
-    });
-
-    return () => {
-      scheduler.cancel();
-    };
-  }, [deferredSource]);
-
-  const diagnosticCount = result.diagnostics.length;
-  const previewIsFresh = lastCompiledSource === source;
-  const compileState = !previewIsFresh
-    ? "Compiling..."
-    : diagnosticCount === 0
-      ? "Preview synced"
-      : `${diagnosticCount} diagnostics`;
-  const compileStateTone = !previewIsFresh ? "pending" : diagnosticCount === 0 ? "success" : "warning";
+  const { exportingDocx, exportMessage, exportDocx } = useDocxExport({
+    payload: { source }
+  });
+  const {
+    editingChemd,
+    closeChemdDialog,
+    handleEditChemd,
+    handleSaveChemd
+  } = useChemdEditFlow({
+    documentId,
+    sessionId,
+    getLatestSource,
+    applySourceChange,
+    setEditorStatus
+  });
   const logoSrc = typeof logoMark === "string" ? logoMark : logoMark.src;
-  const lineCount = source.split(/\r?\n/).length;
-
+  const diagnosticCount = result.diagnostics.length;
   const applyOcrFile = (file: File) => {
     if (ocr.loading) {
       return;
@@ -130,6 +68,16 @@ const Page = () => {
         }
         return;
       }
+
+      if (next.kind === "reaction") {
+        setEditorStatus(
+          next.action === "create_new"
+            ? `OCR created reaction block #${next.blockId}`
+            : `OCR updated reaction block #${next.blockId}`
+        );
+        return;
+      }
+
       setEditorStatus(
         next.action === "create_new"
           ? `OCR created molecule block #${next.blockId}`
@@ -141,165 +89,95 @@ const Page = () => {
   return (
     <main
       data-playground-shell="workbench"
-      className="playground-page workspace-page min-h-screen overflow-auto xl:h-screen xl:overflow-hidden"
+      className="bg-background min-h-screen overflow-auto xl:h-screen xl:overflow-hidden"
     >
-      <div className="playground-shell flex min-h-0 flex-col xl:h-full">
-        <section className="playground-topbar shrink-0" aria-label="Playground overview">
-          <div className="playground-overview">
-            <Card className="playground-overview-card md:col-span-1">
-              <CardHeader className="gap-4">
-                <div className="playground-brand-row">
-                  <div className="playground-brand min-w-0">
-                    <img src={logoSrc} alt="chemd logo" className="playground-logo object-contain" />
-                    <div className="min-w-0">
-                      <p className="playground-meta-label">Chemd Playground</p>
-                      <CardTitle className="truncate text-xl">{result.document.meta.title}</CardTitle>
-                      <p className="playground-panel-copy text-sm text-muted-foreground">
-                        收口为 Editor + Preview 的 v0.1 原型，并保留 OCR、结构编辑与导出能力。
-                      </p>
-                    </div>
+      <div className="flex min-h-0 flex-col xl:h-full w-full max-w-[2000px] mx-auto">
+        <header className="sticky top-0 z-30 shrink-0 w-full border-b border-border bg-background">
+          <div className="flex h-14 items-center justify-between px-3 md:px-5">
+            <div className="flex items-center gap-2.5">
+              <img src={logoSrc} alt="chemd logo" className="h-5 w-auto pr-1 object-contain dark:invert" />
+              <h1 className="notion-font-label text-[14px] text-foreground tracking-tight flex items-center gap-1">
+                <FlaskConical className="w-3.5 h-3.5 text-primary" />
+                Chemd Playground
+              </h1>
+            </div>
+
+            <div className="flex items-center gap-3 md:gap-5">
+              <div className="hidden md:flex items-center gap-4 text-[0.8rem] text-muted-foreground mr-2">
+                <div className="flex max-w-[360px] min-w-0 flex-col items-end text-right">
+                  <div className="notion-font-label text-[14px] text-foreground w-full truncate">
+                    {result.document.meta.title || "Untitled Document"}
                   </div>
-                  <span className="playground-status-pill shrink-0" data-state={compileStateTone}>
-                    {compileState}
+                  <div className="notion-font-caption text-[14px] text-muted-foreground w-full truncate">
+                    {[result.document.meta.date, result.document.meta.id].filter(Boolean).join(" · ")}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-accent text-accent-foreground rounded-full notion-font-badge">
+                  <span className="flex h-1.5 w-1.5 rounded-full bg-accent-foreground/50"></span>
+                  YAML: {result.renderOptions.profileId}
+                </div>
+                <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full notion-font-badge ${diagnosticCount === 0 ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400" : "bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400"}`}>
+                  <Activity className="w-3 h-3" />
+                  <span>
+                    {diagnosticCount === 0 ? "Clean compile" : compileState}
                   </span>
                 </div>
-              </CardHeader>
-              <Separator />
-              <CardContent className="pt-6">
-                <div className="playground-meta-grid">
-                  <div className="playground-meta-card">
-                    <p className="playground-meta-label">Render Profile</p>
-                    <p className="playground-meta-value">{result.renderOptions.profileId}</p>
-                  </div>
-                  <div className="playground-meta-card">
-                    <p className="playground-meta-label">Diagnostics</p>
-                    <p className="playground-meta-value">
-                      {diagnosticCount === 0 ? "Clean compile" : compileState}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="playground-overview-card">
-              <CardHeader>
-                <p className="playground-meta-label">Source</p>
-                <CardTitle className="text-base">{lineCount} lines</CardTitle>
-                <p className="playground-panel-copy text-sm text-muted-foreground">
-                  YAML metadata、markdown 源文和 OCR 回填都在同一编辑面板完成。
-                </p>
-              </CardHeader>
-            </Card>
-
-            <Card className="playground-overview-card">
-              <CardHeader>
-                <p className="playground-meta-label">Outputs</p>
-                <CardTitle className="text-base">Preview, JSON, DOCX</CardTitle>
-                <p className="playground-panel-copy text-sm text-muted-foreground">
-                  同一份输入驱动实时预览、JSON 检查和 DOCX 导出。
-                </p>
-              </CardHeader>
-            </Card>
+              </div>
+              <Separator orientation="vertical" className="h-4 hidden md:block" />
+              <ThemeToggle />
+            </div>
           </div>
-        </section>
+        </header>
 
         <section
-          className="workspace-grid min-h-0 flex-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:overflow-hidden"
+          className="flex-1 min-h-0 grid grid-cols-1 xl:grid-cols-2 items-stretch xl:items-start xl:overflow-hidden bg-background"
           aria-label="Playground workbench"
         >
           <EditorShell
             source={source}
             lineCount={lineCount}
             profileId={result.renderOptions.profileId}
-            toolbarActions={<OcrImportButton loading={ocr.loading} onPickFile={applyOcrFile} />}
-            statusMessage={ocr.error ?? editorStatus}
+            toolbarActions={(
+              <>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void exportDocx()}
+                  disabled={exportingDocx || !previewIsFresh}
+                  className="playground-topbar-button notion-font-ui h-8 px-3 text-[13px]"
+                >
+                  {exportingDocx ? "Exporting..." : "Export DOCX"}
+                </Button>
+                <OcrImportButton
+                  loading={ocr.loading}
+                  label="OCR Image"
+                  onPickFile={applyOcrFile}
+                  className="playground-topbar-button notion-font-ui h-8 px-3 text-[13px]"
+                />
+              </>
+            )}
+            statusMessage={exportMessage ?? ocr.error ?? editorStatus}
             onSourceChange={applySourceChange}
           />
           <PreviewShell
             html={result.html}
-            json={result.json}
+            json={json}
             docxBridge={result.docxBridge}
             source={source}
+            documentId={documentId}
+            sessionId={sessionId}
+            renderOptions={result.renderOptions}
             previewIsFresh={previewIsFresh}
-            onEditMolecule={async (blockId, smiles) => {
-              if (!previewIsFresh) {
-                setEditorStatus("Preview is updating; wait for compile to finish before editing.");
-                return;
-              }
-
-              try {
-                const draft = await loadStructureDraft({
-                  documentId,
-                  blockId,
-                  sessionId,
-                  fallbackSmiles: smiles
-                });
-                setEditingStructure(draft);
-              } catch (error) {
-                setEditingStructure({ blockId, smiles });
-                setEditorStatus(
-                  error instanceof Error
-                    ? `${error.message}; fallback to preview structure`
-                    : "Structure draft load failed; fallback to preview structure"
-                );
-              }
-            }}
+            onEditChemd={(draft) => handleEditChemd(draft, previewIsFresh)}
           />
         </section>
 
-        <KetcherDialog
-          open={Boolean(editingStructure)}
-          value={
-            editingStructure
-              ? { smiles: editingStructure.smiles, molfile: editingStructure.molfile }
-              : null
-          }
-          onClose={() => setEditingStructure(null)}
-          onSave={async (next) => {
-            if (!editingStructure) {
-              return;
-            }
-
-            const response = await fetch("/api/chem/structure/save", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json"
-              },
-              body: JSON.stringify({
-                documentId,
-                blockId: editingStructure.blockId,
-                sessionId,
-                ...buildStructureSaveRequest(next)
-              })
-            });
-
-            const payload = (await response.json().catch(() => null)) as
-              | { smiles?: string; molfile?: string; message?: string }
-              | null;
-            if (!response.ok || !payload?.smiles) {
-              throw new Error(payload?.message ?? `Structure save failed (${response.status})`);
-            }
-
-            const savedDraft = resolveSavedStructureDraft(next, {
-              smiles: payload.smiles,
-              molfile: typeof payload.molfile === "string" ? payload.molfile : undefined
-            });
-            saveStoredStructureDraft({
-              documentId,
-              blockId: editingStructure.blockId,
-              smiles: savedDraft.smiles,
-              molfile: savedDraft.molfile,
-              sourceSmiles: savedDraft.smiles
-            });
-            const latestSource = sourceRef.current;
-            const blockExists = latestSource.includes(`:::molecule #${editingStructure.blockId}`);
-            const nextSource = blockExists
-              ? updateMoleculeBlock(latestSource, editingStructure.blockId, savedDraft.smiles)
-              : insertMoleculeBlock(latestSource, editingStructure.blockId, savedDraft.smiles);
-            applySourceChange(nextSource);
-            setEditorStatus(`Structure updated for #${editingStructure.blockId}`);
-            setEditingStructure(null);
-          }}
+        <ChemEditorDialog
+          open={Boolean(editingChemd)}
+          value={editingChemd}
+          onClose={closeChemdDialog}
+          onSave={handleSaveChemd}
         />
         <OcrPasteListener enabled={!ocr.loading} onPickFile={applyOcrFile} />
       </div>

@@ -125,8 +125,8 @@ export const BUILTIN_RENDER_PROFILES: RenderProfileRegistry = {
     },
     reaction: {
       arrowLength: 48,
-      componentGap: 16,
-      plusGap: 12,
+      componentGap: 24,
+      plusGap: 20,
       showConditionsBelowArrow: true
     },
     export: {
@@ -150,8 +150,8 @@ export const BUILTIN_RENDER_PROFILES: RenderProfileRegistry = {
     },
     reaction: {
       arrowLength: 48,
-      componentGap: 16,
-      plusGap: 12,
+      componentGap: 24,
+      plusGap: 20,
       showConditionsBelowArrow: true
     },
     export: {
@@ -175,8 +175,8 @@ export const BUILTIN_RENDER_PROFILES: RenderProfileRegistry = {
     },
     reaction: {
       arrowLength: 48,
-      componentGap: 16,
-      plusGap: 12,
+      componentGap: 24,
+      plusGap: 20,
       showConditionsBelowArrow: true
     },
     export: {
@@ -201,8 +201,8 @@ export const BUILTIN_RENDER_PROFILES: RenderProfileRegistry = {
     },
     reaction: {
       arrowLength: 64,
-      componentGap: 20,
-      plusGap: 16,
+      componentGap: 28,
+      plusGap: 24,
       showConditionsBelowArrow: true
     },
     export: {
@@ -459,6 +459,17 @@ const applyRenderConstraints = (options: RenderOptions, diagnostics: Diagnostic[
 
   return nextOptions;
 };
+
+const cloneRenderOptions = (options: RenderOptions): RenderOptions => ({
+  profileId: options.profileId,
+  structure: { ...options.structure },
+  reaction: { ...options.reaction },
+  export: { ...options.export }
+});
+
+export const sanitizeRenderOptions = (options: RenderOptions): RenderOptions =>
+  applyRenderConstraints(cloneRenderOptions(options), []);
+
 const resolveProfileOrUndefined = (
   profileId: string,
   registry: RenderProfileRegistry,
@@ -576,26 +587,131 @@ export const resolveRenderProfile = (
   registry?: RenderProfileRegistry
 ): RenderOptions => resolveRenderProfileWithDiagnostics(selection, registry).options;
 
-export const mapRenderOptionsToAdapterPayload = (options: RenderOptions): RenderAdapterPayload => ({
-  rdkit: {
-    fixedBondLength: options.structure.bondLength,
-    bondLineWidth: options.structure.bondLineWidth,
-    multipleBondOffset: options.structure.multipleBondOffset,
-    hashSpacing: options.structure.hashSpacing,
-    fixedFontSize: options.structure.fontSize,
-    atomLabelPadding: options.structure.atomLabelPadding,
-    monochrome: options.structure.monochrome,
-    backgroundColor: options.structure.backgroundColor,
-    reactionArrowLength: options.reaction.arrowLength,
-    reactionComponentGap: options.reaction.componentGap,
-    reactionPlusGap: options.reaction.plusGap,
-    showConditionsBelowArrow: options.reaction.showConditionsBelowArrow,
-    imageFormat: options.export.imageFormat,
-    margin: options.export.margin,
-    dpi: options.export.dpi,
-    transparentBackground: options.export.transparentBackground
+export const mapRenderOptionsToAdapterPayload = (options: RenderOptions): RenderAdapterPayload => {
+  const sanitizedOptions = sanitizeRenderOptions(options);
+
+  return {
+    rdkit: {
+      fixedBondLength: sanitizedOptions.structure.bondLength,
+      bondLineWidth: sanitizedOptions.structure.bondLineWidth,
+      multipleBondOffset: sanitizedOptions.structure.multipleBondOffset,
+      hashSpacing: sanitizedOptions.structure.hashSpacing,
+      fixedFontSize: sanitizedOptions.structure.fontSize,
+      atomLabelPadding: sanitizedOptions.structure.atomLabelPadding,
+      monochrome: sanitizedOptions.structure.monochrome,
+      backgroundColor: sanitizedOptions.structure.backgroundColor,
+      reactionArrowLength: sanitizedOptions.reaction.arrowLength,
+      reactionComponentGap: sanitizedOptions.reaction.componentGap,
+      reactionPlusGap: sanitizedOptions.reaction.plusGap,
+      showConditionsBelowArrow: sanitizedOptions.reaction.showConditionsBelowArrow,
+      imageFormat: sanitizedOptions.export.imageFormat,
+      margin: sanitizedOptions.export.margin,
+      dpi: sanitizedOptions.export.dpi,
+      transparentBackground: sanitizedOptions.export.transparentBackground
+    }
+  };
+};
+
+const isAdapterPayloadRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+const ADAPTER_TO_RENDER_PATH = {
+  fixedBondLength: "structure.bondLength",
+  bondLineWidth: "structure.bondLineWidth",
+  multipleBondOffset: "structure.multipleBondOffset",
+  hashSpacing: "structure.hashSpacing",
+  fixedFontSize: "structure.fontSize",
+  atomLabelPadding: "structure.atomLabelPadding",
+  monochrome: "structure.monochrome",
+  backgroundColor: "structure.backgroundColor",
+  reactionArrowLength: "reaction.arrowLength",
+  reactionComponentGap: "reaction.componentGap",
+  reactionPlusGap: "reaction.plusGap",
+  showConditionsBelowArrow: "reaction.showConditionsBelowArrow",
+  imageFormat: "export.imageFormat",
+  margin: "export.margin",
+  dpi: "export.dpi",
+  transparentBackground: "export.transparentBackground"
+} satisfies Record<keyof RdkitAdapterOptions, `${RenderSectionName}.${string}`>;
+
+const applyAdapterValue = (
+  options: RenderOptions,
+  key: keyof RdkitAdapterOptions,
+  value: unknown
+): void => {
+  const path = ADAPTER_TO_RENDER_PATH[key];
+  if (!isValidRenderOverrideValue(path, value)) {
+    return;
   }
-});
+
+  switch (key) {
+    case "fixedBondLength":
+      options.structure.bondLength = value as number;
+      break;
+    case "bondLineWidth":
+      options.structure.bondLineWidth = value as number;
+      break;
+    case "multipleBondOffset":
+      options.structure.multipleBondOffset = value as number;
+      break;
+    case "hashSpacing":
+      options.structure.hashSpacing = value as number;
+      break;
+    case "fixedFontSize":
+      options.structure.fontSize = value as number;
+      break;
+    case "atomLabelPadding":
+      options.structure.atomLabelPadding = value as number;
+      break;
+    case "monochrome":
+      options.structure.monochrome = value as boolean;
+      break;
+    case "backgroundColor":
+      options.structure.backgroundColor = value as string;
+      break;
+    case "reactionArrowLength":
+      options.reaction.arrowLength = value as number;
+      break;
+    case "reactionComponentGap":
+      options.reaction.componentGap = value as number;
+      break;
+    case "reactionPlusGap":
+      options.reaction.plusGap = value as number;
+      break;
+    case "showConditionsBelowArrow":
+      options.reaction.showConditionsBelowArrow = value as boolean;
+      break;
+    case "imageFormat":
+      options.export.imageFormat = value as "svg" | "png";
+      break;
+    case "margin":
+      options.export.margin = value as number;
+      break;
+    case "dpi":
+      options.export.dpi = value as number;
+      break;
+    case "transparentBackground":
+      options.export.transparentBackground = value as boolean;
+      break;
+  }
+};
+
+export const sanitizeRenderAdapterPayload = (
+  payload: unknown,
+  fallbackOptions: RenderOptions
+): RenderAdapterPayload => {
+  const nextOptions = sanitizeRenderOptions(fallbackOptions);
+
+  if (!isAdapterPayloadRecord(payload) || !isAdapterPayloadRecord(payload.rdkit)) {
+    return mapRenderOptionsToAdapterPayload(nextOptions);
+  }
+
+  for (const key of Object.keys(ADAPTER_TO_RENDER_PATH) as Array<keyof RdkitAdapterOptions>) {
+    applyAdapterValue(nextOptions, key, payload.rdkit[key]);
+  }
+
+  return mapRenderOptionsToAdapterPayload(nextOptions);
+};
 
 
 

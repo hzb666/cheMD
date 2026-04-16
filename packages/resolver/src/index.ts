@@ -30,7 +30,7 @@ const MAX_TEMPLATE_EXPANSION_DEPTH = 32;
 const MAX_TEMPLATE_EXPANDED_NODES = 2000;
 
 const isObjectNode = (node: ChemdNode): node is ObjectNode =>
-  ["molecule", "reaction", "result", "analysis", "sample"].includes(node.type);
+  ["molecule", "reaction", "result", "analysis", "procedure", "observation", "sample"].includes(node.type);
 
 const getNestedNodes = (node: ChemdNode): ChemdNode[] => {
   if (node.type === "col") {
@@ -121,6 +121,14 @@ const buildTemplateIndex = (children: ChemdNode[], diagnostics: Diagnostic[]): R
   return index;
 };
 
+const getRequiredFields = (node: ObjectNode): string[] | undefined => {
+  if (node.type === "analysis" && node.type_name?.toLowerCase() === "tlc") {
+    return ["type_name"];
+  }
+
+  return REQUIRED_FIELDS[node.type];
+};
+
 const validateNodes = (children: ChemdNode[], diagnostics: Diagnostic[]) => {
   const queue = [...children];
   let cursor = 0;
@@ -134,7 +142,7 @@ const validateNodes = (children: ChemdNode[], diagnostics: Diagnostic[]) => {
       continue;
     }
 
-    const requiredFields = REQUIRED_FIELDS[child.type];
+    const requiredFields = getRequiredFields(child);
 
     if (!requiredFields) {
       continue;
@@ -152,6 +160,48 @@ const validateNodes = (children: ChemdNode[], diagnostics: Diagnostic[]) => {
     }
   }
 };
+
+const createDefaultObjectId = (
+  documentId: string,
+  type: ObjectNode["type"],
+  counters: Partial<Record<ObjectNode["type"], number>>
+): string => {
+  const nextCount = (counters[type] ?? 0) + 1;
+  counters[type] = nextCount;
+  return `${documentId}-${type}-${nextCount}`;
+};
+
+const assignDefaultObjectIds = (
+  nodes: ChemdNode[],
+  documentId: string,
+  counters: Partial<Record<ObjectNode["type"], number>> = {}
+): ChemdNode[] =>
+  nodes.map((node) => {
+    if (node.type === "col") {
+      return {
+        ...node,
+        children: assignDefaultObjectIds(node.children, documentId, counters)
+      };
+    }
+
+    if (node.type === "template") {
+      return {
+        ...node,
+        body: assignDefaultObjectIds(node.body, documentId, counters) as TemplateNode["body"]
+      };
+    }
+
+    if (!isObjectNode(node)) {
+      return node;
+    }
+
+    return node.id
+      ? node
+      : {
+          ...node,
+          id: createDefaultObjectId(documentId, node.type, counters)
+        };
+  });
 
 const validatePrimaryReferences = (
   document: ChemdDocument,
@@ -185,6 +235,14 @@ interface TemplateContext {
 interface ExpansionGuard {
   expandedNodes: number;
   limitReached: boolean;
+}
+
+interface ResolverEnvironment {
+  document: ChemdDocument;
+  objectIndex: Record<string, ObjectNode>;
+  templateIndex: Record<string, TemplateNode>;
+  diagnostics: Diagnostic[];
+  guard: ExpansionGuard;
 }
 
 const createContext = (context: Partial<TemplateContext> = {}): TemplateContext => ({
@@ -257,13 +315,11 @@ const resolveParamValue = (field: string, context: TemplateContext): string | un
 
 const resolveReference = (
   token: ReferenceToken,
-  document: ChemdDocument,
-  objectIndex: Record<string, ObjectNode>,
-  diagnostics: Diagnostic[],
+  environment: Pick<ResolverEnvironment, "document" | "objectIndex" | "diagnostics">,
   context: TemplateContext
 ): ReferenceToken => {
   const unresolved = (message: string): ReferenceToken => {
-    diagnostics.push({
+    environment.diagnostics.push({
       code: "W_UNRESOLVED_REFERENCE",
       severity: "warning",
       message
@@ -279,7 +335,7 @@ const resolveReference = (
   };
 
   if (token.kind === "meta") {
-    const value = token.field ? document.meta[token.field] : undefined;
+    const value = token.field ? environment.document.meta[token.field] : undefined;
 
     if (value === undefined) {
       return unresolved(`Unable to resolve reference ${token.raw}`);
@@ -311,7 +367,12 @@ const resolveReference = (
   }
 
   if (token.kind === "alias_field") {
-    const target = resolveAliasObject(token.source, context, document, objectIndex);
+    const target = resolveAliasObject(
+      token.source,
+      context,
+      environment.document,
+      environment.objectIndex
+    );
     const value = token.field ? readNodeField(target, token.field) : undefined;
 
     if (value === undefined) {
@@ -328,7 +389,7 @@ const resolveReference = (
   }
 
   if (token.kind === "object") {
-    const value = getIndexedValue(objectIndex, token.source);
+    const value = getIndexedValue(environment.objectIndex, token.source);
 
     if (!value) {
       return unresolved(`Unable to resolve reference ${token.raw}`);
@@ -344,7 +405,7 @@ const resolveReference = (
   }
 
   if (token.kind === "object_field") {
-    const value = getIndexedValue(objectIndex, token.source);
+    const value = getIndexedValue(environment.objectIndex, token.source);
     const fieldValue = token.field ? readNodeField(value, token.field) : undefined;
 
     if (fieldValue === undefined) {
@@ -365,13 +426,11 @@ const resolveReference = (
 
 const resolveMarkdownNode = (
   node: MarkdownNode,
-  document: ChemdDocument,
-  objectIndex: Record<string, ObjectNode>,
-  diagnostics: Diagnostic[],
+  environment: Pick<ResolverEnvironment, "document" | "objectIndex" | "diagnostics">,
   context: TemplateContext
 ): MarkdownNode => ({
   ...node,
-  references: node.references.map((token) => resolveReference(token, document, objectIndex, diagnostics, context))
+  references: node.references.map((token) => resolveReference(token, environment, context))
 });
 
 const cloneNode = (node: ChemdNode): ChemdNode => {
@@ -447,27 +506,23 @@ const consumeExpansionSlot = (diagnostics: Diagnostic[], guard: ExpansionGuard):
 
 const expandTemplateChild = (
   child: ChemdNode,
-  document: ChemdDocument,
-  objectIndex: Record<string, ObjectNode>,
-  templateIndex: Record<string, TemplateNode>,
-  diagnostics: Diagnostic[],
+  environment: ResolverEnvironment,
   context: TemplateContext,
-  guard: ExpansionGuard
 ): ChemdNode[] => {
   if (child.type === "markdown") {
-    if (!consumeExpansionSlot(diagnostics, guard)) {
+    if (!consumeExpansionSlot(environment.diagnostics, environment.guard)) {
       return [];
     }
 
-    return [resolveMarkdownNode(child, document, objectIndex, diagnostics, context)];
+    return [resolveMarkdownNode(child, environment, context)];
   }
 
   if (child.type === "use") {
-    return expandUseNode(child, document, objectIndex, templateIndex, diagnostics, guard, context);
+    return expandUseNode(child, environment, context);
   }
 
   if (child.type === "template") {
-    if (!consumeExpansionSlot(diagnostics, guard)) {
+    if (!consumeExpansionSlot(environment.diagnostics, environment.guard)) {
       return [];
     }
 
@@ -475,19 +530,19 @@ const expandTemplateChild = (
   }
 
   if (child.type === "col") {
-    if (!consumeExpansionSlot(diagnostics, guard)) {
+    if (!consumeExpansionSlot(environment.diagnostics, environment.guard)) {
       return [];
     }
 
     return [{
       ...child,
       children: child.children.flatMap((nested) =>
-        expandTemplateChild(nested, document, objectIndex, templateIndex, diagnostics, context, guard)
+        expandTemplateChild(nested, environment, context)
       )
     }];
   }
 
-  if (!consumeExpansionSlot(diagnostics, guard)) {
+  if (!consumeExpansionSlot(environment.diagnostics, environment.guard)) {
     return [];
   }
 
@@ -496,17 +551,13 @@ const expandTemplateChild = (
 
 const expandUseNode = (
   node: UseNode,
-  document: ChemdDocument,
-  objectIndex: Record<string, ObjectNode>,
-  templateIndex: Record<string, TemplateNode>,
-  diagnostics: Diagnostic[],
-  guard: ExpansionGuard,
+  environment: ResolverEnvironment,
   parentContext: TemplateContext = createContext()
 ): ChemdNode[] => {
   if (parentContext.templateStack.length >= MAX_TEMPLATE_EXPANSION_DEPTH) {
     reportExpansionLimit(
-      diagnostics,
-      guard,
+      environment.diagnostics,
+      environment.guard,
       `Template expansion depth limit reached: max depth is ${MAX_TEMPLATE_EXPANSION_DEPTH}`
     );
     return [];
@@ -514,7 +565,7 @@ const expandUseNode = (
 
   if (parentContext.templateStack.includes(node.template)) {
     const cyclePath = [...parentContext.templateStack, node.template].join(" -> ");
-    diagnostics.push({
+    environment.diagnostics.push({
       code: "E_TEMPLATE_CYCLE",
       severity: "error",
       message: `Template cycle detected: ${cyclePath}`
@@ -522,10 +573,10 @@ const expandUseNode = (
     return [];
   }
 
-  const template = getIndexedValue(templateIndex, node.template);
+  const template = getIndexedValue(environment.templateIndex, node.template);
 
   if (!template) {
-    diagnostics.push({
+    environment.diagnostics.push({
       code: "E_UNKNOWN_TEMPLATE",
       severity: "error",
       message: `Unknown template: ${node.template}`
@@ -540,20 +591,16 @@ const expandUseNode = (
   });
 
   return template.body.flatMap((child) =>
-    expandTemplateChild(child, document, objectIndex, templateIndex, diagnostics, context, guard)
+    expandTemplateChild(child, environment, context)
   );
 };
 
 const resolveNode = (
   node: ChemdNode,
-  document: ChemdDocument,
-  objectIndex: Record<string, ObjectNode>,
-  templateIndex: Record<string, TemplateNode>,
-  diagnostics: Diagnostic[],
-  guard: ExpansionGuard
+  environment: ResolverEnvironment
 ): ChemdNode[] => {
   if (node.type === "markdown") {
-    return [resolveMarkdownNode(node, document, objectIndex, diagnostics, createContext())];
+    return [resolveMarkdownNode(node, environment, createContext())];
   }
 
   if (node.type === "template") {
@@ -561,14 +608,14 @@ const resolveNode = (
   }
 
   if (node.type === "use") {
-    return expandUseNode(node, document, objectIndex, templateIndex, diagnostics, guard);
+    return expandUseNode(node, environment);
   }
 
   if (node.type === "col") {
     return [{
       ...node,
       children: node.children.flatMap((child) =>
-        resolveNode(child, document, objectIndex, templateIndex, diagnostics, guard)
+        resolveNode(child, environment)
       )
     }];
   }
@@ -581,22 +628,30 @@ export const resolveChemd = (document: ChemdDocument): ChemdDocument => {
   const templateIndex = buildTemplateIndex(document.children, diagnostics);
   const objectIndex = buildObjectIndex(document.children);
   const expansionGuard: ExpansionGuard = { expandedNodes: 0, limitReached: false };
+  const environment: ResolverEnvironment = {
+    document,
+    objectIndex,
+    templateIndex,
+    diagnostics,
+    guard: expansionGuard
+  };
   const resolvedChildren = document.children.flatMap((child) =>
-    resolveNode(child, document, objectIndex, templateIndex, diagnostics, expansionGuard)
+    resolveNode(child, environment)
   );
+  const childrenWithDefaultIds = assignDefaultObjectIds(resolvedChildren, document.meta.id);
   const resolvedDocument: ChemdDocument = {
     ...document,
-    children: resolvedChildren
+    children: childrenWithDefaultIds
   };
-  const resolvedObjectIndex = buildObjectIndex(resolvedChildren, diagnostics);
+  const resolvedObjectIndex = buildObjectIndex(childrenWithDefaultIds, diagnostics);
 
-  validateNodes(resolvedChildren, diagnostics);
+  validateNodes(childrenWithDefaultIds, diagnostics);
   validatePrimaryReferences(resolvedDocument, resolvedObjectIndex, diagnostics);
 
   return {
     ...resolvedDocument,
     diagnostics,
-    children: resolvedChildren
+    children: childrenWithDefaultIds
   };
 };
 

@@ -116,16 +116,36 @@ export interface ResultNode {
   notes?: string;
 }
 
-export interface AnalysisNode {
+export type AnalysisNode = {
   type: "analysis";
   id?: string;
   type_name?: string;
+  ref?: string;
+  time?: string;
+  eluent?: string;
+  plate?: string;
+  visualization?: string;
+  result?: string;
   instrument?: string;
   solvent?: string;
   frequency?: string;
   method?: string;
   data?: string;
   notes?: string;
+} & Partial<Record<`p${number}`, string>>;
+
+export interface ProcedureNode {
+  type: "procedure";
+  id?: string;
+  ref?: string;
+  body?: string;
+}
+
+export interface ObservationNode {
+  type: "observation";
+  id?: string;
+  ref?: string;
+  body?: string;
 }
 
 export interface SampleNode {
@@ -165,12 +185,21 @@ export type StructuredNode =
   | ReactionNode
   | ResultNode
   | AnalysisNode
+  | ProcedureNode
+  | ObservationNode
   | SampleNode
   | TemplateNode
   | UseNode
   | ColNode;
 
-export type ObjectNode = MoleculeNode | ReactionNode | ResultNode | AnalysisNode | SampleNode;
+export type ObjectNode =
+  | MoleculeNode
+  | ReactionNode
+  | ResultNode
+  | AnalysisNode
+  | ProcedureNode
+  | ObservationNode
+  | SampleNode;
 
 export type ChemdNode = MarkdownNode | StructuredNode;
 

@@ -1,34 +1,79 @@
-import { parseDocumentIdFromSource } from "../../editor/lib/parse-document-id-from-source";
+import { compileChemd } from "@chemd/compiler";
+import type { ChemdNode } from "@chemd/core";
 
 export interface TreeNode {
   id: string;
-  kind: "document" | "reaction" | "result" | "molecule";
+  kind:
+    | "document"
+    | "molecule"
+    | "reaction"
+    | "result"
+    | "analysis"
+    | "procedure"
+    | "observation"
+    | "sample";
 }
 
-const BLOCK_ID_CAPTURE_GROUP = "([A-Za-z0-9_-]+)";
-const BLOCK_KINDS: Array<Exclude<TreeNode["kind"], "document">> = ["reaction", "result", "molecule"];
-const BLOCK_PATTERNS: Array<{ kind: TreeNode["kind"]; pattern: RegExp }> = BLOCK_KINDS.map((kind) => ({
-  kind,
-  pattern: new RegExp(`:::${kind}\\s+#${BLOCK_ID_CAPTURE_GROUP}`, "g")
-}));
+const isTreeObjectNode = (
+  node: ChemdNode
+): node is Extract<
+  ChemdNode,
+  {
+    type:
+      | "molecule"
+      | "reaction"
+      | "result"
+      | "analysis"
+      | "procedure"
+      | "observation"
+      | "sample";
+  }
+> =>
+  [
+    "molecule",
+    "reaction",
+    "result",
+    "analysis",
+    "procedure",
+    "observation",
+    "sample"
+  ].includes(node.type);
+
+const collectTreeNodes = (children: ChemdNode[]): Array<TreeNode> => {
+  const nodes: Array<TreeNode> = [];
+
+  for (const child of children) {
+    if (child.type === "col") {
+      nodes.push(...collectTreeNodes(child.children));
+      continue;
+    }
+
+    if (child.type === "template") {
+      nodes.push(...collectTreeNodes(child.body));
+      continue;
+    }
+
+    if (!isTreeObjectNode(child) || !child.id) {
+      continue;
+    }
+
+    nodes.push({
+      id: child.id,
+      kind: child.type
+    });
+  }
+
+  return nodes;
+};
 
 export const buildMockTreeFromSource = (source: string): TreeNode[] => {
+  const document = compileChemd(source).document;
   const nodes: TreeNode[] = [
     {
-      id: parseDocumentIdFromSource(source),
+      id: document.meta.id,
       kind: "document"
     }
   ];
 
-  for (const { kind, pattern } of BLOCK_PATTERNS) {
-    for (const match of source.matchAll(pattern)) {
-      const id = match[1].trim();
-      if (!id) {
-        continue;
-      }
-      nodes.push({ id, kind });
-    }
-  }
-
-  return nodes;
+  return [...nodes, ...collectTreeNodes(document.children)];
 };

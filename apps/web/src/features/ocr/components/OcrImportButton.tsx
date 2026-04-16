@@ -1,23 +1,28 @@
 import React, { useRef } from "react";
+import { Button } from "../../../components/ui/button";
 
 interface OcrImportButtonProps {
   loading: boolean;
   onPickFile: (file: File) => void;
+  label?: string;
+  className?: string;
 }
 
-export const OcrImportButton = ({ loading, onPickFile }: OcrImportButtonProps) => {
+export const OcrImportButton = ({ loading, onPickFile, label = "OCR Image", className }: OcrImportButtonProps) => {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   return (
     <>
-      <button
+      <Button
         type="button"
-        className="button-primary"
+        variant="outline"
+        size="sm"
         disabled={loading}
         onClick={() => inputRef.current?.click()}
+        className={className}
       >
-        {loading ? "Recognizing..." : "OCR Image"}
-      </button>
+        {loading ? "Recognizing..." : label}
+      </Button>
       <input
         ref={inputRef}
         type="file"

@@ -1,3 +1,5 @@
+import { createScopedToken } from "../../../lib/random-token";
+
 const STORAGE_KEY = "chemd:structure-session-id";
 
 interface StorageLike {
@@ -5,12 +7,22 @@ interface StorageLike {
   setItem: (key: string, value: string) => void;
 }
 
-const createSessionId = (): string => {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
+const createFallbackSessionId = (): string => {
+  const uuid = globalThis.crypto?.randomUUID?.();
+  if (uuid) {
+    return `session-${uuid}`;
   }
 
-  return `session-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  const highResNow = typeof globalThis.performance?.now === "function" ? globalThis.performance.now() : 0;
+  return `session-${Date.now().toString(36)}-${Math.floor(highResNow * 1000).toString(36)}`;
+};
+
+const createSessionId = (): string => {
+  try {
+    return createScopedToken("session");
+  } catch {
+    return createFallbackSessionId();
+  }
 };
 
 const resolveStorage = (storageImpl?: StorageLike): StorageLike | null => {

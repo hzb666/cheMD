@@ -1,167 +1,134 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React from "react";
+import type { RenderOptions } from "@chemd/render-profile";
+import type { ChemEditorDraftWithBlockId } from "../../chem-editor/types";
 
-import { Button } from "../../../components/ui/button";
-import { Card, CardContent, CardHeader } from "../../../components/ui/card";
+import { CopyIconButton } from "../../../components/copy-icon-button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../components/ui/tabs";
-import { useRenderedPreview } from "../../chem-preview/hooks/useRenderedPreview";
-import { useDocxExport } from "../../export-docx/hooks/useDocxExport";
-import { readPreviewEditMessage } from "../lib/read-preview-edit-message";
-import { toSandboxedPreviewDocument } from "../styles/preview-document";
+import { DocumentPreview } from "./DocumentPreview";
+import { usePreviewShellController } from "../hooks/usePreviewShellController";
 
 interface PreviewShellProps {
   html: string;
   json: string;
   docxBridge: string;
   source: string;
+  documentId?: string;
+  sessionId?: string;
+  renderOptions?: RenderOptions;
   previewIsFresh?: boolean;
-  onEditMolecule?: (blockId: string, smiles: string) => void | Promise<void>;
+  onEditChemd?: (draft: ChemEditorDraftWithBlockId) => void | Promise<void>;
 }
 
-type OutputTab = "preview" | "json" | "docxBridge";
+type PreviewTabValue = "preview" | "json" | "docxBridge";
 
 const PreviewShell = ({
   html,
   json,
   docxBridge,
   source,
+  documentId,
+  sessionId,
+  renderOptions,
   previewIsFresh = true,
-  onEditMolecule
+  onEditChemd
 }: PreviewShellProps) => {
-  const [activeTab, setActiveTab] = useState<OutputTab>("preview");
-  const previewFrameRef = useRef<HTMLIFrameElement>(null);
-  const { exportingDocx, exportMessage, exportDocx } = useDocxExport({
-    payload: { source }
+  const {
+    activeTab,
+    setActiveTab,
+    previewFrameRef,
+    hydratedHtml,
+    activeCode
+  } = usePreviewShellController({
+    html,
+    json,
+    docxBridge,
+    source,
+    documentId,
+    sessionId,
+    renderOptions,
+    previewIsFresh,
+    onEditChemd
   });
-  const { hydratedHtml } = useRenderedPreview(html);
-
-  useEffect(() => {
-    if (!onEditMolecule) {
-      return undefined;
-    }
-
-    const handlePreviewMessage = (event: MessageEvent) => {
-      const payload = readPreviewEditMessage(
-        event,
-        previewFrameRef.current?.contentWindow ?? null,
-        previewIsFresh
-      );
-      if (!payload) {
-        return;
-      }
-      void onEditMolecule(payload.blockId, payload.smiles);
-    };
-
-    window.addEventListener("message", handlePreviewMessage);
-    return () => {
-      window.removeEventListener("message", handlePreviewMessage);
-    };
-  }, [onEditMolecule, previewIsFresh]);
-
-  const activeCode = activeTab === "json" ? json : docxBridge;
 
   return (
-    <Card
-      data-playground-panel="preview"
-      className="playground-panel workspace-panel workspace-panel-output panel-stack rounded-none border-0 shadow-none"
+    <Tabs
+      value={activeTab}
+      onValueChange={(value) => setActiveTab(value as PreviewTabValue)}
+      className="flex flex-col h-full min-h-[500px] w-full"
     >
-      <CardHeader className="panel-header panel-toolbar shrink-0 items-center space-y-0 p-0">
-        <div className="panel-heading-inline">
-          <p className="panel-kicker">Preview</p>
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => void exportDocx()}
-          disabled={exportingDocx || !previewIsFresh}
-          className="button-primary h-auto"
-        >
-          {exportingDocx ? "Exporting..." : "Export"}
-        </Button>
-      </CardHeader>
-
-      <CardContent className="playground-panel-content p-0">
-        {!previewIsFresh ? (
-          <p className="status-text shrink-0">Preview updating; export and structure edit are disabled.</p>
-        ) : null}
-        {exportMessage ? <p className="status-text shrink-0">{exportMessage}</p> : null}
-
-        <Tabs
-          value={activeTab}
-          onValueChange={(value) => setActiveTab(value as OutputTab)}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <div className="panel-toolbar shrink-0">
-            <div className="panel-heading-inline">
-              <TabsList className="tab-strip-container">
-                <span className="tab-indicator" data-active-tab={activeTab} aria-hidden />
-                <TabsTrigger
-                  value="preview"
-                  className="tab-button"
-                  data-active={activeTab === "preview"}
-                >
-                  Preview
-                </TabsTrigger>
-                <TabsTrigger
-                  value="json"
-                  className="tab-button"
-                  data-active={activeTab === "json"}
-                >
-                  JSON
-                </TabsTrigger>
-                <TabsTrigger
-                  value="docxBridge"
-                  className="tab-button"
-                  data-active={activeTab === "docxBridge"}
-                >
-                  DOCX
-                </TabsTrigger>
-              </TabsList>
-            </div>
+      <div
+        data-playground-panel="preview"
+        className="flex flex-col h-full bg-background relative z-10 shadow-[-10px_0_30px_rgba(0,0,0,0.05)] border-l border-border"
+      >
+        <div className="flex flex-row items-center justify-between shrink-0 h-11 px-4 py-0 border-b border-border bg-background">
+          <div className="flex items-center gap-3">
+            <TabsList className="playground-tab-list notion-font-ui">
+              <TabsTrigger
+                value="preview"
+                className="playground-tab-trigger notion-font-ui h-8 px-3 py-0 text-[13px] data-[state=active]:font-semibold"
+              >
+                Preview
+              </TabsTrigger>
+              <TabsTrigger
+                value="json"
+                className="playground-tab-trigger notion-font-ui h-8 px-3 py-0 text-[13px] data-[state=active]:font-semibold"
+              >
+                JSON
+              </TabsTrigger>
+              <TabsTrigger
+                value="docxBridge"
+                className="playground-tab-trigger notion-font-ui h-8 px-3 py-0 text-[13px] data-[state=active]:font-semibold"
+              >
+                DOCX
+              </TabsTrigger>
+            </TabsList>
           </div>
+          <div className="flex items-center gap-2">
+            {activeTab === "json" ? (
+              <CopyIconButton
+                copyText={activeCode}
+                label="Copy JSON output"
+                className="playground-topbar-button notion-font-ui h-8 w-8 p-0"
+              />
+            ) : null}
+          </div>
+        </div>
 
-          <TabsContent value="preview" className="mt-0 flex min-h-0 flex-1 flex-col">
-            <div className="detail-card min-h-0 flex-1">
-              <div className="detail-card-body preview-canvas h-full">
-                <iframe
-                  ref={previewFrameRef}
-                  title="chemd-preview"
-                  sandbox="allow-scripts"
-                  referrerPolicy="no-referrer"
-                  className="preview-frame"
-                  srcDoc={toSandboxedPreviewDocument(hydratedHtml)}
-                />
-              </div>
+        <div className="flex-1 min-h-0 p-0 flex flex-col relative bg-background">
+          {!previewIsFresh ? (
+            <div className="px-4 py-2 border-b border-border bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400 notion-font-caption">
+              Preview updating; export and structure edit are disabled.
             </div>
-          </TabsContent>
+          ) : null}
 
-          <TabsContent value="json" className="mt-0 flex min-h-0 flex-1 flex-col">
-            <div className="detail-card min-h-0 flex-1">
-              <div className="detail-card-body h-full">
-                <div className="code-surface h-full">
-                  <pre className="code-block scroll-area">
-                    <code>{activeCode}</code>
-                  </pre>
-                </div>
+          <div className="flex min-h-0 flex-1 flex-col w-full relative">
+            <TabsContent value="preview" className="mt-0 flex min-h-0 flex-1 flex-col focus-visible:outline-none absolute inset-0 w-full h-full overflow-auto">
+              <div className="relative w-full min-h-full bg-background">
+                <DocumentPreview html={hydratedHtml} frameRef={previewFrameRef} />
               </div>
-            </div>
-          </TabsContent>
+            </TabsContent>
 
-          <TabsContent value="docxBridge" className="mt-0 flex min-h-0 flex-1 flex-col">
-            <div className="detail-card min-h-0 flex-1">
-              <div className="detail-card-body h-full">
-                <div className="code-surface h-full">
-                  <pre className="code-block scroll-area">
-                    <code>{activeCode}</code>
-                  </pre>
-                </div>
+            <TabsContent value="json" className="mt-0 flex min-h-0 flex-1 flex-col focus-visible:outline-none absolute inset-0 w-full h-full">
+              <div className="absolute inset-0 p-6 overflow-auto bg-background" data-preview-code-surface="json">
+                <pre className="font-mono text-[0.85rem] leading-relaxed text-foreground opacity-90">
+                  <code>{activeCode}</code>
+                </pre>
               </div>
-            </div>
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
+            </TabsContent>
+
+            <TabsContent value="docxBridge" className="mt-0 flex min-h-0 flex-1 flex-col focus-visible:outline-none absolute inset-0 w-full h-full">
+              <div className="absolute inset-0 p-6 overflow-auto bg-background">
+                <pre className="font-mono text-[0.85rem] leading-relaxed text-foreground opacity-90">
+                  <code>{activeCode}</code>
+                </pre>
+              </div>
+            </TabsContent>
+          </div>
+        </div>
+      </div>
+    </Tabs>
   );
 };
 

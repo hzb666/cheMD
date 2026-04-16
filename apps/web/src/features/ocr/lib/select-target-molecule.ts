@@ -1,7 +1,8 @@
 import { ensureBlockId } from "./ensure-block-id";
 
-const MOLECULE_OPEN_RE = /^:::molecule(?:\s+#([^\s]+))?/;
+const CHEMD_OPEN_RE = /^:::chemd(?:\s+#([^\s]+))?/;
 const MOLECULE_CLOSE_RE = /^:::$/;
+const REACTION_FIELD_RE = /^\s*(?:reac|prod|reactant|product|reactants|products)\s*:/i;
 
 export interface MoleculeTarget {
   blockId: string;
@@ -15,22 +16,28 @@ export const selectTargetMolecule = (
 ): MoleculeTarget | null => {
   const lines = source.split(/\r?\n/);
   const candidates: MoleculeTarget[] = [];
+  let chemdOrdinal = 0;
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index] ?? "";
-    const openMatch = line.match(MOLECULE_OPEN_RE);
-    if (!openMatch) {
+    const chemdMatch = line.match(CHEMD_OPEN_RE);
+    if (!chemdMatch) {
       continue;
     }
-
-    const blockId = ensureBlockId(openMatch[1]);
-    let endLine = index;
+    let endLine = lines.length;
 
     for (let scan = index + 1; scan < lines.length; scan += 1) {
       if (MOLECULE_CLOSE_RE.test(lines[scan] ?? "")) {
         endLine = scan;
         break;
       }
+    }
+
+    const blockId = ensureBlockId(chemdMatch[1], "chem", ++chemdOrdinal);
+    const isReaction = lines.slice(index + 1, endLine).some((entry) => REACTION_FIELD_RE.test(entry ?? ""));
+    if (isReaction) {
+      index = endLine;
+      continue;
     }
 
     candidates.push({ blockId, startLine: index, endLine });

@@ -5,11 +5,14 @@
   "packageManager": "pnpm@10.33.0",
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev --filter=@chemd/web",
+    "dev": "node scripts/dev-demo.mjs",
+    "dev:demo": "node scripts/dev-demo.mjs",
+    "dev:web": "turbo run dev --filter=@chemd/web",
     "lint": "eslint apps packages vitest.workspace.ts --ext .ts,.tsx",
     "lint:fix": "eslint apps packages vitest.workspace.ts --ext .ts,.tsx --fix",
     "lint:py": "ruff check services/chem-service",
     "format:check:py": "ruff format --check services/chem-service",
+    "test:dev-demo": "node --test scripts/dev-demo.test.mjs",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck"
   },

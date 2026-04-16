@@ -14,3 +14,15 @@ __pycache__
 .playwright-mcp
 **/test/
 **/tests/
+**/test/**
+**/tests/**
+**/*.test.ts
+**/*.test.tsx
+**/*.test.js
+**/*.test.jsx
+**/*.test.py
+docs/
+AGENTS.md
+.agents/
+.codex/
+.trellis/
