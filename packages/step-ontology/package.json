@@ -1,5 +1,5 @@
 {
-  "name": "@chemd/exporter-training",
+  "name": "@chemd/step-ontology",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -8,11 +8,7 @@
   },
   "dependencies": {
     "@chemd/core": "workspace:*",
-    "@chemd/lnf": "workspace:*",
-    "@chemd/parser": "workspace:*",
-    "@chemd/resolver": "workspace:*",
-    "@chemd/step-ontology": "workspace:*",
-    "@chemd/typechecker": "workspace:*"
+    "@chemd/diagnostics": "workspace:*"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json --noEmit",

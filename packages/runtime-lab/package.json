@@ -1,5 +1,5 @@
 {
-  "name": "@chemd/exporter-training",
+  "name": "@chemd/runtime-lab",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -8,9 +8,7 @@
   },
   "dependencies": {
     "@chemd/core": "workspace:*",
-    "@chemd/lnf": "workspace:*",
-    "@chemd/parser": "workspace:*",
-    "@chemd/resolver": "workspace:*",
+    "@chemd/diagnostics": "workspace:*",
     "@chemd/step-ontology": "workspace:*",
     "@chemd/typechecker": "workspace:*"
   },

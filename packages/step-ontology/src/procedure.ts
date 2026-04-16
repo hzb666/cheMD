@@ -1,0 +1,238 @@
+import { createV03Diagnostic } from "@chemd/diagnostics";
+import type { V03Diagnostic } from "@chemd/diagnostics";
+
+import type {
+  CanonicalStepNode,
+  ProcedureLoweringInput,
+  ProcedureLoweringResult,
+  StepEffect,
+  StepFamily,
+  StepSourceInfo
+} from "./types";
+import {
+  cleanExtractedText,
+  detectStructureHint,
+  extractDuration,
+  extractFirst,
+  extractRepeatCount,
+  extractTemperature,
+  splitProcedureSentences
+} from "./text";
+
+interface SentenceContext {
+  procedureId?: string;
+  sentence: string;
+  sentenceIndex: number;
+  nextStepId: () => string;
+}
+
+const createStep = (
+  context: SentenceContext,
+  family: StepFamily,
+  params: Record<string, unknown>,
+  confidence: number,
+  effects: StepEffect[] = []
+): CanonicalStepNode => ({
+  stepId: context.nextStepId(),
+  family,
+  params,
+  ...(effects.length > 0 ? { effects } : {}),
+  source: createProcedureSource(context),
+  loweringConfidence: confidence
+});
+
+const createProcedureSource = (context: SentenceContext): StepSourceInfo => ({
+  sourceNodeType: "procedure",
+  sourceNodeId: context.procedureId,
+  sentenceIndex: context.sentenceIndex,
+  rawText: context.sentence
+});
+
+const hasAny = (text: string, patterns: RegExp[]): boolean =>
+  patterns.some((pattern) => pattern.test(text));
+
+const getAddMaterial = (sentence: string): string | undefined =>
+  extractFirst(sentence, /(?:滴加|加入|added(?:\s+dropwise)?|add(?:ed)?)(.+?)(?:后|到|至|$)/i);
+
+const getChargeMaterial = (sentence: string): string | undefined =>
+  extractFirst(sentence, /将(.+?)(?:加入|置于|溶于|charged|charge)/i);
+
+const getSolvent = (sentence: string): string | undefined =>
+  extractFirst(sentence, /(?:溶于|in|into)\s*([A-Za-z0-9（）()/_-]+)/i);
+
+const lowerCharge = (context: SentenceContext): CanonicalStepNode[] => {
+  const isInitialCharge = context.sentenceIndex === 0
+    && hasAny(context.sentence, [/将.+(?:加入|置于|溶于)/, /\bcharged\b/i]);
+
+  if (!isInitialCharge) {
+    return [];
+  }
+
+  return [createStep(context, "charge", {
+    ...(getChargeMaterial(context.sentence) ? { materials: getChargeMaterial(context.sentence) } : {}),
+    ...(getSolvent(context.sentence) ? { solvent: getSolvent(context.sentence) } : {})
+  }, 0.82)];
+};
+
+const lowerEnvironment = (context: SentenceContext): CanonicalStepNode[] => {
+  if (hasAny(context.sentence, [/氮气置换/, /nitrogen\s+purge/i, /\bpurged\b/i])) {
+    return [createStep(context, "purge", {
+      atmosphere: "nitrogen",
+      ...(extractDuration(context.sentence) ? { duration: extractDuration(context.sentence) } : {})
+    }, 0.9, ["uses_inert_atmosphere"])];
+  }
+
+  return [];
+};
+
+const lowerTemperature = (context: SentenceContext): CanonicalStepNode[] => {
+  const temperature = extractTemperature(context.sentence);
+  const steps: CanonicalStepNode[] = [];
+
+  if (hasAny(context.sentence, [/冷却|冰浴/, /\bcooled?\b/i, /\bcooling\b/i])) {
+    steps.push(createStep(context, "cool", { target_temperature: temperature }, 0.9, ["changes_temperature"]));
+  }
+
+  if (hasAny(context.sentence, [/加热|升温/, /\bheated?\b/i, /\bwarmed?\b/i])) {
+    steps.push(createStep(context, "heat", { target_temperature: temperature }, 0.88, ["changes_temperature"]));
+  }
+
+  return steps;
+};
+
+const lowerAddition = (context: SentenceContext): CanonicalStepNode[] => {
+  if (hasAny(context.sentence, [/淬灭/, /\bquench(?:ed)?\b/i])) {
+    return [createStep(context, "quench", {
+      ...(getAddMaterial(context.sentence) ? { agent: getAddMaterial(context.sentence) } : {})
+    }, 0.86)];
+  }
+
+  if (!hasAny(context.sentence, [/滴加|加入/, /\badd(?:ed)?\b/i])) {
+    return [];
+  }
+
+  return [createStep(context, "add", {
+    ...(getAddMaterial(context.sentence) ? { materials: getAddMaterial(context.sentence) } : {}),
+    ...(hasAny(context.sentence, [/滴加|缓慢/, /dropwise|slowly/i]) ? { mode: "dropwise" } : {}),
+    ...(hasAny(context.sentence, [/氮气下/, /under\s+nitrogen/i]) ? { atmosphere: "nitrogen" } : {})
+  }, 0.84, hasAny(context.sentence, [/n-?BuLi/i]) ? ["consumes_hazardous_reagent"] : [])];
+};
+
+const lowerProcess = (context: SentenceContext): CanonicalStepNode[] => {
+  const duration = extractDuration(context.sentence);
+  const isHold = hasAny(context.sentence, [/反应|保温|搅拌/, /\bstir(?:red)?\b/i, /\bhold\b/i]);
+
+  return isHold && duration
+    ? [createStep(context, "hold", { duration }, 0.86)]
+    : [];
+};
+
+const lowerWorkup = (context: SentenceContext): CanonicalStepNode[] => {
+  if (hasAny(context.sentence, [/萃取/, /\bextract(?:ed)?\b/i])) {
+    return [createStep(context, "extract", {
+      ...(extractFirst(context.sentence, /([A-Za-z]+)\s*萃取/i) ? { solvent: extractFirst(context.sentence, /([A-Za-z]+)\s*萃取/i) } : {}),
+      ...(extractRepeatCount(context.sentence) ? { repeats: extractRepeatCount(context.sentence) } : {})
+    }, 0.84, ["creates_biphasic_system"])];
+  }
+
+  if (hasAny(context.sentence, [/干燥/, /\bdried?\b/i])) {
+    return [createStep(context, "dry", { agent: extractFirst(context.sentence, /([A-Za-z0-9]+)\s*干燥/i) }, 0.82)];
+  }
+
+  return lowerMechanicalWorkup(context);
+};
+
+const lowerMechanicalWorkup = (context: SentenceContext): CanonicalStepNode[] => {
+  if (hasAny(context.sentence, [/旋干|浓缩/, /\bconcentrat(?:e|ed)\b/i])) {
+    return [createStep(context, "concentrate", { method: "rotavap" }, 0.84)];
+  }
+
+  if (hasAny(context.sentence, [/分液|取有机层/, /separat(?:e|ed)\s+layers/i])) {
+    return [createStep(context, "separate_layers", {}, 0.82, ["creates_biphasic_system"])];
+  }
+
+  if (hasAny(context.sentence, [/过滤/, /\bfilter(?:ed)?\b/i])) {
+    return [createStep(context, "filter", {}, 0.82)];
+  }
+
+  return [];
+};
+
+const lowerAnalysis = (context: SentenceContext): CanonicalStepNode[] => {
+  const steps: CanonicalStepNode[] = [];
+
+  if (hasAny(context.sentence, [/取样/, /\bsampl(?:e|ed|ing)\b/i])) {
+    steps.push(createStep(context, "sample", {}, 0.88, ["requires_sampling"]));
+  }
+
+  if (hasAny(context.sentence, [/TLC|HPLC|NMR|分析/i])) {
+    steps.push(createStep(context, "analyze", { type: extractAnalysisType(context.sentence) }, 0.88));
+  }
+
+  return steps;
+};
+
+const extractAnalysisType = (sentence: string): string => {
+  const match = sentence.match(/\b(TLC|HPLC|NMR)\b/i);
+  return match?.[1]?.toLowerCase() ?? "unknown";
+};
+
+const lowerSentence = (context: SentenceContext): CanonicalStepNode[] => [
+  ...lowerCharge(context),
+  ...lowerEnvironment(context),
+  ...lowerTemperature(context),
+  ...lowerAddition(context),
+  ...lowerProcess(context),
+  ...lowerAnalysis(context),
+  ...lowerWorkup(context)
+].filter((step) => !(step.family === "add" && context.sentenceIndex === 0 && /将.+加入/.test(context.sentence)));
+
+const createAmbiguousStep = (context: SentenceContext): CanonicalStepNode =>
+  createStep(context, "observe", { raw: cleanExtractedText(context.sentence) }, 0.35);
+
+const createLowConfidenceDiagnostic = (procedureId: string | undefined, sentence: string): V03Diagnostic =>
+  createV03Diagnostic({
+    code: "W805",
+    severity: "warning",
+    message: "Procedure sentence was kept as low-confidence prose because no canonical step matched.",
+    sourceLayer: "procedure_lowering",
+    sourceNodeType: "procedure",
+    sourceNodeId: procedureId,
+    facts: { raw_sentence: sentence }
+  });
+
+const averageConfidence = (steps: CanonicalStepNode[]): number => {
+  if (steps.length === 0) {
+    return 0;
+  }
+
+  return steps.reduce((sum, step) => sum + step.loweringConfidence, 0) / steps.length;
+};
+
+export const lowerProcedureToSteps = (input: ProcedureLoweringInput): ProcedureLoweringResult => {
+  const sentences = splitProcedureSentences(input.body);
+  const diagnostics: V03Diagnostic[] = [];
+  const steps: CanonicalStepNode[] = [];
+  let stepCounter = 0;
+  const nextStepId = () => `${input.procedureId ?? "procedure"}:s${++stepCounter}`;
+
+  sentences.forEach((sentence, sentenceIndex) => {
+    const context = { procedureId: input.procedureId, sentence, sentenceIndex, nextStepId };
+    const lowered = lowerSentence(context);
+    if (lowered.length === 0) {
+      steps.push(createAmbiguousStep(context));
+      diagnostics.push(createLowConfidenceDiagnostic(input.procedureId, sentence));
+      return;
+    }
+
+    steps.push(...lowered);
+  });
+
+  return {
+    procedureId: input.procedureId,
+    structureHint: detectStructureHint(input.body),
+    steps,
+    diagnostics,
+    loweringConfidence: averageConfidence(steps)
+  };
+};

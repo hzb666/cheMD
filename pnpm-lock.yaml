@@ -122,6 +122,15 @@ importers:
       '@chemd/core':
         specifier: workspace:*
         version: link:../core
+      '@chemd/diagnostics':
+        specifier: workspace:*
+        version: link:../diagnostics
+      '@chemd/exporter-training':
+        specifier: workspace:*
+        version: link:../exporter-training
+      '@chemd/lnf':
+        specifier: workspace:*
+        version: link:../lnf
       '@chemd/parser':
         specifier: workspace:*
         version: link:../parser
@@ -140,20 +149,62 @@ importers:
       '@chemd/resolver':
         specifier: workspace:*
         version: link:../resolver
+      '@chemd/runtime-lab':
+        specifier: workspace:*
+        version: link:../runtime-lab
+      '@chemd/step-ontology':
+        specifier: workspace:*
+        version: link:../step-ontology
+      '@chemd/typechecker':
+        specifier: workspace:*
+        version: link:../typechecker
 
   packages/core: {}
+
+  packages/diagnostics:
+    dependencies:
+      '@chemd/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/exporter-training:
     dependencies:
       '@chemd/core':
         specifier: workspace:*
         version: link:../core
+      '@chemd/lnf':
+        specifier: workspace:*
+        version: link:../lnf
       '@chemd/parser':
         specifier: workspace:*
         version: link:../parser
       '@chemd/resolver':
         specifier: workspace:*
         version: link:../resolver
+      '@chemd/step-ontology':
+        specifier: workspace:*
+        version: link:../step-ontology
+      '@chemd/typechecker':
+        specifier: workspace:*
+        version: link:../typechecker
+
+  packages/lnf:
+    dependencies:
+      '@chemd/core':
+        specifier: workspace:*
+        version: link:../core
+      '@chemd/diagnostics':
+        specifier: workspace:*
+        version: link:../diagnostics
+      '@chemd/runtime-lab':
+        specifier: workspace:*
+        version: link:../runtime-lab
+      '@chemd/step-ontology':
+        specifier: workspace:*
+        version: link:../step-ontology
+      '@chemd/typechecker':
+        specifier: workspace:*
+        version: link:../typechecker
 
   packages/parser:
     dependencies:
@@ -205,6 +256,54 @@ importers:
       '@chemd/parser':
         specifier: workspace:*
         version: link:../parser
+
+  packages/runtime-lab:
+    dependencies:
+      '@chemd/core':
+        specifier: workspace:*
+        version: link:../core
+      '@chemd/diagnostics':
+        specifier: workspace:*
+        version: link:../diagnostics
+      '@chemd/step-ontology':
+        specifier: workspace:*
+        version: link:../step-ontology
+      '@chemd/typechecker':
+        specifier: workspace:*
+        version: link:../typechecker
+
+  packages/runtime-trace:
+    dependencies:
+      '@chemd/runtime-lab':
+        specifier: workspace:*
+        version: link:../runtime-lab
+
+  packages/step-ontology:
+    dependencies:
+      '@chemd/core':
+        specifier: workspace:*
+        version: link:../core
+      '@chemd/diagnostics':
+        specifier: workspace:*
+        version: link:../diagnostics
+
+  packages/typechecker:
+    dependencies:
+      '@chemd/core':
+        specifier: workspace:*
+        version: link:../core
+      '@chemd/diagnostics':
+        specifier: workspace:*
+        version: link:../diagnostics
+      '@chemd/parser':
+        specifier: workspace:*
+        version: link:../parser
+      '@chemd/resolver':
+        specifier: workspace:*
+        version: link:../resolver
+      '@chemd/step-ontology':
+        specifier: workspace:*
+        version: link:../step-ontology
 
 packages:
 

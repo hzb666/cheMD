@@ -12,12 +12,18 @@
   },
   "dependencies": {
     "@chemd/core": "workspace:*",
+    "@chemd/diagnostics": "workspace:*",
+    "@chemd/exporter-training": "workspace:*",
+    "@chemd/lnf": "workspace:*",
     "@chemd/parser": "workspace:*",
     "@chemd/render-profile": "workspace:*",
     "@chemd/renderer-html": "workspace:*",
     "@chemd/renderer-docx": "workspace:*",
     "@chemd/renderer-json": "workspace:*",
-    "@chemd/resolver": "workspace:*"
+    "@chemd/resolver": "workspace:*",
+    "@chemd/runtime-lab": "workspace:*",
+    "@chemd/step-ontology": "workspace:*",
+    "@chemd/typechecker": "workspace:*"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json --noEmit",

@@ -1,4 +1,6 @@
 import type { ChemdDocument } from "@chemd/core";
+import type { ChemdLnfV03 } from "@chemd/lnf";
+import type { StepGraph } from "@chemd/step-ontology";
 
 import { buildLearningLayer } from "./learning-layer";
 import { buildQualityLayer } from "./quality-layer";
@@ -14,6 +16,8 @@ export interface ExportTrainingRecordOptions {
   exportId?: string;
   exporterModule?: string;
   exporterVersion?: string;
+  stepGraph?: StepGraph;
+  v03Lnf?: ChemdLnfV03;
 }
 
 const toDocumentInfo = (document: ChemdDocument): ExportedDocumentInfo => {
@@ -63,8 +67,11 @@ export const exportTrainingRecordFromDocument = (
   );
   const exportId = options.exportId ?? `export::${document.meta.id}::${fingerprint}`;
   const sourceLayer = buildSourceLayer(document);
-  const semanticLayer = buildSemanticLayer(document);
-  const learningLayer = buildLearningLayer();
+  const baseSemanticLayer = buildSemanticLayer(document);
+  const semanticLayer = options.v03Lnf
+    ? { ...baseSemanticLayer, v03_lnf: options.v03Lnf }
+    : baseSemanticLayer;
+  const learningLayer = buildLearningLayer(options.stepGraph);
   const qualityLayer = buildQualityLayer(document.diagnostics, learningLayer);
 
   return {
@@ -75,7 +82,7 @@ export const exportTrainingRecordFromDocument = (
       system: "chemd",
       exporter_module: options.exporterModule ?? DEFAULT_EXPORTER_MODULE,
       exporter_version: options.exporterVersion ?? DEFAULT_EXPORTER_VERSION,
-      pipeline: ["parseChemd", "resolveChemd", "exportTrainingRecordFromDocument"]
+      pipeline: ["parseChemd", "resolveChemd", "typecheckDocument", "buildLnf", "exportTrainingRecordFromDocument"]
     },
     document: toDocumentInfo(document),
     source_layer: sourceLayer,

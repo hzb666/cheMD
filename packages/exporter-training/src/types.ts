@@ -1,4 +1,6 @@
 import type { NormalizedTlcAnalysis } from "@chemd/core";
+import type { ChemdLnfV03 } from "@chemd/lnf";
+import type { CanonicalStepNode, ObservationEventNode } from "@chemd/step-ontology";
 
 export interface ChemdTrainingExportV1 {
   schema_version: "chemd-training-export/v0.1";
@@ -80,6 +82,7 @@ export interface SemanticLayerV1 {
   samples: ExportedSampleV1[];
   markdown_blocks: ExportedMarkdownBlockV1[];
   links: ExportedRelationV1[];
+  v03_lnf?: ChemdLnfV03;
 }
 
 export interface ExportedEntityBase {
@@ -386,10 +389,28 @@ export interface ChemistryFeatureRefV1 {
   external_uri?: string;
 }
 
+export interface ProcedureToStepsPairV03 {
+  pair_id: string;
+  procedure_id?: string;
+  source_text: string;
+  steps: CanonicalStepNode[];
+  diagnostics: ExportedDiagnostic[];
+}
+
+export interface ObservationToEventsPairV03 {
+  pair_id: string;
+  observation_id?: string;
+  source_text: string;
+  events: ObservationEventNode[];
+  diagnostics: ExportedDiagnostic[];
+}
+
 export interface LearningLayerV1 {
   retrieval_chunks: RetrievalChunkV1[];
   prediction_instances: PredictionInstanceV1[];
   chemistry_feature_refs?: ChemistryFeatureRefV1[];
+  procedure_to_steps?: ProcedureToStepsPairV03[];
+  observation_to_events?: ObservationToEventsPairV03[];
 }
 
 export interface ParseQualityV1 {

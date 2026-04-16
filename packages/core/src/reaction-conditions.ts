@@ -18,6 +18,7 @@ export interface NormalizedMultiTokenValue {
 }
 
 export interface NormalizedReactionConditions {
+  conditions_text?: NormalizedMultiTokenValue | null;
   solvent?: NormalizedTokenValue | null;
   catalyst?: NormalizedTokenValue | null;
   reagents?: NormalizedMultiTokenValue | null;
@@ -57,6 +58,27 @@ const ATMOSPHERE_ALIASES: Record<string, string> = {
   oxygen: "oxygen"
 };
 
+const TEMPERATURE_UNITS: Record<string, string> = {
+  c: "C",
+  "°c": "C",
+  k: "K",
+  f: "F"
+};
+
+const TIME_UNITS: Record<string, string> = {
+  h: "h",
+  hr: "h",
+  hrs: "h",
+  min: "min",
+  mins: "min"
+};
+
+const PRESSURE_UNITS: Record<string, string> = {
+  bar: "bar",
+  atm: "atm",
+  psi: "psi"
+};
+
 const normalizeToken = (value: string): string => value.trim().replace(/\s+/g, " ");
 
 const parseNumericWithUnit = (
@@ -83,108 +105,177 @@ const parseNumericWithUnit = (
   };
 };
 
+type ConditionNode = Pick<
+  ReactionNode,
+  "conditions" | "reagents" | "catalyst" | "solvent" | "temperature" | "time" | "pressure" | "atmosphere"
+>;
+
+type ConsumeFirst = (predicate: (value: string) => boolean) => string | undefined;
+
+const normalizeConditionList = (conditions: ReactionNode["conditions"]): string[] => {
+  if (!Array.isArray(conditions)) {
+    return [];
+  }
+
+  return conditions.map(normalizeToken).filter(Boolean);
+};
+
+const createRemainingConsumer = (remaining: string[]): ConsumeFirst => (
+  predicate: (value: string) => boolean
+): string | undefined => {
+  const index = remaining.findIndex(predicate);
+  if (index < 0) {
+    return undefined;
+  }
+
+  const [match] = remaining.splice(index, 1);
+  return match;
+};
+
+const consumeExactValue = (
+  value: string | undefined,
+  consumeFirst: ConsumeFirst
+): string | undefined => {
+  if (!value) {
+    return undefined;
+  }
+
+  const normalized = normalizeToken(value);
+  return consumeFirst((candidate) => candidate.toLowerCase() === normalized.toLowerCase()) ?? normalized;
+};
+
+const consumePreferred = (
+  explicit: string | undefined,
+  consumeFirst: ConsumeFirst,
+  predicate: (value: string) => boolean
+): string | undefined => {
+  if (explicit) {
+    return consumeExactValue(explicit, consumeFirst);
+  }
+
+  return consumeFirst(predicate);
+};
+
+const isKnownSolvent = (value: string): boolean => Boolean(SOLVENT_ALIASES[value.toLowerCase()]);
+
+const isKnownAtmosphere = (value: string): boolean => Boolean(ATMOSPHERE_ALIASES[value.toLowerCase()]);
+
+const isCatalystText = (value: string): boolean => value.toLowerCase().includes("catalyst");
+
+const matchesQuantity = (units: Record<string, string>) => (value: string): boolean =>
+  parseNumericWithUnit(value, units) !== null;
+
+const reagentValuesFrom = (reagents: string | undefined, remaining: string[]): string[] => [
+  ...(reagents ? reagents.split("|").map(normalizeToken).filter(Boolean) : []),
+  ...remaining
+];
+
+const assignConditionsText = (
+  result: NormalizedReactionConditions,
+  conditions: string[]
+): void => {
+  if (conditions.length === 0) {
+    return;
+  }
+
+  result.conditions_text = {
+    raw: conditions.join(" | "),
+    normalized: conditions
+  };
+};
+
+const assignAliasToken = (
+  result: NormalizedReactionConditions,
+  key: "solvent" | "atmosphere",
+  raw: string | undefined,
+  aliases: Record<string, string>
+): void => {
+  if (!raw) {
+    return;
+  }
+
+  result[key] = {
+    raw,
+    normalized: aliases[raw.toLowerCase()] ?? raw
+  };
+};
+
+const assignPlainToken = (
+  result: NormalizedReactionConditions,
+  key: "catalyst",
+  raw: string | undefined
+): void => {
+  if (!raw) {
+    return;
+  }
+
+  result[key] = {
+    raw,
+    normalized: raw
+  };
+};
+
+const assignReagents = (
+  result: NormalizedReactionConditions,
+  reagents: string[]
+): void => {
+  if (reagents.length === 0) {
+    return;
+  }
+
+  result.reagents = {
+    raw: reagents.join(" | "),
+    normalized: reagents
+  };
+};
+
+const assignNumericValue = (
+  result: NormalizedReactionConditions,
+  key: "temperature" | "time" | "pressure",
+  raw: string | undefined,
+  units: Record<string, string>
+): void => {
+  if (!raw) {
+    return;
+  }
+
+  const value = parseNumericWithUnit(raw, units);
+  if (value) {
+    result[key] = value;
+  }
+};
+
 export const classifyReactionConditions = (
-  node: Pick<
-    ReactionNode,
-    "conditions" | "reagents" | "catalyst" | "solvent" | "temperature" | "time" | "pressure" | "atmosphere"
-  >
+  node: ConditionNode
 ): NormalizedReactionConditions => {
-  const conditions = Array.isArray(node.conditions)
-    ? node.conditions.map(normalizeToken).filter(Boolean)
-    : [];
+  const conditions = normalizeConditionList(node.conditions);
   const remaining = [...conditions];
+  const consumeFirst = createRemainingConsumer(remaining);
+  const result: NormalizedReactionConditions = {};
 
-  const consumeFirst = (
-    predicate: (value: string) => boolean
-  ): string | undefined => {
-    const index = remaining.findIndex(predicate);
-    if (index < 0) {
-      return undefined;
-    }
+  assignConditionsText(result, conditions);
+  assignAliasToken(result, "solvent", consumePreferred(node.solvent, consumeFirst, isKnownSolvent), SOLVENT_ALIASES);
+  assignPlainToken(result, "catalyst", consumePreferred(node.catalyst, consumeFirst, isCatalystText));
+  assignAliasToken(
+    result,
+    "atmosphere",
+    consumePreferred(node.atmosphere, consumeFirst, isKnownAtmosphere),
+    ATMOSPHERE_ALIASES
+  );
+  assignNumericValue(
+    result,
+    "temperature",
+    consumePreferred(node.temperature, consumeFirst, matchesQuantity(TEMPERATURE_UNITS)),
+    TEMPERATURE_UNITS
+  );
+  assignNumericValue(result, "time", consumePreferred(node.time, consumeFirst, matchesQuantity(TIME_UNITS)), TIME_UNITS);
+  assignNumericValue(
+    result,
+    "pressure",
+    consumePreferred(node.pressure, consumeFirst, matchesQuantity(PRESSURE_UNITS)),
+    PRESSURE_UNITS
+  );
+  assignReagents(result, reagentValuesFrom(node.reagents, remaining));
 
-    const [match] = remaining.splice(index, 1);
-    return match;
-  };
-
-  const consumeExact = (value?: string): string | undefined => {
-    if (!value) {
-      return undefined;
-    }
-
-    const normalized = normalizeToken(value);
-    return consumeFirst((candidate) => candidate.toLowerCase() === normalized.toLowerCase()) ?? normalized;
-  };
-
-  const solventRaw = node.solvent
-    ? consumeExact(node.solvent)
-    : consumeFirst((value) => Boolean(SOLVENT_ALIASES[value.toLowerCase()]));
-  const catalystRaw = node.catalyst
-    ? consumeExact(node.catalyst)
-    : consumeFirst((value) => value.toLowerCase().includes("catalyst"));
-  const atmosphereRaw = node.atmosphere
-    ? consumeExact(node.atmosphere)
-    : consumeFirst((value) => Boolean(ATMOSPHERE_ALIASES[value.toLowerCase()]));
-  const temperatureRaw = node.temperature
-    ? consumeExact(node.temperature)
-    : consumeFirst((value) => parseNumericWithUnit(value, { c: "C", "°c": "C", k: "K", f: "F" }) !== null);
-  const timeRaw = node.time
-    ? consumeExact(node.time)
-    : consumeFirst((value) => parseNumericWithUnit(value, { h: "h", hr: "h", hrs: "h", min: "min", mins: "min" }) !== null);
-  const pressureRaw = node.pressure
-    ? consumeExact(node.pressure)
-    : consumeFirst((value) => parseNumericWithUnit(value, { bar: "bar", atm: "atm", psi: "psi" }) !== null);
-  const reagentValues = [
-    ...(node.reagents ? node.reagents.split("|").map(normalizeToken).filter(Boolean) : []),
-    ...remaining
-  ];
-
-  return {
-    ...(solventRaw
-      ? {
-          solvent: {
-            raw: solventRaw,
-            normalized: SOLVENT_ALIASES[solventRaw.toLowerCase()] ?? solventRaw
-          }
-        }
-      : {}),
-    ...(catalystRaw
-      ? {
-          catalyst: {
-            raw: catalystRaw,
-            normalized: catalystRaw
-          }
-        }
-      : {}),
-    ...(reagentValues.length > 0
-      ? {
-          reagents: {
-            raw: reagentValues.join(" | "),
-            normalized: reagentValues
-          }
-        }
-      : {}),
-    ...(atmosphereRaw
-      ? {
-          atmosphere: {
-            raw: atmosphereRaw,
-            normalized: ATMOSPHERE_ALIASES[atmosphereRaw.toLowerCase()] ?? atmosphereRaw
-          }
-        }
-      : {}),
-    ...(temperatureRaw
-      ? {
-          temperature: parseNumericWithUnit(temperatureRaw, { c: "C", "°c": "C", k: "K", f: "F" })
-        }
-      : {}),
-    ...(timeRaw
-      ? {
-          time: parseNumericWithUnit(timeRaw, { h: "h", hr: "h", hrs: "h", min: "min", mins: "min" })
-        }
-      : {}),
-    ...(pressureRaw
-      ? {
-          pressure: parseNumericWithUnit(pressureRaw, { bar: "bar", atm: "atm", psi: "psi" })
-        }
-      : {})
-  };
+  return result;
 };
