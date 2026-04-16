@@ -19,6 +19,10 @@ export const isChemServiceError = (
     && error !== null
     && typeof (error as { status?: unknown }).status === "number"
     && typeof (error as { message?: unknown }).message === "string"
+    && (
+      (error as { code?: unknown }).code === undefined
+      || typeof (error as { code?: unknown }).code === "string"
+    )
   );
 
 export const readErrorStatus = (error: unknown, fallback: number): number =>

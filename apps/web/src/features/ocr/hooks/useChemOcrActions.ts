@@ -40,9 +40,7 @@ export const useChemOcrActions = <
 
       void moleculeOcr.runOcr(file).then((next) => {
         if (!next) {
-          if (moleculeOcr.error) {
-            setEditorStatus("OCR failed");
-          }
+          setEditorStatus("OCR failed");
           return;
         }
 
@@ -64,9 +62,7 @@ export const useChemOcrActions = <
 
       void reactionOcr.runOcr(file).then((next) => {
         if (!next) {
-          if (reactionOcr.error) {
-            setEditorStatus("Reaction OCR failed");
-          }
+          setEditorStatus("Reaction OCR failed");
           return;
         }
 

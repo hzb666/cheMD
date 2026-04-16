@@ -22,7 +22,7 @@ export const readStructuredBlockId = (
   const trimmed = headerArg?.trim() ?? "";
   const id = trimmed.startsWith("#") ? trimmed.slice(1) : undefined;
 
-  if (id && !ID_PATTERN.test(id)) {
+  if (id !== undefined && !ID_PATTERN.test(id)) {
     diagnostics.push({
       code: "E_INVALID_ID",
       severity: "error",
@@ -98,5 +98,5 @@ export const createBodyText = (lines: string[]): string | undefined => {
     return undefined;
   }
 
-  return bodyLines.map((line) => line.trimEnd()).join("\n").trim();
+  return bodyLines.map((line) => line.trimEnd()).join("\n");
 };

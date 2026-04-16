@@ -31,29 +31,67 @@ const persistSessionTokenCookie = (token: string): void => {
   document.cookie = `${CHEMD_SESSION_TOKEN_COOKIE}=${encodeURIComponent(token)}; Path=/; SameSite=Lax`;
 };
 
+const readSessionTokenCookie = (): string | null => {
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  for (const part of document.cookie.split(";")) {
+    const [rawName, ...rawValueParts] = part.trim().split("=");
+    if (rawName !== CHEMD_SESSION_TOKEN_COOKIE) {
+      continue;
+    }
+
+    const rawValue = rawValueParts.join("=").trim();
+    if (!rawValue) {
+      return null;
+    }
+
+    try {
+      return decodeURIComponent(rawValue);
+    } catch {
+      return rawValue;
+    }
+  }
+
+  return null;
+};
+
+const readSessionStorageToken = (): string | null => {
+  try {
+    return window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+};
+
+const persistSessionStorageToken = (token: string): void => {
+  try {
+    window.sessionStorage.setItem(SESSION_STORAGE_KEY, token);
+  } catch {
+    // Ignore sessionStorage failures and still use the generated token for this page session.
+  }
+};
+
 export const getOrCreateChemdSessionToken = (): string => {
   if (typeof window === "undefined") {
     return "";
   }
 
-  try {
-    const existingToken = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
-    if (existingToken) {
-      persistSessionTokenCookie(existingToken);
-      return existingToken;
-    }
-  } catch {
-    // Ignore sessionStorage failures and fall back to an in-memory token.
+  const cookieToken = readSessionTokenCookie();
+  if (cookieToken) {
+    persistSessionStorageToken(cookieToken);
+    return cookieToken;
+  }
+
+  const existingToken = readSessionStorageToken();
+  if (existingToken) {
+    persistSessionTokenCookie(existingToken);
+    return existingToken;
   }
 
   const nextToken = createSessionToken();
-
-  try {
-    window.sessionStorage.setItem(SESSION_STORAGE_KEY, nextToken);
-  } catch {
-    // Ignore sessionStorage failures and still use the generated token for this page session.
-  }
-
+  persistSessionStorageToken(nextToken);
   persistSessionTokenCookie(nextToken);
   return nextToken;
 };

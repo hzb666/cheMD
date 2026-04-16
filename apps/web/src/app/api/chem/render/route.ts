@@ -1,4 +1,4 @@
-import { isCasResolutionError } from "../../../../server/chem/cas-resolver";
+import { isKnownCasResolutionError } from "../../../../server/chem/cas-error-guard";
 import { readErrorCode } from "../../../../server/chem/chem-service-error";
 import type { ParsedRenderRouteInput } from "../../../../server/chem/dto";
 import {
@@ -82,7 +82,7 @@ export const POST = async (request: Request): Promise<Response> => {
 
     return toJsonResponse(result);
   } catch (error) {
-    if (isCasResolutionError(error)) {
+    if (isKnownCasResolutionError(error)) {
       return errorResponse(error.status, error.message, { code: error.code });
     }
 

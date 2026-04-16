@@ -34,7 +34,7 @@ def _read_int_env(name: str, default: int, *, minimum: int = 1) -> int:
 
     try:
         value = int(raw)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return default
 
     if value < minimum:

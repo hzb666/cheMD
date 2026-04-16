@@ -82,7 +82,7 @@ export const replaceChemBlock = (
       continue;
     }
 
-    let endLine = index;
+    let endLine = lines.length;
     for (let scan = index + 1; scan < lines.length; scan += 1) {
       if (BLOCK_CLOSE_RE.test(lines[scan] ?? "")) {
         endLine = scan;
@@ -90,8 +90,10 @@ export const replaceChemBlock = (
       }
     }
 
+    const hasClosingMarker = endLine < lines.length && BLOCK_CLOSE_RE.test(lines[endLine] ?? "");
     const existingLines = lines.slice(index + 1, endLine);
-    lines.splice(index, endLine - index + 1, ...serializeChemBlock(blockId, draft, existingLines));
+    const deleteCount = hasClosingMarker ? endLine - index + 1 : endLine - index;
+    lines.splice(index, deleteCount, ...serializeChemBlock(blockId, draft, existingLines));
     return lines.join("\n");
   }
 

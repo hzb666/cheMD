@@ -24,7 +24,7 @@ export const selectTargetMolecule = (
     if (!chemdMatch) {
       continue;
     }
-    let endLine = index;
+    let endLine = lines.length;
 
     for (let scan = index + 1; scan < lines.length; scan += 1) {
       if (MOLECULE_CLOSE_RE.test(lines[scan] ?? "")) {

@@ -23,7 +23,7 @@ export const selectTargetReaction = (
       continue;
     }
 
-    let endLine = index;
+    let endLine = lines.length;
     for (let scan = index + 1; scan < lines.length; scan += 1) {
       if (REACTION_CLOSE_RE.test(lines[scan] ?? "")) {
         endLine = scan;

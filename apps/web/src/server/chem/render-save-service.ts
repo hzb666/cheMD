@@ -6,10 +6,10 @@ import {
   callChemServiceRender
 } from "./chem-service-client";
 import {
-  isCasResolutionError,
   resolveChemicalNotation,
   resolveChemicalNotationList
 } from "./cas-resolver";
+import { isKnownCasResolutionError } from "./cas-error-guard";
 import { readErrorMessage, readErrorStatus } from "./chem-service-error";
 import type {
   MoleculeRenderRouteInput,
@@ -55,7 +55,7 @@ export const renderMoleculeNotation = async (
       type: "molecule"
     });
   } catch (error) {
-    if (isCasResolutionError(error)) {
+    if (isKnownCasResolutionError(error)) {
       throw error;
     }
 
@@ -85,7 +85,7 @@ export const renderReactionNotation = async (
         rendered.normalized_conditions ?? classifyReactionConditions(reaction)
     });
   } catch (error) {
-    if (isCasResolutionError(error)) {
+    if (isKnownCasResolutionError(error)) {
       throw error;
     }
 
