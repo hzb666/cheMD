@@ -5,8 +5,15 @@ export const CHEMD_SESSION_TOKEN_HEADER = "x-chemd-session-token";
 
 const SESSION_STORAGE_KEY = "chemd-session-token";
 
-const createFallbackSessionToken = (): string =>
-  `chemd-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+const createFallbackSessionToken = (): string => {
+  const uuid = globalThis.crypto?.randomUUID?.();
+  if (uuid) {
+    return `chemd-${uuid}`;
+  }
+
+  const highResNow = typeof globalThis.performance?.now === "function" ? globalThis.performance.now() : 0;
+  return `chemd-${Date.now().toString(36)}-${Math.floor(highResNow * 1000).toString(36)}`;
+};
 
 const createSessionToken = (): string => {
   try {
