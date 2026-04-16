@@ -12,12 +12,15 @@ interface DocumentPreviewProps {
   title?: string;
 }
 
+// Sandboxed srcDoc iframes (without allow-same-origin) use the literal "null" origin.
+const PREVIEW_FRAME_TARGET_ORIGIN = "null";
+
 const postPreviewTheme = (
   frame: HTMLIFrameElement | null | undefined,
   theme: PreviewTheme
 ): void => {
   try {
-    frame?.contentWindow?.postMessage({ type: PREVIEW_THEME_SYNC_MESSAGE_TYPE, theme }, "*");
+    frame?.contentWindow?.postMessage({ type: PREVIEW_THEME_SYNC_MESSAGE_TYPE, theme }, PREVIEW_FRAME_TARGET_ORIGIN);
   } catch {
     // Ignore transient iframe reload races.
   }
