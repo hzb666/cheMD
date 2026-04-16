@@ -23,3 +23,6 @@ __pycache__
 **/*.test.py
 docs/
 AGENTS.md
+.agents/
+.codex/
+.trellis/
