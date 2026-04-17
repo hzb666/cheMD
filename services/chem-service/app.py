@@ -442,6 +442,31 @@ def _render_reaction_with_rdkit(
     )
 
 
+def _render_reaction(
+    reactants: list[str],
+    products: list[str],
+    conditions: list[str],
+    render_options: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    rendered = _render_reaction_with_rdkit(
+        reactants,
+        products,
+        conditions,
+        render_options,
+    )
+    if rendered is not None:
+        return rendered
+
+    return reaction_rendering._build_reaction_render_payload(
+        reaction_rendering.ReactionRenderInput(
+            reactants=reactants,
+            products=products,
+            conditions=conditions,
+        ),
+        render_config=reaction_rendering._read_reaction_render_config(render_options),
+    )
+
+
 def _cache_key(document_id: str, block_id: str, session_id: str) -> str:
     return structure_store._cache_key(document_id, block_id, session_id)
 
@@ -667,16 +692,14 @@ def reaction_render() -> Any:
         if isinstance(conditions, list) and len(conditions) > 0 and not normalized_conditions:
             return jsonify({"message": "conditions must be a non-empty string array"}), 400
 
-    rendered = _render_reaction_with_rdkit(
-        reactants,
-        products,
-        normalized_conditions,
-        render_options if isinstance(render_options, dict) else None,
+    return jsonify(
+        _render_reaction(
+            reactants,
+            products,
+            normalized_conditions,
+            render_options if isinstance(render_options, dict) else None,
+        )
     )
-    if rendered is None:
-        return jsonify({"message": "Reaction SVG render failed."}), 503
-
-    return jsonify(rendered)
 
 
 @app.route("/structure", methods=["GET", "POST", "OPTIONS"])

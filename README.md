@@ -250,7 +250,7 @@ The current repository should still be described conservatively in a few areas:
 - Reaction editing is on the product path, but it should not yet be presented as complete parity with the molecule editing flow.
 - OCR is available in the product surface, but real accuracy and readiness still depend on external service configuration.
 - `chem-service` is intended as an internal chemistry runtime and should not be treated as a public-facing service.
-- The repository does not currently ship with a production deployment bundle or deployment templates.
+- The repository only ships targeted `deploy/playground` deployment examples for the public playground; it does not yet provide a general production deployment bundle.
 
 ---
 
@@ -264,6 +264,8 @@ The repository is a `pnpm` workspace and Turborepo monorepo:
 chemd/
 ├── apps/
 │   └── web/                    # Next.js 15 workbench and API facade
+├── deploy/
+│   └── playground/             # compose, Dockerfile, systemd, nginx, and env examples
 ├── packages/
 │   ├── compiler/               # Orchestration entry point
 │   ├── core/                   # AST, diagnostics, shared contracts
@@ -522,16 +524,32 @@ pnpm --filter @chemd/renderer-docx test -- renderer-docx.test.ts
 
 ## Deployment Notes
 
-The repository does not currently include root-level production deployment assets such as:
+The repository now includes targeted deployment assets for exposing only the playground:
 
-- `Dockerfile`
-- `docker-compose.yml`
+- `deploy/playground/compose.yaml`
+- `deploy/playground/.env.example`
+- `deploy/playground/web.Dockerfile`
+- `deploy/playground/chem-service.Dockerfile`
+- `deploy/playground/systemd/chemd-playground-web.service`
+- `deploy/playground/systemd/chemd-playground-chem.service`
+- `deploy/playground/nginx/chemd-playground.conf`
+- `deploy/playground/env/web.env.example`
+- `deploy/playground/env/chem-service.env.example`
+
+It still does not include a general root-level deployment bundle or managed-platform assets such as:
+
 - `vercel.json`
 - `render.yaml`
 - `fly.toml`
 - `railway.toml`
 
-The clearest supported operating mode today is the local demo stack.
+The clearest supported production-style operating mode today is:
+
+```text
+public internet -> nginx -> apps/web -> chem-service
+```
+
+with `chem-service` kept on a trusted local or internal boundary.
 
 For service topology, the intended trust model is:
 
@@ -539,11 +557,13 @@ For service topology, the intended trust model is:
 apps/web -> chem-service
 ```
 
-on a trusted local or internal boundary.
+The local demo stack remains the simplest supported development mode.
 
 Important operational notes:
 
 - `chem-service` should not be documented or treated as a public internet-facing service
+- when deploying the playground publicly, expose `apps/web` only and keep `chem-service` on loopback or a trusted internal network
+- for container orchestration, prefer `deploy/playground/compose.yaml` and keep `chem-service` unpublished
 - RDKit-first behavior depends on the runtime environment actually having RDKit available
 - OCR seams are present, but real provider readiness depends on external configuration and service availability
 - fallback behavior is a resilience mechanism, not evidence of complete chemistry backend delivery

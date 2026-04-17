@@ -250,7 +250,7 @@ notes: Product isolated as colorless liquid.
 - Reaction 编辑已经在产品路径上，但还不应宣传为与 molecule 编辑流程完全对齐。
 - OCR 已出现在产品界面中，但真实准确率和可用性仍取决于外部服务配置。
 - `chem-service` 设计目标是内部 chemistry runtime，不应被视为公网服务。
-- 仓库当前并未附带生产部署 bundle 或部署模板。
+- 仓库当前只附带面向 playground 的 `deploy/playground` 定向部署示例，尚未提供通用生产部署 bundle。
 
 ---
 
@@ -264,6 +264,8 @@ notes: Product isolated as colorless liquid.
 chemd/
 ├── apps/
 │   └── web/                    # Next.js 15 工作台与 API facade
+├── deploy/
+│   └── playground/             # compose、Dockerfile、systemd、nginx 与 env 示例
 ├── packages/
 │   ├── compiler/               # 编排入口
 │   ├── core/                   # AST、诊断与共享 contract
@@ -522,16 +524,32 @@ pnpm --filter @chemd/renderer-docx test -- renderer-docx.test.ts
 
 ## 部署说明
 
-当前仓库并未提供根级生产部署资产，例如：
+当前仓库已经提供一套“只公开 playground”的定向部署资产：
 
-- `Dockerfile`
-- `docker-compose.yml`
+- `deploy/playground/compose.yaml`
+- `deploy/playground/.env.example`
+- `deploy/playground/web.Dockerfile`
+- `deploy/playground/chem-service.Dockerfile`
+- `deploy/playground/systemd/chemd-playground-web.service`
+- `deploy/playground/systemd/chemd-playground-chem.service`
+- `deploy/playground/nginx/chemd-playground.conf`
+- `deploy/playground/env/web.env.example`
+- `deploy/playground/env/chem-service.env.example`
+
+但仍未提供通用根级部署 bundle 或托管平台部署资产，例如：
+
 - `vercel.json`
 - `render.yaml`
 - `fly.toml`
 - `railway.toml`
 
-目前最明确、最受支持的运行方式仍然是本地 demo 栈。
+目前最明确的类生产运行方式是：
+
+```text
+public internet -> nginx -> apps/web -> chem-service
+```
+
+其中 `chem-service` 仍应保留在可信本地或内网边界内。
 
 就 service 拓扑而言，预期信任模型是：
 
@@ -539,11 +557,13 @@ pnpm --filter @chemd/renderer-docx test -- renderer-docx.test.ts
 apps/web -> chem-service
 ```
 
-运行在可信本地或内网边界内。
+本地 demo 栈仍然是最简单、最受支持的开发运行方式。
 
 重要运维说明：
 
 - `chem-service` 不应被文档化或视为公网暴露服务
+- 如果要把 playground 放到公网，应只公开 `apps/web`，并让 `chem-service` 保持在 loopback 或可信内网
+- 如果走容器编排，优先使用 `deploy/playground/compose.yaml`，并保持 `chem-service` 不对宿主机开放端口
 - RDKit-first 行为依赖运行环境中确实具备 RDKit
 - OCR 接缝已经存在，但真实 provider 就绪度仍取决于外部配置与服务可用性
 - fallback 行为是韧性机制，不代表完整 chemistry backend 已经交付

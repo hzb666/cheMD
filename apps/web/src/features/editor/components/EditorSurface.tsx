@@ -27,8 +27,7 @@ export const EditorSurface = ({ source, onSourceChange }: EditorSurfaceProps) =>
   return (
     <div
       className={cn(
-        "relative h-full overflow-hidden bg-background transition-[background-color]",
-        SURFACE_TRANSITION_CLASS,
+        "relative h-full overflow-hidden bg-background",
         "shadow-none"
       )}
     >

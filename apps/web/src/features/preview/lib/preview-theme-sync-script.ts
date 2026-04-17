@@ -1,3 +1,5 @@
+import { PREVIEW_THEME_SYNC_ACK_MESSAGE_TYPE } from "../../../lib/theme-sync-events";
+
 export const PREVIEW_THEME_SYNC_MESSAGE_TYPE = "chemd:theme-sync";
 
 const PREVIEW_THEME_SYNC_SCRIPT_BODY = `(() => {
@@ -20,6 +22,23 @@ const PREVIEW_THEME_SYNC_SCRIPT_BODY = `(() => {
     }
   };
 
+  const postThemeSyncAck = (theme, requestId) => {
+    if (typeof requestId !== "string" || requestId.length === 0) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      window.parent.postMessage(
+        {
+          type: ${JSON.stringify(PREVIEW_THEME_SYNC_ACK_MESSAGE_TYPE)},
+          requestId,
+          theme
+        },
+        "*"
+      );
+    });
+  };
+
   window.addEventListener("message", (event) => {
     const payload = event.data;
     if (!payload || typeof payload !== "object" || payload.type !== ${JSON.stringify(PREVIEW_THEME_SYNC_MESSAGE_TYPE)}) {
@@ -27,6 +46,7 @@ const PREVIEW_THEME_SYNC_SCRIPT_BODY = `(() => {
     }
 
     applyTheme(payload.theme);
+    postThemeSyncAck(payload.theme, payload.requestId);
   });
 
   applyTheme(

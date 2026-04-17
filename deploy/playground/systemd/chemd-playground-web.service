@@ -1,0 +1,19 @@
+[Unit]
+Description=chemd playground web
+After=network-online.target chemd-playground-chem.service
+Wants=network-online.target
+Requires=chemd-playground-chem.service
+
+[Service]
+Type=simple
+User=chemd
+Group=chemd
+WorkingDirectory=/srv/chemd
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=/etc/chemd/playground/web.env
+ExecStart=/usr/bin/env pnpm --filter @chemd/web exec next start -H 127.0.0.1 -p 2436
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

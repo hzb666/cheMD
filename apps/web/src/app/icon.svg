@@ -1,29 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg id="_图层_1" xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 373 373">
+<svg id="icon-root" xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 373 373">
   <!-- Generator: Adobe Illustrator 29.1.0, SVG Export Plug-In . SVG Version: 2.1.0 Build 142)  -->
   <defs>
     <style>
       .st0 {
-        fill: url(#_未命名的渐变_3);
+        fill: url(#icon-gradient-bottom);
       }
 
       .st1 {
-        fill: url(#_未命名的渐变);
+        fill: url(#icon-gradient-main);
       }
 
       .st2 {
-        fill: url(#_未命名的渐变_2);
+        fill: url(#icon-gradient-middle);
       }
     </style>
-    <linearGradient id="_未命名的渐变" data-name="未命名的渐变" x1="12.2" y1="189.5" x2="360.8" y2="189.5" gradientTransform="translate(0 376) scale(1 -1)" gradientUnits="userSpaceOnUse">
+    <linearGradient id="icon-gradient-main" data-name="未命名的渐变" x1="12.2" y1="189.5" x2="360.8" y2="189.5" gradientTransform="translate(0 376) scale(1 -1)" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#000"/>
       <stop offset="1" stop-color="#0e1110"/>
     </linearGradient>
-    <linearGradient id="_未命名的渐变_2" data-name="未命名的渐变 2" x1="43.4" y1="172.5" x2="186.5" y2="172.5" gradientTransform="translate(0 376) scale(1 -1)" gradientUnits="userSpaceOnUse">
+    <linearGradient id="icon-gradient-middle" data-name="未命名的渐变 2" x1="43.4" y1="172.5" x2="186.5" y2="172.5" gradientTransform="translate(0 376) scale(1 -1)" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#000"/>
       <stop offset="1" stop-color="#0e1110"/>
     </linearGradient>
-    <linearGradient id="_未命名的渐变_3" data-name="未命名的渐变 3" x1="43.4" y1="69.2" x2="186.5" y2="69.2" gradientTransform="translate(0 376) scale(1 -1)" gradientUnits="userSpaceOnUse">
+    <linearGradient id="icon-gradient-bottom" data-name="未命名的渐变 3" x1="43.4" y1="69.2" x2="186.5" y2="69.2" gradientTransform="translate(0 376) scale(1 -1)" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#000"/>
       <stop offset="1" stop-color="#0e1110"/>
     </linearGradient>
