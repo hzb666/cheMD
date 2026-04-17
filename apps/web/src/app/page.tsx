@@ -18,6 +18,90 @@ import { Button } from "../components/ui/button";
 import PreviewShell from "../features/preview/components/PreviewShell";
 import { Activity, FlaskConical } from "lucide-react";
 
+interface PlaygroundHeaderProps {
+  logoSrc: string;
+  title: string;
+  subtitle: string;
+  profileId: string;
+  diagnosticCount: number;
+  compileState: string;
+}
+
+interface EditorToolbarProps {
+  exportingDocx: boolean;
+  previewIsFresh: boolean;
+  ocrLoading: boolean;
+  onExportDocx: () => void;
+  onPickOcrFile: (file: File) => void;
+}
+
+const PlaygroundHeader = ({
+  logoSrc,
+  title,
+  subtitle,
+  profileId,
+  diagnosticCount,
+  compileState
+}: PlaygroundHeaderProps) => (
+  <header className="sticky top-0 z-30 shrink-0 w-full border-b border-border bg-background">
+    <div className="flex h-14 items-center justify-between px-3 md:px-5">
+      <div className="flex items-center gap-2.5">
+        <img src={logoSrc} alt="chemd logo" className="h-5 w-auto pr-1 object-contain dark:invert" />
+        <h1 className="notion-font-label text-[14px] text-foreground tracking-tight flex items-center gap-1">
+          <FlaskConical className="w-3.5 h-3.5 text-primary" />
+          Chemd Playground
+        </h1>
+      </div>
+
+      <div className="flex items-center gap-3 md:gap-5">
+        <div className="hidden md:flex items-center gap-4 text-[0.8rem] text-muted-foreground mr-2">
+          <div className="flex max-w-[360px] min-w-0 flex-col items-end text-right">
+            <div className="notion-font-label text-[14px] text-foreground w-full truncate">{title}</div>
+            <div className="notion-font-caption text-[14px] text-muted-foreground w-full truncate">{subtitle}</div>
+          </div>
+          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-accent text-accent-foreground rounded-full notion-font-badge">
+            <span className="flex h-1.5 w-1.5 rounded-full bg-accent-foreground/50"></span>
+            YAML: {profileId}
+          </div>
+          <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full notion-font-badge ${diagnosticCount === 0 ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400" : "bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400"}`}>
+            <Activity className="w-3 h-3" />
+            <span>{diagnosticCount === 0 ? "Clean compile" : compileState}</span>
+          </div>
+        </div>
+        <Separator orientation="vertical" className="h-4 hidden md:block" />
+        <ThemeToggle />
+      </div>
+    </div>
+  </header>
+);
+
+const EditorToolbar = ({
+  exportingDocx,
+  previewIsFresh,
+  ocrLoading,
+  onExportDocx,
+  onPickOcrFile
+}: EditorToolbarProps) => (
+  <>
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      onClick={onExportDocx}
+      disabled={exportingDocx || !previewIsFresh}
+      className="playground-topbar-button notion-font-ui h-8 px-3 text-[13px]"
+    >
+      {exportingDocx ? "Exporting..." : "Export DOCX"}
+    </Button>
+    <OcrImportButton
+      loading={ocrLoading}
+      label="OCR Image"
+      onPickFile={onPickOcrFile}
+      className="playground-topbar-button notion-font-ui h-8 px-3 text-[13px]"
+    />
+  </>
+);
+
 const Page = () => {
   const {
     source,
@@ -56,6 +140,7 @@ const Page = () => {
   });
   const logoSrc = typeof logoMark === "string" ? logoMark : logoMark.src;
   const diagnosticCount = result.diagnostics.length;
+  const documentSubtitle = [result.document.meta.date, result.document.meta.id].filter(Boolean).join(" · ");
   const applyOcrFile = (file: File) => {
     if (ocr.loading) {
       return;
@@ -92,42 +177,14 @@ const Page = () => {
       className="bg-background min-h-screen overflow-auto xl:h-screen xl:overflow-hidden"
     >
       <div className="flex min-h-0 flex-col xl:h-full w-full max-w-[2000px] mx-auto">
-        <header className="sticky top-0 z-30 shrink-0 w-full border-b border-border bg-background">
-          <div className="flex h-14 items-center justify-between px-3 md:px-5">
-            <div className="flex items-center gap-2.5">
-              <img src={logoSrc} alt="chemd logo" className="h-5 w-auto pr-1 object-contain dark:invert" />
-              <h1 className="notion-font-label text-[14px] text-foreground tracking-tight flex items-center gap-1">
-                <FlaskConical className="w-3.5 h-3.5 text-primary" />
-                Chemd Playground
-              </h1>
-            </div>
-
-            <div className="flex items-center gap-3 md:gap-5">
-              <div className="hidden md:flex items-center gap-4 text-[0.8rem] text-muted-foreground mr-2">
-                <div className="flex max-w-[360px] min-w-0 flex-col items-end text-right">
-                  <div className="notion-font-label text-[14px] text-foreground w-full truncate">
-                    {result.document.meta.title || "Untitled Document"}
-                  </div>
-                  <div className="notion-font-caption text-[14px] text-muted-foreground w-full truncate">
-                    {[result.document.meta.date, result.document.meta.id].filter(Boolean).join(" · ")}
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-accent text-accent-foreground rounded-full notion-font-badge">
-                  <span className="flex h-1.5 w-1.5 rounded-full bg-accent-foreground/50"></span>
-                  YAML: {result.renderOptions.profileId}
-                </div>
-                <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full notion-font-badge ${diagnosticCount === 0 ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400" : "bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400"}`}>
-                  <Activity className="w-3 h-3" />
-                  <span>
-                    {diagnosticCount === 0 ? "Clean compile" : compileState}
-                  </span>
-                </div>
-              </div>
-              <Separator orientation="vertical" className="h-4 hidden md:block" />
-              <ThemeToggle />
-            </div>
-          </div>
-        </header>
+        <PlaygroundHeader
+          logoSrc={logoSrc}
+          title={result.document.meta.title || "Untitled Document"}
+          subtitle={documentSubtitle}
+          profileId={result.renderOptions.profileId}
+          diagnosticCount={diagnosticCount}
+          compileState={compileState}
+        />
 
         <section
           className="flex-1 min-h-0 grid grid-cols-1 xl:grid-cols-2 items-stretch xl:items-start xl:overflow-hidden bg-background"
@@ -138,24 +195,13 @@ const Page = () => {
             lineCount={lineCount}
             profileId={result.renderOptions.profileId}
             toolbarActions={(
-              <>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => void exportDocx()}
-                  disabled={exportingDocx || !previewIsFresh}
-                  className="playground-topbar-button notion-font-ui h-8 px-3 text-[13px]"
-                >
-                  {exportingDocx ? "Exporting..." : "Export DOCX"}
-                </Button>
-                <OcrImportButton
-                  loading={ocr.loading}
-                  label="OCR Image"
-                  onPickFile={applyOcrFile}
-                  className="playground-topbar-button notion-font-ui h-8 px-3 text-[13px]"
-                />
-              </>
+              <EditorToolbar
+                exportingDocx={exportingDocx}
+                previewIsFresh={previewIsFresh}
+                ocrLoading={ocr.loading}
+                onExportDocx={() => void exportDocx()}
+                onPickOcrFile={applyOcrFile}
+              />
             )}
             statusMessage={exportMessage ?? ocr.error ?? editorStatus}
             onSourceChange={applySourceChange}

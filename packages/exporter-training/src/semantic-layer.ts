@@ -302,58 +302,94 @@ const buildPrimaryLinks = (
       confidence: 1
     }));
 
-export const buildSemanticLayer = (document: ChemdDocument): SemanticLayerV1 => {
-  const documentId = document.meta.id;
-  const molecules: ExportedMoleculeV1[] = [];
-  const reactions: ExportedReactionV1[] = [];
-  const results: ExportedResultV1[] = [];
-  const analyses: ExportedAnalysisV1[] = [];
-  const samples: ExportedSampleV1[] = [];
-  const markdownBlocks: ExportedMarkdownBlockV1[] = [];
-  const traversedNodes = collectExportableNodes(document.children);
+interface SemanticLayerParts {
+  molecules: ExportedMoleculeV1[];
+  reactions: ExportedReactionV1[];
+  results: ExportedResultV1[];
+  analyses: ExportedAnalysisV1[];
+  samples: ExportedSampleV1[];
+  markdownBlocks: ExportedMarkdownBlockV1[];
+}
 
+type TraversedNode = ReturnType<typeof collectExportableNodes>[number];
+
+const createSemanticLayerParts = (): SemanticLayerParts => ({
+  molecules: [],
+  reactions: [],
+  results: [],
+  analyses: [],
+  samples: [],
+  markdownBlocks: []
+});
+
+const collectMoleculesAndMarkdown = (
+  document: ChemdDocument,
+  traversedNodes: TraversedNode[],
+  parts: SemanticLayerParts
+): void => {
+  const documentId = document.meta.id;
   for (const { nodeIndex, node } of traversedNodes) {
     const isPrimary = isPrimaryEntity(document, node);
 
     if (node.type === "molecule") {
-      molecules.push(buildMolecule(documentId, node, nodeIndex, isPrimary));
+      parts.molecules.push(buildMolecule(documentId, node, nodeIndex, isPrimary));
       continue;
     }
 
     if (node.type === "markdown") {
-      markdownBlocks.push(buildMarkdown(documentId, node, nodeIndex));
+      parts.markdownBlocks.push(buildMarkdown(documentId, node, nodeIndex));
     }
   }
+};
 
-  const moleculeByOriginalId = new Map(
+const createMoleculeIndex = (molecules: ExportedMoleculeV1[]): Map<string, ExportedMoleculeV1> =>
+  new Map(
     molecules
       .filter((molecule) => molecule.original_id)
       .map((molecule) => [molecule.original_id as string, molecule])
   );
 
+const collectRelatedEntities = (
+  document: ChemdDocument,
+  traversedNodes: TraversedNode[],
+  moleculeByOriginalId: Map<string, ExportedMoleculeV1>,
+  parts: SemanticLayerParts
+): void => {
+  const documentId = document.meta.id;
   for (const { nodeIndex, node } of traversedNodes) {
     const isPrimary = isPrimaryEntity(document, node);
 
     if (node.type === "reaction") {
-      reactions.push(buildReaction(documentId, node, nodeIndex, isPrimary, moleculeByOriginalId));
+      parts.reactions.push(buildReaction(documentId, node, nodeIndex, isPrimary, moleculeByOriginalId));
       continue;
     }
 
     if (node.type === "result") {
-      results.push(buildResult(documentId, node, nodeIndex, isPrimary));
+      parts.results.push(buildResult(documentId, node, nodeIndex, isPrimary));
       continue;
     }
 
     if (node.type === "analysis") {
-      analyses.push(buildAnalysis(documentId, node, nodeIndex, isPrimary));
+      parts.analyses.push(buildAnalysis(documentId, node, nodeIndex, isPrimary));
       continue;
     }
 
     if (node.type === "sample") {
-      samples.push(buildSample(documentId, node, nodeIndex, isPrimary));
+      parts.samples.push(buildSample(documentId, node, nodeIndex, isPrimary));
     }
   }
+};
 
+export const buildSemanticLayer = (document: ChemdDocument): SemanticLayerV1 => {
+  const documentId = document.meta.id;
+  const traversedNodes = collectExportableNodes(document.children);
+  const parts = createSemanticLayerParts();
+
+  collectMoleculesAndMarkdown(document, traversedNodes, parts);
+  // Reaction participant 可以用 @id 指向 molecule，索引必须先于 reaction 语义层生成。
+  collectRelatedEntities(document, traversedNodes, createMoleculeIndex(parts.molecules), parts);
+
+  const { molecules, reactions, results, analyses, samples, markdownBlocks } = parts;
   const links = buildPrimaryLinks(documentId, [...molecules, ...reactions, ...results, ...analyses, ...samples]);
 
   return {

@@ -16,6 +16,64 @@ interface UseChemdEditFlowParams {
   setEditorStatus: (next: string | null) => void;
 }
 
+interface ChemSavePayload {
+  message?: string;
+  type?: unknown;
+  smiles?: unknown;
+  molfile?: unknown;
+  reactants?: unknown;
+  products?: unknown;
+  conditions?: unknown;
+  reactionSmiles?: unknown;
+  rxnfile?: unknown;
+}
+
+const readStringArray = (value: unknown, fallback: string[]): string[] =>
+  Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : fallback;
+
+const readOptionalString = (value: unknown): string | undefined =>
+  typeof value === "string" ? value : undefined;
+
+const readSavePayload = async (response: Response): Promise<ChemSavePayload | null> =>
+  (await response.json().catch(() => null)) as ChemSavePayload | null;
+
+const buildSavedReactionDraft = (
+  next: ChemEditorDraftWithBlockId,
+  payload: ChemSavePayload
+): ChemEditorDraftWithBlockId => {
+  const fallbackReaction = next.kind === "reaction" ? next : undefined;
+
+  return {
+    blockId: next.blockId,
+    kind: "reaction",
+    reactants: readStringArray(payload.reactants, fallbackReaction?.reactants ?? []),
+    products: readStringArray(payload.products, fallbackReaction?.products ?? []),
+    conditions: readStringArray(payload.conditions, fallbackReaction?.conditions ?? []),
+    reactionSmiles: readOptionalString(payload.reactionSmiles),
+    rxnfile: readOptionalString(payload.rxnfile)
+  };
+};
+
+const buildSavedMoleculeDraft = (
+  next: ChemEditorDraftWithBlockId,
+  payload: ChemSavePayload
+): ChemEditorDraftWithBlockId => ({
+  blockId: next.blockId,
+  kind: "molecule",
+  smiles: readOptionalString(payload.smiles) ?? (next.kind === "molecule" ? next.smiles : ""),
+  molfile: readOptionalString(payload.molfile)
+});
+
+const buildSavedDraft = (
+  next: ChemEditorDraftWithBlockId,
+  payload: ChemSavePayload
+): ChemEditorDraftWithBlockId =>
+  payload.type === "reaction"
+    ? buildSavedReactionDraft(next, payload)
+    : buildSavedMoleculeDraft(next, payload);
+
 export const useChemdEditFlow = ({
   documentId,
   sessionId,
@@ -67,51 +125,14 @@ export const useChemdEditFlow = ({
         })
       });
 
-      const payload = (await response.json().catch(() => null)) as
-        | { message?: string; type?: unknown; smiles?: unknown; molfile?: unknown; reactants?: unknown; products?: unknown; conditions?: unknown; reactionSmiles?: unknown; rxnfile?: unknown }
-        | null;
+      const payload = await readSavePayload(response);
 
       if (!response.ok || !payload || payload.type !== request.payload.type) {
         throw new Error(payload?.message ?? `Chemd save failed (${response.status})`);
       }
 
-      const savedDraft: ChemEditorDraftWithBlockId = payload.type === "reaction"
-        ? {
-            blockId: next.blockId,
-            kind: "reaction",
-            reactants: Array.isArray(payload.reactants)
-              ? payload.reactants.filter((item): item is string => typeof item === "string")
-              : next.kind === "reaction"
-                ? next.reactants
-                : [],
-            products: Array.isArray(payload.products)
-              ? payload.products.filter((item): item is string => typeof item === "string")
-              : next.kind === "reaction"
-                ? next.products
-                : [],
-            conditions: Array.isArray(payload.conditions)
-              ? payload.conditions.filter((item): item is string => typeof item === "string")
-              : next.kind === "reaction"
-                ? next.conditions
-                : [],
-            reactionSmiles:
-              typeof payload.reactionSmiles === "string" ? payload.reactionSmiles : undefined,
-            rxnfile:
-              typeof payload.rxnfile === "string" ? payload.rxnfile : undefined
-          }
-        : {
-            blockId: next.blockId,
-            kind: "molecule",
-            smiles:
-              typeof payload.smiles === "string"
-                ? payload.smiles
-                : next.kind === "molecule"
-                  ? next.smiles
-                  : "",
-            molfile:
-              typeof payload.molfile === "string" ? payload.molfile : undefined
-      };
-
+      // 保存接口会回传标准化后的结构，source patch 必须使用服务端确认的 payload。
+      const savedDraft = buildSavedDraft(next, payload);
       const latestSource = getLatestSource();
       const nextSource = replaceChemBlock(latestSource, next.blockId, savedDraft);
       if (nextSource === null) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { compileChemd, type CompileResult } from "@chemd/compiler";
 
 import { createCompileScheduler } from "../../editor/lib/compile-scheduler";
@@ -49,6 +49,21 @@ export const usePlaygroundDocumentController = (): PlaygroundDocumentController 
     setSource(nextSource);
   };
 
+  const commitCompileResult = useCallback((nextResult: CompileResult, nextSource: string) => {
+    startTransition(() => {
+      setResult(nextResult);
+      setLastCompiledSource(nextSource);
+      setJsonState((current) =>
+        current.source === nextSource
+          ? current
+          : {
+              source: nextSource,
+              value: nextResult.json
+            }
+      );
+    });
+  }, []);
+
   useEffect(() => {
     sourceRef.current = source;
   }, [source]);
@@ -57,24 +72,13 @@ export const usePlaygroundDocumentController = (): PlaygroundDocumentController 
     const scheduler = schedulerRef.current;
 
     scheduler.schedule(deferredSource, (nextResult) => {
-      startTransition(() => {
-        setResult(nextResult);
-        setLastCompiledSource(deferredSource);
-        setJsonState((current) =>
-          current.source === deferredSource
-            ? current
-            : {
-                source: deferredSource,
-                value: nextResult.json
-              }
-        );
-      });
+      commitCompileResult(nextResult, deferredSource);
     });
 
     return () => {
       scheduler.cancel();
     };
-  }, [deferredSource]);
+  }, [commitCompileResult, deferredSource]);
 
   useEffect(() => {
     const abortController = new AbortController();

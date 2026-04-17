@@ -89,6 +89,24 @@ const resolveReactionParticipants = (
   return components;
 };
 
+const createReactionFallback = (
+  fallback: ReactionSmilesParseOptions["fallback"]
+): Pick<ChemEditorReactionDraft, "reactants" | "products"> => ({
+  reactants: fallback?.reactants ?? [],
+  products: fallback?.products ?? []
+});
+
+const resolveReactionSide = (
+  sideText: string,
+  expectedCount: number | undefined,
+  fallback: string[]
+): string[] =>
+  resolveReactionParticipants(
+    sideText,
+    expectedCount ?? inferFallbackParticipantCount(sideText, fallback),
+    fallback
+  );
+
 export const buildReactionSmiles = ({
   reactants,
   products
@@ -101,18 +119,12 @@ export const parseReactionSmiles = (
 ): ReactionSmilesParts => {
   const [reactantsText = "", productsText = ""] = value.split(">>", 2);
   const participantCounts = parseRxnParticipantCounts(options.rxnfile);
+  const fallback = createReactionFallback(options.fallback);
 
+  // RXN counts 用于区分 participant 分隔符和 ionic fragment 内部的点号。
   return {
-    reactants: resolveReactionParticipants(
-      reactantsText,
-      participantCounts?.reactants ?? inferFallbackParticipantCount(reactantsText, options.fallback?.reactants ?? []),
-      options.fallback?.reactants ?? []
-    ),
-    products: resolveReactionParticipants(
-      productsText,
-      participantCounts?.products ?? inferFallbackParticipantCount(productsText, options.fallback?.products ?? []),
-      options.fallback?.products ?? []
-    )
+    reactants: resolveReactionSide(reactantsText, participantCounts?.reactants, fallback.reactants),
+    products: resolveReactionSide(productsText, participantCounts?.products, fallback.products)
   };
 };
 

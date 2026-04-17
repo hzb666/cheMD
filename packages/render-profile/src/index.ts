@@ -644,56 +644,9 @@ const applyAdapterValue = (
     return;
   }
 
-  switch (key) {
-    case "fixedBondLength":
-      options.structure.bondLength = value as number;
-      break;
-    case "bondLineWidth":
-      options.structure.bondLineWidth = value as number;
-      break;
-    case "multipleBondOffset":
-      options.structure.multipleBondOffset = value as number;
-      break;
-    case "hashSpacing":
-      options.structure.hashSpacing = value as number;
-      break;
-    case "fixedFontSize":
-      options.structure.fontSize = value as number;
-      break;
-    case "atomLabelPadding":
-      options.structure.atomLabelPadding = value as number;
-      break;
-    case "monochrome":
-      options.structure.monochrome = value as boolean;
-      break;
-    case "backgroundColor":
-      options.structure.backgroundColor = value as string;
-      break;
-    case "reactionArrowLength":
-      options.reaction.arrowLength = value as number;
-      break;
-    case "reactionComponentGap":
-      options.reaction.componentGap = value as number;
-      break;
-    case "reactionPlusGap":
-      options.reaction.plusGap = value as number;
-      break;
-    case "showConditionsBelowArrow":
-      options.reaction.showConditionsBelowArrow = value as boolean;
-      break;
-    case "imageFormat":
-      options.export.imageFormat = value as "svg" | "png";
-      break;
-    case "margin":
-      options.export.margin = value as number;
-      break;
-    case "dpi":
-      options.export.dpi = value as number;
-      break;
-    case "transparentBackground":
-      options.export.transparentBackground = value as boolean;
-      break;
-  }
+  // Adapter 使用 RDKit 字段名，写回前统一走 render override schema 校验。
+  const [sectionName, fieldName] = path.split(".") as [RenderSectionName, string];
+  (options[sectionName] as Record<string, unknown>)[fieldName] = value;
 };
 
 export const sanitizeRenderAdapterPayload = (

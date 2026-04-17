@@ -92,6 +92,183 @@ interface UsePreviewShellControllerParams {
   onEditChemd?: (draft: ChemEditorDraftWithBlockId) => void | Promise<void>;
 }
 
+interface InventoryHoverContext {
+  getPreviewFrame: () => HTMLIFrameElement | null;
+  previewBridgeToken: string;
+  inventoryCache: Map<string, InventoryLookupResponse>;
+  inventoryPending: Map<string, Promise<InventoryLookupResponse>>;
+}
+
+const postInventoryState = (
+  getPreviewFrame: () => HTMLIFrameElement | null,
+  message: InventoryStateMessage
+): void => {
+  try {
+    getPreviewFrame()?.contentWindow?.postMessage(message, PREVIEW_FRAME_TARGET_ORIGIN);
+  } catch {
+    // iframe srcDoc reload 时 contentWindow 可能短暂不可用，下一次 hover 会重新同步状态。
+  }
+};
+
+const createInventoryCacheKey = (payload: PreviewInventoryHoverMessage): string | null => {
+  if (payload.type === "molecule") {
+    const smiles = payload.smiles.trim();
+    return smiles ? `molecule:${smiles}` : null;
+  }
+
+  const reactants = payload.reactants.map((item) => item.trim()).filter((item) => item.length > 0);
+  return reactants.length > 0 ? `reaction:${reactants.join("\u001f")}` : null;
+};
+
+const readInventoryErrorMessage = async (response: Response): Promise<string> => {
+  const payload = (await response.json().catch(() => null)) as { message?: unknown } | null;
+  return typeof payload?.message === "string" && payload.message.trim().length > 0
+    ? payload.message.trim()
+    : `Inventory lookup failed (${response.status})`;
+};
+
+const fetchInventoryLookup = async (
+  payload: PreviewInventoryHoverMessage
+): Promise<InventoryLookupResponse> => {
+  const response = await fetch("/api/chem/inventory", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(
+      payload.type === "molecule"
+        ? {
+            type: "molecule",
+            smiles: payload.smiles
+          }
+        : {
+            type: "reaction",
+            reactants: payload.reactants
+          }
+    )
+  });
+
+  if (!response.ok) {
+    throw new Error(await readInventoryErrorMessage(response));
+  }
+
+  const result = (await response.json().catch(() => null)) as InventoryLookupResponse | null;
+  if (!result || result.type !== payload.type) {
+    throw new Error("Inventory response type mismatch");
+  }
+
+  return result;
+};
+
+const buildReadyInventoryState = (
+  previewToken: string,
+  blockId: string,
+  result: InventoryLookupResponse
+): InventoryStateMessage =>
+  result.type === "reaction"
+    ? {
+        type: "chemd:inventory-state",
+        previewToken,
+        blockId,
+        draftType: "reaction",
+        state: "ready",
+        items: result.items
+      }
+    : {
+        type: "chemd:inventory-state",
+        previewToken,
+        blockId,
+        draftType: "molecule",
+        state: "ready",
+        item: result.item
+      };
+
+const getPendingInventoryLookup = (
+  payload: PreviewInventoryHoverMessage,
+  cacheKey: string,
+  context: InventoryHoverContext
+): Promise<InventoryLookupResponse> => {
+  const pending = context.inventoryPending.get(cacheKey);
+  if (pending) {
+    return pending;
+  }
+
+  const nextPending = fetchInventoryLookup(payload)
+    .then((result) => {
+      context.inventoryCache.set(cacheKey, result);
+      return result;
+    })
+    .finally(() => {
+      context.inventoryPending.delete(cacheKey);
+    });
+  context.inventoryPending.set(cacheKey, nextPending);
+  return nextPending;
+};
+
+export const handleInventoryHover = async (
+  payload: PreviewInventoryHoverMessage,
+  context: InventoryHoverContext
+): Promise<void> => {
+  const cacheKey = createInventoryCacheKey(payload);
+  if (!cacheKey) {
+    return;
+  }
+
+  const cached = context.inventoryCache.get(cacheKey);
+  if (cached) {
+    postInventoryState(context.getPreviewFrame, buildReadyInventoryState(context.previewBridgeToken, payload.blockId, cached));
+    return;
+  }
+
+  postInventoryState(context.getPreviewFrame, {
+    type: "chemd:inventory-state",
+    previewToken: context.previewBridgeToken,
+    blockId: payload.blockId,
+    draftType: payload.type,
+    state: "loading"
+  });
+
+  try {
+    const result = await getPendingInventoryLookup(payload, cacheKey, context);
+    postInventoryState(context.getPreviewFrame, buildReadyInventoryState(context.previewBridgeToken, payload.blockId, result));
+  } catch (error) {
+    postInventoryState(context.getPreviewFrame, {
+      type: "chemd:inventory-state",
+      previewToken: context.previewBridgeToken,
+      blockId: payload.blockId,
+      draftType: payload.type,
+      state: "error",
+      message: error instanceof Error ? error.message : "Inventory lookup failed"
+    });
+  }
+};
+
+const dispatchPreviewEdit = (
+  editPayload: NonNullable<ReturnType<typeof readPreviewEditMessage>>,
+  onEditChemd?: (draft: ChemEditorDraftWithBlockId) => void | Promise<void>
+): void => {
+  if (!onEditChemd) {
+    return;
+  }
+
+  if (editPayload.type === "reaction") {
+    void onEditChemd({
+      blockId: editPayload.blockId,
+      kind: "reaction",
+      reactants: editPayload.reactants,
+      products: editPayload.products,
+      conditions: editPayload.conditions
+    });
+    return;
+  }
+
+  void onEditChemd({
+    blockId: editPayload.blockId,
+    kind: "molecule",
+    smiles: editPayload.smiles
+  });
+};
+
 export const usePreviewShellController = ({
   html,
   json,
@@ -114,184 +291,22 @@ export const usePreviewShellController = ({
   });
 
   useEffect(() => {
-    const postInventoryState = (message: InventoryStateMessage) => {
-      try {
-        previewFrameRef.current?.contentWindow?.postMessage(message, PREVIEW_FRAME_TARGET_ORIGIN);
-      } catch {
-        // Ignore transient iframe reload races.
-      }
-    };
-
-    const createInventoryCacheKey = (payload: PreviewInventoryHoverMessage): string | null => {
-      if (payload.type === "molecule") {
-        const smiles = payload.smiles.trim();
-        return smiles ? `molecule:${smiles}` : null;
-      }
-
-      const reactants = payload.reactants.map((item) => item.trim()).filter((item) => item.length > 0);
-      return reactants.length > 0 ? `reaction:${reactants.join("\u001f")}` : null;
-    };
-
-    const readInventoryErrorMessage = async (response: Response): Promise<string> => {
-      const payload = (await response.json().catch(() => null)) as { message?: unknown } | null;
-      return typeof payload?.message === "string" && payload.message.trim().length > 0
-        ? payload.message.trim()
-        : `Inventory lookup failed (${response.status})`;
-    };
-
-    const fetchInventoryLookup = async (
-      payload: PreviewInventoryHoverMessage
-    ): Promise<InventoryLookupResponse> => {
-      const response = await fetch("/api/chem/inventory", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(
-          payload.type === "molecule"
-            ? {
-                type: "molecule",
-                smiles: payload.smiles
-              }
-            : {
-                type: "reaction",
-                reactants: payload.reactants
-              }
-        )
-      });
-
-      if (!response.ok) {
-        throw new Error(await readInventoryErrorMessage(response));
-      }
-
-      const result = (await response.json().catch(() => null)) as InventoryLookupResponse | null;
-      if (!result || result.type !== payload.type) {
-        throw new Error("Inventory response type mismatch");
-      }
-
-      return result;
-    };
-
-    const handleInventoryHover = async (payload: PreviewInventoryHoverMessage) => {
-      const cacheKey = createInventoryCacheKey(payload);
-      if (!cacheKey) {
-        return;
-      }
-
-      const cached = inventoryCacheRef.current.get(cacheKey);
-      if (cached) {
-        if (cached.type === "reaction") {
-          postInventoryState({
-            type: "chemd:inventory-state",
-            previewToken: previewBridgeToken,
-            blockId: payload.blockId,
-            draftType: "reaction",
-            state: "ready",
-            items: cached.items
-          });
-          return;
-        }
-
-        postInventoryState({
-          type: "chemd:inventory-state",
-          previewToken: previewBridgeToken,
-          blockId: payload.blockId,
-          draftType: "molecule",
-          state: "ready",
-          item: cached.item
-        });
-        return;
-      }
-
-      postInventoryState({
-        type: "chemd:inventory-state",
-        previewToken: previewBridgeToken,
-        blockId: payload.blockId,
-        draftType: payload.type,
-        state: "loading"
-      });
-
-      let pending = inventoryPendingRef.current.get(cacheKey);
-      if (!pending) {
-        pending = fetchInventoryLookup(payload)
-          .then((result) => {
-            inventoryCacheRef.current.set(cacheKey, result);
-            return result;
-          })
-          .finally(() => {
-            inventoryPendingRef.current.delete(cacheKey);
-          });
-        inventoryPendingRef.current.set(cacheKey, pending);
-      }
-
-      try {
-        const result = await pending;
-        if (result.type === "reaction") {
-          postInventoryState({
-            type: "chemd:inventory-state",
-            previewToken: previewBridgeToken,
-            blockId: payload.blockId,
-            draftType: "reaction",
-            state: "ready",
-            items: result.items
-          });
-          return;
-        }
-
-        postInventoryState({
-          type: "chemd:inventory-state",
-          previewToken: previewBridgeToken,
-          blockId: payload.blockId,
-          draftType: "molecule",
-          state: "ready",
-          item: result.item
-        });
-      } catch (error) {
-        postInventoryState({
-          type: "chemd:inventory-state",
-          previewToken: previewBridgeToken,
-          blockId: payload.blockId,
-          draftType: payload.type,
-          state: "error",
-          message: error instanceof Error ? error.message : "Inventory lookup failed"
-        });
-      }
-    };
-
     const handlePreviewMessage = (event: MessageEvent) => {
+      const previewWindow = previewFrameRef.current?.contentWindow ?? null;
       const editPayload = readPreviewEditMessage(
         event,
-        previewFrameRef.current?.contentWindow ?? null,
+        previewWindow,
         previewIsFresh,
         previewBridgeToken
       );
       if (editPayload) {
-        if (editPayload.type === "reaction") {
-          if (onEditChemd) {
-            void onEditChemd({
-              blockId: editPayload.blockId,
-              kind: "reaction",
-              reactants: editPayload.reactants,
-              products: editPayload.products,
-              conditions: editPayload.conditions
-            });
-          }
-          return;
-        }
-
-        if (onEditChemd) {
-          void onEditChemd({
-            blockId: editPayload.blockId,
-            kind: "molecule",
-            smiles: editPayload.smiles
-          });
-        }
+        dispatchPreviewEdit(editPayload, onEditChemd);
         return;
       }
 
       const inventoryPayload = readPreviewInventoryHoverMessage(
         event,
-        previewFrameRef.current?.contentWindow ?? null,
+        previewWindow,
         previewIsFresh,
         previewBridgeToken
       );
@@ -299,7 +314,12 @@ export const usePreviewShellController = ({
         return;
       }
 
-      void handleInventoryHover(inventoryPayload);
+      void handleInventoryHover(inventoryPayload, {
+        getPreviewFrame: () => previewFrameRef.current,
+        previewBridgeToken,
+        inventoryCache: inventoryCacheRef.current,
+        inventoryPending: inventoryPendingRef.current
+      });
     };
 
     window.addEventListener("message", handlePreviewMessage);

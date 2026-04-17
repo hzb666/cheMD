@@ -10,11 +10,10 @@ export const injectEditButtons = (html: string): string =>
     .replace(/(<section class="chemd-block chemd-block--molecule"[^>]*>)/g, `$1${CHEMD_EDIT_BUTTON}`)
     .replace(/(<section class="chemd-block chemd-block--reaction"[^>]*>)/g, `$1${CHEMD_EDIT_BUTTON}`);
 
-export const buildPreviewBridgeScript = (
+const createPreviewBridgePreamble = (
   previewBridgeToken: string,
   parentOrigin: string
-): string => `<script>
-(() => {
+): string => `(() => {
   if (window.__chemdBridgeBound) return;
   window.__chemdBridgeBound = true;
   const previewToken = ${JSON.stringify(previewBridgeToken)};
@@ -25,6 +24,9 @@ export const buildPreviewBridgeScript = (
   const inventoryStateByBlockId = new Map();
   let activeHoverBlock = null;
   let hoverTimeoutId = 0;
+`;
+
+const PREVIEW_BRIDGE_BLOCK_HELPERS = `
   const resolveBlockId = (block, prefix) => {
     const explicitId = String(block.getAttribute("data-node-id") || "").trim();
     if (explicitId) return explicitId;
@@ -73,6 +75,9 @@ export const buildPreviewBridgeScript = (
     typeof value === "number" && Number.isFinite(value)
       ? new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value)
       : null;
+`;
+
+const PREVIEW_BRIDGE_INVENTORY_RENDERING = `
   const pickInventoryUnit = (inventory) => {
     if (!inventory || !Array.isArray(inventory.items)) {
       return "";
@@ -237,6 +242,9 @@ export const buildPreviewBridgeScript = (
 
     renderMoleculeInventory(popover, nextState.item);
   };
+`;
+
+const PREVIEW_BRIDGE_EVENT_HANDLERS = `
   const postInventoryHover = (block) => {
     if (!(block instanceof HTMLElement)) {
       return;
@@ -359,4 +367,14 @@ export const buildPreviewBridgeScript = (
     renderInventoryPopover(block, activeHoverBlock === block);
   });
 })();
-</script>`;
+`;
+
+// Bridge runtime 只接受 parent origin 和 previewToken 都匹配的 postMessage。
+export const buildPreviewBridgeScript = (
+  previewBridgeToken: string,
+  parentOrigin: string
+): string => `<script>
+${createPreviewBridgePreamble(previewBridgeToken, parentOrigin)}
+${PREVIEW_BRIDGE_BLOCK_HELPERS}
+${PREVIEW_BRIDGE_INVENTORY_RENDERING}
+${PREVIEW_BRIDGE_EVENT_HANDLERS}</script>`;

@@ -10,13 +10,18 @@ const CONDITIONS_RE = /^\s*conditions\s*:/i;
 
 const joinList = (values: string[]): string => values.join(" | ");
 
-export const updateReactionBlock = (
-  source: string,
-  blockId: string,
-  draft: ReactionEditorDraft
-): string => {
-  const lines = source.split(/\r?\n/);
-  const targetOpen = `:::chemd #${blockId}`;
+interface ReactionBlockRange {
+  startLine: number;
+  endLine: number;
+}
+
+interface ReactionFieldLines {
+  reactantsLine: number;
+  productsLine: number;
+  conditionsLine: number;
+}
+
+const findReactionBlock = (lines: string[], blockId: string): ReactionBlockRange | null => {
   let chemdOrdinal = 0;
 
   for (let index = 0; index < lines.length; index += 1) {
@@ -31,56 +36,111 @@ export const updateReactionBlock = (
       continue;
     }
 
-    lines[index] = targetOpen;
-
-    let endLine = lines.length;
-    for (let scan = index + 1; scan < lines.length; scan += 1) {
-      if (BLOCK_CLOSE_RE.test(lines[scan] ?? "")) {
-        endLine = scan;
-        break;
-      }
-    }
-
-    let reactantsLine = -1;
-    let productsLine = -1;
-    let conditionsLine = -1;
-
-    for (let scan = index + 1; scan < endLine; scan += 1) {
-      if (REACTANTS_RE.test(lines[scan] ?? "")) {
-        reactantsLine = scan;
-      } else if (PRODUCTS_RE.test(lines[scan] ?? "")) {
-        productsLine = scan;
-      } else if (CONDITIONS_RE.test(lines[scan] ?? "")) {
-        conditionsLine = scan;
-      }
-    }
-
-    if (reactantsLine >= 0) {
-      lines[reactantsLine] = `reac: ${joinList(draft.reactants)}`;
-    } else {
-      lines.splice(endLine, 0, `reac: ${joinList(draft.reactants)}`);
-      endLine += 1;
-    }
-
-    if (productsLine >= 0) {
-      lines[productsLine] = `prod: ${joinList(draft.products)}`;
-    } else {
-      lines.splice(endLine, 0, `prod: ${joinList(draft.products)}`);
-      endLine += 1;
-    }
-
-    if (draft.conditions.length > 0) {
-      if (conditionsLine >= 0) {
-        lines[conditionsLine] = `conditions: ${joinList(draft.conditions)}`;
-      } else {
-        lines.splice(endLine, 0, `conditions: ${joinList(draft.conditions)}`);
-      }
-    } else if (conditionsLine >= 0) {
-      lines.splice(conditionsLine, 1);
-    }
-
-    return lines.join("\n");
+    return {
+      startLine: index,
+      endLine: findBlockEnd(lines, index)
+    };
   }
 
-  return source;
+  return null;
+};
+
+const findBlockEnd = (lines: string[], startLine: number): number => {
+  for (let scan = startLine + 1; scan < lines.length; scan += 1) {
+    if (BLOCK_CLOSE_RE.test(lines[scan] ?? "")) {
+      return scan;
+    }
+  }
+
+  return lines.length;
+};
+
+const findReactionFieldLines = (
+  lines: string[],
+  startLine: number,
+  endLine: number
+): ReactionFieldLines => {
+  const fieldLines: ReactionFieldLines = {
+    reactantsLine: -1,
+    productsLine: -1,
+    conditionsLine: -1
+  };
+
+  for (let scan = startLine + 1; scan < endLine; scan += 1) {
+    const line = lines[scan] ?? "";
+    if (REACTANTS_RE.test(line)) {
+      fieldLines.reactantsLine = scan;
+    } else if (PRODUCTS_RE.test(line)) {
+      fieldLines.productsLine = scan;
+    } else if (CONDITIONS_RE.test(line)) {
+      fieldLines.conditionsLine = scan;
+    }
+  }
+
+  return fieldLines;
+};
+
+const upsertReactionLine = (
+  lines: string[],
+  lineIndex: number,
+  endLine: number,
+  nextLine: string
+): number => {
+  if (lineIndex >= 0) {
+    lines[lineIndex] = nextLine;
+    return endLine;
+  }
+
+  lines.splice(endLine, 0, nextLine);
+  return endLine + 1;
+};
+
+const updateConditionsLine = (
+  lines: string[],
+  lineIndex: number,
+  endLine: number,
+  conditions: string[]
+): void => {
+  if (conditions.length > 0) {
+    upsertReactionLine(lines, lineIndex, endLine, `conditions: ${joinList(conditions)}`);
+    return;
+  }
+
+  if (lineIndex >= 0) {
+    lines.splice(lineIndex, 1);
+  }
+};
+
+export const updateReactionBlock = (
+  source: string,
+  blockId: string,
+  draft: ReactionEditorDraft
+): string => {
+  const lines = source.split(/\r?\n/);
+  const targetOpen = `:::chemd #${blockId}`;
+  const block = findReactionBlock(lines, blockId);
+
+  if (!block) {
+    return source;
+  }
+
+  lines[block.startLine] = targetOpen;
+  const fieldLines = findReactionFieldLines(lines, block.startLine, block.endLine);
+
+  // 只改 reaction 编辑器托管的三类字段，其它 metadata 保持原有顺序和内容。
+  const nextEndLine = upsertReactionLine(
+    lines,
+    fieldLines.reactantsLine,
+    block.endLine,
+    `reac: ${joinList(draft.reactants)}`
+  );
+  const finalEndLine = upsertReactionLine(
+    lines,
+    fieldLines.productsLine,
+    nextEndLine,
+    `prod: ${joinList(draft.products)}`
+  );
+  updateConditionsLine(lines, fieldLines.conditionsLine, finalEndLine, draft.conditions);
+
+  return lines.join("\n");
 };

@@ -27,7 +27,30 @@ interface EmbeddedChemEditorHostProps {
   onBridgeReady?: (instance: KetcherBridgeInstance | null) => void;
 }
 
+interface KetcherStatusShellProps {
+  state: "loading" | "error";
+  children: React.ReactNode;
+}
+
+interface KetcherRuntimeSurfaceProps {
+  runtime: KetcherRuntime;
+  isReady: boolean;
+  onInit: (instance: KetcherBridgeInstance) => void;
+}
+
 const KETCHER_STATIC_RESOURCES_URL = "/ketcher";
+
+const loadKetcherRuntime = async (): Promise<KetcherRuntime> => {
+  const [{ Editor }, { StandaloneStructServiceProvider }] = await Promise.all([
+    import("ketcher-react"),
+    import("ketcher-standalone")
+  ]);
+
+  return {
+    Editor: Editor as KetcherEditorComponent,
+    structServiceProvider: new StandaloneStructServiceProvider()
+  };
+};
 
 const applyDraftToEditor = async (
   instance: Pick<KetcherBridgeInstance, "setMolecule" | "editor">,
@@ -75,15 +98,80 @@ export const initializeEditorInstance = async ({
   };
 };
 
+const KetcherStatusShell = ({ state, children }: KetcherStatusShellProps) => (
+  <div className="ketcher-host-shell" data-ketcher-host="embedded" data-ketcher-state={state}>
+    {children}
+  </div>
+);
+
+const KetcherLoadingContent = () => (
+  <div className="ketcher-host-loading">
+    <p className="panel-kicker">Structure sketch surface</p>
+    <p className="panel-meta">Loading Ketcher</p>
+  </div>
+);
+
+const KetcherRuntimeSurface = ({ runtime, isReady, onInit }: KetcherRuntimeSurfaceProps) => {
+  const { Editor, structServiceProvider } = runtime;
+
+  return (
+    <div className="ketcher-host-shell" data-ketcher-host="embedded" data-ketcher-state={isReady ? "ready" : "booting"}>
+      {!isReady ? <KetcherLoadingContent /> : null}
+      <div className="ketcher-host-surface" data-ketcher-surface="editor">
+        <Editor
+          onInit={onInit}
+          staticResourcesUrl={KETCHER_STATIC_RESOURCES_URL}
+          structServiceProvider={structServiceProvider}
+        />
+      </div>
+    </div>
+  );
+};
+
+const useKetcherRuntime = (): {
+  runtime: KetcherRuntime | null;
+  loadError: string | null;
+} => {
+  const [runtime, setRuntime] = useState<KetcherRuntime | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void loadKetcherRuntime()
+      .then((nextRuntime) => {
+        if (cancelled) {
+          return;
+        }
+
+        setRuntime(nextRuntime);
+        setLoadError(null);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setLoadError(error instanceof Error ? error.message : "Failed to load Ketcher");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return {
+    runtime,
+    loadError
+  };
+};
+
 export const EmbeddedChemEditorHost = ({
   value,
   onChange,
   onBridgeReady
 }: EmbeddedChemEditorHostProps) => {
-  const [runtime, setRuntime] = useState<KetcherRuntime | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [editorInstanceVersion, setEditorInstanceVersion] = useState(0);
+  const { runtime, loadError } = useKetcherRuntime();
   const ketcherRef = useRef<KetcherBridgeInstance | null>(null);
   const applyingRef = useRef(false);
   const changeHandlerRef = useRef<(() => void) | null>(null);
@@ -106,41 +194,6 @@ export const EmbeddedChemEditorHost = ({
     lastSyncedInputRef.current = getChemEditorStructureInput(next);
     onChange(next);
   }, [onChange]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadRuntime = async () => {
-      try {
-        const [{ Editor }, { StandaloneStructServiceProvider }] = await Promise.all([
-          import("ketcher-react"),
-          import("ketcher-standalone")
-        ]);
-
-        if (cancelled) {
-          return;
-        }
-
-        setRuntime({
-          Editor: Editor as KetcherEditorComponent,
-          structServiceProvider: new StandaloneStructServiceProvider()
-        });
-        setLoadError(null);
-      } catch (error) {
-        if (cancelled) {
-          return;
-        }
-
-        setLoadError(error instanceof Error ? error.message : "Failed to load Ketcher");
-      }
-    };
-
-    void loadRuntime();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     const instance = ketcherRef.current;
@@ -226,6 +279,25 @@ export const EmbeddedChemEditorHost = ({
     };
   }, [editorInstanceVersion, isReady, structureInput, syncDraftFromEditor]);
 
+  const handleEditorInit = useCallback(
+    (instance: KetcherBridgeInstance) => {
+      const previousInstance = ketcherRef.current;
+      const previousHandler = changeHandlerRef.current;
+      if (previousInstance && previousHandler) {
+        previousInstance.changeEvent?.remove?.(previousHandler);
+      }
+
+      ketcherRef.current = instance;
+      changeHandlerRef.current = null;
+      hasHydratedInitialValueRef.current = false;
+      lastSyncedInputRef.current = null;
+      setIsReady(true);
+      setEditorInstanceVersion((current) => current + 1);
+      onBridgeReady?.(instance);
+    },
+    [onBridgeReady]
+  );
+
   useEffect(() => {
     return () => {
       const instance = ketcherRef.current;
@@ -243,54 +315,19 @@ export const EmbeddedChemEditorHost = ({
 
   if (loadError) {
     return (
-      <div className="ketcher-host-shell" data-ketcher-host="embedded" data-ketcher-state="error">
+      <KetcherStatusShell state="error">
         <p className="panel-meta">Ketcher load failed: {loadError}</p>
-      </div>
+      </KetcherStatusShell>
     );
   }
 
   if (!runtime) {
     return (
-      <div className="ketcher-host-shell" data-ketcher-host="embedded" data-ketcher-state="loading">
-        <div className="ketcher-host-loading">
-          <p className="panel-kicker">Structure sketch surface</p>
-          <p className="panel-meta">Loading Ketcher</p>
-        </div>
-      </div>
+      <KetcherStatusShell state="loading">
+        <KetcherLoadingContent />
+      </KetcherStatusShell>
     );
   }
 
-  const { Editor, structServiceProvider } = runtime;
-
-  return (
-    <div className="ketcher-host-shell" data-ketcher-host="embedded" data-ketcher-state={isReady ? "ready" : "booting"}>
-      {!isReady ? (
-        <div className="ketcher-host-loading">
-          <p className="panel-kicker">Structure sketch surface</p>
-          <p className="panel-meta">Loading Ketcher</p>
-        </div>
-      ) : null}
-      <div className="ketcher-host-surface" data-ketcher-surface="editor">
-        <Editor
-          onInit={(instance) => {
-            const previousInstance = ketcherRef.current;
-            const previousHandler = changeHandlerRef.current;
-            if (previousInstance && previousHandler) {
-              previousInstance.changeEvent?.remove?.(previousHandler);
-            }
-
-            ketcherRef.current = instance;
-            changeHandlerRef.current = null;
-            hasHydratedInitialValueRef.current = false;
-            lastSyncedInputRef.current = null;
-            setIsReady(true);
-            setEditorInstanceVersion((current) => current + 1);
-            onBridgeReady?.(instance);
-          }}
-          staticResourcesUrl={KETCHER_STATIC_RESOURCES_URL}
-          structServiceProvider={structServiceProvider}
-        />
-      </div>
-    </div>
-  );
+  return <KetcherRuntimeSurface runtime={runtime} isReady={isReady} onInit={handleEditorInit} />;
 };

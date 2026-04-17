@@ -8,6 +8,34 @@ interface LoadChemdDraftOptions {
   fetchImpl?: typeof fetch;
 }
 
+interface DraftCacheRecord {
+  blockId?: unknown;
+  type?: unknown;
+  smiles?: unknown;
+  molfile?: unknown;
+  reactants?: unknown;
+  products?: unknown;
+  conditions?: unknown;
+  reactionSmiles?: unknown;
+  rxnfile?: unknown;
+}
+
+interface DraftCachePayload {
+  found?: boolean;
+  draft?: DraftCacheRecord;
+}
+
+const readStringArray = (value: unknown, fallback: string[]): string[] =>
+  Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : fallback;
+
+const readOptionalString = (value: unknown): string | undefined =>
+  typeof value === "string" ? value : undefined;
+
+const readDraftCachePayload = async (response: Response): Promise<DraftCachePayload | null> =>
+  (await response.json().catch(() => null)) as DraftCachePayload | null;
+
 const hydrateMoleculeDraft = async (
   draft: ChemEditorDraftWithBlockId,
   fetchImpl: typeof fetch
@@ -53,6 +81,36 @@ const hydrateMoleculeDraft = async (
   }
 };
 
+const buildCachedReactionDraft = (
+  blockId: string,
+  draft: DraftCacheRecord,
+  fallback: ChemEditorDraftWithBlockId
+): ChemEditorDraftWithBlockId => {
+  const fallbackReaction = fallback.kind === "reaction" ? fallback : undefined;
+
+  return {
+    blockId,
+    kind: "reaction",
+    reactants: readStringArray(draft.reactants, fallbackReaction?.reactants ?? []),
+    products: readStringArray(draft.products, fallbackReaction?.products ?? []),
+    conditions: readStringArray(draft.conditions, fallbackReaction?.conditions ?? []),
+    reactionSmiles: readOptionalString(draft.reactionSmiles),
+    rxnfile: readOptionalString(draft.rxnfile)
+  };
+};
+
+const buildCachedMoleculeDraft = (
+  blockId: string,
+  draft: DraftCacheRecord,
+  fallback: ChemEditorDraftWithBlockId
+): ChemEditorDraftWithBlockId => ({
+  blockId,
+  sourceKind: fallback.sourceKind,
+  kind: "molecule",
+  smiles: readOptionalString(draft.smiles) ?? (fallback.kind === "molecule" ? fallback.smiles : ""),
+  molfile: readOptionalString(draft.molfile)
+});
+
 export const loadChemdDraft = async ({
   documentId,
   blockId,
@@ -71,64 +129,16 @@ export const loadChemdDraft = async ({
     throw new Error(`Chemd draft load failed (${response.status})`);
   }
 
-  const payload = (await response.json().catch(() => null)) as
-    | {
-        found?: boolean;
-        draft?: {
-          blockId?: unknown;
-          type?: unknown;
-          smiles?: unknown;
-          molfile?: unknown;
-          reactants?: unknown;
-          products?: unknown;
-          conditions?: unknown;
-          reactionSmiles?: unknown;
-          rxnfile?: unknown;
-        };
-      }
-    | null;
+  const payload = await readDraftCachePayload(response);
 
   if (!payload?.found || !payload.draft || payload.draft.blockId !== blockId) {
     return hydrateMoleculeDraft(fallback, fetchImpl);
   }
 
   if (payload.draft.type === "reaction") {
-    return {
-      blockId,
-      kind: "reaction",
-      reactants: Array.isArray(payload.draft.reactants)
-        ? payload.draft.reactants.filter((item): item is string => typeof item === "string")
-        : fallback.kind === "reaction"
-          ? fallback.reactants
-          : [],
-      products: Array.isArray(payload.draft.products)
-        ? payload.draft.products.filter((item): item is string => typeof item === "string")
-        : fallback.kind === "reaction"
-          ? fallback.products
-          : [],
-      conditions: Array.isArray(payload.draft.conditions)
-        ? payload.draft.conditions.filter((item): item is string => typeof item === "string")
-        : fallback.kind === "reaction"
-          ? fallback.conditions
-          : [],
-      reactionSmiles:
-        typeof payload.draft.reactionSmiles === "string" ? payload.draft.reactionSmiles : undefined,
-      rxnfile:
-        typeof payload.draft.rxnfile === "string" ? payload.draft.rxnfile : undefined
-    };
+    return buildCachedReactionDraft(blockId, payload.draft, fallback);
   }
 
-  return hydrateMoleculeDraft({
-    blockId,
-    sourceKind: fallback.sourceKind,
-    kind: "molecule",
-    smiles:
-      typeof payload.draft.smiles === "string"
-        ? payload.draft.smiles
-        : fallback.kind === "molecule"
-          ? fallback.smiles
-          : "",
-    molfile:
-      typeof payload.draft.molfile === "string" ? payload.draft.molfile : undefined
-  }, fetchImpl);
+  // 缓存的 molecule draft 可能只有 smiles，进入编辑器前补一次标准 molfile。
+  return hydrateMoleculeDraft(buildCachedMoleculeDraft(blockId, payload.draft, fallback), fetchImpl);
 };

@@ -57,136 +57,149 @@ const renderMetaFrontmatter = (meta: ChemdDocument["meta"]): string => {
   return ["---", ...lines, "---"].join("\n");
 };
 
+type DocxNode = ChemdDocument["children"][number];
+type DocxNodeByType<TType extends DocxNode["type"]> = Extract<DocxNode, { type: TType }>;
+type FieldLine = [label: string, value: string | undefined];
+
+const compactLines = (lines: Array<string | undefined>): string =>
+  lines.filter((line): line is string => Boolean(line)).join("\n");
+
+const renderHeading = (label: string, id?: string): string =>
+  id ? `### ${label} \`${id}\`` : `### ${label}`;
+
+const renderFieldLines = (fields: FieldLine[]): string[] =>
+  fields.flatMap(([label, value]) => (value ? [`- ${label}: ${value}`] : []));
+
 const renderMarkdownNode = (value: string): string => value.trim();
 
-const renderStructuredNode = (node: ChemdDocument["children"][number]): string => {
-  if (node.type === "markdown") {
-    return renderMarkdownNode(node.value);
+const renderReactionNode = (node: DocxNodeByType<"reaction">): string =>
+  compactLines([
+    renderHeading("Reaction", node.id),
+    ...renderFieldLines([
+      ["Name", node.name],
+      ["Temperature", node.temperature],
+      ["Time", node.time],
+      ["Solvent", node.solvent],
+      ["Catalyst", node.catalyst],
+      ["Yield", node.yield],
+      ["Caption", node.caption]
+    ])
+  ]);
+
+const renderMoleculeNode = (node: DocxNodeByType<"molecule">): string =>
+  compactLines([
+    renderHeading("Molecule", node.id),
+    ...renderFieldLines([
+      ["Name", node.name],
+      ["Formula", node.formula],
+      ["Amount", node.amount],
+      ["Role", node.role]
+    ])
+  ]);
+
+const renderResultNode = (node: DocxNodeByType<"result">): string =>
+  compactLines([
+    renderHeading("Result", node.id),
+    ...renderFieldLines([
+      ["Status", node.status],
+      ["Yield", node.yield],
+      ["Conversion", node.conversion],
+      ["Selectivity", node.selectivity],
+      ["Isolated mass", node.isolated_mass]
+    ])
+  ]);
+
+const renderAnalysisPointLines = (node: DocxNodeByType<"analysis">): string[] =>
+  Object.entries(node)
+    .filter(([key, value]) => /^p\d+$/.test(key) && typeof value === "string" && value.length > 0)
+    .sort(([left], [right]) => left.localeCompare(right, undefined, { numeric: true }))
+    .map(([key, value]) => `- ${key.toUpperCase()}: ${value}`);
+
+const renderAnalysisNode = (node: DocxNodeByType<"analysis">): string =>
+  compactLines([
+    renderHeading("Analysis", node.id),
+    ...renderFieldLines([
+      ["Type", node.type_name],
+      ["Ref", node.ref],
+      ["Time", node.time],
+      ["Eluent", node.eluent],
+      ["Plate", node.plate],
+      ["Visualization", node.visualization],
+      ["Result", node.result],
+      ["Instrument", node.instrument],
+      ["Solvent", node.solvent],
+      ["Frequency", node.frequency],
+      ["Data", node.data]
+    ]),
+    ...renderAnalysisPointLines(node)
+  ]);
+
+const renderProcedureNode = (node: DocxNodeByType<"procedure">): string =>
+  compactLines([renderHeading("Procedure", node.id), ...renderFieldLines([["Ref", node.ref]]), node.body]);
+
+const renderObservationNode = (node: DocxNodeByType<"observation">): string =>
+  compactLines([renderHeading("Observation", node.id), ...renderFieldLines([["Ref", node.ref]]), node.body]);
+
+const renderSampleNode = (node: DocxNodeByType<"sample">): string =>
+  compactLines([
+    renderHeading("Sample", node.id),
+    ...renderFieldLines([
+      ["Name", node.name],
+      ["Sample ID", node.sample_id],
+      ["Batch", node.batch],
+      ["Purity", node.purity],
+      ["Supplier", node.supplier]
+    ])
+  ]);
+
+const renderTemplateBindLine = (bind: DocxNodeByType<"template">["bind"]): string | undefined => {
+  const values = Object.entries(bind);
+  return values.length > 0
+    ? `- Bind: ${values.map(([key, value]) => `${key}=${value}`).join(" | ")}`
+    : undefined;
+};
+
+const renderTemplateNode = (node: DocxNodeByType<"template">): string =>
+  compactLines([
+    `### Template \`${node.name}\``,
+    renderTemplateBindLine(node.bind),
+    node.params.length > 0 ? `- Params: ${node.params.join(", ")}` : undefined,
+    ...node.body.map(renderStructuredNode).filter((block) => block.length > 0)
+  ]);
+
+const renderUseNode = (node: DocxNodeByType<"use">): string => {
+  const values = Object.entries(node.values).map(([key, value]) => `${key}: ${value}`);
+  return [
+    `### Use Template \`${node.template}\``,
+    ...(values.length > 0 ? values.map((value) => `- ${value}`) : ["- (no overrides)"])
+  ].join("\n");
+};
+
+const renderStructuredNode = (node: DocxNode): string => {
+  switch (node.type) {
+    case "markdown":
+      return renderMarkdownNode(node.value);
+    case "reaction":
+      return renderReactionNode(node);
+    case "molecule":
+      return renderMoleculeNode(node);
+    case "result":
+      return renderResultNode(node);
+    case "analysis":
+      return renderAnalysisNode(node);
+    case "procedure":
+      return renderProcedureNode(node);
+    case "observation":
+      return renderObservationNode(node);
+    case "sample":
+      return renderSampleNode(node);
+    case "template":
+      return renderTemplateNode(node);
+    case "use":
+      return renderUseNode(node);
+    default:
+      return "";
   }
-
-  if (node.type === "reaction") {
-    const title = node.id ? `### Reaction \`${node.id}\`` : "### Reaction";
-    const lines = [
-      title,
-      node.name ? `- Name: ${node.name}` : undefined,
-      node.temperature ? `- Temperature: ${node.temperature}` : undefined,
-      node.time ? `- Time: ${node.time}` : undefined,
-      node.solvent ? `- Solvent: ${node.solvent}` : undefined,
-      node.catalyst ? `- Catalyst: ${node.catalyst}` : undefined,
-      node.yield ? `- Yield: ${node.yield}` : undefined,
-      node.caption ? `- Caption: ${node.caption}` : undefined
-    ].filter((line): line is string => Boolean(line));
-
-    return lines.join("\n");
-  }
-
-  if (node.type === "molecule") {
-    const title = node.id ? `### Molecule \`${node.id}\`` : "### Molecule";
-    const lines = [
-      title,
-      node.name ? `- Name: ${node.name}` : undefined,
-      node.formula ? `- Formula: ${node.formula}` : undefined,
-      node.amount ? `- Amount: ${node.amount}` : undefined,
-      node.role ? `- Role: ${node.role}` : undefined
-    ].filter((line): line is string => Boolean(line));
-
-    return lines.join("\n");
-  }
-
-  if (node.type === "result") {
-    const title = node.id ? `### Result \`${node.id}\`` : "### Result";
-    const lines = [
-      title,
-      node.status ? `- Status: ${node.status}` : undefined,
-      node.yield ? `- Yield: ${node.yield}` : undefined,
-      node.conversion ? `- Conversion: ${node.conversion}` : undefined,
-      node.selectivity ? `- Selectivity: ${node.selectivity}` : undefined,
-      node.isolated_mass ? `- Isolated mass: ${node.isolated_mass}` : undefined
-    ].filter((line): line is string => Boolean(line));
-
-    return lines.join("\n");
-  }
-
-  if (node.type === "analysis") {
-    const title = node.id ? `### Analysis \`${node.id}\`` : "### Analysis";
-    const lines = [
-      title,
-      node.type_name ? `- Type: ${node.type_name}` : undefined,
-      node.ref ? `- Ref: ${node.ref}` : undefined,
-      node.time ? `- Time: ${node.time}` : undefined,
-      node.eluent ? `- Eluent: ${node.eluent}` : undefined,
-      node.plate ? `- Plate: ${node.plate}` : undefined,
-      node.visualization ? `- Visualization: ${node.visualization}` : undefined,
-      node.result ? `- Result: ${node.result}` : undefined,
-      node.instrument ? `- Instrument: ${node.instrument}` : undefined,
-      node.solvent ? `- Solvent: ${node.solvent}` : undefined,
-      node.frequency ? `- Frequency: ${node.frequency}` : undefined,
-      node.data ? `- Data: ${node.data}` : undefined,
-      ...Object.entries(node)
-        .filter(([key, value]) => /^p\d+$/.test(key) && typeof value === "string" && value.length > 0)
-        .sort(([left], [right]) => left.localeCompare(right, undefined, { numeric: true }))
-        .map(([key, value]) => `- ${key.toUpperCase()}: ${value}`)
-    ].filter((line): line is string => Boolean(line));
-
-    return lines.join("\n");
-  }
-
-  if (node.type === "procedure") {
-    const title = node.id ? `### Procedure \`${node.id}\`` : "### Procedure";
-    const lines = [
-      title,
-      node.ref ? `- Ref: ${node.ref}` : undefined,
-      node.body
-    ].filter((line): line is string => Boolean(line));
-
-    return lines.join("\n");
-  }
-
-  if (node.type === "observation") {
-    const title = node.id ? `### Observation \`${node.id}\`` : "### Observation";
-    const lines = [
-      title,
-      node.ref ? `- Ref: ${node.ref}` : undefined,
-      node.body
-    ].filter((line): line is string => Boolean(line));
-
-    return lines.join("\n");
-  }
-
-  if (node.type === "sample") {
-    const title = node.id ? `### Sample \`${node.id}\`` : "### Sample";
-    const lines = [
-      title,
-      node.name ? `- Name: ${node.name}` : undefined,
-      node.sample_id ? `- Sample ID: ${node.sample_id}` : undefined,
-      node.batch ? `- Batch: ${node.batch}` : undefined,
-      node.purity ? `- Purity: ${node.purity}` : undefined,
-      node.supplier ? `- Supplier: ${node.supplier}` : undefined
-    ].filter((line): line is string => Boolean(line));
-
-    return lines.join("\n");
-  }
-
-  if (node.type === "template") {
-    const lines = [
-      `### Template \`${node.name}\``,
-      Object.keys(node.bind).length > 0 ? `- Bind: ${Object.entries(node.bind).map(([key, value]) => `${key}=${value}`).join(" | ")}` : undefined,
-      node.params.length > 0 ? `- Params: ${node.params.join(", ")}` : undefined,
-      ...(node.body.map(renderStructuredNode).filter((block) => block.length > 0))
-    ].filter((line): line is string => Boolean(line));
-
-    return lines.join("\n");
-  }
-
-  if (node.type === "use") {
-    const values = Object.entries(node.values).map(([key, value]) => `${key}: ${value}`);
-    return [
-      `### Use Template \`${node.template}\``,
-      ...(values.length > 0 ? values.map((value) => `- ${value}`) : ["- (no overrides)"])
-    ].join("\n");
-  }
-
-  return "";
 };
 
 export const renderDocxMarkdown = (document: ChemdDocument): string => {

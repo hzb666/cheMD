@@ -36,6 +36,18 @@ interface RenderRequestResult {
   errorMessage?: string;
 }
 
+interface MoleculeRenderResult {
+  svg: string;
+  smiles: string;
+}
+
+interface ReactionRenderResult {
+  svg: string;
+  reactants: string[];
+  products: string[];
+  conditions: string[];
+}
+
 const RENDER_REQUEST_TIMEOUT_MS = 8000;
 const subscribeToClientReady = (_onStoreChange: () => void) => () => undefined;
 const HTML_ESCAPE_MAP: Record<string, string> = {
@@ -94,6 +106,91 @@ const requestRenderPayload = async (
   }
 };
 
+const readReactionPayloadList = (value: unknown, fallback: string[]): string[] =>
+  Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : fallback;
+
+const hydrateMoleculeRenderResult = async (
+  entry: ReturnType<typeof parseMoleculeEntries>[number],
+  options: UseRenderedPreviewOptions
+): Promise<MoleculeRenderResult> => {
+  if (!entry.smiles) {
+    return {
+      svg: "",
+      smiles: entry.smiles
+    };
+  }
+
+  try {
+    const hydratedEntry = await loadHydratedMoleculeEntry(entry, options);
+    const { payload } = await requestRenderPayload(
+      buildMoleculeRenderRequestPayload(hydratedEntry, options.renderOptions)
+    );
+    return {
+      svg: typeof payload?.svg === "string" ? payload.svg : "",
+      smiles:
+        typeof payload?.canonicalSmiles === "string" && payload.canonicalSmiles.trim().length > 0
+          ? payload.canonicalSmiles
+          : hydratedEntry.smiles
+    };
+  } catch {
+    return {
+      svg: "",
+      smiles: entry.smiles
+    };
+  }
+};
+
+const hydrateReactionRenderResult = async (
+  entry: ReturnType<typeof parseReactionEntries>[number],
+  options: UseRenderedPreviewOptions
+): Promise<ReactionRenderResult> => {
+  try {
+    const hydratedEntry = await loadHydratedReactionEntry(entry, options);
+    const { payload, errorMessage } = await requestRenderPayload(
+      buildReactionRenderRequestPayload(hydratedEntry, options.renderOptions)
+    );
+    const fallbackSvg = errorMessage ? buildReactionRenderErrorMarkup(errorMessage) : "";
+    return {
+      svg: typeof payload?.svg === "string" && payload.svg.trim().length > 0 ? payload.svg : fallbackSvg,
+      reactants: readReactionPayloadList(payload?.reaction?.reactants, hydratedEntry.reactants),
+      products: readReactionPayloadList(payload?.reaction?.products, hydratedEntry.products),
+      conditions: readReactionPayloadList(payload?.reaction?.conditions, hydratedEntry.conditions)
+    };
+  } catch {
+    return {
+      svg: "",
+      reactants: entry.reactants,
+      products: entry.products,
+      conditions: entry.conditions
+    };
+  }
+};
+
+const buildHydratedPreviewHtml = (
+  baseHtml: string,
+  moleculePayloads: MoleculeRenderResult[],
+  reactionPayloads: ReactionRenderResult[]
+): string =>
+  replaceReactionFieldValues(
+    replaceReactionGraphics(
+      replaceMoleculeFieldValues(
+        replaceMoleculeGraphics(
+          baseHtml,
+          moleculePayloads.map((payload) => payload.svg)
+        ),
+        moleculePayloads.map((payload) => payload.smiles)
+      ),
+      reactionPayloads.map((payload) => payload.svg)
+    ),
+    reactionPayloads.map((payload) => ({
+      reactants: payload.reactants,
+      products: payload.products,
+      conditions: payload.conditions
+    }))
+  );
+
 export const useRenderedPreview = (
   html: string,
   options: UseRenderedPreviewOptions = {}
@@ -131,99 +228,12 @@ export const useRenderedPreview = (
         return;
       }
 
+      const hydrationOptions = { documentId, sessionId, renderOptions };
       const moleculePayloadPromise = Promise.all(
-        molecules.map(async (entry) => {
-          if (!entry.smiles) {
-            return {
-              svg: "",
-              smiles: entry.smiles
-            };
-          }
-
-          try {
-            const hydratedEntry = await loadHydratedMoleculeEntry(entry, { documentId, sessionId });
-            const { payload } = await requestRenderPayload(
-              buildMoleculeRenderRequestPayload(hydratedEntry, renderOptions)
-            );
-            if (!payload) {
-              return {
-                svg: "",
-                smiles: hydratedEntry.smiles
-              };
-            }
-            return {
-              svg: typeof payload?.svg === "string" ? payload.svg : "",
-              smiles:
-                typeof payload?.canonicalSmiles === "string" && payload.canonicalSmiles.trim().length > 0
-                  ? payload.canonicalSmiles
-                  : hydratedEntry.smiles
-            };
-          } catch {
-            return {
-              svg: "",
-              smiles: entry.smiles
-            };
-          }
-        })
+        molecules.map((entry) => hydrateMoleculeRenderResult(entry, hydrationOptions))
       );
-
       const reactionPayloadPromise = Promise.all(
-        reactions.map(async (entry) => {
-          try {
-            const hydratedEntry = await loadHydratedReactionEntry(entry, { documentId, sessionId });
-            const { payload, errorMessage } = await requestRenderPayload(
-              buildReactionRenderRequestPayload(hydratedEntry, renderOptions)
-            );
-            if (!payload && errorMessage) {
-              return {
-                svg: buildReactionRenderErrorMarkup(errorMessage),
-                reactants: hydratedEntry.reactants,
-                products: hydratedEntry.products,
-                conditions: hydratedEntry.conditions
-              };
-            }
-            if (!payload) {
-              return {
-                svg: "",
-                reactants: hydratedEntry.reactants,
-                products: hydratedEntry.products,
-                conditions: hydratedEntry.conditions
-              };
-            }
-
-            const svg =
-              typeof payload?.svg === "string" && payload.svg.trim().length > 0
-                ? payload.svg
-                : errorMessage
-                  ? buildReactionRenderErrorMarkup(errorMessage)
-                  : "";
-            return {
-              svg,
-              reactants: Array.isArray(payload?.reaction?.reactants)
-                ? payload.reaction.reactants.filter(
-                    (item): item is string => typeof item === "string" && item.trim().length > 0
-                  )
-                : hydratedEntry.reactants,
-              products: Array.isArray(payload?.reaction?.products)
-                ? payload.reaction.products.filter(
-                    (item): item is string => typeof item === "string" && item.trim().length > 0
-                  )
-                : hydratedEntry.products,
-              conditions: Array.isArray(payload?.reaction?.conditions)
-                ? payload.reaction.conditions.filter(
-                    (item): item is string => typeof item === "string" && item.trim().length > 0
-                  )
-                : hydratedEntry.conditions
-            };
-          } catch {
-            return {
-              svg: "",
-              reactants: entry.reactants,
-              products: entry.products,
-              conditions: entry.conditions
-            };
-          }
-        })
+        reactions.map((entry) => hydrateReactionRenderResult(entry, hydrationOptions))
       );
       const [moleculePayloads, reactionPayloads] = await Promise.all([
         moleculePayloadPromise,
@@ -234,24 +244,7 @@ export const useRenderedPreview = (
         return;
       }
 
-      const nextHtml = replaceReactionFieldValues(
-        replaceReactionGraphics(
-          replaceMoleculeFieldValues(
-            replaceMoleculeGraphics(
-              baseHtml,
-              moleculePayloads.map((payload) => payload.svg)
-            ),
-            moleculePayloads.map((payload) => payload.smiles)
-          ),
-          reactionPayloads.map((payload) => payload.svg)
-        ),
-        reactionPayloads.map((payload) => ({
-          reactants: payload.reactants,
-          products: payload.products,
-          conditions: payload.conditions
-        }))
-      );
-      setHydratedHtml(nextHtml);
+      setHydratedHtml(buildHydratedPreviewHtml(baseHtml, moleculePayloads, reactionPayloads));
     };
 
     void hydrate();

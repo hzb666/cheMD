@@ -34,6 +34,18 @@ interface LoadHydratedReactionEntryOptions {
   fetchImpl?: typeof fetch;
 }
 
+interface DraftCachePayload {
+  found?: boolean;
+  draft?: {
+    type?: unknown;
+    smiles?: unknown;
+    molfile?: unknown;
+    reactants?: unknown;
+    products?: unknown;
+    conditions?: unknown;
+  };
+}
+
 const DRAFT_REQUEST_TIMEOUT_MS = 5000;
 
 const HTML_ESCAPE_MAP: Record<string, string> = {
@@ -99,6 +111,59 @@ const fetchWithTimeout = async (
   } finally {
     globalThis.clearTimeout(timeoutId);
   }
+};
+
+const readDraftCachePayload = async (response: Response): Promise<DraftCachePayload | null> =>
+  (await response.json().catch(() => null)) as DraftCachePayload | null;
+
+const readNonEmptyString = (value: unknown): string | undefined =>
+  typeof value === "string" && value.trim().length > 0 ? value : undefined;
+
+const readStringList = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : [];
+
+const readOptionalStringList = (value: unknown): string[] | null =>
+  Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : null;
+
+const fallbackReactionEntry = (
+  entry: HydratedReactionEntry
+): Pick<HydratedReactionEntry, "reactants" | "products" | "conditions"> => ({
+  reactants: entry.reactants,
+  products: entry.products,
+  conditions: entry.conditions
+});
+
+const resolveMoleculeDraft = (
+  entry: HydratedMoleculeEntry,
+  payload: DraftCachePayload | null
+): { smiles: string; molfile?: string } => ({
+  smiles: readNonEmptyString(payload?.draft?.smiles) ?? entry.smiles,
+  molfile: readNonEmptyString(payload?.draft?.molfile)
+});
+
+const resolveReactionDraft = (
+  entry: HydratedReactionEntry,
+  payload: DraftCachePayload | null
+): Pick<HydratedReactionEntry, "reactants" | "products" | "conditions"> => {
+  if (!payload?.found || payload.draft?.type !== "reaction") {
+    return fallbackReactionEntry(entry);
+  }
+
+  const reactants = readOptionalStringList(payload.draft.reactants);
+  const products = readOptionalStringList(payload.draft.products);
+  if (!reactants || !products) {
+    return fallbackReactionEntry(entry);
+  }
+
+  return {
+    reactants,
+    products,
+    conditions: readStringList(payload.draft.conditions)
+  };
 };
 
 export const buildMoleculeRenderRequestPayload = (
@@ -172,30 +237,13 @@ export const loadHydratedMoleculeEntry = async (
       return { smiles: entry.smiles };
     }
 
-    const payload = (await response.json().catch(() => null)) as
-      | {
-          found?: boolean;
-          draft?: {
-            type?: unknown;
-            smiles?: unknown;
-            molfile?: unknown;
-          };
-        }
-      | null;
+    const payload = await readDraftCachePayload(response);
     if (!payload?.found) {
       return { smiles: entry.smiles };
     }
 
-    return {
-      smiles:
-        typeof payload.draft?.smiles === "string" && payload.draft.smiles.trim().length > 0
-          ? payload.draft.smiles
-          : entry.smiles,
-      molfile:
-        typeof payload.draft?.molfile === "string" && payload.draft.molfile.trim().length > 0
-          ? payload.draft.molfile
-          : undefined
-    };
+    // Preview hydration 优先使用编辑器缓存里的结构，保证图形和刚保存的 draft 同步。
+    return resolveMoleculeDraft(entry, payload);
   } catch {
     return { smiles: entry.smiles };
   }
@@ -274,70 +322,13 @@ export const loadHydratedReactionEntry = async (
       DRAFT_REQUEST_TIMEOUT_MS
     );
     if (!response?.ok) {
-      return {
-        reactants: entry.reactants,
-        products: entry.products,
-        conditions: entry.conditions
-      };
+      return fallbackReactionEntry(entry);
     }
 
-    const payload = (await response.json().catch(() => null)) as
-      | {
-          found?: boolean;
-          draft?: {
-            type?: unknown;
-            reactants?: unknown;
-            products?: unknown;
-            conditions?: unknown;
-          };
-        }
-      | null;
-
-    if (!payload?.found || payload.draft?.type !== "reaction") {
-      return {
-        reactants: entry.reactants,
-        products: entry.products,
-        conditions: entry.conditions
-      };
-    }
-
-    const hasReactants = Array.isArray(payload.draft.reactants);
-    const hasProducts = Array.isArray(payload.draft.products);
-    if (!hasReactants || !hasProducts) {
-      return {
-        reactants: entry.reactants,
-        products: entry.products,
-        conditions: entry.conditions
-      };
-    }
-
-    const reactants = Array.isArray(payload?.draft?.reactants)
-      ? payload?.draft?.reactants.filter(
-          (item): item is string => typeof item === "string" && item.trim().length > 0
-        )
-      : [];
-    const products = Array.isArray(payload?.draft?.products)
-      ? payload?.draft?.products.filter(
-          (item): item is string => typeof item === "string" && item.trim().length > 0
-        )
-      : [];
-    const conditions = Array.isArray(payload?.draft?.conditions)
-      ? payload?.draft?.conditions.filter(
-          (item): item is string => typeof item === "string" && item.trim().length > 0
-        )
-      : [];
-
-    return {
-      reactants,
-      products,
-      conditions
-    };
+    // Reaction hydration 需要 reactants/products 同时可用，避免把半截缓存写回 preview。
+    return resolveReactionDraft(entry, await readDraftCachePayload(response));
   } catch {
-    return {
-      reactants: entry.reactants,
-      products: entry.products,
-      conditions: entry.conditions
-    };
+    return fallbackReactionEntry(entry);
   }
 };
 
