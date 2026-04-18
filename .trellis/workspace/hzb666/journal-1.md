@@ -80,7 +80,7 @@ Implemented the chemd-lang v0.3 semantic core and connected the new semantic out
 | Tests | Added focused package tests for compiler v0.3, diagnostics, step ontology, typechecker, runtime lab, runtime trace, LNF, exporter training, and baseline package smoke tests. |
 | Verification | `pnpm typecheck` passed; `pnpm test` passed; v0.3 scoped eslint passed. |
 | Known blocker | Full `pnpm lint` still fails on existing unrelated complexity/React lint issues outside the v0.3 change scope. |
-| Code-spec | Added local `.trellis/spec/compiler/backend/language-v03-contracts.md` and linked it from compiler backend index; `.trellis/` is ignored and not committed. |
+| Code-spec | Added `.trellis/spec/compiler/backend/language-v03-contracts.md` and linked it from compiler backend index. |
 
 **Commit**:
 - `97d3151 feat(lang)：实现 chemd-lang v0.3 语义内核`
@@ -174,6 +174,84 @@ Cleared the current TypeScript lint complexity backlog and kept Python Ruff chec
 - [OK] `pnpm test`
 - [OK] `pnpm lint:py`
 - [OK] `poetry run ruff check app.py chem_service --select C90,PLR0911,PLR0912,PLR0913,PLR0915`
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 4: 完成 chemd DSL 语义闭环与提交拆分
+
+**Date**: 2026-04-19
+**Task**: 完成 chemd DSL 语义闭环与提交拆分
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+(Add summary)
+
+### Main Changes
+
+## Summary
+
+Completed the staged chemd DSL language package work and split the implementation into six topic-focused commits.
+
+| Area | Result |
+|------|--------|
+| Parser/Core/Resolver | Canonicalized `:::chemd` authoring with explicit semantic `kind`, AST origin tracking, template parameter validation, and legacy surface migration diagnostics. |
+| Typechecker | Added typed graph nodes, reference rules, explicit step and observation semantics, derived expression parsing, and normalized graph contracts. |
+| Export/Runtime/Renderers | Added LNF v0.4 and training export layers, threaded typed graph output through compiler/renderers, and aligned JSON/HTML/DOCX/runtime trace behavior. |
+| Web | Added diagnostics quick fix UI, canonical OCR block kind handling, stricter JSON export validation, chem-service timeout handling, and safer preview hydration. |
+| Chem Service | Improved reaction OCR payload compatibility, reaction render fallback behavior, and molecule/reaction structure cache handling. |
+| Tooling/Docs | Added legacy surface audit and migration scripts, script tests, lint coverage updates, and README DSL documentation updates. |
+
+## Commits
+
+- `ba7fff5` feat(parser)：收紧 chemd DSL 语义契约
+- `ac2d500` feat(typechecker)：补齐 typed graph 语义规则
+- `3bd576c` feat(export)：接入 LNF v0.4 与训练导出层
+- `5f105e3` feat(web)：强化 Web 化学编辑与服务边界
+- `8248e37` feat(chem-service)：完善 reaction 服务与结构缓存
+- `8a2d6ba` chore(tooling)：补充 legacy surface 工具和文档
+
+## Validation Notes
+
+- `pnpm lint` passed.
+- `node node_modules\turbo\bin\turbo run typecheck` passed.
+- `poetry run ruff check app.py chem_service tests` passed.
+- `poetry run python -m unittest discover -s tests -v` passed.
+- `pnpm --filter @chemd/web typecheck` passed.
+- `pnpm --filter @chemd/compiler typecheck` passed.
+- `pnpm exec eslint packages/compiler/src/quick-fix.ts packages/compiler/tests/quick-fix.test.ts` passed.
+- User-reported web preview hydration regression was fixed by allowing safe local render-error markup while continuing to reject unsafe markup.
+- Local Vitest execution in Codex remained blocked by environment `spawn EPERM` / mounted node_modules resolution behavior, so root Vitest was not re-run locally after the final fix.
+
+## Notes
+
+- Did not use `git add -f` when creating commits.
+- Restored `.gitignore` to the prior strategy for `docs/`, `tests/`, and `.trellis/`.
+- Final non-ignored working tree was clean before recording this session.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ba7fff5` | (see git log) |
+| `ac2d500` | (see git log) |
+| `3bd576c` | (see git log) |
+| `5f105e3` | (see git log) |
+| `8248e37` | (see git log) |
+| `8a2d6ba` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
 
 ### Status
 

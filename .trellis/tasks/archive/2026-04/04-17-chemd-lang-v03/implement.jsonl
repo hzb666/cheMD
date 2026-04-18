@@ -1,0 +1,7 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/web/backend/index.md", "reason": "Backend development guide"}
+{"file": ".trellis/spec/web/frontend/index.md", "reason": "Frontend development guide"}
+{"file": ".trellis/spec/core/backend/quality-guidelines.md", "reason": "Shared package quality and strict TypeScript rules"}
+{"file": ".trellis/spec/core/backend/error-handling.md", "reason": "Diagnostics-first error handling contract"}
+{"file": ".trellis/spec/core/backend/directory-structure.md", "reason": "Workspace package structure and public exports"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "v0.3 spans parser/resolver/compiler/exporter/runtime layers"}

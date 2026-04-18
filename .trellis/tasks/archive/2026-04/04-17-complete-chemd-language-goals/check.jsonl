@@ -1,0 +1,9 @@
+{"file": ".agents/skills/finish-work/SKILL.md", "reason": "Finish work checklist"}
+{"file": ".agents/skills/check/SKILL.md", "reason": "Code quality check spec"}
+{"file": "docs/chemd_package_task_breakdown_code_corrected.md", "reason": "verify implementation against requested goals"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "cross-layer verification"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "reuse verification"}
+{"file": ".trellis/spec/core/backend/quality-guidelines.md", "reason": "core quality checks"}
+{"file": ".trellis/spec/parser/backend/quality-guidelines.md", "reason": "parser quality checks"}
+{"file": ".trellis/spec/compiler/backend/language-v03-contracts.md", "reason": "compiler contract verification"}
+{"file": ".trellis/spec/web/frontend/quality-guidelines.md", "reason": "web quality checks"}

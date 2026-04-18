@@ -1,0 +1,17 @@
+{"file": ".agents/skills/finish-work/SKILL.md", "reason": "Finish work checklist"}
+{"file": ".agents/skills/check/SKILL.md", "reason": "Code quality check spec"}
+{"file": "AGENTS.md", "reason": "repository instructions and command conventions"}
+{"file": "package.json", "reason": "workspace scripts and toolchain"}
+{"file": "tsconfig.base.json", "reason": "strict TypeScript and @chemd aliases"}
+{"file": "eslint.config.mjs", "reason": "lint and complexity rules"}
+{"file": "vitest.workspace.ts", "reason": "test workspace shape"}
+{"file": "apps/web/src/app/api/chem/render/route.ts", "reason": "Next route validation and response pattern"}
+{"file": "apps/web/src/server/chem/request-parsers.ts", "reason": "request parsing helpers"}
+{"file": "apps/web/src/features/playground/hooks/usePlaygroundDocumentController.ts", "reason": "frontend hook/state pattern"}
+{"file": "apps/web/src/components/ui/button.tsx", "reason": "shared UI component pattern"}
+{"file": "packages/core/src/ast.ts", "reason": "shared AST contracts"}
+{"file": "packages/parser/src/index.ts", "reason": "parser public API"}
+{"file": "packages/resolver/src/index.ts", "reason": "resolver diagnostics and safety pattern"}
+{"file": "packages/compiler/src/index.ts", "reason": "cross-package compile pipeline"}
+{"file": "packages/renderer-html/src/shared.ts", "reason": "renderer escaping and safety helpers"}
+{"file": "packages/render-profile/src/index.ts", "reason": "render profile validation contracts"}

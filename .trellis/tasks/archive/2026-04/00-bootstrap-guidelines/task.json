@@ -1,0 +1,76 @@
+{
+  "id": "00-bootstrap-guidelines",
+  "name": "Bootstrap Guidelines",
+  "description": "Fill in project development guidelines for AI agents",
+  "status": "completed",
+  "dev_type": "docs",
+  "priority": "P1",
+  "creator": "hzb666",
+  "assignee": "hzb666",
+  "createdAt": "2026-04-16",
+  "completedAt": "2026-04-16",
+  "commit": null,
+  "subtasks": [
+    {
+      "name": "Fill guidelines for @chemd/web",
+      "status": "completed"
+    },
+    {
+      "name": "Fill guidelines for @chemd/compiler",
+      "status": "completed"
+    },
+    {
+      "name": "Fill guidelines for @chemd/core",
+      "status": "completed"
+    },
+    {
+      "name": "Fill guidelines for @chemd/exporter-training",
+      "status": "completed"
+    },
+    {
+      "name": "Fill guidelines for @chemd/parser",
+      "status": "completed"
+    },
+    {
+      "name": "Fill guidelines for @chemd/render-profile",
+      "status": "completed"
+    },
+    {
+      "name": "Fill guidelines for @chemd/renderer-docx",
+      "status": "completed"
+    },
+    {
+      "name": "Fill guidelines for @chemd/renderer-html",
+      "status": "completed"
+    },
+    {
+      "name": "Fill guidelines for @chemd/renderer-json",
+      "status": "completed"
+    },
+    {
+      "name": "Fill guidelines for @chemd/resolver",
+      "status": "completed"
+    },
+    {
+      "name": "Add code examples",
+      "status": "completed"
+    }
+  ],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    ".trellis/spec/web/",
+    ".trellis/spec/compiler/",
+    ".trellis/spec/core/",
+    ".trellis/spec/exporter-training/",
+    ".trellis/spec/parser/",
+    ".trellis/spec/render-profile/",
+    ".trellis/spec/renderer-docx/",
+    ".trellis/spec/renderer-html/",
+    ".trellis/spec/renderer-json/",
+    ".trellis/spec/resolver/"
+  ],
+  "notes": "First-time setup task created by trellis init (frontend project)",
+  "meta": {},
+  "package": "web"
+}
