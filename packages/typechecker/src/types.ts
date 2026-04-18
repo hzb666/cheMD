@@ -4,13 +4,18 @@ import type {
   ChemdNode,
   MoleculeNode,
   ObservationNode,
+  ProvenanceInfo,
   ProcedureNode,
   ReactionNode,
   ResultNode,
   SampleNode
 } from "@chemd/core";
+import type {
+  NormalizedReactionConditions,
+  NormalizedTlcAnalysis
+} from "@chemd/core";
 import type { V03Diagnostic } from "@chemd/diagnostics";
-import type { StepGraph } from "@chemd/step-ontology";
+import type { CanonicalStepNode, ObservationEventNode, StepGraph } from "@chemd/step-ontology";
 
 export type QuantityClass =
   | "amount"
@@ -33,9 +38,22 @@ export interface QuantityType {
   canonicalUnit?: string;
   sourceNodeId?: string;
   sourceField?: string;
+  provenance?: ProvenanceInfo;
 }
 
 export type StatusLabel = "success" | "partial" | "failed" | "unknown";
+
+export interface BoundedStringValue<KnownValue extends string = string> {
+  kind: "known" | "extension";
+  raw: string;
+  value: KnownValue | string;
+}
+
+export type AnalysisTypeLabel = "tlc" | "nmr" | "hplc" | "lcms" | "gcms";
+export type AnalysisTypeValue = BoundedStringValue<AnalysisTypeLabel>;
+
+export type AtmosphereLabel = "nitrogen" | "argon" | "air" | "oxygen" | "inert";
+export type AtmosphereValue = BoundedStringValue<AtmosphereLabel>;
 
 export interface ReferenceType {
   kind: "reference";
@@ -50,12 +68,15 @@ export interface TypedNodeBase {
   nodeId: string;
   kind: string;
   sourceNodeType: ChemdNode["type"];
+  syntaxOrigin?: string;
+  declaredKind?: string;
   diagnostics?: V03Diagnostic[];
 }
 
 export interface TypedMoleculeNode extends TypedNodeBase {
   kind: "molecule";
   smiles?: string;
+  cas?: string;
   name?: string;
   role?: string;
   formula?: string;
@@ -67,10 +88,11 @@ export interface TypedReactionNode extends TypedNodeBase {
   kind: "reaction";
   reactants: ReferenceOrLiteral[];
   products: ReferenceOrLiteral[];
+  normalizedConditions: NormalizedReactionConditions;
   solvent?: string;
   catalyst?: string;
   reagents?: string;
-  atmosphere?: string;
+  atmosphere?: AtmosphereValue;
   temperature?: QuantityType;
   time?: QuantityType;
   pressure?: QuantityType;
@@ -79,6 +101,8 @@ export interface TypedReactionNode extends TypedNodeBase {
 export interface TypedResultNode extends TypedNodeBase {
   kind: "result";
   status?: StatusLabel;
+  reaction?: ReferenceOrLiteral;
+  product?: ReferenceOrLiteral;
   yield?: QuantityType;
   conversion?: QuantityType;
   selectivity?: QuantityType;
@@ -89,8 +113,9 @@ export interface TypedResultNode extends TypedNodeBase {
 
 export interface TypedAnalysisNode extends TypedNodeBase {
   kind: "analysis";
-  analysisType?: string;
-  ref?: string;
+  analysisType?: AnalysisTypeValue;
+  normalizedTlc?: NormalizedTlcAnalysis | null;
+  ref?: ReferenceOrLiteral;
   result?: string;
   instrument?: string;
   method?: string;
@@ -101,7 +126,7 @@ export interface TypedAnalysisNode extends TypedNodeBase {
 export interface TypedProcedureNarrativeNode extends TypedNodeBase {
   kind: "procedure_narrative";
   rawText: string;
-  structureHint: "ordered_list" | "paragraph" | "mixed";
+  structureHint: "ordered_list" | "paragraph" | "mixed" | "explicit_steps";
 }
 
 export interface TypedObservationNarrativeNode extends TypedNodeBase {
@@ -110,10 +135,41 @@ export interface TypedObservationNarrativeNode extends TypedNodeBase {
   stageHint?: string;
 }
 
+export interface TypedStepNode extends TypedNodeBase {
+  kind: "step";
+  stepId: string;
+  family: CanonicalStepNode["family"];
+  params: Record<string, unknown>;
+  inputs?: CanonicalStepNode["inputs"];
+  outputs?: CanonicalStepNode["outputs"];
+  artifacts?: CanonicalStepNode["artifacts"];
+  effects?: CanonicalStepNode["effects"];
+  dependsOn?: string[];
+  source: CanonicalStepNode["source"];
+  provenance?: CanonicalStepNode["provenance"];
+  confidence: number;
+}
+
+export interface TypedObservationEventNode extends TypedNodeBase {
+  kind: "observation_event";
+  eventId: string;
+  eventType?: ObservationEventNode["eventType"];
+  stage?: string;
+  rawText: string;
+  params?: Record<string, unknown>;
+  linkedStepId?: string;
+  linkedStepFamily?: ObservationEventNode["linkedStepFamily"];
+  normalizedValue?: unknown;
+  source: ObservationEventNode["source"];
+  provenance?: ObservationEventNode["provenance"];
+  confidence: number;
+}
+
 export interface TypedSampleNode extends TypedNodeBase {
   kind: "sample";
   name?: string;
   sampleCode?: string;
+  ref?: ReferenceOrLiteral;
   purity?: QuantityType;
   supplier?: string;
   notes?: string;
@@ -126,6 +182,8 @@ export type TypedSemanticNode =
   | TypedAnalysisNode
   | TypedProcedureNarrativeNode
   | TypedObservationNarrativeNode
+  | TypedStepNode
+  | TypedObservationEventNode
   | TypedSampleNode;
 
 export interface TypedSemanticGraph {
@@ -140,6 +198,12 @@ export interface TypecheckResult {
   typedGraph: TypedSemanticGraph;
   stepGraph: StepGraph;
   diagnostics: V03Diagnostic[];
+}
+
+export type ProcedureMode = "auto" | "explicit" | "lowered";
+
+export interface TypecheckOptions {
+  procedureMode?: ProcedureMode;
 }
 
 export interface QuantityParseContext {

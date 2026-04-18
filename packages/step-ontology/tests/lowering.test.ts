@@ -27,7 +27,18 @@ describe("procedure and observation lowering", () => {
     ]);
     expect(result.steps[1].params.target_temperature).toBe("-78 °C");
     expect(result.steps[2].params.mode).toBe("dropwise");
-    expect(result.diagnostics).toEqual([]);
+    expect(result.steps[0].provenance).toMatchObject({
+      origin: "lowered",
+      sourceNodeType: "procedure",
+      sourceNodeId: "proc-main",
+      ruleId: "step_ontology.procedure.charge"
+    });
+    expect(result.diagnostics).toEqual([
+      expect.objectContaining({
+        code: "W_PROCEDURE_PROSE_LOWERED",
+        sourceField: "body"
+      })
+    ]);
   });
 
   it("preserves ambiguous prose and emits a low-confidence diagnostic", () => {
@@ -40,7 +51,10 @@ describe("procedure and observation lowering", () => {
       family: "observe",
       loweringConfidence: 0.35
     });
-    expect(result.diagnostics[0]?.code).toBe("W805");
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+      "W_PROCEDURE_PROSE_LOWERED",
+      "W805"
+    ]);
   });
 
   it("lowers observations and analysis blocks without new surface syntax", () => {
@@ -55,8 +69,24 @@ describe("procedure and observation lowering", () => {
 
     expect(observation.events[0]).toMatchObject({
       eventType: "color_change",
-      linkedStepFamily: "add"
+      linkedStepFamily: "add",
+      provenance: expect.objectContaining({
+        origin: "lowered",
+        sourceNodeType: "observation",
+        sourceNodeId: "obs-1",
+        ruleId: "step_ontology.observation.event"
+      })
     });
+    expect(observation.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+      "W_OBSERVATION_PROSE_LOWERED"
+    ]);
     expect(analysis.steps.map((step) => step.family)).toEqual(["sample", "analyze"]);
+    expect(analysis.steps.every((step) => step.source.sourceType === "lowered_step")).toBe(true);
+    expect(analysis.steps[0].provenance).toMatchObject({
+      origin: "lowered",
+      sourceNodeType: "analysis",
+      sourceNodeId: "ana-tlc",
+      ruleId: "step_ontology.analysis.sample"
+    });
   });
 });

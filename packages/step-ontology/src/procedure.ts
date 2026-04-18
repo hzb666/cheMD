@@ -1,5 +1,6 @@
 import { createV03Diagnostic } from "@chemd/diagnostics";
 import type { V03Diagnostic } from "@chemd/diagnostics";
+import type { ProvenanceInfo } from "@chemd/core";
 
 import type {
   CanonicalStepNode,
@@ -32,20 +33,43 @@ const createStep = (
   params: Record<string, unknown>,
   confidence: number,
   effects: StepEffect[] = []
-): CanonicalStepNode => ({
-  stepId: context.nextStepId(),
-  family,
-  params,
-  ...(effects.length > 0 ? { effects } : {}),
-  source: createProcedureSource(context),
-  loweringConfidence: confidence
-});
+): CanonicalStepNode => {
+  const provenance = createProcedureProvenance(context, family, confidence);
 
-const createProcedureSource = (context: SentenceContext): StepSourceInfo => ({
+  return {
+    stepId: context.nextStepId(),
+    family,
+    params,
+    ...(effects.length > 0 ? { effects } : {}),
+    source: createProcedureSource(context, provenance),
+    provenance,
+    loweringConfidence: confidence
+  };
+};
+
+const createProcedureProvenance = (
+  context: SentenceContext,
+  family: StepFamily,
+  confidence: number
+): ProvenanceInfo => ({
+  origin: "lowered",
   sourceNodeType: "procedure",
   sourceNodeId: context.procedureId,
+  sourceField: "body",
+  ruleId: `step_ontology.procedure.${family}`,
+  confidence
+});
+
+const createProcedureSource = (
+  context: SentenceContext,
+  provenance: ProvenanceInfo
+): StepSourceInfo => ({
+  sourceNodeType: "procedure",
+  sourceNodeId: context.procedureId,
+  sourceType: "lowered_step",
   sentenceIndex: context.sentenceIndex,
-  rawText: context.sentence
+  rawText: context.sentence,
+  provenance
 });
 
 const hasAny = (text: string, patterns: RegExp[]): boolean =>
@@ -195,10 +219,22 @@ const createLowConfidenceDiagnostic = (procedureId: string | undefined, sentence
     code: "W805",
     severity: "warning",
     message: "Procedure sentence was kept as low-confidence prose because no canonical step matched.",
-    sourceLayer: "procedure_lowering",
+    sourceLayer: "lowering",
     sourceNodeType: "procedure",
     sourceNodeId: procedureId,
+    sourceField: "body",
     facts: { raw_sentence: sentence }
+  });
+
+const createProcedureLoweredDiagnostic = (procedureId: string | undefined): V03Diagnostic =>
+  createV03Diagnostic({
+    code: "W_PROCEDURE_PROSE_LOWERED",
+    severity: "warning",
+    message: "Procedure prose was lowered into canonical steps; prefer explicit step blocks.",
+    sourceLayer: "lowering",
+    sourceNodeType: "procedure",
+    sourceNodeId: procedureId,
+    sourceField: "body"
   });
 
 const averageConfidence = (steps: CanonicalStepNode[]): number => {
@@ -228,9 +264,14 @@ export const lowerProcedureToSteps = (input: ProcedureLoweringInput): ProcedureL
     steps.push(...lowered);
   });
 
+  if (sentences.length > 0) {
+    diagnostics.unshift(createProcedureLoweredDiagnostic(input.procedureId));
+  }
+
   return {
     procedureId: input.procedureId,
     structureHint: detectStructureHint(input.body),
+    sourceType: "lowered_prose",
     steps,
     diagnostics,
     loweringConfidence: averageConfidence(steps)

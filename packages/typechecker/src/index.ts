@@ -1,11 +1,5 @@
 import type { ChemdDocument } from "@chemd/core";
-import {
-  lowerObservationToEvents,
-  lowerProcedureToSteps,
-  type ObservationLoweringResult,
-  type ProcedureLoweringResult,
-  type StepGraph
-} from "@chemd/step-ontology";
+import type { ObservationLoweringResult, ProcedureLoweringResult, StepGraph } from "@chemd/step-ontology";
 import type { V03Diagnostic } from "@chemd/diagnostics";
 
 import {
@@ -18,13 +12,18 @@ import {
   buildSampleNode,
   type BuiltTypedNode
 } from "./nodes";
+import { buildTypedObservationEventNodes, buildTypedStepNode } from "./graph-nodes";
+import { resolveObservationEvents, validateObservationEventLinks } from "./observations";
 import { createObjectIndex } from "./references";
+import { resolveProcedureSteps } from "./steps";
 import { collectNodes, isObjectNode } from "./traversal";
 import type {
   ObjectNode,
+  ProcedureMode,
   QuantityType,
   TypedSemanticGraph,
   TypedSemanticNode,
+  TypecheckOptions,
   TypecheckResult
 } from "./types";
 
@@ -38,6 +37,12 @@ interface Accumulator {
   observationResults: ObservationLoweringResult[];
   stepGraphDiagnostics: V03Diagnostic[];
   stepGraphSteps: StepGraph["steps"];
+}
+
+interface ProcedureProcessContext {
+  accumulator: Accumulator;
+  objectIndex: Map<string, ObjectNode>;
+  procedureMode: ProcedureMode;
 }
 
 const createAccumulator = (): Accumulator => ({
@@ -56,23 +61,22 @@ const appendBuiltNode = (accumulator: Accumulator, built: BuiltTypedNode) => {
   accumulator.diagnostics.push(...built.diagnostics);
 };
 
-const processProcedure = (node: Extract<ObjectNode, { type: "procedure" }>, accumulator: Accumulator) => {
-  const lowered = lowerProcedureToSteps({
-    procedureId: node.id,
-    body: node.body
-  });
+const processProcedure = (
+  node: Extract<ObjectNode, { type: "procedure" }>,
+  context: ProcedureProcessContext
+) => {
+  const { accumulator, objectIndex, procedureMode } = context;
+  const { result: lowered, quantities } = resolveProcedureSteps(node, procedureMode, objectIndex);
 
   accumulator.procedureResults.push(lowered);
+  accumulator.quantities.push(...quantities);
   accumulator.stepGraphSteps.push(...lowered.steps);
   accumulator.stepGraphDiagnostics.push(...lowered.diagnostics);
   appendBuiltNode(accumulator, buildProcedureNode(node, lowered.structureHint));
 };
 
 const processObservation = (node: Extract<ObjectNode, { type: "observation" }>, accumulator: Accumulator) => {
-  const lowered = lowerObservationToEvents({
-    observationId: node.id,
-    body: node.body
-  });
+  const lowered = resolveObservationEvents(node);
 
   accumulator.observationResults.push(lowered);
   accumulator.stepGraphDiagnostics.push(...lowered.diagnostics);
@@ -82,10 +86,11 @@ const processObservation = (node: Extract<ObjectNode, { type: "observation" }>, 
 const processObjectNode = (
   node: ObjectNode,
   objectIndex: Map<string, ObjectNode>,
-  accumulator: Accumulator
+  accumulator: Accumulator,
+  procedureMode: ProcedureMode
 ) => {
   if (node.type === "procedure") {
-    processProcedure(node, accumulator);
+    processProcedure(node, { accumulator, objectIndex, procedureMode });
     return;
   }
 
@@ -102,7 +107,7 @@ const buildTypedObjectNode = (
   objectIndex: Map<string, ObjectNode>
 ): BuiltTypedNode => {
   if (node.type === "molecule") {
-    return buildMoleculeNode(node);
+    return buildMoleculeNode(node, { objectIndex });
   }
 
   if (node.type === "reaction") {
@@ -110,14 +115,14 @@ const buildTypedObjectNode = (
   }
 
   if (node.type === "result") {
-    return buildResultNode(node);
+    return buildResultNode(node, { objectIndex });
   }
 
   if (node.type === "analysis") {
-    return buildAnalysisNode(node);
+    return buildAnalysisNode(node, { objectIndex });
   }
 
-  return buildSampleNode(node);
+  return buildSampleNode(node, { objectIndex });
 };
 
 const buildStepGraph = (accumulator: Accumulator): StepGraph => ({
@@ -127,20 +132,32 @@ const buildStepGraph = (accumulator: Accumulator): StepGraph => ({
   diagnostics: accumulator.stepGraphDiagnostics
 });
 
-export const typecheckDocument = (document: ChemdDocument): TypecheckResult => {
+export const typecheckDocument = (
+  document: ChemdDocument,
+  options: TypecheckOptions = {}
+): TypecheckResult => {
   const objectNodes = collectNodes(document.children).filter(isObjectNode);
   const objectIndex = createObjectIndex(objectNodes);
   const accumulator = createAccumulator();
+  const procedureMode = options.procedureMode ?? "auto";
 
   for (const node of objectNodes) {
-    processObjectNode(node, objectIndex, accumulator);
+    processObjectNode(node, objectIndex, accumulator, procedureMode);
   }
 
+  accumulator.stepGraphDiagnostics.push(
+    ...validateObservationEventLinks(accumulator.observationResults, accumulator.stepGraphSteps)
+  );
   accumulator.diagnostics.push(...accumulator.stepGraphDiagnostics);
+  const stepGraph = buildStepGraph(accumulator);
 
   const typedGraph: TypedSemanticGraph = {
     documentId: document.meta.id,
-    nodes: accumulator.nodes,
+    nodes: [
+      ...accumulator.nodes,
+      ...stepGraph.steps.map(buildTypedStepNode),
+      ...buildTypedObservationEventNodes(stepGraph.observations)
+    ],
     quantities: accumulator.quantities,
     diagnostics: accumulator.diagnostics
   };
@@ -148,7 +165,7 @@ export const typecheckDocument = (document: ChemdDocument): TypecheckResult => {
   return {
     document,
     typedGraph,
-    stepGraph: buildStepGraph(accumulator),
+    stepGraph,
     diagnostics: accumulator.diagnostics
   };
 };

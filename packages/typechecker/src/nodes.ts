@@ -7,10 +7,21 @@ import type {
   ResultNode,
   SampleNode
 } from "@chemd/core";
+import {
+  classifyReactionConditions,
+  classifyTlcAnalysis
+} from "@chemd/core";
 import type { V03Diagnostic } from "@chemd/diagnostics";
 
-import { parseQuantity, normalizeStatus } from "./normalize";
-import { toReferenceOrLiteral } from "./references";
+import {
+  normalizeAnalysisType,
+  normalizeAtmosphere,
+  normalizeStatus,
+  parseQuantity
+} from "./normalize";
+import { resolveDerivedField } from "./expressions";
+import { resolveOptionalReference, resolveReferenceList } from "./reference-rules";
+import { resolveResultRelationships, resolveSampleRelationships } from "./relationships";
 import type {
   ObjectNode,
   QuantityClass,
@@ -35,34 +46,71 @@ export interface BuiltTypedNode {
   diagnostics: V03Diagnostic[];
 }
 
-const readQuantity = (
-  raw: string | undefined,
-  quantityClass: QuantityClass,
-  sourceNodeType: string,
-  sourceNodeId: string | undefined,
-  field: string
-): { quantity?: QuantityType; diagnostic?: V03Diagnostic } =>
-  parseQuantity(raw, quantityClass, {
-    sourceNodeType,
-    sourceNodeId,
-    field
+interface ReadQuantityInput {
+  raw: string | undefined;
+  quantityClass: QuantityClass;
+  sourceNodeType: string;
+  sourceNodeId?: string;
+  field: string;
+  objectIndex: Map<string, ObjectNode>;
+}
+
+const readQuantity = (input: ReadQuantityInput): { quantity?: QuantityType; diagnostics: V03Diagnostic[] } => {
+  const derived = resolveDerivedField(input.raw, input);
+  if (derived.diagnostic) {
+    return {
+      quantity: createRawQuantity(input),
+      diagnostics: [derived.diagnostic]
+    };
+  }
+
+  const parsed = parseQuantity(derived.value, input.quantityClass, {
+    sourceNodeType: input.sourceNodeType,
+    sourceNodeId: input.sourceNodeId,
+    field: input.field
   });
+  const quantity = parsed.quantity && derived.provenance
+    ? { ...parsed.quantity, provenance: derived.provenance }
+    : parsed.quantity;
+
+  return {
+    ...(quantity ? { quantity } : {}),
+    diagnostics: parsed.diagnostic ? [parsed.diagnostic] : []
+  };
+};
+
+const createRawQuantity = (input: ReadQuantityInput): QuantityType | undefined =>
+  input.raw
+    ? {
+        kind: "quantity",
+        quantityClass: input.quantityClass,
+        raw: input.raw.trim(),
+        sourceNodeId: input.sourceNodeId,
+        sourceField: input.field
+      }
+    : undefined;
 
 const collectQuantity = (
   output: BuiltTypedNode,
   key: string,
   quantityClass: QuantityClass,
-  raw: string | undefined
+  raw: string | undefined,
+  objectIndex: Map<string, ObjectNode>
 ): QuantityType | undefined => {
-  const parsed = readQuantity(raw, quantityClass, output.node.sourceNodeType, output.node.nodeId, key);
+  const parsed = readQuantity({
+    raw,
+    quantityClass,
+    sourceNodeType: output.node.sourceNodeType,
+    sourceNodeId: output.node.nodeId,
+    field: key,
+    objectIndex
+  });
 
   if (parsed.quantity) {
     output.quantities.push(parsed.quantity);
   }
 
-  if (parsed.diagnostic) {
-    output.diagnostics.push(parsed.diagnostic);
-  }
+  output.diagnostics.push(...parsed.diagnostics);
 
   return parsed.quantity;
 };
@@ -71,20 +119,32 @@ const createBase = (kind: TypedSemanticNode["kind"], node: ObjectNode): BuiltTyp
   node: {
     kind,
     nodeId: node.id ?? `${node.type}:anonymous`,
-    sourceNodeType: node.type
+    sourceNodeType: node.type,
+    ...("syntaxOrigin" in node && node.syntaxOrigin ? { syntaxOrigin: node.syntaxOrigin } : {}),
+    ...("declaredKind" in node && node.declaredKind ? { declaredKind: node.declaredKind } : {})
   } as TypedSemanticNode,
   quantities: [],
   diagnostics: []
 });
 
-export const buildMoleculeNode = (node: MoleculeNode): BuiltTypedNode => {
+export const buildMoleculeNode = (
+  node: MoleculeNode,
+  context: BuildNodeContext
+): BuiltTypedNode => {
   const output = createBase("molecule", node);
-  const amount = collectQuantity(output, "amount", "amount", node.amount);
-  const equivalents = collectQuantity(output, "equivalents", "equivalent", node.equivalents);
+  const amount = collectQuantity(output, "amount", "amount", node.amount, context.objectIndex);
+  const equivalents = collectQuantity(
+    output,
+    "equivalents",
+    "equivalent",
+    node.equivalents,
+    context.objectIndex
+  );
 
   output.node = {
     ...output.node,
     smiles: node.smiles,
+    cas: node.cas,
     name: node.name,
     role: node.role,
     formula: node.formula,
@@ -100,18 +160,34 @@ export const buildReactionNode = (
   context: BuildNodeContext
 ): BuiltTypedNode => {
   const output = createBase("reaction", node);
-  const temperature = collectQuantity(output, "temperature", "temperature", node.temperature);
-  const time = collectQuantity(output, "time", "time", node.time);
-  const pressure = collectQuantity(output, "pressure", "pressure", node.pressure);
+  const temperature = collectQuantity(output, "temperature", "temperature", node.temperature, context.objectIndex);
+  const time = collectQuantity(output, "time", "time", node.time, context.objectIndex);
+  const pressure = collectQuantity(output, "pressure", "pressure", node.pressure, context.objectIndex);
+  const atmosphere = normalizeAtmosphere(node.atmosphere);
+  const reactants = resolveReferenceList(node.reactants ?? [], context.objectIndex, {
+    sourceNodeType: "reaction",
+    sourceNodeId: node.id,
+    field: "reactants",
+    expectedTargetKind: "molecule"
+  });
+  const products = resolveReferenceList(node.products ?? [], context.objectIndex, {
+    sourceNodeType: "reaction",
+    sourceNodeId: node.id,
+    field: "products",
+    expectedTargetKind: "molecule"
+  });
+
+  output.diagnostics.push(...reactants.diagnostics, ...products.diagnostics);
 
   output.node = {
     ...output.node,
-    reactants: (node.reactants ?? []).map((raw) => toReferenceOrLiteral(raw, context.objectIndex)),
-    products: (node.products ?? []).map((raw) => toReferenceOrLiteral(raw, context.objectIndex)),
+    reactants: reactants.values,
+    products: products.values,
+    normalizedConditions: classifyReactionConditions(node),
     solvent: node.solvent,
     catalyst: node.catalyst,
     reagents: node.reagents,
-    atmosphere: node.atmosphere,
+    ...(atmosphere ? { atmosphere } : {}),
     ...(temperature ? { temperature } : {}),
     ...(time ? { time } : {}),
     ...(pressure ? { pressure } : {})
@@ -120,25 +196,38 @@ export const buildReactionNode = (
   return output;
 };
 
-export const buildResultNode = (node: ResultNode): BuiltTypedNode => {
+export const buildResultNode = (
+  node: ResultNode,
+  context: BuildNodeContext
+): BuiltTypedNode => {
   const output = createBase("result", node);
   const normalizedStatus = normalizeStatus(node.status, {
     sourceNodeType: "result",
     sourceNodeId: node.id
   });
-  const yieldPercent = collectQuantity(output, "yield", "percent", node.yield);
-  const conversion = collectQuantity(output, "conversion", "percent", node.conversion);
-  const selectivity = collectQuantity(output, "selectivity", "percent", node.selectivity);
-  const purity = collectQuantity(output, "purity", "percent", node.purity);
-  const isolatedMass = collectQuantity(output, "isolated_mass", "mass", node.isolated_mass);
+  const yieldPercent = collectQuantity(output, "yield", "percent", node.yield, context.objectIndex);
+  const conversion = collectQuantity(output, "conversion", "percent", node.conversion, context.objectIndex);
+  const selectivity = collectQuantity(output, "selectivity", "percent", node.selectivity, context.objectIndex);
+  const purity = collectQuantity(output, "purity", "percent", node.purity, context.objectIndex);
+  const relationships = resolveResultRelationships(node, context.objectIndex);
+  const isolatedMass = collectQuantity(
+    output,
+    "isolated_mass",
+    "mass",
+    node.isolated_mass,
+    context.objectIndex
+  );
 
   if (normalizedStatus.diagnostic) {
     output.diagnostics.push(normalizedStatus.diagnostic);
   }
+  output.diagnostics.push(...relationships.diagnostics);
 
   output.node = {
     ...output.node,
     status: normalizedStatus.status,
+    ...(relationships.reaction ? { reaction: relationships.reaction } : {}),
+    ...(relationships.product ? { product: relationships.product } : {}),
     ...(yieldPercent ? { yield: yieldPercent } : {}),
     ...(conversion ? { conversion } : {}),
     ...(selectivity ? { selectivity } : {}),
@@ -150,23 +239,37 @@ export const buildResultNode = (node: ResultNode): BuiltTypedNode => {
   return output;
 };
 
-export const buildAnalysisNode = (node: AnalysisNode): BuiltTypedNode => ({
-  ...createBase("analysis", node),
-  node: {
-    ...createBase("analysis", node).node,
-    analysisType: node.type_name,
-    ref: node.ref,
+export const buildAnalysisNode = (
+  node: AnalysisNode,
+  context: BuildNodeContext
+): BuiltTypedNode => {
+  const output = createBase("analysis", node);
+  const analysisType = normalizeAnalysisType(node.type_name);
+  const reference = resolveOptionalReference(node.ref, context.objectIndex, {
+    sourceNodeType: "analysis",
+    sourceNodeId: node.id,
+    field: "ref"
+  });
+
+  output.diagnostics.push(...reference.diagnostics);
+  output.node = {
+    ...output.node,
+    ...(analysisType ? { analysisType } : {}),
+    normalizedTlc: classifyTlcAnalysis(node) ?? null,
+    ...(reference.value ? { ref: reference.value } : {}),
     result: node.result,
     instrument: node.instrument,
     method: node.method,
     data: node.data,
     notes: node.notes
-  } as TypedAnalysisNode
-});
+  } as TypedAnalysisNode;
+
+  return output;
+};
 
 export const buildProcedureNode = (
   node: ProcedureNode,
-  structureHint: "ordered_list" | "paragraph" | "mixed"
+  structureHint: "ordered_list" | "paragraph" | "mixed" | "explicit_steps"
 ): BuiltTypedNode => ({
   ...createBase("procedure_narrative", node),
   node: {
@@ -185,14 +288,21 @@ export const buildObservationNode = (node: ObservationNode): BuiltTypedNode => (
   } as TypedObservationNarrativeNode
 });
 
-export const buildSampleNode = (node: SampleNode): BuiltTypedNode => {
+export const buildSampleNode = (
+  node: SampleNode,
+  context: BuildNodeContext
+): BuiltTypedNode => {
   const output = createBase("sample", node);
-  const purity = collectQuantity(output, "purity", "percent", node.purity);
+  const purity = collectQuantity(output, "purity", "percent", node.purity, context.objectIndex);
+  const relationships = resolveSampleRelationships(node, context.objectIndex);
+
+  output.diagnostics.push(...relationships.diagnostics);
 
   output.node = {
     ...output.node,
     name: node.name,
     sampleCode: node.sample_id,
+    ...(relationships.ref ? { ref: relationships.ref } : {}),
     ...(purity ? { purity } : {}),
     supplier: node.supplier,
     notes: node.notes

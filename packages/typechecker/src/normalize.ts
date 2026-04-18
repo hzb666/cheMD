@@ -1,7 +1,16 @@
 import { createV03Diagnostic } from "@chemd/diagnostics";
 import type { V03Diagnostic } from "@chemd/diagnostics";
 
-import type { QuantityClass, QuantityParseContext, QuantityType, StatusLabel } from "./types";
+import type {
+  AnalysisTypeLabel,
+  AnalysisTypeValue,
+  AtmosphereLabel,
+  AtmosphereValue,
+  QuantityClass,
+  QuantityParseContext,
+  QuantityType,
+  StatusLabel
+} from "./types";
 
 interface ParsedUnit {
   unit: string;
@@ -70,8 +79,49 @@ const STATUS_ALIASES: Record<string, StatusLabel> = {
   unknown: "unknown"
 };
 
+const ANALYSIS_TYPE_ALIASES: Record<string, AnalysisTypeLabel> = {
+  tlc: "tlc",
+  nmr: "nmr",
+  hplc: "hplc",
+  lcms: "lcms",
+  "lc-ms": "lcms",
+  gcms: "gcms",
+  "gc-ms": "gcms"
+};
+
+const ATMOSPHERE_ALIASES: Record<string, AtmosphereLabel> = {
+  n2: "nitrogen",
+  nitrogen: "nitrogen",
+  argon: "argon",
+  ar: "argon",
+  air: "air",
+  oxygen: "oxygen",
+  o2: "oxygen",
+  inert: "inert"
+};
+
 const normalizeUnitKey = (unit: string): string =>
   unit.trim().replace(/\s+/g, "").toLowerCase();
+
+const normalizeTokenKey = (raw: string): string =>
+  raw.trim().replace(/\s+/g, "-").toLowerCase();
+
+const normalizeBoundedString = <KnownValue extends string>(
+  raw: string | undefined,
+  aliases: Record<string, KnownValue>
+): { kind: "known" | "extension"; raw: string; value: KnownValue | string } | undefined => {
+  if (!raw) {
+    return undefined;
+  }
+
+  const trimmed = raw.trim();
+  const value = aliases[normalizeTokenKey(trimmed)];
+  return {
+    kind: value ? "known" : "extension",
+    raw: trimmed,
+    value: value ?? trimmed
+  };
+};
 
 const createQuantityDiagnostic = (
   raw: string,
@@ -85,6 +135,7 @@ const createQuantityDiagnostic = (
     sourceLayer: "typechecker",
     sourceNodeType: context.sourceNodeType,
     sourceNodeId: context.sourceNodeId,
+    sourceField: context.field,
     facts: {
       field: context.field,
       raw_value: raw,
@@ -103,6 +154,7 @@ const createPercentDiagnostic = (
     sourceLayer: "typechecker",
     sourceNodeType: context.sourceNodeType,
     sourceNodeId: context.sourceNodeId,
+    sourceField: context.field,
     facts: { field: context.field, raw_value: raw }
   });
 
@@ -198,7 +250,14 @@ export const normalizeStatus = (
       sourceLayer: "typechecker",
       sourceNodeType: context.sourceNodeType,
       sourceNodeId: context.sourceNodeId,
+      sourceField: "status",
       facts: { field: "status", raw_value: raw }
     })
   };
 };
+
+export const normalizeAnalysisType = (raw: string | undefined): AnalysisTypeValue | undefined =>
+  normalizeBoundedString(raw, ANALYSIS_TYPE_ALIASES);
+
+export const normalizeAtmosphere = (raw: string | undefined): AtmosphereValue | undefined =>
+  normalizeBoundedString(raw, ATMOSPHERE_ALIASES);
