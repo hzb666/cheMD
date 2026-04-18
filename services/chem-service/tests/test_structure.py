@@ -16,6 +16,9 @@ class ChemServiceStructureRouteTest(ChemServiceAppTestCase):
                 "products": ["CC(=O)O"],
                 "conditions": ["air"],
                 "source": "manual",
+                "provider": "rxnscribe",
+                "fingerprint": "rxn-fp",
+                "normalized": {"reactants": ["CCO"]},
             },
         )
         same_session = self.client.get(
@@ -31,6 +34,9 @@ class ChemServiceStructureRouteTest(ChemServiceAppTestCase):
         self.assertTrue(same_session.get_json()["found"])
         self.assertEqual(same_session.get_json()["record"]["kind"], "reaction")
         self.assertEqual(same_session.get_json()["record"]["reactants"], ["CCO"])
+        self.assertEqual(same_session.get_json()["record"]["provider"], "rxnscribe")
+        self.assertEqual(same_session.get_json()["record"]["fingerprint"], "rxn-fp")
+        self.assertEqual(same_session.get_json()["record"]["normalized"], {"reactants": ["CCO"]})
         self.assertEqual(other_session.status_code, 200)
         self.assertFalse(other_session.get_json()["found"])
 

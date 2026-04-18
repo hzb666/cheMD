@@ -134,10 +134,84 @@ def _decode_image_bytes(image_base64: str) -> bytes | None:
         return None
 
 
-def _placeholder_ocr_response(message: str) -> Any:
+def _complete_service_payload(
+    payload: dict[str, Any],
+    *,
+    kind: str,
+    provider: str,
+    placeholder: bool = False,
+    normalized: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    completed = dict(payload)
+    completed.setdefault("kind", kind)
+    completed.setdefault("provider", provider)
+    completed.setdefault("placeholder", placeholder)
+    completed.setdefault("candidates", [])
+    if normalized is not None:
+        completed.setdefault("normalized", normalized)
+    return completed
+
+
+def _complete_molecule_payload(
+    payload: dict[str, Any],
+    *,
+    provider: str,
+    placeholder: bool = False,
+) -> dict[str, Any]:
+    structure = payload.get("structure")
+    normalized = structure if isinstance(structure, dict) else None
+    completed = _complete_service_payload(
+        payload,
+        kind="molecule",
+        provider=provider,
+        placeholder=placeholder,
+        normalized=normalized,
+    )
+    if not completed["candidates"] and normalized is not None:
+        completed["candidates"] = [
+            {
+                "provider": completed["provider"],
+                "structure": normalized,
+                "confidence": completed.get("confidence"),
+            }
+        ]
+    return completed
+
+
+def _complete_reaction_payload(
+    payload: dict[str, Any],
+    *,
+    provider: str,
+    placeholder: bool = False,
+) -> dict[str, Any]:
+    reaction = payload.get("reaction")
+    normalized = reaction if isinstance(reaction, dict) else None
+    completed = _complete_service_payload(
+        payload,
+        kind="reaction",
+        provider=provider,
+        placeholder=placeholder,
+        normalized=normalized,
+    )
+    if not completed["candidates"] and normalized is not None:
+        completed["candidates"] = [
+            {
+                "provider": completed["provider"],
+                "reaction": normalized,
+                "confidence": completed.get("confidence"),
+            }
+        ]
+    return completed
+
+
+def _placeholder_ocr_response(message: str, *, kind: str) -> Any:
     return jsonify(
         {
             "status": "failed",
+            "kind": kind,
+            "provider": "placeholder",
+            "candidates": [],
+            "placeholder": True,
             "warnings": [message],
         }
     )
@@ -575,10 +649,13 @@ def ocr() -> Any:
         mime_type if isinstance(mime_type, str) else None,
     )
     if provider_payload is not None:
-        return jsonify(provider_payload)
+        return jsonify(
+            _complete_molecule_payload(provider_payload, provider=_MOLECULE_OCR_PROVIDER)
+        )
 
     return _placeholder_ocr_response(
-        "Molecule OCR provider is not enabled; placeholder structure was not persisted."
+        "Molecule OCR provider is not enabled; placeholder structure was not persisted.",
+        kind="molecule",
     )
 
 
@@ -598,12 +675,30 @@ def normalize() -> Any:
 
     rdkit_payload = _normalize_with_rdkit(normalized_smiles, normalized_molfile)
     if rdkit_payload is not None:
-        return jsonify(rdkit_payload)
+        return jsonify(
+            _complete_service_payload(
+                rdkit_payload,
+                kind="molecule",
+                provider="rdkit",
+                normalized={
+                    "canonicalSmiles": rdkit_payload.get("canonicalSmiles"),
+                    "normalizedMolfile": rdkit_payload.get("normalizedMolfile"),
+                },
+            )
+        )
 
     return jsonify(
         {
+            "kind": "molecule",
+            "provider": "fallback",
+            "candidates": [],
+            "placeholder": False,
             "canonicalSmiles": normalized_smiles or "",
             "normalizedMolfile": normalized_molfile or None,
+            "normalized": {
+                "canonicalSmiles": normalized_smiles or "",
+                "normalizedMolfile": normalized_molfile or None,
+            },
             "warnings": ["RDKit normalization fallback is active."],
         }
     )
@@ -630,14 +725,34 @@ def render() -> Any:
         render_options if isinstance(render_options, dict) else None,
     )
     if rdkit_payload is not None:
-        return jsonify(rdkit_payload)
+        return jsonify(
+            _complete_service_payload(
+                rdkit_payload,
+                kind="molecule",
+                provider="rdkit",
+                normalized={
+                    "canonicalSmiles": rdkit_payload.get("canonicalSmiles"),
+                    "normalizedMolfile": rdkit_payload.get("normalizedMolfile"),
+                },
+            )
+        )
 
     display = normalized_smiles or normalized_molfile or "structure"
     svg = molecule_rendering._build_molecule_fallback_svg(display)
 
     return jsonify(
         {
+            "kind": "molecule",
+            "provider": "fallback",
+            "candidates": [],
+            "placeholder": False,
             "svg": svg,
+            "canonicalSmiles": normalized_smiles or "",
+            "normalizedMolfile": normalized_molfile or None,
+            "normalized": {
+                "canonicalSmiles": normalized_smiles or "",
+                "normalizedMolfile": normalized_molfile or None,
+            },
             "warnings": ["RDKit render fallback is active."],
         }
     )
@@ -664,10 +779,13 @@ def reaction_ocr() -> Any:
             mime_type if isinstance(mime_type, str) else None,
         )
         if provider_payload is not None:
-            return jsonify(provider_payload)
+            return jsonify(
+                _complete_reaction_payload(provider_payload, provider=_REACTION_OCR_PROVIDER)
+            )
 
     return _placeholder_ocr_response(
-        "Reaction OCR provider is not enabled; placeholder reaction was not persisted."
+        "Reaction OCR provider is not enabled; placeholder reaction was not persisted.",
+        kind="reaction",
     )
 
 
@@ -687,18 +805,21 @@ def reaction_render() -> Any:
 
     if conditions is None:
         normalized_conditions: list[str] = []
+    elif not isinstance(conditions, list):
+        return jsonify({"message": "conditions must be a string array"}), 400
     else:
         normalized_conditions = _coerce_string_list(conditions) or []
-        if isinstance(conditions, list) and len(conditions) > 0 and not normalized_conditions:
+        if len(conditions) > 0 and not normalized_conditions:
             return jsonify({"message": "conditions must be a non-empty string array"}), 400
 
+    rendered = _render_reaction(
+        reactants,
+        products,
+        normalized_conditions,
+        render_options if isinstance(render_options, dict) else None,
+    )
     return jsonify(
-        _render_reaction(
-            reactants,
-            products,
-            normalized_conditions,
-            render_options if isinstance(render_options, dict) else None,
-        )
+        _complete_reaction_payload(rendered, provider=rendered.get("renderer", "fallback"))
     )
 
 

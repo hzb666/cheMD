@@ -41,6 +41,14 @@ def _read_confidence(
     return float(value), None
 
 
+def _read_optional_string(value: Any) -> str | None:
+    return value if isinstance(value, str) and value.strip() else None
+
+
+def _read_optional_dict(value: Any) -> dict[str, Any] | None:
+    return value if isinstance(value, dict) else None
+
+
 def _handle_structure_get_request(context: StructureReadContext) -> Any:
     # GET 缓存查询必须带 documentId/blockId/sessionId 三元组。
     context.prune_cache()
@@ -75,6 +83,9 @@ def _save_reaction_structure(
     rxnfile = payload.get("rxnfile")
     source = payload.get("source", "manual")
     confidence = payload.get("confidence")
+    provider = _read_optional_string(payload.get("provider"))
+    fingerprint = _read_optional_string(payload.get("fingerprint"))
+    normalized = _read_optional_dict(payload.get("normalized"))
 
     normalized_reactants = context.coerce_string_list(reactants, allow_empty=True)
     normalized_products = context.coerce_string_list(products, allow_empty=True)
@@ -105,6 +116,9 @@ def _save_reaction_structure(
             rxnfile=rxnfile if isinstance(rxnfile, str) else None,
             source=source if isinstance(source, str) else "manual",
             confidence=conf,
+            provider=provider,
+            fingerprint=fingerprint,
+            normalized=normalized,
         )
     )
     return context.jsonify(context.serialize_structure_record(record))
@@ -119,6 +133,9 @@ def _save_molecule_structure(
     molfile = payload.get("molfile")
     source = payload.get("source", "manual")
     confidence = payload.get("confidence")
+    provider = _read_optional_string(payload.get("provider"))
+    fingerprint = _read_optional_string(payload.get("fingerprint"))
+    normalized = _read_optional_dict(payload.get("normalized"))
 
     if not isinstance(smiles, str) or not smiles.strip():
         return context.jsonify({"message": "smiles is required"}), 400
@@ -135,6 +152,9 @@ def _save_molecule_structure(
             molfile=molfile if isinstance(molfile, str) else None,
             source=source if isinstance(source, str) else "manual",
             confidence=conf,
+            provider=provider,
+            fingerprint=fingerprint,
+            normalized=normalized,
         )
     )
     return context.jsonify(context.serialize_structure_record(record))

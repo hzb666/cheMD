@@ -4,8 +4,8 @@ import unittest
 from typing import Any
 from unittest.mock import patch
 
-import chem_service.remote_provider as remote_provider
 import chem_service.reaction_ocr as reaction_ocr
+import chem_service.remote_provider as remote_provider
 from tests.support import ChemServiceAppTestCase
 
 
@@ -16,6 +16,10 @@ class ChemServiceReactionOcrRouteTest(ChemServiceAppTestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
         self.assertEqual(payload["status"], "failed")
+        self.assertEqual(payload["kind"], "reaction")
+        self.assertEqual(payload["provider"], "placeholder")
+        self.assertTrue(payload["placeholder"])
+        self.assertEqual(payload["candidates"], [])
         self.assertNotIn("reaction", payload)
         self.assertIn("placeholder", payload["warnings"][0].lower())
 
@@ -43,6 +47,8 @@ class ChemServiceReactionOcrRouteTest(ChemServiceAppTestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
         self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["kind"], "reaction")
+        self.assertFalse(payload["placeholder"])
         self.assertEqual(payload["reaction"]["reactants"], ["CCO"])
         self.assertEqual(payload["reaction"]["products"], ["CC=O"])
         self.assertEqual(payload["reaction"]["conditions"], ["heat"])
@@ -98,9 +104,12 @@ class ChemServiceReactionOcrModuleTest(unittest.TestCase):
         self.assertEqual(captured["payload"]["imageBase64"], "YWJj")
         self.assertEqual(captured["payload"]["mimeType"], "image/png")
         self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["kind"], "reaction")
+        self.assertEqual(payload["provider"], "RxnScribe")
         self.assertEqual(payload["reaction"]["reactants"], ["CCO"])
         self.assertEqual(payload["reaction"]["products"], ["CC(=O)O"])
         self.assertEqual(payload["reaction"]["conditions"], ["air", "80 C"])
+        self.assertEqual(payload["normalized"]["reactants"], ["CCO"])
         self.assertEqual(payload["confidence"], 0.82)
         self.assertEqual(payload["warnings"], ["low contrast"])
 

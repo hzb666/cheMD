@@ -13,15 +13,29 @@ def _build_remote_molecule_ocr_payload(
     smiles: str | None,
     molfile: str | None,
     *,
+    provider_label: str,
     confidence: float | None = None,
     warnings: list[str] | None = None,
 ) -> dict[str, Any]:
+    structure = {
+        "smiles": smiles or "",
+        "molfile": molfile,
+    }
+
     return {
         "status": "ok",
-        "structure": {
-            "smiles": smiles or "",
-            "molfile": molfile,
-        },
+        "kind": "molecule",
+        "provider": provider_label,
+        "structure": structure,
+        "normalized": structure,
+        "candidates": [
+            {
+                "provider": provider_label,
+                "structure": structure,
+                "confidence": confidence,
+            }
+        ],
+        "placeholder": False,
         "confidence": confidence,
         "warnings": warnings or [],
     }
@@ -74,6 +88,10 @@ def _map_remote_molecule_payload(
     if payload.get("status") == "failed":
         return {
             "status": "failed",
+            "kind": "molecule",
+            "provider": provider_label,
+            "candidates": [],
+            "placeholder": False,
             "warnings": _normalize_warning_list(payload.get("warnings"))
             or [f"{provider_label} remote provider returned failed status."],
         }
@@ -89,6 +107,10 @@ def _map_remote_molecule_payload(
     if not smiles and not molfile:
         return {
             "status": "failed",
+            "kind": "molecule",
+            "provider": provider_label,
+            "candidates": [],
+            "placeholder": False,
             "warnings": (
                 warnings or [f"{provider_label} remote payload did not contain a structure result."]
             ),
@@ -97,6 +119,7 @@ def _map_remote_molecule_payload(
     return _build_remote_molecule_ocr_payload(
         smiles,
         molfile,
+        provider_label=provider_label,
         confidence=normalized_confidence,
         warnings=warnings,
     )

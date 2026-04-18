@@ -48,6 +48,10 @@ def _map_remote_rxnscribe_payload(payload: dict[str, Any]) -> dict[str, Any]:
     if payload.get("status") == "failed":
         return {
             "status": "failed",
+            "kind": "reaction",
+            "provider": "RxnScribe",
+            "candidates": [],
+            "placeholder": False,
             "warnings": _normalize_warning_list(payload.get("warnings"))
             or ["RxnScribe remote provider returned failed status."],
         }
@@ -68,13 +72,27 @@ def _map_remote_rxnscribe_payload(payload: dict[str, Any]) -> dict[str, Any]:
         )
         if reactants and products:
             confidence = payload.get("confidence")
+            reaction_payload = {
+                "reactants": reactants,
+                "products": products,
+                "conditions": conditions,
+            }
             return {
                 "status": "ok",
-                "reaction": {
-                    "reactants": reactants,
-                    "products": products,
-                    "conditions": conditions,
-                },
+                "kind": "reaction",
+                "provider": "RxnScribe",
+                "reaction": reaction_payload,
+                "normalized": reaction_payload,
+                "candidates": [
+                    {
+                        "provider": "RxnScribe",
+                        "reaction": reaction_payload,
+                        "confidence": (
+                            float(confidence) if isinstance(confidence, (int, float)) else None
+                        ),
+                    }
+                ],
+                "placeholder": False,
                 "confidence": (float(confidence) if isinstance(confidence, (int, float)) else None),
                 "warnings": _normalize_warning_list(payload.get("warnings")),
             }
@@ -104,21 +122,38 @@ def _map_remote_rxnscribe_payload(payload: dict[str, Any]) -> dict[str, Any]:
                 confidence = payload.get("confidence")
                 if not isinstance(confidence, (int, float)):
                     confidence = reaction.get("confidence")
+                normalized_confidence = (
+                    float(confidence) if isinstance(confidence, (int, float)) else None
+                )
+                reaction_payload = {
+                    "reactants": reactants,
+                    "products": products,
+                    "conditions": conditions,
+                }
                 return {
                     "status": "ok",
-                    "reaction": {
-                        "reactants": reactants,
-                        "products": products,
-                        "conditions": conditions,
-                    },
-                    "confidence": (
-                        float(confidence) if isinstance(confidence, (int, float)) else None
-                    ),
+                    "kind": "reaction",
+                    "provider": "RxnScribe",
+                    "reaction": reaction_payload,
+                    "normalized": reaction_payload,
+                    "candidates": [
+                        {
+                            "provider": "RxnScribe",
+                            "reaction": reaction_payload,
+                            "confidence": normalized_confidence,
+                        }
+                    ],
+                    "placeholder": False,
+                    "confidence": normalized_confidence,
                     "warnings": _normalize_warning_list(payload.get("warnings")),
                 }
 
     return {
         "status": "failed",
+        "kind": "reaction",
+        "provider": "RxnScribe",
+        "candidates": [],
+        "placeholder": False,
         "warnings": _normalize_warning_list(payload.get("warnings"))
         or ["RxnScribe remote payload did not contain a usable reaction result."],
     }
@@ -146,6 +181,10 @@ def _request_remote_reaction_provider(
 
     return {
         "status": "failed",
+        "kind": "reaction",
+        "provider": provider_label,
+        "candidates": [],
+        "placeholder": False,
         "warnings": _normalize_warning_list(payload.get("warnings"))
         or [f"{provider_label} remote mapping skeleton is reserved but not implemented yet."],
     }

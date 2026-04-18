@@ -22,6 +22,9 @@ class StructureRecord:
     rxnfile: str | None
     source: str
     confidence: float | None
+    provider: str | None
+    fingerprint: str | None
+    normalized: dict[str, Any] | None
     updated_at: str
     expires_at: str
 
@@ -81,6 +84,9 @@ def _save_cache(
         rxnfile=getattr(request, "rxnfile", None),
         source=request.source,
         confidence=request.confidence,
+        provider=request.provider,
+        fingerprint=request.fingerprint,
+        normalized=request.normalized,
         updated_at=now.isoformat(),
         expires_at=(now + timedelta(seconds=ttl_seconds)).isoformat(),
     )
@@ -98,6 +104,9 @@ def _serialize_structure_record(record: StructureRecord) -> dict[str, Any]:
         "sessionId": record.session_id,
         "source": record.source,
         "confidence": record.confidence,
+        "provider": record.provider,
+        "fingerprint": record.fingerprint,
+        "normalized": record.normalized,
         "updatedAt": record.updated_at,
         "expiresAt": record.expires_at,
     }

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 
 @dataclass(frozen=True, slots=True)
@@ -11,6 +11,9 @@ class BaseStructureSaveRequest:
     session_id: str
     source: str
     confidence: float | None = None
+    provider: str | None = None
+    fingerprint: str | None = None
+    normalized: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)

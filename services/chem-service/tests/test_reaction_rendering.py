@@ -27,6 +27,9 @@ class ChemServiceReactionRenderingRouteTest(ChemServiceAppTestCase):
         payload = response.get_json()
         self.assertIn("<svg", payload["svg"])
         self.assertEqual(payload["renderer"], "fallback")
+        self.assertEqual(payload["kind"], "reaction")
+        self.assertFalse(payload["placeholder"])
+        self.assertEqual(payload["provider"], "fallback")
         self.assertIn('data-arrow-top-text="air"', payload["svg"])
         self.assertEqual(
             payload["reaction"],
@@ -58,6 +61,22 @@ class ChemServiceReactionRenderingRouteTest(ChemServiceAppTestCase):
             },
         )
         self.assertIn("<svg", payload["svg"])
+
+    def test_reaction_render_rejects_non_array_conditions(self) -> None:
+        response = self.client.post(
+            "/reaction/render",
+            json={
+                "reactants": ["CCO"],
+                "products": ["CC(=O)O"],
+                "conditions": "air",
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.get_json(),
+            {"message": "conditions must be a string array"},
+        )
 
     def test_reaction_render_trims_payload_before_building_contract(self) -> None:
         response = self.client.post(
@@ -112,10 +131,29 @@ class ChemServiceReactionRenderingRouteTest(ChemServiceAppTestCase):
         self.assertEqual(
             response.get_json(),
             {
+                "kind": "reaction",
+                "provider": "rdkit",
+                "candidates": [
+                    {
+                        "provider": "rdkit",
+                        "reaction": {
+                            "reactants": ["CCO"],
+                            "products": ["CC(=O)O"],
+                            "conditions": ["air"],
+                        },
+                        "confidence": None,
+                    }
+                ],
+                "placeholder": False,
                 "svg": "<svg>rdkit-reaction</svg>",
                 "warnings": [],
                 "renderer": "rdkit",
                 "reaction": {
+                    "reactants": ["CCO"],
+                    "products": ["CC(=O)O"],
+                    "conditions": ["air"],
+                },
+                "normalized": {
                     "reactants": ["CCO"],
                     "products": ["CC(=O)O"],
                     "conditions": ["air"],

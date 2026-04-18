@@ -15,6 +15,10 @@ class ChemServiceMoleculeRenderingTest(ChemServiceAppTestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
         self.assertEqual(payload["status"], "failed")
+        self.assertEqual(payload["kind"], "molecule")
+        self.assertEqual(payload["provider"], "placeholder")
+        self.assertTrue(payload["placeholder"])
+        self.assertEqual(payload["candidates"], [])
         self.assertNotIn("structure", payload)
         self.assertIn("placeholder", payload["warnings"][0].lower())
         self.assertIn("molecule ocr provider is not enabled", payload["warnings"][0].lower())
@@ -41,8 +45,11 @@ class ChemServiceMoleculeRenderingTest(ChemServiceAppTestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
         self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["kind"], "molecule")
+        self.assertFalse(payload["placeholder"])
         self.assertEqual(payload["structure"]["smiles"], "CCO")
         self.assertEqual(payload["structure"]["molfile"], "mock-molfile")
+        self.assertEqual(payload["normalized"]["smiles"], "CCO")
         self.assertEqual(payload["confidence"], 0.91)
         ocr_mock.assert_called_once()
 
@@ -82,6 +89,8 @@ class ChemServiceMoleculeRenderingTest(ChemServiceAppTestCase):
         )
 
         self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["kind"], "molecule")
+        self.assertEqual(payload["provider"], "DECIMER")
         self.assertEqual(payload["structure"]["smiles"], "CCO")
         self.assertEqual(payload["confidence"], 0.63)
         self.assertEqual(payload["warnings"], ["hand-drawn mode"])
@@ -143,8 +152,16 @@ class ChemServiceMoleculeRenderingTest(ChemServiceAppTestCase):
         self.assertEqual(
             response.get_json(),
             {
+                "kind": "molecule",
+                "provider": "rdkit",
+                "candidates": [],
+                "placeholder": False,
                 "canonicalSmiles": "CCO",
                 "normalizedMolfile": "rdkit-molfile",
+                "normalized": {
+                    "canonicalSmiles": "CCO",
+                    "normalizedMolfile": "rdkit-molfile",
+                },
                 "warnings": [],
             },
         )
@@ -167,10 +184,41 @@ class ChemServiceMoleculeRenderingTest(ChemServiceAppTestCase):
         self.assertEqual(
             response.get_json(),
             {
+                "kind": "molecule",
+                "provider": "rdkit",
+                "candidates": [],
+                "placeholder": False,
                 "svg": "<svg>rdkit</svg>",
                 "canonicalSmiles": "CCO",
                 "normalizedMolfile": "rdkit-molfile",
+                "normalized": {
+                    "canonicalSmiles": "CCO",
+                    "normalizedMolfile": "rdkit-molfile",
+                },
                 "warnings": [],
+            },
+        )
+
+    def test_render_fallback_includes_normalized_payload(self) -> None:
+        with patch.object(self.module, "_render_with_rdkit", return_value=None):
+            response = self.client.post("/render", json={"smiles": " CCO "})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.get_json(),
+            {
+                "kind": "molecule",
+                "provider": "fallback",
+                "candidates": [],
+                "placeholder": False,
+                "svg": molecule_rendering._build_molecule_fallback_svg("CCO"),
+                "canonicalSmiles": "CCO",
+                "normalizedMolfile": None,
+                "normalized": {
+                    "canonicalSmiles": "CCO",
+                    "normalizedMolfile": None,
+                },
+                "warnings": ["RDKit render fallback is active."],
             },
         )
 
