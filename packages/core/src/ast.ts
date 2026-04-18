@@ -24,6 +24,56 @@ export interface ReferenceResolution {
   message?: string;
 }
 
+export type ChemdSemanticKind = "molecule" | "reaction";
+
+export type ObjectSemanticKind =
+  | ChemdSemanticKind
+  | "result"
+  | "analysis"
+  | "procedure"
+  | "observation"
+  | "sample";
+
+export type TemplateParamType =
+  | { kind: "string" }
+  | { kind: "ref"; targetKind: ObjectSemanticKind }
+  | { kind: "quantity"; quantityClass?: string };
+
+export interface TemplateParamSpec {
+  name: string;
+  raw: string;
+  type: TemplateParamType;
+}
+
+export type SyntaxOrigin =
+  | "chemd"
+  | "template_expanded"
+  | "migrated";
+export interface SourceSpan {
+  start?: number;
+  end?: number;
+  startLine?: number;
+  startColumn?: number;
+  endLine?: number;
+  endColumn?: number;
+}
+export interface Confidence {
+  score: number;
+  method?: string;
+}
+export type ProvenanceOrigin = "author" | "lowered" | "normalized" | "inferred";
+export interface ProvenanceInfo {
+  origin: ProvenanceOrigin;
+  source?: string;
+  sourceNodeType?: string;
+  sourceNodeId?: string;
+  sourceField?: string;
+  sourceSpan?: SourceSpan;
+  ruleId?: string;
+  confidence?: number | Confidence;
+}
+export type Provenance = ProvenanceInfo;
+
 interface TokenLocation {
   start?: number;
   end?: number;
@@ -74,7 +124,10 @@ export interface MarkdownNode {
 export interface MoleculeNode {
   type: "molecule";
   id?: string;
+  syntaxOrigin?: SyntaxOrigin;
+  declaredKind?: ChemdSemanticKind;
   smiles?: string;
+  cas?: string;
   name?: string;
   role?: string;
   caption?: string;
@@ -86,6 +139,8 @@ export interface MoleculeNode {
 export interface ReactionNode {
   type: "reaction";
   id?: string;
+  syntaxOrigin?: SyntaxOrigin;
+  declaredKind?: ChemdSemanticKind;
   reactants?: string[];
   products?: string[];
   conditions?: string[];
@@ -113,7 +168,7 @@ export interface ResultNode {
   isolated_mass?: string;
   product_state?: string;
   purity?: string;
-  notes?: string;
+  notes?: string; ref?: string; reaction?: string; product?: string;
 }
 
 export type AnalysisNode = {
@@ -139,6 +194,22 @@ export interface ProcedureNode {
   id?: string;
   ref?: string;
   body?: string;
+  steps?: ProcedureStepNode[];
+  children?: Array<ProcedureStepNode | MarkdownNode>;
+}
+
+export interface ProcedureStepNode {
+  type: "step";
+  stepId?: string;
+  family: string;
+  params?: Record<string, string>;
+  inputs?: string[];
+  outputs?: string[];
+  dependsOn?: string[];
+  raw?: string;
+  authorProvided?: boolean;
+  sourceSpan?: SourceSpan;
+  provenance?: ProvenanceInfo;
 }
 
 export interface ObservationNode {
@@ -146,6 +217,21 @@ export interface ObservationNode {
   id?: string;
   ref?: string;
   body?: string;
+  events?: ObservationEventAuthorNode[];
+  children?: Array<ObservationEventAuthorNode | MarkdownNode>;
+}
+
+export interface ObservationEventAuthorNode {
+  type: "event";
+  eventId?: string;
+  eventType: string;
+  params?: Record<string, string>;
+  stage?: string;
+  linkedStepId?: string;
+  raw?: string;
+  authorProvided?: boolean;
+  sourceSpan?: SourceSpan;
+  provenance?: ProvenanceInfo;
 }
 
 export interface SampleNode {
@@ -156,7 +242,7 @@ export interface SampleNode {
   batch?: string;
   purity?: string;
   supplier?: string;
-  notes?: string;
+  notes?: string; ref?: string;
 }
 
 export interface UseNode {
@@ -176,6 +262,7 @@ export interface TemplateNode {
   name: string;
   bind: Record<string, string>;
   params: string[];
+  paramSpecs?: TemplateParamSpec[];
   description?: string;
   body: Array<MarkdownNode | StructuredNode>;
 }
@@ -211,65 +298,3 @@ export interface ChemdDocument {
   source?: string;
   renderSelection?: RenderSelection;
 }
-
-export interface CreateDocumentOptions {
-  children?: ChemdNode[];
-  diagnostics?: Diagnostic[];
-  renderSelection?: RenderSelection;
-  source?: string;
-}
-
-export const createReferenceToken = (
-  input: Omit<ReferenceToken, "type">
-): ReferenceToken => ({
-  type: "reference",
-  ...input
-});
-
-export const createInlineChemToken = (
-  input: Omit<InlineChemToken, "type">
-): InlineChemToken => ({
-  type: "inline_chem",
-  ...input
-});
-
-export const createInlineCodeToken = (
-  input: Omit<InlineCodeToken, "type">
-): InlineCodeToken => ({
-  type: "inline_code",
-  ...input
-});
-
-export const createMarkdownLinkToken = (
-  input: Omit<MarkdownLinkToken, "type">
-): MarkdownLinkToken => ({
-  type: "markdown_link",
-  ...input
-});
-
-export const createMarkdownNode = (
-  value: string,
-  references: ReferenceToken[] = [],
-  inlineChem: InlineChemToken[] = [],
-  inlineCode: InlineCodeToken[] = [],
-  links: MarkdownLinkToken[] = []
-): MarkdownNode => ({
-  type: "markdown",
-  value,
-  references,
-  inlineChem,
-  inlineCode,
-  links
-});
-
-export const createDocument = (
-  meta: ChemdMeta,
-  options: CreateDocumentOptions = {}
-): ChemdDocument => ({
-  type: "document",
-  meta,
-  children: options.children ?? [],
-  diagnostics: options.diagnostics ?? [],
-  source: options.source,
-  renderSelection: options.renderSelection
-});

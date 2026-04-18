@@ -20,6 +20,8 @@ const LIST_FIELDS = new Set([
   "params"
 ]);
 
+export { collectBraceBlockLines, collectStructuredBlockLines } from "./collect-block-lines";
+
 const resolveHeaderArg = (
   blockType: string,
   columnsArg: string | undefined,
@@ -131,23 +133,6 @@ const splitFieldSegments = (line: string): string[] =>
     .split(";;")
     .map((segment) => segment.trim())
     .filter((segment) => segment.length > 0);
-
-const readColBraceState = (trimmed: string): "open" | "close" | "none" => {
-  if (trimmed === "}" || trimmed === ":::}") {
-    return "close";
-  }
-
-  if (!trimmed.startsWith("col:")) {
-    return "none";
-  }
-
-  const value = trimmed.slice(4).trim();
-  if (!value.startsWith("{")) {
-    return "none";
-  }
-
-  return value.endsWith("}") && value.length > 1 ? "none" : "open";
-};
 
 export interface KeyValueParseOptions {
   allowField?: (key: string) => boolean;
@@ -266,67 +251,3 @@ export const createMarkdownFromText = (value: string, diagnostics: Diagnostic[])
     tokenizeInlineCode(value),
     tokenizeMarkdownLinks(value, diagnostics)
   );
-
-export const collectBraceBlockLines = (
-  lines: string[],
-  startIndex: number
-): { lines: string[]; nextIndex: number; terminated: boolean } => {
-  const collected: string[] = [];
-  let index = startIndex;
-
-  while (index < lines.length) {
-    const line = lines[index];
-
-    if (line.trim() === ":::}") {
-      return { lines: collected, nextIndex: index + 1, terminated: true };
-    }
-
-    collected.push(line);
-    index += 1;
-  }
-
-  return { lines: collected, nextIndex: index, terminated: false };
-};
-
-export const collectStructuredBlockLines = (
-  blockType: string,
-  lines: string[],
-  diagnostics: Diagnostic[],
-  startIndex: number
-): { blockLines: string[]; nextIndex: number; terminated: boolean } => {
-  const blockLines: string[] = [];
-  let index = startIndex;
-  let braceDepth = 0;
-
-  while (index < lines.length) {
-    const line = lines[index];
-    const trimmed = line.trim();
-
-    if (blockType === "col") {
-      const braceState = readColBraceState(trimmed);
-
-      if (braceState === "open") {
-        braceDepth += 1;
-      } else if (braceState === "close" && braceDepth > 0) {
-        braceDepth -= 1;
-      }
-    }
-
-    if (trimmed === ":::" && (blockType !== "col" || braceDepth === 0)) {
-      return { blockLines, nextIndex: index + 1, terminated: true };
-    }
-
-    blockLines.push(line);
-    index += 1;
-  }
-
-  if (blockType === "col" && braceDepth > 0) {
-    diagnostics.push({
-      code: "W_UNTERMINATED_BRACE_BLOCK",
-      severity: "warning",
-      message: "Unterminated brace block inside col block"
-    });
-  }
-
-  return { blockLines, nextIndex: index, terminated: false };
-};

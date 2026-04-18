@@ -3,6 +3,7 @@ import type { Diagnostic } from "@chemd/core";
 import { parseKeyValueLine, parseKeyValueLines } from "../parse-body-shared";
 
 const ID_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
+const CHILD_FIELD_PATTERN = /^([a-zA-Z][a-zA-Z0-9_]*):\s*(.*)$/;
 
 export const DEFAULT_LIST_FIELDS = new Set([
   "reactants",
@@ -49,6 +50,19 @@ export const parseAllowedFields = (
     listFields: options.listFields ?? DEFAULT_LIST_FIELDS,
     blockTypeForDiagnostics: blockType
   });
+
+export const parseChildBlockFieldLine = (
+  line: string
+): { key: string; rawValue: string } | undefined => {
+  const match = line.match(CHILD_FIELD_PATTERN);
+
+  return match
+    ? {
+        key: match[1],
+        rawValue: match[2]
+      }
+    : undefined;
+};
 
 export const splitLeadingFieldLines = (
   lines: string[],

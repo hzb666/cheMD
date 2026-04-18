@@ -16,6 +16,18 @@ export interface Diagnostic {
   message: string;
   position?: SourceRange;
   nodeId?: string;
+  sourceLayer?: string;
+  sourceNodeType?: string;
+  sourceNodeId?: string;
+  sourceField?: string;
+  facts?: Record<string, unknown>;
+  quickFixes?: DiagnosticQuickFix[];
+}
+
+export interface DiagnosticQuickFix {
+  title: string;
+  kind: string;
+  patch?: unknown;
 }
 
 export const createDiagnostic = (diagnostic: Diagnostic): Diagnostic => diagnostic;

@@ -11,12 +11,17 @@ const RESULT_FIELDS = new Set([
   "isolated_mass",
   "product_state",
   "purity",
-  "notes"
+  "notes",
+  "ref",
+  "reaction",
+  "product"
 ]);
 
 export const parseResultBlock: BlockParser = ({ headerArg, lines, diagnostics }) => {
   const id = readStructuredBlockId(headerArg, diagnostics);
-  const fields = parseAllowedFields(lines, diagnostics, "result", RESULT_FIELDS);
+  const fields = parseAllowedFields(lines, diagnostics, "result", RESULT_FIELDS, {
+    listFields: new Set()
+  });
 
   return { type: "result", id, ...fields } as ResultNode;
 };

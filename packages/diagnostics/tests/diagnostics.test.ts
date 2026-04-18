@@ -45,4 +45,74 @@ describe("v0.3 diagnostics registry", () => {
       title: expect.stringContaining("temperature")
     });
   });
+
+  it("classifies chemd surface policy diagnostics and quick fixes", () => {
+    const inferredKindDiagnostic = createV03Diagnostic({
+      code: "W_CHEMD_KIND_INFERRED",
+      severity: "warning",
+      message: "Chemd kind inferred from fields",
+      sourceLayer: "parser",
+      sourceNodeType: "chemd",
+      sourceNodeId: "mol-1"
+    });
+    const legacyDiagnostic = createV03Diagnostic({
+      code: "W_LEGACY_BLOCK_KIND",
+      severity: "warning",
+      message: "Legacy molecule block should be migrated to chemd",
+      sourceLayer: "parser",
+      sourceNodeType: "molecule",
+      sourceNodeId: "legacy-mol"
+    });
+    const missingKindDiagnostic = createV03Diagnostic({
+      code: "W_CHEMD_KIND_AMBIGUOUS",
+      severity: "warning",
+      message: "Chemd block should declare kind",
+      sourceLayer: "parser",
+      sourceNodeType: "molecule",
+      sourceNodeId: "mol-1"
+    });
+
+    expect(getDiagnosticSpec("W_CHEMD_KIND_INFERRED")?.band).toBe("syntax");
+    expect(getDiagnosticSpec("E_CHEMD_KIND_CONFLICT")?.band).toBe("syntax");
+    expect(getLegacyDiagnosticBand("W_LEGACY_BLOCK_KIND")).toBe("syntax");
+    expect(buildQuickFixes(inferredKindDiagnostic)[0]).toMatchObject({
+      kind: "insert_chemd_kind"
+    });
+    expect(buildQuickFixes(legacyDiagnostic)[0]).toMatchObject({
+      kind: "convert_legacy_block",
+      title: expect.stringContaining("chemd")
+    });
+    expect(buildQuickFixes(missingKindDiagnostic)[0]).toMatchObject({
+      kind: "insert_chemd_kind"
+    });
+  });
+
+  it("classifies explicit step rule diagnostics", () => {
+    expect(getDiagnosticSpec("E_STEP_PARAM_MISSING")?.band).toBe("procedure");
+    expect(getDiagnosticSpec("E_STEP_PARAM_INVALID")?.band).toBe("procedure");
+    expect(getDiagnosticSpec("E_STEP_DEPENDENCY_CYCLE")?.band).toBe("procedure");
+    expect(getDiagnosticSpec("E_STEP_ID_DUPLICATE")?.band).toBe("procedure");
+    expect(getDiagnosticSpec("E_TYPED_REFERENCE_MISMATCH")?.band).toBe("reference");
+    expect(getDiagnosticSpec("E_OBSERVATION_EVENT_INVALID_TYPE")?.band).toBe("procedure");
+    expect(getDiagnosticSpec("E_OBSERVATION_LINKED_STEP_MISSING")?.band).toBe("reference");
+  });
+
+  it("classifies template parameter diagnostics", () => {
+    expect(getDiagnosticSpec("E_TEMPLATE_PARAM_MISSING")?.band).toBe("type");
+    expect(getDiagnosticSpec("E_TEMPLATE_PARAM_TYPE_MISMATCH")?.band).toBe("type");
+    expect(getLegacyDiagnosticBand("E_TEMPLATE_PARAM_MISSING")).toBe("type");
+    expect(getLegacyDiagnosticBand("E_TEMPLATE_PARAM_TYPE_MISMATCH")).toBe("type");
+  });
+
+  it("classifies derived expression diagnostics", () => {
+    expect(getDiagnosticSpec("E_DERIVED_EXPRESSION_INVALID")?.band).toBe("type");
+    expect(getLegacyDiagnosticBand("E_DERIVED_EXPRESSION_INVALID")).toBe("type");
+  });
+
+  it("classifies runtime diagnostics", () => {
+    expect(getDiagnosticSpec("E_RUNTIME_UNKNOWN_STEP")?.band).toBe("runtime");
+    expect(getDiagnosticSpec("E_RUNTIME_STEP_NOT_READY")?.band).toBe("runtime");
+    expect(getLegacyDiagnosticBand("E_RUNTIME_UNKNOWN_STEP")).toBe("runtime");
+    expect(getLegacyDiagnosticBand("E_RUNTIME_STEP_NOT_READY")).toBe("runtime");
+  });
 });

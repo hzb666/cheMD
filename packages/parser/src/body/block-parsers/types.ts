@@ -5,6 +5,11 @@ export interface BlockParserContext {
   lines: string[];
   diagnostics: Diagnostic[];
   bodyChildren?: ChemdNode[];
+  options?: ParserOptions;
 }
 
 export type BlockParser = (context: BlockParserContext) => StructuredNode | undefined;
+
+export interface ParserOptions {
+  strictChemdKind?: boolean;
+}

@@ -5,13 +5,20 @@ export type DiagnosticSourceLayer =
   | "parser"
   | "resolver"
   | "typechecker"
+  | "lowering"
   | "procedure_lowering"
   | "runtime_preflight"
+  | "export"
   | "training_export";
 
 export type QuickFixKind =
   | "replace_text"
   | "insert_field"
+  | "convert_legacy_block"
+  | "insert_chemd_kind"
+  | "insert_step_skeleton"
+  | "split_procedure_to_steps"
+  | "insert_missing_id"
   | "normalize_unit"
   | "split_procedure_sentence"
   | "add_block"
@@ -32,6 +39,7 @@ export interface V03Diagnostic {
   sourceLayer: DiagnosticSourceLayer;
   sourceNodeType?: string;
   sourceNodeId?: string;
+  sourceField?: string;
   facts?: Record<string, unknown>;
   quickFixes?: QuickFix[];
 }
@@ -59,6 +67,29 @@ export interface DiagnosticSpec {
 }
 
 const DIAGNOSTIC_SPECS: DiagnosticSpec[] = [
+  { code: "W_LEGACY_BLOCK_KIND", band: "syntax", title: "Legacy surface block", defaultSeverity: "warning" },
+  { code: "W_UNKNOWN_BLOCK", band: "heuristic", title: "Unknown block", defaultSeverity: "warning" },
+  { code: "W_CHEMD_KIND_INFERRED", band: "syntax", title: "Inferred chemd kind", defaultSeverity: "warning" },
+  { code: "W_CHEMD_KIND_AMBIGUOUS", band: "syntax", title: "Missing chemd kind", defaultSeverity: "warning" },
+  { code: "E_CHEMD_KIND_CONFLICT", band: "syntax", title: "Conflicting chemd kind", defaultSeverity: "error" },
+  { code: "E_STEP_INVALID_FAMILY", band: "procedure", title: "Invalid step family", defaultSeverity: "error" },
+  { code: "E_STEP_MISSING_FIELD", band: "procedure", title: "Missing step field", defaultSeverity: "error" },
+  { code: "E_STEP_PARAM_MISSING", band: "procedure", title: "Missing step parameter", defaultSeverity: "error" },
+  { code: "E_STEP_PARAM_INVALID", band: "procedure", title: "Invalid step parameter", defaultSeverity: "error" },
+  { code: "E_STEP_DEPENDENCY_CYCLE", band: "procedure", title: "Step dependency cycle", defaultSeverity: "error" },
+  { code: "E_STEP_ID_DUPLICATE", band: "procedure", title: "Duplicate step id", defaultSeverity: "error" },
+  { code: "E_STEP_INVALID_REFERENCE", band: "reference", title: "Invalid step reference", defaultSeverity: "error" },
+  { code: "E_TYPED_REFERENCE_MISMATCH", band: "reference", title: "Typed reference mismatch", defaultSeverity: "error" },
+  { code: "E_RESULT_REACTION_CONFLICT", band: "type", title: "Result reaction conflict", defaultSeverity: "warning" },
+  { code: "E_TEMPLATE_PARAM_MISSING", band: "type", title: "Missing template parameter", defaultSeverity: "error" },
+  { code: "E_TEMPLATE_PARAM_TYPE_MISMATCH", band: "type", title: "Template parameter type mismatch", defaultSeverity: "error" },
+  { code: "E_DERIVED_EXPRESSION_INVALID", band: "type", title: "Invalid derived expression", defaultSeverity: "error" },
+  { code: "E_OBSERVATION_EVENT_INVALID_TYPE", band: "procedure", title: "Invalid observation event type", defaultSeverity: "error" },
+  { code: "E_OBSERVATION_LINKED_STEP_MISSING", band: "reference", title: "Missing linked observation step", defaultSeverity: "error" },
+  { code: "W_PROCEDURE_PROSE_LOWERED", band: "procedure", title: "Procedure prose lowered", defaultSeverity: "warning" },
+  { code: "W_OBSERVATION_PROSE_LOWERED", band: "procedure", title: "Observation prose lowered", defaultSeverity: "warning" },
+  { code: "E_RUNTIME_UNKNOWN_STEP", band: "runtime", title: "Unknown runtime step", defaultSeverity: "error" },
+  { code: "E_RUNTIME_STEP_NOT_READY", band: "runtime", title: "Runtime step not ready", defaultSeverity: "error" },
   { code: "E301", band: "type", title: "Missing required field", defaultSeverity: "error" },
   { code: "E306", band: "type", title: "Invalid status value", defaultSeverity: "warning" },
   { code: "E401", band: "quantity", title: "Invalid unit", defaultSeverity: "warning" },
@@ -77,6 +108,28 @@ const DIAGNOSTIC_SPECS: DiagnosticSpec[] = [
 const LEGACY_BANDS: Record<string, DiagnosticBand> = {
   E_INVALID_ID: "syntax",
   E_DUPLICATE_ID: "syntax",
+  W_LEGACY_BLOCK_KIND: "syntax",
+  W_CHEMD_KIND_INFERRED: "syntax",
+  W_CHEMD_KIND_AMBIGUOUS: "syntax",
+  E_CHEMD_KIND_CONFLICT: "syntax",
+  E_STEP_INVALID_FAMILY: "procedure",
+  E_STEP_MISSING_FIELD: "procedure",
+  E_STEP_PARAM_MISSING: "procedure",
+  E_STEP_PARAM_INVALID: "procedure",
+  E_STEP_DEPENDENCY_CYCLE: "procedure",
+  E_STEP_ID_DUPLICATE: "procedure",
+  E_STEP_INVALID_REFERENCE: "reference",
+  E_TYPED_REFERENCE_MISMATCH: "reference",
+  E_RESULT_REACTION_CONFLICT: "type",
+  E_TEMPLATE_PARAM_MISSING: "type",
+  E_TEMPLATE_PARAM_TYPE_MISMATCH: "type",
+  E_DERIVED_EXPRESSION_INVALID: "type",
+  E_OBSERVATION_EVENT_INVALID_TYPE: "procedure",
+  E_OBSERVATION_LINKED_STEP_MISSING: "reference",
+  W_PROCEDURE_PROSE_LOWERED: "procedure",
+  W_OBSERVATION_PROSE_LOWERED: "procedure",
+  E_RUNTIME_UNKNOWN_STEP: "runtime",
+  E_RUNTIME_STEP_NOT_READY: "runtime",
   E_MISSING_REQUIRED_FIELD: "type",
   W_UNKNOWN_FIELD: "heuristic",
   W_UNKNOWN_BLOCK: "heuristic",
@@ -115,6 +168,35 @@ const createProcedureQuickFix = (): QuickFix => ({
   kind: "split_procedure_sentence"
 });
 
+const createLegacyBlockQuickFix = (diagnostic: V03Diagnostic): QuickFix => ({
+  title: "Convert this legacy block to canonical chemd syntax",
+  kind: "convert_legacy_block",
+  patch: {
+    source_node_type: diagnostic.sourceNodeType,
+    source_node_id: diagnostic.sourceNodeId
+  }
+});
+
+const isLegacySurfaceDiagnostic = (diagnostic: V03Diagnostic): boolean =>
+  diagnostic.code === "W_LEGACY_BLOCK_KIND"
+  || (
+    diagnostic.code === "W_UNKNOWN_BLOCK"
+    && (
+      diagnostic.sourceNodeType === "molecule"
+      || diagnostic.sourceNodeType === "reaction"
+      || typeof diagnostic.facts?.legacy_block_kind === "string"
+    )
+  );
+
+const createInsertChemdKindQuickFix = (diagnostic: V03Diagnostic): QuickFix => ({
+  title: "Insert an explicit kind field in this chemd block",
+  kind: "insert_chemd_kind",
+  patch: {
+    source_node_type: diagnostic.sourceNodeType,
+    source_node_id: diagnostic.sourceNodeId
+  }
+});
+
 export const getDiagnosticSpec = (code: string): DiagnosticSpec | undefined => SPEC_BY_CODE.get(code);
 
 export const getLegacyDiagnosticBand = (code: string): DiagnosticBand | undefined => LEGACY_BANDS[code];
@@ -126,6 +208,14 @@ export const buildQuickFixes = (diagnostic: V03Diagnostic): QuickFix[] => {
 
   if (diagnostic.code === "W805") {
     return [createProcedureQuickFix()];
+  }
+
+  if (isLegacySurfaceDiagnostic(diagnostic)) {
+    return [createLegacyBlockQuickFix(diagnostic)];
+  }
+
+  if (["W_CHEMD_KIND_INFERRED", "W_CHEMD_KIND_AMBIGUOUS"].includes(diagnostic.code)) {
+    return diagnostic.sourceNodeId ? [createInsertChemdKindQuickFix(diagnostic)] : [];
   }
 
   return [];

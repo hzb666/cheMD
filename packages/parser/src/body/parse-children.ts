@@ -8,11 +8,12 @@ import {
   collectStructuredBlockLines,
   createMarkdownFromText,
   parseBlockStartLine,
-  parseKeyValueLine,
   parseKeyValueLines,
   parseTemplateBind
 } from "./parse-body-shared";
+import type { ParserOptions } from "./block-parsers/types";
 import { parseStructuredBlock } from "./parse-structured-block";
+import { collectTemplateHeaderLines, parseTemplateParams } from "./template-params";
 
 export interface ParseChildrenResult {
   children: ChemdNode[];
@@ -45,7 +46,8 @@ const flushMarkdownBuffer = (
 const parseBraceColChild = (
   lines: string[],
   diagnostics: Diagnostic[],
-  index: number
+  index: number,
+  options: ParserOptions
 ): { children: ChemdNode[]; nextIndex: number } => {
   const value = lines[index].trim().slice(4).trim();
   if (value.startsWith("{:::")) {
@@ -59,7 +61,7 @@ const parseBraceColChild = (
     }
 
     // legacy brace block 继续走同一套 structured block 解析，避免旧语法立即失效。
-    const parsed = parseChildren(braceBlockLines, diagnostics);
+    const parsed = parseChildren(braceBlockLines, diagnostics, 0, false, options);
     return {
       children: parsed.children,
       nextIndex: collected.nextIndex
@@ -68,7 +70,7 @@ const parseBraceColChild = (
 
   if (value.endsWith("}") && value.length > 1) {
     const inlineBody = value.slice(1, -1).trim();
-    const parsed = parseChildren(inlineBody ? [inlineBody] : [], diagnostics);
+    const parsed = parseChildren(inlineBody ? [inlineBody] : [], diagnostics, 0, false, options);
     return {
       children: parsed.children,
       nextIndex: index + 1
@@ -85,7 +87,7 @@ const parseBraceColChild = (
   while (nextIndex < lines.length) {
     const line = lines[nextIndex];
     if (line.trim() === "}") {
-      const parsed = parseChildren(braceBlockLines, diagnostics);
+      const parsed = parseChildren(braceBlockLines, diagnostics, 0, false, options);
       return {
         children: parsed.children,
         nextIndex: nextIndex + 1
@@ -97,14 +99,18 @@ const parseBraceColChild = (
   }
 
   pushWarning(diagnostics, "W_UNTERMINATED_BRACE_BLOCK", "Unterminated brace block inside col block");
-  const parsed = parseChildren(braceBlockLines, diagnostics);
+  const parsed = parseChildren(braceBlockLines, diagnostics, 0, false, options);
   return {
     children: parsed.children,
     nextIndex
   };
 };
 
-const parseColChildren = (lines: string[], diagnostics: Diagnostic[]): ChemdNode[] => {
+const parseColChildren = (
+  lines: string[],
+  diagnostics: Diagnostic[],
+  options: ParserOptions
+): ChemdNode[] => {
   const children: ChemdNode[] = [];
   let index = 0;
 
@@ -125,7 +131,7 @@ const parseColChildren = (lines: string[], diagnostics: Diagnostic[]): ChemdNode
 
     const value = line.slice(4).trim();
     if (value.startsWith("{")) {
-      const parsed = parseBraceColChild(lines, diagnostics, index);
+      const parsed = parseBraceColChild(lines, diagnostics, index, options);
       children.push(...parsed.children);
       index = parsed.nextIndex;
       continue;
@@ -145,29 +151,28 @@ const parseTemplateBlock = (
   lines: string[],
   diagnostics: Diagnostic[],
   startIndex: number,
-  templateName: string
+  templateName: string,
+  options: ParserOptions
 ): { node: TemplateNode; nextIndex: number; terminatedBlock: boolean } => {
-  const templateFields = new Set(["bind", "params", "description"]);
-  const leadingFieldLines: string[] = [];
-  let index = startIndex;
-
-  while (index < lines.length && parseKeyValueLine(lines[index])) {
-    leadingFieldLines.push(lines[index]);
-    index += 1;
-  }
+  const templateFields = new Set(["bind", "params", "description", "body"]);
+  const collected = collectTemplateHeaderLines(lines, startIndex);
+  const leadingFieldLines = collected.fieldLines;
+  const index = collected.nextIndex;
 
   const fields = parseKeyValueLines(leadingFieldLines, diagnostics, {
     allowField: (key) => templateFields.has(key),
     blockTypeForDiagnostics: "template"
   });
-  const bodyResult = parseChildren(lines, diagnostics, index, true);
+  const paramSpecs = parseTemplateParams(fields.params);
+  const bodyResult = parseChildren(lines, diagnostics, index, true, options);
 
   return {
     node: {
       type: "template",
       name: templateName,
       bind: parseTemplateBind(fields.bind),
-      params: Array.isArray(fields.params) ? fields.params : [],
+      params: paramSpecs.map((param) => param.name),
+      paramSpecs,
       description: typeof fields.description === "string" ? fields.description : undefined,
       body: bodyResult.children.filter(
         (child): child is TemplateNode["body"][number] => child.type !== "template"
@@ -178,13 +183,23 @@ const parseTemplateBlock = (
   };
 };
 
-const parseStructuredNodeBlock = (
-  lines: string[],
-  diagnostics: Diagnostic[],
-  startIndex: number,
-  blockType: string,
-  headerArg: string | undefined
-): { node?: ChemdNode; nextIndex: number } => {
+interface MatchedBlockContext {
+  lines: string[];
+  diagnostics: Diagnostic[];
+  startIndex: number;
+  blockType: string;
+  headerArg: string | undefined;
+  options: ParserOptions;
+}
+
+const parseStructuredNodeBlock = ({
+  lines,
+  diagnostics,
+  startIndex,
+  blockType,
+  headerArg,
+  options
+}: MatchedBlockContext): { node?: ChemdNode; nextIndex: number } => {
   const { blockLines, nextIndex, terminated } = collectStructuredBlockLines(
     blockType,
     lines,
@@ -197,26 +212,23 @@ const parseStructuredNodeBlock = (
   }
 
   return {
-    node: parseStructuredBlock(
+    node: parseStructuredBlock({
       blockType,
       headerArg,
-      blockLines,
+      lines: blockLines,
       diagnostics,
-      blockType === "col" ? parseColChildren(blockLines, diagnostics) : undefined
-    ),
+      bodyChildren: blockType === "col" ? parseColChildren(blockLines, diagnostics, options) : undefined,
+      options
+    }),
     nextIndex
   };
 };
 
-const parseMatchedBlock = (
-  lines: string[],
-  diagnostics: Diagnostic[],
-  startIndex: number,
-  blockType: string,
-  headerArg: string | undefined
-): { node?: ChemdNode; nextIndex: number } => {
+const parseMatchedBlock = (context: MatchedBlockContext): { node?: ChemdNode; nextIndex: number } => {
+  const { lines, diagnostics, startIndex, blockType, headerArg, options } = context;
+
   if (blockType === "template") {
-    const parsed = parseTemplateBlock(lines, diagnostics, startIndex, headerArg?.trim() ?? "");
+    const parsed = parseTemplateBlock(lines, diagnostics, startIndex, headerArg?.trim() ?? "", options);
     if (!parsed.terminatedBlock) {
       pushWarning(diagnostics, "W_UNTERMINATED_BLOCK", "Unterminated block: template");
     }
@@ -227,14 +239,15 @@ const parseMatchedBlock = (
     };
   }
 
-  return parseStructuredNodeBlock(lines, diagnostics, startIndex, blockType, headerArg);
+  return parseStructuredNodeBlock(context);
 };
 
 export const parseChildren = (
   lines: string[],
   diagnostics: Diagnostic[],
   startIndex = 0,
-  stopAtBlockEnd = false
+  stopAtBlockEnd = false,
+  options: ParserOptions = {}
 ): ParseChildrenResult => {
   const children: ChemdNode[] = [];
   const markdownBuffer: string[] = [];
@@ -264,13 +277,14 @@ export const parseChildren = (
     flushMarkdownBuffer(markdownBuffer, children, diagnostics);
     index += 1;
 
-    const parsed = parseMatchedBlock(
+    const parsed = parseMatchedBlock({
       lines,
       diagnostics,
-      index,
-      blockMatch.blockType,
-      blockMatch.headerArg
-    );
+      startIndex: index,
+      blockType: blockMatch.blockType,
+      headerArg: blockMatch.headerArg,
+      options
+    });
     if (parsed.node) {
       children.push(parsed.node);
     }
