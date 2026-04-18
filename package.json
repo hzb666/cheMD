@@ -8,12 +8,14 @@
     "dev": "node scripts/dev-demo.mjs",
     "dev:demo": "node scripts/dev-demo.mjs",
     "dev:web": "turbo run dev --filter=@chemd/web",
-    "lint": "eslint apps packages vitest.workspace.ts --ext .ts,.tsx",
-    "lint:fix": "eslint apps packages vitest.workspace.ts --ext .ts,.tsx --fix",
+    "lint": "eslint apps packages scripts eslint.config.mjs vitest.workspace.ts --ext .ts,.tsx,.js,.mjs,.cjs",
+    "lint:fix": "eslint apps packages scripts eslint.config.mjs vitest.workspace.ts --ext .ts,.tsx,.js,.mjs,.cjs --fix",
     "lint:py": "ruff check services/chem-service",
     "format:check:py": "ruff format --check services/chem-service",
     "test:dev-demo": "node --test scripts/dev-demo.test.mjs",
-    "test": "turbo run test",
+    "test:legacy-surface": "node --test scripts/legacy-surface-tools.test.mjs",
+    "test:scripts": "node --test scripts/dev-demo.test.mjs scripts/legacy-surface-tools.test.mjs",
+    "test": "turbo run test && pnpm run test:scripts",
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {
