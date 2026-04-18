@@ -1,6 +1,7 @@
 import type { ChemdDocument } from "@chemd/core";
-import type { ChemdLnfV03 } from "@chemd/lnf";
+import type { ChemdLnfV03, ChemdLnfV04 } from "@chemd/lnf";
 import type { StepGraph } from "@chemd/step-ontology";
+import { buildTypedSemanticGraph, type TypedSemanticGraph } from "@chemd/typechecker";
 
 import { buildLearningLayer } from "./learning-layer";
 import { buildQualityLayer } from "./quality-layer";
@@ -17,7 +18,9 @@ export interface ExportTrainingRecordOptions {
   exporterModule?: string;
   exporterVersion?: string;
   stepGraph?: StepGraph;
+  typedGraph?: TypedSemanticGraph;
   v03Lnf?: ChemdLnfV03;
+  v04Lnf?: ChemdLnfV04;
 }
 
 const toDocumentInfo = (document: ChemdDocument): ExportedDocumentInfo => {
@@ -66,12 +69,22 @@ export const exportTrainingRecordFromDocument = (
       : JSON.stringify({ meta: document.meta, children: document.children })
   );
   const exportId = options.exportId ?? `export::${document.meta.id}::${fingerprint}`;
+  const documentInfo = toDocumentInfo(document);
   const sourceLayer = buildSourceLayer(document);
-  const baseSemanticLayer = buildSemanticLayer(document);
-  const semanticLayer = options.v03Lnf
-    ? { ...baseSemanticLayer, v03_lnf: options.v03Lnf }
-    : baseSemanticLayer;
-  const learningLayer = buildLearningLayer(options.stepGraph);
+  const typedGraph = options.typedGraph ?? buildTypedSemanticGraph(document);
+  const baseSemanticLayer = buildSemanticLayer(document, {
+    typedGraph
+  });
+  const semanticLayer = {
+    ...baseSemanticLayer,
+    ...(options.v03Lnf ? { v03_lnf: options.v03Lnf } : {}),
+    ...(options.v04Lnf ? { v04_lnf: options.v04Lnf } : {})
+  };
+  const learningLayer = buildLearningLayer({
+    document: documentInfo,
+    semanticLayer,
+    stepGraph: options.stepGraph
+  });
   const qualityLayer = buildQualityLayer(document.diagnostics, learningLayer);
 
   return {
@@ -84,7 +97,7 @@ export const exportTrainingRecordFromDocument = (
       exporter_version: options.exporterVersion ?? DEFAULT_EXPORTER_VERSION,
       pipeline: ["parseChemd", "resolveChemd", "typecheckDocument", "buildLnf", "exportTrainingRecordFromDocument"]
     },
-    document: toDocumentInfo(document),
+    document: documentInfo,
     source_layer: sourceLayer,
     semantic_layer: semanticLayer,
     learning_layer: learningLayer,

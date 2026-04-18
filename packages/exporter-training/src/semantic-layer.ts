@@ -9,11 +9,6 @@ import type {
   SampleNode
 } from "@chemd/core";
 
-import {
-  classifyTlcAnalysis,
-  classifyReactionConditions
-} from "@chemd/core";
-
 import type {
   ExportedAnalysisV1,
   ExportedMarkdownBlockV1,
@@ -22,10 +17,20 @@ import type {
   ExportedRelationV1,
   ExportedResultV1,
   ExportedSampleV1,
+  NumericWithUnit,
   ReactionParticipantV1,
   SemanticLayerV1
 } from "./types";
 import { collectExportableNodes } from "./traversal";
+import type {
+  QuantityType,
+  TypedAnalysisNode,
+  TypedMoleculeNode,
+  TypedReactionNode,
+  TypedResultNode,
+  TypedSampleNode,
+  TypedSemanticGraph
+} from "@chemd/typechecker";
 
 const collapseWhitespace = (value: string): string => value.replace(/\s+/g, " ").trim();
 
@@ -80,25 +85,91 @@ const isPrimaryEntity = (document: ChemdDocument, node: ChemdNode): boolean => {
 const asNodeArray = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 
+const readNodeStringField = (node: ChemdNode, field: string): string | undefined => {
+  if (!(field in node)) {
+    return undefined;
+  }
+
+  const value = (node as Record<string, unknown>)[field];
+  return typeof value === "string" ? value : undefined;
+};
+
+const createEntityBase = (
+  sourceNodeType: string,
+  node: ChemdNode
+): Pick<ExportedReactionV1, "source_block_type" | "syntax_origin" | "declared_kind"> => ({
+  source_block_type: readNodeStringField(node, "syntaxOrigin") ?? sourceNodeType,
+  syntax_origin: readNodeStringField(node, "syntaxOrigin"),
+  declared_kind: readNodeStringField(node, "declaredKind")
+});
+
+const indexTypedNodes = (
+  typedGraph: TypedSemanticGraph | undefined
+): Map<string, TypedSemanticGraph["nodes"][number]> =>
+  new Map(typedGraph?.nodes.map((node) => [node.nodeId, node]) ?? []);
+
+const toNumericWithUnit = (quantity: QuantityType | undefined): NumericWithUnit | null | undefined => {
+  if (!quantity) {
+    return undefined;
+  }
+
+  const value = typeof quantity.canonicalValue === "number" ? quantity.canonicalValue : quantity.value;
+  const unit = quantity.canonicalUnit ?? quantity.unit;
+
+  if (typeof value !== "number" || !unit) {
+    return null;
+  }
+
+  return {
+    raw: quantity.raw,
+    value,
+    unit,
+    ...(quantity.unit && quantity.unit !== unit ? { original_unit: quantity.unit } : {})
+  };
+};
+
+const toNumericValue = (quantity: QuantityType | undefined): number | null | undefined => {
+  if (!quantity) {
+    return undefined;
+  }
+
+  const value = typeof quantity.canonicalValue === "number" ? quantity.canonicalValue : quantity.value;
+  return typeof value === "number" ? value : null;
+};
+
+const readPercentText = (value: string | undefined): number | null | undefined => {
+  if (!value) {
+    return undefined;
+  }
+
+  const match = value.match(/-?\d+(?:\.\d+)?/);
+  return match ? Number(match[0]) : null;
+};
+
 const buildMolecule = (
   documentId: string,
   node: MoleculeNode,
   nodeIndex: number,
-  isPrimary: boolean
+  isPrimary: boolean,
+  typedMolecule: TypedMoleculeNode | undefined
 ): ExportedMoleculeV1 => ({
   entity_id: buildEntityId("mol", documentId, node.id, nodeIndex),
   original_id: node.id,
   node_index: nodeIndex,
   source_node_type: "molecule",
+  ...createEntityBase("molecule", node),
   ...(isPrimary ? { is_primary: true } : {}),
   name: node.name,
   role: node.role,
   caption: node.caption,
   smiles: node.smiles,
+  cas: node.cas,
   formula: node.formula,
   amount_raw: node.amount,
+  amount_value: toNumericWithUnit(typedMolecule?.amount),
   equivalents_raw: node.equivalents,
-  text_for_embedding: compactText(node.name, node.smiles, node.role, node.formula, node.caption)
+  equivalents_value: toNumericValue(typedMolecule?.equivalents),
+  text_for_embedding: compactText(node.name, node.smiles, node.cas, node.role, node.formula, node.caption)
 });
 
 const createParticipant = (
@@ -137,13 +208,17 @@ const createParticipant = (
   };
 };
 
-const buildReaction = (
-  documentId: string,
-  node: ReactionNode,
-  nodeIndex: number,
-  isPrimary: boolean,
-  moleculeByOriginalId: Map<string, ExportedMoleculeV1>
-): ExportedReactionV1 => {
+interface BuildReactionInput {
+  documentId: string;
+  node: ReactionNode;
+  nodeIndex: number;
+  isPrimary: boolean;
+  moleculeByOriginalId: Map<string, ExportedMoleculeV1>;
+  typedReaction?: TypedReactionNode;
+}
+
+const buildReaction = (input: BuildReactionInput): ExportedReactionV1 => {
+  const { documentId, node, nodeIndex, isPrimary, moleculeByOriginalId, typedReaction } = input;
   const reactants = asNodeArray(node.reactants).map((raw) => createParticipant("reactant", raw, moleculeByOriginalId));
   const products = asNodeArray(node.products).map((raw) => createParticipant("product", raw, moleculeByOriginalId));
   const conditions = asNodeArray(node.conditions);
@@ -154,6 +229,7 @@ const buildReaction = (
     original_id: node.id,
     node_index: nodeIndex,
     source_node_type: "reaction",
+    ...createEntityBase("reaction", node),
     ...(isPrimary ? { is_primary: true } : {}),
     name: node.name,
     caption: node.caption,
@@ -170,8 +246,12 @@ const buildReaction = (
     yield_raw: node.yield,
     conversion_raw: node.conversion,
     selectivity_raw: node.selectivity,
-    normalized_conditions: classifyReactionConditions(node),
-    normalized_outcome_hints: {},
+    normalized_conditions: typedReaction?.normalizedConditions ?? {},
+    normalized_outcome_hints: {
+      yield_percent: readPercentText(node.yield),
+      conversion_percent: readPercentText(node.conversion),
+      selectivity_percent: readPercentText(node.selectivity)
+    },
     text_for_embedding: compactText(
       node.name,
       node.caption,
@@ -194,12 +274,14 @@ const buildResult = (
   documentId: string,
   node: ResultNode,
   nodeIndex: number,
-  isPrimary: boolean
+  isPrimary: boolean,
+  typedResult: TypedResultNode | undefined
 ): ExportedResultV1 => ({
   entity_id: buildEntityId("res", documentId, node.id, nodeIndex),
   original_id: node.id,
   node_index: nodeIndex,
   source_node_type: "result",
+  ...createEntityBase("result", node),
   ...(isPrimary ? { is_primary: true } : {}),
   status_raw: node.status,
   yield_raw: node.yield,
@@ -209,6 +291,12 @@ const buildResult = (
   product_state: node.product_state,
   purity_raw: node.purity,
   notes: node.notes,
+  status_label: typedResult?.status,
+  yield_percent: toNumericValue(typedResult?.yield),
+  conversion_percent: toNumericValue(typedResult?.conversion),
+  selectivity_percent: toNumericValue(typedResult?.selectivity),
+  purity_percent: toNumericValue(typedResult?.purity),
+  isolated_mass: toNumericWithUnit(typedResult?.isolatedMass),
   text_for_embedding: compactText(
     node.status,
     node.notes,
@@ -223,12 +311,14 @@ const buildAnalysis = (
   documentId: string,
   node: AnalysisNode,
   nodeIndex: number,
-  isPrimary: boolean
+  isPrimary: boolean,
+  typedAnalysis: TypedAnalysisNode | undefined
 ): ExportedAnalysisV1 => ({
   entity_id: buildEntityId("ana", documentId, node.id, nodeIndex),
   original_id: node.id,
   node_index: nodeIndex,
   source_node_type: "analysis",
+  ...createEntityBase("analysis", node),
   ...(isPrimary ? { is_primary: true } : {}),
   analysis_type: node.type_name,
   ref_raw: node.ref,
@@ -243,7 +333,7 @@ const buildAnalysis = (
   method: node.method,
   data_raw: node.data,
   notes: node.notes,
-  normalized_tlc: classifyTlcAnalysis(node) ?? null,
+  normalized_tlc: typedAnalysis?.normalizedTlc ?? null,
   text_for_embedding: compactText(node.type_name, node.instrument, node.method, node.data, node.notes)
 });
 
@@ -251,12 +341,14 @@ const buildSample = (
   documentId: string,
   node: SampleNode,
   nodeIndex: number,
-  isPrimary: boolean
+  isPrimary: boolean,
+  typedSample: TypedSampleNode | undefined
 ): ExportedSampleV1 => ({
   entity_id: buildEntityId("sam", documentId, node.id, nodeIndex),
   original_id: node.id,
   node_index: nodeIndex,
   source_node_type: "sample",
+  ...createEntityBase("sample", node),
   ...(isPrimary ? { is_primary: true } : {}),
   name: node.name,
   sample_code: node.sample_id,
@@ -264,6 +356,7 @@ const buildSample = (
   purity_raw: node.purity,
   supplier: node.supplier,
   notes: node.notes,
+  purity_percent: toNumericValue(typedSample?.purity),
   text_for_embedding: compactText(node.name, node.batch, node.supplier, node.notes)
 });
 
@@ -271,6 +364,7 @@ const buildMarkdown = (documentId: string, node: MarkdownNode, nodeIndex: number
   entity_id: buildEntityId("md", documentId, undefined, nodeIndex),
   node_index: nodeIndex,
   source_node_type: "markdown",
+  ...createEntityBase("markdown", node),
   raw_text: node.value,
   cleaned_text: collapseWhitespace(node.value),
   references: node.references.map((reference) => ({
@@ -312,6 +406,7 @@ interface SemanticLayerParts {
 }
 
 type TraversedNode = ReturnType<typeof collectExportableNodes>[number];
+type TypedNodeIndex = Map<string, TypedSemanticGraph["nodes"][number]>;
 
 const createSemanticLayerParts = (): SemanticLayerParts => ({
   molecules: [],
@@ -325,14 +420,21 @@ const createSemanticLayerParts = (): SemanticLayerParts => ({
 const collectMoleculesAndMarkdown = (
   document: ChemdDocument,
   traversedNodes: TraversedNode[],
-  parts: SemanticLayerParts
+  parts: SemanticLayerParts,
+  typedNodes: TypedNodeIndex
 ): void => {
   const documentId = document.meta.id;
   for (const { nodeIndex, node } of traversedNodes) {
     const isPrimary = isPrimaryEntity(document, node);
 
     if (node.type === "molecule") {
-      parts.molecules.push(buildMolecule(documentId, node, nodeIndex, isPrimary));
+      parts.molecules.push(buildMolecule(
+        documentId,
+        node,
+        nodeIndex,
+        isPrimary,
+        getTypedMolecule(typedNodes, node)
+      ));
       continue;
     }
 
@@ -349,45 +451,104 @@ const createMoleculeIndex = (molecules: ExportedMoleculeV1[]): Map<string, Expor
       .map((molecule) => [molecule.original_id as string, molecule])
   );
 
+const getTypedMolecule = (typedNodes: TypedNodeIndex, node: MoleculeNode): TypedMoleculeNode | undefined => {
+  const typedNode = typedNodes.get(node.id ?? "");
+  return typedNode?.kind === "molecule" ? typedNode : undefined;
+};
+
+const getTypedReaction = (typedNodes: TypedNodeIndex, node: ReactionNode): TypedReactionNode | undefined => {
+  const typedNode = typedNodes.get(node.id ?? "");
+  return typedNode?.kind === "reaction" ? typedNode : undefined;
+};
+
+const getTypedResult = (typedNodes: TypedNodeIndex, node: ResultNode): TypedResultNode | undefined => {
+  const typedNode = typedNodes.get(node.id ?? "");
+  return typedNode?.kind === "result" ? typedNode : undefined;
+};
+
+const getTypedAnalysis = (typedNodes: TypedNodeIndex, node: AnalysisNode): TypedAnalysisNode | undefined => {
+  const typedNode = typedNodes.get(node.id ?? "");
+  return typedNode?.kind === "analysis" ? typedNode : undefined;
+};
+
+const getTypedSample = (typedNodes: TypedNodeIndex, node: SampleNode): TypedSampleNode | undefined => {
+  const typedNode = typedNodes.get(node.id ?? "");
+  return typedNode?.kind === "sample" ? typedNode : undefined;
+};
+
 const collectRelatedEntities = (
   document: ChemdDocument,
   traversedNodes: TraversedNode[],
   moleculeByOriginalId: Map<string, ExportedMoleculeV1>,
-  parts: SemanticLayerParts
+  parts: SemanticLayerParts,
+  typedNodes: TypedNodeIndex
 ): void => {
   const documentId = document.meta.id;
   for (const { nodeIndex, node } of traversedNodes) {
     const isPrimary = isPrimaryEntity(document, node);
 
     if (node.type === "reaction") {
-      parts.reactions.push(buildReaction(documentId, node, nodeIndex, isPrimary, moleculeByOriginalId));
+      parts.reactions.push(buildReaction({
+        documentId,
+        node,
+        nodeIndex,
+        isPrimary,
+        moleculeByOriginalId,
+        typedReaction: getTypedReaction(typedNodes, node)
+      }));
       continue;
     }
 
     if (node.type === "result") {
-      parts.results.push(buildResult(documentId, node, nodeIndex, isPrimary));
+      parts.results.push(buildResult(
+        documentId,
+        node,
+        nodeIndex,
+        isPrimary,
+        getTypedResult(typedNodes, node)
+      ));
       continue;
     }
 
     if (node.type === "analysis") {
-      parts.analyses.push(buildAnalysis(documentId, node, nodeIndex, isPrimary));
+      parts.analyses.push(buildAnalysis(
+        documentId,
+        node,
+        nodeIndex,
+        isPrimary,
+        getTypedAnalysis(typedNodes, node)
+      ));
       continue;
     }
 
     if (node.type === "sample") {
-      parts.samples.push(buildSample(documentId, node, nodeIndex, isPrimary));
+      parts.samples.push(buildSample(
+        documentId,
+        node,
+        nodeIndex,
+        isPrimary,
+        getTypedSample(typedNodes, node)
+      ));
     }
   }
 };
 
-export const buildSemanticLayer = (document: ChemdDocument): SemanticLayerV1 => {
+export interface BuildSemanticLayerOptions {
+  typedGraph?: TypedSemanticGraph;
+}
+
+export const buildSemanticLayer = (
+  document: ChemdDocument,
+  options: BuildSemanticLayerOptions = {}
+): SemanticLayerV1 => {
   const documentId = document.meta.id;
   const traversedNodes = collectExportableNodes(document.children);
   const parts = createSemanticLayerParts();
+  const typedNodes = indexTypedNodes(options.typedGraph);
 
-  collectMoleculesAndMarkdown(document, traversedNodes, parts);
+  collectMoleculesAndMarkdown(document, traversedNodes, parts, typedNodes);
   // Reaction participant 可以用 @id 指向 molecule，索引必须先于 reaction 语义层生成。
-  collectRelatedEntities(document, traversedNodes, createMoleculeIndex(parts.molecules), parts);
+  collectRelatedEntities(document, traversedNodes, createMoleculeIndex(parts.molecules), parts, typedNodes);
 
   const { molecules, reactions, results, analyses, samples, markdownBlocks } = parts;
   const links = buildPrimaryLinks(documentId, [...molecules, ...reactions, ...results, ...analyses, ...samples]);

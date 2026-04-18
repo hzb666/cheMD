@@ -1,4 +1,4 @@
-import { classifyTlcAnalysis, type AnalysisNode } from "@chemd/core";
+import type { AnalysisNode, NormalizedTlcAnalysis } from "@chemd/core";
 
 import { escapeHtml, renderBlockTitle, renderFieldList } from "./shared";
 
@@ -25,17 +25,17 @@ const getVerticalPosition = (rf?: number | null): string => {
 };
 
 const renderSpot = (
-  spot: NonNullable<ReturnType<typeof classifyTlcAnalysis>>["lanes"][number]["spots"][number]
+  spot: NonNullable<NormalizedTlcAnalysis>["lanes"][number]["spots"][number]
 ): string =>
   `<span class="chemd-tlc-spot" data-shape="${escapeHtml(spot.shape)}" data-size-rank="${resolveRank(spot.size_rank)}" data-intensity-rank="${resolveRank(spot.intensity_rank)}" style="top:${getVerticalPosition(spot.rf)}"></span>`;
 
 const renderMessRegion = (
-  region: NonNullable<ReturnType<typeof classifyTlcAnalysis>>["lanes"][number]["mess_regions"][number]
+  region: NonNullable<NormalizedTlcAnalysis>["lanes"][number]["mess_regions"][number]
 ): string =>
   `<span class="chemd-tlc-mess" data-size-rank="${resolveRank(region.size_rank)}" data-intensity-rank="${resolveRank(region.intensity_rank)}" style="top:${getVerticalPosition(region.rf ?? null)}"></span>`;
 
 const renderLane = (
-  lane: NonNullable<ReturnType<typeof classifyTlcAnalysis>>["lanes"][number]
+  lane: NonNullable<NormalizedTlcAnalysis>["lanes"][number]
 ): string => {
   const content = [
     ...lane.mess_regions.map(renderMessRegion),
@@ -50,8 +50,7 @@ const renderLane = (
   </div>`;
 };
 
-const renderPlate = (node: AnalysisNode): string => {
-  const analysis = classifyTlcAnalysis(node);
+const renderPlate = (analysis: NormalizedTlcAnalysis | null | undefined): string => {
   if (!analysis) {
     return "";
   }
@@ -87,9 +86,12 @@ const renderTlcFields = (node: AnalysisNode): string =>
     ["Notes", node.notes]
   ]);
 
-export const renderTlcAnalysis = (node: AnalysisNode): string =>
+export const renderTlcAnalysis = (
+  node: AnalysisNode,
+  normalizedTlc?: NormalizedTlcAnalysis | null
+): string =>
   `<section class="chemd-block chemd-block--analysis chemd-block--analysis-tlc" data-node-id="${escapeHtml(node.id ?? "")}" data-analysis-type="tlc">
     ${renderBlockTitle("Analysis", node.id)}
-    ${renderPlate(node)}
+    ${renderPlate(normalizedTlc)}
     ${renderTlcFields(node)}
   </section>`;

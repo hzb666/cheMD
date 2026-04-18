@@ -18,10 +18,22 @@ const getOriginalId = (node: ChemdNode): string | undefined => {
   return undefined;
 };
 
+const readNodeStringField = (node: ChemdNode, field: string): string | undefined => {
+  if (!(field in node)) {
+    return undefined;
+  }
+
+  const value = (node as Record<string, unknown>)[field];
+  return typeof value === "string" ? value : undefined;
+};
+
 const createSourceSnapshot = (node: ChemdNode, nodeIndex: number): SourceNodeSnapshot => ({
   node_index: nodeIndex,
   node_type: node.type,
   original_id: getOriginalId(node),
+  source_block_type: readNodeStringField(node, "syntaxOrigin") ?? node.type,
+  syntax_origin: readNodeStringField(node, "syntaxOrigin"),
+  declared_kind: readNodeStringField(node, "declaredKind"),
   raw_payload: toRecord(node)
 });
 

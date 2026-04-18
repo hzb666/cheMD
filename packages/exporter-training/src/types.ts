@@ -1,5 +1,5 @@
 import type { NormalizedTlcAnalysis } from "@chemd/core";
-import type { ChemdLnfV03 } from "@chemd/lnf";
+import type { ChemdLnfV03, ChemdLnfV04 } from "@chemd/lnf";
 import type { CanonicalStepNode, ObservationEventNode } from "@chemd/step-ontology";
 
 export interface ChemdTrainingExportV1 {
@@ -59,6 +59,9 @@ export interface SourceNodeSnapshot {
     | "template"
     | "use";
   original_id?: string;
+  source_block_type?: string;
+  syntax_origin?: string;
+  declared_kind?: string;
   raw_payload: Record<string, unknown>;
 }
 
@@ -83,6 +86,7 @@ export interface SemanticLayerV1 {
   markdown_blocks: ExportedMarkdownBlockV1[];
   links: ExportedRelationV1[];
   v03_lnf?: ChemdLnfV03;
+  v04_lnf?: ChemdLnfV04;
 }
 
 export interface ExportedEntityBase {
@@ -90,6 +94,9 @@ export interface ExportedEntityBase {
   original_id?: string;
   node_index: number;
   source_node_type: string;
+  source_block_type?: string;
+  syntax_origin?: string;
+  declared_kind?: string;
   is_primary?: boolean;
   provenance?: {
     from_template?: boolean;
@@ -121,6 +128,7 @@ export interface ExportedMoleculeV1 extends ExportedEntityBase {
   role?: string;
   caption?: string;
   smiles?: string;
+  cas?: string;
   canonical_smiles?: string;
   formula?: string;
   amount_raw?: string;
@@ -392,8 +400,10 @@ export interface ChemistryFeatureRefV1 {
 export interface ProcedureToStepsPairV03 {
   pair_id: string;
   procedure_id?: string;
+  source_type?: "explicit_steps" | "lowered_prose";
   source_text: string;
   steps: CanonicalStepNode[];
+  low_confidence_step_count?: number;
   diagnostics: ExportedDiagnostic[];
 }
 

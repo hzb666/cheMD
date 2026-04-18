@@ -13,11 +13,18 @@ export interface DocxBridgePayload {
     resolvedOptions: RenderOptions;
     adapter?: RenderAdapterPayload;
   };
+  semantic?: {
+    typedGraph: unknown;
+  };
   exportHints: {
     format: "docx-bridge";
     pipeline: "html-or-markdown-to-docx";
     recommendedTool: "pandoc";
   };
+}
+
+export interface DocxBridgeOptions {
+  typedGraph?: unknown;
 }
 
 const normalizeWhitespace = (value: string): string => value.replaceAll(/\s+/g, " ").trim();
@@ -72,9 +79,18 @@ const renderFieldLines = (fields: FieldLine[]): string[] =>
 
 const renderMarkdownNode = (value: string): string => value.trim();
 
+const renderSourceFieldLines = (
+  node: DocxNodeByType<"reaction"> | DocxNodeByType<"molecule">
+): string[] =>
+  renderFieldLines([
+    ["Surface origin", node.syntaxOrigin],
+    ["Declared kind", node.declaredKind]
+  ]);
+
 const renderReactionNode = (node: DocxNodeByType<"reaction">): string =>
   compactLines([
     renderHeading("Reaction", node.id),
+    ...renderSourceFieldLines(node),
     ...renderFieldLines([
       ["Name", node.name],
       ["Temperature", node.temperature],
@@ -89,8 +105,11 @@ const renderReactionNode = (node: DocxNodeByType<"reaction">): string =>
 const renderMoleculeNode = (node: DocxNodeByType<"molecule">): string =>
   compactLines([
     renderHeading("Molecule", node.id),
+    ...renderSourceFieldLines(node),
     ...renderFieldLines([
       ["Name", node.name],
+      ["SMILES", node.smiles],
+      ["CAS", node.cas],
       ["Formula", node.formula],
       ["Amount", node.amount],
       ["Role", node.role]
@@ -134,8 +153,25 @@ const renderAnalysisNode = (node: DocxNodeByType<"analysis">): string =>
     ...renderAnalysisPointLines(node)
   ]);
 
+const renderProcedureStepLines = (node: DocxNodeByType<"procedure">): string[] =>
+  node.steps?.map((step, index) => {
+    const details = [
+      step.params ? Object.entries(step.params).map(([key, value]) => `${key}=${value}`).join(" | ") : "",
+      step.inputs?.length ? `inputs=${step.inputs.join(", ")}` : "",
+      step.outputs?.length ? `outputs=${step.outputs.join(", ")}` : "",
+      step.dependsOn?.length ? `depends_on=${step.dependsOn.join(", ")}` : ""
+    ].filter(Boolean).join(" | ");
+
+    return `- Step ${index + 1}: ${step.family}${details ? ` | ${details}` : ""}`;
+  }) ?? [];
+
 const renderProcedureNode = (node: DocxNodeByType<"procedure">): string =>
-  compactLines([renderHeading("Procedure", node.id), ...renderFieldLines([["Ref", node.ref]]), node.body]);
+  compactLines([
+    renderHeading("Procedure", node.id),
+    ...renderFieldLines([["Ref", node.ref]]),
+    ...renderProcedureStepLines(node),
+    node.body
+  ]);
 
 const renderObservationNode = (node: DocxNodeByType<"observation">): string =>
   compactLines([renderHeading("Observation", node.id), ...renderFieldLines([["Ref", node.ref]]), node.body]);
@@ -175,6 +211,12 @@ const renderUseNode = (node: DocxNodeByType<"use">): string => {
   ].join("\n");
 };
 
+const renderColNode = (node: DocxNodeByType<"col">): string =>
+  compactLines([
+    renderHeading(`Columns (${node.columns})`),
+    ...node.children.map(renderStructuredNode).filter((block) => block.length > 0)
+  ]);
+
 const renderStructuredNode = (node: DocxNode): string => {
   switch (node.type) {
     case "markdown":
@@ -197,6 +239,8 @@ const renderStructuredNode = (node: DocxNode): string => {
       return renderTemplateNode(node);
     case "use":
       return renderUseNode(node);
+    case "col":
+      return renderColNode(node);
     default:
       return "";
   }
@@ -223,7 +267,8 @@ export const renderDocxMarkdown = (document: ChemdDocument): string => {
 export const createDocxBridgePayload = (
   document: ChemdDocument,
   options: RenderOptions,
-  adapterPayload?: RenderAdapterPayload
+  adapterPayload?: RenderAdapterPayload,
+  bridgeOptions: DocxBridgeOptions = {}
 ): DocxBridgePayload => ({
   version: "v0.1",
   document: {
@@ -236,6 +281,7 @@ export const createDocxBridgePayload = (
     resolvedOptions: options,
     ...(adapterPayload ? { adapter: adapterPayload } : {})
   },
+  ...(bridgeOptions.typedGraph ? { semantic: { typedGraph: bridgeOptions.typedGraph } } : {}),
   exportHints: {
     format: "docx-bridge",
     pipeline: "html-or-markdown-to-docx",
@@ -246,5 +292,6 @@ export const createDocxBridgePayload = (
 export const renderDocxBridge = (
   document: ChemdDocument,
   options: RenderOptions,
-  adapterPayload?: RenderAdapterPayload
-): string => JSON.stringify(createDocxBridgePayload(document, options, adapterPayload), null, 2);
+  adapterPayload?: RenderAdapterPayload,
+  bridgeOptions: DocxBridgeOptions = {}
+): string => JSON.stringify(createDocxBridgePayload(document, options, adapterPayload, bridgeOptions), null, 2);

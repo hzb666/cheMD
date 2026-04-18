@@ -1,4 +1,4 @@
-import type { ChemdDocument, Diagnostic } from "@chemd/core";
+import type { ChemdDocument, Diagnostic, NormalizedReactionConditions } from "@chemd/core";
 import type { V03Diagnostic } from "@chemd/diagnostics";
 import type { CanonicalStepNode, ObservationEventNode, StepGraph } from "@chemd/step-ontology";
 import type {
@@ -8,7 +8,7 @@ import type {
   TypedSemanticGraph,
   TypedSemanticNode
 } from "@chemd/typechecker";
-import type { RunPlan } from "@chemd/runtime-lab";
+import type { LabState, RunPlan } from "@chemd/runtime-lab";
 
 export interface LnfDocumentInfo {
   id: string;
@@ -20,16 +20,25 @@ export interface LnfStep {
   stepId: string;
   family: string;
   params: Record<string, unknown>;
+  inputs?: CanonicalStepNode["inputs"];
+  outputs?: CanonicalStepNode["outputs"];
+  artifacts?: CanonicalStepNode["artifacts"];
+  source: CanonicalStepNode["source"];
+  provenance?: CanonicalStepNode["provenance"];
   sourceNodeId?: string;
+  sourceType?: string;
   rawText: string;
   loweringConfidence: number;
 }
 
 export interface LnfReaction {
   nodeId: string;
+  syntaxOrigin?: string;
+  declaredKind?: string;
   reactants: unknown[];
   products: unknown[];
   conditions: Record<string, unknown>;
+  normalizedConditions?: NormalizedReactionConditions;
 }
 
 export interface LnfResult {
@@ -52,12 +61,54 @@ export interface ChemdLnfV03 {
   };
 }
 
+export interface LnfMigrationSummary {
+  legacyBlockCount: number;
+  missingKindCount: number;
+  conflictCount: number;
+}
+
+export interface LnfRuntimeSummary {
+  planId?: string;
+  runId?: string;
+  mode?: string;
+  status?: string;
+  currentStepId?: string;
+  stepCount: number;
+  traceCount: number;
+  stepStates: Array<{
+    stepId: string;
+    status: string;
+    startedAt?: string;
+    endedAt?: string;
+  }>;
+}
+
+export interface ChemdLnfV04 {
+  schemaVersion: "chemd-lnf/v0.4";
+  experiment: ChemdLnfV03["experiment"] & {
+    typedGraph: TypedSemanticGraph;
+    stepGraph: {
+      steps: LnfStep[];
+      observations: ObservationEventNode[];
+      diagnostics: V03Diagnostic[];
+    };
+    runtimeSummary?: LnfRuntimeSummary;
+    stepSources: {
+      explicit: LnfStep[];
+      lowered: LnfStep[];
+      observation: ObservationEventNode[];
+    };
+    migration: LnfMigrationSummary;
+  };
+}
+
 export interface BuildLnfInput {
   document: ChemdDocument | LnfDocumentInfo;
   typedGraph: TypedSemanticGraph;
   stepGraph: StepGraph;
   diagnostics: Array<Diagnostic | V03Diagnostic>;
   runPlan?: RunPlan;
+  runtimeState?: LabState;
 }
 
 const toDocumentInfo = (document: ChemdDocument | LnfDocumentInfo): LnfDocumentInfo => {
@@ -82,13 +133,21 @@ const toLnfStep = (step: CanonicalStepNode): LnfStep => ({
   stepId: step.stepId,
   family: step.family,
   params: step.params,
+  inputs: step.inputs,
+  outputs: step.outputs,
+  artifacts: step.artifacts,
+  source: step.source,
+  provenance: step.provenance,
   sourceNodeId: step.source.sourceNodeId,
+  sourceType: step.source.sourceType,
   rawText: step.source.rawText,
   loweringConfidence: step.loweringConfidence
 });
 
 const toLnfReaction = (node: TypedReactionNode): LnfReaction => ({
   nodeId: node.nodeId,
+  syntaxOrigin: node.syntaxOrigin,
+  declaredKind: node.declaredKind,
   reactants: node.reactants,
   products: node.products,
   conditions: {
@@ -99,7 +158,8 @@ const toLnfReaction = (node: TypedReactionNode): LnfReaction => ({
     temperature: node.temperature,
     time: node.time,
     pressure: node.pressure
-  }
+  },
+  normalizedConditions: node.normalizedConditions
 });
 
 const toLnfResult = (node: TypedResultNode): LnfResult => ({
@@ -138,3 +198,94 @@ export const buildLnf = (input: BuildLnfInput): ChemdLnfV03 => ({
     ...(input.runPlan ? { runPlan: toRunPlanSummary(input.runPlan) } : {})
   }
 });
+
+const countDiagnostics = (
+  diagnostics: Array<Diagnostic | V03Diagnostic>,
+  code: string
+): number => diagnostics.filter((diagnostic) => diagnostic.code === code).length;
+
+const isLegacyUnknownBlockDiagnostic = (diagnostic: Diagnostic | V03Diagnostic): boolean =>
+  diagnostic.code === "W_UNKNOWN_BLOCK"
+  && (
+    diagnostic.sourceNodeType === "molecule"
+    || diagnostic.sourceNodeType === "reaction"
+    || typeof diagnostic.facts?.legacy_block_kind === "string"
+  );
+
+const countLegacyBlockDiagnostics = (
+  diagnostics: Array<Diagnostic | V03Diagnostic>
+): number =>
+  diagnostics.filter((diagnostic) =>
+    diagnostic.code === "W_LEGACY_BLOCK_KIND" || isLegacyUnknownBlockDiagnostic(diagnostic)
+  ).length;
+
+const buildMigrationSummary = (
+  diagnostics: Array<Diagnostic | V03Diagnostic>
+): LnfMigrationSummary => ({
+  legacyBlockCount: countLegacyBlockDiagnostics(diagnostics),
+  missingKindCount: countDiagnostics(diagnostics, "W_CHEMD_KIND_AMBIGUOUS"),
+  conflictCount: countDiagnostics(diagnostics, "E_CHEMD_KIND_CONFLICT")
+});
+
+const toStepGraphSummary = (
+  stepGraph: StepGraph,
+  steps: LnfStep[]
+): ChemdLnfV04["experiment"]["stepGraph"] => ({
+  steps,
+  observations: stepGraph.observations.flatMap((observation) => observation.events),
+  diagnostics: stepGraph.diagnostics
+});
+
+const hasRuntimeSummaryInput = (input: BuildLnfInput): boolean =>
+  Boolean(input.runtimeState || input.runPlan);
+
+const toRuntimeStepStates = (runtimeState: LabState | undefined): LnfRuntimeSummary["stepStates"] =>
+  runtimeState?.stepStates.map((step) => ({
+    stepId: step.stepId,
+    status: step.status,
+    startedAt: step.startedAt,
+    endedAt: step.endedAt
+  })) ?? [];
+
+const countRuntimeSteps = (input: BuildLnfInput): number =>
+  input.runPlan?.steps.length ?? input.runtimeState?.stepStates.length ?? 0;
+
+const toRuntimeSummary = (input: BuildLnfInput): LnfRuntimeSummary | undefined => {
+  if (!hasRuntimeSummaryInput(input)) {
+    return undefined;
+  }
+
+  const runtimeState = input.runtimeState;
+  return {
+    planId: runtimeState?.planId ?? input.runPlan?.planId,
+    runId: runtimeState?.runId,
+    mode: runtimeState?.mode,
+    status: runtimeState?.status ?? input.runPlan?.status,
+    currentStepId: runtimeState?.currentStepId,
+    stepCount: countRuntimeSteps(input),
+    traceCount: runtimeState?.trace.length ?? 0,
+    stepStates: toRuntimeStepStates(runtimeState)
+  };
+};
+
+export const buildLnfV04 = (input: BuildLnfInput): ChemdLnfV04 => {
+  const v03 = buildLnf(input);
+  const steps = input.stepGraph.steps.map(toLnfStep);
+  const runtimeSummary = toRuntimeSummary(input);
+
+  return {
+    schemaVersion: "chemd-lnf/v0.4",
+    experiment: {
+      ...v03.experiment,
+      typedGraph: input.typedGraph,
+      stepGraph: toStepGraphSummary(input.stepGraph, steps),
+      ...(runtimeSummary ? { runtimeSummary } : {}),
+      stepSources: {
+        explicit: steps.filter((step) => step.sourceType === "explicit_step"),
+        lowered: steps.filter((step) => step.sourceType === "lowered_step"),
+        observation: input.stepGraph.observations.flatMap((observation) => observation.events)
+      },
+      migration: buildMigrationSummary(input.diagnostics)
+    }
+  };
+};

@@ -1,11 +1,25 @@
 import type { StepGraph } from "@chemd/step-ontology";
 
 import type {
+  ExportedDocumentInfo,
   ExportedDiagnostic,
+  ExportedReactionV1,
+  ExportedResultV1,
   LearningLayerV1,
   ObservationToEventsPairV03,
-  ProcedureToStepsPairV03
+  PredictionInstanceV1,
+  PredictionTargetsV1,
+  ProcedureToStepsPairV03,
+  RetrievalChunkV1,
+  RetrievalMetadataV1,
+  SemanticLayerV1
 } from "./types";
+
+export interface BuildLearningLayerInput {
+  document: ExportedDocumentInfo;
+  semanticLayer: SemanticLayerV1;
+  stepGraph?: StepGraph;
+}
 
 const exportDiagnostic = (diagnostic: StepGraph["diagnostics"][number]): ExportedDiagnostic => ({
   code: diagnostic.code,
@@ -15,12 +29,20 @@ const exportDiagnostic = (diagnostic: StepGraph["diagnostics"][number]): Exporte
   position: diagnostic.position
 });
 
+const readProcedureSourceText = (procedure: StepGraph["procedures"][number]): string =>
+  procedure.steps
+    .map((step) => step.source.rawText.trim())
+    .filter((rawText) => rawText.length > 0)
+    .join("\n");
+
 const buildProcedurePairs = (stepGraph: StepGraph | undefined): ProcedureToStepsPairV03[] =>
   stepGraph?.procedures.map((procedure, index) => ({
     pair_id: `procedure_to_steps::${procedure.procedureId ?? index}`,
     procedure_id: procedure.procedureId,
-    source_text: procedure.steps[0]?.source.rawText ?? "",
+    source_type: procedure.sourceType,
+    source_text: readProcedureSourceText(procedure),
     steps: procedure.steps,
+    low_confidence_step_count: procedure.steps.filter((step) => step.loweringConfidence < 0.85).length,
     diagnostics: procedure.diagnostics.map(exportDiagnostic)
   })) ?? [];
 
@@ -33,13 +55,189 @@ const buildObservationPairs = (stepGraph: StepGraph | undefined): ObservationToE
     diagnostics: observation.diagnostics.map(exportDiagnostic)
   })) ?? [];
 
-export const buildLearningLayer = (stepGraph?: StepGraph): LearningLayerV1 => {
-  const procedurePairs = buildProcedurePairs(stepGraph);
-  const observationPairs = buildObservationPairs(stepGraph);
+const compactText = (...parts: Array<string | undefined>): string =>
+  parts
+    .map((part) => part?.trim() ?? "")
+    .filter(Boolean)
+    .join(" ");
+
+const createRetrievalMetadata = (
+  document: ExportedDocumentInfo,
+  semanticLayer: SemanticLayerV1
+): RetrievalMetadataV1 => ({
+  date: document.date,
+  ...(document.tags ? { tags: document.tags } : {}),
+  molecule_ids: semanticLayer.molecules.map((molecule) => molecule.entity_id),
+  reaction_ids: semanticLayer.reactions.map((reaction) => reaction.entity_id),
+  result_ids: semanticLayer.results.map((result) => result.entity_id),
+  analysis_ids: semanticLayer.analyses.map((analysis) => analysis.entity_id),
+  sample_ids: semanticLayer.samples.map((sample) => sample.entity_id)
+});
+
+const buildRetrievalChunks = (
+  document: ExportedDocumentInfo,
+  semanticLayer: SemanticLayerV1
+): RetrievalChunkV1[] => {
+  const metadata = createRetrievalMetadata(document, semanticLayer);
+  const chunks: RetrievalChunkV1[] = [];
+
+  semanticLayer.markdown_blocks.forEach((block) => {
+    if (!block.text_for_embedding) {
+      return;
+    }
+
+    chunks.push({
+      chunk_id: `retrieval::${document.document_id}::${block.entity_id}`,
+      experiment_id: document.document_id,
+      chunk_type: "markdown",
+      source_entity_ids: [block.entity_id],
+      text: block.text_for_embedding,
+      raw_text: block.raw_text,
+      metadata
+    });
+  });
+
+  semanticLayer.reactions.forEach((reaction) => {
+    const text = compactText(reaction.name, reaction.caption, reaction.text_for_embedding);
+    if (!text) {
+      return;
+    }
+
+    chunks.push({
+      chunk_id: `retrieval::${document.document_id}::${reaction.entity_id}`,
+      experiment_id: document.document_id,
+      chunk_type: "reaction_summary",
+      source_entity_ids: [reaction.entity_id],
+      text,
+      metadata
+    });
+  });
+
+  semanticLayer.results.forEach((result) => {
+    const text = compactText(result.notes, result.text_for_embedding);
+    if (!text) {
+      return;
+    }
+
+    chunks.push({
+      chunk_id: `retrieval::${document.document_id}::${result.entity_id}`,
+      experiment_id: document.document_id,
+      chunk_type: "result_notes",
+      source_entity_ids: [result.entity_id],
+      text,
+      metadata: {
+        ...metadata,
+        status_label: result.status_label,
+        yield_percent: result.yield_percent,
+        conversion_percent: result.conversion_percent,
+        selectivity_percent: result.selectivity_percent,
+        purity_percent: result.purity_percent
+      }
+    });
+  });
+
+  return chunks;
+};
+
+const toConditionValue = (value: { normalized?: string } | null | undefined): string | null =>
+  value?.normalized ?? null;
+
+const toNumericValue = (value: { value?: number } | null | undefined): number | null =>
+  typeof value?.value === "number" ? value.value : null;
+
+const buildPredictionTargets = (
+  reaction: ExportedReactionV1,
+  primaryResult: ExportedResultV1 | undefined
+): PredictionTargetsV1 => ({
+  status_class: primaryResult?.status_label,
+  yield_percent: primaryResult?.yield_percent ?? reaction.normalized_outcome_hints.yield_percent,
+  conversion_percent: primaryResult?.conversion_percent ?? reaction.normalized_outcome_hints.conversion_percent,
+  selectivity_percent: primaryResult?.selectivity_percent ?? reaction.normalized_outcome_hints.selectivity_percent,
+  purity_percent: primaryResult?.purity_percent
+});
+
+const buildMissingPredictionFields = (
+  reaction: ExportedReactionV1,
+  primaryResult: ExportedResultV1 | undefined,
+  targets: PredictionTargetsV1
+): string[] => [
+  reaction.reactants.length === 0 ? "reactants" : "",
+  reaction.products.length === 0 ? "products" : "",
+  !primaryResult && targets.yield_percent == null ? "result_or_reaction_yield" : ""
+].filter(Boolean);
+
+const buildLinkedMoleculeIds = (reaction: ExportedReactionV1): string[] => [
+  ...reaction.reactants.flatMap((participant) => participant.target_entity_id ?? []),
+  ...reaction.products.flatMap((participant) => participant.target_entity_id ?? [])
+];
+
+const buildPredictionWarnings = (reaction: ExportedReactionV1): string[] =>
+  reaction.reactants.concat(reaction.products)
+    .filter((participant) => participant.reference_status === "unresolved")
+    .map((participant) => `unresolved_${participant.role}:${participant.raw}`);
+
+const buildPredictionInstance = (
+  document: ExportedDocumentInfo,
+  reaction: ExportedReactionV1,
+  primaryResult: ExportedResultV1 | undefined
+): PredictionInstanceV1 => {
+  const targets = buildPredictionTargets(reaction, primaryResult);
 
   return {
-    retrieval_chunks: [],
-    prediction_instances: [],
+    instance_id: `prediction::${document.document_id}::${reaction.entity_id}`,
+    experiment_id: document.document_id,
+    task_scope: "reaction",
+    reaction_entity_id: reaction.entity_id,
+    ...(primaryResult ? { linked_result_entity_id: primaryResult.entity_id } : {}),
+    linked_molecule_entity_ids: buildLinkedMoleculeIds(reaction),
+    split_hint: {
+      date: document.date
+    },
+    features: {
+      categorical: {
+        solvent: toConditionValue(reaction.normalized_conditions.solvent),
+        catalyst: toConditionValue(reaction.normalized_conditions.catalyst),
+        atmosphere: toConditionValue(reaction.normalized_conditions.atmosphere)
+      },
+      numeric: {
+        temperature: toNumericValue(reaction.normalized_conditions.temperature),
+        time: toNumericValue(reaction.normalized_conditions.time),
+        pressure: toNumericValue(reaction.normalized_conditions.pressure)
+      },
+      text_refs: reaction.text_for_embedding ? [reaction.text_for_embedding] : [],
+      entity_refs: [
+        reaction.entity_id,
+        ...(primaryResult ? [primaryResult.entity_id] : [])
+      ]
+    },
+    targets,
+    usability: {
+      usable_for_classification: Boolean(targets.status_class),
+      usable_for_yield_regression: typeof targets.yield_percent === "number",
+      usable_for_conversion_regression: typeof targets.conversion_percent === "number",
+      usable_for_selectivity_regression: typeof targets.selectivity_percent === "number",
+      missing_required_fields: buildMissingPredictionFields(reaction, primaryResult, targets),
+      warnings: buildPredictionWarnings(reaction)
+    }
+  };
+};
+
+const buildPredictionInstances = (
+  document: ExportedDocumentInfo,
+  semanticLayer: SemanticLayerV1
+): PredictionInstanceV1[] => {
+  const primaryResult = semanticLayer.results.find((result) => result.is_primary) ?? semanticLayer.results[0];
+
+  return semanticLayer.reactions.map((reaction) => buildPredictionInstance(document, reaction, primaryResult));
+};
+
+export const buildLearningLayer = (input: BuildLearningLayerInput): LearningLayerV1 => {
+  const procedurePairs = buildProcedurePairs(input.stepGraph);
+  const observationPairs = buildObservationPairs(input.stepGraph);
+
+  return {
+    retrieval_chunks: buildRetrievalChunks(input.document, input.semanticLayer),
+    prediction_instances: buildPredictionInstances(input.document, input.semanticLayer),
     ...(procedurePairs.length > 0 ? { procedure_to_steps: procedurePairs } : {}),
     ...(observationPairs.length > 0 ? { observation_to_events: observationPairs } : {})
   };

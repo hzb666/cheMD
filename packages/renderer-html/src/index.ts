@@ -1,7 +1,13 @@
 import type { ChemdDocument } from "@chemd/core";
 import type { RenderOptions } from "@chemd/render-profile";
-import { renderNode } from "./block-render";
+import { renderNode, type HtmlTypedSemanticNode } from "./block-render";
 import { escapeHtml, normalizeWhitespace } from "./shared";
+
+export interface RenderHtmlSemanticOptions {
+  typedGraph?: {
+    nodes: HtmlTypedSemanticNode[];
+  };
+}
 
 const readDocumentMetaValue = (document: ChemdDocument, key: string): string | undefined => {
   const value = document.meta[key];
@@ -19,7 +25,8 @@ const readDocumentMetaValue = (document: ChemdDocument, key: string): string | u
 
 export const renderHtml = (
   document: ChemdDocument,
-  options: RenderOptions
+  options: RenderOptions,
+  semanticOptions: RenderHtmlSemanticOptions = {}
 ): string => {
   const title = readDocumentMetaValue(document, "title") ?? "Untitled Document";
   const id = readDocumentMetaValue(document, "id");
@@ -32,10 +39,14 @@ export const renderHtml = (
     date ? ["Date", date] : undefined,
     time ? ["Time", time] : undefined
   ].filter((item): item is [string, string] => Boolean(item));
+  const typedNodes = new Map(
+    semanticOptions.typedGraph?.nodes.map((node) => [node.nodeId, node]) ?? []
+  );
   const body = document.children
     .map((child, index) =>
       renderNode(child, {
-        suppressLeadingMarkdownHeadingText: index === 0 ? title : undefined
+        suppressLeadingMarkdownHeadingText: index === 0 ? title : undefined,
+        typedNodes
       })
     )
     .join("\n");

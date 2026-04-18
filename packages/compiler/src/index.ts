@@ -1,7 +1,7 @@
 import { parseChemd } from "@chemd/parser";
-import type { RenderSelection } from "@chemd/core";
+import type { ChemdDocument, RenderSelection } from "@chemd/core";
 import { exportTrainingRecordFromDocument, type ChemdTrainingExportV1 } from "@chemd/exporter-training";
-import { buildLnf, type ChemdLnfV03 } from "@chemd/lnf";
+import { buildLnf, buildLnfV04, type ChemdLnfV03, type ChemdLnfV04 } from "@chemd/lnf";
 import {
   mapRenderOptionsToAdapterPayload,
   resolveRenderProfileWithDiagnostics
@@ -19,6 +19,11 @@ import {
 } from "@chemd/runtime-lab";
 import { typecheckDocument, type TypedSemanticGraph } from "@chemd/typechecker";
 import type { StepGraph } from "@chemd/step-ontology";
+export {
+  applyDiagnosticQuickFix,
+  type DiagnosticQuickFix,
+  type DiagnosticWithQuickFixes
+} from "./quick-fix";
 
 export interface CompileResult {
   document: ReturnType<typeof resolveChemd>;
@@ -30,6 +35,7 @@ export interface CompileResult {
   runPlan: RunPlan;
   runtimePreflight: PreflightResult;
   lnf: ChemdLnfV03;
+  lnfV04: ChemdLnfV04;
   trainingExport: ChemdTrainingExportV1;
   html: string;
   json: string;
@@ -38,6 +44,8 @@ export interface CompileResult {
 
 export interface CompileOptions {
   renderSelection?: RenderSelection;
+  strictChemdKind?: boolean;
+  procedureMode?: "auto" | "explicit" | "lowered";
 }
 
 const mergeRenderSelection = (
@@ -60,10 +68,19 @@ const mergeRenderSelection = (
   };
 };
 
+export const renderCompiledJson = (
+  document: ChemdDocument,
+  typedGraph: TypedSemanticGraph
+): string => renderJson(document, { typedGraph });
+
 export const compileChemd = (source: string, options: CompileOptions = {}): CompileResult => {
-  const parsedDocument = parseChemd(source);
+  const parsedDocument = parseChemd(source, {
+    strictChemdKind: options.strictChemdKind
+  });
   const resolvedDocument = resolveChemd(parsedDocument);
-  const typecheckResult = typecheckDocument(resolvedDocument);
+  const typecheckResult = typecheckDocument(resolvedDocument, {
+    procedureMode: options.procedureMode
+  });
   const semanticDocument = typecheckResult.diagnostics.length
     ? {
         ...resolvedDocument,
@@ -96,15 +113,26 @@ export const compileChemd = (source: string, options: CompileOptions = {}): Comp
     diagnostics: document.diagnostics,
     runPlan
   });
+  const lnfV04 = buildLnfV04({
+    document,
+    typedGraph: typecheckResult.typedGraph,
+    stepGraph: typecheckResult.stepGraph,
+    diagnostics: document.diagnostics,
+    runPlan
+  });
   const trainingExport = exportTrainingRecordFromDocument(document, {
     stepGraph: typecheckResult.stepGraph,
-    v03Lnf: lnf
+    typedGraph: typecheckResult.typedGraph,
+    v03Lnf: lnf,
+    v04Lnf: lnfV04
   });
   const renderOptions = renderProfileResolution.options;
   const renderAdapterPayload = mapRenderOptionsToAdapterPayload(renderOptions);
-  const html = renderHtml(document, renderOptions);
-  const json = renderJson(document);
-  const docxBridge = renderDocxBridge(document, renderOptions, renderAdapterPayload);
+  const html = renderHtml(document, renderOptions, { typedGraph: typecheckResult.typedGraph });
+  const json = renderCompiledJson(document, typecheckResult.typedGraph);
+  const docxBridge = renderDocxBridge(document, renderOptions, renderAdapterPayload, {
+    typedGraph: typecheckResult.typedGraph
+  });
 
   return {
     document,
@@ -116,6 +144,7 @@ export const compileChemd = (source: string, options: CompileOptions = {}): Comp
     runPlan,
     runtimePreflight,
     lnf,
+    lnfV04,
     trainingExport,
     html,
     json,

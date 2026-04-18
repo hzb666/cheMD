@@ -8,6 +8,7 @@ import type {
   TemplateNode,
   UseNode
 } from "@chemd/core";
+import { validateTemplateParams } from "./template-params";
 
 const REQUIRED_FIELDS: Record<string, string[]> = {
   molecule: ["smiles"],
@@ -456,6 +457,7 @@ const cloneNode = (node: ChemdNode): ChemdNode => {
       ...node,
       bind: { ...node.bind },
       params: [...node.params],
+      ...(node.paramSpecs ? { paramSpecs: node.paramSpecs.map((param) => ({ ...param, type: { ...param.type } })) } : {}),
       body: node.body.map((child) => cloneNode(child) as TemplateNode["body"][number])
     };
   }
@@ -583,6 +585,8 @@ const expandUseNode = (
     });
     return [];
   }
+
+  validateTemplateParams(template, node, environment.objectIndex, environment.diagnostics);
 
   const context = createContext({
     template,

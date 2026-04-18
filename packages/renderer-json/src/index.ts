@@ -1,6 +1,4 @@
 import {
-  classifyReactionConditions,
-  classifyTlcAnalysis,
   type ChemdDocument,
   type ChemdNode,
   type InlineChemToken,
@@ -16,6 +14,10 @@ interface SerializedNodeEntry {
   value: unknown;
 }
 
+export interface RenderJsonOptions {
+  typedGraph?: unknown;
+}
+
 const ARRAY_ITEM_NAME_BY_KEY: Record<string, string> = {
   diagnostics: "diagnostic",
   tags: "tag",
@@ -23,6 +25,13 @@ const ARRAY_ITEM_NAME_BY_KEY: Record<string, string> = {
   inlineChem: "inlineChem",
   inlineCode: "inlineCode",
   links: "link",
+  nodes: "node",
+  steps: "step",
+  events: "event",
+  inputs: "input",
+  outputs: "output",
+  artifacts: "artifact",
+  effects: "effect",
   reactants: "reactant",
   products: "product",
   conditions: "condition",
@@ -112,34 +121,36 @@ const serializeMarkdownNode = (node: MarkdownNode): SerializedNodeEntry => {
   };
 };
 
+const serializeSourceMetadata = (node: Exclude<StructuredNode, { type: "col" }>): Record<string, unknown> => {
+  const payload = node as Record<string, unknown>;
+  const syntaxOrigin = typeof payload.syntaxOrigin === "string" ? payload.syntaxOrigin : undefined;
+  const declaredKind = typeof payload.declaredKind === "string" ? payload.declaredKind : undefined;
+
+  return {
+    source_block_type: syntaxOrigin ?? node.type,
+    ...(syntaxOrigin ? { syntax_origin: syntaxOrigin } : {}),
+    ...(declaredKind ? { declared_kind: declaredKind } : {})
+  };
+};
+
+const serializeStructuredPayload = (
+  node: Exclude<StructuredNode, { type: "col" }>
+): Record<string, unknown> => {
+  const { type: _type, syntaxOrigin: _syntaxOrigin, declaredKind: _declaredKind, ...rest } = (
+    node as Record<string, unknown>
+  );
+
+  return {
+    ...rest,
+    ...serializeSourceMetadata(node)
+  };
+};
+
 const serializeStructuredNode = (
   node: Exclude<StructuredNode, { type: "col" }>
 ): SerializedNodeEntry => {
-  const { type, ...rest } = node;
-
-  if (node.type === "reaction") {
-    return {
-      type,
-      value: {
-        ...rest,
-        normalized_conditions: classifyReactionConditions(node)
-      }
-    };
-  }
-
-  if (node.type === "analysis") {
-    return {
-      type,
-      value: {
-        ...rest,
-        ...(node.type_name?.toLowerCase() === "tlc"
-          ? {
-              normalized_tlc: classifyTlcAnalysis(node)
-            }
-          : {})
-      }
-    };
-  }
+  const { type } = node;
+  const rest = serializeStructuredPayload(node);
 
   if (node.type === "template") {
     return {
@@ -157,7 +168,9 @@ const serializeStructuredNode = (
   };
 };
 
-const serializeNode = (node: ChemdNode): SerializedNodeEntry[] => {
+const serializeNode = (
+  node: ChemdNode
+): SerializedNodeEntry[] => {
   if (node.type === "markdown") {
     return [serializeMarkdownNode(node)];
   }
@@ -168,6 +181,13 @@ const serializeNode = (node: ChemdNode): SerializedNodeEntry[] => {
 
   return [serializeStructuredNode(node)];
 };
+
+const hasColNode = (nodes: ChemdNode[]): boolean =>
+  nodes.some((node) =>
+    node.type === "col"
+      ? true
+      : node.type === "template" && hasColNode(node.body)
+  );
 
 const serializeBody = (nodes: ChemdNode[]): Record<string, unknown> => {
   const entries = nodes.flatMap((node) => serializeNode(node));
@@ -181,15 +201,18 @@ const serializeBody = (nodes: ChemdNode[]): Record<string, unknown> => {
   );
 };
 
-export const renderJson = (document: ChemdDocument): string =>
-  JSON.stringify(
+export const renderJson = (document: ChemdDocument, options: RenderJsonOptions = {}): string => {
+  return JSON.stringify(
     objectifyArrays({
       document: {
         meta: document.meta,
+        ...(hasColNode(document.children) ? { layout: { col_strategy: "flatten_children" } } : {}),
         body: serializeBody(document.children)
       },
+      ...(options.typedGraph ? { semantic: { typedGraph: options.typedGraph } } : {}),
       diagnostics: document.diagnostics
     }),
     null,
     2
   );
+};

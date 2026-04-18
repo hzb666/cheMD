@@ -11,6 +11,7 @@ primary_result: res-main
 ---
 
 :::chemd #rxn-main
+kind: reaction
 reactants: substrate_1 | reagent_2
 products: product_1
 solvent: THF
@@ -60,6 +61,17 @@ describe("chemd-lang v0.3 compiler integration", () => {
     ]);
     expect(result.runtimePreflight.blocking).toBe(false);
     expect(result.lnf.experiment.procedure.map((step) => step.family)).toContain("cool");
+    expect(result.lnfV04.schemaVersion).toBe("chemd-lnf/v0.4");
+    expect(result.lnfV04.experiment.stepSources.lowered.length).toBeGreaterThan(0);
     expect(result.trainingExport.semantic_layer.v03_lnf?.experiment.procedure.length).toBeGreaterThan(0);
+    expect(result.trainingExport.semantic_layer.v04_lnf?.schemaVersion).toBe("chemd-lnf/v0.4");
+    expect(result.trainingExport.learning_layer.retrieval_chunks.length).toBeGreaterThan(0);
+    expect(JSON.parse(result.docxBridge)).toMatchObject({
+      semantic: {
+        typedGraph: {
+          documentId: "exp-v03"
+        }
+      }
+    });
   });
 });
