@@ -9,9 +9,24 @@ primary_result: res-main
 # Ethanol oxidation to acetic acid
 
 :::chemd #chem-rxn-main
+kind: reaction
 reac: CCO | O=O
 prod: CC(=O)O
 conditions: Cu catalyst | air | 80 C | 4 h
+:::
+
+:::procedure #proc-main
+ref: chem-rxn-main
+:::step heat-main
+family: heat
+temperature: 80 C
+duration: 4 h
+:::
+:::step analyze-main
+family: analyze
+analysisType: tlc
+dependsOn: heat-main
+:::
 :::
 
 :::col-2
@@ -44,6 +59,7 @@ notes: TLC demo shows circle / up / down, mess, none, and base.
 :::
 
 :::chemd #chem-mol-main
+kind: molecule
 smiles: CCO
 :::
 

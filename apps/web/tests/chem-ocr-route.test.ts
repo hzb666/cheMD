@@ -165,10 +165,16 @@ describe("POST /api/chem/ocr reaction writeback", () => {
   it("prefers RxnScribe and writes back a reaction when a usable reaction payload exists", async () => {
     callChemServiceReactionOcrMock.mockResolvedValueOnce({
       status: "ok",
+      provider: "rxnscribe",
       reaction: {
         reactants: [" CCO ", " O=O "],
         products: [" CC(=O)O "],
         conditions: [" air ", " 80 C "]
+      },
+      normalized: {
+        reactants: ["CCO", "O=O"],
+        products: ["CC(=O)O"],
+        conditions: ["air", "80 C"]
       },
       confidence: 0.91,
       warnings: ["rxnscribe"]
@@ -232,7 +238,13 @@ describe("POST /api/chem/ocr reaction writeback", () => {
       products: ["CC(=O)O"],
       conditions: ["air", "80 C"],
       source: "ocr",
-      confidence: 0.91
+      confidence: 0.91,
+      provider: "rxnscribe",
+      normalized: {
+        reactants: ["CCO", "O=O"],
+        products: ["CC(=O)O"],
+        conditions: ["air", "80 C"]
+      }
     });
   });
 
@@ -309,6 +321,7 @@ describe("POST /api/chem/ocr molecule fallback", () => {
     });
     callChemServiceOcrMock.mockResolvedValueOnce({
       status: "ok",
+      provider: "molscribe",
       structure: {
         smiles: "CCO",
         molfile: "mock-molfile"
@@ -317,8 +330,13 @@ describe("POST /api/chem/ocr molecule fallback", () => {
       warnings: ["molscribe"]
     });
     callChemServiceNormalizeMock.mockResolvedValueOnce({
+      provider: "rdkit",
       canonicalSmiles: "CCO",
       normalizedMolfile: "normalized-molfile",
+      normalized: {
+        canonicalSmiles: "CCO",
+        normalizedMolfile: "normalized-molfile"
+      },
       warnings: ["normalized"]
     });
 
@@ -356,5 +374,20 @@ describe("POST /api/chem/ocr molecule fallback", () => {
     });
     expect(callChemServiceReactionOcrMock).toHaveBeenCalledTimes(1);
     expect(callChemServiceOcrMock).toHaveBeenCalledTimes(1);
+    expect(saveStructureRecordMock).toHaveBeenCalledWith({
+      kind: "molecule",
+      documentId: "doc-ocr",
+      blockId: "mol-ocr",
+      sessionId: "session-ocr",
+      smiles: "CCO",
+      molfile: "normalized-molfile",
+      source: "ocr",
+      confidence: 0.67,
+      provider: "rdkit",
+      normalized: {
+        canonicalSmiles: "CCO",
+        normalizedMolfile: "normalized-molfile"
+      }
+    });
   });
 });

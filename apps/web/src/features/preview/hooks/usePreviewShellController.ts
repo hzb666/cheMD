@@ -11,7 +11,7 @@ import {
 } from "../lib/read-preview-edit-message";
 import type { ChemEditorDraftWithBlockId } from "../../chem-editor/types";
 
-type OutputTab = "preview" | "json" | "docxBridge";
+type OutputTab = "preview" | "json" | "docxBridge" | "diagnostics";
 
 interface InventoryItemRecord {
   notation: string;
@@ -333,6 +333,6 @@ export const usePreviewShellController = ({
     setActiveTab,
     previewFrameRef,
     hydratedHtml,
-    activeCode: activeTab === "json" ? json : docxBridge
+    activeCode: activeTab === "json" ? json : activeTab === "docxBridge" ? docxBridge : ""
   };
 };

@@ -43,6 +43,7 @@ const serializeChemBlock = (blockId: string, draft: ChemEditorDraft, existingLin
     const preservedLines = pickPreservedLines(existingLines, REACTION_METADATA_KEYS);
     const lines = [
       `:::chemd #${blockId}`,
+      "kind: reaction",
       `reac: ${draft.reactants.join(" | ")}`,
       `prod: ${draft.products.join(" | ")}`
     ];
@@ -58,6 +59,7 @@ const serializeChemBlock = (blockId: string, draft: ChemEditorDraft, existingLin
 
   return [
     `:::chemd #${blockId}`,
+    "kind: molecule",
     `smiles: ${draft.smiles}`,
     ...pickPreservedLines(existingLines, MOLECULE_METADATA_KEYS),
     ":::"

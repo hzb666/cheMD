@@ -20,6 +20,7 @@ describe("replaceChemBlock", () => {
       })
     ).toBe([
       ":::chemd #rxn-main",
+      "kind: molecule",
       "smiles: CCO",
       ":::"
     ].join("\n"));
@@ -41,6 +42,7 @@ describe("replaceChemBlock", () => {
       })
     ).toBe([
       ":::chemd #mol-main",
+      "kind: reaction",
       "reac: CCO | O=O",
       "prod: CC(=O)O",
       "conditions: air | 80 C",
@@ -71,6 +73,7 @@ describe("replaceChemBlock", () => {
       ":::",
       "",
       ":::chemd #rxn-main",
+      "kind: molecule",
       "smiles: NH3",
       ":::"
     ].join("\n"));
@@ -95,6 +98,7 @@ describe("replaceChemBlock metadata preservation", () => {
       })
     ).toBe([
       ":::chemd #mol-main",
+      "kind: molecule",
       "smiles: CCN",
       "name: Ethanol",
       "formula: C2H6O",
@@ -123,6 +127,7 @@ describe("replaceChemBlock metadata preservation", () => {
       })
     ).toBe([
       ":::chemd #rxn-main",
+      "kind: reaction",
       "reac: N2 | H2",
       "prod: NH3",
       "conditions: Fe",
@@ -164,6 +169,7 @@ describe("replaceChemBlock missing or unterminated targets", () => {
       })
     ).toBe([
       ":::chemd #mol-a",
+      "kind: molecule",
       "smiles: CCN",
       "caption: stale",
       ":::"

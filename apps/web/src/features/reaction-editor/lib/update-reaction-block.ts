@@ -7,6 +7,7 @@ const BLOCK_CLOSE_RE = /^:::$/;
 const REACTANTS_RE = /^\s*(?:reac|reactant|reactants)\s*:/i;
 const PRODUCTS_RE = /^\s*(?:prod|product|products)\s*:/i;
 const CONDITIONS_RE = /^\s*conditions\s*:/i;
+const KIND_RE = /^\s*kind\s*:/i;
 
 const joinList = (values: string[]): string => values.join(" | ");
 
@@ -95,6 +96,18 @@ const upsertReactionLine = (
   return endLine + 1;
 };
 
+const ensureReactionKindLine = (lines: string[], startLine: number, endLine: number): number => {
+  for (let scan = startLine + 1; scan < endLine; scan += 1) {
+    if (KIND_RE.test(lines[scan] ?? "")) {
+      lines[scan] = "kind: reaction";
+      return endLine;
+    }
+  }
+
+  lines.splice(startLine + 1, 0, "kind: reaction");
+  return endLine + 1;
+};
+
 const updateConditionsLine = (
   lines: string[],
   lineIndex: number,
@@ -125,13 +138,14 @@ export const updateReactionBlock = (
   }
 
   lines[block.startLine] = targetOpen;
-  const fieldLines = findReactionFieldLines(lines, block.startLine, block.endLine);
+  const blockEndLine = ensureReactionKindLine(lines, block.startLine, block.endLine);
+  const fieldLines = findReactionFieldLines(lines, block.startLine, blockEndLine);
 
   // 只改 reaction 编辑器托管的三类字段，其它 metadata 保持原有顺序和内容。
   const nextEndLine = upsertReactionLine(
     lines,
     fieldLines.reactantsLine,
-    block.endLine,
+    blockEndLine,
     `reac: ${joinList(draft.reactants)}`
   );
   const finalEndLine = upsertReactionLine(

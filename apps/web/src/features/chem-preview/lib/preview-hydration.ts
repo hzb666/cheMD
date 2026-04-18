@@ -129,6 +129,25 @@ const readOptionalStringList = (value: unknown): string[] | null =>
     ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
     : null;
 
+const RENDER_ERROR_PATTERN =
+  /^<div class="chemd-render-error" role="alert" aria-live="polite">[^<]*<\/div>$/;
+
+const hasUnsafeMarkup = (value: string): boolean =>
+  /<script[\s>]/i.test(value) || /\son[a-z]+\s*=/i.test(value) || /javascript:/i.test(value);
+
+const sanitizePreviewGraphicMarkup = (value: string): string => {
+  const trimmed = value.trim();
+  if (hasUnsafeMarkup(trimmed)) {
+    return "";
+  }
+
+  if (trimmed.startsWith("<svg") || RENDER_ERROR_PATTERN.test(trimmed)) {
+    return trimmed;
+  }
+
+  return "";
+};
+
 const fallbackReactionEntry = (
   entry: HydratedReactionEntry
 ): Pick<HydratedReactionEntry, "reactants" | "products" | "conditions"> => ({
@@ -337,7 +356,7 @@ export const replaceMoleculeGraphics = (html: string, svgs: string[]): string =>
   return html.replace(
     /(<section class="chemd-block chemd-block--molecule"[\s\S]*?<div class="chemd-graphic"[^>]*>)([\s\S]*?)(<\/div>)/g,
     (_, open, oldGraphic, close) => {
-      const nextSvg = svgs[index] || "";
+      const nextSvg = sanitizePreviewGraphicMarkup(svgs[index] || "");
       index += 1;
       if (!nextSvg) {
         return `${open}${oldGraphic}${close}`;
@@ -352,7 +371,7 @@ export const replaceReactionGraphics = (html: string, svgs: string[]): string =>
   return html.replace(
     /(<section class="chemd-block chemd-block--reaction"[\s\S]*?<div class="chemd-graphic"[^>]*>)([\s\S]*?)(<\/div>)/g,
     (_, open, oldGraphic, close) => {
-      const nextSvg = svgs[index] || "";
+      const nextSvg = sanitizePreviewGraphicMarkup(svgs[index] || "");
       index += 1;
       if (!nextSvg) {
         return `${open}${oldGraphic}${close}`;

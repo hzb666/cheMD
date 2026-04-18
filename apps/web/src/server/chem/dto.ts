@@ -5,9 +5,21 @@ export interface StructurePayload {
   molfile?: string;
 }
 
+export interface ChemServiceCandidate {
+  provider?: string;
+  confidence?: number | null;
+  structure?: StructurePayload;
+  reaction?: ReactionPayload;
+}
+
 export interface OcrResponse {
   status: "ok" | "partial" | "failed";
+  kind?: "molecule";
+  provider?: string;
   structure?: StructurePayload;
+  normalized?: StructurePayload;
+  candidates?: ChemServiceCandidate[];
+  placeholder?: boolean;
   confidence?: number;
   warnings: string[];
 }
@@ -22,8 +34,13 @@ export interface ReactionPayload {
 
 export interface ReactionOcrResponse {
   status: "ok" | "partial" | "failed";
+  kind?: "reaction";
+  provider?: string;
   reaction?: ReactionPayload;
   normalized_conditions?: NormalizedReactionConditions;
+  normalized?: ReactionPayload;
+  candidates?: ChemServiceCandidate[];
+  placeholder?: boolean;
   confidence?: number;
   warnings: string[];
 }
@@ -34,8 +51,16 @@ export interface NormalizeRequest {
 }
 
 export interface NormalizeResponse {
+  kind?: "molecule";
+  provider?: string;
   canonicalSmiles: string;
   normalizedMolfile?: string;
+  normalized?: {
+    canonicalSmiles?: string;
+    normalizedMolfile?: string;
+  };
+  candidates?: ChemServiceCandidate[];
+  placeholder?: boolean;
   warnings: string[];
 }
 
@@ -116,13 +141,20 @@ export interface ReactionRenderRequest {
 export interface RenderResponse {
   svg: string;
   warnings: string[];
+  kind?: "molecule" | "reaction";
+  provider?: string;
+  candidates?: ChemServiceCandidate[];
+  placeholder?: boolean;
   canonicalSmiles?: string;
   normalizedMolfile?: string;
+  normalized?: unknown;
 }
 
 export interface ReactionRenderResponse extends RenderResponse {
+  kind?: "reaction";
   renderer?: string;
   reaction?: ReactionPayload;
+  normalized?: ReactionPayload;
   normalized_conditions?: NormalizedReactionConditions;
 }
 
@@ -132,6 +164,9 @@ interface StructureRecordBase {
   sessionId: string;
   source: "ocr" | "ketcher" | "manual";
   confidence?: number;
+  provider?: string;
+  fingerprint?: string;
+  normalized?: Record<string, unknown>;
   updatedAt: string;
   expiresAt: string;
 }

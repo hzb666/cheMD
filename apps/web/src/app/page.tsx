@@ -17,6 +17,11 @@ import { useDocxExport } from "../features/export-docx/hooks/useDocxExport";
 import { Button } from "../components/ui/button";
 import PreviewShell from "../features/preview/components/PreviewShell";
 import { Activity, FlaskConical } from "lucide-react";
+import {
+  applyDiagnosticQuickFix,
+  type DiagnosticQuickFix,
+  type DiagnosticWithQuickFixes
+} from "@chemd/compiler";
 
 interface PlaygroundHeaderProps {
   logoSrc: string;
@@ -141,6 +146,26 @@ const Page = () => {
   const logoSrc = typeof logoMark === "string" ? logoMark : logoMark.src;
   const diagnosticCount = result.diagnostics.length;
   const documentSubtitle = [result.document.meta.date, result.document.meta.id].filter(Boolean).join(" · ");
+  const handleApplyQuickFix = (
+    diagnostic: DiagnosticWithQuickFixes,
+    quickFix: DiagnosticQuickFix
+  ) => {
+    if (!previewIsFresh) {
+      setEditorStatus("Wait for preview to update before applying quick fixes");
+      return;
+    }
+
+    const currentSource = getLatestSource();
+    const nextSource = applyDiagnosticQuickFix(currentSource, diagnostic, quickFix);
+
+    if (nextSource === currentSource) {
+      setEditorStatus("Quick fix unavailable for this source");
+      return;
+    }
+
+    applySourceChange(nextSource);
+    setEditorStatus("Applied quick fix");
+  };
   const applyOcrFile = (file: File) => {
     if (ocr.loading) {
       return;
@@ -148,9 +173,7 @@ const Page = () => {
 
     void ocr.runOcr(file).then((next) => {
       if (!next) {
-        if (ocr.error) {
-          setEditorStatus("OCR failed");
-        }
+        setEditorStatus("OCR failed");
         return;
       }
 
@@ -216,6 +239,8 @@ const Page = () => {
             renderOptions={result.renderOptions}
             previewIsFresh={previewIsFresh}
             onEditChemd={(draft) => handleEditChemd(draft, previewIsFresh)}
+            diagnostics={result.diagnostics}
+            onApplyQuickFix={handleApplyQuickFix}
           />
         </section>
 

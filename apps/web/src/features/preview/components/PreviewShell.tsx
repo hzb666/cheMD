@@ -2,10 +2,12 @@
 
 import React from "react";
 import type { RenderOptions } from "@chemd/render-profile";
+import type { DiagnosticQuickFix, DiagnosticWithQuickFixes } from "@chemd/compiler";
 import type { ChemEditorDraftWithBlockId } from "../../chem-editor/types";
 
 import { CopyIconButton } from "../../../components/copy-icon-button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../components/ui/tabs";
+import { DiagnosticQuickFixPanel } from "../../diagnostics/components/DiagnosticQuickFixPanel";
 import { DocumentPreview } from "./DocumentPreview";
 import { usePreviewShellController } from "../hooks/usePreviewShellController";
 
@@ -19,9 +21,14 @@ interface PreviewShellProps {
   renderOptions?: RenderOptions;
   previewIsFresh?: boolean;
   onEditChemd?: (draft: ChemEditorDraftWithBlockId) => void | Promise<void>;
+  diagnostics?: DiagnosticWithQuickFixes[];
+  onApplyQuickFix?: (
+    diagnostic: DiagnosticWithQuickFixes,
+    quickFix: DiagnosticQuickFix
+  ) => void;
 }
 
-type PreviewTabValue = "preview" | "json" | "docxBridge";
+type PreviewTabValue = "preview" | "json" | "docxBridge" | "diagnostics";
 
 const PreviewShell = ({
   html,
@@ -32,7 +39,9 @@ const PreviewShell = ({
   sessionId,
   renderOptions,
   previewIsFresh = true,
-  onEditChemd
+  onEditChemd,
+  diagnostics = [],
+  onApplyQuickFix
 }: PreviewShellProps) => {
   const {
     activeTab,
@@ -83,6 +92,12 @@ const PreviewShell = ({
               >
                 DOCX
               </TabsTrigger>
+              <TabsTrigger
+                value="diagnostics"
+                className="playground-tab-trigger notion-font-ui h-8 px-3 py-0 text-[13px] data-[state=active]:font-semibold"
+              >
+                Diagnostics
+              </TabsTrigger>
             </TabsList>
           </div>
           <div className="flex items-center gap-2">
@@ -124,6 +139,14 @@ const PreviewShell = ({
                   <code>{activeCode}</code>
                 </pre>
               </div>
+            </TabsContent>
+
+            <TabsContent value="diagnostics" className="mt-0 flex min-h-0 flex-1 flex-col focus-visible:outline-none absolute inset-0 w-full h-full">
+              <DiagnosticQuickFixPanel
+                diagnostics={diagnostics}
+                quickFixesEnabled={previewIsFresh}
+                onApplyQuickFix={onApplyQuickFix}
+              />
             </TabsContent>
           </div>
         </div>

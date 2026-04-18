@@ -1,8 +1,8 @@
 import { ensureBlockId } from "./ensure-block-id";
+import { readChemdBlockKind } from "./read-chemd-block-kind";
 
 const CHEMD_OPEN_RE = /^:::chemd(?:\s+#([^\s]+))?/;
 const MOLECULE_CLOSE_RE = /^:::$/;
-const REACTION_FIELD_RE = /^\s*(?:reac|prod|reactant|product|reactants|products)\s*:/i;
 
 export interface MoleculeTarget {
   blockId: string;
@@ -33,9 +33,10 @@ export const selectTargetMolecule = (
       }
     }
 
+    const blockLines = lines.slice(index + 1, endLine);
     const blockId = ensureBlockId(chemdMatch[1], "chem", ++chemdOrdinal);
-    const isReaction = lines.slice(index + 1, endLine).some((entry) => REACTION_FIELD_RE.test(entry ?? ""));
-    if (isReaction) {
+    const explicitKind = readChemdBlockKind(blockLines);
+    if (explicitKind !== "molecule") {
       index = endLine;
       continue;
     }

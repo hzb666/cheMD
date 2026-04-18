@@ -38,6 +38,14 @@ const hydrateReactionPayload = async (
   };
 };
 
+const normalizedReactionPayload = (reaction: ReactionPayload): Record<string, unknown> => ({
+  reactants: reaction.reactants,
+  products: reaction.products,
+  conditions: reaction.conditions,
+  ...(reaction.reactionSmiles ? { reactionSmiles: reaction.reactionSmiles } : {}),
+  ...(reaction.rxnfile ? { rxnfile: reaction.rxnfile } : {})
+});
+
 export const renderMoleculeNotation = async (
   input: MoleculeRenderRouteInput
 ): Promise<JsonRouteResult<Record<string, unknown>>> => {
@@ -117,7 +125,12 @@ export const saveMoleculeNotation = async (
     sessionId: input.sessionId,
     smiles: normalized.canonicalSmiles,
     molfile: normalized.normalizedMolfile,
-    source: "ketcher"
+    source: "ketcher",
+    ...(normalized.provider ? { provider: normalized.provider } : {}),
+    normalized: normalized.normalized ?? {
+      canonicalSmiles: normalized.canonicalSmiles,
+      normalizedMolfile: normalized.normalizedMolfile
+    }
   });
 
   return jsonResult({
@@ -144,7 +157,8 @@ export const saveReactionNotation = async (
     conditions: reaction.conditions,
     reactionSmiles: input.reactionSmiles,
     rxnfile: input.rxnfile,
-    source: "ketcher"
+    source: "ketcher",
+    normalized: normalizedReactionPayload(reaction)
   });
 
   return jsonResult({

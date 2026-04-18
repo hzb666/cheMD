@@ -10,6 +10,7 @@ export const insertReactionBlock = (
   const trimmed = source.trimEnd();
   const lines = [
     `:::chemd #${blockId}`,
+    "kind: reaction",
     `reac: ${joinList(draft.reactants)}`,
     `prod: ${joinList(draft.products)}`
   ];

@@ -15,6 +15,12 @@ import { ChemServiceError } from "./chem-service-error";
 
 const baseUrl = process.env.CHEM_SERVICE_BASE_URL ?? "http://127.0.0.1:18081";
 const chemServiceAccessKey = process.env.CHEM_SERVICE_ACCESS_KEY?.trim();
+const DEFAULT_CHEM_SERVICE_TIMEOUT_MS = 10_000;
+
+const readTimeoutMs = (): number => {
+  const value = Number(process.env.CHEM_SERVICE_TIMEOUT_MS);
+  return Number.isFinite(value) && value > 0 ? value : DEFAULT_CHEM_SERVICE_TIMEOUT_MS;
+};
 
 const createChemServiceHeaders = (headers: HeadersInit): Headers => {
   const nextHeaders = new Headers(headers);
@@ -48,11 +54,36 @@ const parseJson = async <T>(response: Response): Promise<T> => {
   return payload;
 };
 
+const isAbortError = (error: unknown): boolean =>
+  error instanceof Error && error.name === "AbortError";
+
+const fetchChemService = async (path: string, init: RequestInit): Promise<Response> => {
+  const controller = new AbortController();
+  const timeoutId = globalThis.setTimeout(() => controller.abort(), readTimeoutMs());
+
+  try {
+    return await fetch(`${baseUrl}${path}`, {
+      ...init,
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw new ChemServiceError("chem-service request timed out", {
+        status: 504,
+        code: "E_CHEM_SERVICE_TIMEOUT"
+      });
+    }
+    throw error;
+  } finally {
+    globalThis.clearTimeout(timeoutId);
+  }
+};
+
 export const callChemServiceOcr = async (
   imageBase64: string,
   mimeType: string
 ): Promise<OcrResponse> => {
-  const response = await fetch(`${baseUrl}/ocr`, {
+  const response = await fetchChemService("/ocr", {
     method: "POST",
     headers: createChemServiceHeaders({
       "Content-Type": "application/json"
@@ -66,7 +97,7 @@ export const callChemServiceReactionOcr = async (
   imageBase64: string,
   mimeType: string
 ): Promise<ReactionOcrResponse> => {
-  const response = await fetch(`${baseUrl}/reaction/ocr`, {
+  const response = await fetchChemService("/reaction/ocr", {
     method: "POST",
     headers: createChemServiceHeaders({
       "Content-Type": "application/json"
@@ -79,7 +110,7 @@ export const callChemServiceReactionOcr = async (
 export const callChemServiceNormalize = async (
   payload: NormalizeRequest
 ): Promise<NormalizeResponse> => {
-  const response = await fetch(`${baseUrl}/normalize`, {
+  const response = await fetchChemService("/normalize", {
     method: "POST",
     headers: createChemServiceHeaders({
       "Content-Type": "application/json"
@@ -90,7 +121,7 @@ export const callChemServiceNormalize = async (
 };
 
 export const callChemServiceRender = async (payload: RenderRequest): Promise<RenderResponse> => {
-  const response = await fetch(`${baseUrl}/render`, {
+  const response = await fetchChemService("/render", {
     method: "POST",
     headers: createChemServiceHeaders({
       "Content-Type": "application/json"
@@ -103,7 +134,7 @@ export const callChemServiceRender = async (payload: RenderRequest): Promise<Ren
 export const callChemServiceReactionRender = async (
   payload: ReactionRenderRequest
 ): Promise<ReactionRenderResponse> => {
-  const response = await fetch(`${baseUrl}/reaction/render`, {
+  const response = await fetchChemService("/reaction/render", {
     method: "POST",
     headers: createChemServiceHeaders({
       "Content-Type": "application/json"
@@ -123,7 +154,7 @@ export const callChemServiceGetStructureRecord = async (
     blockId,
     sessionId
   });
-  const response = await fetch(`${baseUrl}/structure?${params.toString()}`, {
+  const response = await fetchChemService(`/structure?${params.toString()}`, {
     method: "GET",
     headers: createChemServiceHeaders({})
   });
@@ -133,7 +164,7 @@ export const callChemServiceGetStructureRecord = async (
 export const callChemServiceSaveStructureRecord = async (
   payload: SaveStructureRecordInput
 ): Promise<StructureRecord> => {
-  const response = await fetch(`${baseUrl}/structure`, {
+  const response = await fetchChemService("/structure", {
     method: "POST",
     headers: createChemServiceHeaders({
       "Content-Type": "application/json"

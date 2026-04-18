@@ -27,17 +27,38 @@ const normalizeStringArray = (value: unknown): string[] => (
 );
 
 const hasPlaceholderStructure = (ocr: OcrResponse): boolean =>
-  ocr.structure?.molfile === "MOLFILE_PLACEHOLDER"
+  ocr.placeholder === true
+  || ocr.structure?.molfile === "MOLFILE_PLACEHOLDER"
   || (ocr.warnings ?? []).some((warning) => warning.toLowerCase().includes("placeholder"));
 
 const hasPlaceholderReaction = (ocr: ReactionOcrResponse): boolean =>
-  (ocr.warnings ?? []).some((warning) => warning.toLowerCase().includes("placeholder"));
+  ocr.placeholder === true
+  || (ocr.warnings ?? []).some((warning) => warning.toLowerCase().includes("placeholder"));
 
 const readReactionPayload = (ocr: ReactionOcrResponse): ReactionPayload => ({
   reactants: normalizeStringArray(ocr.reaction?.reactants),
   products: normalizeStringArray(ocr.reaction?.products),
   conditions: normalizeStringArray(ocr.reaction?.conditions)
 });
+
+const normalizedMoleculePayload = (
+  normalized: Awaited<ReturnType<typeof callChemServiceNormalize>>
+): Record<string, unknown> =>
+  normalized.normalized ?? {
+    canonicalSmiles: normalized.canonicalSmiles,
+    normalizedMolfile: normalized.normalizedMolfile
+  };
+
+const normalizedReactionPayload = (reaction: ReactionPayload): Record<string, unknown> => ({
+  reactants: reaction.reactants,
+  products: reaction.products,
+  conditions: reaction.conditions,
+  ...(reaction.reactionSmiles ? { reactionSmiles: reaction.reactionSmiles } : {}),
+  ...(reaction.rxnfile ? { rxnfile: reaction.rxnfile } : {})
+});
+
+const providerFields = (provider: string | undefined): { provider?: string } =>
+  provider ? { provider } : {};
 
 const isUsableReactionPayload = (reaction: ReactionPayload, ocr: ReactionOcrResponse): boolean =>
   reaction.reactants.length > 0
@@ -82,7 +103,9 @@ export const runReactionOcrWorkflow = async (
     products: reaction.products,
     conditions: reaction.conditions,
     source: "ocr",
-    confidence: ocr.confidence
+    confidence: ocr.confidence,
+    ...providerFields(ocr.provider),
+    normalized: ocr.normalized ? normalizedReactionPayload(ocr.normalized) : normalizedReactionPayload(reaction)
   });
 
   return buildReactionSuccessResult(reaction, ocr.confidence, ocr.warnings, target);
@@ -106,7 +129,11 @@ export const runReactionFirstOcrWorkflow = async (
       products: reaction.products,
       conditions: reaction.conditions,
       source: "ocr",
-      confidence: reactionOcr.confidence
+      confidence: reactionOcr.confidence,
+      ...providerFields(reactionOcr.provider),
+      normalized: reactionOcr.normalized
+        ? normalizedReactionPayload(reactionOcr.normalized)
+        : normalizedReactionPayload(reaction)
     });
 
     return buildReactionSuccessResult(reaction, reactionOcr.confidence, reactionOcr.warnings, reactionTarget);
@@ -131,7 +158,9 @@ export const runReactionFirstOcrWorkflow = async (
     smiles: normalized.canonicalSmiles,
     molfile: normalized.normalizedMolfile,
     source: "ocr",
-    confidence: moleculeOcr.confidence
+    confidence: moleculeOcr.confidence,
+    ...providerFields(normalized.provider ?? moleculeOcr.provider),
+    normalized: normalizedMoleculePayload(normalized)
   });
 
   return jsonResult({

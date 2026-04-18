@@ -220,6 +220,17 @@ describe("useRenderedPreview graphic replacement helpers", () => {
     expect(next).not.toContain("<svg>fallback</svg>");
   });
 
+  it("does not inject dangerous backend svg payloads", () => {
+    const html = `<section class="chemd-block chemd-block--reaction" data-node-id="rxn-1">
+      <div class="chemd-graphic"><svg>fallback</svg></div>
+    </section>`;
+
+    const next = replaceReactionGraphics(html, ['<svg><script>alert("x")</script></svg>']);
+
+    expect(next).toContain("<svg>fallback</svg>");
+    expect(next).not.toContain("<script>");
+  });
+
   it("replaces molecule graphics when loading placeholders include data attributes", () => {
     const html = `<section class="chemd-block chemd-block--molecule" data-node-id="mol-1">
       <div class="chemd-graphic" data-chem-render-state="loading" data-chem-kind="molecule"><svg>fallback</svg></div>

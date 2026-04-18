@@ -29,8 +29,8 @@ const parseRenderRouteInput = async (
   }
 
   if (body.type === "reaction") {
-    const reactants = readStringArray(body.reactants, { allowEmptyArray: false });
-    const products = readStringArray(body.products, { allowEmptyArray: false });
+    const reactants = readStringArray(body.reactants);
+    const products = readStringArray(body.products);
     const conditions = body.conditions === undefined ? [] : readStringArray(body.conditions);
 
     if (!reactants || !products) {
