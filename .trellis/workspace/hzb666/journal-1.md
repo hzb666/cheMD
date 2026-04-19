@@ -316,3 +316,46 @@ Completed the staged chemd DSL language package work and split the implementatio
 ### Next Steps
 
 - None - task complete
+
+
+## Session 6: Chemd CLI MVP and training export context
+
+**Date**: 2026-04-20
+**Task**: Chemd CLI MVP and training export context
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+Implemented local Chemd CLI, improved training export semantic context, fixed workbench UI issues, and archived the completed task.
+
+### Main Changes
+
+| Area | Details |
+|------|---------|
+| CLI | Added local validate/export/diff/changed commands under packages/cli. |
+| Training Export | Added semantic fact links and extra LLM/RAG retrieval chunks. |
+| Web Workbench | Fixed compile badge state, line count typography, sample title, and preview banner placement. |
+| Specs | Added CLI contracts and training export contract docs under .trellis/spec. |
+| Verification | pnpm lint, pnpm typecheck, pnpm test, and git diff --check completed before commit. |
+| Notes | docs/ remains git-ignored, so docs alignment edits were intentionally not committed. |
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `179be6c` | (see git log) |
+| `349051f` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
