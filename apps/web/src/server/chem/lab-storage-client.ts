@@ -17,6 +17,10 @@ export interface LabStorageInventoryResponse {
   items: LabStorageInventoryItem[];
 }
 
+export interface LabStorageConnectionStatus {
+  status: "ready" | "disconnect";
+}
+
 interface LabStorageInventoryListResponse {
   data: Array<{
     id: number;
@@ -261,3 +265,16 @@ export const fetchLabStorageInventoryByCas = async (
   } = {}
 ): Promise<LabStorageInventoryResponse> =>
   requestLabStorageInventory(casNumber, options.fetchImpl ?? fetch, true);
+
+export const readLabStorageConnectionStatus = async (
+  options: {
+    fetchImpl?: typeof fetch;
+  } = {}
+): Promise<LabStorageConnectionStatus> => {
+  try {
+    await getLabStorageSession(options.fetchImpl ?? fetch);
+    return { status: "ready" };
+  } catch {
+    return { status: "disconnect" };
+  }
+};

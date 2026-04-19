@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 
 import logoMark from "../../../../vision/logo-03.png";
 
@@ -28,6 +28,7 @@ interface PlaygroundHeaderProps {
   title: string;
   subtitle: string;
   profileId: string;
+  labStorageStatus: LabStorageStatus;
   diagnosticCount: number;
   compileState: string;
   compileStateTone: "pending" | "success" | "warning";
@@ -41,15 +42,63 @@ interface EditorToolbarProps {
   onPickOcrFile: (file: File) => void;
 }
 
+type LabStorageStatus = "ready" | "disconnect";
+
+const readLabStorageStatusPayload = (value: unknown): LabStorageStatus =>
+  typeof value === "object"
+  && value !== null
+  && "status" in value
+  && value.status === "ready"
+    ? "ready"
+    : "disconnect";
+
+const useLabStorageStatus = (): LabStorageStatus => {
+  const [status, setStatus] = useState<LabStorageStatus>("disconnect");
+
+  useEffect(() => {
+    let active = true;
+
+    const loadStatus = async () => {
+      try {
+        const response = await fetch("/api/chem/inventory/status", {
+          cache: "no-store"
+        });
+        const payload = (await response.json().catch(() => null)) as unknown;
+        if (active) {
+          setStatus(response.ok ? readLabStorageStatusPayload(payload) : "disconnect");
+        }
+      } catch {
+        if (active) {
+          setStatus("disconnect");
+        }
+      }
+    };
+
+    void loadStatus();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  return status;
+};
+
 const PlaygroundHeader = ({
   logoSrc,
   title,
   subtitle,
   profileId,
+  labStorageStatus,
   diagnosticCount,
   compileState,
   compileStateTone
 }: PlaygroundHeaderProps) => {
+  const labStorageStatusLabel = labStorageStatus === "ready" ? "ready" : "Disconnect";
+  const labStorageStatusToneClass = labStorageStatus === "ready"
+    ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400"
+    : "bg-rose-50 text-rose-600 dark:bg-rose-950/45 dark:text-rose-300";
+  const labStorageStatusDotClass = labStorageStatus === "ready" ? "bg-emerald-500" : "bg-rose-500";
   const compileBadgeToneClass = compileStateTone === "pending"
     ? "bg-sky-50 text-sky-700 dark:bg-sky-950/45 dark:text-sky-300"
     : compileStateTone === "success"
@@ -76,12 +125,32 @@ const PlaygroundHeader = ({
               <div className="notion-font-label text-[14px] text-foreground w-full truncate">{title}</div>
               <div className="notion-font-caption text-[14px] text-muted-foreground w-full truncate">{subtitle}</div>
             </div>
-            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-accent text-accent-foreground rounded-full notion-font-badge">
-              <span className="flex h-1.5 w-1.5 rounded-full bg-accent-foreground/50"></span>
-              YAML: {profileId}
+            <div
+              className={`group flex shrink-0 items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-full px-2 py-0.5 notion-font-badge focus:outline-none ${labStorageStatusToneClass}`}
+              aria-label={`LSM: ${labStorageStatusLabel}`}
+              tabIndex={0}
+              title={`LSM: ${labStorageStatusLabel}`}
+            >
+              <span className={`flex h-1.5 w-1.5 shrink-0 rounded-full ${labStorageStatusDotClass}`}></span>
+              <span className="shrink-0">LSM</span>
+              <span className="inline-block max-w-0 overflow-hidden opacity-0 transition-[max-width,opacity] duration-250 ease-in group-hover:max-w-[10rem] group-hover:opacity-100 group-focus:max-w-[10rem] group-focus:opacity-100">
+                : {labStorageStatusLabel}
+              </span>
             </div>
             <div
-              className={`flex w-[7.5rem] items-center gap-1.5 rounded-full px-2 py-0.5 notion-font-badge ${compileBadgeToneClass}`}
+              className="group flex shrink-0 items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-full bg-accent px-2 py-0.5 text-accent-foreground notion-font-badge focus:outline-none"
+              aria-label={`YAML: ${profileId}`}
+              tabIndex={0}
+              title={`YAML: ${profileId}`}
+            >
+              <span className="flex h-1.5 w-1.5 shrink-0 rounded-full bg-accent-foreground/50"></span>
+              <span className="shrink-0">YAML</span>
+              <span className="inline-block max-w-0 overflow-hidden opacity-0 transition-[max-width,opacity] duration-250 ease-in group-hover:max-w-[12rem] group-hover:opacity-100 group-focus:max-w-[12rem] group-focus:opacity-100">
+                : {profileId}
+              </span>
+            </div>
+            <div
+              className={`flex w-[8.75rem] shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 notion-font-badge ${compileBadgeToneClass}`}
               aria-live="polite"
             >
               {compileStateTone === "pending" ? (
@@ -128,6 +197,7 @@ const EditorToolbar = ({
 );
 
 const Page = () => {
+  const labStorageStatus = useLabStorageStatus();
   const {
     source,
     result,
@@ -227,6 +297,7 @@ const Page = () => {
           title={result.document.meta.title || "Untitled Document"}
           subtitle={documentSubtitle}
           profileId={result.renderOptions.profileId}
+          labStorageStatus={labStorageStatus}
           diagnosticCount={diagnosticCount}
           compileState={compileState}
           compileStateTone={compileStateTone}
