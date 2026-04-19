@@ -5,6 +5,7 @@ import type {
   MoleculeNode,
   ObservationNode,
   ProcedureNode,
+  ProcedureStepNode,
   ReactionNode,
   ResultNode,
   SampleNode,
@@ -17,7 +18,6 @@ import {
   renderBlockTitle,
   renderFieldList,
   renderLoadingGraphic,
-  stringifyAttributeValue,
   stringifyJsonAttributeValue
 } from "./shared";
 import { renderTlcAnalysis } from "./tlc-render";
@@ -45,28 +45,95 @@ const renderBodyText = (value: string | undefined): string =>
     ? `<div class="chemd-block-copy"><p>${escapeHtml(value).replace(/\n/g, "<br />")}</p></div>`
     : "";
 
-const renderOriginFields = (
-  node: MoleculeNode | ReactionNode
-): Array<[string, unknown]> => [
-  ["Surface origin", node.syntaxOrigin],
-  ["Declared kind", node.declaredKind]
-];
+const STEP_FAMILY_LABELS: Record<string, string> = {
+  analyze: "Analyze",
+  cool: "Cool",
+  heat: "Heat",
+  hold: "Hold",
+  mix: "Mix",
+  purge: "Purge",
+  quench: "Quench"
+};
+
+const STEP_PARAM_LABELS: Record<string, string> = {
+  analysisType: "Analysis type",
+  analysis_type: "Analysis type",
+  duration: "Duration",
+  target_temperature: "Target temperature",
+  temperature: "Temperature",
+  time: "Time"
+};
+
+const humanizeIdentifier = (value: string): string => {
+  const spaced = value
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .trim();
+  return spaced ? `${spaced[0].toUpperCase()}${spaced.slice(1)}` : value;
+};
+
+const renderStepParamValue = (key: string, value: string): string =>
+  key === "analysisType" || key === "analysis_type" ? value.toUpperCase() : value;
+
+const readStepFamilyLabel = (family: string): string =>
+  STEP_FAMILY_LABELS[family] ?? humanizeIdentifier(family);
+
+const readStepParamLabel = (key: string): string =>
+  STEP_PARAM_LABELS[key] ?? humanizeIdentifier(key);
+
+const renderStepField = (label: string, value: string): string =>
+  `<div class="chemd-step-field"><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`;
+
+const renderStepListField = (label: string, values: string[] | undefined): string[] =>
+  values?.length ? [renderStepField(label, values.join(", "))] : [];
+
+const buildStepNumberById = (steps: ProcedureStepNode[]): Map<string, number> => {
+  const idCounts = new Map<string, number>();
+  steps.forEach((step) => {
+    if (step.stepId) {
+      idCounts.set(step.stepId, (idCounts.get(step.stepId) ?? 0) + 1);
+    }
+  });
+
+  const indexedSteps: Array<[string, number]> = [];
+  steps.forEach((step, index) => {
+    if (step.stepId && idCounts.get(step.stepId) === 1) {
+      indexedSteps.push([step.stepId, index + 1]);
+    }
+  });
+
+  return new Map(indexedSteps);
+};
+
+const renderStepFields = (
+  step: ProcedureStepNode,
+  stepNumberById: Map<string, number>
+): string => {
+  const paramFields = Object.entries(step.params ?? {}).map(([key, value]) =>
+    renderStepField(readStepParamLabel(key), renderStepParamValue(key, value))
+  );
+  const dependencyFields = (step.dependsOn ?? []).flatMap((id) => {
+    const stepNumber = stepNumberById.get(id);
+    return [renderStepField("After", stepNumber ? `Step ${stepNumber}` : id)];
+  });
+  const fields = [
+    ...paramFields,
+    ...renderStepListField("Uses", step.inputs),
+    ...renderStepListField("Produces", step.outputs),
+    ...dependencyFields
+  ].join("");
+  return fields ? `<dl class="chemd-step-fields">${fields}</dl>` : "";
+};
 
 const renderProcedureSteps = (node: ProcedureNode): string => {
   if (!node.steps?.length) {
     return "";
   }
 
+  const stepNumberById = buildStepNumberById(node.steps);
   const items = node.steps.map((step, index) => {
-    const params = step.params ? Object.entries(step.params).map(([key, value]) => `${key}=${value}`).join(" | ") : "";
-    const details = [
-      params,
-      step.inputs?.length ? `inputs=${step.inputs.join(", ")}` : "",
-      step.outputs?.length ? `outputs=${step.outputs.join(", ")}` : "",
-      step.dependsOn?.length ? `depends_on=${step.dependsOn.join(", ")}` : ""
-    ].filter(Boolean).join(" | ");
-
-    return `<li><span class="chemd-step-family">${escapeHtml(step.family)}</span>${details ? ` <span class="chemd-step-detail">${escapeHtml(details)}</span>` : ""}<span class="chemd-step-index">#${index + 1}</span></li>`;
+    const title = `Step ${index + 1}: ${readStepFamilyLabel(step.family)}`;
+    return `<li class="chemd-procedure-step"><span class="chemd-step-title">${escapeHtml(title)}</span>${renderStepFields(step, stepNumberById)}</li>`;
   }).join("");
 
   return `<ol class="chemd-procedure-steps">${items}</ol>`;
@@ -87,11 +154,10 @@ const findTypedAnalysisNode = (
 };
 
 const renderReaction = (node: ReactionNode): string =>
-  `<section class="chemd-block chemd-block--reaction" data-node-id="${escapeHtml(node.id ?? "")}" data-source-origin="${stringifyAttributeValue(node.syntaxOrigin)}" data-declared-kind="${stringifyAttributeValue(node.declaredKind)}" data-reactants="${stringifyJsonAttributeValue(node.reactants ?? [])}" data-products="${stringifyJsonAttributeValue(node.products ?? [])}" data-conditions="${stringifyJsonAttributeValue(node.conditions ?? [])}">
+  `<section class="chemd-block chemd-block--reaction" data-node-id="${escapeHtml(node.id ?? "")}" data-reactants="${stringifyJsonAttributeValue(node.reactants ?? [])}" data-products="${stringifyJsonAttributeValue(node.products ?? [])}" data-conditions="${stringifyJsonAttributeValue(node.conditions ?? [])}">
     ${renderBlockTitle("Reaction", node.id)}
     ${renderLoadingGraphic("reaction")}
     ${renderFieldList([
-      ...renderOriginFields(node),
       ["Name", node.name],
       ["Reagents", node.reagents],
       ["Catalyst", node.catalyst],
@@ -123,11 +189,10 @@ const renderResult = (node: ResultNode): string =>
   </section>`;
 
 const renderMolecule = (node: MoleculeNode): string =>
-  `<section class="chemd-block chemd-block--molecule" data-node-id="${escapeHtml(node.id ?? "")}" data-source-origin="${stringifyAttributeValue(node.syntaxOrigin)}" data-declared-kind="${stringifyAttributeValue(node.declaredKind)}" data-smiles="${stringifyAttributeValue(node.smiles)}">
+  `<section class="chemd-block chemd-block--molecule" data-node-id="${escapeHtml(node.id ?? "")}" data-smiles="${escapeHtml(node.smiles ?? "")}">
     ${renderBlockTitle("Molecule", node.id)}
     ${renderLoadingGraphic("molecule")}
     ${renderFieldList([
-      ...renderOriginFields(node),
       ["Name", node.name],
       ["SMILES", node.smiles],
       ["CAS", node.cas],
@@ -146,7 +211,7 @@ const renderAnalysis = (node: AnalysisNode, options: RenderNodeOptions): string 
     ${renderBlockTitle("Analysis", node.id)}
     ${renderFieldList([
       ["Type", node.type_name],
-      ["Ref", node.ref],
+      ["Related", node.ref],
       ["Time", node.time],
       ["Eluent", node.eluent],
       ["Plate", node.plate],
@@ -165,7 +230,7 @@ const renderAnalysis = (node: AnalysisNode, options: RenderNodeOptions): string 
 const renderProcedure = (node: ProcedureNode): string =>
   `<section class="chemd-block chemd-block--procedure" data-node-id="${escapeHtml(node.id ?? "")}">
     ${renderBlockTitle("Procedure", node.id)}
-    ${renderFieldList([["Ref", node.ref]])}
+    ${renderFieldList([["Related", node.ref]])}
     ${renderProcedureSteps(node)}
     ${renderBodyText(node.body)}
   </section>`;
@@ -173,7 +238,7 @@ const renderProcedure = (node: ProcedureNode): string =>
 const renderObservation = (node: ObservationNode): string =>
   `<section class="chemd-block chemd-block--observation" data-node-id="${escapeHtml(node.id ?? "")}">
     ${renderBlockTitle("Observation", node.id)}
-    ${renderFieldList([["Ref", node.ref]])}
+    ${renderFieldList([["Related", node.ref]])}
     ${renderBodyText(node.body)}
   </section>`;
 

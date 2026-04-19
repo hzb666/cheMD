@@ -1,9 +1,9 @@
 import type { NormalizedTlcAnalysis } from "@chemd/core";
-import type { ChemdLnfV03, ChemdLnfV04 } from "@chemd/lnf";
+import type { ChemdLnf } from "@chemd/lnf";
 import type { CanonicalStepNode, ObservationEventNode } from "@chemd/step-ontology";
 
-export interface ChemdTrainingExportV1 {
-  schema_version: "chemd-training-export/v0.1";
+export interface ChemdTrainingExportV2 {
+  schema_version: "chemd-training-export/v0.2";
   export_id: string;
   exported_at: string;
   generator: ExportGeneratorInfo;
@@ -85,8 +85,7 @@ export interface SemanticLayerV1 {
   samples: ExportedSampleV1[];
   markdown_blocks: ExportedMarkdownBlockV1[];
   links: ExportedRelationV1[];
-  v03_lnf?: ChemdLnfV03;
-  v04_lnf?: ChemdLnfV04;
+  lnf?: ChemdLnf;
 }
 
 export interface ExportedEntityBase {

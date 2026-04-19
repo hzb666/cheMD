@@ -44,10 +44,10 @@ export const stringifyJsonAttributeValue = (value: unknown): string =>
 
 export const normalizeWhitespace = (value: string): string => value.replace(/\s+/g, " ").trim();
 
-export const renderBlockTitle = (label: string, id?: string): string =>
-  id
-    ? `<h2>${escapeHtml(label)} <span class="chemd-block-id">${escapeHtml(id)}</span></h2>`
-    : `<h2>${escapeHtml(label)}</h2>`;
+export const renderBlockTitle = (label: string, id?: string): string => {
+  const blockId = id ? ` <span class="chemd-block-id">${escapeHtml(id)}</span>` : "";
+  return `<h2>${escapeHtml(label)}${blockId}</h2>`;
+};
 
 const hasControlCharacters = (value: string): boolean =>
   Array.from(value).some((char) => {

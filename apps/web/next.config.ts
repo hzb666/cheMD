@@ -5,11 +5,19 @@ const nextConfig: NextConfig = {
   transpilePackages: [
     "@chemd/compiler",
     "@chemd/core",
+    "@chemd/diagnostics",
+    "@chemd/exporter-training",
+    "@chemd/lnf",
     "@chemd/parser",
     "@chemd/render-profile",
+    "@chemd/renderer-docx",
     "@chemd/renderer-html",
     "@chemd/renderer-json",
-    "@chemd/resolver"
+    "@chemd/resolver",
+    "@chemd/runtime-lab",
+    "@chemd/runtime-trace",
+    "@chemd/step-ontology",
+    "@chemd/typechecker"
   ],
   webpack: (config) => {
     config.resolve.alias = {

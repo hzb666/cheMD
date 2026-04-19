@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildReactionRenderErrorMarkup,
+  buildMoleculeRenderErrorMarkup,
   injectEditButtons,
   loadHydratedMoleculeEntry,
   loadHydratedReactionEntry,
@@ -10,7 +11,8 @@ import {
   replaceMoleculeFieldValues,
   replaceMoleculeGraphics,
   replaceReactionFieldValues,
-  replaceReactionGraphics
+  replaceReactionGraphics,
+  selectRenderGraphicMarkup
 } from "../src/features/chem-preview/hooks/useRenderedPreview";
 
 describe("useRenderedPreview helpers", () => {
@@ -242,6 +244,20 @@ describe("useRenderedPreview graphic replacement helpers", () => {
     expect(next).not.toContain("<svg>fallback</svg>");
   });
 
+  it("accepts RDKit SVG payloads with XML declarations", () => {
+    const html = `<section class="chemd-block chemd-block--molecule" data-node-id="mol-1">
+      <div class="chemd-graphic" data-chem-render-state="loading" data-chem-kind="molecule"><svg>fallback</svg></div>
+    </section>`;
+
+    const next = replaceMoleculeGraphics(html, [
+      `<?xml version='1.0' encoding='iso-8859-1'?>\n<svg><path d="M 1,1" /></svg>`
+    ]);
+
+    expect(next).toContain('<svg><path d="M 1,1" /></svg>');
+    expect(next).not.toContain("<?xml");
+    expect(next).not.toContain("<svg>fallback</svg>");
+  });
+
   it("replaces reaction graphics when loading placeholders include data attributes", () => {
     const html = `<section class="chemd-block chemd-block--reaction" data-node-id="rxn-1">
       <div class="chemd-graphic" data-chem-render-state="loading" data-chem-kind="reaction"><svg>fallback</svg></div>
@@ -266,6 +282,17 @@ describe("useRenderedPreview graphic replacement helpers", () => {
     expect(next).toContain('class="chemd-render-error"');
     expect(next).toContain("Reaction render failed: &lt;bad &quot;input&quot;&gt;");
     expect(next).not.toContain("<svg>fallback</svg>");
+  });
+
+  it("prefers render error markup over a loading svg in failed responses", () => {
+    const markup = selectRenderGraphicMarkup(
+      { svg: '<svg class="chemd-loading-svg"></svg>' },
+      buildMoleculeRenderErrorMarkup("Molecule render failed: service unavailable")
+    );
+
+    expect(markup).toContain('class="chemd-render-error"');
+    expect(markup).toContain("Molecule render failed: service unavailable");
+    expect(markup).not.toContain("chemd-loading-svg");
   });
 });
 

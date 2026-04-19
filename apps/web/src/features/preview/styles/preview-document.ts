@@ -530,6 +530,45 @@ export const PREVIEW_DOCUMENT_STYLE = `
     margin: 0;
   }
 
+  .chemd-procedure-steps {
+    display: grid;
+    gap: 0.65rem;
+    margin: 0.75rem 0 0;
+    padding-left: 1.35rem;
+  }
+
+  .chemd-procedure-step {
+    padding-left: 0.25rem;
+  }
+
+  .chemd-step-title {
+    font-weight: 700;
+    color: var(--preview-foreground);
+  }
+
+  .chemd-step-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.9rem;
+    margin: 0.2rem 0 0;
+  }
+
+  .chemd-step-field {
+    display: inline-flex;
+    gap: 0.3rem;
+    flex-wrap: wrap;
+    font-size: 0.92rem;
+  }
+
+  .chemd-step-field dt {
+    color: var(--preview-muted);
+    font-weight: 600;
+  }
+
+  .chemd-step-field dd {
+    margin: 0;
+  }
+
   .chemd-tlc {
     margin: 0.2rem 0 0.95rem;
   }

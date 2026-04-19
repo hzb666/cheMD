@@ -11,7 +11,22 @@ import {
 } from "../lib/read-preview-edit-message";
 import type { ChemEditorDraftWithBlockId } from "../../chem-editor/types";
 
-type OutputTab = "preview" | "json" | "docxBridge" | "diagnostics";
+export type OutputTab =
+  | "preview"
+  | "json"
+  | "docxBridge"
+  | "diagnostics"
+  | "semantic"
+  | "runtime"
+  | "lnf"
+  | "training";
+
+export interface PreviewCompilerOutputCode {
+  semantic: string;
+  runtime: string;
+  lnf: string;
+  training: string;
+}
 
 interface InventoryItemRecord {
   notation: string;
@@ -84,6 +99,7 @@ interface UsePreviewShellControllerParams {
   html: string;
   json: string;
   docxBridge: string;
+  compilerOutputCode: PreviewCompilerOutputCode;
   source: string;
   documentId?: string;
   sessionId?: string;
@@ -273,6 +289,7 @@ export const usePreviewShellController = ({
   html,
   json,
   docxBridge,
+  compilerOutputCode,
   source: _source,
   documentId,
   sessionId,
@@ -333,6 +350,35 @@ export const usePreviewShellController = ({
     setActiveTab,
     previewFrameRef,
     hydratedHtml,
-    activeCode: activeTab === "json" ? json : activeTab === "docxBridge" ? docxBridge : ""
+    activeCode: readActiveCode(activeTab, json, docxBridge, compilerOutputCode)
   };
+};
+
+const readActiveCode = (
+  activeTab: OutputTab,
+  json: string,
+  docxBridge: string,
+  compilerOutputCode: PreviewCompilerOutputCode
+): string => {
+  if (activeTab === "json") {
+    return json;
+  }
+
+  if (activeTab === "docxBridge") {
+    return docxBridge;
+  }
+
+  if (activeTab === "semantic") {
+    return compilerOutputCode.semantic;
+  }
+
+  if (activeTab === "runtime") {
+    return compilerOutputCode.runtime;
+  }
+
+  if (activeTab === "lnf") {
+    return compilerOutputCode.lnf;
+  }
+
+  return activeTab === "training" ? compilerOutputCode.training : "";
 };

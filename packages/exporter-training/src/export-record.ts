@@ -1,5 +1,5 @@
 import type { ChemdDocument } from "@chemd/core";
-import type { ChemdLnfV03, ChemdLnfV04 } from "@chemd/lnf";
+import type { ChemdLnf } from "@chemd/lnf";
 import type { StepGraph } from "@chemd/step-ontology";
 import { buildTypedSemanticGraph, type TypedSemanticGraph } from "@chemd/typechecker";
 
@@ -7,7 +7,7 @@ import { buildLearningLayer } from "./learning-layer";
 import { buildQualityLayer } from "./quality-layer";
 import { buildSemanticLayer } from "./semantic-layer";
 import { buildSourceLayer } from "./source-layer";
-import type { ChemdTrainingExportV1, ExportedDocumentInfo } from "./types";
+import type { ChemdTrainingExportV2, ExportedDocumentInfo } from "./types";
 
 const DEFAULT_EXPORTER_MODULE = "@chemd/exporter-training";
 const DEFAULT_EXPORTER_VERSION = "0.0.0";
@@ -19,8 +19,7 @@ export interface ExportTrainingRecordOptions {
   exporterVersion?: string;
   stepGraph?: StepGraph;
   typedGraph?: TypedSemanticGraph;
-  v03Lnf?: ChemdLnfV03;
-  v04Lnf?: ChemdLnfV04;
+  lnf?: ChemdLnf;
 }
 
 const toDocumentInfo = (document: ChemdDocument): ExportedDocumentInfo => {
@@ -61,7 +60,7 @@ const createStableHash = (value: string): string => {
 export const exportTrainingRecordFromDocument = (
   document: ChemdDocument,
   options: ExportTrainingRecordOptions = {}
-): ChemdTrainingExportV1 => {
+): ChemdTrainingExportV2 => {
   const exportedAt = options.exportedAt ?? new Date().toISOString();
   const fingerprint = createStableHash(
     typeof document.source === "string"
@@ -77,8 +76,7 @@ export const exportTrainingRecordFromDocument = (
   });
   const semanticLayer = {
     ...baseSemanticLayer,
-    ...(options.v03Lnf ? { v03_lnf: options.v03Lnf } : {}),
-    ...(options.v04Lnf ? { v04_lnf: options.v04Lnf } : {})
+    ...(options.lnf ? { lnf: options.lnf } : {})
   };
   const learningLayer = buildLearningLayer({
     document: documentInfo,
@@ -88,14 +86,20 @@ export const exportTrainingRecordFromDocument = (
   const qualityLayer = buildQualityLayer(document.diagnostics, learningLayer);
 
   return {
-    schema_version: "chemd-training-export/v0.1",
+    schema_version: "chemd-training-export/v0.2",
     export_id: exportId,
     exported_at: exportedAt,
     generator: {
       system: "chemd",
       exporter_module: options.exporterModule ?? DEFAULT_EXPORTER_MODULE,
       exporter_version: options.exporterVersion ?? DEFAULT_EXPORTER_VERSION,
-      pipeline: ["parseChemd", "resolveChemd", "typecheckDocument", "buildLnf", "exportTrainingRecordFromDocument"]
+      pipeline: [
+        "parseChemd",
+        "resolveChemd",
+        "typecheckDocument",
+        "buildCanonicalLnf",
+        "exportTrainingRecordFromDocument"
+      ]
     },
     document: documentInfo,
     source_layer: sourceLayer,

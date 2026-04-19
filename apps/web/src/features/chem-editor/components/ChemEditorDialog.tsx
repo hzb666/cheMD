@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 
 import { Button } from "../../../components/ui/button";
 import { ChemEditorFrame } from "./ChemEditorFrame";
@@ -15,6 +15,29 @@ interface ChemEditorDialogProps {
   onClose: () => void;
   onSave: (next: ChemEditorDraftWithBlockId) => Promise<void>;
 }
+
+interface ChemEditorDialogContentProps {
+  value: ChemEditorDraftWithBlockId;
+  onClose: () => void;
+  onSave: (next: ChemEditorDraftWithBlockId) => Promise<void>;
+}
+
+const buildChemEditorDialogKey = (value: ChemEditorDraftWithBlockId): string => {
+  const commonParts = [value.blockId, value.kind, value.sourceKind ?? ""];
+
+  if (value.kind === "molecule") {
+    return [...commonParts, value.smiles, value.molfile ?? ""].join("\x1f");
+  }
+
+  return [
+    ...commonParts,
+    value.reactants.join("\x1e"),
+    value.products.join("\x1e"),
+    value.conditions.join("\x1e"),
+    value.reactionSmiles ?? "",
+    value.rxnfile ?? ""
+  ].join("\x1f");
+};
 
 export const resolveVisibleChemEditorDraft = ({
   open,
@@ -44,12 +67,11 @@ export const resolveVisibleChemEditorDraft = ({
   return draft;
 };
 
-export const ChemEditorDialog = ({
-  open,
+const ChemEditorDialogContent = ({
   value,
   onClose,
   onSave
-}: ChemEditorDialogProps) => {
+}: ChemEditorDialogContentProps) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<ChemEditorDraft | null>(value);
@@ -59,28 +81,13 @@ export const ChemEditorDialog = ({
     [value]
   );
   const visibleDraft = resolveVisibleChemEditorDraft({
-    open,
+    open: true,
     value,
     draft
   });
   const currentDraft = draft ?? visibleDraft;
 
-  useEffect(() => {
-    if (open && value) {
-      setDraft(value);
-      setError(null);
-      return;
-    }
-
-    if (!open) {
-      setDraft(null);
-      setError(null);
-      setSaving(false);
-      bridgeRef.current = null;
-    }
-  }, [open, resetKey, value]);
-
-  if (!open || !value || !visibleDraft || !currentDraft) {
+  if (!visibleDraft || !currentDraft) {
     return null;
   }
 
@@ -153,5 +160,25 @@ export const ChemEditorDialog = ({
         </div>
       </div>
     </div>
+  );
+};
+
+export const ChemEditorDialog = ({
+  open,
+  value,
+  onClose,
+  onSave
+}: ChemEditorDialogProps) => {
+  if (!open || !value) {
+    return null;
+  }
+
+  return (
+    <ChemEditorDialogContent
+      key={buildChemEditorDialogKey(value)}
+      value={value}
+      onClose={onClose}
+      onSave={onSave}
+    />
   );
 };

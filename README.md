@@ -336,7 +336,7 @@ source markdown
   -> resolveRenderProfileWithDiagnostics()
   -> buildRunPlan()
   -> preflightRun()
-  -> buildLnf()
+  -> buildCanonicalLnf()
   -> exportTrainingRecordFromDocument()
   -> renderHtml()
   -> renderJson()
@@ -350,7 +350,7 @@ The returned `CompileResult` includes:
 - typed semantic graph
 - lowered step graph
 - runtime run plan and preflight result
-- LNF v0.3 payload
+- canonical LNF v0.5 payload
 - training export payload
 - HTML, JSON, and DOCX bridge strings
 

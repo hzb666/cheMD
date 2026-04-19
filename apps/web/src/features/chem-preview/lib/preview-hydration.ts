@@ -135,14 +135,18 @@ const RENDER_ERROR_PATTERN =
 const hasUnsafeMarkup = (value: string): boolean =>
   /<script[\s>]/i.test(value) || /\son[a-z]+\s*=/i.test(value) || /javascript:/i.test(value);
 
+const removeXmlDeclaration = (value: string): string =>
+  value.replace(/^<\?xml[\s\S]*?\?>\s*/i, "");
+
 const sanitizePreviewGraphicMarkup = (value: string): string => {
   const trimmed = value.trim();
   if (hasUnsafeMarkup(trimmed)) {
     return "";
   }
 
-  if (trimmed.startsWith("<svg") || RENDER_ERROR_PATTERN.test(trimmed)) {
-    return trimmed;
+  const markup = removeXmlDeclaration(trimmed);
+  if (markup.startsWith("<svg") || RENDER_ERROR_PATTERN.test(markup)) {
+    return markup;
   }
 
   return "";

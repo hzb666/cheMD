@@ -11,10 +11,18 @@ import { sampleSource } from "../lib/sample-source";
 const compilePreview = (source: string): CompileResult => compileChemd(source);
 const initialPreviewResult = compilePreview(sampleSource);
 
+export interface PlaygroundCompilerOutputCode {
+  semantic: string;
+  runtime: string;
+  lnf: string;
+  training: string;
+}
+
 export interface PlaygroundDocumentController {
   source: string;
   result: CompileResult;
   json: string;
+  compilerOutputCode: PlaygroundCompilerOutputCode;
   documentId: string;
   sessionId: string;
   lineCount: number;
@@ -26,6 +34,21 @@ export interface PlaygroundDocumentController {
   applySourceChange: (nextSource: string) => void;
   getLatestSource: () => string;
 }
+
+const stringifyCompilerOutput = (value: unknown): string => JSON.stringify(value, null, 2);
+
+const buildCompilerOutputCode = (result: CompileResult): PlaygroundCompilerOutputCode => ({
+  semantic: stringifyCompilerOutput({
+    typedSemanticGraph: result.typedSemanticGraph,
+    stepGraph: result.stepGraph
+  }),
+  runtime: stringifyCompilerOutput({
+    runPlan: result.runPlan,
+    runtimePreflight: result.runtimePreflight
+  }),
+  lnf: stringifyCompilerOutput(result.lnf),
+  training: stringifyCompilerOutput(result.trainingExport)
+});
 
 export const usePlaygroundDocumentController = (): PlaygroundDocumentController => {
   const [source, setSource] = useState(sampleSource);
@@ -43,6 +66,7 @@ export const usePlaygroundDocumentController = (): PlaygroundDocumentController 
   const documentId = useMemo(() => parseDocumentIdFromSource(source), [source]);
   const sessionId = useMemo(() => getStructureSessionId(), []);
   const lineCount = useMemo(() => source.split(/\r?\n/).length, [source]);
+  const compilerOutputCode = useMemo(() => buildCompilerOutputCode(result), [result]);
 
   const applySourceChange = (nextSource: string) => {
     sourceRef.current = nextSource;
@@ -132,6 +156,7 @@ export const usePlaygroundDocumentController = (): PlaygroundDocumentController 
     source,
     result,
     json: jsonState.value,
+    compilerOutputCode,
     documentId,
     sessionId,
     lineCount,

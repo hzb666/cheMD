@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildLnf, buildLnfV04 } from "@chemd/lnf";
+import { buildCanonicalLnf } from "@chemd/lnf";
 import { parseChemd } from "@chemd/parser";
 import { resolveChemd } from "@chemd/resolver";
 import { typecheckDocument } from "@chemd/typechecker";
@@ -8,7 +8,7 @@ import { typecheckDocument } from "@chemd/typechecker";
 import { exportTrainingRecordFromDocument } from "../src/index";
 
 describe("training export", () => {
-  it("includes v0.3 LNF and procedure lowering pairs when provided", () => {
+  it("includes canonical LNF and procedure lowering pairs when provided", () => {
     const document = resolveChemd(parseChemd(`---
 id: exp-export
 title: Export test
@@ -27,7 +27,7 @@ solvent: THF
 :::
 `));
     const checked = typecheckDocument(document);
-    const lnf = buildLnf({
+    const lnf = buildCanonicalLnf({
       document,
       typedGraph: checked.typedGraph,
       stepGraph: checked.stepGraph,
@@ -36,11 +36,12 @@ solvent: THF
     const record = exportTrainingRecordFromDocument(document, {
       stepGraph: checked.stepGraph,
       typedGraph: checked.typedGraph,
-      v03Lnf: lnf,
+      lnf,
       exportedAt: "2026-04-17T00:00:00.000Z"
     });
 
-    expect(record.semantic_layer.v03_lnf?.schemaVersion).toBe("chemd-lnf/v0.3");
+    expect(record.schema_version).toBe("chemd-training-export/v0.2");
+    expect(record.semantic_layer.lnf?.schemaVersion).toBe("chemd-lnf/v0.5");
     expect(record.learning_layer.retrieval_chunks.length).toBeGreaterThan(0);
     expect(record.learning_layer.procedure_to_steps?.[0]?.steps[0]?.family).toBe("cool");
     expect(record.learning_layer.procedure_to_steps?.[0]).toMatchObject({
@@ -135,7 +136,7 @@ name: ethanol
     expect(record.semantic_layer.molecules[0]).not.toMatchObject({ smiles: "64-17-5" });
   });
 
-  it("uses typed graph and v0.4 LNF data for training features", () => {
+  it("uses typed graph and canonical LNF data for training features", () => {
     const document = resolveChemd(parseChemd(`---
 id: exp-export-typed
 title: Export typed graph
@@ -171,7 +172,7 @@ purity: 95%
 :::
 `));
     const checked = typecheckDocument(document);
-    const v04Lnf = buildLnfV04({
+    const lnf = buildCanonicalLnf({
       document,
       typedGraph: checked.typedGraph,
       stepGraph: checked.stepGraph,
@@ -180,11 +181,11 @@ purity: 95%
     const record = exportTrainingRecordFromDocument(document, {
       typedGraph: checked.typedGraph,
       stepGraph: checked.stepGraph,
-      v04Lnf,
+      lnf,
       exportedAt: "2026-04-19T00:00:00.000Z"
     });
 
-    expect(record.semantic_layer.v04_lnf?.schemaVersion).toBe("chemd-lnf/v0.4");
+    expect(record.semantic_layer.lnf?.schemaVersion).toBe("chemd-lnf/v0.5");
     expect(record.semantic_layer.molecules[0]).toMatchObject({
       amount_value: { value: 1.2, unit: "mmol" },
       equivalents_value: 1

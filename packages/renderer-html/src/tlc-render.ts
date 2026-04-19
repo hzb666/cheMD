@@ -72,7 +72,7 @@ const renderPlate = (analysis: NormalizedTlcAnalysis | null | undefined): string
 const renderTlcFields = (node: AnalysisNode): string =>
   renderFieldList([
     ["Type", node.type_name],
-    ["Ref", node.ref],
+    ["Related", node.ref],
     ["Time", node.time],
     ["Eluent", node.eluent],
     ["Plate", node.plate],

@@ -20,7 +20,7 @@ Keep runtime input untrusted until it is narrowed. Shared contracts belong in DT
 ## Package Contracts
 
 - Use public `@chemd/*` exports, not deep package internals.
-- `compileChemd` returns the canonical compile result: document, diagnostics, render options, adapter payload, HTML, JSON, DOCX bridge, `typedSemanticGraph`, `stepGraph`, `runPlan`, `runtimePreflight`, `lnf`, `lnfV04`, and `trainingExport`.
+- `compileChemd` returns the canonical compile result: document, diagnostics, render options, adapter payload, HTML, JSON, DOCX bridge, `typedSemanticGraph`, `stepGraph`, `runPlan`, `runtimePreflight`, `lnf`, and `trainingExport`.
 - Diagnostics quick-fix types and compile artifacts must be consumed through public `@chemd/compiler` exports.
 - Render option changes must stay aligned with `@chemd/render-profile` validators and adapter mapping.
 

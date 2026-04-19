@@ -1,7 +1,10 @@
 import { parseChemd } from "@chemd/parser";
 import type { ChemdDocument, RenderSelection } from "@chemd/core";
-import { exportTrainingRecordFromDocument, type ChemdTrainingExportV1 } from "@chemd/exporter-training";
-import { buildLnf, buildLnfV04, type ChemdLnfV03, type ChemdLnfV04 } from "@chemd/lnf";
+import { exportTrainingRecordFromDocument, type ChemdTrainingExportV2 } from "@chemd/exporter-training";
+import {
+  buildCanonicalLnf,
+  type ChemdLnf
+} from "@chemd/lnf";
 import {
   mapRenderOptionsToAdapterPayload,
   resolveRenderProfileWithDiagnostics
@@ -34,9 +37,8 @@ export interface CompileResult {
   stepGraph: StepGraph;
   runPlan: RunPlan;
   runtimePreflight: PreflightResult;
-  lnf: ChemdLnfV03;
-  lnfV04: ChemdLnfV04;
-  trainingExport: ChemdTrainingExportV1;
+  lnf: ChemdLnf;
+  trainingExport: ChemdTrainingExportV2;
   html: string;
   json: string;
   docxBridge: string;
@@ -106,25 +108,18 @@ export const compileChemd = (source: string, options: CompileOptions = {}): Comp
   const runtimePreflight = preflightRun(runPlan, {
     capabilities: DEFAULT_RUNTIME_CAPABILITIES
   });
-  const lnf = buildLnf({
+  const lnf = buildCanonicalLnf({
     document,
     typedGraph: typecheckResult.typedGraph,
     stepGraph: typecheckResult.stepGraph,
     diagnostics: document.diagnostics,
-    runPlan
-  });
-  const lnfV04 = buildLnfV04({
-    document,
-    typedGraph: typecheckResult.typedGraph,
-    stepGraph: typecheckResult.stepGraph,
-    diagnostics: document.diagnostics,
-    runPlan
+    runPlan,
+    runtimePreflight
   });
   const trainingExport = exportTrainingRecordFromDocument(document, {
     stepGraph: typecheckResult.stepGraph,
     typedGraph: typecheckResult.typedGraph,
-    v03Lnf: lnf,
-    v04Lnf: lnfV04
+    lnf
   });
   const renderOptions = renderProfileResolution.options;
   const renderAdapterPayload = mapRenderOptionsToAdapterPayload(renderOptions);
@@ -144,7 +139,6 @@ export const compileChemd = (source: string, options: CompileOptions = {}): Comp
     runPlan,
     runtimePreflight,
     lnf,
-    lnfV04,
     trainingExport,
     html,
     json,

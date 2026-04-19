@@ -16,7 +16,7 @@ Status: Filled from commit `97d3151`; v0.4 surface semantics below supersede leg
 compileChemd(source: string, options?: CompileOptions): CompileResult
 ```
 
-`CompileResult` must keep the legacy render fields and add:
+`CompileResult` must keep the legacy render fields and add the canonical semantic artifacts:
 
 ```typescript
 {
@@ -24,9 +24,8 @@ compileChemd(source: string, options?: CompileOptions): CompileResult
   stepGraph: StepGraph;
   runPlan: RunPlan;
   runtimePreflight: PreflightResult;
-  lnf: ChemdLnfV03;
-  lnfV04: ChemdLnfV04;
-  trainingExport: ChemdTrainingExportV1;
+  lnf: ChemdLnf;
+  trainingExport: ChemdTrainingExportV2;
 }
 ```
 
@@ -36,11 +35,11 @@ Core builders:
 typecheckDocument(document: ChemdDocument, options?: TypecheckOptions): TypecheckResult
 buildRunPlan(input: RunPlanInput): RunPlan
 preflightRun(runPlan: RunPlan, options: PreflightOptions): PreflightResult
-buildLnf(input: BuildLnfInput): ChemdLnfV03
+buildCanonicalLnf(input: BuildLnfInput): ChemdLnf
 exportTrainingRecordFromDocument(
   document: ChemdDocument,
   options?: ExportTrainingRecordOptions
-): ChemdTrainingExportV1
+): ChemdTrainingExportV2
 ```
 
 ### 3. Contracts
@@ -54,7 +53,7 @@ parseChemd
   -> resolveRenderProfileWithDiagnostics
   -> buildRunPlan
   -> preflightRun
-  -> buildLnf
+  -> buildCanonicalLnf
   -> exportTrainingRecordFromDocument
   -> renderHtml/renderJson/renderDocxBridge
 ```
@@ -67,10 +66,9 @@ Required payload fields:
 | `StepGraph` | `steps`, `procedures`, `observations`, `diagnostics` |
 | `RunPlan` | `planId`, `documentId`, `status`, `steps`, `diagnostics` |
 | `PreflightResult` | `blocking`, `diagnostics` |
-| `ChemdLnfV03` | `schemaVersion: "chemd-lnf/v0.3"`, `experiment.document`, `experiment.reactions`, `experiment.results`, `experiment.procedure`, `experiment.observations`, `experiment.diagnostics` |
-| `ChemdLnfV04` | `schemaVersion: "chemd-lnf/v0.4"`, `experiment.typedGraph`, `experiment.stepGraph`, `experiment.stepSources`, `experiment.migration` |
-| `ChemdTrainingExportV1.semantic_layer` | Optional `v03_lnf` when caller passes `v03Lnf`; optional `v04_lnf` when caller passes `v04Lnf` |
-| `ChemdTrainingExportV1.learning_layer` | `retrieval_chunks`, `prediction_instances`, plus optional `procedure_to_steps`, `observation_to_events` from `StepGraph` |
+| `ChemdLnf` | `schemaVersion: "chemd-lnf/v0.5"`, `experiment.document`, `experiment.entities`, `experiment.semantic`, `experiment.workflow`, optional `experiment.runtime`, `experiment.quality` |
+| `ChemdTrainingExportV2.semantic_layer` | Optional `lnf` when caller passes the canonical `ChemdLnf` |
+| `ChemdTrainingExportV2.learning_layer` | `retrieval_chunks`, `prediction_instances`, plus optional `procedure_to_steps`, `observation_to_events` from `StepGraph` |
 
 Diagnostics from `typecheckDocument` and render profile resolution must be merged into `CompileResult.document.diagnostics`; do not throw for semantic validation failures that have a diagnostic code.
 
@@ -93,8 +91,9 @@ Diagnostics from `typecheckDocument` and render profile resolution must be merge
 Good:
 
 - A procedure containing charge, purge, heat/cool, sample, analyze, quench, workup, filter, or isolate text lowers to canonical `CanonicalStepNode` entries.
-- `compileChemd(source).lnf.schemaVersion` is exactly `"chemd-lnf/v0.3"`.
-- `trainingExport.semantic_layer.v03_lnf` matches the LNF returned by `compileChemd`.
+- `compileChemd(source).lnf.schemaVersion` is exactly `"chemd-lnf/v0.5"`.
+- `trainingExport.schema_version` is exactly `"chemd-training-export/v0.2"`.
+- `trainingExport.semantic_layer.lnf` matches the LNF returned by `compileChemd`.
 
 Base:
 
@@ -118,7 +117,7 @@ Required assertion points:
 - `packages/runtime-lab/tests/runtime-lab.test.ts`: run plan and preflight contract, including `E605`.
 - `packages/runtime-trace/tests/runtime-trace.test.ts`: trace replay order, state transitions, and runtime-lab trace adaptation.
 - `packages/lnf/tests/lnf.test.ts`: LNF schema version and semantic payload fields.
-- `packages/exporter-training/tests/exporter-record.test.ts`: `v03_lnf` and learning pairs are exported when passed.
+- `packages/exporter-training/tests/exporter-record.test.ts`: canonical `lnf` and learning pairs are exported when passed.
 
 Run before claiming complete:
 
@@ -134,7 +133,7 @@ pnpm exec eslint packages/diagnostics packages/step-ontology packages/typechecke
 
 ```typescript
 const document = resolveChemd(parseChemd(source));
-const lnf = buildLnf({ document, typedGraph: {} as never, stepGraph: {} as never, diagnostics: [] });
+const lnf = buildCanonicalLnf({ document, typedGraph: {} as never, stepGraph: {} as never, diagnostics: [] });
 ```
 
 This bypasses the typed graph and step graph contracts, so LNF becomes structurally valid but semantically empty.
@@ -149,12 +148,16 @@ const runPlan = buildRunPlan({
   typedGraph: typecheckResult.typedGraph,
   stepGraph: typecheckResult.stepGraph
 });
-const lnf = buildLnf({
+const runtimePreflight = preflightRun(runPlan, {
+  capabilities: DEFAULT_RUNTIME_CAPABILITIES
+});
+const lnf = buildCanonicalLnf({
   document,
   typedGraph: typecheckResult.typedGraph,
   stepGraph: typecheckResult.stepGraph,
   diagnostics: document.diagnostics,
-  runPlan
+  runPlan,
+  runtimePreflight
 });
 ```
 
@@ -185,12 +188,11 @@ renderJson(document: ChemdDocument, options?: {
 }): string
 ```
 
-`CompileResult` must include both compatibility and enriched LNF outputs:
+`CompileResult` must include the unique canonical LNF output:
 
 ```typescript
 {
-  lnf: ChemdLnfV03;
-  lnfV04: ChemdLnfV04;
+  lnf: ChemdLnf;
 }
 ```
 
@@ -237,7 +239,7 @@ Normalization contract:
 - `renderJson` flattens `col.children` for compatibility and must mark `document.layout.col_strategy` as `"flatten_children"` when a `col` node was flattened.
 - `renderDocxBridge` must recursively render `col.children`; it must not return an empty bridge for a populated column node.
 - LNF and training export must consume `typedGraph` fields instead of reclassifying raw renderer nodes.
-- Training export semantic layer must preserve molecule `cas`, normalized molecule quantities, result/sample percent fields, result status labels, `normalized_outcome_hints`, and optional `v04_lnf`.
+- Training export semantic layer must preserve molecule `cas`, normalized molecule quantities, result/sample percent fields, result status labels, `normalized_outcome_hints`, and optional canonical `lnf`.
 - Training export learning layer must create retrieval chunks from available source text/reactions/results and prediction instances for reactions with linked features/targets.
 
 Runtime/service contract:
@@ -274,7 +276,7 @@ Base:
 
 - Existing prose-only procedures still lower in `auto` mode.
 - JSON/HTML/DOCX renderers remain display layers and can show origin/step metadata without inferring chemistry.
-- `ChemdLnfV03` remains available while `ChemdLnfV04` adds step source and migration summaries.
+- `ChemdLnf` is the only LNF output and uses `schemaVersion: "chemd-lnf/v0.5"`.
 - JSON output may flatten layout `col` nodes only when it records the flattening strategy.
 
 Bad:
@@ -293,8 +295,8 @@ Required assertion points:
 - Typechecker tests for `procedureMode`, explicit/lowered `sourceType`, typed normalization, and molecule `cas`.
 - Renderer JSON tests proving normalized fields come only from typed graph and `col` flattening records `document.layout.col_strategy`.
 - Renderer HTML/DOCX tests proving molecule CAS/SMILES display and DOCX recursive `col.children` rendering.
-- LNF tests for `chemd-lnf/v0.4` step source and migration summary.
-- Exporter/compiler tests proving `semantic_layer.v04_lnf`, normalized values, retrieval chunks, and reaction prediction instances are populated.
+- LNF tests for `chemd-lnf/v0.5` canonical entities, workflow, runtime, step source, and migration summary.
+- Exporter/compiler tests proving `semantic_layer.lnf`, normalized values, retrieval chunks, and reaction prediction instances are populated.
 - Runtime lab/trace tests for source provenance, inferred confirmation, artifact IDs, unknown steps, and order violations.
 - Web tests for strict JSON export diagnostics, explicit-kind target selection, structure cache metadata, timeout/error handling, request size/content-type limits, and SVG hydration rejection.
 - Chem-service tests for DTO metadata, placeholder behavior, and empty-side reaction acceptance.

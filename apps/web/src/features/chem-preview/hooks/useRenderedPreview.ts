@@ -65,11 +65,23 @@ export const buildReactionRenderErrorMarkup = (message: string): string => {
   return `<div class="chemd-render-error" role="alert" aria-live="polite">${escapeHtml(normalizedMessage)}</div>`;
 };
 
+export const buildMoleculeRenderErrorMarkup = (message: string): string => {
+  const normalizedMessage = message.trim() || "Molecule render failed";
+  return `<div class="chemd-render-error" role="alert" aria-live="polite">${escapeHtml(normalizedMessage)}</div>`;
+};
+
+export const selectRenderGraphicMarkup = (
+  payload: RenderPayload | null,
+  fallbackMarkup = ""
+): string =>
+  fallbackMarkup || (typeof payload?.svg === "string" && payload.svg.trim().length > 0 ? payload.svg : "");
+
 const requestRenderPayload = async (
   payload: ReturnType<typeof buildMoleculeRenderRequestPayload> | ReturnType<typeof buildReactionRenderRequestPayload>
 ): Promise<RenderRequestResult> => {
   const controller = new AbortController();
   const timeoutId = globalThis.setTimeout(() => controller.abort(), RENDER_REQUEST_TIMEOUT_MS);
+  const fallbackMessage = payload.type === "molecule" ? "Molecule render failed" : "Reaction render failed";
 
   try {
     const response = await fetch("/api/chem/render", {
@@ -89,7 +101,7 @@ const requestRenderPayload = async (
         errorMessage:
           typeof nextPayload?.message === "string" && nextPayload.message.trim().length > 0
             ? nextPayload.message.trim()
-            : `Render request failed (${response.status})`
+            : `${fallbackMessage} (${response.status})`
       };
     }
 
@@ -99,7 +111,7 @@ const requestRenderPayload = async (
   } catch {
     return {
       payload: null,
-      errorMessage: "Reaction render failed"
+      errorMessage: fallbackMessage
     };
   } finally {
     globalThis.clearTimeout(timeoutId);
@@ -124,11 +136,12 @@ const hydrateMoleculeRenderResult = async (
 
   try {
     const hydratedEntry = await loadHydratedMoleculeEntry(entry, options);
-    const { payload } = await requestRenderPayload(
+    const { payload, errorMessage } = await requestRenderPayload(
       buildMoleculeRenderRequestPayload(hydratedEntry, options.renderOptions)
     );
+    const fallbackSvg = errorMessage ? buildMoleculeRenderErrorMarkup(errorMessage) : "";
     return {
-      svg: typeof payload?.svg === "string" ? payload.svg : "",
+      svg: selectRenderGraphicMarkup(payload, fallbackSvg),
       smiles:
         typeof payload?.canonicalSmiles === "string" && payload.canonicalSmiles.trim().length > 0
           ? payload.canonicalSmiles
@@ -153,7 +166,7 @@ const hydrateReactionRenderResult = async (
     );
     const fallbackSvg = errorMessage ? buildReactionRenderErrorMarkup(errorMessage) : "";
     return {
-      svg: typeof payload?.svg === "string" && payload.svg.trim().length > 0 ? payload.svg : fallbackSvg,
+      svg: selectRenderGraphicMarkup(payload, fallbackSvg),
       reactants: readReactionPayloadList(payload?.reaction?.reactants, hydratedEntry.reactants),
       products: readReactionPayloadList(payload?.reaction?.products, hydratedEntry.products),
       conditions: readReactionPayloadList(payload?.reaction?.conditions, hydratedEntry.conditions)

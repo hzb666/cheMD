@@ -112,6 +112,7 @@ const Page = () => {
     source,
     result,
     json,
+    compilerOutputCode,
     documentId,
     sessionId,
     lineCount,
@@ -233,6 +234,7 @@ const Page = () => {
             html={result.html}
             json={json}
             docxBridge={result.docxBridge}
+            compilerOutputCode={compilerOutputCode}
             source={source}
             documentId={documentId}
             sessionId={sessionId}

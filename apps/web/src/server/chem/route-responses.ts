@@ -79,14 +79,16 @@ export const busyResponse = (
 
 export const buildMoleculeLoadingResult = (message: string): JsonRouteResult<{
   type: "molecule";
+  message: string;
   svg: string;
   warnings: string[];
 }> =>
   jsonResult({
     type: "molecule",
+    message: `Molecule render failed: ${message}`,
     svg: buildChemRenderLoadingSvg("molecule"),
     warnings: [`chem-service unavailable, loading placeholder used: ${message}`]
-  });
+  }, 502);
 
 export const buildOcrFailedResult = (
   target: ResolvedWritebackTarget,

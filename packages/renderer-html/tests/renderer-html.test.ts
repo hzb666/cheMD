@@ -15,7 +15,7 @@ describe("renderHtml", () => {
     expect(renderHtml(document, resolveRenderProfile())).toContain("HTML test");
   });
 
-  it("renders surface origin metadata and explicit procedure steps", () => {
+  it("keeps machine metadata out of visible fields and renders readable procedure steps", () => {
     const document = createDocument(
       { id: "exp-html-origin", title: "HTML origin test", date: "2026-04-17" },
       {
@@ -31,22 +31,62 @@ describe("renderHtml", () => {
           {
             type: "procedure",
             id: "proc-main",
+            ref: "rxn-main",
             steps: [{
               type: "step",
-              family: "add",
-              params: { materials: "A" },
+              stepId: "heat-main",
+              family: "heat",
+              params: { temperature: "80 C", duration: "4 h" },
+              inputs: ["A"],
               outputs: ["intermediate"]
+            }, {
+              type: "step",
+              stepId: "analyze-main",
+              family: "analyze",
+              params: { analysisType: "tlc" },
+              dependsOn: ["heat-main"]
+            }, {
+              type: "step",
+              stepId: "review-main",
+              family: "hold",
+              params: {},
+              dependsOn: ["missing-step"]
             }]
+          },
+          {
+            type: "analysis",
+            id: "tlc-main",
+            type_name: "tlc",
+            ref: "rxn-main"
           }
         ]
       }
     );
     const html = renderHtml(document, resolveRenderProfile());
 
-    expect(html).toContain('data-source-origin="chemd"');
-    expect(html).toContain("Surface origin");
+    expect(html).not.toContain("data-source-origin");
+    expect(html).not.toContain("data-declared-kind");
+    expect(html).not.toContain("data-ref");
+    expect(html).not.toContain("Surface origin");
+    expect(html).not.toContain("Declared kind");
+    expect(html).not.toContain("<dt>Ref</dt>");
+    expect(html).toContain("<dt>Related</dt><dd>rxn-main</dd>");
+    expect(html).toContain('<span class="chemd-block-id">rxn-main</span>');
+    expect(html).toContain('<span class="chemd-block-id">proc-main</span>');
+    expect(html).toContain('<span class="chemd-block-id">tlc-main</span>');
     expect(html).toContain("chemd-procedure-steps");
-    expect(html).toContain("outputs=intermediate");
+    expect(html).toContain("Step 1: Heat");
+    expect(html).toContain("<dt>Temperature</dt><dd>80 C</dd>");
+    expect(html).toContain("<dt>Duration</dt><dd>4 h</dd>");
+    expect(html).toContain("<dt>Uses</dt><dd>A</dd>");
+    expect(html).toContain("<dt>Produces</dt><dd>intermediate</dd>");
+    expect(html).toContain("Step 2: Analyze");
+    expect(html).toContain("<dt>Analysis type</dt><dd>TLC</dd>");
+    expect(html).toContain("<dt>After</dt><dd>Step 1</dd>");
+    expect(html).toContain("Step 3: Hold");
+    expect(html).toContain("<dt>After</dt><dd>missing-step</dd>");
+    expect(html).not.toContain("temperature=80 C");
+    expect(html).not.toContain("depends_on=heat-main");
   });
 
   it("renders col layout without dropping nested blocks", () => {

@@ -60,11 +60,11 @@ describe("chemd-lang v0.3 compiler integration", () => {
       "analyze"
     ]);
     expect(result.runtimePreflight.blocking).toBe(false);
-    expect(result.lnf.experiment.procedure.map((step) => step.family)).toContain("cool");
-    expect(result.lnfV04.schemaVersion).toBe("chemd-lnf/v0.4");
-    expect(result.lnfV04.experiment.stepSources.lowered.length).toBeGreaterThan(0);
-    expect(result.trainingExport.semantic_layer.v03_lnf?.experiment.procedure.length).toBeGreaterThan(0);
-    expect(result.trainingExport.semantic_layer.v04_lnf?.schemaVersion).toBe("chemd-lnf/v0.4");
+    expect(result.lnf.schemaVersion).toBe("chemd-lnf/v0.5");
+    expect(result.lnf.experiment.workflow.steps.map((step) => step.family)).toContain("cool");
+    expect(result.lnf.experiment.workflow.stepSources.loweredStepIds.length).toBeGreaterThan(0);
+    expect(result.trainingExport.schema_version).toBe("chemd-training-export/v0.2");
+    expect(result.trainingExport.semantic_layer.lnf?.schemaVersion).toBe("chemd-lnf/v0.5");
     expect(result.trainingExport.learning_layer.retrieval_chunks.length).toBeGreaterThan(0);
     expect(JSON.parse(result.docxBridge)).toMatchObject({
       semantic: {
