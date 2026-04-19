@@ -120,13 +120,13 @@ const PlaygroundHeader = ({
         </div>
 
         <div className="flex items-center gap-3 md:gap-5">
-          <div className="hidden md:flex items-center gap-4 text-[0.8rem] text-muted-foreground mr-2">
+          <div className="hidden md:flex items-center gap-4 text-[0.8rem] text-muted-foreground">
             <div className="flex max-w-[360px] min-w-0 flex-col items-end text-right">
               <div className="notion-font-label text-[14px] text-foreground w-full truncate">{title}</div>
               <div className="notion-font-caption text-[14px] text-muted-foreground w-full truncate">{subtitle}</div>
             </div>
             <div
-              className={`group flex shrink-0 items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-full px-2 py-0.5 notion-font-badge focus:outline-none ${labStorageStatusToneClass}`}
+              className={`group ml-3 flex shrink-0 items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-full px-2 py-0.5 notion-font-badge focus:outline-none ${labStorageStatusToneClass}`}
               aria-label={`LSM: ${labStorageStatusLabel}`}
               tabIndex={0}
               title={`LSM: ${labStorageStatusLabel}`}
@@ -138,12 +138,12 @@ const PlaygroundHeader = ({
               </span>
             </div>
             <div
-              className="group flex shrink-0 items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-full bg-accent px-2 py-0.5 text-accent-foreground notion-font-badge focus:outline-none"
+              className="group flex shrink-0 items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-full bg-accent px-2 py-0.5 text-accent-foreground notion-font-badge focus:outline-none dark:bg-sky-950/35 dark:text-sky-300"
               aria-label={`YAML: ${profileId}`}
               tabIndex={0}
               title={`YAML: ${profileId}`}
             >
-              <span className="flex h-1.5 w-1.5 shrink-0 rounded-full bg-accent-foreground/50"></span>
+              <span className="flex h-1.5 w-1.5 shrink-0 rounded-full bg-accent-foreground/50 dark:bg-sky-400/60"></span>
               <span className="shrink-0">YAML</span>
               <span className="inline-block max-w-0 overflow-hidden opacity-0 transition-[max-width,opacity] duration-250 ease-in group-hover:max-w-[12rem] group-hover:opacity-100 group-focus:max-w-[12rem] group-focus:opacity-100">
                 : {profileId}
