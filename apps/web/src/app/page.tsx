@@ -16,7 +16,7 @@ import { usePlaygroundDocumentController } from "../features/playground/hooks/us
 import { useDocxExport } from "../features/export-docx/hooks/useDocxExport";
 import { Button } from "../components/ui/button";
 import PreviewShell from "../features/preview/components/PreviewShell";
-import { Activity, FlaskConical } from "lucide-react";
+import { Activity, FlaskConical, LoaderCircle } from "lucide-react";
 import {
   applyDiagnosticQuickFix,
   type DiagnosticQuickFix,
@@ -30,6 +30,7 @@ interface PlaygroundHeaderProps {
   profileId: string;
   diagnosticCount: number;
   compileState: string;
+  compileStateTone: "pending" | "success" | "warning";
 }
 
 interface EditorToolbarProps {
@@ -46,39 +47,58 @@ const PlaygroundHeader = ({
   subtitle,
   profileId,
   diagnosticCount,
-  compileState
-}: PlaygroundHeaderProps) => (
-  <header className="sticky top-0 z-30 shrink-0 w-full border-b border-border bg-background">
-    <div className="flex h-14 items-center justify-between px-3 md:px-5">
-      <div className="flex items-center gap-2.5">
-        <img src={logoSrc} alt="chemd logo" className="h-5 w-auto pr-1 object-contain dark:invert" />
-        <h1 className="notion-font-label text-[14px] text-foreground tracking-tight flex items-center gap-1">
-          <FlaskConical className="w-3.5 h-3.5 text-primary" />
-          Chemd Playground
-        </h1>
-      </div>
+  compileState,
+  compileStateTone
+}: PlaygroundHeaderProps) => {
+  const compileBadgeToneClass = compileStateTone === "pending"
+    ? "bg-sky-50 text-sky-700 dark:bg-sky-950/45 dark:text-sky-300"
+    : compileStateTone === "success"
+      ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400"
+      : "bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400";
+  const compileBadgeLabel = compileStateTone === "success" && diagnosticCount === 0
+    ? "Clean compile"
+    : compileState;
 
-      <div className="flex items-center gap-3 md:gap-5">
-        <div className="hidden md:flex items-center gap-4 text-[0.8rem] text-muted-foreground mr-2">
-          <div className="flex max-w-[360px] min-w-0 flex-col items-end text-right">
-            <div className="notion-font-label text-[14px] text-foreground w-full truncate">{title}</div>
-            <div className="notion-font-caption text-[14px] text-muted-foreground w-full truncate">{subtitle}</div>
-          </div>
-          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-accent text-accent-foreground rounded-full notion-font-badge">
-            <span className="flex h-1.5 w-1.5 rounded-full bg-accent-foreground/50"></span>
-            YAML: {profileId}
-          </div>
-          <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full notion-font-badge ${diagnosticCount === 0 ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400" : "bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400"}`}>
-            <Activity className="w-3 h-3" />
-            <span>{diagnosticCount === 0 ? "Clean compile" : compileState}</span>
-          </div>
+  return (
+    <header className="sticky top-0 z-30 shrink-0 w-full border-b border-border bg-background">
+      <div className="flex h-14 items-center justify-between px-3 md:px-5">
+        <div className="flex items-center gap-2.5">
+          <img src={logoSrc} alt="chemd logo" className="h-5 w-auto pr-1 object-contain dark:invert" />
+          <h1 className="notion-font-label text-[14px] text-foreground tracking-tight flex items-center gap-1">
+            <FlaskConical className="w-3.5 h-3.5 text-primary" />
+            Chemd Playground
+          </h1>
         </div>
-        <Separator orientation="vertical" className="h-4 hidden md:block" />
-        <ThemeToggle />
+
+        <div className="flex items-center gap-3 md:gap-5">
+          <div className="hidden md:flex items-center gap-4 text-[0.8rem] text-muted-foreground mr-2">
+            <div className="flex max-w-[360px] min-w-0 flex-col items-end text-right">
+              <div className="notion-font-label text-[14px] text-foreground w-full truncate">{title}</div>
+              <div className="notion-font-caption text-[14px] text-muted-foreground w-full truncate">{subtitle}</div>
+            </div>
+            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-accent text-accent-foreground rounded-full notion-font-badge">
+              <span className="flex h-1.5 w-1.5 rounded-full bg-accent-foreground/50"></span>
+              YAML: {profileId}
+            </div>
+            <div
+              className={`flex w-[7.5rem] items-center gap-1.5 rounded-full px-2 py-0.5 notion-font-badge ${compileBadgeToneClass}`}
+              aria-live="polite"
+            >
+              {compileStateTone === "pending" ? (
+                <LoaderCircle className="w-3 h-3 shrink-0 animate-spin" />
+              ) : (
+                <Activity className="w-3 h-3 shrink-0" />
+              )}
+              <span className="min-w-0 truncate">{compileBadgeLabel}</span>
+            </div>
+          </div>
+          <Separator orientation="vertical" className="h-4 hidden md:block" />
+          <ThemeToggle />
+        </div>
       </div>
-    </div>
-  </header>
-);
+    </header>
+  );
+};
 
 const EditorToolbar = ({
   exportingDocx,
@@ -118,6 +138,7 @@ const Page = () => {
     lineCount,
     previewIsFresh,
     compileState,
+    compileStateTone,
     editorStatus,
     setEditorStatus,
     applySourceChange,
@@ -208,6 +229,7 @@ const Page = () => {
           profileId={result.renderOptions.profileId}
           diagnosticCount={diagnosticCount}
           compileState={compileState}
+          compileStateTone={compileStateTone}
         />
 
         <section

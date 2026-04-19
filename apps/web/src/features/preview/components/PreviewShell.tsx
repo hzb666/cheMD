@@ -288,12 +288,6 @@ const PreviewShell = ({
         <PreviewTabsHeader activeTab={activeTab} activeCode={activeCode} />
 
         <div className="flex-1 min-h-0 p-0 flex flex-col relative bg-background">
-          {!previewIsFresh ? (
-            <div className="px-4 py-2 border-b border-border bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400 notion-font-caption">
-              Preview updating; export and structure edit are disabled.
-            </div>
-          ) : null}
-
           <PreviewTabPanels
             hydratedHtml={hydratedHtml}
             previewFrameRef={previewFrameRef}

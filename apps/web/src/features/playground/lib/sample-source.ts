@@ -6,8 +6,6 @@ render_profile: publication-acs
 primary_result: res-main
 ---
 
-# Ethanol oxidation to acetic acid
-
 :::chemd #chem-rxn-main
 kind: reaction
 reac: CCO | O=O

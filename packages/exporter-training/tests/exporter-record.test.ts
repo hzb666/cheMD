@@ -216,4 +216,115 @@ purity: 95%
     });
     expect(record.quality_layer.training_quality.prediction_eligible).toBe(true);
   });
+
+  it("exports semantic fact links and retrieval chunks for analyses and samples", () => {
+    const document = resolveChemd(parseChemd(`---
+id: exp-export-links
+title: Export linked facts
+date: 2026-04-20
+primary_result: res-main
+---
+
+:::chemd #mol-start
+kind: molecule
+smiles: CCO
+name: ethanol
+:::
+
+:::chemd #mol-product
+kind: molecule
+smiles: CC(=O)O
+name: acetic acid
+:::
+
+:::chemd #rxn-main
+kind: reaction
+reactants: @mol-start
+products: @mol-product
+solvent: THF
+:::
+
+:::result #res-main
+ref: rxn-main
+status: success
+yield: 80%
+notes: isolated product after workup
+:::
+
+:::sample #sample-main
+ref: mol-product
+name: final product
+batch: B-001
+purity: 95%
+notes: stored under nitrogen
+:::
+
+:::sample #sample-crude
+ref: rxn-main
+name: crude aliquot
+notes: sampled before purification
+:::
+
+:::analysis #ana-sample
+type: nmr
+ref: sample-main
+instrument: Bruker 400
+data: data/nmr/sample-main.pdf
+notes: clean spectrum
+:::
+
+:::analysis #ana-rxn
+type: tlc
+ref: rxn-main
+data: one major product spot
+:::
+
+Linked notes mention @rxn-main and @res-main.yield.
+`));
+    const checked = typecheckDocument(document);
+    const record = exportTrainingRecordFromDocument(document, {
+      typedGraph: checked.typedGraph,
+      stepGraph: checked.stepGraph,
+      exportedAt: "2026-04-20T00:00:00.000Z"
+    });
+    const relationTypes = record.semantic_layer.links.map((link) => link.relation_type);
+    const chunkTypes = record.learning_layer.retrieval_chunks.map((chunk) => chunk.chunk_type);
+
+    expect(relationTypes).toEqual(expect.arrayContaining([
+      "document_primary",
+      "reaction_uses_molecule",
+      "reaction_produces_molecule",
+      "result_describes_reaction",
+      "sample_related_to_molecule",
+      "sample_derived_from_reaction",
+      "analysis_targets_sample",
+      "analysis_targets_reaction",
+      "markdown_mentions_entity"
+    ]));
+    expect(record.semantic_layer.links).toContainEqual(expect.objectContaining({
+      relation_type: "analysis_targets_sample",
+      from_entity_id: "ana::exp-export-links::ana-sample",
+      to_entity_id: "sam::exp-export-links::sample-main"
+    }));
+    expect(record.semantic_layer.links).toContainEqual(expect.objectContaining({
+      relation_type: "result_describes_reaction",
+      from_entity_id: "res::exp-export-links::res-main",
+      to_entity_id: "rxn::exp-export-links::rxn-main"
+    }));
+    expect(chunkTypes).toEqual(expect.arrayContaining([
+      "document_summary",
+      "analysis_notes",
+      "sample_notes"
+    ]));
+    expect(record.learning_layer.retrieval_chunks).toContainEqual(expect.objectContaining({
+      chunk_type: "analysis_notes",
+      source_entity_ids: ["ana::exp-export-links::ana-sample"],
+      text: expect.stringContaining("data/nmr/sample-main.pdf")
+    }));
+    expect(record.learning_layer.retrieval_chunks).toContainEqual(expect.objectContaining({
+      chunk_type: "sample_notes",
+      source_entity_ids: ["sam::exp-export-links::sample-crude"],
+      text: expect.stringContaining("sampled before purification")
+    }));
+  });
 });

@@ -40,7 +40,9 @@ export const EditorShell = ({
             className="playground-topbar-button notion-font-ui h-8 w-8 p-0"
           />
         </div>
-        <span className="notion-font-caption text-muted-foreground opacity-70">{lineCount} lines</span>
+        <span className="notion-font-caption text-muted-foreground opacity-70">
+          <span className="editor-gutter-font">{lineCount}</span> lines
+        </span>
       </div>
     </div>
 

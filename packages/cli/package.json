@@ -1,0 +1,22 @@
+{
+  "name": "@chemd/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "chemd": "./bin/chemd.mjs"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@chemd/compiler": "workspace:*",
+    "@chemd/core": "workspace:*",
+    "typescript": "^5.9.2"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --pool=threads",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

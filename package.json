@@ -8,6 +8,7 @@
     "dev": "node scripts/dev-demo.mjs",
     "dev:demo": "node scripts/dev-demo.mjs",
     "dev:web": "turbo run dev --filter=@chemd/web",
+    "chemd": "node packages/cli/bin/chemd.mjs",
     "lint": "eslint apps packages scripts eslint.config.mjs vitest.workspace.ts --ext .ts,.tsx,.js,.mjs,.cjs",
     "lint:fix": "eslint apps packages scripts eslint.config.mjs vitest.workspace.ts --ext .ts,.tsx,.js,.mjs,.cjs --fix",
     "lint:py": "ruff check services/chem-service",

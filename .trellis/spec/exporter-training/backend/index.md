@@ -13,6 +13,7 @@ Status: Filled from the current codebase.
 | [Directory Structure](./directory-structure.md) | Filled | Package layout, public entry points, and ownership |
 | [Database Guidelines](./database-guidelines.md) | Filled | Persistence and external IO boundaries |
 | [Error Handling](./error-handling.md) | Filled | Diagnostics, thrown errors, and fallback behavior |
+| [Training Export Contract](./training-export-contract.md) | Filled | Semantic links, retrieval chunks, and schema extension rules |
 | [Quality Guidelines](./quality-guidelines.md) | Filled | TypeScript, testing, lint, and package contracts |
 | [Logging Guidelines](./logging-guidelines.md) | Filled | Logging policy for library code |
 
@@ -21,6 +22,7 @@ Status: Filled from the current codebase.
 - Read `AGENTS.md` and this package's relevant guideline file before editing.
 - Inspect the public API at `packages/exporter-training/src/index.ts` before adding exports.
 - Search for existing AST fields, diagnostic codes, render paths, or schema names before adding new ones.
+- Read `training-export-contract.md` before changing `semantic_layer.links` or `learning_layer.retrieval_chunks`.
 - Add or update tests under `packages/exporter-training/tests` for behavior changes.
 - Run `pnpm --filter @chemd/exporter-training test` and `pnpm --filter @chemd/exporter-training typecheck` for package changes.
 

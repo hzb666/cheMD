@@ -61,6 +61,9 @@ const compactText = (...parts: Array<string | undefined>): string =>
     .filter(Boolean)
     .join(" ");
 
+const uniqueStrings = (values: Array<string | undefined>): string[] =>
+  Array.from(new Set(values.filter((value): value is string => Boolean(value))));
+
 const createRetrievalMetadata = (
   document: ExportedDocumentInfo,
   semanticLayer: SemanticLayerV1
@@ -71,8 +74,31 @@ const createRetrievalMetadata = (
   reaction_ids: semanticLayer.reactions.map((reaction) => reaction.entity_id),
   result_ids: semanticLayer.results.map((result) => result.entity_id),
   analysis_ids: semanticLayer.analyses.map((analysis) => analysis.entity_id),
-  sample_ids: semanticLayer.samples.map((sample) => sample.entity_id)
+  sample_ids: semanticLayer.samples.map((sample) => sample.entity_id),
+  analysis_types: uniqueStrings(semanticLayer.analyses.map((analysis) => analysis.analysis_type))
 });
+
+const buildDocumentSummaryText = (
+  document: ExportedDocumentInfo,
+  semanticLayer: SemanticLayerV1
+): string => compactText(
+  `Document ${document.title}`,
+  `date ${document.date}`,
+  document.tags?.length ? `tags ${document.tags.join(", ")}` : undefined,
+  semanticLayer.molecules.length ? `${semanticLayer.molecules.length} molecules` : undefined,
+  semanticLayer.reactions.length ? `${semanticLayer.reactions.length} reactions` : undefined,
+  semanticLayer.results.length ? `${semanticLayer.results.length} results` : undefined,
+  semanticLayer.analyses.length ? `${semanticLayer.analyses.length} analyses` : undefined,
+  semanticLayer.samples.length ? `${semanticLayer.samples.length} samples` : undefined
+);
+
+const getDocumentSummaryEntityIds = (semanticLayer: SemanticLayerV1): string[] => [
+  ...semanticLayer.molecules.map((molecule) => molecule.entity_id),
+  ...semanticLayer.reactions.map((reaction) => reaction.entity_id),
+  ...semanticLayer.results.map((result) => result.entity_id),
+  ...semanticLayer.analyses.map((analysis) => analysis.entity_id),
+  ...semanticLayer.samples.map((sample) => sample.entity_id)
+];
 
 const buildRetrievalChunks = (
   document: ExportedDocumentInfo,
@@ -80,6 +106,18 @@ const buildRetrievalChunks = (
 ): RetrievalChunkV1[] => {
   const metadata = createRetrievalMetadata(document, semanticLayer);
   const chunks: RetrievalChunkV1[] = [];
+  const documentSummary = buildDocumentSummaryText(document, semanticLayer);
+
+  if (documentSummary) {
+    chunks.push({
+      chunk_id: `retrieval::${document.document_id}::document-summary`,
+      experiment_id: document.document_id,
+      chunk_type: "document_summary",
+      source_entity_ids: getDocumentSummaryEntityIds(semanticLayer),
+      text: documentSummary,
+      metadata
+    });
+  }
 
   semanticLayer.markdown_blocks.forEach((block) => {
     if (!block.text_for_embedding) {
@@ -132,6 +170,60 @@ const buildRetrievalChunks = (
         conversion_percent: result.conversion_percent,
         selectivity_percent: result.selectivity_percent,
         purity_percent: result.purity_percent
+      }
+    });
+  });
+
+  semanticLayer.analyses.forEach((analysis) => {
+    const text = compactText(
+      analysis.analysis_type,
+      analysis.ref_raw ? `ref ${analysis.ref_raw}` : undefined,
+      analysis.instrument,
+      analysis.method,
+      analysis.data_raw,
+      analysis.result_raw,
+      analysis.notes
+    );
+    if (!text) {
+      return;
+    }
+
+    chunks.push({
+      chunk_id: `retrieval::${document.document_id}::${analysis.entity_id}`,
+      experiment_id: document.document_id,
+      chunk_type: "analysis_notes",
+      source_entity_ids: [analysis.entity_id],
+      text,
+      metadata: {
+        ...metadata,
+        analysis_types: analysis.analysis_type ? [analysis.analysis_type] : metadata.analysis_types
+      }
+    });
+  });
+
+  semanticLayer.samples.forEach((sample) => {
+    const text = compactText(
+      sample.name,
+      sample.sample_code,
+      sample.batch,
+      sample.ref_raw ? `ref ${sample.ref_raw}` : undefined,
+      sample.supplier,
+      sample.purity_raw,
+      sample.notes
+    );
+    if (!text) {
+      return;
+    }
+
+    chunks.push({
+      chunk_id: `retrieval::${document.document_id}::${sample.entity_id}`,
+      experiment_id: document.document_id,
+      chunk_type: "sample_notes",
+      source_entity_ids: [sample.entity_id],
+      text,
+      metadata: {
+        ...metadata,
+        purity_percent: sample.purity_percent
       }
     });
   });

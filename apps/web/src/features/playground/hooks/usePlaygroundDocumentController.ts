@@ -146,9 +146,9 @@ export const usePlaygroundDocumentController = (): PlaygroundDocumentController 
   const diagnosticCount = result.diagnostics.length;
   const previewIsFresh = lastCompiledSource === source;
   const compileState = !previewIsFresh
-    ? "Compiling..."
+    ? "Compiling"
     : diagnosticCount === 0
-      ? "Preview synced"
+      ? "Clean compile"
       : `${diagnosticCount} diagnostics`;
   const compileStateTone = !previewIsFresh ? "pending" : diagnosticCount === 0 ? "success" : "warning";
 

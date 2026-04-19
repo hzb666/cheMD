@@ -51,6 +51,14 @@ const buildEntityId = (
 ): string => `${prefix}::${documentId}::${originalId ?? nodeIndex}`;
 
 type PrimaryNodeType = "molecule" | "reaction" | "result" | "analysis" | "sample";
+type ExportedObjectEntity =
+  | ExportedMoleculeV1
+  | ExportedReactionV1
+  | ExportedResultV1
+  | ExportedAnalysisV1
+  | ExportedSampleV1;
+
+type RelationType = ExportedRelationV1["relation_type"];
 
 const PRIMARY_FIELD_BY_TYPE: Record<PrimaryNodeType, string> = {
   molecule: "primary_molecule",
@@ -283,6 +291,9 @@ const buildResult = (
   source_node_type: "result",
   ...createEntityBase("result", node),
   ...(isPrimary ? { is_primary: true } : {}),
+  ref_raw: node.ref,
+  reaction_ref_raw: node.reaction,
+  product_ref_raw: node.product,
   status_raw: node.status,
   yield_raw: node.yield,
   conversion_raw: node.conversion,
@@ -356,6 +367,7 @@ const buildSample = (
   purity_raw: node.purity,
   supplier: node.supplier,
   notes: node.notes,
+  ref_raw: node.ref,
   purity_percent: toNumericValue(typedSample?.purity),
   text_for_embedding: compactText(node.name, node.batch, node.supplier, node.notes)
 });
@@ -395,6 +407,161 @@ const buildPrimaryLinks = (
       role: entity.source_node_type,
       confidence: 1
     }));
+
+const createRelation = (
+  documentId: string,
+  relationType: RelationType,
+  fromEntityId: string,
+  toEntityId: string,
+  role?: string
+): ExportedRelationV1 => ({
+  relation_id: `rel::${documentId}::${relationType}::${fromEntityId}::${role ?? "ref"}::${toEntityId}`,
+  relation_type: relationType,
+  from_entity_id: fromEntityId,
+  to_entity_id: toEntityId,
+  ...(role ? { role } : {}),
+  confidence: 1
+});
+
+const normalizeReferenceId = (value: string): string => {
+  const withoutPrefix = value.trim().startsWith("@") ? value.trim().slice(1) : value.trim();
+  return withoutPrefix.split(".")[0]?.trim() ?? "";
+};
+
+const buildEntityIndex = (entities: ExportedObjectEntity[]): Map<string, ExportedObjectEntity> =>
+  new Map(
+    entities
+      .filter((entity) => entity.original_id)
+      .map((entity) => [entity.original_id as string, entity])
+  );
+
+const getReferencedEntity = (
+  reference: string | undefined,
+  entityByOriginalId: Map<string, ExportedObjectEntity>
+): ExportedObjectEntity | undefined => reference ? entityByOriginalId.get(normalizeReferenceId(reference)) : undefined;
+
+const uniqueRelations = (relations: ExportedRelationV1[]): ExportedRelationV1[] =>
+  Array.from(new Map(relations.map((relation) => [relation.relation_id, relation])).values());
+
+const buildReactionParticipantLinks = (
+  documentId: string,
+  reactions: ExportedReactionV1[]
+): ExportedRelationV1[] =>
+  reactions.flatMap((reaction) => [
+    ...reaction.reactants.flatMap((participant) =>
+      participant.target_entity_id
+        ? [createRelation(documentId, "reaction_uses_molecule", reaction.entity_id, participant.target_entity_id, "reactant")]
+        : []
+    ),
+    ...reaction.products.flatMap((participant) =>
+      participant.target_entity_id
+        ? [createRelation(documentId, "reaction_produces_molecule", reaction.entity_id, participant.target_entity_id, "product")]
+        : []
+    )
+  ]);
+
+const buildResultLinks = (
+  documentId: string,
+  results: ExportedResultV1[],
+  entityByOriginalId: Map<string, ExportedObjectEntity>
+): ExportedRelationV1[] =>
+  results.flatMap((result) => {
+    const target = getReferencedEntity(result.reaction_ref_raw ?? result.ref_raw, entityByOriginalId);
+    return target?.source_node_type === "reaction"
+      ? [createRelation(documentId, "result_describes_reaction", result.entity_id, target.entity_id, "reaction")]
+      : [];
+  });
+
+const getAnalysisRelationType = (target: ExportedObjectEntity | undefined): RelationType | undefined => {
+  if (target?.source_node_type === "reaction") {
+    return "analysis_targets_reaction";
+  }
+  if (target?.source_node_type === "result") {
+    return "analysis_targets_result";
+  }
+  if (target?.source_node_type === "sample") {
+    return "analysis_targets_sample";
+  }
+  return undefined;
+};
+
+const buildAnalysisLinks = (
+  documentId: string,
+  analyses: ExportedAnalysisV1[],
+  entityByOriginalId: Map<string, ExportedObjectEntity>
+): ExportedRelationV1[] =>
+  analyses.flatMap((analysis) => {
+    const target = getReferencedEntity(analysis.ref_raw, entityByOriginalId);
+    const relationType = getAnalysisRelationType(target);
+    return target && relationType
+      ? [createRelation(documentId, relationType, analysis.entity_id, target.entity_id, "ref")]
+      : [];
+  });
+
+const getSampleRelationType = (target: ExportedObjectEntity | undefined): RelationType | undefined => {
+  if (target?.source_node_type === "reaction") {
+    return "sample_derived_from_reaction";
+  }
+  if (target?.source_node_type === "result") {
+    return "sample_related_to_result";
+  }
+  if (target?.source_node_type === "molecule") {
+    return "sample_related_to_molecule";
+  }
+  return undefined;
+};
+
+const buildSampleLinks = (
+  documentId: string,
+  samples: ExportedSampleV1[],
+  entityByOriginalId: Map<string, ExportedObjectEntity>
+): ExportedRelationV1[] =>
+  samples.flatMap((sample) => {
+    const target = getReferencedEntity(sample.ref_raw, entityByOriginalId);
+    const relationType = getSampleRelationType(target);
+    return target && relationType
+      ? [createRelation(documentId, relationType, sample.entity_id, target.entity_id, "ref")]
+      : [];
+  });
+
+const buildMarkdownMentionLinks = (
+  documentId: string,
+  markdownBlocks: ExportedMarkdownBlockV1[],
+  entityByOriginalId: Map<string, ExportedObjectEntity>
+): ExportedRelationV1[] =>
+  markdownBlocks.flatMap((block) =>
+    block.references.flatMap((reference) => {
+      const target = reference.resolution_status === "resolved"
+        ? entityByOriginalId.get(reference.source)
+        : undefined;
+      return target
+        ? [createRelation(documentId, "markdown_mentions_entity", block.entity_id, target.entity_id, reference.field ?? reference.kind)]
+        : [];
+    })
+  );
+
+const buildSemanticLinks = (
+  documentId: string,
+  parts: SemanticLayerParts
+): ExportedRelationV1[] => {
+  const entities = [
+    ...parts.molecules,
+    ...parts.reactions,
+    ...parts.results,
+    ...parts.analyses,
+    ...parts.samples
+  ];
+  const entityByOriginalId = buildEntityIndex(entities);
+
+  return uniqueRelations([
+    ...buildPrimaryLinks(documentId, entities),
+    ...buildReactionParticipantLinks(documentId, parts.reactions),
+    ...buildResultLinks(documentId, parts.results, entityByOriginalId),
+    ...buildAnalysisLinks(documentId, parts.analyses, entityByOriginalId),
+    ...buildSampleLinks(documentId, parts.samples, entityByOriginalId),
+    ...buildMarkdownMentionLinks(documentId, parts.markdownBlocks, entityByOriginalId)
+  ]);
+};
 
 interface SemanticLayerParts {
   molecules: ExportedMoleculeV1[];
@@ -551,7 +718,7 @@ export const buildSemanticLayer = (
   collectRelatedEntities(document, traversedNodes, createMoleculeIndex(parts.molecules), parts, typedNodes);
 
   const { molecules, reactions, results, analyses, samples, markdownBlocks } = parts;
-  const links = buildPrimaryLinks(documentId, [...molecules, ...reactions, ...results, ...analyses, ...samples]);
+  const links = buildSemanticLinks(documentId, parts);
 
   return {
     molecules,

@@ -188,6 +188,9 @@ export interface ExportedReactionV1 extends ExportedEntityBase {
 
 export interface ExportedResultV1 extends ExportedEntityBase {
   source_node_type: "result";
+  ref_raw?: string;
+  reaction_ref_raw?: string;
+  product_ref_raw?: string;
   status_raw?: string;
   status_label?: "success" | "partial" | "failed" | "unknown";
   yield_raw?: string;
@@ -241,6 +244,7 @@ export interface ExportedSampleV1 extends ExportedEntityBase {
   purity_raw?: string;
   supplier?: string;
   notes?: string;
+  ref_raw?: string;
   purity_percent?: number | null;
   text_for_embedding?: string;
 }
@@ -289,9 +293,12 @@ export interface ExportedRelationV1 {
     | "reaction_uses_molecule"
     | "reaction_produces_molecule"
     | "result_describes_reaction"
+    | "analysis_targets_reaction"
     | "analysis_targets_sample"
     | "analysis_targets_result"
+    | "sample_derived_from_reaction"
     | "sample_related_to_molecule"
+    | "sample_related_to_result"
     | "markdown_mentions_entity";
   from_entity_id: string;
   to_entity_id: string;

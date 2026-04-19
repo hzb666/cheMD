@@ -117,6 +117,18 @@ importers:
         specifier: ^1.0.7
         version: 1.0.7(tailwindcss@4.2.2)
 
+  packages/cli:
+    dependencies:
+      '@chemd/compiler':
+        specifier: workspace:*
+        version: link:../compiler
+      '@chemd/core':
+        specifier: workspace:*
+        version: link:../core
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+
   packages/compiler:
     dependencies:
       '@chemd/core':
