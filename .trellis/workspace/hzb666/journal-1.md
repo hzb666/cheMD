@@ -359,3 +359,45 @@ Implemented local Chemd CLI, improved training export semantic context, fixed wo
 ### Next Steps
 
 - None - task complete
+
+
+## Session 7: Playground LSM status header
+
+**Date**: 2026-04-20
+**Task**: Playground LSM status header
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+Added a playground LSM status indicator and refined the compact header label styling.
+
+### Main Changes
+
+| Area | Details |
+|------|---------|
+| LSM status | Added a lightweight LabStorageManager status endpoint and surfaced ready/disconnect state in the playground header. |
+| Header UI | Added compact hover/focus expanding LSM and YAML pills with no wrapping. |
+| Dark mode | Lowered YAML pill brightness in dark mode. |
+| Layout | Adjusted header tag spacing and removed the tag container right margin. |
+| Verification | Ran targeted web eslint, typecheck, route/client tests, and status endpoint smoke check during the session. |
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ac52175` | (see git log) |
+| `ff2906a` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
