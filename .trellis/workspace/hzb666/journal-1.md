@@ -260,3 +260,59 @@ Completed the staged chemd DSL language package work and split the implementatio
 ### Next Steps
 
 - None - task complete
+
+
+## Session 5: 对齐 canonical LNF 与训练导出契约
+
+**Date**: 2026-04-19
+**Task**: 对齐 canonical LNF 与训练导出契约
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+(Add summary)
+
+### Main Changes
+
+| Area | Summary |
+|------|---------|
+| LNF | Split canonical LNF types/builders and removed old V03/V04 compatibility outputs. |
+| Training export | Updated export schema to chemd-training-export/v0.2 and stores semantic_layer.lnf. |
+| Compiler | compileChemd now returns one canonical lnf plus ChemdTrainingExportV2. |
+| Renderer HTML | Restored human-readable related/uses/produces/after step details without machine metadata. |
+| Web preview | Preferred render error markup over fallback SVG payloads and fixed SVG hydration edge cases. |
+| Local tooling | Repaired Windows pnpm workspace package resolution and expanded Next transpilePackages. |
+| React build | Removed setState-in-effect from ChemEditorDialog by remounting per edit-session key. |
+| Docs/tests | Updated Trellis specs, README files, and affected package/web tests. |
+
+**Verification**:
+- `pnpm lint`
+- `pnpm typecheck`
+- `pnpm test`
+- `pnpm build`
+- `git diff --check`
+
+**Notes**:
+- `pnpm type-check` is not a repo script; `pnpm typecheck` is the canonical command.
+- Next build still emits a non-blocking warning about missing Next.js ESLint plugin detection.
+- Historical v0.1 docs remain as archived planning material; current code/spec/README/v0.2 docs are aligned.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b396143` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
