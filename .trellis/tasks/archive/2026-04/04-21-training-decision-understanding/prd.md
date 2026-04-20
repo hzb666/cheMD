@@ -30,7 +30,7 @@
 - [x] 可从 `trainingUnderstanding` 派生任务化 SFT 数据。
 - [x] 新结构不要求用户增加 Chemd 书写负担。
 - [x] exporter-training 定向测试和 typecheck 通过。
-- [ ] 完成代码审查、finish-work、git commit 和 record-session。
+- [x] 完成代码审查、finish-work、git commit 和 record-session。
 
 ## Technical Notes
 
