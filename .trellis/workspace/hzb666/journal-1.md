@@ -436,3 +436,38 @@ Added a playground LSM status indicator and refined the compact header label sty
 ### Next Steps
 
 - None - task complete
+
+
+## Session 9: 实验决策训练理解阶段 2
+
+**Date**: 2026-04-21
+**Task**: 实验决策训练理解阶段 2
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+从 trainingUnderstanding 派生实验决策训练样本，新增 JSONL/SFT messages 数据集 API，补充来源实体、派生监督质量、任务 contract，并归档任务。验证通过：exporter-training typecheck/test/eslint、git diff --check、pnpm typecheck、pnpm test。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `36e1a4d` | (see git log) |
+| `63efbe3` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
