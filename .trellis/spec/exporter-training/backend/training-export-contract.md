@@ -71,7 +71,20 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
     compared inside one document
   - outcome quality records that separate reported yield values from yield
     confidence, yield basis, analysis confirmation, and regression usability
+  - conservative reaction taxonomy labels inferred from existing reaction
+    names, participants, and conditions
+  - expert routing labels derived from taxonomy, design contexts, outcome
+    quality, and failure signals
+  - optimization trajectories that summarize baseline/variant steps and best
+    available outcomes without adding author-facing syntax
+  - failure signals for failed, low-yield, low-conversion, low-selectivity,
+    low-purity, conflicting, uncertain, or unlinked results
   - analysis evidence links and sample lineage links
+- Reaction taxonomy, expert routing, optimization trajectories, and failure
+  signals are derived experiment-understanding features. They must carry
+  evidence IDs, warnings, and confidence where applicable, and must not be
+  treated as human-verified labels unless an annotation layer later confirms
+  them.
 - `ChemdTrainingUnderstandingV1.resolved_references` must include Markdown
   references and structured `ref`/participant references that affect
   experiment logic.
@@ -81,7 +94,8 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   and pre-outcome context.
 - LoRA generation hints should distinguish extraction/summary tasks from
   experiment-decision tasks such as yield prediction, condition recommendation,
-  experiment proposal, failure analysis, and experiment comparison.
+  experiment proposal, failure analysis, experiment comparison, reaction
+  classification, and expert routing.
 - LoRA/SFT JSONL must be generated from `ChemdTrainingUnderstandingV1`,
   not from RAG chunks or the full audit export.
 - `buildTrainingTaskDatasetFromUnderstanding()` is the public task-projection
@@ -124,6 +138,8 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   missing logic, and LoRA generation hints.
 - Assert training understanding includes experiment design contexts and outcome
   quality without leaking source layer, render layout, or full audit fields.
+- Assert training understanding includes reaction taxonomy, expert routing,
+  optimization trajectories, and failure signals with evidence IDs and warnings.
 - Assert prediction instances link the correct result per reaction and do not
   apply a primary-result fallback to multiple unrelated reactions.
 - Assert task-projection examples are generated from training understanding,

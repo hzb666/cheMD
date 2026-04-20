@@ -1,0 +1,53 @@
+{
+  "id": "experiment-intelligence-projections",
+  "name": "experiment-intelligence-projections",
+  "title": "补充实验内涵训练投影",
+  "description": "",
+  "status": "planning",
+  "dev_type": "backend",
+  "scope": null,
+  "package": "web",
+  "priority": "P2",
+  "creator": "hzb666",
+  "assignee": "hzb666",
+  "createdAt": "2026-04-21",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "develop",
+  "worktree_path": null,
+  "current_phase": 0,
+  "next_action": [
+    {
+      "phase": 1,
+      "action": "brainstorm"
+    },
+    {
+      "phase": 2,
+      "action": "research"
+    },
+    {
+      "phase": 3,
+      "action": "implement"
+    },
+    {
+      "phase": 4,
+      "action": "check"
+    },
+    {
+      "phase": 5,
+      "action": "update-spec"
+    },
+    {
+      "phase": 6,
+      "action": "record-session"
+    }
+  ],
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

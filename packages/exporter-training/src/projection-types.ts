@@ -132,6 +132,84 @@ export interface TrainingOutcomeQualityV1 {
   warnings: string[];
 }
 
+export type TrainingReactionFamilyV1 =
+  | "cross_coupling"
+  | "oxidation"
+  | "reduction"
+  | "protection"
+  | "deprotection"
+  | "amidation"
+  | "esterification"
+  | "substitution"
+  | "addition"
+  | "elimination"
+  | "unknown";
+
+export type TrainingInferenceConfidenceV1 = "high" | "medium" | "low" | "unknown";
+
+export interface TrainingReactionTaxonomyV1 {
+  reaction_entity_id: string;
+  reaction_family: TrainingReactionFamilyV1;
+  transformation_tags: string[];
+  confidence: TrainingInferenceConfidenceV1;
+  evidence_entity_ids: string[];
+  warnings: string[];
+}
+
+export interface TrainingOptimizationStepV1 {
+  step_id: string;
+  reaction_entity_id: string;
+  linked_result_entity_id?: string;
+  variant_role: TrainingExperimentDesignContextV1["variant_role"];
+  changed_variables: TrainingExperimentVariableDeltaV1[];
+  controlled_variables: string[];
+  status_label?: TrainingOutcomeLogicV1["status_label"];
+  yield_percent?: number | null;
+  outcome_rank?: number;
+  warnings: string[];
+}
+
+export interface TrainingOptimizationTrajectoryV1 {
+  trajectory_id: string;
+  series_id: string;
+  baseline_reaction_entity_id?: string;
+  best_reaction_entity_id?: string;
+  best_yield_percent?: number | null;
+  steps: TrainingOptimizationStepV1[];
+  evidence_entity_ids: string[];
+  warnings: string[];
+}
+
+export type TrainingFailureModeV1 =
+  | "failed_status"
+  | "low_yield"
+  | "low_conversion"
+  | "low_selectivity"
+  | "low_purity"
+  | "conflicting_result_values"
+  | "analytical_uncertainty"
+  | "missing_reaction_link";
+
+export interface TrainingFailureSignalV1 {
+  failure_id: string;
+  result_entity_id: string;
+  reaction_entity_id?: string;
+  failure_modes: TrainingFailureModeV1[];
+  evidence_entity_ids: string[];
+  recommended_checks: string[];
+  confidence: TrainingInferenceConfidenceV1;
+  warnings: string[];
+}
+
+export interface TrainingExpertRoutingV1 {
+  route_id: string;
+  reaction_entity_id: string;
+  expert_labels: string[];
+  routing_basis: string[];
+  confidence: TrainingInferenceConfidenceV1;
+  warnings: string[];
+}
+
 export interface TrainingEvidenceLinkV1 {
   evidence_entity_id: string;
   target_entity_id: string;
@@ -245,6 +323,8 @@ export type LoraTaskTypeV1 =
   | "experiment_proposal"
   | "failure_analysis"
   | "experiment_comparison"
+  | "reaction_classification"
+  | "expert_routing"
   | "consistency_check"
   | "qa_with_context";
 
@@ -268,6 +348,10 @@ export interface TrainingExperimentLogicV1 {
   outcomes: TrainingOutcomeLogicV1[];
   design_contexts: TrainingExperimentDesignContextV1[];
   outcome_quality: TrainingOutcomeQualityV1[];
+  reaction_taxonomy: TrainingReactionTaxonomyV1[];
+  expert_routing: TrainingExpertRoutingV1[];
+  optimization_trajectories: TrainingOptimizationTrajectoryV1[];
+  failure_signals: TrainingFailureSignalV1[];
   evidence_links: TrainingEvidenceLinkV1[];
   sample_lineage: TrainingEvidenceLinkV1[];
 }

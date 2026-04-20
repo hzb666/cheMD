@@ -7,9 +7,12 @@ import type {
   TrainingAnalysisV1,
   TrainingCanonicalSummaryV1,
   TrainingEvidenceLinkV1,
+  TrainingExpertRoutingV1,
   TrainingExperimentDesignContextV1,
   TrainingExperimentVariableDeltaV1,
+  TrainingFailureSignalV1,
   TrainingFieldEvidenceV1,
+  TrainingInferenceConfidenceV1,
   TrainingKnowledgeEdgeV1,
   TrainingKnowledgeNodeV1,
   TrainingLoraGenerationHintsV1,
@@ -19,8 +22,12 @@ import type {
   TrainingObservationLogicPairV1,
   TrainingOutcomeQualityV1,
   TrainingOutcomeLogicV1,
+  TrainingOptimizationStepV1,
+  TrainingOptimizationTrajectoryV1,
   TrainingPrimaryEntityV1,
   TrainingProcedureLogicPairV1,
+  TrainingReactionFamilyV1,
+  TrainingReactionTaxonomyV1,
   TrainingReactionV1,
   TrainingResolvedReferenceV1,
   TrainingResultV1,
@@ -89,6 +96,78 @@ const EVIDENCE_RELATIONS = new Set<ExportedRelationV1["relation_type"]>([
   "analysis_targets_result",
   "analysis_targets_sample"
 ]);
+const LOW_YIELD_THRESHOLD = 20;
+const LOW_CONVERSION_THRESHOLD = 50;
+const LOW_SELECTIVITY_THRESHOLD = 50;
+const LOW_PURITY_THRESHOLD = 80;
+const REACTION_TAXONOMY_RULES: Array<{
+  family: TrainingReactionFamilyV1;
+  tags: string[];
+  terms: string[];
+  confidence: TrainingInferenceConfidenceV1;
+}> = [
+  {
+    family: "cross_coupling",
+    tags: ["cross_coupling", "organometallic_catalysis"],
+    terms: ["suzuki", "heck", "sonogashira", "negishi", "stille", "kumada", "buchwald", "palladium", "pd("],
+    confidence: "high"
+  },
+  {
+    family: "oxidation",
+    tags: ["redox", "oxidation"],
+    terms: ["oxidation", "oxidized", "mcpba", "pcc", "dess-martin", "tempo", "oxone", "h2o2"],
+    confidence: "medium"
+  },
+  {
+    family: "reduction",
+    tags: ["redox", "reduction"],
+    terms: ["reduction", "reduced", "hydrogenation", "nabh4", "lialh4", "pd/c", "raney"],
+    confidence: "medium"
+  },
+  {
+    family: "protection",
+    tags: ["protecting_group"],
+    terms: ["protection", "protected", "boc", "tbs", "tbdms", "fmoc"],
+    confidence: "medium"
+  },
+  {
+    family: "deprotection",
+    tags: ["protecting_group", "deprotection"],
+    terms: ["deprotection", "deprotected", "tfa", "hcl/dioxane", "desilylation"],
+    confidence: "medium"
+  },
+  {
+    family: "amidation",
+    tags: ["amide_formation", "condensation"],
+    terms: ["amidation", "amide coupling", "hatu", "hbtu", "edci", "edc", "dcc"],
+    confidence: "medium"
+  },
+  {
+    family: "esterification",
+    tags: ["ester_formation", "condensation"],
+    terms: ["esterification", "fischer", "esterified"],
+    confidence: "medium"
+  },
+  {
+    family: "substitution",
+    tags: ["substitution"],
+    terms: ["substitution", "sn2", "alkylation", "nucleophilic substitution"],
+    confidence: "medium"
+  }
+];
+const FAMILY_EXPERT_LABELS: Record<TrainingReactionFamilyV1, string[]> = {
+  cross_coupling: ["cross_coupling", "organometallic_catalysis"],
+  oxidation: ["oxidation_chemistry", "redox_chemistry"],
+  reduction: ["reduction_chemistry", "redox_chemistry"],
+  protection: ["protecting_group_strategy"],
+  deprotection: ["protecting_group_strategy"],
+  amidation: ["amide_bond_formation"],
+  esterification: ["ester_formation"],
+  substitution: ["substitution_chemistry"],
+  addition: ["addition_chemistry"],
+  elimination: ["elimination_chemistry"],
+  unknown: []
+};
 
 const compactText = (...parts: Array<string | undefined>): string | undefined => {
   const text = parts
@@ -100,6 +179,9 @@ const compactText = (...parts: Array<string | undefined>): string | undefined =>
 };
 
 const uniqueStrings = (values: string[]): string[] => Array.from(new Set(values));
+
+const hasAnyTerm = (text: string, terms: string[]): boolean =>
+  terms.some((term) => text.includes(term));
 
 const stripSourceFields = <T extends ExportedEntityBase>(
   entity: T
@@ -496,6 +578,270 @@ const buildExperimentDesignContexts = (record: ChemdTrainingExportV2): TrainingE
       changed_variables: deltas.changed,
       controlled_variables: deltas.controlled,
       evidence_entity_ids: uniqueStrings([reaction.entity_id, ...(linkedResult ? [linkedResult.entity_id] : [])])
+    };
+  });
+};
+
+const getReactionClassificationText = (reaction: ExportedReactionV1): string =>
+  compactText(
+    reaction.name,
+    reaction.caption,
+    reaction.reagents_raw,
+    reaction.catalyst_raw,
+    reaction.solvent_raw,
+    reaction.conditions_raw?.join(" "),
+    reaction.normalized_conditions.catalyst?.normalized,
+    reaction.normalized_conditions.reagents?.normalized.join(" "),
+    formatParticipantList(reaction, "reactant") ?? undefined,
+    formatParticipantList(reaction, "product") ?? undefined
+  )?.toLowerCase() ?? "";
+
+const getContextualReactionTags = (text: string): string[] => [
+  ...(hasAnyTerm(text, ["palladium", "pd("]) ? ["palladium_catalysis"] : []),
+  ...(hasAnyTerm(text, ["nickel", "ni("]) ? ["nickel_catalysis"] : []),
+  ...(hasAnyTerm(text, ["photoredox", "irradiation", "blue led", "led"]) ? ["photochemistry"] : []),
+  ...(hasAnyTerm(text, ["base", "k2co3", "cs2co3", "tea", "dipea"]) ? ["base_screening"] : []),
+  ...(hasAnyTerm(text, ["ligand", "xphos", "sphos", "binap"]) ? ["ligand_screening"] : [])
+];
+
+const inferReactionTaxonomy = (
+  reaction: ExportedReactionV1
+): Omit<TrainingReactionTaxonomyV1, "reaction_entity_id" | "evidence_entity_ids"> => {
+  const text = getReactionClassificationText(reaction);
+  const rule = REACTION_TAXONOMY_RULES.find((candidate) =>
+    hasAnyTerm(text, candidate.terms)
+  );
+
+  if (!rule) {
+    return {
+      reaction_family: "unknown",
+      transformation_tags: getContextualReactionTags(text),
+      confidence: "unknown",
+      warnings: ["reaction_family_not_inferred"]
+    };
+  }
+
+  return {
+    reaction_family: rule.family,
+    transformation_tags: uniqueStrings([...rule.tags, ...getContextualReactionTags(text)]),
+    confidence: rule.confidence,
+    warnings: []
+  };
+};
+
+const buildReactionTaxonomy = (record: ChemdTrainingExportV2): TrainingReactionTaxonomyV1[] =>
+  record.semantic_layer.reactions.map((reaction) => ({
+    reaction_entity_id: reaction.entity_id,
+    ...inferReactionTaxonomy(reaction),
+    evidence_entity_ids: [reaction.entity_id]
+  }));
+
+const qualityByResultId = (
+  outcomeQuality: TrainingOutcomeQualityV1[]
+): Map<string, TrainingOutcomeQualityV1> =>
+  new Map(outcomeQuality.map((quality) => [quality.result_entity_id, quality]));
+
+const outcomeByResultId = (
+  outcomes: TrainingOutcomeLogicV1[]
+): Map<string, TrainingOutcomeLogicV1> =>
+  new Map(outcomes.map((outcome) => [outcome.result_entity_id, outcome]));
+
+const inferFailureModes = (
+  outcome: TrainingOutcomeLogicV1,
+  quality: TrainingOutcomeQualityV1 | undefined
+): TrainingFailureSignalV1["failure_modes"] => [
+  ...(outcome.status_label === "failed" ? ["failed_status" as const] : []),
+  ...(typeof outcome.yield_percent === "number" && outcome.yield_percent < LOW_YIELD_THRESHOLD ? ["low_yield" as const] : []),
+  ...(typeof outcome.conversion_percent === "number" && outcome.conversion_percent < LOW_CONVERSION_THRESHOLD ? ["low_conversion" as const] : []),
+  ...(typeof outcome.selectivity_percent === "number" && outcome.selectivity_percent < LOW_SELECTIVITY_THRESHOLD ? ["low_selectivity" as const] : []),
+  ...(typeof outcome.purity_percent === "number" && outcome.purity_percent < LOW_PURITY_THRESHOLD ? ["low_purity" as const] : []),
+  ...(quality?.has_conflicting_values ? ["conflicting_result_values" as const] : []),
+  ...(quality && quality.yield_confidence !== "confirmed" ? ["analytical_uncertainty" as const] : []),
+  ...(!outcome.reaction_entity_id ? ["missing_reaction_link" as const] : [])
+];
+
+const uniqueFailureModes = (
+  modes: TrainingFailureSignalV1["failure_modes"]
+): TrainingFailureSignalV1["failure_modes"] => Array.from(new Set(modes));
+
+const hasActionableFailureMode = (
+  modes: TrainingFailureSignalV1["failure_modes"]
+): boolean => modes.some((mode) => mode !== "analytical_uncertainty");
+
+const getRecommendedChecks = (
+  modes: TrainingFailureSignalV1["failure_modes"]
+): string[] => uniqueStrings([
+  ...(modes.includes("failed_status") ? ["Check reaction setup, reagent identity, and analysis evidence."] : []),
+  ...(modes.includes("low_yield") ? ["Review limiting reagent, conversion, workup, and isolated yield basis."] : []),
+  ...(modes.includes("low_conversion") ? ["Inspect temperature, time, catalyst, base, and reagent equivalence."] : []),
+  ...(modes.includes("low_selectivity") ? ["Review side-product evidence and selectivity-driving conditions."] : []),
+  ...(modes.includes("low_purity") ? ["Inspect purification records and analytical confirmation."] : []),
+  ...(modes.includes("conflicting_result_values") ? ["Resolve conflicting linked result values before training."] : []),
+  ...(modes.includes("analytical_uncertainty") ? ["Confirm yield basis with analysis or isolation evidence."] : []),
+  ...(modes.includes("missing_reaction_link") ? ["Link the result to a reaction before decision training."] : [])
+]);
+
+const buildFailureSignals = (
+  outcomes: TrainingOutcomeLogicV1[],
+  outcomeQuality: TrainingOutcomeQualityV1[]
+): TrainingFailureSignalV1[] => {
+  const qualityByResult = qualityByResultId(outcomeQuality);
+
+  return outcomes.flatMap((outcome) => {
+    const quality = qualityByResult.get(outcome.result_entity_id);
+    const modes = inferFailureModes(outcome, quality);
+    if (modes.length === 0 || !hasActionableFailureMode(modes)) {
+      return [];
+    }
+
+    return [{
+      failure_id: `failure::${outcome.result_entity_id}`,
+      result_entity_id: outcome.result_entity_id,
+      ...(outcome.reaction_entity_id ? { reaction_entity_id: outcome.reaction_entity_id } : {}),
+      failure_modes: uniqueFailureModes(modes),
+      evidence_entity_ids: uniqueStrings([
+        outcome.result_entity_id,
+        ...(outcome.reaction_entity_id ? [outcome.reaction_entity_id] : []),
+        ...(quality?.evidence_entity_ids ?? [])
+      ]),
+      recommended_checks: getRecommendedChecks(modes),
+      confidence: quality?.has_conflicting_values ? "low" : "medium",
+      warnings: quality?.warnings ?? []
+    }];
+  });
+};
+
+const rankOutcomeYields = (
+  steps: Array<{ resultEntityId?: string; yieldPercent?: number | null }>
+): Map<string, number> => {
+  const ranked = steps
+    .filter((step): step is { resultEntityId: string; yieldPercent: number } =>
+      Boolean(step.resultEntityId) && typeof step.yieldPercent === "number"
+    )
+    .sort((left, right) => right.yieldPercent - left.yieldPercent);
+
+  return new Map(ranked.map((step, index) => [step.resultEntityId, index + 1]));
+};
+
+const buildOptimizationStep = (
+  context: TrainingExperimentDesignContextV1,
+  outcome: TrainingOutcomeLogicV1 | undefined,
+  rankByResult: Map<string, number>,
+  qualityByResult: Map<string, TrainingOutcomeQualityV1>
+): TrainingOptimizationStepV1 => ({
+  step_id: `trajectory-step::${context.context_id}`,
+  reaction_entity_id: context.reaction_entity_id,
+  ...(context.linked_result_entity_id ? { linked_result_entity_id: context.linked_result_entity_id } : {}),
+  variant_role: context.variant_role,
+  changed_variables: context.changed_variables,
+  controlled_variables: context.controlled_variables,
+  ...(outcome?.status_label ? { status_label: outcome.status_label } : {}),
+  ...(outcome ? { yield_percent: outcome.yield_percent } : {}),
+  ...(context.linked_result_entity_id && rankByResult.has(context.linked_result_entity_id)
+    ? { outcome_rank: rankByResult.get(context.linked_result_entity_id) }
+    : {}),
+  warnings: context.linked_result_entity_id
+    ? qualityByResult.get(context.linked_result_entity_id)?.warnings ?? []
+    : ["missing_linked_result"]
+});
+
+const buildTrajectoryForSeries = (
+  documentId: string,
+  seriesId: string,
+  contexts: TrainingExperimentDesignContextV1[],
+  outcomes: TrainingOutcomeLogicV1[],
+  outcomeQuality: TrainingOutcomeQualityV1[]
+): TrainingOptimizationTrajectoryV1 => {
+  const outcomeByResult = outcomeByResultId(outcomes);
+  const qualityByResult = qualityByResultId(outcomeQuality);
+  const rankByResult = rankOutcomeYields(contexts.map((context) => {
+    const outcome = context.linked_result_entity_id
+      ? outcomeByResult.get(context.linked_result_entity_id)
+      : undefined;
+    return { resultEntityId: context.linked_result_entity_id, yieldPercent: outcome?.yield_percent };
+  }));
+  const steps = contexts.map((context) =>
+    buildOptimizationStep(context, context.linked_result_entity_id
+      ? outcomeByResult.get(context.linked_result_entity_id)
+      : undefined, rankByResult, qualityByResult)
+  );
+  const bestStep = steps.find((step) => step.outcome_rank === 1);
+
+  return {
+    trajectory_id: `trajectory::${documentId}::${seriesId}`,
+    series_id: seriesId,
+    ...(contexts.find((context) => context.variant_role === "baseline")
+      ? { baseline_reaction_entity_id: contexts.find((context) => context.variant_role === "baseline")?.reaction_entity_id }
+      : {}),
+    ...(bestStep ? { best_reaction_entity_id: bestStep.reaction_entity_id } : {}),
+    ...(typeof bestStep?.yield_percent === "number" ? { best_yield_percent: bestStep.yield_percent } : {}),
+    steps,
+    evidence_entity_ids: uniqueStrings(contexts.flatMap((context) => context.evidence_entity_ids)),
+    warnings: uniqueStrings(steps.flatMap((step) => step.warnings))
+  };
+};
+
+const buildOptimizationTrajectories = (
+  documentId: string,
+  contexts: TrainingExperimentDesignContextV1[],
+  outcomes: TrainingOutcomeLogicV1[],
+  outcomeQuality: TrainingOutcomeQualityV1[]
+): TrainingOptimizationTrajectoryV1[] => {
+  const bySeries = new Map<string, TrainingExperimentDesignContextV1[]>();
+  contexts.forEach((context) => {
+    bySeries.set(context.series_id, [...(bySeries.get(context.series_id) ?? []), context]);
+  });
+
+  return Array.from(bySeries.entries()).map(([seriesId, seriesContexts]) =>
+    buildTrajectoryForSeries(documentId, seriesId, seriesContexts, outcomes, outcomeQuality)
+  );
+};
+
+const getRouteLabels = (
+  taxonomy: TrainingReactionTaxonomyV1,
+  context: TrainingExperimentDesignContextV1 | undefined,
+  quality: TrainingOutcomeQualityV1 | undefined,
+  failure: TrainingFailureSignalV1 | undefined
+): string[] => uniqueStrings([
+  ...FAMILY_EXPERT_LABELS[taxonomy.reaction_family],
+  ...(context ? ["condition_reasoning", "yield_prediction"] : []),
+  ...(context && context.changed_variables.length > 0 ? ["condition_optimization"] : []),
+  ...(quality?.result_confirmed_by_analysis ? ["analytical_confirmation"] : []),
+  ...(failure ? ["failure_diagnosis"] : []),
+  ...(taxonomy.reaction_family === "unknown" ? ["general_experiment_understanding"] : [])
+]);
+
+const buildExpertRouting = (
+  taxonomies: TrainingReactionTaxonomyV1[],
+  contexts: TrainingExperimentDesignContextV1[],
+  outcomeQuality: TrainingOutcomeQualityV1[],
+  failureSignals: TrainingFailureSignalV1[]
+): TrainingExpertRoutingV1[] => {
+  const contextByReaction = new Map(contexts.map((context) => [context.reaction_entity_id, context]));
+  const qualityByReaction = new Map(outcomeQuality.flatMap((quality) =>
+    quality.reaction_entity_id ? [[quality.reaction_entity_id, quality] as const] : []
+  ));
+  const failureByReaction = new Map(failureSignals.flatMap((failure) =>
+    failure.reaction_entity_id ? [[failure.reaction_entity_id, failure] as const] : []
+  ));
+
+  return taxonomies.map((taxonomy) => {
+    const context = contextByReaction.get(taxonomy.reaction_entity_id);
+    const quality = qualityByReaction.get(taxonomy.reaction_entity_id);
+    const failure = failureByReaction.get(taxonomy.reaction_entity_id);
+    const warnings = uniqueStrings([...taxonomy.warnings, ...(quality?.warnings ?? []), ...(failure?.warnings ?? [])]);
+
+    return {
+      route_id: `expert-route::${taxonomy.reaction_entity_id}`,
+      reaction_entity_id: taxonomy.reaction_entity_id,
+      expert_labels: getRouteLabels(taxonomy, context, quality, failure),
+      routing_basis: uniqueStrings([
+        `reaction_family:${taxonomy.reaction_family}`,
+        ...(context ? [`variant_role:${context.variant_role}`] : []),
+        ...(failure ? failure.failure_modes.map((mode) => `failure_mode:${mode}`) : [])
+      ]),
+      confidence: warnings.length > 0 ? "low" : taxonomy.confidence,
+      warnings
     };
   });
 };
@@ -1398,6 +1744,7 @@ const buildRecommendedLoraTasks = (
 ): LoraTaskHintV1[] => {
   const { record, fieldEvidence, missingLogic, resolvedReferences } = context;
   const hasProcedureLogic = Boolean(record.learning_layer.procedure_to_steps?.length);
+  const hasReactions = record.semantic_layer.reactions.length > 0;
   const hasSemanticRelations = record.semantic_layer.links.length > 0;
   const hasEvidenceLinks = fieldEvidence.some(hasExternalEvidence);
   const hasSummaryBasis = record.semantic_layer.reactions.length + record.semantic_layer.results.length > 0;
@@ -1413,6 +1760,8 @@ const buildRecommendedLoraTasks = (
   return [
     ...(entityIds.length > 0 ? [createTaskHint("entity_extraction", "Experiment entities are available.", entityIds)] : []),
     ...includeTask(hasSummaryBasis, createTaskHint("experiment_summary", "Reaction or result entities are available.", entityIds)),
+    ...includeTask(hasReactions, createTaskHint("reaction_classification", "Reaction entities can receive taxonomy labels.")),
+    ...includeTask(hasReactions, createTaskHint("expert_routing", "Reaction entities can receive expert routing labels.")),
     ...includeTask(hasSemanticRelations, createTaskHint("relation_extraction", "Semantic relations are available.", entityIds)),
     ...includeTask(resolvedReferences.length > 0, createTaskHint("reference_resolution", "Resolved or unresolved references are available.")),
     ...includeTask(hasEvidenceLinks, createTaskHint("evidence_tracing", "External field-level evidence is available.")),
@@ -1430,6 +1779,7 @@ const buildRecommendedLoraTasks = (
 const buildBlockedLoraTasks = (context: LoraHintContext): LoraTaskHintV1[] => {
   const { record, fieldEvidence, resolvedReferences } = context;
   const hasProcedureLogic = Boolean(record.learning_layer.procedure_to_steps?.length);
+  const hasReactions = record.semantic_layer.reactions.length > 0;
   const hasSemanticRelations = record.semantic_layer.links.length > 0;
   const hasEvidenceLinks = fieldEvidence.some(hasExternalEvidence);
   const hasYieldPrediction = record.learning_layer.prediction_instances.some((instance) =>
@@ -1437,6 +1787,8 @@ const buildBlockedLoraTasks = (context: LoraHintContext): LoraTaskHintV1[] => {
   );
 
   return [
+    ...includeTask(!hasReactions, createTaskHint("reaction_classification", "No reaction entities are available.")),
+    ...includeTask(!hasReactions, createTaskHint("expert_routing", "No reaction entities are available.")),
     ...includeTask(!hasSemanticRelations, createTaskHint("relation_extraction", "No semantic relations are available.")),
     ...includeTask(resolvedReferences.length === 0, createTaskHint("reference_resolution", "No references are available.")),
     ...includeTask(!hasEvidenceLinks, createTaskHint("evidence_tracing", "No external field-level evidence is available.")),
@@ -1490,6 +1842,23 @@ export const buildTrainingUnderstandingFromRecord = (
   const graphEdges = buildKnowledgeEdges(record, entityByOriginalId, fieldEvidence);
   const missingLogic = buildMissingLogic(record, resolvedReferences, primaryEntities);
   const canonicalSummary = buildCanonicalSummary(record, fieldEvidence);
+  const outcomes = buildOutcomeLogic(record);
+  const designContexts = buildExperimentDesignContexts(record);
+  const outcomeQuality = buildOutcomeQuality(record);
+  const reactionTaxonomy = buildReactionTaxonomy(record);
+  const failureSignals = buildFailureSignals(outcomes, outcomeQuality);
+  const optimizationTrajectories = buildOptimizationTrajectories(
+    record.document.document_id,
+    designContexts,
+    outcomes,
+    outcomeQuality
+  );
+  const expertRouting = buildExpertRouting(
+    reactionTaxonomy,
+    designContexts,
+    outcomeQuality,
+    failureSignals
+  );
 
   return {
     schema_version: "chemd-training-understanding/v0.1",
@@ -1514,9 +1883,13 @@ export const buildTrainingUnderstandingFromRecord = (
     },
     experiment_logic: {
       primary_entities: primaryEntities,
-      outcomes: buildOutcomeLogic(record),
-      design_contexts: buildExperimentDesignContexts(record),
-      outcome_quality: buildOutcomeQuality(record),
+      outcomes,
+      design_contexts: designContexts,
+      outcome_quality: outcomeQuality,
+      reaction_taxonomy: reactionTaxonomy,
+      expert_routing: expertRouting,
+      optimization_trajectories: optimizationTrajectories,
+      failure_signals: failureSignals,
       evidence_links: buildEvidenceLinks(record, EVIDENCE_RELATIONS, "analysis"),
       sample_lineage: buildEvidenceLinks(record, SAMPLE_LINEAGE_RELATIONS, "sample")
     },
