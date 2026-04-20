@@ -355,12 +355,22 @@ export interface PredictionFeaturesV1 {
   chemistry_feature_ref_ids?: string[];
 }
 
+export type PredictionTargetFieldV1 =
+  | "status_class"
+  | "yield_percent"
+  | "conversion_percent"
+  | "selectivity_percent"
+  | "purity_percent";
+
+export type PredictionTargetSourceV1 = "result" | "reaction_hint" | "missing";
+
 export interface PredictionTargetsV1 {
   status_class?: "success" | "partial" | "failed" | "unknown";
   yield_percent?: number | null;
   conversion_percent?: number | null;
   selectivity_percent?: number | null;
   purity_percent?: number | null;
+  target_sources?: Partial<Record<PredictionTargetFieldV1, PredictionTargetSourceV1>>;
 }
 
 export interface PredictionUsabilityV1 {

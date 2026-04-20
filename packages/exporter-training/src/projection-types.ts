@@ -102,6 +102,36 @@ export interface TrainingOutcomeLogicV1 {
   purity_percent?: number | null;
 }
 
+export interface TrainingExperimentVariableDeltaV1 {
+  field: string;
+  baseline_value?: string | number | boolean | null;
+  candidate_value?: string | number | boolean | null;
+}
+
+export interface TrainingExperimentDesignContextV1 {
+  context_id: string;
+  reaction_entity_id: string;
+  linked_result_entity_id?: string;
+  series_id: string;
+  variant_role: "baseline" | "variant" | "single_run";
+  baseline_reaction_entity_id?: string;
+  changed_variables: TrainingExperimentVariableDeltaV1[];
+  controlled_variables: string[];
+  evidence_entity_ids: string[];
+}
+
+export interface TrainingOutcomeQualityV1 {
+  result_entity_id: string;
+  reaction_entity_id?: string;
+  yield_confidence: "confirmed" | "estimated" | "unknown";
+  yield_basis: "isolated" | "nmr" | "lcms" | "crude" | "not_reported" | "unknown";
+  result_confirmed_by_analysis: boolean;
+  has_conflicting_values: boolean;
+  target_usable_for_regression: boolean;
+  evidence_entity_ids: string[];
+  warnings: string[];
+}
+
 export interface TrainingEvidenceLinkV1 {
   evidence_entity_id: string;
   target_entity_id: string;
@@ -210,6 +240,11 @@ export type LoraTaskTypeV1 =
   | "reference_resolution"
   | "evidence_tracing"
   | "procedure_reasoning"
+  | "yield_prediction"
+  | "condition_recommendation"
+  | "experiment_proposal"
+  | "failure_analysis"
+  | "experiment_comparison"
   | "consistency_check"
   | "qa_with_context";
 
@@ -231,6 +266,8 @@ export interface TrainingLoraGenerationHintsV1 {
 export interface TrainingExperimentLogicV1 {
   primary_entities: TrainingPrimaryEntityV1[];
   outcomes: TrainingOutcomeLogicV1[];
+  design_contexts: TrainingExperimentDesignContextV1[];
+  outcome_quality: TrainingOutcomeQualityV1[];
   evidence_links: TrainingEvidenceLinkV1[];
   sample_lineage: TrainingEvidenceLinkV1[];
 }

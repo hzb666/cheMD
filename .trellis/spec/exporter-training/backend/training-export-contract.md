@@ -63,9 +63,25 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   - field-level evidence for molecule, reaction, result, analysis, and
     sample fields when available
   - missing logic records for unresolved references or disconnected facts
+- `ChemdTrainingUnderstandingV1.experiment_logic` must preserve:
+  - primary entities and result/outcome links
+  - derived experiment design contexts for baseline, variant, or single-run
+    records without requiring additional author syntax
+  - changed and controlled reaction variables when multiple reactions can be
+    compared inside one document
+  - outcome quality records that separate reported yield values from yield
+    confidence, yield basis, analysis confirmation, and regression usability
+  - analysis evidence links and sample lineage links
 - `ChemdTrainingUnderstandingV1.resolved_references` must include Markdown
   references and structured `ref`/participant references that affect
   experiment logic.
+- `learning_layer.prediction_instances` must avoid leaking linked result text
+  into input features. Result entities remain linked as targets/evidence, while
+  feature inputs should focus on reaction conditions, participants, quantities,
+  and pre-outcome context.
+- LoRA generation hints should distinguish extraction/summary tasks from
+  experiment-decision tasks such as yield prediction, condition recommendation,
+  experiment proposal, failure analysis, and experiment comparison.
 - LoRA/SFT JSONL must be generated from `ChemdTrainingUnderstandingV1`,
   not from RAG chunks or the full audit export.
 
@@ -95,6 +111,10 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 - Assert training understanding includes knowledge graph nodes/edges,
   field-level evidence, normalization edges, procedure/observation logic,
   missing logic, and LoRA generation hints.
+- Assert training understanding includes experiment design contexts and outcome
+  quality without leaking source layer, render layout, or full audit fields.
+- Assert prediction instances link the correct result per reaction and do not
+  apply a primary-result fallback to multiple unrelated reactions.
 
 ### 7. Wrong vs Correct
 

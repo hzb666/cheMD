@@ -7,6 +7,8 @@ import type {
   TrainingAnalysisV1,
   TrainingCanonicalSummaryV1,
   TrainingEvidenceLinkV1,
+  TrainingExperimentDesignContextV1,
+  TrainingExperimentVariableDeltaV1,
   TrainingFieldEvidenceV1,
   TrainingKnowledgeEdgeV1,
   TrainingKnowledgeNodeV1,
@@ -15,6 +17,7 @@ import type {
   TrainingMoleculeV1,
   TrainingNarrativeBlockV1,
   TrainingObservationLogicPairV1,
+  TrainingOutcomeQualityV1,
   TrainingOutcomeLogicV1,
   TrainingPrimaryEntityV1,
   TrainingProcedureLogicPairV1,
@@ -381,6 +384,14 @@ const findLinkedReactionId = (
     && relation.from_entity_id === result.entity_id
   )?.to_entity_id;
 
+const findLinkedResultForReaction = (
+  record: ChemdTrainingExportV2,
+  reactionEntityId: string
+): ExportedResultV1 | undefined =>
+  record.semantic_layer.results.find((result) =>
+    findLinkedReactionId(result, record.semantic_layer.links) === reactionEntityId
+  );
+
 const buildOutcomeLogic = (record: ChemdTrainingExportV2): TrainingOutcomeLogicV1[] =>
   record.semantic_layer.results.map((result) => ({
     result_entity_id: result.entity_id,
@@ -393,6 +404,101 @@ const buildOutcomeLogic = (record: ChemdTrainingExportV2): TrainingOutcomeLogicV
     selectivity_percent: result.selectivity_percent,
     purity_percent: result.purity_percent
   }));
+
+const formatParticipantList = (reaction: ExportedReactionV1, role: "reactant" | "product"): string | null => {
+  const values = (role === "reactant" ? reaction.reactants : reaction.products)
+    .map((participant) => participant.target_entity_id ?? participant.name ?? participant.raw)
+    .filter(Boolean);
+
+  return values.length > 0 ? values.join(" + ") : null;
+};
+
+const getReactionVariableMap = (reaction: ExportedReactionV1): Record<string, string | number | null> => ({
+  reaction_name: reaction.name ?? null,
+  reactants: formatParticipantList(reaction, "reactant"),
+  products: formatParticipantList(reaction, "product"),
+  solvent: reaction.normalized_conditions.solvent?.normalized ?? null,
+  catalyst: reaction.normalized_conditions.catalyst?.normalized ?? null,
+  reagents: reaction.normalized_conditions.reagents?.normalized.join(", ") ?? null,
+  atmosphere: reaction.normalized_conditions.atmosphere?.normalized ?? null,
+  temperature: formatNumericWithUnit(reaction.normalized_conditions.temperature) ?? null,
+  time: formatNumericWithUnit(reaction.normalized_conditions.time) ?? null,
+  pressure: formatNumericWithUnit(reaction.normalized_conditions.pressure) ?? null
+});
+
+const buildVariableDeltas = (
+  baseline: ExportedReactionV1,
+  candidate: ExportedReactionV1
+): {
+  changed: TrainingExperimentVariableDeltaV1[];
+  controlled: string[];
+} => {
+  const baselineValues = getReactionVariableMap(baseline);
+  const candidateValues = getReactionVariableMap(candidate);
+
+  return Object.keys(candidateValues).reduce(
+    (result, field) => {
+      const baselineValue = baselineValues[field];
+      const candidateValue = candidateValues[field];
+
+      if (baselineValue === candidateValue) {
+        return baselineValue === null
+          ? result
+          : { ...result, controlled: [...result.controlled, field] };
+      }
+
+      return {
+        ...result,
+        changed: [
+          ...result.changed,
+          {
+            field,
+            ...(baselineValue !== undefined ? { baseline_value: baselineValue } : {}),
+            ...(candidateValue !== undefined ? { candidate_value: candidateValue } : {})
+          }
+        ]
+      };
+    },
+    { changed: [] as TrainingExperimentVariableDeltaV1[], controlled: [] as string[] }
+  );
+};
+
+const buildExperimentDesignContexts = (record: ChemdTrainingExportV2): TrainingExperimentDesignContextV1[] => {
+  const baseline = record.semantic_layer.reactions.find((reaction) => reaction.is_primary)
+    ?? record.semantic_layer.reactions[0];
+
+  if (!baseline) {
+    return [];
+  }
+
+  const seriesId = `series::${record.document.document_id}::${baseline.entity_id}`;
+  return record.semantic_layer.reactions.map((reaction) => {
+    const linkedResult = findLinkedResultForReaction(record, reaction.entity_id);
+    const reactionVariables = getReactionVariableMap(reaction);
+    const deltas = reaction.entity_id === baseline.entity_id
+      ? {
+          changed: [],
+          controlled: Object.keys(reactionVariables).filter((field) => reactionVariables[field] !== null)
+        }
+      : buildVariableDeltas(baseline, reaction);
+
+    return {
+      context_id: `design::${record.document.document_id}::${reaction.entity_id}`,
+      reaction_entity_id: reaction.entity_id,
+      ...(linkedResult ? { linked_result_entity_id: linkedResult.entity_id } : {}),
+      series_id: seriesId,
+      variant_role: record.semantic_layer.reactions.length === 1
+        ? "single_run"
+        : reaction.entity_id === baseline.entity_id
+          ? "baseline"
+          : "variant",
+      ...(reaction.entity_id !== baseline.entity_id ? { baseline_reaction_entity_id: baseline.entity_id } : {}),
+      changed_variables: deltas.changed,
+      controlled_variables: deltas.controlled,
+      evidence_entity_ids: uniqueStrings([reaction.entity_id, ...(linkedResult ? [linkedResult.entity_id] : [])])
+    };
+  });
+};
 
 const buildEvidenceLinks = (
   record: ChemdTrainingExportV2,
@@ -730,6 +836,127 @@ const findEvidenceRelationsForResult = (
   );
 };
 
+const getEvidenceAnalyses = (
+  record: ChemdTrainingExportV2,
+  relations: ExportedRelationV1[]
+): ExportedAnalysisV1[] => {
+  const analysisIds = new Set(relations.map((relation) => relation.from_entity_id));
+
+  return record.semantic_layer.analyses.filter((analysis) => analysisIds.has(analysis.entity_id));
+};
+
+const containsAny = (value: string | undefined, patterns: RegExp[]): boolean =>
+  Boolean(value && patterns.some((pattern) => pattern.test(value)));
+
+const inferYieldBasis = (
+  result: ExportedResultV1,
+  analyses: ExportedAnalysisV1[]
+): TrainingOutcomeQualityV1["yield_basis"] => {
+  const text = compactText(
+    result.yield_raw,
+    result.notes,
+    ...analyses.map((analysis) => compactText(analysis.analysis_type, analysis.method, analysis.result_raw))
+  );
+
+  if (result.yield_percent == null) {
+    return "not_reported";
+  }
+
+  if (result.isolated_mass || containsAny(text, [/isolated/i])) {
+    return "isolated";
+  }
+
+  if (containsAny(text, [/\bnmr\b/i])) {
+    return "nmr";
+  }
+
+  if (containsAny(text, [/\blc[-\s]?ms\b/i, /\blcms\b/i])) {
+    return "lcms";
+  }
+
+  return containsAny(text, [/crude/i]) ? "crude" : "unknown";
+};
+
+const getResultsForReaction = (
+  record: ChemdTrainingExportV2,
+  reactionEntityId: string
+): ExportedResultV1[] =>
+  record.semantic_layer.results.filter((result) =>
+    findLinkedReactionId(result, record.semantic_layer.links) === reactionEntityId
+  );
+
+const hasConflictingOutcomeValue = (
+  record: ChemdTrainingExportV2,
+  reactionEntityId: string | undefined,
+  field: "yield_percent" | "conversion_percent" | "selectivity_percent" | "purity_percent"
+): boolean => {
+  if (!reactionEntityId) {
+    return false;
+  }
+
+  const values = uniqueStrings(
+    getResultsForReaction(record, reactionEntityId).flatMap((result) => {
+      const value = result[field];
+      return typeof value === "number" ? [String(value)] : [];
+    })
+  );
+
+  return values.length > 1;
+};
+
+const inferYieldConfidence = (
+  basis: TrainingOutcomeQualityV1["yield_basis"],
+  hasConflict: boolean
+): TrainingOutcomeQualityV1["yield_confidence"] => {
+  if (basis === "not_reported") {
+    return "unknown";
+  }
+
+  if (hasConflict) {
+    return "estimated";
+  }
+
+  return basis === "isolated" || basis === "nmr" || basis === "lcms"
+    ? "confirmed"
+    : "estimated";
+};
+
+const buildOutcomeWarnings = (
+  result: ExportedResultV1,
+  basis: TrainingOutcomeQualityV1["yield_basis"],
+  hasConflict: boolean
+): string[] => [
+  ...(result.yield_percent == null ? ["missing_yield_percent"] : []),
+  ...(hasConflict ? ["conflicting_result_values"] : []),
+  ...(basis === "unknown" ? ["unknown_yield_basis"] : []),
+  ...(basis === "crude" ? ["crude_yield_basis"] : [])
+];
+
+const buildOutcomeQuality = (record: ChemdTrainingExportV2): TrainingOutcomeQualityV1[] =>
+  record.semantic_layer.results.map((result) => {
+    const reactionId = findLinkedReactionId(result, record.semantic_layer.links);
+    const evidenceRelations = findEvidenceRelationsForResult(result, record);
+    const analyses = getEvidenceAnalyses(record, evidenceRelations);
+    const hasConflict = hasConflictingOutcomeValue(record, reactionId, "yield_percent");
+    const basis = inferYieldBasis(result, analyses);
+    const confirmedByAnalysis = analyses.length > 0;
+
+    return {
+      result_entity_id: result.entity_id,
+      ...(reactionId ? { reaction_entity_id: reactionId } : {}),
+      yield_confidence: inferYieldConfidence(basis, hasConflict),
+      yield_basis: basis,
+      result_confirmed_by_analysis: confirmedByAnalysis,
+      has_conflicting_values: hasConflict,
+      target_usable_for_regression: typeof result.yield_percent === "number" && !hasConflict,
+      evidence_entity_ids: uniqueStrings([
+        result.entity_id,
+        ...evidenceRelations.map((relation) => relation.from_entity_id)
+      ]),
+      warnings: buildOutcomeWarnings(result, basis, hasConflict)
+    };
+  });
+
 const createFieldEvidence = (input: FieldEvidenceInput): TrainingFieldEvidenceV1[] => {
   if (input.value === undefined || input.value === null) {
     return [];
@@ -803,10 +1030,45 @@ const buildReactionFieldEvidence = (record: ChemdTrainingExportV2): TrainingFiel
     }),
     ...createFieldEvidence({
       subjectEntityId: reaction.entity_id,
+      field: "time",
+      value: formatNumericWithUnit(reaction.normalized_conditions.time),
+      rawValue: reaction.time_raw,
+      normalized: Boolean(reaction.normalized_conditions.time)
+    }),
+    ...createFieldEvidence({
+      subjectEntityId: reaction.entity_id,
+      field: "pressure",
+      value: formatNumericWithUnit(reaction.normalized_conditions.pressure),
+      rawValue: reaction.pressure_raw,
+      normalized: Boolean(reaction.normalized_conditions.pressure)
+    }),
+    ...createFieldEvidence({
+      subjectEntityId: reaction.entity_id,
+      field: "atmosphere",
+      value: reaction.normalized_conditions.atmosphere?.normalized,
+      rawValue: reaction.atmosphere_raw,
+      normalized: Boolean(reaction.normalized_conditions.atmosphere)
+    }),
+    ...createFieldEvidence({
+      subjectEntityId: reaction.entity_id,
       field: "yield_percent",
       value: reaction.normalized_outcome_hints.yield_percent,
       rawValue: reaction.yield_raw,
       normalized: typeof reaction.normalized_outcome_hints.yield_percent === "number"
+    }),
+    ...createFieldEvidence({
+      subjectEntityId: reaction.entity_id,
+      field: "conversion_percent",
+      value: reaction.normalized_outcome_hints.conversion_percent,
+      rawValue: reaction.conversion_raw,
+      normalized: typeof reaction.normalized_outcome_hints.conversion_percent === "number"
+    }),
+    ...createFieldEvidence({
+      subjectEntityId: reaction.entity_id,
+      field: "selectivity_percent",
+      value: reaction.normalized_outcome_hints.selectivity_percent,
+      rawValue: reaction.selectivity_raw,
+      normalized: typeof reaction.normalized_outcome_hints.selectivity_percent === "number"
     })
   ]);
 
@@ -1139,6 +1401,13 @@ const buildRecommendedLoraTasks = (
   const hasSemanticRelations = record.semantic_layer.links.length > 0;
   const hasEvidenceLinks = fieldEvidence.some(hasExternalEvidence);
   const hasSummaryBasis = record.semantic_layer.reactions.length + record.semantic_layer.results.length > 0;
+  const hasDecisionBasis = record.semantic_layer.reactions.length > 0 && record.semantic_layer.results.length > 0;
+  const hasYieldPrediction = record.learning_layer.prediction_instances.some((instance) =>
+    instance.usability.usable_for_yield_regression
+  );
+  const hasFailedOutcome = record.semantic_layer.results.some((result) => result.status_label === "failed");
+  const hasExperimentComparison = record.semantic_layer.reactions.length > 1;
+  const hasProposalBasis = hasProcedureLogic && hasDecisionBasis;
   const qualityIssueCount = missingLogic.length + (record.quality_layer.training_quality.exclusion_reasons?.length ?? 0);
 
   return [
@@ -1148,6 +1417,11 @@ const buildRecommendedLoraTasks = (
     ...includeTask(resolvedReferences.length > 0, createTaskHint("reference_resolution", "Resolved or unresolved references are available.")),
     ...includeTask(hasEvidenceLinks, createTaskHint("evidence_tracing", "External field-level evidence is available.")),
     ...includeTask(hasProcedureLogic, createTaskHint("procedure_reasoning", "Procedure-to-step pairs are available.")),
+    ...includeTask(hasYieldPrediction, createTaskHint("yield_prediction", "Usable yield targets are available.")),
+    ...includeTask(hasDecisionBasis, createTaskHint("condition_recommendation", "Reaction conditions and outcomes are available.")),
+    ...includeTask(hasProposalBasis, createTaskHint("experiment_proposal", "Procedure and outcome context are available.")),
+    ...includeTask(hasFailedOutcome, createTaskHint("failure_analysis", "Failed result labels are available.")),
+    ...includeTask(hasExperimentComparison, createTaskHint("experiment_comparison", "Multiple reactions can be compared.")),
     ...includeTask(qualityIssueCount > 0, createTaskHint("consistency_check", "Quality warnings or missing logic are available.")),
     ...(entityIds.length > 0 ? [createTaskHint("qa_with_context", "Structured experiment context is available.", entityIds)] : [])
   ];
@@ -1158,12 +1432,23 @@ const buildBlockedLoraTasks = (context: LoraHintContext): LoraTaskHintV1[] => {
   const hasProcedureLogic = Boolean(record.learning_layer.procedure_to_steps?.length);
   const hasSemanticRelations = record.semantic_layer.links.length > 0;
   const hasEvidenceLinks = fieldEvidence.some(hasExternalEvidence);
+  const hasYieldPrediction = record.learning_layer.prediction_instances.some((instance) =>
+    instance.usability.usable_for_yield_regression
+  );
 
   return [
     ...includeTask(!hasSemanticRelations, createTaskHint("relation_extraction", "No semantic relations are available.")),
     ...includeTask(resolvedReferences.length === 0, createTaskHint("reference_resolution", "No references are available.")),
     ...includeTask(!hasEvidenceLinks, createTaskHint("evidence_tracing", "No external field-level evidence is available.")),
-    ...includeTask(!hasProcedureLogic, createTaskHint("procedure_reasoning", "No procedure logic is available."))
+    ...includeTask(!hasProcedureLogic, createTaskHint("procedure_reasoning", "No procedure logic is available.")),
+    ...includeTask(!hasYieldPrediction, createTaskHint("yield_prediction", "No usable yield target is available.")),
+    ...includeTask(
+      record.semantic_layer.reactions.length === 0 || record.semantic_layer.results.length === 0,
+      createTaskHint("condition_recommendation", "No reaction/result pair is available.")
+    ),
+    ...includeTask(!hasProcedureLogic, createTaskHint("experiment_proposal", "No procedure logic is available.")),
+    ...includeTask(!record.semantic_layer.results.some((result) => result.status_label === "failed"), createTaskHint("failure_analysis", "No failed result label is available.")),
+    ...includeTask(record.semantic_layer.reactions.length < 2, createTaskHint("experiment_comparison", "Fewer than two reactions are available."))
   ];
 };
 
@@ -1230,6 +1515,8 @@ export const buildTrainingUnderstandingFromRecord = (
     experiment_logic: {
       primary_entities: primaryEntities,
       outcomes: buildOutcomeLogic(record),
+      design_contexts: buildExperimentDesignContexts(record),
+      outcome_quality: buildOutcomeQuality(record),
       evidence_links: buildEvidenceLinks(record, EVIDENCE_RELATIONS, "analysis"),
       sample_lineage: buildEvidenceLinks(record, SAMPLE_LINEAGE_RELATIONS, "sample")
     },

@@ -8,6 +8,8 @@ import type {
   LearningLayerV1,
   ObservationToEventsPairV03,
   PredictionInstanceV1,
+  PredictionTargetFieldV1,
+  PredictionTargetSourceV1,
   PredictionTargetsV1,
   ProcedureToStepsPairV03,
   RetrievalChunkV1,
@@ -237,16 +239,56 @@ const toConditionValue = (value: { normalized?: string } | null | undefined): st
 const toNumericValue = (value: { value?: number } | null | undefined): number | null =>
   typeof value?.value === "number" ? value.value : null;
 
+const readTargetValue = (
+  resultValue: number | null | undefined,
+  reactionHint: number | null | undefined
+): { value?: number | null; source: PredictionTargetSourceV1 } => {
+  if (typeof resultValue === "number") {
+    return { value: resultValue, source: "result" };
+  }
+
+  if (typeof reactionHint === "number") {
+    return { value: reactionHint, source: "reaction_hint" };
+  }
+
+  return { source: "missing" };
+};
+
+const createTargetSources = (
+  entries: Array<[PredictionTargetFieldV1, PredictionTargetSourceV1]>
+): Partial<Record<PredictionTargetFieldV1, PredictionTargetSourceV1>> =>
+  Object.fromEntries(entries) as Partial<Record<PredictionTargetFieldV1, PredictionTargetSourceV1>>;
+
 const buildPredictionTargets = (
   reaction: ExportedReactionV1,
   primaryResult: ExportedResultV1 | undefined
-): PredictionTargetsV1 => ({
-  status_class: primaryResult?.status_label,
-  yield_percent: primaryResult?.yield_percent ?? reaction.normalized_outcome_hints.yield_percent,
-  conversion_percent: primaryResult?.conversion_percent ?? reaction.normalized_outcome_hints.conversion_percent,
-  selectivity_percent: primaryResult?.selectivity_percent ?? reaction.normalized_outcome_hints.selectivity_percent,
-  purity_percent: primaryResult?.purity_percent
-});
+): PredictionTargetsV1 => {
+  const yieldTarget = readTargetValue(primaryResult?.yield_percent, reaction.normalized_outcome_hints.yield_percent);
+  const conversionTarget = readTargetValue(
+    primaryResult?.conversion_percent,
+    reaction.normalized_outcome_hints.conversion_percent
+  );
+  const selectivityTarget = readTargetValue(
+    primaryResult?.selectivity_percent,
+    reaction.normalized_outcome_hints.selectivity_percent
+  );
+  const puritySource: PredictionTargetSourceV1 = typeof primaryResult?.purity_percent === "number" ? "result" : "missing";
+
+  return {
+    status_class: primaryResult?.status_label,
+    yield_percent: yieldTarget.value,
+    conversion_percent: conversionTarget.value,
+    selectivity_percent: selectivityTarget.value,
+    purity_percent: primaryResult?.purity_percent,
+    target_sources: createTargetSources([
+      ["status_class", primaryResult?.status_label ? "result" : "missing"],
+      ["yield_percent", yieldTarget.source],
+      ["conversion_percent", conversionTarget.source],
+      ["selectivity_percent", selectivityTarget.source],
+      ["purity_percent", puritySource]
+    ])
+  };
+};
 
 const buildMissingPredictionFields = (
   reaction: ExportedReactionV1,
@@ -263,6 +305,41 @@ const buildLinkedMoleculeIds = (reaction: ExportedReactionV1): string[] => [
   ...reaction.products.flatMap((participant) => participant.target_entity_id ?? [])
 ];
 
+const findLinkedResultForReaction = (
+  semanticLayer: SemanticLayerV1,
+  reactionEntityId: string
+): ExportedResultV1 | undefined =>
+  semanticLayer.results.find((result) =>
+    semanticLayer.links.some((relation) =>
+      relation.relation_type === "result_describes_reaction"
+      && relation.from_entity_id === result.entity_id
+      && relation.to_entity_id === reactionEntityId
+    )
+  );
+
+const buildLinkedEntityIds = (
+  semanticLayer: SemanticLayerV1,
+  relationTypes: string[],
+  targetIds: string[]
+): string[] =>
+  semanticLayer.links
+    .filter((relation) =>
+      relationTypes.includes(relation.relation_type)
+      && targetIds.includes(relation.to_entity_id)
+    )
+    .map((relation) => relation.from_entity_id);
+
+const sumReactantEquivalents = (
+  semanticLayer: SemanticLayerV1,
+  linkedMoleculeEntityIds: string[]
+): number | null => {
+  const values = semanticLayer.molecules
+    .filter((molecule) => linkedMoleculeEntityIds.includes(molecule.entity_id))
+    .flatMap((molecule) => typeof molecule.equivalents_value === "number" ? [molecule.equivalents_value] : []);
+
+  return values.length > 0 ? values.reduce((sum, value) => sum + value, 0) : null;
+};
+
 const buildPredictionWarnings = (reaction: ExportedReactionV1): string[] =>
   reaction.reactants.concat(reaction.products)
     .filter((participant) => participant.reference_status === "unresolved")
@@ -270,10 +347,21 @@ const buildPredictionWarnings = (reaction: ExportedReactionV1): string[] =>
 
 const buildPredictionInstance = (
   document: ExportedDocumentInfo,
+  semanticLayer: SemanticLayerV1,
   reaction: ExportedReactionV1,
   primaryResult: ExportedResultV1 | undefined
 ): PredictionInstanceV1 => {
   const targets = buildPredictionTargets(reaction, primaryResult);
+  const linkedMoleculeIds = buildLinkedMoleculeIds(reaction);
+  const linkedTargetIds = [reaction.entity_id, ...(primaryResult ? [primaryResult.entity_id] : [])];
+  const linkedAnalysisIds = buildLinkedEntityIds(semanticLayer, [
+    "analysis_targets_reaction",
+    "analysis_targets_result"
+  ], linkedTargetIds);
+  const linkedSampleIds = buildLinkedEntityIds(semanticLayer, [
+    "sample_derived_from_reaction",
+    "sample_related_to_result"
+  ], linkedTargetIds);
 
   return {
     instance_id: `prediction::${document.document_id}::${reaction.entity_id}`,
@@ -281,25 +369,33 @@ const buildPredictionInstance = (
     task_scope: "reaction",
     reaction_entity_id: reaction.entity_id,
     ...(primaryResult ? { linked_result_entity_id: primaryResult.entity_id } : {}),
-    linked_molecule_entity_ids: buildLinkedMoleculeIds(reaction),
+    ...(linkedAnalysisIds.length > 0 ? { linked_analysis_entity_ids: linkedAnalysisIds } : {}),
+    ...(linkedSampleIds.length > 0 ? { linked_sample_entity_ids: linkedSampleIds } : {}),
+    linked_molecule_entity_ids: linkedMoleculeIds,
     split_hint: {
       date: document.date
     },
     features: {
       categorical: {
+        reaction_name: reaction.name ?? null,
         solvent: toConditionValue(reaction.normalized_conditions.solvent),
         catalyst: toConditionValue(reaction.normalized_conditions.catalyst),
+        reagents: reaction.normalized_conditions.reagents?.normalized.join(", ") ?? null,
         atmosphere: toConditionValue(reaction.normalized_conditions.atmosphere)
       },
       numeric: {
         temperature: toNumericValue(reaction.normalized_conditions.temperature),
         time: toNumericValue(reaction.normalized_conditions.time),
-        pressure: toNumericValue(reaction.normalized_conditions.pressure)
+        pressure: toNumericValue(reaction.normalized_conditions.pressure),
+        num_reactants: reaction.reactants.length,
+        num_products: reaction.products.length,
+        num_resolved_reactants: reaction.reactants.filter((participant) => participant.reference_status === "resolved").length,
+        total_reactant_equivalents: sumReactantEquivalents(semanticLayer, linkedMoleculeIds)
       },
       text_refs: reaction.text_for_embedding ? [reaction.text_for_embedding] : [],
       entity_refs: [
         reaction.entity_id,
-        ...(primaryResult ? [primaryResult.entity_id] : [])
+        ...linkedMoleculeIds
       ]
     },
     targets,
@@ -318,9 +414,18 @@ const buildPredictionInstances = (
   document: ExportedDocumentInfo,
   semanticLayer: SemanticLayerV1
 ): PredictionInstanceV1[] => {
-  const primaryResult = semanticLayer.results.find((result) => result.is_primary) ?? semanticLayer.results[0];
+  const fallbackResult = semanticLayer.reactions.length === 1
+    ? semanticLayer.results.find((result) => result.is_primary) ?? semanticLayer.results[0]
+    : undefined;
 
-  return semanticLayer.reactions.map((reaction) => buildPredictionInstance(document, reaction, primaryResult));
+  return semanticLayer.reactions.map((reaction) =>
+    buildPredictionInstance(
+      document,
+      semanticLayer,
+      reaction,
+      findLinkedResultForReaction(semanticLayer, reaction.entity_id) ?? fallbackResult
+    )
+  );
 };
 
 export const buildLearningLayer = (input: BuildLearningLayerInput): LearningLayerV1 => {
