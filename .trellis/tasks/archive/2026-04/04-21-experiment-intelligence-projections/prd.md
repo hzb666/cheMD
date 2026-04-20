@@ -42,7 +42,7 @@
 - [x] 不把 RAG chunks、audit/layout/source_layer/raw AST 混入训练任务。
 - [x] exporter-training 定向测试、typecheck、eslint 通过。
 - [x] 根级 `pnpm typecheck` 和 `pnpm test` 通过。
-- [ ] 每阶段完成代码审查、finish-work、git commit 和 record-session。
+- [x] 每阶段完成代码审查、finish-work、git commit 和 record-session。
 
 ## Technical Notes
 
