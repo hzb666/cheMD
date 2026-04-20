@@ -23,13 +23,13 @@
 
 ## Acceptance Criteria
 
-- [ ] `trainingUnderstanding` 包含实验设计/优化上下文。
-- [ ] `trainingUnderstanding` 包含结果质量和目标可用性信息。
-- [ ] `prediction_instances` 覆盖更多反应、条件、操作、证据相关特征。
-- [ ] LoRA/SFT hints 能区分总结/抽取任务和实验决策任务。
-- [ ] 可从 `trainingUnderstanding` 派生任务化 SFT 数据。
-- [ ] 新结构不要求用户增加 Chemd 书写负担。
-- [ ] exporter-training 定向测试和 typecheck 通过。
+- [x] `trainingUnderstanding` 包含实验设计/优化上下文。
+- [x] `trainingUnderstanding` 包含结果质量和目标可用性信息。
+- [x] `prediction_instances` 覆盖更多反应、条件、操作、证据相关特征。
+- [x] LoRA/SFT hints 能区分总结/抽取任务和实验决策任务。
+- [x] 可从 `trainingUnderstanding` 派生任务化 SFT 数据。
+- [x] 新结构不要求用户增加 Chemd 书写负担。
+- [x] exporter-training 定向测试和 typecheck 通过。
 - [ ] 完成代码审查、finish-work、git commit 和 record-session。
 
 ## Technical Notes

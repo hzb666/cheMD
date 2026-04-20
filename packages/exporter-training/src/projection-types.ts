@@ -293,3 +293,40 @@ export interface ChemdTrainingUnderstandingV1 {
     exclusion_reasons?: string[];
   };
 }
+
+export type ExperimentDecisionTaskTypeV1 =
+  | "yield_prediction"
+  | "condition_recommendation"
+  | "experiment_proposal"
+  | "failure_analysis"
+  | "experiment_comparison";
+
+export interface TrainingTaskMessageV1 {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+export interface TrainingTaskExampleV1 {
+  example_id: string;
+  task_type: ExperimentDecisionTaskTypeV1;
+  source_document_id: string;
+  source_entity_ids: string[];
+  split_hint: TrainingLoraGenerationHintsV1["split_hint"];
+  messages: TrainingTaskMessageV1[];
+  quality: {
+    supervision: "derived_from_training_understanding";
+    usable_for_sft: boolean;
+    warnings: string[];
+  };
+}
+
+export interface ChemdTrainingTaskDatasetV1 {
+  schema_version: "chemd-training-task-dataset/v0.1";
+  document: ExportedDocumentInfo & { summary?: string };
+  examples: TrainingTaskExampleV1[];
+  quality: {
+    example_count: number;
+    task_types: ExperimentDecisionTaskTypeV1[];
+    warnings: string[];
+  };
+}

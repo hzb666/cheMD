@@ -84,6 +84,17 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   experiment proposal, failure analysis, and experiment comparison.
 - LoRA/SFT JSONL must be generated from `ChemdTrainingUnderstandingV1`,
   not from RAG chunks or the full audit export.
+- `buildTrainingTaskDatasetFromUnderstanding()` is the public task-projection
+  API for experiment-decision SFT/LoRA samples. It consumes only
+  `ChemdTrainingUnderstandingV1` and emits JSONL-ready `messages` examples for
+  yield prediction, condition recommendation, experiment proposal, failure
+  analysis, and experiment comparison.
+- Task-projection examples are derived supervision. They must carry quality
+  warnings and must not be treated as human-confirmed labels unless a later
+  annotation layer explicitly adds that status.
+- Task-projection prompts may include structured reaction/design/outcome facts,
+  but must not include `source_layer`, raw AST payloads, render/layout fields,
+  full audit export data, or RAG-only chunks.
 
 ### 4. Validation & Error Matrix
 
@@ -115,6 +126,9 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   quality without leaking source layer, render layout, or full audit fields.
 - Assert prediction instances link the correct result per reaction and do not
   apply a primary-result fallback to multiple unrelated reactions.
+- Assert task-projection examples are generated from training understanding,
+  expose `messages`, carry source entity IDs, and preserve derived-supervision
+  warnings for weak labels.
 
 ### 7. Wrong vs Correct
 
