@@ -379,11 +379,15 @@ export interface ChemdTrainingUnderstandingV1 {
 }
 
 export type ExperimentDecisionTaskTypeV1 =
+  | "reaction_classification"
+  | "expert_routing"
   | "yield_prediction"
   | "condition_recommendation"
   | "experiment_proposal"
   | "failure_analysis"
   | "experiment_comparison";
+
+export type TrainingTaskLeakageRiskV1 = "low" | "medium" | "high";
 
 export interface TrainingTaskMessageV1 {
   role: "system" | "user" | "assistant";
@@ -400,7 +404,14 @@ export interface TrainingTaskExampleV1 {
   quality: {
     supervision: "derived_from_training_understanding";
     usable_for_sft: boolean;
+    usable_for_eval: boolean;
+    derived_label_confidence?: TrainingInferenceConfidenceV1;
     warnings: string[];
+  };
+  evaluation: {
+    holdout_eligible: boolean;
+    leakage_risk: TrainingTaskLeakageRiskV1;
+    target_fields: string[];
   };
 }
 
@@ -411,6 +422,39 @@ export interface ChemdTrainingTaskDatasetV1 {
   quality: {
     example_count: number;
     task_types: ExperimentDecisionTaskTypeV1[];
+    sft_eligible_count: number;
+    eval_eligible_count: number;
+    holdout_eligible_count: number;
     warnings: string[];
+  };
+}
+
+export type TrainingAnnotationTargetTypeV1 =
+  | "reaction_taxonomy"
+  | "expert_routing"
+  | "optimization_trajectory"
+  | "failure_signal"
+  | "task_example";
+
+export interface TrainingAnnotationCorrectionV1 {
+  correction_id: string;
+  source_document_id: string;
+  target_type: TrainingAnnotationTargetTypeV1;
+  target_id: string;
+  original_value?: unknown;
+  corrected_value: unknown;
+  reason?: string;
+  corrected_by?: string;
+  corrected_at?: string;
+  supervision_after_correction: "human_verified" | "human_corrected" | "rejected" | "needs_review";
+}
+
+export interface ChemdTrainingAnnotationPatchV1 {
+  schema_version: "chemd-training-annotation-patch/v0.1";
+  document: ExportedDocumentInfo;
+  corrections: TrainingAnnotationCorrectionV1[];
+  quality: {
+    correction_count: number;
+    requires_regeneration: boolean;
   };
 }

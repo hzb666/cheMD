@@ -35,13 +35,13 @@
 
 - [x] `trainingUnderstanding` 包含反应分类和专家路由标签。
 - [x] `trainingUnderstanding` 包含优化轨迹和失败模式信号。
-- [ ] task dataset 可以派生 reaction classification 和 expert routing 样本。
-- [ ] task dataset 明确区分 SFT 样本和 eval/holdout 适用性。
-- [ ] annotation/correction 类型只作为训练回流入口，不污染自动派生监督。
+- [x] task dataset 可以派生 reaction classification 和 expert routing 样本。
+- [x] task dataset 明确区分 SFT 样本和 eval/holdout 适用性。
+- [x] annotation/correction 类型只作为训练回流入口，不污染自动派生监督。
 - [x] 新结构不要求用户改变 Chemd 写法。
 - [x] 不把 RAG chunks、audit/layout/source_layer/raw AST 混入训练任务。
-- [ ] exporter-training 定向测试、typecheck、eslint 通过。
-- [ ] 根级 `pnpm typecheck` 和 `pnpm test` 通过。
+- [x] exporter-training 定向测试、typecheck、eslint 通过。
+- [x] 根级 `pnpm typecheck` 和 `pnpm test` 通过。
 - [ ] 每阶段完成代码审查、finish-work、git commit 和 record-session。
 
 ## Technical Notes

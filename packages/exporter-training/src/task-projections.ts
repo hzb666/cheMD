@@ -2,10 +2,14 @@ import type {
   ChemdTrainingTaskDatasetV1,
   ChemdTrainingUnderstandingV1,
   ExperimentDecisionTaskTypeV1,
+  TrainingExpertRoutingV1,
   TrainingExperimentDesignContextV1,
+  TrainingInferenceConfidenceV1,
   TrainingOutcomeLogicV1,
   TrainingOutcomeQualityV1,
   TrainingReactionV1,
+  TrainingReactionTaxonomyV1,
+  TrainingTaskLeakageRiskV1,
   TrainingTaskExampleV1
 } from "./projection-types";
 
@@ -19,9 +23,15 @@ interface CreateExampleInput {
   input: JsonObject;
   output: JsonObject;
   warnings?: string[];
+  targetFields?: string[];
+  leakageRisk?: TrainingTaskLeakageRiskV1;
+  usableForEval?: boolean;
+  derivedLabelConfidence?: TrainingInferenceConfidenceV1;
 }
 
 const SYSTEM_PROMPTS: Record<ExperimentDecisionTaskTypeV1, string> = {
+  reaction_classification: "Classify the reaction using only supplied Chemd experiment facts and return conservative taxonomy labels.",
+  expert_routing: "Route the experiment to suitable chemistry or modeling experts using only supplied Chemd experiment facts.",
   yield_prediction: "Use only the supplied Chemd experiment facts to estimate the observed reaction outcome. Do not invent missing chemistry.",
   condition_recommendation: "Use Chemd experiment facts to recommend conservative condition changes with evidence. Do not invent unavailable reagents.",
   experiment_proposal: "Use Chemd experiment facts to draft the next experiment plan with assumptions and risks.",
@@ -63,6 +73,12 @@ const getOutcomeQuality = (
     ? understanding.experiment_logic.outcome_quality.find((quality) => quality.result_entity_id === resultEntityId)
     : undefined;
 
+const getDesignContext = (
+  understanding: ChemdTrainingUnderstandingV1,
+  reactionEntityId: string
+): TrainingExperimentDesignContextV1 | undefined =>
+  understanding.experiment_logic.design_contexts.find((context) => context.reaction_entity_id === reactionEntityId);
+
 const getReactionFacts = (reaction: TrainingReactionV1 | undefined): JsonObject => ({
   reaction_entity_id: reaction?.entity_id,
   name: reaction?.name,
@@ -86,6 +102,34 @@ const getOutcomeFacts = (
   result_confirmed_by_analysis: quality?.result_confirmed_by_analysis
 });
 
+const mapYieldConfidence = (
+  confidence: TrainingOutcomeQualityV1["yield_confidence"] | undefined
+): TrainingInferenceConfidenceV1 | undefined => {
+  if (confidence === "confirmed") {
+    return "high";
+  }
+
+  if (confidence === "estimated") {
+    return "medium";
+  }
+
+  return confidence === "unknown" ? "low" : undefined;
+};
+
+const getTaxonomyOutput = (taxonomy: TrainingReactionTaxonomyV1): JsonObject => ({
+  reaction_family: taxonomy.reaction_family,
+  transformation_tags: taxonomy.transformation_tags,
+  confidence: taxonomy.confidence,
+  warnings: taxonomy.warnings
+});
+
+const getRoutingOutput = (routing: TrainingExpertRoutingV1): JsonObject => ({
+  expert_labels: routing.expert_labels,
+  routing_basis: routing.routing_basis,
+  confidence: routing.confidence,
+  warnings: routing.warnings
+});
+
 const createExample = (input: CreateExampleInput): TrainingTaskExampleV1 => ({
   example_id: `${input.taskType}::${input.understanding.document.document_id}::${input.suffix}`,
   task_type: input.taskType,
@@ -100,9 +144,70 @@ const createExample = (input: CreateExampleInput): TrainingTaskExampleV1 => ({
   quality: {
     supervision: "derived_from_training_understanding",
     usable_for_sft: (input.warnings ?? []).length === 0,
+    usable_for_eval: input.usableForEval ?? false,
+    ...(input.derivedLabelConfidence ? { derived_label_confidence: input.derivedLabelConfidence } : {}),
     warnings: input.warnings ?? []
+  },
+  evaluation: {
+    holdout_eligible: input.usableForEval ?? false,
+    leakage_risk: input.leakageRisk ?? "low",
+    target_fields: input.targetFields ?? []
   }
 });
+
+const buildReactionClassificationExamples = (
+  understanding: ChemdTrainingUnderstandingV1
+): TrainingTaskExampleV1[] =>
+  understanding.experiment_logic.reaction_taxonomy.map((taxonomy) => {
+    const reaction = getReaction(understanding, taxonomy.reaction_entity_id);
+
+    return createExample({
+      understanding,
+      taskType: "reaction_classification",
+      suffix: taxonomy.reaction_entity_id,
+      sourceEntityIds: taxonomy.evidence_entity_ids,
+      input: {
+        task: "reaction_classification",
+        reaction: getReactionFacts(reaction)
+      },
+      output: getTaxonomyOutput(taxonomy),
+      warnings: taxonomy.warnings,
+      targetFields: ["reaction_family", "transformation_tags"],
+      leakageRisk: "low",
+      usableForEval: taxonomy.warnings.length === 0 && taxonomy.confidence !== "unknown",
+      derivedLabelConfidence: taxonomy.confidence
+    });
+  });
+
+const buildExpertRoutingExamples = (
+  understanding: ChemdTrainingUnderstandingV1
+): TrainingTaskExampleV1[] =>
+  understanding.experiment_logic.expert_routing.map((routing) => {
+    const reaction = getReaction(understanding, routing.reaction_entity_id);
+    const context = getDesignContext(understanding, routing.reaction_entity_id);
+    const taxonomy = understanding.experiment_logic.reaction_taxonomy.find((candidate) =>
+      candidate.reaction_entity_id === routing.reaction_entity_id
+    );
+
+    return createExample({
+      understanding,
+      taskType: "expert_routing",
+      suffix: routing.reaction_entity_id,
+      sourceEntityIds: uniqueStrings([routing.reaction_entity_id, ...(context?.evidence_entity_ids ?? [])]),
+      input: {
+        task: "expert_routing",
+        reaction: getReactionFacts(reaction),
+        taxonomy: taxonomy ? getTaxonomyOutput(taxonomy) : undefined,
+        design_context: context
+      },
+      output: getRoutingOutput(routing),
+      warnings: routing.warnings,
+      targetFields: ["expert_labels"],
+      leakageRisk: "low",
+      usableForEval: routing.warnings.length === 0 && routing.confidence !== "unknown",
+      derivedLabelConfidence: routing.confidence
+    });
+  });
 
 const buildYieldPredictionExamples = (
   understanding: ChemdTrainingUnderstandingV1
@@ -131,7 +236,11 @@ const buildYieldPredictionExamples = (
         target_source: "linked_result",
         rationale: "Observed yield is derived from the linked result entity."
       },
-      warnings: quality?.warnings ?? []
+      warnings: quality?.warnings ?? [],
+      targetFields: ["observed_outcome.yield_percent"],
+      leakageRisk: "medium",
+      usableForEval: (quality?.warnings ?? []).length === 0,
+      derivedLabelConfidence: mapYieldConfidence(quality?.yield_confidence)
     })];
   });
 
@@ -180,7 +289,10 @@ const buildConditionRecommendationExamples = (
         preserve: context.controlled_variables,
         review_first: quality?.warnings ?? []
       },
-      warnings: quality?.warnings ?? []
+      warnings: quality?.warnings ?? [],
+      targetFields: ["recommendation"],
+      leakageRisk: "medium",
+      usableForEval: false
     })];
   });
 
@@ -217,40 +329,55 @@ const buildExperimentProposalExamples = (
         assumptions: ["Derived proposal requires human chemistry review before execution."],
         risks: quality?.warnings ?? []
       },
-      warnings: quality?.warnings ?? []
+      warnings: quality?.warnings ?? [],
+      targetFields: ["proposal_strategy"],
+      leakageRisk: "medium",
+      usableForEval: false
     })];
   });
 
 const buildFailureAnalysisExamples = (
   understanding: ChemdTrainingUnderstandingV1
 ): TrainingTaskExampleV1[] =>
-  understanding.experiment_logic.outcomes.flatMap((outcome) => {
-    if (outcome.status_label !== "failed") {
+  understanding.experiment_logic.failure_signals.flatMap((failure) => {
+    const outcome = getOutcomeByResult(understanding, failure.result_entity_id);
+    if (!outcome) {
       return [];
     }
 
-    const context = understanding.experiment_logic.design_contexts.find((candidate) =>
-      candidate.reaction_entity_id === outcome.reaction_entity_id
-    );
+    const context = outcome.reaction_entity_id
+      ? getDesignContext(understanding, outcome.reaction_entity_id)
+      : undefined;
     const quality = getOutcomeQuality(understanding, outcome.result_entity_id);
+    const sourceEntityIds = uniqueStrings([
+      failure.result_entity_id,
+      ...(failure.reaction_entity_id ? [failure.reaction_entity_id] : []),
+      ...failure.evidence_entity_ids
+    ]);
 
     return [createExample({
       understanding,
       taskType: "failure_analysis",
       suffix: outcome.result_entity_id,
-      sourceEntityIds: uniqueStrings([outcome.result_entity_id, ...(outcome.reaction_entity_id ? [outcome.reaction_entity_id] : [])]),
+      sourceEntityIds,
       input: {
         task: "failure_analysis",
         design_context: context,
         observed_outcome: getOutcomeFacts(outcome, quality),
+        failure_signal: failure,
         missing_logic: understanding.knowledge_graph.missing_logic
       },
       output: {
-        evidence: quality?.warnings ?? [],
-        hypothesis: "Failure analysis is derived from status labels, missing logic, and linked evidence only.",
-        next_check: "Inspect analysis evidence and repeat with one controlled variable changed."
+        failure_modes: failure.failure_modes,
+        evidence: failure.warnings,
+        recommended_checks: failure.recommended_checks,
+        hypothesis: "Failure analysis is derived from status labels, outcome quality, and linked evidence only."
       },
-      warnings: quality?.warnings ?? []
+      warnings: uniqueStrings([...(quality?.warnings ?? []), ...failure.warnings]),
+      targetFields: ["failure_modes", "recommended_checks"],
+      leakageRisk: "medium",
+      usableForEval: failure.warnings.length === 0,
+      derivedLabelConfidence: failure.confidence
     })];
   });
 
@@ -300,14 +427,28 @@ const buildExperimentComparisonExamples = (
         candidate_outcome: getOutcomeFacts(candidateOutcome, candidateQuality),
         yield_delta_percent: delta
       },
-      warnings
+      warnings,
+      targetFields: ["yield_delta_percent"],
+      leakageRisk: "medium",
+      usableForEval: warnings.length === 0 && delta !== null,
+      derivedLabelConfidence: warnings.length === 0 ? "medium" : "low"
     })];
   });
+
+const countEligible = (
+  examples: TrainingTaskExampleV1[],
+  key: "usable_for_sft" | "usable_for_eval"
+): number => examples.filter((example) => example.quality[key]).length;
+
+const countHoldoutEligible = (examples: TrainingTaskExampleV1[]): number =>
+  examples.filter((example) => example.evaluation.holdout_eligible).length;
 
 export const buildTrainingTaskDatasetFromUnderstanding = (
   understanding: ChemdTrainingUnderstandingV1
 ): ChemdTrainingTaskDatasetV1 => {
   const examples = [
+    ...buildReactionClassificationExamples(understanding),
+    ...buildExpertRoutingExamples(understanding),
     ...buildYieldPredictionExamples(understanding),
     ...buildConditionRecommendationExamples(understanding),
     ...buildExperimentProposalExamples(understanding),
@@ -322,6 +463,9 @@ export const buildTrainingTaskDatasetFromUnderstanding = (
     quality: {
       example_count: examples.length,
       task_types: uniqueStrings(examples.map((example) => example.task_type)) as ExperimentDecisionTaskTypeV1[],
+      sft_eligible_count: countEligible(examples, "usable_for_sft"),
+      eval_eligible_count: countEligible(examples, "usable_for_eval"),
+      holdout_eligible_count: countHoldoutEligible(examples),
       warnings: understanding.quality.warnings
     }
   };

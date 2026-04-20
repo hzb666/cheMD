@@ -102,13 +102,21 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   API for experiment-decision SFT/LoRA samples. It consumes only
   `ChemdTrainingUnderstandingV1` and emits JSONL-ready `messages` examples for
   yield prediction, condition recommendation, experiment proposal, failure
-  analysis, and experiment comparison.
+  analysis, experiment comparison, reaction classification, and expert routing.
 - Task-projection examples are derived supervision. They must carry quality
   warnings and must not be treated as human-confirmed labels unless a later
   annotation layer explicitly adds that status.
+- Task-projection examples must distinguish SFT and eval/holdout use through
+  `quality.usable_for_sft`, `quality.usable_for_eval`, and `evaluation`.
+  Open-ended heuristic recommendation/proposal labels should remain SFT-only
+  unless a human annotation layer confirms them.
 - Task-projection prompts may include structured reaction/design/outcome facts,
   but must not include `source_layer`, raw AST payloads, render/layout fields,
   full audit export data, or RAG-only chunks.
+- `ChemdTrainingAnnotationPatchV1` is the correction envelope for human review.
+  It records corrected values and post-correction supervision status separately
+  from automatic projections, so derived labels do not silently become
+  human-verified labels.
 
 ### 4. Validation & Error Matrix
 
@@ -145,6 +153,8 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 - Assert task-projection examples are generated from training understanding,
   expose `messages`, carry source entity IDs, and preserve derived-supervision
   warnings for weak labels.
+- Assert task-projection examples expose SFT/eval/holdout metadata and that
+  annotation patches remain separate from automatic derived supervision.
 
 ### 7. Wrong vs Correct
 
