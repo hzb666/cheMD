@@ -15,74 +15,72 @@
 
 [简体中文](./README.zh-CN.md) | [English](./README.md)
 
-`chemd` 是以 Markdown 为源文档的化学文档工作台。它提供结构化实验记录语言、TypeScript 编译流水线、Next.js playground，以及本地 Flask/RDKit chemistry service，用于渲染、规范化、OCR 接入、导出、运行前检查和面向模型的实验数据生成。
+`chemd` 将化学实验记录转成接近代码的、可由编译器检查的文档，同时保留研究人员可读的叙述，并为 LLM 系统提供结构化输入。它从实验记录中抽取实体、引用、步骤逻辑、观察、证据关系和知识图谱边，用于检索、训练和下游推理。系统由类型化化学文档语言、TypeScript 编译流水线、Next.js playground 和本地 Flask/RDKit chemistry service 组成。
 
-## 能力范围
+## 产品范围
 
-- 结构化化学 Markdown，覆盖 frontmatter、行内化学 token、引用、分子、反应、结果、分析、样品、步骤、观察、模板和列布局。
-- 基于 Next.js playground 的浏览器编辑与预览。
-- 从 parser、resolver、typechecker、runtime planner、LNF builder、renderer 到 training exporter 的语义编译链。
-- HTML 预览、规范化 JSON 导出、DOCX bridge 输出，以及 Pandoc 可用时的服务端 DOCX 生成。
-- 基于 Ketcher 的 molecule 与 reaction 编辑流程。
-- 可配置 provider 的 molecule 与 reaction OCR 入口。
-- 本地 chemistry service，负责规范化、渲染、OCR provider 适配和结构草稿存储。
-- 拆分后的检索数据、训练理解数据和完整审计数据导出。
+- 接近代码的化学 Markdown 写作模型，覆盖 frontmatter、行内化学、引用、分子、反应、结果、分析、样品、步骤、观察、模板和列布局。
+- 实验逻辑增强：将原始记录连接到 typed entities、resolved references、procedure steps、observations、field evidence、normalization facts 和 knowledge-graph edges。
+- 浏览器工作台，支持源码编辑、渲染预览、diagnostics、结构化输出、导出动作、OCR 入口和 chemistry editor 集成。
+- 编译输出覆盖 HTML 预览、规范化 JSON、DOCX bridge Markdown、canonical LNF、runtime preflight、RAG 检索数据、training understanding 数据和 full audit 数据。
+- 面向 LLM 的导出边界：检索数据与训练理解数据分离，审计用 source detail 不进入模型训练输入。
+- 本地 chemistry API，负责 molecule/reaction 规范化、渲染、OCR provider 适配和结构草稿存储。
+- Playground 部署资产支持 web service 与内部 chemistry service 的组合运行。
 
 ## 技术栈
 
-| 范围 | 实现 |
+| 层级 | 技术 |
 | --- | --- |
-| Workspace | pnpm workspace 与 Turborepo |
+| Workspace | pnpm workspace、Turborepo |
 | Web | Next.js 15、React 19、Tailwind CSS 4 |
-| 语言 | TypeScript 5.9 |
-| 化学 UI | Ketcher React 与 standalone packages |
+| 语言包 | TypeScript 5.9 |
+| 化学编辑 | Ketcher React、Ketcher standalone |
 | Chemistry service | Python 3.14、Flask 3.1、RDKit 2025.9 |
 | 验证 | Vitest、TypeScript checks、ESLint、Ruff、Python unittest |
-| 文档导出 | Pandoc 生成最终 DOCX 文件 |
+| 文档转换 | Pandoc 生成最终 DOCX 文件 |
 
-## 仓库结构
+## 仓库布局
 
 ```text
 chemd/
 |-- apps/
-|   `-- web/                 # Playground UI、API routes 与 server facade
+|   `-- web/                 # Playground UI、route handlers、server facade
 |-- deploy/
-|   `-- playground/          # Compose、Dockerfile、nginx 与 systemd 资产
+|   `-- playground/          # Container、reverse proxy 与 service assets
 |-- packages/
-|   |-- compiler/            # 公开 compile/export/render 编排
-|   |-- core/                # AST、diagnostics 与共享原语
+|   |-- compiler/            # 公开 compile pipeline
+|   |-- core/                # AST、diagnostics、共享原语
 |   |-- diagnostics/         # Diagnostic model 与 quick-fix metadata
-|   |-- exporter-training/   # RAG、training understanding 与 audit exports
+|   |-- exporter-training/   # RAG、training understanding、audit exports
 |   |-- lnf/                 # Canonical LNF builder
-|   |-- parser/              # Frontmatter、block、inline 与 reference parsing
+|   |-- parser/              # Frontmatter、blocks、inline tokens、references
 |   |-- render-profile/      # Render profiles 与 override validation
 |   |-- renderer-docx/       # DOCX bridge renderer
-|   |-- renderer-html/       # HTML renderer
+|   |-- renderer-html/       # HTML preview renderer
 |   |-- renderer-json/       # JSON renderer
 |   |-- resolver/            # Reference resolution 与 template expansion
 |   |-- runtime-lab/         # Runtime plan 与 preflight model
 |   |-- runtime-trace/       # Runtime trace events 与 replay helpers
-|   |-- step-ontology/       # Procedure、observation 与 analysis lowering
+|   |-- step-ontology/       # Procedure、observation、analysis lowering
 |   `-- typechecker/         # Typed semantic graph 与 value diagnostics
-|-- scripts/
-|   `-- dev-demo.mjs         # 本地启动 web 与 chemistry service
+|-- scripts/                 # 本地开发与迁移工具
 |-- services/
 |   `-- chem-service/        # Flask/RDKit chemistry API
-`-- vision/                  # Logo 与视觉资产
+`-- vision/                  # 视觉资产
 ```
 
 ## 本地开发
 
-### 前置要求
+前置要求：
 
 - Node.js 20 或更新版本。
 - pnpm 10.x。
 - Python `>=3.14,<3.15`。
-- Chemistry service 使用 Poetry 管理 Python 依赖。
-- 最终 DOCX 文件生成需要 Pandoc。
-- 容器化部署 playground 时需要 Docker。
+- Chemistry service 使用 Poetry 管理依赖。
+- 生成最终 DOCX 文件需要 Pandoc。
+- 容器化部署 playground 需要 Docker。
 
-### 安装依赖
+安装依赖：
 
 ```bash
 pnpm install
@@ -91,17 +89,20 @@ cd services/chem-service
 poetry install
 ```
 
-### 启动完整 demo
-
-在仓库根目录运行：
+启动完整本地栈：
 
 ```bash
 pnpm dev
 ```
 
-该命令会启动 web app `http://127.0.0.1:2436` 和 chemistry service `http://127.0.0.1:18081`。
+默认本地端点：
 
-### 单独启动进程
+| 服务 | URL |
+| --- | --- |
+| Web playground | `http://127.0.0.1:2436` |
+| Chemistry service | `http://127.0.0.1:18081` |
+
+单独启动服务：
 
 ```bash
 pnpm dev:web
@@ -112,18 +113,18 @@ cd services/chem-service
 poetry run python app.py
 ```
 
-## 常用命令
+## 命令
 
 | 命令 | 作用 |
 | --- | --- |
 | `pnpm install` | 安装 workspace 依赖 |
-| `pnpm dev` | 启动 web app 与 chemistry service |
+| `pnpm dev` | 启动 web playground 与 chemistry service |
 | `pnpm dev:web` | 只启动 web playground |
-| `pnpm build` | 通过 Turbo 构建全部 workspace packages |
-| `pnpm lint` | 对 TypeScript 与 JavaScript 源码运行 ESLint |
+| `pnpm build` | 构建 workspace |
+| `pnpm lint` | 运行 ESLint |
 | `pnpm lint:fix` | 运行 ESLint 自动修复 |
 | `pnpm typecheck` | 运行 TypeScript checks |
-| `pnpm test` | 运行完整验证套件 |
+| `pnpm test` | 运行验证套件 |
 | `pnpm lint:py` | 对 chemistry service 运行 Ruff |
 | `pnpm format:check:py` | 检查 Python 格式 |
 
@@ -142,9 +143,15 @@ cd services/chem-service
 poetry run python -m unittest discover
 ```
 
-## 文档语言模型
+## 文档语言
 
-`chemd` 文档是带必需 frontmatter 和结构化 fenced blocks 的 Markdown。必需 frontmatter 字段是 `id`、`title` 和 `date`。支持的 metadata 包括 render profile、render overrides、tags，以及 reaction、result、product、sample、molecule、analysis 的 primary alias。
+`chemd` 文档是带必需 frontmatter 的 Markdown 文件：
+
+- `id`
+- `title`
+- `date`
+
+支持的 metadata 包括 render profile、render overrides、tags，以及 reaction、result、product、sample、molecule、analysis 的 primary alias。
 
 行内语法：
 
@@ -152,23 +159,23 @@ poetry run python -m unittest discover
 | --- | --- |
 | `:chem[H2O]` | 行内化学 token |
 | `` `inline code` `` | 行内代码 token |
-| `[label](https://example.com)` | 带安全 metadata 的 Markdown link token |
-| `@rxn-main` | 实体引用 |
-| `@res-main.yield` | 实体字段引用 |
-| `@meta.title` | Metadata 引用 |
-| `@result.yield` | Primary alias 字段引用 |
-| `@param.amount` | 模板参数引用 |
+| `[label](https://example.com)` | 带 safety metadata 的 Markdown link token |
+| `@rxn-main` | Entity reference |
+| `@res-main.yield` | Entity field reference |
+| `@meta.title` | Metadata reference |
+| `@result.yield` | Primary alias field reference |
+| `@param.amount` | Template parameter reference |
 
 结构化块：
 
 | Block | 作用 |
 | --- | --- |
-| `:::chemd` | Molecule 或 reaction，新文档应设置 `kind` |
-| `:::result` | Result status、yield、conversion、selectivity、purity 和 notes |
-| `:::analysis` | Analysis 记录，包括 TLC lane data |
-| `:::sample` | Sample metadata 和 lineage reference |
-| `:::procedure` | Procedure text 或 explicit step blocks |
-| `:::observation` | Observation text 或 explicit event blocks |
+| `:::chemd` | Molecule 或 reaction block，使用显式 `kind` |
+| `:::result` | Outcome status、yield、conversion、selectivity、purity、notes |
+| `:::analysis` | Analysis records 和 TLC-style lane data |
+| `:::sample` | Sample metadata 与 lineage references |
+| `:::procedure` | Procedure text 或 explicit steps |
+| `:::observation` | Observation text 或 explicit events |
 | `:::template` | 可复用文档模板 |
 | `:::use` | 模板调用 |
 | `:::col-N` | 列布局块 |
@@ -192,10 +199,7 @@ tags:
 kind: reaction
 reactants: CCO | O=O
 products: CC(=O)O
-solvent: THF
-temperature: -78 C
-time: 30 min
-atmosphere: nitrogen
+conditions: THF | -78 C | 30 min | nitrogen
 :::
 
 :::procedure #proc-main
@@ -241,27 +245,29 @@ source markdown
   -> renderDocxBridge()
 ```
 
-编译结果包含 diagnostics、resolved document、typed semantic graph、lowered step graph、runtime plan、runtime preflight output、LNF、HTML、JSON、DOCX bridge Markdown、RAG export、training understanding export 和 full audit export。
+编译输出包含 diagnostics、resolved document、typed semantic graph、lowered step graph、runtime plan、preflight results、LNF、HTML、JSON、DOCX bridge Markdown、RAG export、training understanding export 和 full audit export。
 
-Full audit export 用于检查。RAG indexing 使用 RAG export。LoRA/SFT 数据集生成使用 training understanding export。
+数据导出职责：
+
+| Export | 用途 |
+| --- | --- |
+| RAG export | 检索索引与搜索上下文 |
+| Training understanding export | LoRA/SFT 数据集生成与实验知识建模 |
+| Full audit export | 检查、调试与可追溯性 |
 
 ## Web Playground
 
-Playground 提供编辑器、实时预览、diagnostics、render profile 选择、theme switching、导出动作、OCR 入口和 chemistry editor 集成。
+Playground 提供：
 
-Preview tabs 包括：
+- source editor 与 rendered document preview
+- diagnostics 与 structured compiler output tabs
+- render profile selection
+- JSON 与 DOCX export actions
+- molecule 与 reaction editing
+- OCR import flows
+- session-scoped draft writes
 
-- rendered document
-- JSON
-- diagnostics
-- semantic output
-- runtime output
-- LNF
-- RAG export
-- training understanding export
-- full audit export
-
-会更新 chemistry draft 的写操作使用 cookie 与请求 header 中匹配的 session token。
+结构化输出 tabs 包括 semantic output、runtime output、LNF、RAG export、training understanding export 和 full audit export。
 
 ## API Surface
 
@@ -269,10 +275,10 @@ Next.js routes：
 
 | Route | Method | 作用 |
 | --- | --- | --- |
-| `/api/export/json` | `POST` | 编译 source 并返回规范化 JSON |
+| `/api/export/json` | `POST` | 编译 source 并返回 normalized JSON |
 | `/api/export/docx` | `POST` | 编译 source 并返回 DOCX 文件 |
-| `/api/chem/draft` | `GET` | 读取已保存的结构草稿 |
-| `/api/chem/inventory` | `POST` | 通过已配置服务解析库存数据 |
+| `/api/chem/draft` | `GET` | 读取已保存的 structure draft |
+| `/api/chem/inventory` | `POST` | 通过已配置服务解析 inventory data |
 | `/api/chem/normalize` | `POST` | 规范化 molecule notation |
 | `/api/chem/render` | `POST` | 渲染 molecule 或 reaction notation |
 | `/api/chem/save` | `POST` | 保存 molecule 或 reaction notation |
@@ -295,26 +301,26 @@ Chemistry service routes：
 
 | Package | 职责 |
 | --- | --- |
-| `@chemd/core` | 共享 AST、diagnostics、render overrides 和 chemistry primitives |
-| `@chemd/parser` | Frontmatter、Markdown、inline token、block 和 reference parsing |
-| `@chemd/resolver` | References、aliases、template expansion 和 semantic cleanup |
-| `@chemd/diagnostics` | Diagnostic model、bands 和 quick-fix metadata |
-| `@chemd/typechecker` | Typed semantic graph 和 value diagnostics |
-| `@chemd/step-ontology` | Procedure、observation 和 analysis lowering |
-| `@chemd/runtime-lab` | Runtime plans 和 preflight checks |
-| `@chemd/runtime-trace` | Runtime trace events 和 replay helpers |
+| `@chemd/core` | 共享 AST、diagnostics、render overrides、chemistry primitives |
+| `@chemd/parser` | Frontmatter、Markdown、inline token、block、reference parsing |
+| `@chemd/resolver` | References、aliases、template expansion、semantic cleanup |
+| `@chemd/diagnostics` | Diagnostic model、bands、quick-fix metadata |
+| `@chemd/typechecker` | Typed semantic graph 与 value diagnostics |
+| `@chemd/step-ontology` | Procedure、observation、analysis lowering |
+| `@chemd/runtime-lab` | Runtime plans 与 preflight checks |
+| `@chemd/runtime-trace` | Runtime trace events 与 replay helpers |
 | `@chemd/lnf` | Canonical LNF payloads |
-| `@chemd/render-profile` | Built-in render profiles 和 override validation |
+| `@chemd/render-profile` | Built-in render profiles 与 override validation |
 | `@chemd/renderer-html` | HTML preview rendering |
 | `@chemd/renderer-json` | JSON rendering |
 | `@chemd/renderer-docx` | DOCX bridge rendering |
-| `@chemd/exporter-training` | Retrieval、training understanding 和 audit exports |
+| `@chemd/exporter-training` | Retrieval、training understanding、audit exports |
 | `@chemd/compiler` | 公开 compile pipeline |
 | `@chemd/web` | Playground UI 与 server-side routes |
 
 ## 配置
 
-通过 shell、进程管理器或部署平台设置环境变量。
+环境变量可由 shell、进程管理器或部署平台提供。
 
 Web app 变量：
 
@@ -360,7 +366,7 @@ Chemistry service 变量：
 
 ## 部署
 
-`deploy/playground` 下的 playground 部署资产支持 web container、chemistry-service container 和反向代理暴露方式。
+Playground 部署资产支持 web service、chemistry service 和 reverse-proxy exposure。
 
 Compose 部署：
 
@@ -369,12 +375,12 @@ cd deploy/playground
 docker compose up -d --build
 ```
 
-Web service 是公网边界。Chemistry service 应位于 web app 后方或可信内部网络中。公网域名和 TLS 由 web service 前方的反向代理处理。
+Web service 是公网边界。Chemistry service 应位于 web app 后方或可信内部网络中。Public domain routing 与 TLS termination 由 web service 前方的 reverse proxy 处理。
 
 ## 运行说明
 
-- RDKit 渲染要求 Python 环境能成功 import RDKit。
-- OCR routes 默认使用 placeholder providers；生产 OCR 需要配置 provider URLs 和 keys。
+- RDKit 渲染要求 Python runtime 能成功 import RDKit。
+- OCR 默认使用 placeholder providers；生产 OCR 需要配置 provider URLs 与 keys。
 - DOCX 文件生成依赖 Pandoc。没有 Pandoc 时 compiler 仍可生成 DOCX bridge Markdown。
 - Lab inventory lookup 需要凭证，并且运行环境需要能访问配置的 API。
 - Structure drafts 由 chemistry service 存储，用于当前 playground flow。

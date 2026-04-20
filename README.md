@@ -15,83 +15,89 @@
 
 [简体中文](./README.zh-CN.md) | [English](./README.md)
 
-`chemd` is a Markdown-native chemistry document workbench. It combines a
-structured authoring language, a TypeScript compiler pipeline, a Next.js
-playground, and a local Flask/RDKit chemistry service for rendering,
-normalization, OCR integration, exports, runtime checks, and model-oriented
-experiment data.
+`chemd` turns chemistry experiment records into code-like, compiler-checked
+documents that remain readable to researchers and structured for LLM systems.
+It preserves the narrative of an experiment while extracting entities,
+references, procedure logic, observations, evidence links, and knowledge-graph
+relations for retrieval, training, and downstream reasoning. The system combines
+a typed chemistry document language, a TypeScript compiler pipeline, a Next.js
+playground, and a local Flask/RDKit chemistry service.
 
-## Capabilities
+## Product Scope
 
-- Structured chemistry Markdown with frontmatter, inline chemistry tokens,
+- Code-like chemistry Markdown authoring with frontmatter, inline chemistry,
   references, molecules, reactions, results, analyses, samples, procedures,
   observations, templates, and column layouts.
-- Browser-based editing and preview through the Next.js playground.
-- Semantic compilation through parser, resolver, typechecker, runtime planner,
-  LNF builder, renderers, and training-data exporters.
-- HTML preview, normalized JSON export, DOCX bridge output, and server-side DOCX
-  generation when Pandoc is available.
-- Molecule and reaction editing through Ketcher-backed UI flows.
-- Molecule and reaction OCR entry points with configurable providers.
-- A local chemistry service for normalization, rendering, OCR provider
-  adapters, and structure draft storage.
-- Separated data exports for retrieval, model training, and full audit review.
+- Experiment-logic enrichment that connects raw records to typed entities,
+  resolved references, procedure steps, observations, field evidence,
+  normalization facts, and knowledge-graph edges.
+- Live browser workbench with source editing, rendered preview, diagnostics,
+  structured outputs, export actions, OCR entry points, and chemistry editor
+  integration.
+- Compiler output for HTML preview, normalized JSON, DOCX bridge Markdown,
+  canonical LNF, runtime preflight, RAG retrieval data, training understanding
+  data, and full audit data.
+- LLM-oriented exports that separate retrieval data from training understanding
+  data, keeping audit-only source detail out of model-training inputs.
+- Local chemistry API for molecule and reaction normalization, rendering, OCR
+  provider adapters, and structure draft storage.
+- Deployment assets for a playground web service backed by an internal chemistry
+  service.
 
-## Technology
+## Stack
 
-| Area | Implementation |
+| Layer | Technology |
 | --- | --- |
-| Workspace | pnpm workspace with Turborepo |
+| Workspace | pnpm workspace, Turborepo |
 | Web | Next.js 15, React 19, Tailwind CSS 4 |
-| Language | TypeScript 5.9 |
-| Chemistry UI | Ketcher React and standalone packages |
+| Language packages | TypeScript 5.9 |
+| Chemistry editing | Ketcher React, Ketcher standalone |
 | Chemistry service | Python 3.14, Flask 3.1, RDKit 2025.9 |
 | Validation | Vitest, TypeScript checks, ESLint, Ruff, Python unittest |
-| Document export | Pandoc for final DOCX generation |
+| Document conversion | Pandoc for final DOCX generation |
 
-## Repository Map
+## Repository Layout
 
 ```text
 chemd/
 |-- apps/
-|   `-- web/                 # Playground UI, API routes, and server facade
+|   `-- web/                 # Playground UI, route handlers, server facade
 |-- deploy/
-|   `-- playground/          # Compose, Dockerfile, nginx, and systemd assets
+|   `-- playground/          # Container, reverse proxy, and service assets
 |-- packages/
-|   |-- compiler/            # Public compile/export/render orchestration
+|   |-- compiler/            # Public compile pipeline
 |   |-- core/                # AST, diagnostics, shared primitives
 |   |-- diagnostics/         # Diagnostic model and quick-fix metadata
-|   |-- exporter-training/   # RAG, training understanding, and audit exports
+|   |-- exporter-training/   # RAG, training understanding, audit exports
 |   |-- lnf/                 # Canonical LNF builder
-|   |-- parser/              # Frontmatter, block, inline, and reference parsing
+|   |-- parser/              # Frontmatter, blocks, inline tokens, references
 |   |-- render-profile/      # Render profiles and override validation
 |   |-- renderer-docx/       # DOCX bridge renderer
-|   |-- renderer-html/       # HTML renderer
+|   |-- renderer-html/       # HTML preview renderer
 |   |-- renderer-json/       # JSON renderer
 |   |-- resolver/            # Reference resolution and template expansion
 |   |-- runtime-lab/         # Runtime plan and preflight model
 |   |-- runtime-trace/       # Runtime trace events and replay helpers
-|   |-- step-ontology/       # Procedure, observation, and analysis lowering
+|   |-- step-ontology/       # Procedure, observation, analysis lowering
 |   `-- typechecker/         # Typed semantic graph and value diagnostics
-|-- scripts/
-|   `-- dev-demo.mjs         # Local launcher for web and chemistry service
+|-- scripts/                 # Local development and migration utilities
 |-- services/
 |   `-- chem-service/        # Flask/RDKit chemistry API
-`-- vision/                  # Logo and visual assets
+`-- vision/                  # Visual assets
 ```
 
 ## Local Development
 
-### Prerequisites
+Prerequisites:
 
 - Node.js 20 or newer.
 - pnpm 10.x.
 - Python `>=3.14,<3.15`.
 - Poetry for the chemistry service.
 - Pandoc for final DOCX file generation.
-- Docker only for containerized playground deployment.
+- Docker for containerized playground deployment.
 
-### Install Dependencies
+Install dependencies:
 
 ```bash
 pnpm install
@@ -100,18 +106,20 @@ cd services/chem-service
 poetry install
 ```
 
-### Start the Full Demo
-
-Run from the repository root:
+Start the full local stack:
 
 ```bash
 pnpm dev
 ```
 
-The launcher starts the web app on `http://127.0.0.1:2436` and the chemistry
-service on `http://127.0.0.1:18081`.
+Default local endpoints:
 
-### Start Individual Processes
+| Service | URL |
+| --- | --- |
+| Web playground | `http://127.0.0.1:2436` |
+| Chemistry service | `http://127.0.0.1:18081` |
+
+Start individual services:
 
 ```bash
 pnpm dev:web
@@ -122,18 +130,18 @@ cd services/chem-service
 poetry run python app.py
 ```
 
-## Common Commands
+## Commands
 
 | Command | Purpose |
 | --- | --- |
 | `pnpm install` | Install workspace dependencies |
-| `pnpm dev` | Start the web app and chemistry service |
+| `pnpm dev` | Start the web playground and chemistry service |
 | `pnpm dev:web` | Start only the web playground |
-| `pnpm build` | Build all workspace packages through Turbo |
-| `pnpm lint` | Run ESLint over TypeScript and JavaScript sources |
+| `pnpm build` | Build the workspace |
+| `pnpm lint` | Run ESLint |
 | `pnpm lint:fix` | Run ESLint with automatic fixes |
 | `pnpm typecheck` | Run TypeScript checks |
-| `pnpm test` | Run the full validation suite |
+| `pnpm test` | Run the validation suite |
 | `pnpm lint:py` | Run Ruff for the chemistry service |
 | `pnpm format:check:py` | Check Python formatting |
 
@@ -152,13 +160,17 @@ cd services/chem-service
 poetry run python -m unittest discover
 ```
 
-## Authoring Model
+## Document Language
 
-`chemd` documents are Markdown files with required frontmatter and structured
-fenced blocks. Required frontmatter fields are `id`, `title`, and `date`.
+`chemd` documents are Markdown files with required frontmatter:
+
+- `id`
+- `title`
+- `date`
+
 Supported metadata includes render profile selection, render overrides, tags,
-and primary entity aliases for reactions, results, products, samples,
-molecules, and analyses.
+and primary aliases for reaction, result, product, sample, molecule, and
+analysis entities.
 
 Inline syntax:
 
@@ -173,16 +185,16 @@ Inline syntax:
 | `@result.yield` | Primary alias field reference |
 | `@param.amount` | Template parameter reference |
 
-Structured block families:
+Structured blocks:
 
 | Block | Role |
 | --- | --- |
-| `:::chemd` | Molecule or reaction; new documents should set `kind` |
-| `:::result` | Result status, yield, conversion, selectivity, purity, and notes |
-| `:::analysis` | Analysis records, including TLC lane data |
+| `:::chemd` | Molecule or reaction block with explicit `kind` |
+| `:::result` | Outcome status, yield, conversion, selectivity, purity, notes |
+| `:::analysis` | Analysis records and TLC-style lane data |
 | `:::sample` | Sample metadata and lineage references |
-| `:::procedure` | Procedure text or explicit step blocks |
-| `:::observation` | Observation text or explicit event blocks |
+| `:::procedure` | Procedure text or explicit steps |
+| `:::observation` | Observation text or explicit events |
 | `:::template` | Reusable document template |
 | `:::use` | Template invocation |
 | `:::col-N` | Column layout block |
@@ -206,10 +218,7 @@ tags:
 kind: reaction
 reactants: CCO | O=O
 products: CC(=O)O
-solvent: THF
-temperature: -78 C
-time: 30 min
-atmosphere: nitrogen
+conditions: THF | -78 C | 30 min | nitrogen
 :::
 
 :::procedure #proc-main
@@ -255,35 +264,33 @@ source markdown
   -> renderDocxBridge()
 ```
 
-The compile result includes diagnostics, resolved document data, typed semantic
-graph, lowered step graph, runtime plan, runtime preflight output, LNF, HTML,
-JSON, DOCX bridge Markdown, RAG export, training understanding export, and full
-audit export.
+Compile output includes diagnostics, resolved document data, typed semantic
+graph, lowered step graph, runtime plan, preflight results, LNF, HTML, JSON,
+DOCX bridge Markdown, RAG export, training understanding export, and full audit
+export.
 
-The full audit export is useful for inspection. RAG indexing should consume the
-RAG export. LoRA/SFT dataset generation should consume the training
-understanding export.
+Data export responsibilities:
+
+| Export | Purpose |
+| --- | --- |
+| RAG export | Retrieval indexing and search context |
+| Training understanding export | LoRA/SFT dataset generation and experiment knowledge modeling |
+| Full audit export | Inspection, debugging, and traceability |
 
 ## Web Playground
 
-The playground provides an editor, live preview, diagnostics, render profile
-selection, theme switching, export actions, OCR entry points, and chemistry
-editor integration.
+The playground provides:
 
-Preview tabs include:
+- source editor and rendered document preview
+- diagnostics and structured compiler output tabs
+- render profile selection
+- JSON and DOCX export actions
+- molecule and reaction editing
+- OCR import flows
+- session-scoped draft writes
 
-- rendered document
-- JSON
-- diagnostics
-- semantic output
-- runtime output
-- LNF
-- RAG export
-- training understanding export
-- full audit export
-
-Write operations that update chemistry drafts use matching session tokens in
-cookie and request header values.
+Structured output tabs include semantic output, runtime output, LNF, RAG export,
+training understanding export, and full audit export.
 
 ## API Surface
 
@@ -292,7 +299,7 @@ Next.js routes:
 | Route | Method | Purpose |
 | --- | --- | --- |
 | `/api/export/json` | `POST` | Compile source and return normalized JSON |
-| `/api/export/docx` | `POST` | Compile source and stream a DOCX file |
+| `/api/export/docx` | `POST` | Compile source and return a DOCX file |
 | `/api/chem/draft` | `GET` | Read a saved structure draft |
 | `/api/chem/inventory` | `POST` | Resolve inventory data through configured services |
 | `/api/chem/normalize` | `POST` | Normalize molecule notation |
@@ -313,16 +320,16 @@ Chemistry service routes:
 | `/reaction/render` | `POST` | Reaction rendering |
 | `/structure` | `GET`, `POST` | Structure draft lookup and storage |
 
-## Package Responsibilities
+## Package Roles
 
-| Package | Responsibility |
+| Package | Role |
 | --- | --- |
-| `@chemd/core` | Shared AST, diagnostics, render overrides, and chemistry primitives |
-| `@chemd/parser` | Frontmatter, Markdown, inline token, block, and reference parsing |
-| `@chemd/resolver` | References, aliases, template expansion, and semantic cleanup |
-| `@chemd/diagnostics` | Diagnostic model, bands, and quick-fix metadata |
+| `@chemd/core` | Shared AST, diagnostics, render overrides, chemistry primitives |
+| `@chemd/parser` | Frontmatter, Markdown, inline token, block, reference parsing |
+| `@chemd/resolver` | References, aliases, template expansion, semantic cleanup |
+| `@chemd/diagnostics` | Diagnostic model, bands, quick-fix metadata |
 | `@chemd/typechecker` | Typed semantic graph and value diagnostics |
-| `@chemd/step-ontology` | Procedure, observation, and analysis lowering |
+| `@chemd/step-ontology` | Procedure, observation, analysis lowering |
 | `@chemd/runtime-lab` | Runtime plans and preflight checks |
 | `@chemd/runtime-trace` | Runtime trace events and replay helpers |
 | `@chemd/lnf` | Canonical LNF payloads |
@@ -330,14 +337,14 @@ Chemistry service routes:
 | `@chemd/renderer-html` | HTML preview rendering |
 | `@chemd/renderer-json` | JSON rendering |
 | `@chemd/renderer-docx` | DOCX bridge rendering |
-| `@chemd/exporter-training` | Retrieval, training understanding, and audit exports |
+| `@chemd/exporter-training` | Retrieval, training understanding, audit exports |
 | `@chemd/compiler` | Public compile pipeline |
 | `@chemd/web` | Playground UI and server-side routes |
 
 ## Configuration
 
-Set environment variables through the shell, process manager, or deployment
-platform used to run the app.
+Environment variables can be supplied by the shell, process manager, or
+deployment platform.
 
 Web app variables:
 
@@ -383,8 +390,8 @@ Chemistry service variables:
 
 ## Deployment
 
-The playground deployment assets under `deploy/playground` support a web
-container, a chemistry-service container, and reverse-proxy based exposure.
+The playground deployment assets support a web service, a chemistry service, and
+reverse-proxy exposure.
 
 Compose deployment:
 
@@ -394,17 +401,17 @@ docker compose up -d --build
 ```
 
 The web service is the public boundary. The chemistry service should remain
-behind the web app or a trusted internal network. Public domains and TLS should
-be handled by the reverse proxy in front of the web service.
+behind the web app or inside a trusted internal network. Public domain routing
+and TLS termination belong at the reverse proxy in front of the web service.
 
 ## Runtime Notes
 
-- RDKit-backed rendering requires the Python environment to import RDKit
+- RDKit-backed rendering requires the Python runtime to import RDKit
   successfully.
-- OCR routes are available with placeholder providers by default; production OCR
-  requires provider URLs and keys.
-- DOCX file generation requires Pandoc. The compiler can still produce DOCX
-  bridge Markdown without it.
+- OCR defaults to placeholder providers; production OCR requires provider URLs
+  and keys.
+- DOCX file generation requires Pandoc. DOCX bridge Markdown is available from
+  the compiler without Pandoc.
 - Lab inventory lookup requires credentials and network access to the configured
   API.
 - Structure drafts are stored by the chemistry service for the active playground
