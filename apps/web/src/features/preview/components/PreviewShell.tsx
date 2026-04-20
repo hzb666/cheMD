@@ -106,9 +106,19 @@ const PREVIEW_TABS: PreviewTabConfig[] = [
     description: "Canonical LNF export"
   },
   {
+    value: "rag",
+    label: "RAG",
+    description: "Retrieval chunks and metadata"
+  },
+  {
     value: "training",
     label: "Training",
-    description: "Training export record"
+    description: "Experiment understanding data"
+  },
+  {
+    value: "fullExport",
+    label: "Full Export",
+    description: "Full audit export"
   }
 ];
 
@@ -118,14 +128,18 @@ const CODE_OUTPUT_TABS = new Set<OutputTab>([
   "semantic",
   "runtime",
   "lnf",
-  "training"
+  "rag",
+  "training",
+  "fullExport"
 ]);
 
 const EMPTY_COMPILER_OUTPUT_CODE: PreviewCompilerOutputCode = {
   semantic: "{}",
   runtime: "{}",
   lnf: "{}",
-  training: "{}"
+  rag: "{}",
+  training: "{}",
+  fullExport: "{}"
 };
 
 const findTabConfig = (value: OutputTab): PreviewTabConfig =>
@@ -192,7 +206,9 @@ const buildCodeTabContents = (
   { value: "semantic", surface: "semantic", code: compilerOutputCode.semantic },
   { value: "runtime", surface: "runtime", code: compilerOutputCode.runtime },
   { value: "lnf", surface: "lnf", code: compilerOutputCode.lnf },
-  { value: "training", surface: "training", code: compilerOutputCode.training }
+  { value: "rag", surface: "rag", code: compilerOutputCode.rag },
+  { value: "training", surface: "training", code: compilerOutputCode.training },
+  { value: "fullExport", surface: "fullExport", code: compilerOutputCode.fullExport }
 ];
 
 const CodeTabContents = ({

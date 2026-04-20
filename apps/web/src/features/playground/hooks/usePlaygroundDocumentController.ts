@@ -15,7 +15,9 @@ export interface PlaygroundCompilerOutputCode {
   semantic: string;
   runtime: string;
   lnf: string;
+  rag: string;
   training: string;
+  fullExport: string;
 }
 
 export interface PlaygroundDocumentController {
@@ -47,7 +49,9 @@ const buildCompilerOutputCode = (result: CompileResult): PlaygroundCompilerOutpu
     runtimePreflight: result.runtimePreflight
   }),
   lnf: stringifyCompilerOutput(result.lnf),
-  training: stringifyCompilerOutput(result.trainingExport)
+  rag: stringifyCompilerOutput(result.ragExport),
+  training: stringifyCompilerOutput(result.trainingUnderstanding),
+  fullExport: stringifyCompilerOutput(result.trainingExport)
 });
 
 export const usePlaygroundDocumentController = (): PlaygroundDocumentController => {

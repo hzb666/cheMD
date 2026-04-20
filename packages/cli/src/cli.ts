@@ -16,7 +16,7 @@ import {
   type SemanticDiff
 } from "./semantic-diff";
 
-const EXPORT_FORMATS = new Set(["json", "lnf", "training"]);
+const EXPORT_FORMATS = new Set(["json", "lnf", "rag", "training", "training-full"]);
 const DIFF_FORMATS = new Set(["text", "json"]);
 const FORMAT_OPTION = new Set<CliOption>(["format"]);
 const CHANGED_OPTIONS = new Set<CliOption>(["base", "format"]);
@@ -28,12 +28,12 @@ export const EXIT_USAGE = 2;
 const usage = [
   "Usage:",
   "  chemd validate <file...>",
-  "  chemd export <file> --format json|lnf|training",
+  "  chemd export <file> --format json|lnf|rag|training|training-full",
   "  chemd diff <old-file> <new-file> [--format text|json]",
   "  chemd changed [--base <ref>] [--format text|json]"
 ].join("\n");
 
-type ExportFormat = "json" | "lnf" | "training";
+type ExportFormat = "json" | "lnf" | "rag" | "training" | "training-full";
 type TextFormat = "text" | "json";
 type CliOption = "base" | "format";
 type CompileChemd = (
@@ -107,7 +107,7 @@ const asExportFormat = (format: string | undefined): ExportFormat => {
     return format as ExportFormat;
   }
 
-  throw new CliUsageError("Export format must be one of: json, lnf, training.");
+  throw new CliUsageError("Export format must be one of: json, lnf, rag, training, training-full.");
 };
 
 const asTextFormat = (format: string | undefined, command: string): TextFormat => {
@@ -348,7 +348,11 @@ const selectExportPayload = (result: CompileResult, format: ExportFormat): unkno
     return result.lnf;
   }
 
-  return result.trainingExport;
+  if (format === "rag") {
+    return result.ragExport;
+  }
+
+  return format === "training" ? result.trainingUnderstanding : result.trainingExport;
 };
 
 const exportFile = (

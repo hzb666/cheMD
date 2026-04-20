@@ -1,6 +1,13 @@
 import { parseChemd } from "@chemd/parser";
 import type { ChemdDocument, RenderSelection } from "@chemd/core";
-import { exportTrainingRecordFromDocument, type ChemdTrainingExportV2 } from "@chemd/exporter-training";
+import {
+  buildRagExportFromTrainingRecord,
+  buildTrainingUnderstandingFromRecord,
+  exportTrainingRecordFromDocument,
+  type ChemdRagExportV1,
+  type ChemdTrainingExportV2,
+  type ChemdTrainingUnderstandingV1
+} from "@chemd/exporter-training";
 import {
   buildCanonicalLnf,
   type ChemdLnf
@@ -38,6 +45,8 @@ export interface CompileResult {
   runPlan: RunPlan;
   runtimePreflight: PreflightResult;
   lnf: ChemdLnf;
+  ragExport: ChemdRagExportV1;
+  trainingUnderstanding: ChemdTrainingUnderstandingV1;
   trainingExport: ChemdTrainingExportV2;
   html: string;
   json: string;
@@ -121,6 +130,8 @@ export const compileChemd = (source: string, options: CompileOptions = {}): Comp
     typedGraph: typecheckResult.typedGraph,
     lnf
   });
+  const ragExport = buildRagExportFromTrainingRecord(trainingExport);
+  const trainingUnderstanding = buildTrainingUnderstandingFromRecord(trainingExport);
   const renderOptions = renderProfileResolution.options;
   const renderAdapterPayload = mapRenderOptionsToAdapterPayload(renderOptions);
   const html = renderHtml(document, renderOptions, { typedGraph: typecheckResult.typedGraph });
@@ -139,6 +150,8 @@ export const compileChemd = (source: string, options: CompileOptions = {}): Comp
     runPlan,
     runtimePreflight,
     lnf,
+    ragExport,
+    trainingUnderstanding,
     trainingExport,
     html,
     json,

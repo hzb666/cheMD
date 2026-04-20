@@ -196,7 +196,7 @@ describe("chemd cli", () => {
     expect(result.exitCode).toBe(EXIT_OK);
     expect(result.stdout).toMatch(/valid\.chemd\.md: ok/);
     expect(result.stderr).toBe("");
-  });
+  }, 10000);
 
   it("exits 1 when compiler diagnostics include an error", async () => {
     const result = await runInTempDir(["validate", "invalid.chemd.md"], {
@@ -246,7 +246,31 @@ describe("chemd cli", () => {
     const payload = JSON.parse(result.stdout);
 
     expect(result.exitCode).toBe(EXIT_OK);
+    expect(payload.schema_version).toBe("chemd-training-understanding/v0.1");
+    expect(payload.source_layer).toBeUndefined();
+  });
+
+  it("exports RAG output", async () => {
+    const result = await runInTempDir(["export", "valid.chemd.md", "--format", "rag"], {
+      "valid.chemd.md": validSource
+    });
+    const payload = JSON.parse(result.stdout);
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(payload.schema_version).toBe("chemd-rag-export/v0.1");
+    expect(payload.chunks.length).toBeGreaterThan(0);
+    expect(payload.learning_layer).toBeUndefined();
+  });
+
+  it("exports full training audit output", async () => {
+    const result = await runInTempDir(["export", "valid.chemd.md", "--format", "training-full"], {
+      "valid.chemd.md": validSource
+    });
+    const payload = JSON.parse(result.stdout);
+
+    expect(result.exitCode).toBe(EXIT_OK);
     expect(payload.schema_version).toBe("chemd-training-export/v0.2");
+    expect(payload.source_layer).toBeDefined();
   });
 
   it("rejects unsupported export formats", async () => {

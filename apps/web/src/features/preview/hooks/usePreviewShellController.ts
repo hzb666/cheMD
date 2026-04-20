@@ -19,13 +19,17 @@ export type OutputTab =
   | "semantic"
   | "runtime"
   | "lnf"
-  | "training";
+  | "rag"
+  | "training"
+  | "fullExport";
 
 export interface PreviewCompilerOutputCode {
   semantic: string;
   runtime: string;
   lnf: string;
+  rag: string;
   training: string;
+  fullExport: string;
 }
 
 interface InventoryItemRecord {
@@ -380,5 +384,13 @@ const readActiveCode = (
     return compilerOutputCode.lnf;
   }
 
-  return activeTab === "training" ? compilerOutputCode.training : "";
+  if (activeTab === "rag") {
+    return compilerOutputCode.rag;
+  }
+
+  if (activeTab === "training") {
+    return compilerOutputCode.training;
+  }
+
+  return activeTab === "fullExport" ? compilerOutputCode.fullExport : "";
 };

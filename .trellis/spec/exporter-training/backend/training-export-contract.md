@@ -41,6 +41,33 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   - `result_notes`
   - `analysis_notes`
   - `sample_notes`
+- The full `ChemdTrainingExportV2` is an audit export. Do not feed it directly
+  to RAG or LoRA/SFT training jobs.
+- RAG and model-training views must be projections from the full export:
+  - `ChemdRagExportV1` keeps retrieval chunks and retrieval quality only.
+  - `ChemdTrainingUnderstandingV1` keeps clean entities, references,
+    relations, procedure logic, experiment logic, knowledge graph,
+    canonical summary, LoRA generation hints, and training quality.
+- RAG projections must not include `source_layer`, raw AST payloads,
+  full LNF, prediction instances, or procedure training pairs.
+- Training understanding projections must not include `source_layer`,
+  raw AST payloads, source positions, render/layout/DOCX/HTML data,
+  prediction instances, chemistry feature vectors, or full LNF.
+- `ChemdTrainingUnderstandingV1.knowledge_graph` must preserve:
+  - exported entity/narrative nodes
+  - semantic relation edges
+  - procedure, canonical step, observation, and observation event nodes
+  - procedure/observation logic edges such as procedure-to-step ordering
+  - field-value and normalized-value nodes for training-relevant fields
+  - raw-to-normalized value edges when normalization is available
+  - field-level evidence for molecule, reaction, result, analysis, and
+    sample fields when available
+  - missing logic records for unresolved references or disconnected facts
+- `ChemdTrainingUnderstandingV1.resolved_references` must include Markdown
+  references and structured `ref`/participant references that affect
+  experiment logic.
+- LoRA/SFT JSONL must be generated from `ChemdTrainingUnderstandingV1`,
+  not from RAG chunks or the full audit export.
 
 ### 4. Validation & Error Matrix
 
@@ -63,6 +90,11 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 - Assert relation types, `from_entity_id`, and `to_entity_id`.
 - Assert chunk types for document, analysis, and sample content.
 - Assert source fields such as `ref_raw` remain visible where they explain links.
+- Assert projections do not leak noisy full-export fields such as `raw_text`,
+  `source_layer`, or `semantic_layer.lnf`.
+- Assert training understanding includes knowledge graph nodes/edges,
+  field-level evidence, normalization edges, procedure/observation logic,
+  missing logic, and LoRA generation hints.
 
 ### 7. Wrong vs Correct
 
