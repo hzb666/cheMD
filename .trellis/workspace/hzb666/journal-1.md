@@ -401,3 +401,38 @@ Added a playground LSM status indicator and refined the compact header label sty
 ### Next Steps
 
 - None - task complete
+
+
+## Session 8: 实验决策训练理解阶段 1
+
+**Date**: 2026-04-21
+**Task**: 实验决策训练理解阶段 1
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+完成 README 与测试索引整理；阶段 1 补强 trainingUnderstanding 的设计上下文、结果质量、预测特征和实验决策类 LoRA hints，并通过 typecheck/test/lint 验证。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c3ffdd4` | (see git log) |
+| `b43a0db` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

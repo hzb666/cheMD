@@ -1,0 +1,5 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/web/backend/index.md", "reason": "Backend development guide"}
+{"file": ".trellis\\spec\\exporter-training\\backend\\training-export-contract.md", "reason": "training understanding and projection contract"}
+{"file": ".trellis\\spec\\exporter-training\\backend\\quality-guidelines.md", "reason": "required checks for exporter-training"}
+{"file": ".trellis\\spec\\guides\\cross-layer-thinking-guide.md", "reason": "training payload crosses compiler, cli, web display consumers"}

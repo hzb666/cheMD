@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 7
-- **Last Active**: 2026-04-20
+- **Total Sessions**: 8
+- **Last Active**: 2026-04-21
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~403 | Active |
+| `journal-1.md` | ~438 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 8 | 2026-04-21 | 实验决策训练理解阶段 1 | `c3ffdd4`, `b43a0db` | `develop` |
 | 7 | 2026-04-20 | Playground LSM status header | `ac52175`, `ff2906a` | `develop` |
 | 6 | 2026-04-20 | Chemd CLI MVP and training export context | `179be6c`, `349051f` | `develop` |
 | 5 | 2026-04-19 | 对齐 canonical LNF 与训练导出契约 | `b396143` | `develop` |
