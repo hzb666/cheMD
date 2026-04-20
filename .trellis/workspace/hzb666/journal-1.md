@@ -505,3 +505,38 @@ Added a playground LSM status indicator and refined the compact header label sty
 ### Next Steps
 
 - None - task complete
+
+
+## Session 11: 实验内涵训练投影阶段 2
+
+**Date**: 2026-04-21
+**Task**: 实验内涵训练投影阶段 2
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+扩展 trainingUnderstanding 派生任务数据：新增 reaction classification 与 expert routing messages 样本，补充 SFT/eval/holdout 适用性元数据，增加人工 annotation/correction 回流类型，并归档任务。验证通过 exporter-training typecheck/test/eslint、git diff --check、pnpm typecheck、pnpm test。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `04996bb` | (see git log) |
+| `7c8e9d7` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
