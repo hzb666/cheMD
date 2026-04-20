@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 9
+- **Total Sessions**: 10
 - **Last Active**: 2026-04-21
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~473 | Active |
+| `journal-1.md` | ~507 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 10 | 2026-04-21 | 实验内涵训练投影阶段 1 | `cf81aad` | `develop` |
 | 9 | 2026-04-21 | 实验决策训练理解阶段 2 | `36e1a4d`, `63efbe3` | `develop` |
 | 8 | 2026-04-21 | 实验决策训练理解阶段 1 | `c3ffdd4`, `b43a0db` | `develop` |
 | 7 | 2026-04-20 | Playground LSM status header | `ac52175`, `ff2906a` | `develop` |

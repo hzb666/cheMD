@@ -471,3 +471,37 @@ Added a playground LSM status indicator and refined the compact header label sty
 ### Next Steps
 
 - None - task complete
+
+
+## Session 10: 实验内涵训练投影阶段 1
+
+**Date**: 2026-04-21
+**Task**: 实验内涵训练投影阶段 1
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+补充 trainingUnderstanding 实验内涵标签：反应分类、专家路由、优化轨迹、失败信号，并同步 LoRA 任务提示和训练导出 contract。保持 Chemd 作者语法不变；验证通过 exporter-training typecheck/test/eslint、git diff --check、pnpm typecheck、pnpm test。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `cf81aad` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
