@@ -1,0 +1,21 @@
+{
+  "name": "@chemd/storage-postgres",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@chemd/exporter-training": "workspace:*",
+    "@chemd/lnf": "workspace:*"
+  },
+  "devDependencies": {
+    "@chemd/compiler": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --pool=threads",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

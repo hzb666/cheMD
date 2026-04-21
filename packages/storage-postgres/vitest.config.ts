@@ -2,18 +2,11 @@ import { fileURLToPath } from "node:url";
 
 import { defineConfig } from "vitest/config";
 
-const srcDirectory = fileURLToPath(new URL("./src", import.meta.url));
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 
 export default defineConfig({
   resolve: {
-    dedupe: ["react", "react-dom"],
     alias: {
-      "@": srcDirectory,
-      react: `${repoRoot}/node_modules/react`,
-      "react-dom": `${repoRoot}/node_modules/react-dom`,
-      "react-dom/server": `${repoRoot}/node_modules/react-dom/server`,
-      "react/jsx-runtime": `${repoRoot}/node_modules/react/jsx-runtime`,
       "@chemd/core": `${repoRoot}/packages/core/src/index.ts`,
       "@chemd/parser": `${repoRoot}/packages/parser/src/index.ts`,
       "@chemd/diagnostics": `${repoRoot}/packages/diagnostics/src/index.ts`,

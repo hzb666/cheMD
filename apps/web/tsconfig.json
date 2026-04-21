@@ -15,6 +15,57 @@
     "moduleResolution": "bundler",
     "noEmit": true,
     "paths": {
+      "@chemd/core": [
+        "../../packages/core/src/index.ts"
+      ],
+      "@chemd/parser": [
+        "../../packages/parser/src/index.ts"
+      ],
+      "@chemd/diagnostics": [
+        "../../packages/diagnostics/src/index.ts"
+      ],
+      "@chemd/step-ontology": [
+        "../../packages/step-ontology/src/index.ts"
+      ],
+      "@chemd/typechecker": [
+        "../../packages/typechecker/src/index.ts"
+      ],
+      "@chemd/runtime-lab": [
+        "../../packages/runtime-lab/src/index.ts"
+      ],
+      "@chemd/runtime-trace": [
+        "../../packages/runtime-trace/src/index.ts"
+      ],
+      "@chemd/lnf": [
+        "../../packages/lnf/src/index.ts"
+      ],
+      "@chemd/resolver": [
+        "../../packages/resolver/src/index.ts"
+      ],
+      "@chemd/render-profile": [
+        "../../packages/render-profile/src/index.ts"
+      ],
+      "@chemd/renderer-html": [
+        "../../packages/renderer-html/src/index.ts"
+      ],
+      "@chemd/renderer-json": [
+        "../../packages/renderer-json/src/index.ts"
+      ],
+      "@chemd/renderer-docx": [
+        "../../packages/renderer-docx/src/index.ts"
+      ],
+      "@chemd/compiler": [
+        "../../packages/compiler/src/index.ts"
+      ],
+      "@chemd/compiler/node": [
+        "../../packages/compiler/src/node.ts"
+      ],
+      "@chemd/exporter-training": [
+        "../../packages/exporter-training/src/index.ts"
+      ],
+      "@chemd/storage-postgres": [
+        "../../packages/storage-postgres/src/index.ts"
+      ],
       "@/*": [
         "./src/*"
       ]
