@@ -1,0 +1,5 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/storage-postgres/backend/storage-contract.md", "reason": "PostgreSQL ingest service contract"}
+{"file": "apps/web/src/server/chem/postgres-rag.ts", "reason": "Compose RAG embedding writer"}
+{"file": "apps/web/src/server/chem/postgres-storage.ts", "reason": "Compose storage writer"}
+{"file": "apps/web/src/server/chem/postgres-client.ts", "reason": "Compose runtime PostgreSQL client"}

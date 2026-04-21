@@ -1,0 +1,6 @@
+{"file": ".agents/skills/finish-work/SKILL.md", "reason": "Finish work checklist"}
+{"file": ".agents/skills/check/SKILL.md", "reason": "Code quality check spec"}
+{"file": ".trellis/spec/storage-postgres/backend/storage-contract.md", "reason": "Check ingest service against storage contract"}
+{"file": "apps/web/src/server/chem/postgres-client.spec.ts", "reason": "Follow runtime client test style"}
+{"file": "apps/web/src/server/chem/postgres-storage.spec.ts", "reason": "Follow storage writer test style"}
+{"file": "apps/web/src/server/chem/postgres-rag.spec.ts", "reason": "Follow RAG helper test style"}
