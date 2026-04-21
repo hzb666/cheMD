@@ -1,0 +1,4 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/storage-postgres/backend/storage-contract.md", "reason": "PostgreSQL storage and pgvector runtime contract"}
+{"file": "apps/web/src/server/chem/postgres-storage.ts", "reason": "Reuse injected PostgresQueryClient pattern"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Embedding data crosses provider, SQL, and retrieval boundaries"}
