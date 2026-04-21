@@ -575,3 +575,38 @@ Implemented PostgreSQL storage schema, runtime ingest/RAG APIs, migration script
 ### Next Steps
 
 - None - task complete
+
+
+## Session 13: PostgreSQL embedding backfill
+
+**Date**: 2026-04-22
+**Task**: PostgreSQL embedding backfill
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+Added RAG embedding backfill service and API route with bounded filters, skip/overwrite behavior, tests, and storage spec coverage.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `51725be` | (see git log) |
+| `62189bd` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
