@@ -1,0 +1,5 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/web/backend/index.md", "reason": "Backend development guide"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Storage contract crosses compile outputs, database schema, and future services"}
+{"file": ".trellis/spec/exporter-training/backend/database-guidelines.md", "reason": "Keep persistence contracts pure and IO-free"}
+{"file": ".trellis/spec/exporter-training/backend/training-export-contract.md", "reason": "Respect trainingExport/ragExport/trainingUnderstanding boundaries"}
