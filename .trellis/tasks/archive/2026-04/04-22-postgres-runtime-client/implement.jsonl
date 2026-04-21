@@ -1,0 +1,4 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/storage-postgres/backend/storage-contract.md", "reason": "PostgreSQL runtime client boundary"}
+{"file": "apps/web/src/server/chem/postgres-storage.ts", "reason": "Reuse PostgresQueryClient interface"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Database config crosses env and runtime boundaries"}
