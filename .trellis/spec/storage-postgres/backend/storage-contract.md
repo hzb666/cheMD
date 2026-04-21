@@ -1305,3 +1305,154 @@ pnpm typecheck
 pnpm lint
 pnpm test
 ```
+
+## Scenario: Web PostgreSQL RAG Embedding Backfill API Route
+
+### 1. Scope / Trigger
+
+- Trigger: changing
+  `apps/web/src/app/api/chem/postgres/rag/backfill/route.ts`,
+  `apps/web/src/server/chem/postgres-rag-backfill-route.ts`, or
+  `apps/web/src/server/chem/postgres-rag-backfill-service.ts`.
+- Scope: server-side embedding backfill over already-persisted RAG chunks.
+- Consumers: local admin tooling, future background workers, and training/RAG
+  maintenance jobs.
+
+### 2. Signatures
+
+```ts
+export interface BackfillRagChunkEmbeddingsInput {
+  client: PostgresQueryClient;
+  provider: EmbeddingProvider;
+  model: RagEmbeddingModelConfig;
+  experimentId?: string;
+  revisionId?: string;
+  chunkTypes?: readonly RagChunkRecord["chunkType"][];
+  limit?: number;
+  overwriteExisting?: boolean;
+}
+
+export const backfillRagChunkEmbeddings = async (
+  input: BackfillRagChunkEmbeddingsInput
+) => Promise<BackfillRagChunkEmbeddingsResult>;
+
+export const backfillRagChunkEmbeddingsWithRuntime = async (
+  input: BackfillRagChunkEmbeddingsWithRuntimeInput
+) => Promise<BackfillRagChunkEmbeddingsResult>;
+```
+
+Route JSON input:
+
+```ts
+{
+  experimentId?: string;
+  revisionId?: string;
+  chunkTypes?: RagChunkRecord["chunkType"][];
+  limit?: number;
+  overwriteExisting?: boolean;
+}
+```
+
+Route JSON response:
+
+```ts
+{
+  model: {
+    embeddingModel: string;
+    embeddingDim: number;
+    distanceMetric: "cosine" | "l2" | "inner_product";
+  };
+  selected: number;
+  embedded: number;
+  skippedExisting: number;
+  embeddings: { count: number; chunkIds: string[] };
+}
+```
+
+### 3. Contracts
+
+Backfill flow:
+
+```text
+POST /api/chem/postgres/rag/backfill
+  -> parseJsonObjectBody(request)
+  -> validate bounded selection
+  -> createRuntimeEmbeddingProvider(process.env)
+  -> createPostgresRuntimeClient(process.env)
+  -> SELECT chemd_rag_chunks with optional filters
+  -> skip existing model embeddings unless overwriteExisting
+  -> writeRagChunkEmbeddings()
+  -> close PostgreSQL runtime client in finally
+```
+
+The service accepts injected `PostgresQueryClient` and `EmbeddingProvider`.
+It must not duplicate pgvector insert SQL; embedding writes go through
+`writeRagChunkEmbeddings()`.
+
+Selection must be bounded by at least one of:
+
+```text
+revisionId
+experimentId
+limit
+```
+
+### 4. Validation & Error Matrix
+
+| Case | Behavior |
+|------|----------|
+| Body is not a JSON object | Return `400` |
+| No `revisionId`, `experimentId`, or `limit` | Return `400` |
+| `limit` is non-positive or non-integer | Return `400` |
+| `overwriteExisting` is not boolean | Return `400` |
+| `chunkTypes` contains unknown value | Return `400` |
+| Existing embedding and no overwrite | Count as `skippedExisting` |
+| `overwriteExisting` is true | Recompute and upsert same model embedding |
+| Embedding env is missing or invalid | Return `500` with `E_EMBEDDING_CONFIG` |
+| PostgreSQL database URL is missing | Return `500` with `E_POSTGRES_CONFIG` |
+| Provider or pgvector write fails | Return `502` with `E_POSTGRES_RAG_BACKFILL` |
+
+### 5. Good/Base/Bad Cases
+
+Good:
+
+- A local admin tool posts `{ "revisionId": "rev-1" }` and receives selected,
+  embedded, skipped counts plus written chunk IDs.
+
+Base:
+
+- Posting `{ "limit": 10 }` is allowed for bounded maintenance batches.
+
+Bad:
+
+- Do not run unbounded backfills without `revisionId`, `experimentId`, or
+  `limit`.
+- Do not return embedding vectors from the route response.
+- Do not create embeddings before RAG chunks are stored.
+
+### 6. Tests Required
+
+`apps/web/src/server/chem/postgres-rag-backfill-service.spec.ts` must assert:
+
+- service selects chunks and writes via `writeRagChunkEmbeddings()`.
+- existing embeddings are skipped unless overwrite is requested.
+- empty selection returns a zero-count summary without embedding calls.
+- unbounded selection fails before SQL.
+- runtime wrapper closes the PostgreSQL client.
+
+`apps/web/tests/postgres-rag-backfill-route.test.ts` must assert:
+
+- route forwards trimmed filters and returns `202`.
+- invalid JSON and unbounded selection return `400`.
+- invalid `limit`, `overwriteExisting`, and `chunkTypes` return `400`.
+- missing embedding config maps to `E_EMBEDDING_CONFIG`.
+- missing PostgreSQL config maps to `E_POSTGRES_CONFIG`.
+- provider/search failures map to `E_POSTGRES_RAG_BACKFILL`.
+
+Required commands:
+
+```bash
+pnpm --filter @chemd/web test -- src/server/chem/postgres-rag-backfill-service.spec.ts tests/postgres-rag-backfill-route.test.ts
+pnpm --filter @chemd/web typecheck
+pnpm exec eslint apps/web/src/app/api/chem/postgres/rag/backfill/route.ts apps/web/src/server/chem/postgres-rag-backfill-route.ts apps/web/src/server/chem/postgres-rag-backfill-service.ts apps/web/src/server/chem/postgres-rag-backfill-service.spec.ts apps/web/tests/postgres-rag-backfill-route.test.ts --ext .ts
+```
