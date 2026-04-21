@@ -540,3 +540,38 @@ Added a playground LSM status indicator and refined the compact header label sty
 ### Next Steps
 
 - None - task complete
+
+
+## Session 12: PostgreSQL storage backend
+
+**Date**: 2026-04-22
+**Task**: PostgreSQL storage backend
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+Implemented PostgreSQL storage schema, runtime ingest/RAG APIs, migration scripts, real pgvector smoke validation, and storage spec updates.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `627a596` | (see git log) |
+| `fd0d0fa` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
