@@ -1,0 +1,3 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/storage-postgres/backend/storage-contract.md", "reason": "Schema SQL and runtime PostgreSQL storage contracts"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Scripts span env, package contracts, and database boundary"}
