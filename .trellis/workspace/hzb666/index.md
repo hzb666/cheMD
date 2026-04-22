@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 14
-- **Last Active**: 2026-04-22
+- **Total Sessions**: 15
+- **Last Active**: 2026-04-23
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~662 | Active |
+| `journal-1.md` | ~697 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 15 | 2026-04-23 | 完善实验逻辑训练导出 | `9fa181f` | `develop` |
 | 14 | 2026-04-22 | Postgres 训练记忆循环 MVP | `1c31bac` | `develop` |
 | 13 | 2026-04-22 | PostgreSQL embedding backfill | `51725be`, `62189bd` | `develop` |
 | 12 | 2026-04-22 | PostgreSQL storage backend | `627a596`, `fd0d0fa` | `develop` |

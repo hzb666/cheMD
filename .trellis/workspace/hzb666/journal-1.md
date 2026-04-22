@@ -661,3 +661,37 @@ Added RAG embedding backfill service and API route with bounded filters, skip/ov
 ### Next Steps
 
 - None - task complete
+
+
+## Session 15: 完善实验逻辑训练导出
+
+**Date**: 2026-04-23
+**Task**: 完善实验逻辑训练导出
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+补齐 artifact、sample lineage、训练理解投影和存储映射，并完成全量验证。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9fa181f` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
