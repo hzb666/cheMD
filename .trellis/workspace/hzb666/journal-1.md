@@ -610,3 +610,54 @@ Added RAG embedding backfill service and API route with bounded filters, skip/ov
 ### Next Steps
 
 - None - task complete
+
+
+## Session 14: Postgres 训练记忆循环 MVP
+
+**Date**: 2026-04-22
+**Task**: Postgres 训练记忆循环 MVP
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+实现 Postgres training memory loop MVP，并补齐 support_count 重算、stale cleanup、索引、测试和文档。
+
+### Main Changes
+
+| 项目 | 内容 |
+| --- | --- |
+| Memory Loop | 新增从 persisted revisions 派生 semantic diff、training events、correction patterns、Experiment Pattern Memory 和 dataset projection 的 MVP。 |
+| Postgres Runtime | 新增 `POST /api/chem/postgres/memory/loop`，读取 latest success/warning compile artifact 并写入 memory records。 |
+| Support Recompute | 从 `chemd_training_experience_events` 全量重算 aggregate correction pattern 的 `support_count`，并清理 stale rows。 |
+| Quality | 补充聚合索引、stale cleanup、upsert 派生字段更新、回归测试和 README。 |
+
+**验证**:
+- `pnpm --filter @chemd/web exec eslint ...`
+- `pnpm --filter @chemd/web test -- postgres-training-memory-storage.spec.ts postgres-correction-pattern-aggregation.spec.ts postgres-memory-loop-service.spec.ts`
+- `pnpm --filter @chemd/storage-postgres test`
+- `pnpm --filter @chemd/web typecheck`
+- `pnpm --filter @chemd/storage-postgres typecheck`
+- `pnpm typecheck`
+- `pnpm test`
+- `git diff --check`
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1c31bac` | (see git log) |
+
+### Testing
+
+- [OK] ESLint, targeted tests, package typecheck, root typecheck,
+  root test, and `git diff --check` passed.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
