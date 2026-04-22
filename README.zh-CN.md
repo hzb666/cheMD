@@ -285,6 +285,7 @@ Next.js routes：
 | `/api/chem/ocr` | `POST` | 执行 molecule-oriented OCR workflow |
 | `/api/chem/reaction/ocr` | `POST` | 执行 reaction OCR workflow |
 | `/api/chem/postgres/memory/loop` | `POST` | 从已持久化 revision 派生 semantic diff、training events、pattern memory、dataset projection 和 correction-pattern support |
+| `/api/chem/postgres/training/export` | `POST` | 从已持久化 PostgreSQL records 导出有界 training artifacts 和可选 pattern memory |
 
 Chemistry service routes：
 

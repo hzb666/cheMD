@@ -99,6 +99,7 @@ The web runtime exposes:
 
 ```text
 POST /api/chem/postgres/memory/loop
+POST /api/chem/postgres/training/export
 ```
 
 Request body:
@@ -128,3 +129,23 @@ current event table rather than incremented per loop run. Rerunning the same
 revision pair first removes stale rows for that semantic diff, and the
 aggregate pass removes `correction::aggregate::*` rows that no longer have
 supporting events.
+
+## Training Export API
+
+`POST /api/chem/postgres/training/export` reads persisted compile artifacts and
+returns training-ready JSON with revision provenance. Requests must provide
+exactly one bounded selector:
+
+```json
+{
+  "experimentId": "exp-storage",
+  "limit": 50,
+  "includeCorrectionPatterns": true,
+  "includeExperimentPatternMemory": true
+}
+```
+
+`revisionId` can be used instead of `experimentId`. The runtime rejects
+unbounded requests, caps `limit` at 100, orders revisions by creation time, and
+only reads compile runs with `success` or `warning` status. Optional correction
+patterns and Experiment Pattern Memory are scoped to the selected revision set.

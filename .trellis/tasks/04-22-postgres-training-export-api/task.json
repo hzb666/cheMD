@@ -1,0 +1,41 @@
+{
+  "id": "postgres-training-export-api",
+  "name": "postgres-training-export-api",
+  "title": "Postgres training export API",
+  "description": "",
+  "status": "completed",
+  "dev_type": "backend",
+  "scope": null,
+  "package": "web",
+  "priority": "P2",
+  "creator": "hzb666",
+  "assignee": "hzb666",
+  "createdAt": "2026-04-22",
+  "completedAt": "2026-04-22",
+  "branch": null,
+  "base_branch": "develop",
+  "worktree_path": null,
+  "current_phase": 5,
+  "next_action": [
+    {
+      "phase": 6,
+      "action": "record-session"
+    }
+  ],
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "apps/web/src/app/api/chem/postgres/training/export/route.ts",
+    "apps/web/src/server/chem/postgres-training-export-service.ts",
+    "apps/web/src/server/chem/postgres-training-export-route.ts",
+    "apps/web/src/server/chem/postgres-training-export-readers.ts",
+    "apps/web/src/server/chem/postgres-training-export-model.ts",
+    "apps/web/src/server/chem/postgres-training-export-service.spec.ts",
+    "apps/web/src/server/chem/postgres-training-export-route.spec.ts"
+  ],
+  "notes": "Implemented bounded Postgres training export API with optional correction pattern and Experiment Pattern Memory payloads.",
+  "meta": {}
+}

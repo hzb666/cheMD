@@ -308,6 +308,7 @@ Next.js routes:
 | `/api/chem/ocr` | `POST` | Run molecule-oriented OCR workflow |
 | `/api/chem/reaction/ocr` | `POST` | Run reaction OCR workflow |
 | `/api/chem/postgres/memory/loop` | `POST` | Derive semantic diff, training events, pattern memory, dataset projection, and correction-pattern support from persisted revisions |
+| `/api/chem/postgres/training/export` | `POST` | Export bounded training artifacts and optional pattern memory from persisted PostgreSQL records |
 
 Chemistry service routes:
 
