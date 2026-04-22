@@ -75,3 +75,56 @@ CHEMD_EMBEDDING_API_KEY=
 The gateway receives `{ "input": "...", "model": "..." }` and may return
 either `{ "embedding": [...] }` or an OpenAI-compatible
 `{ "data": [{ "embedding": [...] }] }` response.
+
+## Training Memory Loop MVP
+
+The first memory-loop path derives deterministic training memory records from
+persisted compile artifacts:
+
+```text
+after revision
+  -> optional parent/before revision
+  -> trainingUnderstanding comparison
+  -> semantic diff
+  -> training experience events
+  -> correction pattern candidates
+  -> Experiment Pattern Memory snapshot
+  -> dataset projection
+```
+
+The pure transform is `buildTrainingMemoryRecords()` from
+`@chemd/storage-postgres`. It does not read the database or environment.
+
+The web runtime exposes:
+
+```text
+POST /api/chem/postgres/memory/loop
+```
+
+Request body:
+
+```json
+{
+  "afterRevisionId": "rev-after",
+  "beforeRevisionId": "rev-before"
+}
+```
+
+`beforeRevisionId` is optional. If omitted, the runtime uses the
+`parent_revision_id` on the after revision when present. The route writes
+records to:
+
+- `chemd_semantic_diffs`
+- `chemd_training_experience_events`
+- `chemd_correction_patterns`
+- `chemd_experiment_pattern_memory`
+- `chemd_dataset_projections`
+
+After writing revision-pair snapshots and per-diff correction candidates, the
+runtime recomputes aggregate correction patterns from
+`chemd_training_experience_events`. Aggregate rows use deterministic
+`correction::aggregate::*` IDs, and their `support_count` is derived from the
+current event table rather than incremented per loop run. Rerunning the same
+revision pair first removes stale rows for that semantic diff, and the
+aggregate pass removes `correction::aggregate::*` rows that no longer have
+supporting events.

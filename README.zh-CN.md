@@ -284,6 +284,7 @@ Next.js routes：
 | `/api/chem/save` | `POST` | 保存 molecule 或 reaction notation |
 | `/api/chem/ocr` | `POST` | 执行 molecule-oriented OCR workflow |
 | `/api/chem/reaction/ocr` | `POST` | 执行 reaction OCR workflow |
+| `/api/chem/postgres/memory/loop` | `POST` | 从已持久化 revision 派生 semantic diff、training events、pattern memory、dataset projection 和 correction-pattern support |
 
 Chemistry service routes：
 
@@ -315,6 +316,7 @@ Chemistry service routes：
 | `@chemd/renderer-json` | JSON rendering |
 | `@chemd/renderer-docx` | DOCX bridge rendering |
 | `@chemd/exporter-training` | Retrieval、training understanding、audit exports |
+| `@chemd/storage-postgres` | PostgreSQL schema、storage records、RAG chunks 与 training memory records |
 | `@chemd/compiler` | 公开 compile pipeline |
 | `@chemd/web` | Playground UI 与 server-side routes |
 

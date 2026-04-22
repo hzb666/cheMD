@@ -307,6 +307,7 @@ Next.js routes:
 | `/api/chem/save` | `POST` | Save molecule or reaction notation |
 | `/api/chem/ocr` | `POST` | Run molecule-oriented OCR workflow |
 | `/api/chem/reaction/ocr` | `POST` | Run reaction OCR workflow |
+| `/api/chem/postgres/memory/loop` | `POST` | Derive semantic diff, training events, pattern memory, dataset projection, and correction-pattern support from persisted revisions |
 
 Chemistry service routes:
 
@@ -338,6 +339,7 @@ Chemistry service routes:
 | `@chemd/renderer-json` | JSON rendering |
 | `@chemd/renderer-docx` | DOCX bridge rendering |
 | `@chemd/exporter-training` | Retrieval, training understanding, audit exports |
+| `@chemd/storage-postgres` | PostgreSQL schema, storage records, RAG chunks, and training memory records |
 | `@chemd/compiler` | Public compile pipeline |
 | `@chemd/web` | Playground UI and server-side routes |
 

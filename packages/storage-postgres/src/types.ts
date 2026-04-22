@@ -1,4 +1,5 @@
 import type {
+  ChemdTrainingTaskDatasetV1,
   ChemdRagExportV1,
   ChemdTrainingExportV2,
   ChemdTrainingUnderstandingV1,
@@ -110,6 +111,80 @@ export interface RagChunkRecord {
   sourceEntityIds: string[];
   text: string;
   metadata: ChemdRagExportV1["chunks"][number]["metadata"];
+}
+
+export interface SemanticDiffRecord {
+  semanticDiffId: string;
+  beforeRevisionId?: string;
+  afterRevisionId: string;
+  diff: JsonRecord;
+  quality: JsonRecord;
+}
+
+export interface TrainingExperienceEventRecord {
+  eventId: string;
+  semanticDiffId?: string;
+  eventType: string;
+  reactionFamily?: string;
+  beforeValue?: JsonRecord;
+  afterValue?: JsonRecord;
+  evidence: JsonRecord;
+  trainingUses: string[];
+  quality: JsonRecord;
+}
+
+export interface CorrectionPatternRecord {
+  patternId: string;
+  reactionFamily?: string;
+  sourceField?: string;
+  oldRole?: string;
+  newRole?: string;
+  evidencePhrasePattern?: string;
+  supportCount: number;
+  confidence?: number;
+  promotedToRule: boolean;
+  trainingUses: string[];
+  qualityTier?: string;
+}
+
+export interface ExperimentPatternMemoryRecord {
+  experimentPatternId: string;
+  patternScope: string;
+  reactionFamily?: string;
+  mechanismFamily?: string;
+  stepSequenceSignature?: string;
+  canonicalRoles: JsonRecord;
+  canonicalPhaseRoles: JsonRecord;
+  commonFieldCorrections: JsonRecord[];
+  commonDiagnostics: JsonRecord[];
+  controlledVariables: JsonRecord[];
+  highValueVariables: JsonRecord[];
+  outcomeDeltaPatterns: JsonRecord[];
+  failureModePatterns: JsonRecord[];
+  evidenceEventIds: string[];
+  supportCount: number;
+  confidence?: number;
+  trainingUses: string[];
+  promotionTargets: string[];
+  qualityTier?: string;
+}
+
+export interface DatasetProjectionRecord {
+  datasetProjectionId: string;
+  sourceKind: string;
+  sourceIds: string[];
+  datasetType: string;
+  schemaVersion: ChemdTrainingTaskDatasetV1["schema_version"];
+  payload: ChemdTrainingTaskDatasetV1;
+  quality: JsonRecord;
+}
+
+export interface TrainingMemoryRecords {
+  semanticDiff: SemanticDiffRecord;
+  trainingExperienceEvents: TrainingExperienceEventRecord[];
+  correctionPatterns: CorrectionPatternRecord[];
+  experimentPatternMemories: ExperimentPatternMemoryRecord[];
+  datasetProjections: DatasetProjectionRecord[];
 }
 
 export interface ExperimentStorageRecords {

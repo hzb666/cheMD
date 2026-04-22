@@ -195,6 +195,18 @@ CREATE INDEX IF NOT EXISTS chemd_relations_type_idx
 
 CREATE INDEX IF NOT EXISTS chemd_rag_chunks_metadata_idx
   ON chemd_rag_chunks USING gin (metadata);
+
+CREATE INDEX IF NOT EXISTS chemd_training_events_condition_pattern_idx
+  ON chemd_training_experience_events (
+    event_type,
+    reaction_family,
+    (after_value->>'field'),
+    (before_value->>'value'),
+    (after_value->>'value')
+  );
+
+CREATE INDEX IF NOT EXISTS chemd_training_events_semantic_diff_idx
+  ON chemd_training_experience_events (semantic_diff_id);
 `
   }
 ];
