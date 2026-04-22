@@ -164,6 +164,120 @@ p1: sm 0.82
   });
 });
 
+describe("typed artifacts and sample lineage", () => {
+  it("adds artifact nodes and resolves sample lineage references", () => {
+    const document = resolveChemd(parseChemd(`---
+id: exp-artifact-typed
+title: typed artifacts
+date: 2026-04-23
+---
+
+:::chemd #rxn-main
+kind: reaction
+reactants: a
+products: b
+:::
+
+:::sample #sample-parent
+name: parent batch
+:::
+
+:::sample #sample-child
+derived_from: rxn-main
+aliquot_of: sample-parent
+batch_of: sample-parent
+artifacts: spec-main
+:::
+
+:::artifact #spec-main
+kind: nmr_spectrum
+ref: sample-child
+path: data/spec-main.pdf
+:::
+`));
+
+    const result = typecheckDocument(document);
+    const sample = result.typedGraph.nodes.find((node) =>
+      node.kind === "sample" && node.nodeId === "sample-child"
+    );
+    const artifact = result.typedGraph.nodes.find((node) => node.kind === "artifact");
+
+    expect(sample).toMatchObject({
+      kind: "sample",
+      derivedFrom: expect.objectContaining({
+        kind: "reference",
+        refId: "rxn-main",
+        targetKind: "reaction",
+        resolved: true
+      }),
+      aliquotOf: expect.objectContaining({
+        refId: "sample-parent",
+        targetKind: "sample",
+        resolved: true
+      }),
+      batchOf: expect.objectContaining({
+        refId: "sample-parent",
+        targetKind: "sample",
+        resolved: true
+      }),
+      artifacts: [
+        expect.objectContaining({
+          refId: "spec-main",
+          targetKind: "artifact",
+          resolved: true
+        })
+      ]
+    });
+    expect(artifact).toMatchObject({
+      kind: "artifact",
+      nodeId: "spec-main",
+      artifactKind: "nmr_spectrum",
+      path: "data/spec-main.pdf"
+    });
+  });
+
+  it("diagnoses sample lineage fields that target non-sample entities", () => {
+    const document = resolveChemd(parseChemd(`---
+id: exp-lineage-mismatch
+title: typed lineage mismatch
+date: 2026-04-23
+---
+
+:::chemd #rxn-main
+kind: reaction
+reactants: a
+products: b
+:::
+
+:::sample #sample-child
+aliquot_of: rxn-main
+batch_of: rxn-main
+:::
+`));
+
+    const result = typecheckDocument(document);
+
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: "E_TYPED_REFERENCE_MISMATCH",
+        sourceField: "aliquot_of",
+        facts: expect.objectContaining({
+          expected_target_kind: "sample",
+          actual_target_kind: "reaction"
+        })
+      }),
+      expect.objectContaining({
+        code: "E_TYPED_REFERENCE_MISMATCH",
+        sourceField: "batch_of",
+        facts: expect.objectContaining({
+          expected_target_kind: "sample",
+          actual_target_kind: "reaction"
+        })
+      })
+    ]));
+  });
+});
+
 describe("procedure mode and rules", () => {
   it("honors explicit and lowered procedure modes", () => {
     const proseDocument = resolveChemd(parseChemd(`---

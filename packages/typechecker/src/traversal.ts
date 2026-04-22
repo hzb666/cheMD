@@ -9,7 +9,8 @@ const OBJECT_TYPES = new Set([
   "analysis",
   "procedure",
   "observation",
-  "sample"
+  "sample",
+  "artifact"
 ]);
 
 export const isObjectNode = (node: ChemdNode): node is ObjectNode =>

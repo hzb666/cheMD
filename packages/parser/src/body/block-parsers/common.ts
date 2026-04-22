@@ -1,4 +1,4 @@
-import type { Diagnostic } from "@chemd/core";
+import type { ChemistryFeatureRef, Diagnostic, SourceSpan } from "@chemd/core";
 
 import { parseKeyValueLine, parseKeyValueLines } from "../parse-body-shared";
 
@@ -50,6 +50,40 @@ export const parseAllowedFields = (
     listFields: options.listFields ?? DEFAULT_LIST_FIELDS,
     blockTypeForDiagnostics: blockType
   });
+
+export const createLineSourceSpan = (lines: string[], startIndex: number, endIndex = startIndex): SourceSpan => ({
+  startLine: startIndex + 1,
+  endLine: endIndex + 1,
+  startColumn: 1,
+  endColumn: (lines[endIndex]?.length ?? 0) + 1
+});
+
+const splitFieldSegments = (line: string): string[] =>
+  line
+    .split(";;")
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0);
+
+export const parseAllowedFieldSpans = (
+  lines: string[],
+  allowedFields: Set<string>,
+  options: {
+    allowExtraField?: (key: string) => boolean;
+  } = {}
+): Record<string, SourceSpan> => {
+  const spans: Record<string, SourceSpan> = {};
+
+  lines.forEach((line, index) => {
+    for (const segment of splitFieldSegments(line)) {
+      const parsed = parseKeyValueLine(segment);
+      if (parsed && (allowedFields.has(parsed.key) || options.allowExtraField?.(parsed.key) === true)) {
+        spans[parsed.key] = createLineSourceSpan(lines, index);
+      }
+    }
+  });
+
+  return spans;
+};
 
 export const parseChildBlockFieldLine = (
   line: string
@@ -113,4 +147,36 @@ export const createBodyText = (lines: string[]): string | undefined => {
   }
 
   return bodyLines.map((line) => line.trimEnd()).join("\n");
+};
+
+const splitList = (value: string): string[] =>
+  value
+    .split(/[|,]/)
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+
+export const readStringListField = (value: string | string[] | undefined): string[] | undefined => {
+  if (Array.isArray(value)) {
+    const items = value.flatMap(splitList);
+    return items.length > 0 ? items : undefined;
+  }
+
+  if (!value) {
+    return undefined;
+  }
+
+  const items = splitList(value);
+  return items.length > 0 ? items : undefined;
+};
+
+export const readChemistryFeatureRefs = (
+  value: string | string[] | undefined,
+  kind: ChemistryFeatureRef["kind"]
+): ChemistryFeatureRef[] | undefined => {
+  const featureIds = readStringListField(value);
+  return featureIds?.map((featureId) => ({
+    featureId,
+    kind,
+    status: "available"
+  }));
 };

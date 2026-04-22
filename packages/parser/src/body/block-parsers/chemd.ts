@@ -1,7 +1,19 @@
-import type { ChemdSemanticKind, MoleculeNode, ReactionNode, SyntaxOrigin } from "@chemd/core";
+import type {
+  ChemdSemanticKind,
+  ChemistryFeatureRef,
+  FieldSourceSpans,
+  MoleculeNode,
+  ReactionNode,
+  SyntaxOrigin
+} from "@chemd/core";
 
 import { collectImplicitChemdValue, pickFirstStringArray, pickFirstStringValue } from "../parse-body-shared";
-import { parseAllowedFields, readStructuredBlockId } from "./common";
+import {
+  parseAllowedFields,
+  parseAllowedFieldSpans,
+  readChemistryFeatureRefs,
+  readStructuredBlockId
+} from "./common";
 import type { BlockParser } from "./types";
 
 const CHEMD_FIELDS = new Set([
@@ -30,7 +42,8 @@ const CHEMD_FIELDS = new Set([
   "atmosphere",
   "yield",
   "conversion",
-  "selectivity"
+  "selectivity",
+  "chemistry_features"
 ]);
 
 const CHEMD_KINDS = new Set<ChemdSemanticKind>(["molecule", "reaction"]);
@@ -39,6 +52,8 @@ interface ParsedChemdMetadata {
   id?: string;
   syntaxOrigin: SyntaxOrigin;
   declaredKind?: ChemdSemanticKind;
+  fieldSpans?: FieldSourceSpans;
+  chemistryFeatureRefs?: ChemistryFeatureRef[];
 }
 
 interface DeclaredKindResult {
@@ -131,6 +146,7 @@ const createReactionNode = (
   id: metadata.id,
   syntaxOrigin: metadata.syntaxOrigin,
   declaredKind: metadata.declaredKind,
+  fieldSpans: metadata.fieldSpans,
   reactants: pickFirstStringArray(fields, ["reac", "reactant", "reactants"]) ?? [],
   products: pickFirstStringArray(fields, ["prod", "product", "products"]) ?? [],
   conditions: Array.isArray(fields.conditions) ? fields.conditions : [],
@@ -145,7 +161,8 @@ const createReactionNode = (
   yield: pickFirstStringValue(fields, ["yield"]),
   conversion: pickFirstStringValue(fields, ["conversion"]),
   selectivity: pickFirstStringValue(fields, ["selectivity"]),
-  caption: pickFirstStringValue(fields, ["caption"])
+  caption: pickFirstStringValue(fields, ["caption"]),
+  chemistryFeatureRefs: metadata.chemistryFeatureRefs
 });
 
 const createMoleculeNode = (
@@ -158,6 +175,7 @@ const createMoleculeNode = (
   id: metadata.id,
   syntaxOrigin: metadata.syntaxOrigin,
   declaredKind: metadata.declaredKind,
+  fieldSpans: metadata.fieldSpans,
   smiles: pickFirstStringValue(fields, ["smiles"]) ?? collectImplicitChemdValue(lines, diagnostics),
   cas: pickFirstStringValue(fields, ["cas"]),
   name: pickFirstStringValue(fields, ["name"]),
@@ -165,7 +183,8 @@ const createMoleculeNode = (
   caption: pickFirstStringValue(fields, ["caption"]),
   formula: pickFirstStringValue(fields, ["formula"]),
   amount: pickFirstStringValue(fields, ["amount"]),
-  equivalents: pickFirstStringValue(fields, ["equivalents"])
+  equivalents: pickFirstStringValue(fields, ["equivalents"]),
+  chemistryFeatureRefs: metadata.chemistryFeatureRefs
 });
 
 const reportMissingKind = (
@@ -228,9 +247,14 @@ const reportInferredKind = (
 export const parseChemdBlock: BlockParser = ({ headerArg, lines, diagnostics, options }) => {
   const id = readStructuredBlockId(headerArg, diagnostics);
   const fields = parseAllowedFields(lines, diagnostics, "chemd", CHEMD_FIELDS);
+  const fieldSpans = parseAllowedFieldSpans(lines, CHEMD_FIELDS);
   const kindResult = readDeclaredKind(id, fields, diagnostics);
   const declaredKind = kindResult.declaredKind;
   const reactionShape = hasReactionShape(fields);
+  const chemistryFeatureRefs = readChemistryFeatureRefs(
+    fields.chemistry_features,
+    reactionShape ? "reaction" : "molecule"
+  );
 
   if (!kindResult.isValid) {
     return undefined;
@@ -248,20 +272,30 @@ export const parseChemdBlock: BlockParser = ({ headerArg, lines, diagnostics, op
         "Explicit reaction chemd kind requires reactants or products fields"
       );
     }
-    return createReactionNode({ id, syntaxOrigin: "chemd", declaredKind }, fields);
+    return createReactionNode({ id, syntaxOrigin: "chemd", declaredKind, fieldSpans, chemistryFeatureRefs }, fields);
   }
 
   if (declaredKind === "molecule") {
     if (reactionShape) {
       reportKindConflict(id, diagnostics);
     }
-    return createMoleculeNode({ id, syntaxOrigin: "chemd", declaredKind }, lines, fields, diagnostics);
+    return createMoleculeNode(
+      { id, syntaxOrigin: "chemd", declaredKind, fieldSpans, chemistryFeatureRefs },
+      lines,
+      fields,
+      diagnostics
+    );
   }
 
   if (!options?.strictChemdKind) {
     reportInferredKind(id, diagnostics, reactionShape ? "reaction" : "molecule");
   }
   return reactionShape
-    ? createReactionNode({ id, syntaxOrigin: "chemd" }, fields)
-    : createMoleculeNode({ id, syntaxOrigin: "chemd" }, lines, fields, diagnostics);
+    ? createReactionNode({ id, syntaxOrigin: "chemd", fieldSpans, chemistryFeatureRefs }, fields)
+    : createMoleculeNode(
+      { id, syntaxOrigin: "chemd", fieldSpans, chemistryFeatureRefs },
+      lines,
+      fields,
+      diagnostics
+    );
 };

@@ -2,6 +2,7 @@ import type { ColNode, StructuredNode, UseNode } from "@chemd/core";
 
 import { parseKeyValueLines } from "../parse-body-shared";
 import { parseAnalysisBlock } from "./analysis";
+import { parseArtifactBlock } from "./artifact";
 import { parseChemdBlock } from "./chemd";
 import { readStructuredBlockId } from "./common";
 import { parseObservationBlock } from "./observation";
@@ -62,6 +63,7 @@ const PARSERS = new Map<string, BlockParser>([
   ["chemd", parseChemdBlock],
   ["result", parseResultBlock],
   ["analysis", parseAnalysisBlock],
+  ["artifact", parseArtifactBlock],
   ["sample", parseSampleBlock],
   ["procedure", parseProcedureBlock],
   ["observation", parseObservationBlock],

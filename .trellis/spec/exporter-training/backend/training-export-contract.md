@@ -32,7 +32,23 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   - `reaction_produces_molecule`
 - `result.ref` / `result.reaction` targeting a reaction produces `result_describes_reaction`.
 - `analysis.ref` targeting a reaction/result/sample produces the matching `analysis_targets_*` relation.
-- `sample.ref` targeting a reaction/result/molecule produces the matching `sample_*` relation.
+- `sample.ref` targeting a reaction/result/molecule/sample produces the matching `sample_*` relation.
+- `sample.derived_from`, `sample.aliquot_of`, `sample.batch_of`, and
+  `sample.artifacts` must export explicit lineage/evidence relations when the
+  target resolves:
+  - `sample_derived_from_reaction`
+  - `sample_derived_from_sample`
+  - `sample_aliquot_of_sample`
+  - `sample_batch_of_sample`
+  - `sample_has_artifact`
+- `sample.aliquot_of` and `sample.batch_of` must only emit relations when the
+  target is a sample. `sample.artifacts` must only emit relations when the
+  target is an artifact.
+- Resolved structured references must match the exact semantic relation target
+  and role for their source field. A relation from another field on the same
+  source entity must not be reused just because it has the same target.
+- `artifact.ref` targeting a reaction/result/analysis/sample produces the
+  matching `artifact_supports_*` relation.
 - Resolved Markdown references produce `markdown_mentions_entity`.
 - `learning_layer.retrieval_chunks` must include available:
   - `document_summary`
@@ -41,6 +57,7 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   - `result_notes`
   - `analysis_notes`
   - `sample_notes`
+  - `artifact_notes`
 - The full `ChemdTrainingExportV2` is an audit export. Do not feed it directly
   to RAG or LoRA/SFT training jobs.
 - RAG and model-training views must be projections from the full export:
@@ -51,8 +68,10 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 - RAG projections must not include `source_layer`, raw AST payloads,
   full LNF, prediction instances, or procedure training pairs.
 - Training understanding projections must not include `source_layer`,
-  raw AST payloads, source positions, render/layout/DOCX/HTML data,
-  prediction instances, chemistry feature vectors, or full LNF.
+  raw AST payloads, render/layout/DOCX/HTML data, prediction instances,
+  chemistry feature vectors, or full LNF. Field-level source spans are allowed
+  only on `knowledge_graph.field_evidence[*].source_span`, not on clean
+  `entities.*` records.
 - `ChemdTrainingUnderstandingV1.knowledge_graph` must preserve:
   - exported entity/narrative nodes
   - semantic relation edges
@@ -60,8 +79,8 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   - procedure/observation logic edges such as procedure-to-step ordering
   - field-value and normalized-value nodes for training-relevant fields
   - raw-to-normalized value edges when normalization is available
-  - field-level evidence for molecule, reaction, result, analysis, and
-    sample fields when available
+  - field-level evidence for molecule, reaction, result, analysis, sample,
+    and artifact fields when available
   - missing logic records for unresolved references or disconnected facts
 - `ChemdTrainingUnderstandingV1.experiment_logic` must preserve:
   - primary entities and result/outcome links
@@ -79,7 +98,7 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
     available outcomes without adding author-facing syntax
   - failure signals for failed, low-yield, low-conversion, low-selectivity,
     low-purity, conflicting, uncertain, or unlinked results
-  - analysis evidence links and sample lineage links
+  - analysis/artifact evidence links and sample lineage links
 - Reaction taxonomy, expert routing, optimization trajectories, and failure
   signals are derived experiment-understanding features. They must carry
   evidence IDs, warnings, and confidence where applicable, and must not be
@@ -93,14 +112,18 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   feature inputs should focus on reaction conditions, participants, quantities,
   and pre-outcome context.
 - LoRA generation hints should distinguish extraction/summary tasks from
-  experiment-decision tasks such as yield prediction, condition recommendation,
-  experiment proposal, failure analysis, experiment comparison, reaction
-  classification, and expert routing.
+  experiment-decision tasks such as record-to-Chemd reconstruction,
+  Chemd repair, normalization explanation, procedure reasoning, observation
+  events, evidence tracing, QA with context, yield prediction, condition
+  recommendation, experiment proposal, failure analysis, experiment comparison,
+  reaction classification, and expert routing.
 - LoRA/SFT JSONL must be generated from `ChemdTrainingUnderstandingV1`,
   not from RAG chunks or the full audit export.
 - `buildTrainingTaskDatasetFromUnderstanding()` is the public task-projection
   API for experiment-decision SFT/LoRA samples. It consumes only
   `ChemdTrainingUnderstandingV1` and emits JSONL-ready `messages` examples for
+  record-to-Chemd reconstruction, Chemd repair, normalization explanation,
+  procedure reasoning, observation events, evidence tracing, QA with context,
   yield prediction, condition recommendation, experiment proposal, failure
   analysis, experiment comparison, reaction classification, and expert routing.
 - Task-projection examples are derived supervision. They must carry quality
@@ -110,6 +133,13 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   `quality.usable_for_sft`, `quality.usable_for_eval`, and `evaluation`.
   Open-ended heuristic recommendation/proposal labels should remain SFT-only
   unless a human annotation layer confirms them.
+- Normalization explanation task inputs may include only the task name,
+  `subject_entity_id`, `field`, `raw_value`, and `source_span`. Do not include
+  the full field-evidence object or clean subject entity in the user prompt.
+- Evidence tracing task inputs must not include the full field-evidence object.
+  Automatically derived evidence tracing examples are SFT-only and must set
+  `usable_for_eval: false`, `holdout_eligible: false`, and at least medium
+  leakage risk unless later human annotations create a clean eval target.
 - Task-projection prompts may include structured reaction/design/outcome facts,
   but must not include `source_layer`, raw AST payloads, render/layout fields,
   full audit export data, or RAG-only chunks.
@@ -126,18 +156,24 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 | Unresolved reference | Keep source diagnostics from parser/typechecker; do not emit a relation |
 | Literal participant | Keep participant as literal; do not emit molecule relation |
 | Empty analysis/sample text | Do not emit an empty retrieval chunk |
+| Empty artifact text | Do not emit an empty artifact retrieval chunk |
 | Duplicate relation source | Deduplicate by stable `relation_id` |
+| Field source spans | Strip from clean entities; preserve on field evidence |
+| Derived task label | Mark SFT/eval/holdout eligibility explicitly |
+| Sample lineage target kind mismatch | Resolve the reference if possible, but do not emit or project a lineage relation |
+| Multiple sample fields target same entity | Project only the relation whose role matches the source field |
+| Derived evidence tracing task | Keep SFT eligible when warning-free, but never eval/holdout eligible |
 
 ### 5. Good/Base/Bad Cases
 
-- Good: reaction + result + sample + analysis all connected through stable links.
+- Good: reaction + result + sample + analysis + artifact all connected through stable links.
 - Base: standalone document still emits a document summary chunk.
 - Bad: unresolved `ref` must not invent a relation.
 
 ### 6. Tests Required
 
 - Assert relation types, `from_entity_id`, and `to_entity_id`.
-- Assert chunk types for document, analysis, and sample content.
+- Assert chunk types for document, analysis, sample, and artifact content.
 - Assert source fields such as `ref_raw` remain visible where they explain links.
 - Assert projections do not leak noisy full-export fields such as `raw_text`,
   `source_layer`, or `semantic_layer.lnf`.
@@ -145,7 +181,8 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   field-level evidence, normalization edges, procedure/observation logic,
   missing logic, and LoRA generation hints.
 - Assert training understanding includes experiment design contexts and outcome
-  quality without leaking source layer, render layout, or full audit fields.
+  quality without leaking source layer, render layout, clean-entity source
+  spans, or full audit fields.
 - Assert training understanding includes reaction taxonomy, expert routing,
   optimization trajectories, and failure signals with evidence IDs and warnings.
 - Assert prediction instances link the correct result per reaction and do not
@@ -155,6 +192,16 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   warnings for weak labels.
 - Assert task-projection examples expose SFT/eval/holdout metadata and that
   annotation patches remain separate from automatic derived supervision.
+- Assert sample lineage, artifact evidence links, chemistry feature reference
+  IDs, procedure step metadata, observation event metadata, field source spans,
+  and task examples for procedure/observation/evidence/QA flows are present in
+  the public projections.
+- Assert mismatched `sample.aliquot_of`, `sample.batch_of`, and
+  `sample.artifacts` targets do not create semantic relations and do not borrow
+  relation types from another sample field.
+- Assert normalization/evidence tracing task inputs do not expose full
+  field-evidence objects, and evidence tracing examples are not eval/holdout
+  eligible by default.
 
 ### 7. Wrong vs Correct
 

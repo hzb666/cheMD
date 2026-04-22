@@ -43,10 +43,13 @@ const isResultNode = (node: TypedSemanticNode): node is TypedResultNode =>
 const toLnfStep = (step: CanonicalStepNode): LnfStep => ({
   stepId: step.stepId,
   family: step.family,
+  stage: step.stage,
+  purpose: step.purpose,
   params: step.params,
   inputs: step.inputs,
   outputs: step.outputs,
   dependsOn: step.dependsOn,
+  evidence: step.evidence,
   artifacts: step.artifacts,
   effects: step.effects,
   source: step.source,

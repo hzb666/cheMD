@@ -67,8 +67,8 @@ Required payload fields:
 | `RunPlan` | `planId`, `documentId`, `status`, `steps`, `diagnostics` |
 | `PreflightResult` | `blocking`, `diagnostics` |
 | `ChemdLnf` | `schemaVersion: "chemd-lnf/v0.5"`, `experiment.document`, `experiment.entities`, `experiment.semantic`, `experiment.workflow`, optional `experiment.runtime`, `experiment.quality` |
-| `ChemdTrainingExportV2.semantic_layer` | Optional `lnf` when caller passes the canonical `ChemdLnf` |
-| `ChemdTrainingExportV2.learning_layer` | `retrieval_chunks`, `prediction_instances`, plus optional `procedure_to_steps`, `observation_to_events` from `StepGraph` |
+| `ChemdTrainingExportV2.semantic_layer` | Optional `lnf` when caller passes the canonical `ChemdLnf`; semantic links for reaction/result/analysis/sample/artifact facts |
+| `ChemdTrainingExportV2.learning_layer` | `retrieval_chunks`, `prediction_instances`, optional `chemistry_feature_refs`, plus optional `procedure_to_steps`, `observation_to_events` from `StepGraph` |
 
 Diagnostics from `typecheckDocument` and render profile resolution must be merged into `CompileResult.document.diagnostics`; do not throw for semantic validation failures that have a diagnostic code.
 
@@ -94,6 +94,8 @@ Good:
 - `compileChemd(source).lnf.schemaVersion` is exactly `"chemd-lnf/v0.5"`.
 - `trainingExport.schema_version` is exactly `"chemd-training-export/v0.2"`.
 - `trainingExport.semantic_layer.lnf` matches the LNF returned by `compileChemd`.
+- `trainingExport.semantic_layer.artifacts` and `trainingUnderstanding.entities.artifacts`
+  preserve authored artifact evidence without leaking audit-only source payloads.
 
 Base:
 
@@ -240,7 +242,13 @@ Normalization contract:
 - `renderDocxBridge` must recursively render `col.children`; it must not return an empty bridge for a populated column node.
 - LNF and training export must consume `typedGraph` fields instead of reclassifying raw renderer nodes.
 - Training export semantic layer must preserve molecule `cas`, normalized molecule quantities, result/sample percent fields, result status labels, `normalized_outcome_hints`, and optional canonical `lnf`.
-- Training export learning layer must create retrieval chunks from available source text/reactions/results and prediction instances for reactions with linked features/targets.
+- Training export semantic layer must preserve sample lineage (`derived_from`,
+  `aliquot_of`, `batch_of`, `artifacts`), artifact evidence links, optional
+  chemistry feature reference IDs, and parser field source spans for field-level
+  evidence projection.
+- Training export learning layer must create retrieval chunks from available source text/reactions/results/analyses/samples/artifacts and prediction instances for reactions with linked features/targets.
+- Training understanding must strip field source spans from clean entities and
+  expose them only through `knowledge_graph.field_evidence[*].source_span`.
 
 Runtime/service contract:
 
@@ -270,6 +278,8 @@ Good:
 - New web/OCR/reaction-editor writeback emits `:::chemd` with `kind: molecule` or `kind: reaction`.
 - A molecule with both `smiles` and `cas` keeps both fields independently through parser, typechecker, HTML/JSON/DOCX renderers, and training export.
 - Explicit procedure steps carry `sourceType: "explicit_step"` to typed graph, runtime plan, LNF, and training export.
+- Sample lineage and artifact evidence survive parser, typechecker, semantic
+  links, training export, and training understanding.
 - Chem-service OCR/render/normalize responses keep old fields and add the canonical DTO metadata.
 
 Base:

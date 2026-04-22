@@ -12,6 +12,9 @@ interface ResultRelationshipResolution {
 
 interface SampleRelationshipResolution {
   ref?: ReferenceOrLiteral;
+  derivedFrom?: ReferenceOrLiteral;
+  aliquotOf?: ReferenceOrLiteral;
+  batchOf?: ReferenceOrLiteral;
   diagnostics: V03Diagnostic[];
 }
 
@@ -146,9 +149,34 @@ export const resolveSampleRelationships = (
     sourceNodeId: node.id,
     field: "ref"
   });
+  const derivedFrom = resolveOptionalReference(node.derived_from, objectIndex, {
+    sourceNodeType: "sample",
+    sourceNodeId: node.id,
+    field: "derived_from"
+  });
+  const aliquotOf = resolveOptionalReference(node.aliquot_of, objectIndex, {
+    sourceNodeType: "sample",
+    sourceNodeId: node.id,
+    field: "aliquot_of",
+    expectedTargetKind: "sample"
+  });
+  const batchOf = resolveOptionalReference(node.batch_of, objectIndex, {
+    sourceNodeType: "sample",
+    sourceNodeId: node.id,
+    field: "batch_of",
+    expectedTargetKind: "sample"
+  });
 
   return {
     ...(ref.value ? { ref: ref.value } : {}),
-    diagnostics: ref.diagnostics
+    ...(derivedFrom.value ? { derivedFrom: derivedFrom.value } : {}),
+    ...(aliquotOf.value ? { aliquotOf: aliquotOf.value } : {}),
+    ...(batchOf.value ? { batchOf: batchOf.value } : {}),
+    diagnostics: [
+      ...ref.diagnostics,
+      ...derivedFrom.diagnostics,
+      ...aliquotOf.diagnostics,
+      ...batchOf.diagnostics
+    ]
   };
 };

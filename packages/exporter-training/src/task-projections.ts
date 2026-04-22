@@ -30,6 +30,13 @@ interface CreateExampleInput {
 }
 
 const SYSTEM_PROMPTS: Record<ExperimentDecisionTaskTypeV1, string> = {
+  record_to_chemd: "Convert supplied structured experiment facts into concise Chemd blocks without inventing missing fields.",
+  chemd_repair: "Identify the minimal Chemd repair needed for the supplied quality issue. Preserve existing meaning.",
+  normalization_explanation: "Explain how raw Chemd fields normalize into structured values using only supplied evidence.",
+  procedure_reasoning: "Convert Chemd procedure text into ordered canonical experiment steps with conservative confidence.",
+  observation_events: "Convert Chemd observation text into structured observation events and link them to known steps when possible.",
+  evidence_tracing: "Trace which evidence supports a field or relation. Separate direct evidence from inferred context.",
+  qa_with_context: "Answer questions using only supplied Chemd training understanding context. Say when evidence is missing.",
   reaction_classification: "Classify the reaction using only supplied Chemd experiment facts and return conservative taxonomy labels.",
   expert_routing: "Route the experiment to suitable chemistry or modeling experts using only supplied Chemd experiment facts.",
   yield_prediction: "Use only the supplied Chemd experiment facts to estimate the observed reaction outcome. Do not invent missing chemistry.",
@@ -87,6 +94,27 @@ const getReactionFacts = (reaction: TrainingReactionV1 | undefined): JsonObject 
   conditions_raw: reaction?.conditions_raw,
   normalized_conditions: reaction?.normalized_conditions
 });
+
+const getEntityById = (
+  understanding: ChemdTrainingUnderstandingV1,
+  entityId: string | undefined
+): JsonObject | undefined => {
+  if (!entityId) {
+    return undefined;
+  }
+
+  const entity = [
+    ...understanding.entities.molecules,
+    ...understanding.entities.reactions,
+    ...understanding.entities.results,
+    ...understanding.entities.analyses,
+    ...understanding.entities.samples,
+    ...understanding.entities.artifacts,
+    ...understanding.entities.narrative_blocks
+  ].find((candidate) => candidate.entity_id === entityId);
+
+  return entity as JsonObject | undefined;
+};
 
 const getOutcomeFacts = (
   outcome: TrainingOutcomeLogicV1 | undefined,
@@ -178,6 +206,261 @@ const buildReactionClassificationExamples = (
       derivedLabelConfidence: taxonomy.confidence
     });
   });
+
+const buildRecordToChemdExamples = (
+  understanding: ChemdTrainingUnderstandingV1
+): TrainingTaskExampleV1[] => {
+  const entityCounts = {
+    molecules: understanding.entities.molecules.length,
+    reactions: understanding.entities.reactions.length,
+    results: understanding.entities.results.length,
+    analyses: understanding.entities.analyses.length,
+    samples: understanding.entities.samples.length,
+    artifacts: understanding.entities.artifacts.length
+  };
+  const sourceEntityIds = uniqueStrings([
+    ...understanding.entities.molecules.map((entity) => entity.entity_id),
+    ...understanding.entities.reactions.map((entity) => entity.entity_id),
+    ...understanding.entities.results.map((entity) => entity.entity_id),
+    ...understanding.entities.analyses.map((entity) => entity.entity_id),
+    ...understanding.entities.samples.map((entity) => entity.entity_id),
+    ...understanding.entities.artifacts.map((entity) => entity.entity_id)
+  ]);
+
+  if (sourceEntityIds.length === 0) {
+    return [];
+  }
+
+  return [createExample({
+    understanding,
+    taskType: "record_to_chemd",
+    suffix: "document",
+    sourceEntityIds,
+    input: {
+      task: "record_to_chemd",
+      document: understanding.document,
+      entity_counts: entityCounts,
+      primary_entities: understanding.experiment_logic.primary_entities,
+      canonical_summary: understanding.canonical_summary
+    },
+    output: {
+      chemd_outline: {
+        meta: {
+          id: understanding.document.document_id,
+          title: understanding.document.title,
+          date: understanding.document.date
+        },
+        entities: entityCounts,
+        relation_count: understanding.relations.length
+      },
+      omissions: understanding.knowledge_graph.missing_logic.map((item) => item.code)
+    },
+    warnings: understanding.knowledge_graph.missing_logic
+      .filter((item) => item.severity === "error")
+      .map((item) => item.code),
+    targetFields: ["chemd_outline"],
+    leakageRisk: "medium",
+    usableForEval: false
+  })];
+};
+
+const buildChemdRepairExamples = (
+  understanding: ChemdTrainingUnderstandingV1
+): TrainingTaskExampleV1[] =>
+  understanding.knowledge_graph.missing_logic.map((issue) =>
+    createExample({
+      understanding,
+      taskType: "chemd_repair",
+      suffix: `${issue.code}::${issue.entity_id ?? "document"}::${issue.field ?? "record"}`,
+      sourceEntityIds: issue.entity_id ? [issue.entity_id] : [],
+      input: {
+        task: "chemd_repair",
+        issue,
+        entity: getEntityById(understanding, issue.entity_id)
+      },
+      output: {
+        repair_goal: issue.message,
+        field_to_review: issue.field,
+        minimal_action: "Add or correct the missing Chemd reference/field before using this record for supervised training.",
+        requires_human_review: issue.severity !== "info"
+      },
+      warnings: issue.severity === "error" ? [issue.code] : [],
+      targetFields: ["minimal_action"],
+      leakageRisk: "low",
+      usableForEval: false
+    })
+  );
+
+const buildNormalizationExplanationExamples = (
+  understanding: ChemdTrainingUnderstandingV1
+): TrainingTaskExampleV1[] =>
+  understanding.knowledge_graph.field_evidence
+    .filter((evidence) => evidence.normalized)
+    .map((evidence) =>
+      createExample({
+        understanding,
+        taskType: "normalization_explanation",
+        suffix: `${evidence.subject_entity_id}::${evidence.field}`,
+        sourceEntityIds: evidence.evidence_entity_ids,
+        input: {
+          task: "normalization_explanation",
+          subject_entity_id: evidence.subject_entity_id,
+          field: evidence.field,
+          raw_value: evidence.raw_value,
+          source_span: evidence.source_span
+        },
+        output: {
+          raw_value: evidence.raw_value,
+          normalized_value: evidence.value,
+          explanation: "The normalized value is derived directly from the Chemd field evidence and preserves the reported unit or percentage semantics."
+        },
+        targetFields: ["normalized_value"],
+        leakageRisk: "low",
+        usableForEval: Boolean(evidence.raw_value)
+      })
+    );
+
+const buildProcedureReasoningExamples = (
+  understanding: ChemdTrainingUnderstandingV1
+): TrainingTaskExampleV1[] =>
+  understanding.procedure_logic.procedure_to_steps.flatMap((pair) => {
+    if (pair.steps.length === 0) {
+      return [];
+    }
+
+    return [createExample({
+      understanding,
+      taskType: "procedure_reasoning",
+      suffix: pair.pair_id,
+      sourceEntityIds: pair.procedure_id ? [pair.procedure_id] : [],
+      input: {
+        task: "procedure_reasoning",
+        source_text: pair.source_text,
+        source_type: pair.source_type
+      },
+      output: {
+        steps: pair.steps.map((step) => ({
+          step_id: step.stepId,
+          family: step.family,
+          params: step.params,
+          stage: step.stage,
+          purpose: step.purpose,
+          evidence: step.evidence,
+          confidence: step.loweringConfidence
+        }))
+      },
+      warnings: pair.low_confidence_step_count ? ["low_confidence_steps"] : [],
+      targetFields: ["steps"],
+      leakageRisk: "low",
+      usableForEval: !pair.low_confidence_step_count,
+      derivedLabelConfidence: pair.low_confidence_step_count ? "low" : "medium"
+    })];
+  });
+
+const buildObservationEventExamples = (
+  understanding: ChemdTrainingUnderstandingV1
+): TrainingTaskExampleV1[] =>
+  understanding.procedure_logic.observation_to_events.flatMap((pair) => {
+    if (pair.events.length === 0) {
+      return [];
+    }
+
+    return [createExample({
+      understanding,
+      taskType: "observation_events",
+      suffix: pair.pair_id,
+      sourceEntityIds: pair.observation_id ? [pair.observation_id] : [],
+      input: {
+        task: "observation_events",
+        source_text: pair.source_text,
+        procedure_steps: understanding.procedure_logic.procedure_to_steps.flatMap((procedure) => procedure.steps)
+      },
+      output: {
+        events: pair.events.map((event) => ({
+          event_id: event.eventId,
+          event_type: event.eventType,
+          linked_step_id: event.linkedStepId,
+          linked_step_family: event.linkedStepFamily,
+          timepoint: event.timepoint,
+          severity: event.severity,
+          evidence: event.evidence,
+          confidence: event.confidence
+        }))
+      },
+      targetFields: ["events"],
+      leakageRisk: "low",
+      usableForEval: true,
+      derivedLabelConfidence: "medium"
+    })];
+  });
+
+const buildEvidenceTracingExamples = (
+  understanding: ChemdTrainingUnderstandingV1
+): TrainingTaskExampleV1[] =>
+  understanding.knowledge_graph.field_evidence
+    .filter((evidence) => evidence.evidence_entity_ids.some((entityId) => entityId !== evidence.subject_entity_id))
+    .map((evidence) =>
+      createExample({
+        understanding,
+        taskType: "evidence_tracing",
+        suffix: `${evidence.subject_entity_id}::${evidence.field}`,
+        sourceEntityIds: evidence.evidence_entity_ids,
+        input: {
+          task: "evidence_tracing",
+          claim: {
+            subject_entity_id: evidence.subject_entity_id,
+            field: evidence.field,
+            value: evidence.value
+          },
+          subject: getEntityById(understanding, evidence.subject_entity_id),
+          evidence_entities: evidence.evidence_entity_ids
+            .filter((entityId) => entityId !== evidence.subject_entity_id)
+            .map((entityId) => getEntityById(understanding, entityId))
+        },
+        output: {
+          supported_field: evidence.field,
+          supported_value: evidence.value,
+          direct_evidence_entity_ids: evidence.evidence_entity_ids.filter((entityId) => entityId !== evidence.subject_entity_id),
+          source_relation_ids: evidence.source_relation_ids
+        },
+        targetFields: ["direct_evidence_entity_ids", "supported_value"],
+        leakageRisk: "medium",
+        usableForEval: false
+      })
+    );
+
+const buildQaWithContextExamples = (
+  understanding: ChemdTrainingUnderstandingV1
+): TrainingTaskExampleV1[] => {
+  const summary = understanding.canonical_summary;
+  if (!summary) {
+    return [];
+  }
+
+  return [createExample({
+    understanding,
+    taskType: "qa_with_context",
+    suffix: "canonical-summary",
+    sourceEntityIds: summary.source_entity_ids,
+    input: {
+      task: "qa_with_context",
+      question: "What are the main structured experiment facts available for this record?",
+      context: {
+        document: understanding.document,
+        primary_entities: understanding.experiment_logic.primary_entities,
+        relation_count: understanding.relations.length
+      }
+    },
+    output: {
+      answer: summary.text,
+      evidence_entity_ids: summary.source_entity_ids
+    },
+    targetFields: ["answer"],
+    leakageRisk: "low",
+    usableForEval: true,
+    derivedLabelConfidence: "medium"
+  })];
+};
 
 const buildExpertRoutingExamples = (
   understanding: ChemdTrainingUnderstandingV1
@@ -447,6 +730,13 @@ export const buildTrainingTaskDatasetFromUnderstanding = (
   understanding: ChemdTrainingUnderstandingV1
 ): ChemdTrainingTaskDatasetV1 => {
   const examples = [
+    ...buildRecordToChemdExamples(understanding),
+    ...buildChemdRepairExamples(understanding),
+    ...buildNormalizationExplanationExamples(understanding),
+    ...buildProcedureReasoningExamples(understanding),
+    ...buildObservationEventExamples(understanding),
+    ...buildEvidenceTracingExamples(understanding),
+    ...buildQaWithContextExamples(understanding),
     ...buildReactionClassificationExamples(understanding),
     ...buildExpertRoutingExamples(understanding),
     ...buildYieldPredictionExamples(understanding),

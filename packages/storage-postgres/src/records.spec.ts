@@ -36,6 +36,18 @@ reaction: @rxn-main
 status: success
 yield: 80%
 :::
+
+:::sample #sample-main
+ref: res-main
+name: final product
+artifacts: spec-main
+:::
+
+:::artifact #spec-main
+kind: nmr_spectrum
+ref: res-main
+path: data/spec-main.pdf
+:::
 `;
 
 describe("PostgreSQL storage records", () => {
@@ -82,6 +94,7 @@ describe("PostgreSQL storage records", () => {
     });
 
     expect(records.semanticEntities.some((entity) => entity.entityType === "reaction")).toBe(true);
+    expect(records.semanticEntities.some((entity) => entity.entityType === "artifact")).toBe(true);
     expect(records.semanticRelations.some((relation) =>
       relation.relation_type === "result_describes_reaction"
     )).toBe(true);

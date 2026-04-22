@@ -3,14 +3,16 @@ import type { Diagnostic, ProcedureNode, ProcedureStepNode, SourceSpan } from "@
 import {
   createBodyText,
   parseAllowedFields,
+  parseAllowedFieldSpans,
   parseChildBlockFieldLine,
+  readStringListField,
   readStructuredBlockId,
   splitLeadingFieldLines
 } from "./common";
 import { createMarkdownFromText } from "../parse-body-shared";
 import type { BlockParser } from "./types";
 
-const PROCEDURE_FIELDS = new Set(["ref"]);
+const PROCEDURE_FIELDS = new Set(["ref", "reaction", "evidence"]);
 const STEP_LINE_RE = /^\s*step\s*:\s*(.+)$/i;
 const STEP_BLOCK_START_RE = /^\s*:::step(?:\s+(.*))?\s*$/i;
 const STEP_STRUCTURAL_PARAM_KEYS = new Set([
@@ -20,7 +22,11 @@ const STEP_STRUCTURAL_PARAM_KEYS = new Set([
   "inputs",
   "outputs",
   "depends_on",
-  "dependsOn"
+  "dependsOn",
+  "stage",
+  "purpose",
+  "evidence",
+  "confidence"
 ]);
 
 const splitStepSegments = (value: string): string[] =>
@@ -51,6 +57,16 @@ const readStepList = (params: Record<string, string>, ...keys: string[]): string
     .map((value) => value.trim())
     .filter(Boolean);
   return values.length > 0 ? values : undefined;
+};
+
+const readStepConfidence = (params: Record<string, string>): number | undefined => {
+  const raw = params.confidence;
+  if (!raw) {
+    return undefined;
+  }
+
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : undefined;
 };
 
 const splitChildBlockList = (value: string | undefined): string[] | undefined => {
@@ -106,6 +122,57 @@ const withStepMetadata = (
   };
 };
 
+const createStepNode = (
+  family: string,
+  params: Record<string, string>,
+  raw: string,
+  sourceSpan: SourceSpan
+): ProcedureStepNode => {
+  const stepParams = removeStructuralParams(params);
+  const inputs = readStepList(params, "inputs");
+  const outputs = readStepList(params, "outputs");
+  const dependsOn = readStepList(params, "depends_on", "dependsOn");
+  const evidence = readStepList(params, "evidence");
+  const confidence = readStepConfidence(params);
+  const step: ProcedureStepNode = {
+    type: "step",
+    family,
+    raw,
+    authorProvided: true,
+    sourceSpan
+  };
+
+  if (params.id ?? params.step_id) {
+    step.stepId = params.id ?? params.step_id;
+  }
+  if (params.stage) {
+    step.stage = params.stage;
+  }
+  if (params.purpose) {
+    step.purpose = params.purpose;
+  }
+  if (Object.keys(stepParams).length > 0) {
+    step.params = stepParams;
+  }
+  if (inputs) {
+    step.inputs = inputs;
+  }
+  if (outputs) {
+    step.outputs = outputs;
+  }
+  if (dependsOn) {
+    step.dependsOn = dependsOn;
+  }
+  if (evidence) {
+    step.evidence = evidence;
+  }
+  if (confidence !== undefined) {
+    step.confidence = confidence;
+  }
+
+  return step;
+};
+
 const parseStepLine = (line: string, sourceSpan: SourceSpan): ProcedureStepNode | undefined => {
   const match = line.match(STEP_LINE_RE);
   if (!match) {
@@ -123,24 +190,8 @@ const parseStepLine = (line: string, sourceSpan: SourceSpan): ProcedureStepNode 
     })
   );
   const family = firstParam ? params.family ?? "" : firstSegment;
-  const stepId = params.id ?? params.step_id;
-  const stepParams = removeStructuralParams(params);
-  const inputs = readStepList(params, "inputs");
-  const outputs = readStepList(params, "outputs");
-  const dependsOn = readStepList(params, "depends_on", "dependsOn");
 
-  return {
-    type: "step",
-    family,
-    ...(stepId ? { stepId } : {}),
-    ...(Object.keys(stepParams).length > 0 ? { params: stepParams } : {}),
-    ...(inputs ? { inputs } : {}),
-    ...(outputs ? { outputs } : {}),
-    ...(dependsOn ? { dependsOn } : {}),
-    raw: line.trim(),
-    authorProvided: true,
-    sourceSpan
-  };
+  return createStepNode(family, params, line.trim(), sourceSpan);
 };
 
 const parseNestedStepFields = (
@@ -165,15 +216,21 @@ const parseNestedStepFields = (
   const inputs = splitChildBlockList(fields.inputs);
   const outputs = splitChildBlockList(fields.outputs);
   const dependsOn = splitChildBlockList(fields.dependsOn ?? fields.depends_on);
+  const evidence = splitChildBlockList(fields.evidence);
+  const confidence = readStepConfidence(fields);
 
   return {
     type: "step",
     family,
     ...(stepId ? { stepId } : {}),
+    ...(fields.stage ? { stage: fields.stage } : {}),
+    ...(fields.purpose ? { purpose: fields.purpose } : {}),
     ...(Object.keys(stepParams).length > 0 ? { params: stepParams } : {}),
     ...(inputs ? { inputs } : {}),
     ...(outputs ? { outputs } : {}),
     ...(dependsOn ? { dependsOn } : {}),
+    ...(evidence ? { evidence } : {}),
+    ...(confidence !== undefined ? { confidence } : {}),
     raw,
     authorProvided: true,
     sourceSpan
@@ -266,13 +323,17 @@ export const parseProcedureBlock: BlockParser = ({ headerArg, lines, diagnostics
   const { fieldLines, bodyLines } = splitLeadingFieldLines(lines, PROCEDURE_FIELDS);
   const parsedBody = splitProcedureBodyAndSteps(bodyLines, diagnostics, id);
   const fields = parseAllowedFields(fieldLines, diagnostics, "procedure", PROCEDURE_FIELDS, {
-    listFields: new Set()
+    listFields: new Set(["evidence"])
   });
+  const fieldSpans = parseAllowedFieldSpans(fieldLines, PROCEDURE_FIELDS);
 
   return {
     type: "procedure",
     id,
     ref: typeof fields.ref === "string" ? fields.ref : undefined,
+    reaction: typeof fields.reaction === "string" ? fields.reaction : undefined,
+    evidence: readStringListField(fields.evidence),
+    fieldSpans,
     body: createBodyText(parsedBody.bodyLines),
     ...(parsedBody.steps.length > 0 ? { steps: parsedBody.steps } : {}),
     ...(parsedBody.children.length > 0 ? { children: parsedBody.children } : {})

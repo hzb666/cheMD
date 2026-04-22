@@ -124,6 +124,7 @@ RAG chunk truth source.
 | `compileRunId` omitted | Use `${revisionId}::compile` |
 | Entity payload contains `original_id` | Preserve it on `SemanticEntityRecord.originalId` |
 | Entity payload has no `original_id` | Leave `originalId` undefined |
+| Training understanding contains artifacts | Persist them as `SemanticEntityRecord` rows with `entityType: "artifact"` |
 | RAG chunk has metadata | Preserve metadata JSON without flattening |
 | LNF omitted | Leave artifact `lnf` undefined |
 
@@ -131,8 +132,8 @@ RAG chunk truth source.
 
 Good:
 
-- A compiled document with molecule, reaction, result, semantic relation,
-  field evidence, RAG chunks, and LNF maps to all record groups.
+- A compiled document with molecule, reaction, result, artifact, semantic
+  relation, field evidence, RAG chunks, and LNF maps to all record groups.
 
 Base:
 
@@ -159,7 +160,7 @@ Tests must assert:
   `"chemd-training-export/v0.2"`.
 - `compileArtifact.trainingUnderstanding.schema_version` is
   `"chemd-training-understanding/v0.1"`.
-- Semantic entity records include reaction entities.
+- Semantic entity records include reaction and artifact entities.
 - Semantic relation records include `result_describes_reaction` when present.
 - Field evidence includes training-relevant fields such as `yield_percent`.
 - RAG chunk records preserve `revisionId`, `experimentId`, text, and metadata.

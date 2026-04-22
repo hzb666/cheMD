@@ -77,6 +77,7 @@ const createRetrievalMetadata = (
   result_ids: semanticLayer.results.map((result) => result.entity_id),
   analysis_ids: semanticLayer.analyses.map((analysis) => analysis.entity_id),
   sample_ids: semanticLayer.samples.map((sample) => sample.entity_id),
+  artifact_ids: semanticLayer.artifacts.map((artifact) => artifact.entity_id),
   analysis_types: uniqueStrings(semanticLayer.analyses.map((analysis) => analysis.analysis_type))
 });
 
@@ -91,7 +92,8 @@ const buildDocumentSummaryText = (
   semanticLayer.reactions.length ? `${semanticLayer.reactions.length} reactions` : undefined,
   semanticLayer.results.length ? `${semanticLayer.results.length} results` : undefined,
   semanticLayer.analyses.length ? `${semanticLayer.analyses.length} analyses` : undefined,
-  semanticLayer.samples.length ? `${semanticLayer.samples.length} samples` : undefined
+  semanticLayer.samples.length ? `${semanticLayer.samples.length} samples` : undefined,
+  semanticLayer.artifacts.length ? `${semanticLayer.artifacts.length} artifacts` : undefined
 );
 
 const getDocumentSummaryEntityIds = (semanticLayer: SemanticLayerV1): string[] => [
@@ -99,7 +101,8 @@ const getDocumentSummaryEntityIds = (semanticLayer: SemanticLayerV1): string[] =
   ...semanticLayer.reactions.map((reaction) => reaction.entity_id),
   ...semanticLayer.results.map((result) => result.entity_id),
   ...semanticLayer.analyses.map((analysis) => analysis.entity_id),
-  ...semanticLayer.samples.map((sample) => sample.entity_id)
+  ...semanticLayer.samples.map((sample) => sample.entity_id),
+  ...semanticLayer.artifacts.map((artifact) => artifact.entity_id)
 ];
 
 const buildRetrievalChunks = (
@@ -230,6 +233,28 @@ const buildRetrievalChunks = (
     });
   });
 
+  semanticLayer.artifacts.forEach((artifact) => {
+    const text = compactText(
+      artifact.artifact_kind,
+      artifact.ref_raw ? `ref ${artifact.ref_raw}` : undefined,
+      artifact.path,
+      artifact.instrument,
+      artifact.notes
+    );
+    if (!text) {
+      return;
+    }
+
+    chunks.push({
+      chunk_id: `retrieval::${document.document_id}::${artifact.entity_id}`,
+      experiment_id: document.document_id,
+      chunk_type: "artifact_notes",
+      source_entity_ids: [artifact.entity_id],
+      text,
+      metadata
+    });
+  });
+
   return chunks;
 };
 
@@ -304,6 +329,17 @@ const buildLinkedMoleculeIds = (reaction: ExportedReactionV1): string[] => [
   ...reaction.reactants.flatMap((participant) => participant.target_entity_id ?? []),
   ...reaction.products.flatMap((participant) => participant.target_entity_id ?? [])
 ];
+
+const buildChemistryFeatureRefIds = (
+  semanticLayer: SemanticLayerV1,
+  reaction: ExportedReactionV1,
+  linkedMoleculeEntityIds: string[]
+): string[] => uniqueStrings([
+  ...(reaction.chemistry_feature_ref_ids ?? []),
+  ...semanticLayer.molecules
+    .filter((molecule) => linkedMoleculeEntityIds.includes(molecule.entity_id))
+    .flatMap((molecule) => molecule.chemistry_feature_ref_ids ?? [])
+]);
 
 const findLinkedResultForReaction = (
   semanticLayer: SemanticLayerV1,
@@ -396,7 +432,8 @@ const buildPredictionInstance = (
       entity_refs: [
         reaction.entity_id,
         ...linkedMoleculeIds
-      ]
+      ],
+      chemistry_feature_ref_ids: buildChemistryFeatureRefIds(semanticLayer, reaction, linkedMoleculeIds)
     },
     targets,
     usability: {

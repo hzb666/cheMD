@@ -42,6 +42,17 @@ status: partial
 yield: 23%
 purity: 91%
 :::
+
+:::sample #sample-main
+derived_from: rxn-main
+artifacts: spec-main
+:::
+
+:::artifact #spec-main
+kind: tlc_image
+ref: res-main
+path: data/tlc/spec-main.png
+:::
 `;
 
 describe("chemd-lang v0.3 compiler integration", () => {
@@ -65,6 +76,17 @@ describe("chemd-lang v0.3 compiler integration", () => {
     expect(result.lnf.experiment.workflow.stepSources.loweredStepIds.length).toBeGreaterThan(0);
     expect(result.trainingExport.schema_version).toBe("chemd-training-export/v0.2");
     expect(result.trainingExport.semantic_layer.lnf?.schemaVersion).toBe("chemd-lnf/v0.5");
+    expect(result.trainingExport.semantic_layer.artifacts[0]).toMatchObject({
+      original_id: "spec-main",
+      artifact_kind: "tlc_image",
+      path: "data/tlc/spec-main.png"
+    });
+    expect(result.trainingUnderstanding.entities.artifacts[0]).toMatchObject({
+      artifact_kind: "tlc_image"
+    });
+    expect(result.trainingUnderstanding.experiment_logic.evidence_links).toContainEqual(
+      expect.objectContaining({ relation_type: "artifact_supports_result" })
+    );
     expect(result.trainingExport.learning_layer.retrieval_chunks.length).toBeGreaterThan(0);
     expect(JSON.parse(result.docxBridge)).toMatchObject({
       semantic: {

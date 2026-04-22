@@ -62,13 +62,20 @@ export const buildQualityLayer = (diagnostics: Diagnostic[], learningLayer: Lear
 
   const lowConfidenceLoweredSteps = countLowConfidenceLoweredSteps(learningLayer);
   const migrationDiagnostics = countMigrationDiagnostics(diagnostics);
+  const reviewReasons: string[] = [];
 
   if (lowConfidenceLoweredSteps > 0) {
     exclusionReasons.push("low_confidence_lowered_steps");
+    reviewReasons.push("low_confidence_lowered_steps");
   }
 
   if (migrationDiagnostics > 0) {
     exclusionReasons.push("surface_migration_required");
+    reviewReasons.push("surface_migration_required");
+  }
+
+  if (parseQuality.has_errors) {
+    reviewReasons.push("parse_errors");
   }
 
   return {
@@ -80,10 +87,15 @@ export const buildQualityLayer = (diagnostics: Diagnostic[], learningLayer: Lear
     training_quality: {
       rag_eligible: ragEligible,
       prediction_eligible: predictionEligible,
+      sft_eligible: ragEligible && !parseQuality.has_errors && lowConfidenceLoweredSteps === 0,
+      eval_eligible: predictionEligible && !parseQuality.has_errors && lowConfidenceLoweredSteps === 0,
+      regression_eligible: predictionEligible && parseQuality.diagnostic_counts.error === 0,
+      review_required: reviewReasons.length > 0,
       confidence_score: getConfidenceScore(
         parseQuality.diagnostic_counts.warning + lowConfidenceLoweredSteps,
         parseQuality.diagnostic_counts.error
       ),
+      ...(reviewReasons.length > 0 ? { review_reasons: reviewReasons } : {}),
       ...(exclusionReasons.length > 0 ? { exclusion_reasons: exclusionReasons } : {})
     }
   };

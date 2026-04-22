@@ -6,6 +6,7 @@ const TARGET_KIND_BY_NODE_TYPE: Record<string, ReferenceType["targetKind"]> = {
   result: "result",
   analysis: "analysis",
   sample: "sample",
+  artifact: "artifact",
   template: "template"
 };
 

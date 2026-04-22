@@ -4,6 +4,7 @@ import type { V03Diagnostic } from "@chemd/diagnostics";
 
 import {
   buildAnalysisNode,
+  buildArtifactNode,
   buildMoleculeNode,
   buildObservationNode,
   buildProcedureNode,
@@ -122,7 +123,11 @@ const buildTypedObjectNode = (
     return buildAnalysisNode(node, { objectIndex });
   }
 
-  return buildSampleNode(node, { objectIndex });
+  if (node.type === "sample") {
+    return buildSampleNode(node, { objectIndex });
+  }
+
+  return buildArtifactNode(node, { objectIndex });
 };
 
 const buildStepGraph = (accumulator: Accumulator): StepGraph => ({

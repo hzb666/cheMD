@@ -162,10 +162,13 @@ const toExplicitStep = ({
     step: {
       stepId,
       family: resolvedParams.family,
+      ...(step.stage ? { stage: step.stage } : {}),
+      ...(step.purpose ? { purpose: step.purpose } : {}),
       params: resolvedParams.params,
       ...(resolvedIo.inputs ? { inputs: resolvedIo.inputs } : {}),
       ...(resolvedIo.outputs ? { outputs: resolvedIo.outputs } : {}),
       ...(step.dependsOn ? { dependsOn: step.dependsOn } : {}),
+      ...(step.evidence ? { evidence: step.evidence } : {}),
       source: {
         sourceNodeType: "procedure",
         sourceNodeId: node.id,
@@ -176,7 +179,7 @@ const toExplicitStep = ({
         ...(step.provenance ? { provenance: step.provenance } : {})
       },
       ...(step.provenance ? { provenance: step.provenance } : {}),
-      loweringConfidence: 1
+      loweringConfidence: typeof step.confidence === "number" ? step.confidence : 1
     }
   };
 };

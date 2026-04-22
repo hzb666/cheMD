@@ -5,6 +5,7 @@ import type {
   LoraTaskHintV1,
   LoraTaskTypeV1,
   TrainingAnalysisV1,
+  TrainingArtifactV1,
   TrainingCanonicalSummaryV1,
   TrainingEvidenceLinkV1,
   TrainingExpertRoutingV1,
@@ -36,6 +37,7 @@ import type {
 import type {
   ChemdTrainingExportV2,
   ExportedAnalysisV1,
+  ExportedArtifactV1,
   ExportedEntityBase,
   ExportedMoleculeV1,
   ExportedReactionV1,
@@ -49,7 +51,8 @@ type ObjectEntity =
   | ExportedAnalysisV1
   | ExportedResultV1
   | ExportedSampleV1
-  | ExportedReactionV1;
+  | ExportedReactionV1
+  | ExportedArtifactV1;
 
 type PrimaryRole = TrainingPrimaryEntityV1["role"];
 type SourceStrippedKey =
@@ -59,6 +62,7 @@ type SourceStrippedKey =
   | "syntax_origin"
   | "declared_kind"
   | "provenance"
+  | "field_source_spans"
   | "text_for_embedding";
 type ProcedurePair = NonNullable<ChemdTrainingExportV2["learning_layer"]["procedure_to_steps"]>[number];
 type ObservationPair = NonNullable<ChemdTrainingExportV2["learning_layer"]["observation_to_events"]>[number];
@@ -74,6 +78,7 @@ interface FieldEvidenceInput {
   normalized?: boolean;
   evidenceEntityIds?: string[];
   sourceRelationIds?: string[];
+  sourceSpan?: TrainingFieldEvidenceV1["source_span"];
 }
 
 interface LoraHintContext {
@@ -89,13 +94,41 @@ const RAG_EXCLUSION_REASONS = new Set(["no_retrieval_chunks"]);
 const SAMPLE_LINEAGE_RELATIONS = new Set<ExportedRelationV1["relation_type"]>([
   "sample_derived_from_reaction",
   "sample_related_to_molecule",
-  "sample_related_to_result"
+  "sample_related_to_result",
+  "sample_derived_from_sample",
+  "sample_aliquot_of_sample",
+  "sample_batch_of_sample",
+  "sample_has_artifact"
 ]);
 const EVIDENCE_RELATIONS = new Set<ExportedRelationV1["relation_type"]>([
   "analysis_targets_reaction",
   "analysis_targets_result",
   "analysis_targets_sample"
 ]);
+const ARTIFACT_EVIDENCE_RELATIONS = new Set<ExportedRelationV1["relation_type"]>([
+  "artifact_supports_reaction",
+  "artifact_supports_result",
+  "artifact_supports_analysis",
+  "artifact_supports_sample"
+]);
+type SampleLineageReferenceField = "derived_from" | "aliquot_of" | "batch_of" | "artifacts";
+const SAMPLE_LINEAGE_FIELD_RELATIONS: Record<SampleLineageReferenceField, ReadonlySet<ExportedRelationV1["relation_type"]>> = {
+  derived_from: new Set([
+    "sample_derived_from_reaction",
+    "sample_related_to_molecule",
+    "sample_related_to_result",
+    "sample_derived_from_sample"
+  ]),
+  aliquot_of: new Set(["sample_aliquot_of_sample"]),
+  batch_of: new Set(["sample_batch_of_sample"]),
+  artifacts: new Set(["sample_has_artifact"])
+};
+const SAMPLE_LINEAGE_FIELD_ROLES: Record<SampleLineageReferenceField, string> = {
+  derived_from: "derived_from",
+  aliquot_of: "aliquot_of",
+  batch_of: "batch_of",
+  artifacts: "artifact"
+};
 const LOW_YIELD_THRESHOLD = 20;
 const LOW_CONVERSION_THRESHOLD = 50;
 const LOW_SELECTIVITY_THRESHOLD = 50;
@@ -193,6 +226,7 @@ const stripSourceFields = <T extends ExportedEntityBase>(
     syntax_origin: _syntaxOrigin,
     declared_kind: _declaredKind,
     provenance: _provenance,
+    field_source_spans: _fieldSourceSpans,
     text_for_embedding: _textForEmbedding,
     ...rest
   } = entity as T & { text_for_embedding?: string };
@@ -236,7 +270,8 @@ const buildEntityIndex = (record: ChemdTrainingExportV2): Map<string, ObjectEnti
     ...record.semantic_layer.reactions,
     ...record.semantic_layer.results,
     ...record.semantic_layer.analyses,
-    ...record.semantic_layer.samples
+    ...record.semantic_layer.samples,
+    ...record.semantic_layer.artifacts
   ];
 
   return new Map(
@@ -269,6 +304,22 @@ const findRelation = (
   record.semantic_layer.links.find((relation) =>
     relation.from_entity_id === fromEntityId && relationTypes.has(relation.relation_type)
   );
+
+const findRelationToTarget = (
+  record: ChemdTrainingExportV2,
+  fromEntityId: string,
+  targetEntityId: string | undefined,
+  relationTypes: ReadonlySet<ExportedRelationV1["relation_type"]>,
+  role?: string
+): ExportedRelationV1 | undefined =>
+  targetEntityId
+    ? record.semantic_layer.links.find((relation) =>
+        relation.from_entity_id === fromEntityId
+        && relation.to_entity_id === targetEntityId
+        && relationTypes.has(relation.relation_type)
+        && (!role || relation.role === role)
+      )
+    : undefined;
 
 const createStructuredReference = (
   raw: string,
@@ -388,7 +439,14 @@ const buildSingleFieldReferences = (
       return [];
     }
 
-    const relation = findRelation(record, entity.entity_id, sourceType === "analysis" ? EVIDENCE_RELATIONS : SAMPLE_LINEAGE_RELATIONS);
+    const target = entityByOriginalId.get(normalizeReferenceId(entity.ref_raw));
+    const relation = findRelationToTarget(
+      record,
+      entity.entity_id,
+      target?.entity_id,
+      sourceType === "analysis" ? EVIDENCE_RELATIONS : SAMPLE_LINEAGE_RELATIONS,
+      "ref"
+    );
 
     return [createStructuredReference(
       entity.ref_raw,
@@ -397,7 +455,86 @@ const buildSingleFieldReferences = (
         source_entity_type: sourceType,
         source_field: "ref"
       },
-      entityByOriginalId.get(normalizeReferenceId(entity.ref_raw)),
+      target,
+      relation?.relation_type
+    )];
+  });
+
+const buildSampleLineageReferences = (
+  record: ChemdTrainingExportV2,
+  entityByOriginalId: Map<string, ObjectEntity>
+): TrainingResolvedReferenceV1[] =>
+  record.semantic_layer.samples.flatMap((sample) => [
+    ...([
+      ["derived_from", sample.derived_from_raw],
+      ["aliquot_of", sample.aliquot_of_raw],
+      ["batch_of", sample.batch_of_raw]
+    ] as const).flatMap(([field, raw]) =>
+      createSampleLineageReference(record, entityByOriginalId, sample, field, raw)
+    ),
+    ...(sample.artifact_refs_raw ?? []).flatMap((raw) =>
+      createSampleLineageReference(record, entityByOriginalId, sample, "artifacts", raw)
+    )
+  ]);
+
+const createSampleLineageReference = (
+  record: ChemdTrainingExportV2,
+  entityByOriginalId: Map<string, ObjectEntity>,
+  sample: ExportedSampleV1,
+  field: SampleLineageReferenceField,
+  raw: string | undefined
+): TrainingResolvedReferenceV1[] => {
+  if (!raw) {
+    return [];
+  }
+
+  const target = entityByOriginalId.get(normalizeReferenceId(raw));
+  const relation = findRelationToTarget(
+    record,
+    sample.entity_id,
+    target?.entity_id,
+    SAMPLE_LINEAGE_FIELD_RELATIONS[field],
+    SAMPLE_LINEAGE_FIELD_ROLES[field]
+  );
+
+  return [createStructuredReference(
+    raw,
+    {
+      source_entity_id: sample.entity_id,
+      source_entity_type: "sample",
+      source_field: field
+    },
+    target,
+    relation?.relation_type
+  )];
+};
+
+const buildArtifactReferences = (
+  record: ChemdTrainingExportV2,
+  entityByOriginalId: Map<string, ObjectEntity>
+): TrainingResolvedReferenceV1[] =>
+  record.semantic_layer.artifacts.flatMap((artifact) => {
+    if (!artifact.ref_raw) {
+      return [];
+    }
+
+    const target = entityByOriginalId.get(normalizeReferenceId(artifact.ref_raw));
+    const relation = findRelationToTarget(
+      record,
+      artifact.entity_id,
+      target?.entity_id,
+      ARTIFACT_EVIDENCE_RELATIONS,
+      "ref"
+    );
+
+    return [createStructuredReference(
+      artifact.ref_raw,
+      {
+        source_entity_id: artifact.entity_id,
+        source_entity_type: "artifact",
+        source_field: "ref"
+      },
+      target,
       relation?.relation_type
     )];
   });
@@ -410,7 +547,9 @@ const buildResolvedReferences = (
   ...buildReactionParticipantReferences(record),
   ...buildResultReferences(record, entityByOriginalId),
   ...buildSingleFieldReferences(record, entityByOriginalId, record.semantic_layer.analyses, "analysis"),
-  ...buildSingleFieldReferences(record, entityByOriginalId, record.semantic_layer.samples, "sample")
+  ...buildSingleFieldReferences(record, entityByOriginalId, record.semantic_layer.samples, "sample"),
+  ...buildSampleLineageReferences(record, entityByOriginalId),
+  ...buildArtifactReferences(record, entityByOriginalId)
 ];
 
 const buildProcedureLogicPairs = (record: ChemdTrainingExportV2): TrainingProcedureLogicPairV1[] =>
@@ -985,6 +1124,7 @@ const buildKnowledgeNodes = (
   ...semanticNodesForEntity("result", record.semantic_layer.results),
   ...semanticNodesForEntity("analysis", record.semantic_layer.analyses),
   ...semanticNodesForEntity("sample", record.semantic_layer.samples),
+  ...semanticNodesForEntity("artifact", record.semantic_layer.artifacts),
   ...record.semantic_layer.markdown_blocks.map((block) => ({
     node_id: block.entity_id,
     node_type: "narrative" as const,
@@ -1175,9 +1315,11 @@ const findEvidenceRelationsForResult = (
   return record.semantic_layer.links.filter((relation) =>
     (relation.relation_type === "analysis_targets_result" && relation.to_entity_id === result.entity_id)
     || (relation.relation_type === "sample_related_to_result" && relation.to_entity_id === result.entity_id)
+    || (relation.relation_type === "artifact_supports_result" && relation.to_entity_id === result.entity_id)
     || Boolean(reactionId && relation.to_entity_id === reactionId && (
       relation.relation_type === "analysis_targets_reaction"
       || relation.relation_type === "sample_derived_from_reaction"
+      || relation.relation_type === "artifact_supports_reaction"
     ))
   );
 };
@@ -1319,28 +1461,51 @@ const createFieldEvidence = (input: FieldEvidenceInput): TrainingFieldEvidenceV1
     ...(rawValueNodeId ? { raw_value_node_id: rawValueNodeId } : {}),
     ...(input.normalized ? { normalized: true } : {}),
     evidence_entity_ids: uniqueStrings([input.subjectEntityId, ...(input.evidenceEntityIds ?? [])]),
-    source_relation_ids: uniqueStrings(input.sourceRelationIds ?? [])
+    source_relation_ids: uniqueStrings(input.sourceRelationIds ?? []),
+    ...(input.sourceSpan ? { source_span: input.sourceSpan } : {})
   }];
 };
 
+const getFieldSourceSpan = (
+  entity: { field_source_spans?: Record<string, TrainingFieldEvidenceV1["source_span"]> },
+  field: string
+): TrainingFieldEvidenceV1["source_span"] => entity.field_source_spans?.[field];
+
 const buildMoleculeFieldEvidence = (record: ChemdTrainingExportV2): TrainingFieldEvidenceV1[] =>
   record.semantic_layer.molecules.flatMap((molecule) => [
-    ...createFieldEvidence({ subjectEntityId: molecule.entity_id, field: "smiles", value: molecule.smiles }),
-    ...createFieldEvidence({ subjectEntityId: molecule.entity_id, field: "cas", value: molecule.cas }),
-    ...createFieldEvidence({ subjectEntityId: molecule.entity_id, field: "formula", value: molecule.formula }),
+    ...createFieldEvidence({
+      subjectEntityId: molecule.entity_id,
+      field: "smiles",
+      value: molecule.smiles,
+      sourceSpan: getFieldSourceSpan(molecule, "smiles")
+    }),
+    ...createFieldEvidence({
+      subjectEntityId: molecule.entity_id,
+      field: "cas",
+      value: molecule.cas,
+      sourceSpan: getFieldSourceSpan(molecule, "cas")
+    }),
+    ...createFieldEvidence({
+      subjectEntityId: molecule.entity_id,
+      field: "formula",
+      value: molecule.formula,
+      sourceSpan: getFieldSourceSpan(molecule, "formula")
+    }),
     ...createFieldEvidence({
       subjectEntityId: molecule.entity_id,
       field: "amount_value",
       value: formatNumericWithUnit(molecule.amount_value),
       rawValue: molecule.amount_raw,
-      normalized: Boolean(molecule.amount_value)
+      normalized: Boolean(molecule.amount_value),
+      sourceSpan: getFieldSourceSpan(molecule, "amount")
     }),
     ...createFieldEvidence({
       subjectEntityId: molecule.entity_id,
       field: "equivalents_value",
       value: molecule.equivalents_value,
       rawValue: molecule.equivalents_raw,
-      normalized: typeof molecule.equivalents_value === "number"
+      normalized: typeof molecule.equivalents_value === "number",
+      sourceSpan: getFieldSourceSpan(molecule, "equivalents")
     })
   ]);
 
@@ -1351,56 +1516,64 @@ const buildReactionFieldEvidence = (record: ChemdTrainingExportV2): TrainingFiel
       field: "solvent",
       value: reaction.normalized_conditions.solvent?.normalized,
       rawValue: reaction.solvent_raw,
-      normalized: Boolean(reaction.normalized_conditions.solvent)
+      normalized: Boolean(reaction.normalized_conditions.solvent),
+      sourceSpan: getFieldSourceSpan(reaction, "solvent")
     }),
     ...createFieldEvidence({
       subjectEntityId: reaction.entity_id,
       field: "catalyst",
       value: reaction.normalized_conditions.catalyst?.normalized,
       rawValue: reaction.catalyst_raw,
-      normalized: Boolean(reaction.normalized_conditions.catalyst)
+      normalized: Boolean(reaction.normalized_conditions.catalyst),
+      sourceSpan: getFieldSourceSpan(reaction, "catalyst")
     }),
     ...createFieldEvidence({
       subjectEntityId: reaction.entity_id,
       field: "reagents",
       value: reaction.normalized_conditions.reagents?.normalized.join(", "),
       rawValue: reaction.reagents_raw,
-      normalized: Boolean(reaction.normalized_conditions.reagents)
+      normalized: Boolean(reaction.normalized_conditions.reagents),
+      sourceSpan: getFieldSourceSpan(reaction, "reagents")
     }),
     ...createFieldEvidence({
       subjectEntityId: reaction.entity_id,
       field: "temperature",
       value: formatNumericWithUnit(reaction.normalized_conditions.temperature),
       rawValue: reaction.temperature_raw,
-      normalized: Boolean(reaction.normalized_conditions.temperature)
+      normalized: Boolean(reaction.normalized_conditions.temperature),
+      sourceSpan: getFieldSourceSpan(reaction, "temperature")
     }),
     ...createFieldEvidence({
       subjectEntityId: reaction.entity_id,
       field: "time",
       value: formatNumericWithUnit(reaction.normalized_conditions.time),
       rawValue: reaction.time_raw,
-      normalized: Boolean(reaction.normalized_conditions.time)
+      normalized: Boolean(reaction.normalized_conditions.time),
+      sourceSpan: getFieldSourceSpan(reaction, "time")
     }),
     ...createFieldEvidence({
       subjectEntityId: reaction.entity_id,
       field: "pressure",
       value: formatNumericWithUnit(reaction.normalized_conditions.pressure),
       rawValue: reaction.pressure_raw,
-      normalized: Boolean(reaction.normalized_conditions.pressure)
+      normalized: Boolean(reaction.normalized_conditions.pressure),
+      sourceSpan: getFieldSourceSpan(reaction, "pressure")
     }),
     ...createFieldEvidence({
       subjectEntityId: reaction.entity_id,
       field: "atmosphere",
       value: reaction.normalized_conditions.atmosphere?.normalized,
       rawValue: reaction.atmosphere_raw,
-      normalized: Boolean(reaction.normalized_conditions.atmosphere)
+      normalized: Boolean(reaction.normalized_conditions.atmosphere),
+      sourceSpan: getFieldSourceSpan(reaction, "atmosphere")
     }),
     ...createFieldEvidence({
       subjectEntityId: reaction.entity_id,
       field: "yield_percent",
       value: reaction.normalized_outcome_hints.yield_percent,
       rawValue: reaction.yield_raw,
-      normalized: typeof reaction.normalized_outcome_hints.yield_percent === "number"
+      normalized: typeof reaction.normalized_outcome_hints.yield_percent === "number",
+      sourceSpan: getFieldSourceSpan(reaction, "yield")
     }),
     ...createFieldEvidence({
       subjectEntityId: reaction.entity_id,
@@ -1432,7 +1605,8 @@ const buildResultFieldEvidence = (record: ChemdTrainingExportV2): TrainingFieldE
         rawValue: result.status_raw,
         normalized: Boolean(result.status_label),
         evidenceEntityIds,
-        sourceRelationIds
+        sourceRelationIds,
+        sourceSpan: getFieldSourceSpan(result, "status")
       }),
       ...createFieldEvidence({
         subjectEntityId: result.entity_id,
@@ -1441,7 +1615,8 @@ const buildResultFieldEvidence = (record: ChemdTrainingExportV2): TrainingFieldE
         rawValue: result.yield_raw,
         normalized: typeof result.yield_percent === "number",
         evidenceEntityIds,
-        sourceRelationIds
+        sourceRelationIds,
+        sourceSpan: getFieldSourceSpan(result, "yield")
       }),
       ...createFieldEvidence({
         subjectEntityId: result.entity_id,
@@ -1450,7 +1625,8 @@ const buildResultFieldEvidence = (record: ChemdTrainingExportV2): TrainingFieldE
         rawValue: result.conversion_raw,
         normalized: typeof result.conversion_percent === "number",
         evidenceEntityIds,
-        sourceRelationIds
+        sourceRelationIds,
+        sourceSpan: getFieldSourceSpan(result, "conversion")
       }),
       ...createFieldEvidence({
         subjectEntityId: result.entity_id,
@@ -1459,7 +1635,8 @@ const buildResultFieldEvidence = (record: ChemdTrainingExportV2): TrainingFieldE
         rawValue: result.selectivity_raw,
         normalized: typeof result.selectivity_percent === "number",
         evidenceEntityIds,
-        sourceRelationIds
+        sourceRelationIds,
+        sourceSpan: getFieldSourceSpan(result, "selectivity")
       }),
       ...createFieldEvidence({
         subjectEntityId: result.entity_id,
@@ -1468,7 +1645,8 @@ const buildResultFieldEvidence = (record: ChemdTrainingExportV2): TrainingFieldE
         rawValue: result.purity_raw,
         normalized: typeof result.purity_percent === "number",
         evidenceEntityIds,
-        sourceRelationIds
+        sourceRelationIds,
+        sourceSpan: getFieldSourceSpan(result, "purity")
       }),
       ...createFieldEvidence({
         subjectEntityId: result.entity_id,
@@ -1477,29 +1655,95 @@ const buildResultFieldEvidence = (record: ChemdTrainingExportV2): TrainingFieldE
         rawValue: result.isolated_mass_raw,
         normalized: Boolean(result.isolated_mass),
         evidenceEntityIds,
-        sourceRelationIds
+        sourceRelationIds,
+        sourceSpan: getFieldSourceSpan(result, "isolated_mass")
       })
     ];
   });
 
 const buildAnalysisFieldEvidence = (record: ChemdTrainingExportV2): TrainingFieldEvidenceV1[] =>
   record.semantic_layer.analyses.flatMap((analysis) => [
-    ...createFieldEvidence({ subjectEntityId: analysis.entity_id, field: "analysis_type", value: analysis.analysis_type }),
-    ...createFieldEvidence({ subjectEntityId: analysis.entity_id, field: "method", value: analysis.method }),
-    ...createFieldEvidence({ subjectEntityId: analysis.entity_id, field: "data", value: analysis.data_raw }),
-    ...createFieldEvidence({ subjectEntityId: analysis.entity_id, field: "result", value: analysis.result_raw })
+    ...createFieldEvidence({
+      subjectEntityId: analysis.entity_id,
+      field: "analysis_type",
+      value: analysis.analysis_type,
+      sourceSpan: getFieldSourceSpan(analysis, "type")
+    }),
+    ...createFieldEvidence({
+      subjectEntityId: analysis.entity_id,
+      field: "method",
+      value: analysis.method,
+      sourceSpan: getFieldSourceSpan(analysis, "method")
+    }),
+    ...createFieldEvidence({
+      subjectEntityId: analysis.entity_id,
+      field: "data",
+      value: analysis.data_raw,
+      sourceSpan: getFieldSourceSpan(analysis, "data")
+    }),
+    ...createFieldEvidence({
+      subjectEntityId: analysis.entity_id,
+      field: "result",
+      value: analysis.result_raw,
+      sourceSpan: getFieldSourceSpan(analysis, "result")
+    })
   ]);
 
 const buildSampleFieldEvidence = (record: ChemdTrainingExportV2): TrainingFieldEvidenceV1[] =>
   record.semantic_layer.samples.flatMap((sample) => [
-    ...createFieldEvidence({ subjectEntityId: sample.entity_id, field: "sample_code", value: sample.sample_code }),
-    ...createFieldEvidence({ subjectEntityId: sample.entity_id, field: "batch", value: sample.batch }),
+    ...createFieldEvidence({
+      subjectEntityId: sample.entity_id,
+      field: "sample_code",
+      value: sample.sample_code,
+      sourceSpan: getFieldSourceSpan(sample, "sample_id")
+    }),
+    ...createFieldEvidence({
+      subjectEntityId: sample.entity_id,
+      field: "batch",
+      value: sample.batch,
+      sourceSpan: getFieldSourceSpan(sample, "batch")
+    }),
     ...createFieldEvidence({
       subjectEntityId: sample.entity_id,
       field: "purity_percent",
       value: sample.purity_percent,
       rawValue: sample.purity_raw,
-      normalized: typeof sample.purity_percent === "number"
+      normalized: typeof sample.purity_percent === "number",
+      sourceSpan: getFieldSourceSpan(sample, "purity")
+    })
+  ]);
+
+const buildArtifactFieldEvidence = (record: ChemdTrainingExportV2): TrainingFieldEvidenceV1[] =>
+  record.semantic_layer.artifacts.flatMap((artifact) => [
+    ...createFieldEvidence({
+      subjectEntityId: artifact.entity_id,
+      field: "artifact_kind",
+      value: artifact.artifact_kind,
+      sourceSpan: getFieldSourceSpan(artifact, "kind")
+    }),
+    ...createFieldEvidence({
+      subjectEntityId: artifact.entity_id,
+      field: "path",
+      value: artifact.path,
+      sourceSpan: getFieldSourceSpan(artifact, "path")
+    }),
+    ...createFieldEvidence({
+      subjectEntityId: artifact.entity_id,
+      field: "checksum",
+      value: artifact.checksum,
+      sourceSpan: getFieldSourceSpan(artifact, "checksum")
+    }),
+    ...createFieldEvidence({
+      subjectEntityId: artifact.entity_id,
+      field: "instrument",
+      value: artifact.instrument,
+      sourceSpan: getFieldSourceSpan(artifact, "instrument")
+    }),
+    ...createFieldEvidence({
+      subjectEntityId: artifact.entity_id,
+      field: "notes",
+      value: artifact.notes,
+      sourceSpan: getFieldSourceSpan(artifact, "notes")
     })
   ]);
 
@@ -1508,7 +1752,8 @@ const buildFieldEvidence = (record: ChemdTrainingExportV2): TrainingFieldEvidenc
   ...buildReactionFieldEvidence(record),
   ...buildResultFieldEvidence(record),
   ...buildAnalysisFieldEvidence(record),
-  ...buildSampleFieldEvidence(record)
+  ...buildSampleFieldEvidence(record),
+  ...buildArtifactFieldEvidence(record)
 ];
 
 const hasExternalEvidence = (item: TrainingFieldEvidenceV1): boolean =>
@@ -1584,6 +1829,19 @@ const buildMissingSampleLogic = (record: ChemdTrainingExportV2): TrainingMissing
           severity: "info" as const,
           message: "Sample has no lineage relation.",
           entity_id: sample.entity_id,
+          field: "ref"
+        }]
+  );
+
+const buildMissingArtifactLogic = (record: ChemdTrainingExportV2): TrainingMissingLogicV1[] =>
+  record.semantic_layer.artifacts.flatMap((artifact) =>
+    findRelation(record, artifact.entity_id, ARTIFACT_EVIDENCE_RELATIONS)
+      ? []
+      : [{
+          code: "artifact_without_target" as const,
+          severity: "info" as const,
+          message: "Artifact has no target relation.",
+          entity_id: artifact.entity_id,
           field: "ref"
         }]
   );
@@ -1690,6 +1948,7 @@ const buildMissingLogic = (
   ...buildMissingResultLogic(record),
   ...buildMissingAnalysisLogic(record),
   ...buildMissingSampleLogic(record),
+  ...buildMissingArtifactLogic(record),
   ...buildMissingProcedureLogic(record),
   ...buildMissingObservationLogic(record),
   ...buildConflictingResultLogic(record),
@@ -1747,6 +2006,7 @@ const buildRecommendedLoraTasks = (
   const hasReactions = record.semantic_layer.reactions.length > 0;
   const hasSemanticRelations = record.semantic_layer.links.length > 0;
   const hasEvidenceLinks = fieldEvidence.some(hasExternalEvidence);
+  const hasObservationLogic = Boolean(record.learning_layer.observation_to_events?.length);
   const hasSummaryBasis = record.semantic_layer.reactions.length + record.semantic_layer.results.length > 0;
   const hasDecisionBasis = record.semantic_layer.reactions.length > 0 && record.semantic_layer.results.length > 0;
   const hasYieldPrediction = record.learning_layer.prediction_instances.some((instance) =>
@@ -1755,9 +2015,13 @@ const buildRecommendedLoraTasks = (
   const hasFailedOutcome = record.semantic_layer.results.some((result) => result.status_label === "failed");
   const hasExperimentComparison = record.semantic_layer.reactions.length > 1;
   const hasProposalBasis = hasProcedureLogic && hasDecisionBasis;
+  const hasNormalizationEvidence = fieldEvidence.some((item) => item.normalized);
   const qualityIssueCount = missingLogic.length + (record.quality_layer.training_quality.exclusion_reasons?.length ?? 0);
 
   return [
+    ...includeTask(record.source_layer.raw_children.length > 0, createTaskHint("record_to_chemd", "Source snapshots can be reconstructed as Chemd blocks.")),
+    ...includeTask(qualityIssueCount > 0, createTaskHint("chemd_repair", "Quality warnings or missing logic can be turned into repair examples.")),
+    ...includeTask(hasNormalizationEvidence, createTaskHint("normalization_explanation", "Normalized field evidence is available.")),
     ...(entityIds.length > 0 ? [createTaskHint("entity_extraction", "Experiment entities are available.", entityIds)] : []),
     ...includeTask(hasSummaryBasis, createTaskHint("experiment_summary", "Reaction or result entities are available.", entityIds)),
     ...includeTask(hasReactions, createTaskHint("reaction_classification", "Reaction entities can receive taxonomy labels.")),
@@ -1766,6 +2030,7 @@ const buildRecommendedLoraTasks = (
     ...includeTask(resolvedReferences.length > 0, createTaskHint("reference_resolution", "Resolved or unresolved references are available.")),
     ...includeTask(hasEvidenceLinks, createTaskHint("evidence_tracing", "External field-level evidence is available.")),
     ...includeTask(hasProcedureLogic, createTaskHint("procedure_reasoning", "Procedure-to-step pairs are available.")),
+    ...includeTask(hasObservationLogic, createTaskHint("observation_events", "Observation-to-event pairs are available.")),
     ...includeTask(hasYieldPrediction, createTaskHint("yield_prediction", "Usable yield targets are available.")),
     ...includeTask(hasDecisionBasis, createTaskHint("condition_recommendation", "Reaction conditions and outcomes are available.")),
     ...includeTask(hasProposalBasis, createTaskHint("experiment_proposal", "Procedure and outcome context are available.")),
@@ -1779,20 +2044,25 @@ const buildRecommendedLoraTasks = (
 const buildBlockedLoraTasks = (context: LoraHintContext): LoraTaskHintV1[] => {
   const { record, fieldEvidence, resolvedReferences } = context;
   const hasProcedureLogic = Boolean(record.learning_layer.procedure_to_steps?.length);
+  const hasObservationLogic = Boolean(record.learning_layer.observation_to_events?.length);
   const hasReactions = record.semantic_layer.reactions.length > 0;
   const hasSemanticRelations = record.semantic_layer.links.length > 0;
   const hasEvidenceLinks = fieldEvidence.some(hasExternalEvidence);
+  const hasNormalizationEvidence = fieldEvidence.some((item) => item.normalized);
   const hasYieldPrediction = record.learning_layer.prediction_instances.some((instance) =>
     instance.usability.usable_for_yield_regression
   );
 
   return [
+    ...includeTask(record.source_layer.raw_children.length === 0, createTaskHint("record_to_chemd", "No source snapshots are available.")),
+    ...includeTask(!hasNormalizationEvidence, createTaskHint("normalization_explanation", "No normalized field evidence is available.")),
     ...includeTask(!hasReactions, createTaskHint("reaction_classification", "No reaction entities are available.")),
     ...includeTask(!hasReactions, createTaskHint("expert_routing", "No reaction entities are available.")),
     ...includeTask(!hasSemanticRelations, createTaskHint("relation_extraction", "No semantic relations are available.")),
     ...includeTask(resolvedReferences.length === 0, createTaskHint("reference_resolution", "No references are available.")),
     ...includeTask(!hasEvidenceLinks, createTaskHint("evidence_tracing", "No external field-level evidence is available.")),
     ...includeTask(!hasProcedureLogic, createTaskHint("procedure_reasoning", "No procedure logic is available.")),
+    ...includeTask(!hasObservationLogic, createTaskHint("observation_events", "No observation event logic is available.")),
     ...includeTask(!hasYieldPrediction, createTaskHint("yield_prediction", "No usable yield target is available.")),
     ...includeTask(
       record.semantic_layer.reactions.length === 0 || record.semantic_layer.results.length === 0,
@@ -1873,6 +2143,7 @@ export const buildTrainingUnderstandingFromRecord = (
       results: record.semantic_layer.results.map(stripSourceFields) as TrainingResultV1[],
       analyses: record.semantic_layer.analyses.map(stripSourceFields) as TrainingAnalysisV1[],
       samples: record.semantic_layer.samples.map(stripSourceFields) as TrainingSampleV1[],
+      artifacts: record.semantic_layer.artifacts.map(stripSourceFields) as TrainingArtifactV1[],
       narrative_blocks: buildNarrativeBlocks(record)
     },
     relations: record.semantic_layer.links,
@@ -1890,7 +2161,10 @@ export const buildTrainingUnderstandingFromRecord = (
       expert_routing: expertRouting,
       optimization_trajectories: optimizationTrajectories,
       failure_signals: failureSignals,
-      evidence_links: buildEvidenceLinks(record, EVIDENCE_RELATIONS, "analysis"),
+      evidence_links: [
+        ...buildEvidenceLinks(record, EVIDENCE_RELATIONS, "analysis"),
+        ...buildEvidenceLinks(record, ARTIFACT_EVIDENCE_RELATIONS, "artifact")
+      ],
       sample_lineage: buildEvidenceLinks(record, SAMPLE_LINEAGE_RELATIONS, "sample")
     },
     knowledge_graph: {

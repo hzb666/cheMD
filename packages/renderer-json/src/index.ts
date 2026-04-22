@@ -122,7 +122,7 @@ const serializeMarkdownNode = (node: MarkdownNode): SerializedNodeEntry => {
 };
 
 const serializeSourceMetadata = (node: Exclude<StructuredNode, { type: "col" }>): Record<string, unknown> => {
-  const payload = node as Record<string, unknown>;
+  const payload = node as unknown as Record<string, unknown>;
   const syntaxOrigin = typeof payload.syntaxOrigin === "string" ? payload.syntaxOrigin : undefined;
   const declaredKind = typeof payload.declaredKind === "string" ? payload.declaredKind : undefined;
 
@@ -137,7 +137,7 @@ const serializeStructuredPayload = (
   node: Exclude<StructuredNode, { type: "col" }>
 ): Record<string, unknown> => {
   const { type: _type, syntaxOrigin: _syntaxOrigin, declaredKind: _declaredKind, ...rest } = (
-    node as Record<string, unknown>
+    node as unknown as Record<string, unknown>
   );
 
   return {

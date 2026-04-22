@@ -23,6 +23,7 @@ export type SemanticEntityType =
   | "result"
   | "analysis"
   | "sample"
+  | "artifact"
   | "narrative";
 
 export interface BuildExperimentStorageInput {

@@ -25,10 +25,13 @@ export interface LnfDocumentInfo {
 export interface LnfStep {
   stepId: string;
   family: string;
+  stage?: string;
+  purpose?: string;
   params: Record<string, unknown>;
   inputs?: CanonicalStepNode["inputs"];
   outputs?: CanonicalStepNode["outputs"];
   dependsOn?: CanonicalStepNode["dependsOn"];
+  evidence?: CanonicalStepNode["evidence"];
   artifacts?: CanonicalStepNode["artifacts"];
   effects?: CanonicalStepNode["effects"];
   source: CanonicalStepNode["source"];

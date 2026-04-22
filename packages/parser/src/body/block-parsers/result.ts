@@ -1,6 +1,6 @@
 import type { ResultNode } from "@chemd/core";
 
-import { parseAllowedFields, readStructuredBlockId } from "./common";
+import { parseAllowedFields, parseAllowedFieldSpans, readStructuredBlockId } from "./common";
 import type { BlockParser } from "./types";
 
 const RESULT_FIELDS = new Set([
@@ -22,6 +22,7 @@ export const parseResultBlock: BlockParser = ({ headerArg, lines, diagnostics })
   const fields = parseAllowedFields(lines, diagnostics, "result", RESULT_FIELDS, {
     listFields: new Set()
   });
+  const fieldSpans = parseAllowedFieldSpans(lines, RESULT_FIELDS);
 
-  return { type: "result", id, ...fields } as ResultNode;
+  return { type: "result", id, ...fields, fieldSpans } as ResultNode;
 };

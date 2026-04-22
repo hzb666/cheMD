@@ -2,9 +2,11 @@ import type {
   CanonicalStepNode,
   ObservationEventNode
 } from "@chemd/step-ontology";
+import type { SourceSpan } from "@chemd/core";
 
 import type {
   ExportedAnalysisV1,
+  ExportedArtifactV1,
   ExportedDocumentInfo,
   ExportedMarkdownBlockV1,
   ExportedMoleculeV1,
@@ -23,6 +25,7 @@ type SourceMetadataKeys =
   | "syntax_origin"
   | "declared_kind"
   | "provenance"
+  | "field_source_spans"
   | "text_for_embedding";
 
 export type ChemdRagChunkV1 = Omit<RetrievalChunkV1, "raw_text">;
@@ -43,6 +46,7 @@ export type TrainingReactionV1 = Omit<ExportedReactionV1, SourceMetadataKeys>;
 export type TrainingResultV1 = Omit<ExportedResultV1, SourceMetadataKeys>;
 export type TrainingAnalysisV1 = Omit<ExportedAnalysisV1, SourceMetadataKeys>;
 export type TrainingSampleV1 = Omit<ExportedSampleV1, SourceMetadataKeys>;
+export type TrainingArtifactV1 = Omit<ExportedArtifactV1, SourceMetadataKeys>;
 export type TrainingNarrativeBlockV1 = Pick<
   ExportedMarkdownBlockV1,
   "entity_id" | "cleaned_text" | "references" | "inline_chem" | "inline_code" | "links"
@@ -54,13 +58,14 @@ export interface TrainingUnderstandingEntitiesV1 {
   results: TrainingResultV1[];
   analyses: TrainingAnalysisV1[];
   samples: TrainingSampleV1[];
+  artifacts: TrainingArtifactV1[];
   narrative_blocks: TrainingNarrativeBlockV1[];
 }
 
 export interface TrainingResolvedReferenceV1 {
   raw: string;
   source_entity_id: string;
-  source_entity_type: "markdown" | "reaction" | "result" | "analysis" | "sample";
+  source_entity_type: "markdown" | "reaction" | "result" | "analysis" | "sample" | "artifact";
   source_field?: string;
   target_entity_id?: string;
   target_original_id?: string;
@@ -214,7 +219,7 @@ export interface TrainingEvidenceLinkV1 {
   evidence_entity_id: string;
   target_entity_id: string;
   relation_type: ExportedRelationV1["relation_type"];
-  evidence_type: "analysis" | "sample";
+  evidence_type: "analysis" | "sample" | "artifact";
 }
 
 export type TrainingKnowledgeNodeType =
@@ -224,6 +229,7 @@ export type TrainingKnowledgeNodeType =
   | "result"
   | "analysis"
   | "sample"
+  | "artifact"
   | "narrative"
   | "procedure"
   | "procedure_step"
@@ -276,6 +282,7 @@ export interface TrainingFieldEvidenceV1 {
   normalized?: boolean;
   evidence_entity_ids: string[];
   source_relation_ids: string[];
+  source_span?: SourceSpan;
 }
 
 export interface TrainingMissingLogicV1 {
@@ -287,6 +294,7 @@ export interface TrainingMissingLogicV1 {
     | "result_without_reaction_link"
     | "analysis_without_target"
     | "sample_without_lineage"
+    | "artifact_without_target"
     | "procedure_without_steps"
     | "procedure_without_reaction_link"
     | "observation_without_event"
@@ -312,12 +320,16 @@ export interface TrainingCanonicalSummaryV1 {
 }
 
 export type LoraTaskTypeV1 =
+  | "record_to_chemd"
+  | "chemd_repair"
+  | "normalization_explanation"
   | "experiment_summary"
   | "entity_extraction"
   | "relation_extraction"
   | "reference_resolution"
   | "evidence_tracing"
   | "procedure_reasoning"
+  | "observation_events"
   | "yield_prediction"
   | "condition_recommendation"
   | "experiment_proposal"
@@ -379,6 +391,13 @@ export interface ChemdTrainingUnderstandingV1 {
 }
 
 export type ExperimentDecisionTaskTypeV1 =
+  | "record_to_chemd"
+  | "chemd_repair"
+  | "normalization_explanation"
+  | "procedure_reasoning"
+  | "observation_events"
+  | "evidence_tracing"
+  | "qa_with_context"
   | "reaction_classification"
   | "expert_routing"
   | "yield_prediction"

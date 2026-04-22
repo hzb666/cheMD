@@ -23,7 +23,7 @@ const readNodeStringField = (node: ChemdNode, field: string): string | undefined
     return undefined;
   }
 
-  const value = (node as Record<string, unknown>)[field];
+  const value = (node as unknown as Record<string, unknown>)[field];
   return typeof value === "string" ? value : undefined;
 };
 

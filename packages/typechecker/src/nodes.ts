@@ -1,5 +1,6 @@
 import type {
   AnalysisNode,
+  ArtifactNode,
   MoleculeNode,
   ObservationNode,
   ProcedureNode,
@@ -27,6 +28,7 @@ import type {
   QuantityClass,
   QuantityType,
   TypedAnalysisNode,
+  TypedArtifactNode,
   TypedMoleculeNode,
   TypedObservationNarrativeNode,
   TypedProcedureNarrativeNode,
@@ -295,18 +297,53 @@ export const buildSampleNode = (
   const output = createBase("sample", node);
   const purity = collectQuantity(output, "purity", "percent", node.purity, context.objectIndex);
   const relationships = resolveSampleRelationships(node, context.objectIndex);
+  const artifacts = resolveReferenceList(node.artifacts ?? [], context.objectIndex, {
+    sourceNodeType: "sample",
+    sourceNodeId: node.id,
+    field: "artifacts",
+    expectedTargetKind: "artifact"
+  });
 
-  output.diagnostics.push(...relationships.diagnostics);
+  output.diagnostics.push(...relationships.diagnostics, ...artifacts.diagnostics);
 
   output.node = {
     ...output.node,
     name: node.name,
     sampleCode: node.sample_id,
     ...(relationships.ref ? { ref: relationships.ref } : {}),
+    ...(relationships.derivedFrom ? { derivedFrom: relationships.derivedFrom } : {}),
+    ...(relationships.aliquotOf ? { aliquotOf: relationships.aliquotOf } : {}),
+    ...(relationships.batchOf ? { batchOf: relationships.batchOf } : {}),
+    ...(artifacts.values.length > 0 ? { artifacts: artifacts.values } : {}),
     ...(purity ? { purity } : {}),
     supplier: node.supplier,
     notes: node.notes
   } as TypedSampleNode;
+
+  return output;
+};
+
+export const buildArtifactNode = (
+  node: ArtifactNode,
+  context: BuildNodeContext
+): BuiltTypedNode => {
+  const output = createBase("artifact", node);
+  const reference = resolveOptionalReference(node.ref, context.objectIndex, {
+    sourceNodeType: "artifact",
+    sourceNodeId: node.id,
+    field: "ref"
+  });
+
+  output.diagnostics.push(...reference.diagnostics);
+  output.node = {
+    ...output.node,
+    artifactKind: node.kind,
+    ...(reference.value ? { ref: reference.value } : {}),
+    path: node.path,
+    checksum: node.checksum,
+    instrument: node.instrument,
+    notes: node.notes
+  } as TypedArtifactNode;
 
   return output;
 };

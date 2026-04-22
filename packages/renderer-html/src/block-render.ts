@@ -1,5 +1,6 @@
 import type {
   AnalysisNode,
+  ArtifactNode,
   ChemdNode,
   ColNode,
   MoleculeNode,
@@ -255,6 +256,19 @@ const renderSample = (node: SampleNode): string =>
     ])}
   </section>`;
 
+const renderArtifact = (node: ArtifactNode): string =>
+  `<section class="chemd-block chemd-block--artifact" data-node-id="${escapeHtml(node.id ?? "")}">
+    ${renderBlockTitle("Artifact", node.id)}
+    ${renderFieldList([
+      ["Kind", node.kind],
+      ["Related", node.ref],
+      ["Path", node.path],
+      ["Checksum", node.checksum],
+      ["Instrument", node.instrument],
+      ["Notes", node.notes]
+    ])}
+  </section>`;
+
 const renderTemplate = (node: TemplateNode): string =>
   `<section class="chemd-block chemd-block--template" data-template-name="${escapeHtml(node.name)}">
     <h2>Template</h2>
@@ -300,6 +314,8 @@ export const renderNode = (
       return renderObservation(node);
     case "sample":
       return renderSample(node);
+    case "artifact":
+      return renderArtifact(node);
     case "template":
       return renderTemplate(node);
     case "col":

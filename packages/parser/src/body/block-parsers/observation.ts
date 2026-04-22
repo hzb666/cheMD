@@ -3,6 +3,7 @@ import type { Diagnostic, ObservationEventAuthorNode, ObservationNode, SourceSpa
 import {
   createBodyText,
   parseAllowedFields,
+  parseAllowedFieldSpans,
   parseChildBlockFieldLine,
   readStructuredBlockId,
   splitLeadingFieldLines
@@ -20,8 +21,12 @@ const EVENT_STRUCTURAL_PARAM_KEYS = new Set([
   "eventType",
   "event_type",
   "stage",
+  "timepoint",
+  "severity",
   "linked_step",
-  "linkedStep"
+  "linkedStep",
+  "evidence",
+  "confidence"
 ]);
 
 const splitEventSegments = (value: string): string[] =>
@@ -58,6 +63,29 @@ const readEventId = (params: Record<string, string>): string | undefined =>
 
 const readLinkedStepId = (params: Record<string, string>): string | undefined =>
   params.linked_step ?? params.linkedStep;
+
+const readEventList = (params: Record<string, string>, key: string): string[] | undefined => {
+  const raw = params[key];
+  if (!raw) {
+    return undefined;
+  }
+
+  const values = raw
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return values.length > 0 ? values : undefined;
+};
+
+const readEventConfidence = (params: Record<string, string>): number | undefined => {
+  const raw = params.confidence;
+  if (!raw) {
+    return undefined;
+  }
+
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : undefined;
+};
 
 const readChildBlockId = (headerArg: string | undefined): string | undefined => {
   const trimmed = headerArg?.trim() ?? "";
@@ -117,13 +145,19 @@ const parseEventLine = (line: string, sourceSpan: SourceSpan): ObservationEventA
   const eventType = readEventType(firstParam, firstSegment, params);
   const eventId = readEventId(params);
   const linkedStepId = readLinkedStepId(params);
+  const evidence = readEventList(params, "evidence");
+  const confidence = readEventConfidence(params);
 
   return {
     type: "event",
     eventType,
     ...(eventId ? { eventId } : {}),
     ...(params.stage ? { stage: params.stage } : {}),
+    ...(params.timepoint ? { timepoint: params.timepoint } : {}),
+    ...(params.severity ? { severity: params.severity } : {}),
     ...(linkedStepId ? { linkedStepId } : {}),
+    ...(evidence ? { evidence } : {}),
+    ...(confidence !== undefined ? { confidence } : {}),
     ...(Object.keys(eventParams).length > 0 ? { params: eventParams } : {}),
     raw: line.trim(),
     authorProvided: true,
@@ -151,13 +185,19 @@ const parseNestedEventFields = (
   const eventId = fields.id ?? fields.event_id ?? readChildBlockId(headerArg);
   const eventParams = removeStructuralParams(fields);
   const linkedStepId = readLinkedStepId(fields);
+  const evidence = readEventList(fields, "evidence");
+  const confidence = readEventConfidence(fields);
 
   return {
     type: "event",
     eventType,
     ...(eventId ? { eventId } : {}),
     ...(fields.stage ? { stage: fields.stage } : {}),
+    ...(fields.timepoint ? { timepoint: fields.timepoint } : {}),
+    ...(fields.severity ? { severity: fields.severity } : {}),
     ...(linkedStepId ? { linkedStepId } : {}),
+    ...(evidence ? { evidence } : {}),
+    ...(confidence !== undefined ? { confidence } : {}),
     ...(Object.keys(eventParams).length > 0 ? { params: eventParams } : {}),
     raw,
     authorProvided: true,
@@ -257,11 +297,13 @@ export const parseObservationBlock: BlockParser = ({ headerArg, lines, diagnosti
   const fields = parseAllowedFields(fieldLines, diagnostics, "observation", OBSERVATION_FIELDS, {
     listFields: new Set()
   });
+  const fieldSpans = parseAllowedFieldSpans(fieldLines, OBSERVATION_FIELDS);
 
   return {
     type: "observation",
     id,
     ref: typeof fields.ref === "string" ? fields.ref : undefined,
+    fieldSpans,
     body: createBodyText(parsedBody.bodyLines),
     ...(parsedBody.events.length > 0 ? { events: parsedBody.events } : {}),
     ...(parsedBody.children.length > 0 ? { children: parsedBody.children } : {})

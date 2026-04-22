@@ -1,6 +1,6 @@
 import type { AnalysisNode } from "@chemd/core";
 
-import { parseAllowedFields, readStructuredBlockId } from "./common";
+import { parseAllowedFields, parseAllowedFieldSpans, readStructuredBlockId } from "./common";
 import type { BlockParser } from "./types";
 
 const ANALYSIS_FIELDS = new Set([
@@ -39,11 +39,15 @@ export const parseAnalysisBlock: BlockParser = ({ headerArg, lines, diagnostics 
     allowExtraField: (key) => LANE_FIELD_PATTERN.test(key),
     listFields: new Set()
   });
+  const fieldSpans = parseAllowedFieldSpans(lines, ANALYSIS_FIELDS, {
+    allowExtraField: (key) => LANE_FIELD_PATTERN.test(key)
+  });
   const { type: analysisType, ...rest } = fields;
 
   return applyTlcDefaults({
     type: "analysis",
     id,
+    fieldSpans,
     type_name: typeof analysisType === "string" ? analysisType : undefined,
     ...rest
   } as AnalysisNode);

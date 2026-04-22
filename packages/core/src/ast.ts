@@ -32,7 +32,8 @@ export type ObjectSemanticKind =
   | "analysis"
   | "procedure"
   | "observation"
-  | "sample";
+  | "sample"
+  | "artifact";
 
 export type TemplateParamType =
   | { kind: "string" }
@@ -56,6 +57,20 @@ export interface SourceSpan {
   startColumn?: number;
   endLine?: number;
   endColumn?: number;
+}
+
+export type FieldSourceSpans = Record<string, SourceSpan>;
+
+export interface ChemistryFeatureRef {
+  featureId: string;
+  provider?: string;
+  kind?: "molecule" | "reaction" | "analysis" | "sample" | "artifact";
+  status?: "available" | "pending" | "missing" | "failed";
+}
+
+export interface SourceMappedNode {
+  sourceSpan?: SourceSpan;
+  fieldSpans?: FieldSourceSpans;
 }
 export interface Confidence {
   score: number;
@@ -121,7 +136,7 @@ export interface MarkdownNode {
   links: MarkdownLinkToken[];
 }
 
-export interface MoleculeNode {
+export interface MoleculeNode extends SourceMappedNode {
   type: "molecule";
   id?: string;
   syntaxOrigin?: SyntaxOrigin;
@@ -134,9 +149,10 @@ export interface MoleculeNode {
   formula?: string;
   amount?: string;
   equivalents?: string;
+  chemistryFeatureRefs?: ChemistryFeatureRef[];
 }
 
-export interface ReactionNode {
+export interface ReactionNode extends SourceMappedNode {
   type: "reaction";
   id?: string;
   syntaxOrigin?: SyntaxOrigin;
@@ -156,9 +172,10 @@ export interface ReactionNode {
   conversion?: string;
   selectivity?: string;
   caption?: string;
+  chemistryFeatureRefs?: ChemistryFeatureRef[];
 }
 
-export interface ResultNode {
+export interface ResultNode extends SourceMappedNode {
   type: "result";
   id?: string;
   status?: string;
@@ -171,7 +188,7 @@ export interface ResultNode {
   notes?: string; ref?: string; reaction?: string; product?: string;
 }
 
-export type AnalysisNode = {
+export type AnalysisNode = SourceMappedNode & {
   type: "analysis";
   id?: string;
   type_name?: string;
@@ -189,10 +206,12 @@ export type AnalysisNode = {
   notes?: string;
 } & Partial<Record<`p${number}`, string>>;
 
-export interface ProcedureNode {
+export interface ProcedureNode extends SourceMappedNode {
   type: "procedure";
   id?: string;
   ref?: string;
+  reaction?: string;
+  evidence?: string[];
   body?: string;
   steps?: ProcedureStepNode[];
   children?: Array<ProcedureStepNode | MarkdownNode>;
@@ -202,17 +221,21 @@ export interface ProcedureStepNode {
   type: "step";
   stepId?: string;
   family: string;
+  stage?: string;
+  purpose?: string;
   params?: Record<string, string>;
   inputs?: string[];
   outputs?: string[];
   dependsOn?: string[];
+  evidence?: string[];
+  confidence?: number | Confidence;
   raw?: string;
   authorProvided?: boolean;
   sourceSpan?: SourceSpan;
   provenance?: ProvenanceInfo;
 }
 
-export interface ObservationNode {
+export interface ObservationNode extends SourceMappedNode {
   type: "observation";
   id?: string;
   ref?: string;
@@ -227,14 +250,18 @@ export interface ObservationEventAuthorNode {
   eventType: string;
   params?: Record<string, string>;
   stage?: string;
+  timepoint?: string;
+  severity?: string;
   linkedStepId?: string;
+  evidence?: string[];
+  confidence?: number | Confidence;
   raw?: string;
   authorProvided?: boolean;
   sourceSpan?: SourceSpan;
   provenance?: ProvenanceInfo;
 }
 
-export interface SampleNode {
+export interface SampleNode extends SourceMappedNode {
   type: "sample";
   id?: string;
   name?: string;
@@ -243,6 +270,23 @@ export interface SampleNode {
   purity?: string;
   supplier?: string;
   notes?: string; ref?: string;
+  derived_from?: string;
+  aliquot_of?: string;
+  batch_of?: string;
+  artifacts?: string[];
+  chemistryFeatureRefs?: ChemistryFeatureRef[];
+}
+
+export interface ArtifactNode extends SourceMappedNode {
+  type: "artifact";
+  id?: string;
+  kind?: string;
+  ref?: string;
+  path?: string;
+  checksum?: string;
+  instrument?: string;
+  notes?: string;
+  chemistryFeatureRefs?: ChemistryFeatureRef[];
 }
 
 export interface UseNode {
@@ -275,6 +319,7 @@ export type StructuredNode =
   | ProcedureNode
   | ObservationNode
   | SampleNode
+  | ArtifactNode
   | TemplateNode
   | UseNode
   | ColNode;
@@ -286,7 +331,8 @@ export type ObjectNode =
   | AnalysisNode
   | ProcedureNode
   | ObservationNode
-  | SampleNode;
+  | SampleNode
+  | ArtifactNode;
 
 export type ChemdNode = MarkdownNode | StructuredNode;
 

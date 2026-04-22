@@ -1,5 +1,6 @@
 import type {
   AnalysisNode,
+  ArtifactNode,
   ChemdDocument,
   ChemdNode,
   MarkdownNode,
@@ -11,6 +12,7 @@ import type {
 
 import type {
   ExportedAnalysisV1,
+  ExportedArtifactV1,
   ExportedMarkdownBlockV1,
   ExportedMoleculeV1,
   ExportedReactionV1,
@@ -25,6 +27,7 @@ import { collectExportableNodes } from "./traversal";
 import type {
   QuantityType,
   TypedAnalysisNode,
+  TypedArtifactNode,
   TypedMoleculeNode,
   TypedReactionNode,
   TypedResultNode,
@@ -44,7 +47,7 @@ const compactText = (...parts: Array<string | undefined>): string | undefined =>
 };
 
 const buildEntityId = (
-  prefix: "mol" | "rxn" | "res" | "ana" | "sam" | "md",
+  prefix: "mol" | "rxn" | "res" | "ana" | "sam" | "art" | "md",
   documentId: string,
   originalId: string | undefined,
   nodeIndex: number
@@ -56,7 +59,8 @@ type ExportedObjectEntity =
   | ExportedReactionV1
   | ExportedResultV1
   | ExportedAnalysisV1
-  | ExportedSampleV1;
+  | ExportedSampleV1
+  | ExportedArtifactV1;
 
 type RelationType = ExportedRelationV1["relation_type"];
 
@@ -98,17 +102,18 @@ const readNodeStringField = (node: ChemdNode, field: string): string | undefined
     return undefined;
   }
 
-  const value = (node as Record<string, unknown>)[field];
+  const value = (node as unknown as Record<string, unknown>)[field];
   return typeof value === "string" ? value : undefined;
 };
 
 const createEntityBase = (
   sourceNodeType: string,
   node: ChemdNode
-): Pick<ExportedReactionV1, "source_block_type" | "syntax_origin" | "declared_kind"> => ({
+): Pick<ExportedReactionV1, "source_block_type" | "syntax_origin" | "declared_kind" | "field_source_spans"> => ({
   source_block_type: readNodeStringField(node, "syntaxOrigin") ?? sourceNodeType,
   syntax_origin: readNodeStringField(node, "syntaxOrigin"),
-  declared_kind: readNodeStringField(node, "declaredKind")
+  declared_kind: readNodeStringField(node, "declaredKind"),
+  field_source_spans: "fieldSpans" in node ? node.fieldSpans : undefined
 });
 
 const indexTypedNodes = (
@@ -145,6 +150,13 @@ const toNumericValue = (quantity: QuantityType | undefined): number | null | und
   return typeof value === "number" ? value : null;
 };
 
+const readChemistryFeatureIds = (
+  node: { chemistryFeatureRefs?: Array<{ featureId: string }> }
+): string[] | undefined => {
+  const ids = node.chemistryFeatureRefs?.map((feature) => feature.featureId).filter(Boolean) ?? [];
+  return ids.length > 0 ? ids : undefined;
+};
+
 const readPercentText = (value: string | undefined): number | null | undefined => {
   if (!value) {
     return undefined;
@@ -177,6 +189,7 @@ const buildMolecule = (
   amount_value: toNumericWithUnit(typedMolecule?.amount),
   equivalents_raw: node.equivalents,
   equivalents_value: toNumericValue(typedMolecule?.equivalents),
+  chemistry_feature_ref_ids: readChemistryFeatureIds(node),
   text_for_embedding: compactText(node.name, node.smiles, node.cas, node.role, node.formula, node.caption)
 });
 
@@ -260,6 +273,7 @@ const buildReaction = (input: BuildReactionInput): ExportedReactionV1 => {
       conversion_percent: readPercentText(node.conversion),
       selectivity_percent: readPercentText(node.selectivity)
     },
+    chemistry_feature_ref_ids: readChemistryFeatureIds(node),
     text_for_embedding: compactText(
       node.name,
       node.caption,
@@ -368,8 +382,34 @@ const buildSample = (
   supplier: node.supplier,
   notes: node.notes,
   ref_raw: node.ref,
+  derived_from_raw: node.derived_from,
+  aliquot_of_raw: node.aliquot_of,
+  batch_of_raw: node.batch_of,
+  artifact_refs_raw: node.artifacts,
   purity_percent: toNumericValue(typedSample?.purity),
+  chemistry_feature_ref_ids: readChemistryFeatureIds(node),
   text_for_embedding: compactText(node.name, node.batch, node.supplier, node.notes)
+});
+
+const buildArtifact = (
+  documentId: string,
+  node: ArtifactNode,
+  nodeIndex: number,
+  typedArtifact: TypedArtifactNode | undefined
+): ExportedArtifactV1 => ({
+  entity_id: buildEntityId("art", documentId, node.id, nodeIndex),
+  original_id: node.id,
+  node_index: nodeIndex,
+  source_node_type: "artifact",
+  ...createEntityBase("artifact", node),
+  artifact_kind: typedArtifact?.artifactKind ?? node.kind,
+  ref_raw: node.ref,
+  path: node.path,
+  checksum: node.checksum,
+  instrument: node.instrument,
+  notes: node.notes,
+  chemistry_feature_ref_ids: readChemistryFeatureIds(node),
+  text_for_embedding: compactText(node.kind, node.path, node.instrument, node.notes)
 });
 
 const buildMarkdown = (documentId: string, node: MarkdownNode, nodeIndex: number): ExportedMarkdownBlockV1 => ({
@@ -508,6 +548,9 @@ const getSampleRelationType = (target: ExportedObjectEntity | undefined): Relati
   if (target?.source_node_type === "molecule") {
     return "sample_related_to_molecule";
   }
+  if (target?.source_node_type === "sample") {
+    return "sample_derived_from_sample";
+  }
   return undefined;
 };
 
@@ -516,11 +559,97 @@ const buildSampleLinks = (
   samples: ExportedSampleV1[],
   entityByOriginalId: Map<string, ExportedObjectEntity>
 ): ExportedRelationV1[] =>
-  samples.flatMap((sample) => {
-    const target = getReferencedEntity(sample.ref_raw, entityByOriginalId);
-    const relationType = getSampleRelationType(target);
+  samples.flatMap((sample) => [
+    ...createSampleRefLink(documentId, sample, sample.ref_raw, "ref", entityByOriginalId),
+    ...createSampleRefLink(documentId, sample, sample.derived_from_raw, "derived_from", entityByOriginalId),
+    ...createSampleLineageLink({
+      documentId,
+      sample,
+      rawRef: sample.aliquot_of_raw,
+      relationType: "sample_aliquot_of_sample",
+      role: "aliquot_of",
+      expectedTargetType: "sample",
+      entityByOriginalId
+    }),
+    ...createSampleLineageLink({
+      documentId,
+      sample,
+      rawRef: sample.batch_of_raw,
+      relationType: "sample_batch_of_sample",
+      role: "batch_of",
+      expectedTargetType: "sample",
+      entityByOriginalId
+    }),
+    ...(sample.artifact_refs_raw ?? []).flatMap((artifactRef) =>
+      createSampleLineageLink({
+        documentId,
+        sample,
+        rawRef: artifactRef,
+        relationType: "sample_has_artifact",
+        role: "artifact",
+        expectedTargetType: "artifact",
+        entityByOriginalId
+      })
+    )
+  ]);
+
+const createSampleRefLink = (
+  documentId: string,
+  sample: ExportedSampleV1,
+  rawRef: string | undefined,
+  role: string,
+  entityByOriginalId: Map<string, ExportedObjectEntity>
+): ExportedRelationV1[] => {
+  const target = getReferencedEntity(rawRef, entityByOriginalId);
+  const relationType = getSampleRelationType(target);
+  return target && relationType
+    ? [createRelation(documentId, relationType, sample.entity_id, target.entity_id, role)]
+    : [];
+};
+
+interface SampleLineageLinkInput {
+  documentId: string;
+  sample: ExportedSampleV1;
+  rawRef: string | undefined;
+  relationType: RelationType;
+  role: string;
+  expectedTargetType: ExportedObjectEntity["source_node_type"];
+  entityByOriginalId: Map<string, ExportedObjectEntity>;
+}
+
+const createSampleLineageLink = (input: SampleLineageLinkInput): ExportedRelationV1[] => {
+  const target = getReferencedEntity(input.rawRef, input.entityByOriginalId);
+  return target?.source_node_type === input.expectedTargetType
+    ? [createRelation(input.documentId, input.relationType, input.sample.entity_id, target.entity_id, input.role)]
+    : [];
+};
+
+const getArtifactRelationType = (target: ExportedObjectEntity | undefined): RelationType | undefined => {
+  if (target?.source_node_type === "reaction") {
+    return "artifact_supports_reaction";
+  }
+  if (target?.source_node_type === "result") {
+    return "artifact_supports_result";
+  }
+  if (target?.source_node_type === "analysis") {
+    return "artifact_supports_analysis";
+  }
+  if (target?.source_node_type === "sample") {
+    return "artifact_supports_sample";
+  }
+  return undefined;
+};
+
+const buildArtifactLinks = (
+  documentId: string,
+  artifacts: ExportedArtifactV1[],
+  entityByOriginalId: Map<string, ExportedObjectEntity>
+): ExportedRelationV1[] =>
+  artifacts.flatMap((artifact) => {
+    const target = getReferencedEntity(artifact.ref_raw, entityByOriginalId);
+    const relationType = getArtifactRelationType(target);
     return target && relationType
-      ? [createRelation(documentId, relationType, sample.entity_id, target.entity_id, "ref")]
+      ? [createRelation(documentId, relationType, artifact.entity_id, target.entity_id, "ref")]
       : [];
   });
 
@@ -549,7 +678,8 @@ const buildSemanticLinks = (
     ...parts.reactions,
     ...parts.results,
     ...parts.analyses,
-    ...parts.samples
+    ...parts.samples,
+    ...parts.artifacts
   ];
   const entityByOriginalId = buildEntityIndex(entities);
 
@@ -559,6 +689,7 @@ const buildSemanticLinks = (
     ...buildResultLinks(documentId, parts.results, entityByOriginalId),
     ...buildAnalysisLinks(documentId, parts.analyses, entityByOriginalId),
     ...buildSampleLinks(documentId, parts.samples, entityByOriginalId),
+    ...buildArtifactLinks(documentId, parts.artifacts, entityByOriginalId),
     ...buildMarkdownMentionLinks(documentId, parts.markdownBlocks, entityByOriginalId)
   ]);
 };
@@ -569,6 +700,7 @@ interface SemanticLayerParts {
   results: ExportedResultV1[];
   analyses: ExportedAnalysisV1[];
   samples: ExportedSampleV1[];
+  artifacts: ExportedArtifactV1[];
   markdownBlocks: ExportedMarkdownBlockV1[];
 }
 
@@ -581,6 +713,7 @@ const createSemanticLayerParts = (): SemanticLayerParts => ({
   results: [],
   analyses: [],
   samples: [],
+  artifacts: [],
   markdownBlocks: []
 });
 
@@ -643,6 +776,11 @@ const getTypedSample = (typedNodes: TypedNodeIndex, node: SampleNode): TypedSamp
   return typedNode?.kind === "sample" ? typedNode : undefined;
 };
 
+const getTypedArtifact = (typedNodes: TypedNodeIndex, node: ArtifactNode): TypedArtifactNode | undefined => {
+  const typedNode = typedNodes.get(node.id ?? "");
+  return typedNode?.kind === "artifact" ? typedNode : undefined;
+};
+
 const collectRelatedEntities = (
   document: ChemdDocument,
   traversedNodes: TraversedNode[],
@@ -696,6 +834,16 @@ const collectRelatedEntities = (
         isPrimary,
         getTypedSample(typedNodes, node)
       ));
+      continue;
+    }
+
+    if (node.type === "artifact") {
+      parts.artifacts.push(buildArtifact(
+        documentId,
+        node,
+        nodeIndex,
+        getTypedArtifact(typedNodes, node)
+      ));
     }
   }
 };
@@ -717,7 +865,7 @@ export const buildSemanticLayer = (
   // Reaction participant 可以用 @id 指向 molecule，索引必须先于 reaction 语义层生成。
   collectRelatedEntities(document, traversedNodes, createMoleculeIndex(parts.molecules), parts, typedNodes);
 
-  const { molecules, reactions, results, analyses, samples, markdownBlocks } = parts;
+  const { molecules, reactions, results, analyses, samples, artifacts, markdownBlocks } = parts;
   const links = buildSemanticLinks(documentId, parts);
 
   return {
@@ -726,6 +874,7 @@ export const buildSemanticLayer = (
     results,
     analyses,
     samples,
+    artifacts,
     markdown_blocks: markdownBlocks,
     links
   };

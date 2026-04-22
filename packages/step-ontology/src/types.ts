@@ -54,6 +54,7 @@ export type StepReferenceTargetKind =
   | "result"
   | "analysis"
   | "sample"
+  | "artifact"
   | "template"
   | "unknown";
 
@@ -77,10 +78,13 @@ export interface StepOutputNode {
 export interface CanonicalStepNode {
   stepId: string;
   family: StepFamily;
+  stage?: string;
+  purpose?: string;
   params: Record<string, unknown>;
   inputs?: StepInputNode[];
   outputs?: StepOutputNode[];
   dependsOn?: string[];
+  evidence?: string[];
   artifacts?: Array<{ artifactId: string; kind: string }>;
   effects?: StepEffect[];
   source: StepSourceInfo;
@@ -94,11 +98,14 @@ export interface ObservationEventNode {
   source: StepSourceInfo;
   eventType?: ObservationEventType;
   stage?: string;
+  timepoint?: string;
+  severity?: string;
   rawText: string;
   params?: Record<string, unknown>;
   normalizedValue?: unknown;
   linkedStepId?: string;
   linkedStepFamily?: StepFamily;
+  evidence?: string[];
   provenance?: ProvenanceInfo;
   confidence: number;
 }

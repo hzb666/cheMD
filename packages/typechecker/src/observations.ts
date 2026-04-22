@@ -49,6 +49,60 @@ const readNormalizedValue = (params: Record<string, string> | undefined): unknow
   return params.value ?? params.color ?? params.state;
 };
 
+const createExplicitEventNode = (
+  node: ObservationNode,
+  eventIndex: number,
+  event: NonNullable<ObservationNode["events"]>[number],
+  eventId: string,
+  eventType: ObservationEventNode["eventType"]
+): ObservationEventNode => {
+  const rawText = event.raw ?? `event: ${event.eventType}`;
+  const normalizedValue = readNormalizedValue(event.params);
+  const explicitEvent: ObservationEventNode = {
+    eventId,
+    observationId: node.id ?? "observation",
+    source: {
+      sourceNodeType: "observation",
+      sourceNodeId: node.id,
+      sourceType: "explicit_observation",
+      sentenceIndex: eventIndex,
+      rawText,
+      ...(event.sourceSpan ? { sourceSpan: event.sourceSpan } : {}),
+      ...(event.provenance ? { provenance: event.provenance } : {})
+    },
+    rawText,
+    params: event.params,
+    confidence: typeof event.confidence === "number" ? event.confidence : eventType ? 1 : 0.4
+  };
+
+  if (eventType) {
+    explicitEvent.eventType = eventType;
+  }
+  if (event.stage) {
+    explicitEvent.stage = event.stage;
+  }
+  if (event.timepoint) {
+    explicitEvent.timepoint = event.timepoint;
+  }
+  if (event.severity) {
+    explicitEvent.severity = event.severity;
+  }
+  if (normalizedValue !== undefined) {
+    explicitEvent.normalizedValue = normalizedValue;
+  }
+  if (event.linkedStepId) {
+    explicitEvent.linkedStepId = event.linkedStepId;
+  }
+  if (event.evidence) {
+    explicitEvent.evidence = event.evidence;
+  }
+  if (event.provenance) {
+    explicitEvent.provenance = event.provenance;
+  }
+
+  return explicitEvent;
+};
+
 const toExplicitObservationEvent = (
   node: ObservationNode,
   eventIndex: number,
@@ -69,29 +123,7 @@ const toExplicitObservationEvent = (
 
   return {
     diagnostics,
-    event: {
-      eventId,
-      observationId: node.id ?? "observation",
-      source: {
-        sourceNodeType: "observation",
-        sourceNodeId: node.id,
-        sourceType: "explicit_observation",
-        sentenceIndex: eventIndex,
-        rawText: event.raw ?? `event: ${event.eventType}`,
-        ...(event.sourceSpan ? { sourceSpan: event.sourceSpan } : {}),
-        ...(event.provenance ? { provenance: event.provenance } : {})
-      },
-      rawText: event.raw ?? `event: ${event.eventType}`,
-      ...(eventType ? { eventType } : {}),
-      ...(event.stage ? { stage: event.stage } : {}),
-      ...(event.params ? { params: event.params } : {}),
-      ...(readNormalizedValue(event.params) !== undefined
-        ? { normalizedValue: readNormalizedValue(event.params) }
-        : {}),
-      ...(event.linkedStepId ? { linkedStepId: event.linkedStepId } : {}),
-      ...(event.provenance ? { provenance: event.provenance } : {}),
-      confidence: eventType ? 1 : 0.4
-    }
+    event: createExplicitEventNode(node, eventIndex, event, eventId, eventType)
   };
 };
 

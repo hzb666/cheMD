@@ -207,6 +207,42 @@ smiles: CCO
 });
 
 describe("parseChemd procedure blocks", () => {
+  it("parses procedure reaction links, evidence, and source-mapped step metadata", () => {
+    const document = parseChemd(`---
+id: exp-procedure-logic
+title: Procedure logic
+date: 2026-04-23
+---
+
+:::procedure #proc-main
+reaction: rxn-main
+evidence: lab-notebook | run-sheet
+step: add | id=s-add | stage=charging | purpose=form intermediate | evidence=notebook,page-2 | confidence=0.9 | inputs=@substrate
+:::
+`);
+
+    expect(document.children[0]).toMatchObject({
+      type: "procedure",
+      id: "proc-main",
+      reaction: "rxn-main",
+      evidence: ["lab-notebook", "run-sheet"],
+      fieldSpans: {
+        reaction: expect.objectContaining({ startLine: 1 }),
+        evidence: expect.objectContaining({ startLine: 2 })
+      },
+      steps: [
+        expect.objectContaining({
+          stepId: "s-add",
+          stage: "charging",
+          purpose: "form intermediate",
+          evidence: ["notebook", "page-2"],
+          confidence: 0.9,
+          sourceSpan: expect.objectContaining({ startLine: 1 })
+        })
+      ]
+    });
+  });
+
   it("parses explicit procedure steps while preserving prose body", () => {
     const document = parseChemd(`---
 id: exp-steps
@@ -309,6 +345,39 @@ Check conversion.
 });
 
 describe("parseChemd observation blocks", () => {
+  it("parses observation event timepoints, severity, evidence, and confidence", () => {
+    const document = parseChemd(`---
+id: exp-observation-logic
+title: Observation logic
+date: 2026-04-23
+---
+
+:::observation #obs-main
+ref: rxn-main
+event: color_change | id=e-color | timepoint=after addition | severity=medium | evidence=photo-1 | confidence=0.8 | linkedStep=s-add
+:::
+`);
+
+    expect(document.children[0]).toMatchObject({
+      type: "observation",
+      id: "obs-main",
+      fieldSpans: {
+        ref: expect.objectContaining({ startLine: 1 })
+      },
+      events: [
+        expect.objectContaining({
+          eventId: "e-color",
+          timepoint: "after addition",
+          severity: "medium",
+          evidence: ["photo-1"],
+          confidence: 0.8,
+          linkedStepId: "s-add",
+          sourceSpan: expect.objectContaining({ startLine: 1 })
+        })
+      ]
+    });
+  });
+
   it("parses explicit observation events while preserving prose body", () => {
     const document = parseChemd(`---
 id: exp-events
@@ -371,6 +440,67 @@ Mixture stayed clear.
           authorProvided: true
         }
       ]
+    });
+  });
+});
+
+describe("parseChemd artifacts and sample lineage", () => {
+  it("parses artifact blocks, sample artifact references, and chemistry feature refs", () => {
+    const document = parseChemd(`---
+id: exp-artifact
+title: Artifact parsing
+date: 2026-04-23
+---
+
+:::sample #sample-main
+name: final product
+derived_from: rxn-main
+aliquot_of: crude-main
+artifacts: spec-main, photo-main
+chemistry_features: fp-sample, fp-extra
+:::
+
+:::artifact #spec-main
+kind: nmr_spectrum
+ref: sample-main
+path: data/spec-main.pdf
+checksum: sha256:abc
+instrument: Bruker 400
+chemistry_features: spec-vector, spec-image
+:::
+`);
+    const sample = document.children.find((node) => node.type === "sample");
+    const artifact = document.children.find((node) => node.type === "artifact");
+
+    expect(sample).toMatchObject({
+      type: "sample",
+      id: "sample-main",
+      derived_from: "rxn-main",
+      aliquot_of: "crude-main",
+      artifacts: ["spec-main", "photo-main"],
+      chemistryFeatureRefs: [
+        { featureId: "fp-sample", kind: "sample", status: "available" },
+        { featureId: "fp-extra", kind: "sample", status: "available" }
+      ],
+      fieldSpans: {
+        artifacts: expect.objectContaining({ startLine: 4 })
+      }
+    });
+    expect(artifact).toMatchObject({
+      type: "artifact",
+      id: "spec-main",
+      kind: "nmr_spectrum",
+      ref: "sample-main",
+      path: "data/spec-main.pdf",
+      checksum: "sha256:abc",
+      instrument: "Bruker 400",
+      chemistryFeatureRefs: [
+        { featureId: "spec-vector", kind: "artifact", status: "available" },
+        { featureId: "spec-image", kind: "artifact", status: "available" }
+      ],
+      fieldSpans: {
+        path: expect.objectContaining({ startLine: 3 })
+      }
     });
   });
 });

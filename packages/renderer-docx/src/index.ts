@@ -188,6 +188,19 @@ const renderSampleNode = (node: DocxNodeByType<"sample">): string =>
     ])
   ]);
 
+const renderArtifactNode = (node: DocxNodeByType<"artifact">): string =>
+  compactLines([
+    renderHeading("Artifact", node.id),
+    ...renderFieldLines([
+      ["Kind", node.kind],
+      ["Ref", node.ref],
+      ["Path", node.path],
+      ["Checksum", node.checksum],
+      ["Instrument", node.instrument],
+      ["Notes", node.notes]
+    ])
+  ]);
+
 const renderTemplateBindLine = (bind: DocxNodeByType<"template">["bind"]): string | undefined => {
   const values = Object.entries(bind);
   return values.length > 0
@@ -235,6 +248,8 @@ const renderStructuredNode = (node: DocxNode): string => {
       return renderObservationNode(node);
     case "sample":
       return renderSampleNode(node);
+    case "artifact":
+      return renderArtifactNode(node);
     case "template":
       return renderTemplateNode(node);
     case "use":

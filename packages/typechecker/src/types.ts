@@ -1,5 +1,6 @@
 import type {
   AnalysisNode,
+  ArtifactNode,
   ChemdDocument,
   ChemdNode,
   MoleculeNode,
@@ -57,7 +58,7 @@ export type AtmosphereValue = BoundedStringValue<AtmosphereLabel>;
 
 export interface ReferenceType {
   kind: "reference";
-  targetKind: "molecule" | "reaction" | "result" | "analysis" | "sample" | "template" | "unknown";
+  targetKind: "molecule" | "reaction" | "result" | "analysis" | "sample" | "artifact" | "template" | "unknown";
   refId: string;
   resolved: boolean;
 }
@@ -139,9 +140,12 @@ export interface TypedStepNode extends TypedNodeBase {
   kind: "step";
   stepId: string;
   family: CanonicalStepNode["family"];
+  stage?: string;
+  purpose?: string;
   params: Record<string, unknown>;
   inputs?: CanonicalStepNode["inputs"];
   outputs?: CanonicalStepNode["outputs"];
+  evidence?: string[];
   artifacts?: CanonicalStepNode["artifacts"];
   effects?: CanonicalStepNode["effects"];
   dependsOn?: string[];
@@ -155,10 +159,13 @@ export interface TypedObservationEventNode extends TypedNodeBase {
   eventId: string;
   eventType?: ObservationEventNode["eventType"];
   stage?: string;
+  timepoint?: string;
+  severity?: string;
   rawText: string;
   params?: Record<string, unknown>;
   linkedStepId?: string;
   linkedStepFamily?: ObservationEventNode["linkedStepFamily"];
+  evidence?: string[];
   normalizedValue?: unknown;
   source: ObservationEventNode["source"];
   provenance?: ObservationEventNode["provenance"];
@@ -170,8 +177,22 @@ export interface TypedSampleNode extends TypedNodeBase {
   name?: string;
   sampleCode?: string;
   ref?: ReferenceOrLiteral;
+  derivedFrom?: ReferenceOrLiteral;
+  aliquotOf?: ReferenceOrLiteral;
+  batchOf?: ReferenceOrLiteral;
+  artifacts?: ReferenceOrLiteral[];
   purity?: QuantityType;
   supplier?: string;
+  notes?: string;
+}
+
+export interface TypedArtifactNode extends TypedNodeBase {
+  kind: "artifact";
+  artifactKind?: string;
+  ref?: ReferenceOrLiteral;
+  path?: string;
+  checksum?: string;
+  instrument?: string;
   notes?: string;
 }
 
@@ -184,7 +205,8 @@ export type TypedSemanticNode =
   | TypedObservationNarrativeNode
   | TypedStepNode
   | TypedObservationEventNode
-  | TypedSampleNode;
+  | TypedSampleNode
+  | TypedArtifactNode;
 
 export interface TypedSemanticGraph {
   documentId: string;
@@ -219,4 +241,5 @@ export type ObjectNode =
   | AnalysisNode
   | ProcedureNode
   | ObservationNode
-  | SampleNode;
+  | SampleNode
+  | ArtifactNode;

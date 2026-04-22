@@ -14,7 +14,8 @@ const REQUIRED_FIELDS: Record<string, string[]> = {
   molecule: ["smiles"],
   reaction: ["reactants", "products"],
   analysis: ["type_name", "data"],
-  sample: ["name"]
+  sample: ["name"],
+  artifact: ["kind", "path"]
 };
 
 const PRIMARY_ALIAS_FIELDS: Record<string, string> = {
@@ -31,7 +32,7 @@ const MAX_TEMPLATE_EXPANSION_DEPTH = 32;
 const MAX_TEMPLATE_EXPANDED_NODES = 2000;
 
 const isObjectNode = (node: ChemdNode): node is ObjectNode =>
-  ["molecule", "reaction", "result", "analysis", "procedure", "observation", "sample"].includes(node.type);
+  ["molecule", "reaction", "result", "analysis", "procedure", "observation", "sample", "artifact"].includes(node.type);
 
 const getNestedNodes = (node: ChemdNode): ChemdNode[] => {
   if (node.type === "col") {

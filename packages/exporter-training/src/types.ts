@@ -1,4 +1,4 @@
-import type { NormalizedTlcAnalysis } from "@chemd/core";
+import type { NormalizedTlcAnalysis, SourceSpan } from "@chemd/core";
 import type { ChemdLnf } from "@chemd/lnf";
 import type { CanonicalStepNode, ObservationEventNode } from "@chemd/step-ontology";
 
@@ -55,6 +55,7 @@ export interface SourceNodeSnapshot {
     | "procedure"
     | "observation"
     | "sample"
+    | "artifact"
     | "col"
     | "template"
     | "use";
@@ -83,6 +84,7 @@ export interface SemanticLayerV1 {
   results: ExportedResultV1[];
   analyses: ExportedAnalysisV1[];
   samples: ExportedSampleV1[];
+  artifacts: ExportedArtifactV1[];
   markdown_blocks: ExportedMarkdownBlockV1[];
   links: ExportedRelationV1[];
   lnf?: ChemdLnf;
@@ -102,6 +104,7 @@ export interface ExportedEntityBase {
     template_name?: string;
     expanded_from_use?: string;
   };
+  field_source_spans?: Record<string, SourceSpan>;
 }
 
 export interface NumericWithUnit {
@@ -134,6 +137,7 @@ export interface ExportedMoleculeV1 extends ExportedEntityBase {
   amount_value?: NumericWithUnit | null;
   equivalents_raw?: string;
   equivalents_value?: number | null;
+  chemistry_feature_ref_ids?: string[];
   text_for_embedding?: string;
 }
 
@@ -183,6 +187,7 @@ export interface ExportedReactionV1 extends ExportedEntityBase {
   selectivity_raw?: string;
   normalized_conditions: NormalizedReactionConditionsV1;
   normalized_outcome_hints: NormalizedOutcomeHintsV1;
+  chemistry_feature_ref_ids?: string[];
   text_for_embedding?: string;
 }
 
@@ -245,7 +250,24 @@ export interface ExportedSampleV1 extends ExportedEntityBase {
   supplier?: string;
   notes?: string;
   ref_raw?: string;
+  derived_from_raw?: string;
+  aliquot_of_raw?: string;
+  batch_of_raw?: string;
+  artifact_refs_raw?: string[];
   purity_percent?: number | null;
+  chemistry_feature_ref_ids?: string[];
+  text_for_embedding?: string;
+}
+
+export interface ExportedArtifactV1 extends ExportedEntityBase {
+  source_node_type: "artifact";
+  artifact_kind?: string;
+  ref_raw?: string;
+  path?: string;
+  checksum?: string;
+  instrument?: string;
+  notes?: string;
+  chemistry_feature_ref_ids?: string[];
   text_for_embedding?: string;
 }
 
@@ -299,6 +321,14 @@ export interface ExportedRelationV1 {
     | "sample_derived_from_reaction"
     | "sample_related_to_molecule"
     | "sample_related_to_result"
+    | "sample_derived_from_sample"
+    | "sample_aliquot_of_sample"
+    | "sample_batch_of_sample"
+    | "sample_has_artifact"
+    | "artifact_supports_reaction"
+    | "artifact_supports_result"
+    | "artifact_supports_analysis"
+    | "artifact_supports_sample"
     | "markdown_mentions_entity";
   from_entity_id: string;
   to_entity_id: string;
@@ -314,6 +344,7 @@ export interface RetrievalMetadataV1 {
   result_ids?: string[];
   analysis_ids?: string[];
   sample_ids?: string[];
+  artifact_ids?: string[];
   analysis_types?: string[];
   status_label?: "success" | "partial" | "failed" | "unknown";
   yield_percent?: number | null;
@@ -334,6 +365,7 @@ export interface RetrievalChunkV1 {
     | "result_notes"
     | "analysis_notes"
     | "sample_notes"
+    | "artifact_notes"
     | "document_summary";
   source_entity_ids: string[];
   text: string;
@@ -460,7 +492,12 @@ export interface NormalizationQualityV1 {
 export interface TrainingQualityV1 {
   rag_eligible: boolean;
   prediction_eligible: boolean;
+  sft_eligible: boolean;
+  eval_eligible: boolean;
+  regression_eligible: boolean;
+  review_required: boolean;
   confidence_score: number;
+  review_reasons?: string[];
   exclusion_reasons?: string[];
 }
 
