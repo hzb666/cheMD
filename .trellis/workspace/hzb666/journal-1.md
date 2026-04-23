@@ -1168,3 +1168,43 @@ note2: Low conversion by TLC.
 ### Next Steps
 
 - None - task complete
+
+
+## Session 28: 完成 agent loop example and best practice
+
+**Date**: 2026-04-24
+**Task**: 完成 agent loop example and best practice
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+(Add summary)
+
+### Main Changes
+
+- 新增可直接运行的示例 driver：[packages/cli/examples/mock-agent-loop-driver.mjs](/D:/Code/chemd/packages/cli/examples/mock-agent-loop-driver.mjs)，用于 `chemd agent-loop` 的最小回路演示。
+- CLI regression tests 现在复用仓库内示例 driver，而不再写临时内联脚本，确保示例文件本身受测试保护。
+- 新增最佳实践文档：[docs/chemd-agent-loop-best-practices.zh-CN.md](/D:/Code/chemd/docs/chemd-agent-loop-best-practices.zh-CN.md)，覆盖 repair-first、driver schema、rewrite/stop 边界、prompt 约束和常见失败模式。
+- 验证通过：`pnpm --filter @chemd/cli test -- cli.spec.ts`、`pnpm --filter @chemd/cli typecheck`、`pnpm --filter @chemd/cli build`、`pnpm exec eslint packages/cli/examples/mock-agent-loop-driver.mjs packages/cli/src/cli.spec.ts --ext .ts,.mjs`、`pnpm lint`、`pnpm test`、`pnpm typecheck`、`git diff --check`。
+- 说明：这轮没有再跑 root `pnpm build`；上轮已确认它仍会被既有 `@chemd/web` `/404` prerender `useContext` null 问题阻塞。
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `05bbbf6` | (see git log) |
+| `2ce9560` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
