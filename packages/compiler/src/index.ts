@@ -31,12 +31,17 @@ import { typecheckDocument, type TypedSemanticGraph } from "@chemd/typechecker";
 import type { StepGraph } from "@chemd/step-ontology";
 import { buildAuthoringAssistance } from "./authoring-assistance";
 import { buildAuthoringDiagnostics } from "./authoring-diagnostics";
+import {
+  buildCompilerDiagnosis,
+  type CompilerDiagnosis
+} from "./diagnosis";
 import type { AuthoringAssistance } from "./authoring-types";
 export {
   applyDiagnosticQuickFix,
   type DiagnosticQuickFix,
   type DiagnosticWithQuickFixes
 } from "./quick-fix";
+export { applyCompilerDiagnosisSafeFixes } from "./diagnosis";
 export {
   applyAuthoringPatch,
   applyAuthoringSuggestion,
@@ -52,6 +57,15 @@ export type {
   AuthoringTemplate,
   AuthoringTemplateCategory
 } from "./authoring-types";
+export type {
+  CompilerDiagnosis,
+  CompilerDiagnosisManualItem,
+  CompilerDiagnosisNextAction,
+  CompilerDiagnosisRequiredInput,
+  CompilerDiagnosisSafeFix,
+  CompilerDiagnosisStatus,
+  CompilerDiagnosisSummary
+} from "./diagnosis";
 
 export interface CompileResult {
   document: ReturnType<typeof resolveChemd>;
@@ -67,6 +81,7 @@ export interface CompileResult {
   trainingUnderstanding: ChemdTrainingUnderstandingV1;
   trainingExport: ChemdTrainingExportV2;
   authoringAssistance: AuthoringAssistance;
+  diagnosis: CompilerDiagnosis;
   html: string;
   json: string;
   docxBridge: string;
@@ -159,6 +174,7 @@ export const compileChemd = (source: string, options: CompileOptions = {}): Comp
         diagnostics: [...document.diagnostics, ...authoringDiagnostics]
       }
     : document;
+  const diagnosis = buildCompilerDiagnosis(compileDocument.diagnostics);
   const renderOptions = renderProfileResolution.options;
   const renderAdapterPayload = mapRenderOptionsToAdapterPayload(renderOptions);
   const html = renderHtml(compileDocument, renderOptions, { typedGraph: typecheckResult.typedGraph });
@@ -181,6 +197,7 @@ export const compileChemd = (source: string, options: CompileOptions = {}): Comp
     trainingUnderstanding,
     trainingExport,
     authoringAssistance,
+    diagnosis,
     html,
     json,
     docxBridge

@@ -70,6 +70,7 @@ const buildChecklistDiagnostic = (input: {
     sourceLayer: "compiler",
     facts: {
       checklist_id: input.checklistId,
+      title: input.title,
       description: input.description,
       missing_items: input.missingItems
     }

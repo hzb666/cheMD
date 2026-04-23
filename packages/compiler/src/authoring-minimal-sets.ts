@@ -33,22 +33,30 @@ const createMinimalSet = (input: {
   suggestion_ids: uniqueStrings(input.suggestion_ids)
 });
 
-const collectReferenceNodeIds = (document: ChemdDocument): string[] =>
+interface ReferenceNodeStatus {
+  nodeId: string;
+  hasRef: boolean;
+}
+
+const collectReferenceNodes = (document: ChemdDocument): ReferenceNodeStatus[] =>
   document.children.flatMap((node) => {
     if (
       (node.type === "analysis" || node.type === "procedure" || node.type === "observation")
       && typeof node.id === "string"
       && node.id.length > 0
     ) {
-      return [node.id];
+      return [{
+        nodeId: node.id,
+        hasRef: typeof node.ref === "string" && node.ref.trim().length > 0
+      }];
     }
 
     if (node.type === "col" && Array.isArray(node.children)) {
-      return collectReferenceNodeIds({ ...document, children: node.children });
+      return collectReferenceNodes({ ...document, children: node.children });
     }
 
     if (node.type === "template" && Array.isArray(node.body)) {
-      return collectReferenceNodeIds({ ...document, children: node.body });
+      return collectReferenceNodes({ ...document, children: node.body });
     }
 
     return [];
@@ -59,7 +67,7 @@ export const buildAuthoringMinimalSets = (
   semanticLayer: ChemdTrainingExportV2["semantic_layer"],
   suggestions: AuthoringSuggestion[]
 ): AuthoringMinimalSet[] => {
-  const referenceNodeIds = collectReferenceNodeIds(document);
+  const referenceNodes = collectReferenceNodes(document);
   const basicMissing = [
     ...(semanticLayer.reactions.length === 0 ? ["至少一个 reaction 块"] : []),
     ...(semanticLayer.results.length === 0 ? ["至少一个 result 块"] : [])
@@ -71,21 +79,25 @@ export const buildAuthoringMinimalSets = (
         ? [`${result.original_id}.ref`]
         : []
     );
-  const referenceSet = referenceNodeIds.length > 0
+  const referenceSet = referenceNodes.length > 0
     ? createMinimalSet({
         checklist_id: "linked-supporting-blocks",
         title: "辅助记录引用",
         description: "analysis / procedure / observation 应尽量显式或可保守推断地指向 reaction 或 attempt。",
-        missing_items: referenceNodeIds.filter((nodeId) =>
-          !suggestions.some((item) => item.target_block_id === nodeId)
-        ).map((nodeId) => `${nodeId}.ref`),
-        inferable_items: referenceNodeIds.flatMap((nodeId) =>
-          suggestions.some((item) => item.target_block_id === nodeId)
+        missing_items: referenceNodes.flatMap(({ nodeId, hasRef }) =>
+          !hasRef && !suggestions.some((item) => item.target_block_id === nodeId)
             ? [`${nodeId}.ref`]
             : []
         ),
-        suggestion_ids: referenceNodeIds.flatMap((nodeId) =>
-          suggestions.filter((item) => item.target_block_id === nodeId).map((item) => item.suggestion_id)
+        inferable_items: referenceNodes.flatMap(({ nodeId, hasRef }) =>
+          !hasRef && suggestions.some((item) => item.target_block_id === nodeId)
+            ? [`${nodeId}.ref`]
+            : []
+        ),
+        suggestion_ids: referenceNodes.flatMap(({ nodeId, hasRef }) =>
+          !hasRef
+            ? suggestions.filter((item) => item.target_block_id === nodeId).map((item) => item.suggestion_id)
+            : []
         )
       })
     : null;
