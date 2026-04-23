@@ -15,6 +15,7 @@ import {
 import type { GitRunner } from "./git-changed";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const exampleAgentLoopDriverPath = path.join(packageRoot, "examples", "mock-agent-loop-driver.mjs");
 
 const createWriter = () => {
   let value = "";
@@ -98,45 +99,6 @@ kind: reaction
 reactants: substrate
 products: product
 :::
-`;
-
-const agentLoopDriverSource = `import { readFileSync } from "node:fs";
-
-const request = JSON.parse(readFileSync(0, "utf8"));
-const schemaVersion = "chemd-agent-driver-response/v0.1";
-const mode = process.argv[2] ?? "rewrite";
-
-if (mode === "stop") {
-  process.stdout.write(JSON.stringify({
-    schemaVersion,
-    action: "stop",
-    note: "need more facts"
-  }));
-  process.exit(0);
-}
-
-const nextSource = request.source.includes(":::result #res-main")
-  ? request.source
-  : \`\${request.source}
-:::result #res-main
-ref: rxn-main
-status: success
-yield: 72%
-:::
-
-:::analysis #ana-main
-ref: rxn-main
-type: tlc
-result: one major spot
-:::
-\`;
-
-process.stdout.write(JSON.stringify({
-  schemaVersion,
-  action: "rewrite",
-  note: "add result and analysis",
-  nextSource
-}));
 `;
 
 const beforeDiffSource = `---
@@ -439,9 +401,7 @@ describe("chemd cli agent loop", () => {
   it("runs agent-loop through an external driver and emits a clean JSON report", async () =>
     withTempDir(async (dir) => {
       const filePath = path.join(dir, "agent.chemd.md");
-      const driverPath = path.join(dir, "driver.mjs");
       writeFileSync(filePath, repairNeedsInputSource);
-      writeFileSync(driverPath, agentLoopDriverSource);
 
       const stdout = createWriter();
       const stderr = createWriter();
@@ -451,7 +411,7 @@ describe("chemd cli agent loop", () => {
         "--driver",
         process.execPath,
         "--driver-arg",
-        driverPath,
+        exampleAgentLoopDriverPath,
         "--format",
         "json"
       ], {
@@ -476,9 +436,7 @@ describe("chemd cli agent loop", () => {
   it("writes the final clean source back to disk when agent-loop uses --write", async () =>
     withTempDir(async (dir) => {
       const filePath = path.join(dir, "agent-write.chemd.md");
-      const driverPath = path.join(dir, "driver.mjs");
       writeFileSync(filePath, repairNeedsInputSource);
-      writeFileSync(driverPath, agentLoopDriverSource);
 
       const stdout = createWriter();
       const stderr = createWriter();
@@ -488,7 +446,7 @@ describe("chemd cli agent loop", () => {
         "--driver",
         process.execPath,
         "--driver-arg",
-        driverPath,
+        exampleAgentLoopDriverPath,
         "--write"
       ], {
         cwd: dir,
@@ -505,9 +463,7 @@ describe("chemd cli agent loop", () => {
   it("returns unresolved diagnosis when the external driver declines to rewrite", async () =>
     withTempDir(async (dir) => {
       const filePath = path.join(dir, "agent-stop.chemd.md");
-      const driverPath = path.join(dir, "driver.mjs");
       writeFileSync(filePath, repairNeedsInputSource);
-      writeFileSync(driverPath, agentLoopDriverSource);
 
       const stdout = createWriter();
       const stderr = createWriter();
@@ -517,7 +473,7 @@ describe("chemd cli agent loop", () => {
         "--driver",
         process.execPath,
         "--driver-arg",
-        driverPath,
+        exampleAgentLoopDriverPath,
         "--driver-arg",
         "stop",
         "--format",
