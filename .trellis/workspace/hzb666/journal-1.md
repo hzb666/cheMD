@@ -1087,3 +1087,43 @@ note2: Low conversion by TLC.
 ### Next Steps
 
 - None - task complete
+
+
+## Session 26: 完成 cli repair loop integration
+
+**Date**: 2026-04-24
+**Task**: 完成 cli repair loop integration
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+(Add summary)
+
+### Main Changes
+
+- 在 `@chemd/compiler` 增加 `runChemdRepairLoop()`，复用 `compileChemd()`、`diagnosis` 和 `applyCompilerDiagnosisSafeFixes()`，提供有界 deterministic repair loop。
+- 在 `@chemd/cli` 增加 `chemd repair <file>`，支持 `--format text|json`、`--max-iterations`、`--write`，并输出 machine-readable diagnosis/repair 结果。
+- 新增 compiler 与 cli regression tests，并同步更新 compiler / cli 契约文档。
+- 验证通过：`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm --filter @chemd/compiler typecheck`、`pnpm --filter @chemd/cli build`、`git diff --check`。
+- 额外确认：`pnpm build` 仍因既有 `@chemd/web` `/404` prerender `useContext` null 问题失败，和本轮改动无关。
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `dc60de9` | (see git log) |
+| `28b62ed` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
