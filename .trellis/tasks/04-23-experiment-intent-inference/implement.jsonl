@@ -1,0 +1,4 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/web/backend/index.md", "reason": "Backend development guide"}
+{"file": ".trellis\\spec\\exporter-training\\backend\\index.md", "reason": "exporter-training package rules"}
+{"file": ".trellis\\spec\\exporter-training\\backend\\training-export-contract.md", "reason": "training understanding and task projection contract"}

@@ -37,6 +37,7 @@ const SYSTEM_PROMPTS: Record<ExperimentDecisionTaskTypeV1, string> = {
   observation_events: "Convert Chemd observation text into structured observation events and link them to known steps when possible.",
   evidence_tracing: "Trace which evidence supports a field or relation. Separate direct evidence from inferred context.",
   qa_with_context: "Answer questions using only supplied Chemd training understanding context. Say when evidence is missing.",
+  experiment_intent: "Infer experiment intent and causal logic from structured Chemd facts without inventing unsupported rationale.",
   reaction_classification: "Classify the reaction using only supplied Chemd experiment facts and return conservative taxonomy labels.",
   expert_routing: "Route the experiment to suitable chemistry or modeling experts using only supplied Chemd experiment facts.",
   yield_prediction: "Use only the supplied Chemd experiment facts to estimate the observed reaction outcome. Do not invent missing chemistry.",
@@ -462,6 +463,58 @@ const buildQaWithContextExamples = (
   })];
 };
 
+const getProcedureFacts = (understanding: ChemdTrainingUnderstandingV1): JsonObject[] =>
+  understanding.procedure_logic.procedure_to_steps.map((pair) => ({
+    pair_id: pair.pair_id,
+    source_type: pair.source_type,
+    step_count: pair.steps.length,
+    step_families: pair.steps.map((step) => step.family),
+    stages: uniqueStrings(pair.steps.flatMap((step) => step.stage ? [step.stage] : [])),
+    low_confidence_step_count: pair.low_confidence_step_count ?? 0
+  }));
+
+const buildExperimentIntentExamples = (
+  understanding: ChemdTrainingUnderstandingV1
+): TrainingTaskExampleV1[] => {
+  const logic = understanding.experiment_logic;
+  if (logic.intent_hypotheses.length === 0 && logic.causal_links.length === 0) {
+    return [];
+  }
+
+  const sourceEntityIds = uniqueStrings([
+    ...logic.intent_hypotheses.flatMap((intent) => intent.evidence_entity_ids),
+    ...logic.variable_logic.flatMap((variable) => variable.evidence_entity_ids),
+    ...logic.causal_links.flatMap((link) => link.evidence_entity_ids)
+  ]);
+
+  return [createExample({
+    understanding,
+    taskType: "experiment_intent",
+    suffix: "document",
+    sourceEntityIds,
+    input: {
+      task: "experiment_intent",
+      document: understanding.document,
+      reactions: understanding.entities.reactions.map(getReactionFacts),
+      outcomes: logic.outcomes.map((outcome) =>
+        getOutcomeFacts(outcome, getOutcomeQuality(understanding, outcome.result_entity_id))
+      ),
+      procedure: getProcedureFacts(understanding),
+      evidence_link_count: logic.evidence_links.length,
+      sample_lineage_count: logic.sample_lineage.length
+    },
+    output: {
+      intent_hypotheses: logic.intent_hypotheses,
+      variable_logic: logic.variable_logic,
+      causal_links: logic.causal_links
+    },
+    targetFields: ["intent_hypotheses", "variable_logic", "causal_links"],
+    leakageRisk: "medium",
+    usableForEval: false,
+    derivedLabelConfidence: "medium"
+  })];
+};
+
 const buildExpertRoutingExamples = (
   understanding: ChemdTrainingUnderstandingV1
 ): TrainingTaskExampleV1[] =>
@@ -737,6 +790,7 @@ export const buildTrainingTaskDatasetFromUnderstanding = (
     ...buildObservationEventExamples(understanding),
     ...buildEvidenceTracingExamples(understanding),
     ...buildQaWithContextExamples(understanding),
+    ...buildExperimentIntentExamples(understanding),
     ...buildReactionClassificationExamples(understanding),
     ...buildExpertRoutingExamples(understanding),
     ...buildYieldPredictionExamples(understanding),

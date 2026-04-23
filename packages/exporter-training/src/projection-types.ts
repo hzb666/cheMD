@@ -206,6 +206,62 @@ export interface TrainingFailureSignalV1 {
   warnings: string[];
 }
 
+export type TrainingLogicSourceV1 = "explicit" | "derived" | "llm_suggested";
+export type TrainingIntentKindV1 =
+  | "synthesis"
+  | "optimization"
+  | "characterization"
+  | "failure_diagnosis"
+  | "baseline_observation";
+
+export interface TrainingIntentHypothesisV1 {
+  intent_id: string;
+  intent_kind: TrainingIntentKindV1;
+  objective: string;
+  reaction_entity_id?: string;
+  result_entity_id?: string;
+  logic_source: TrainingLogicSourceV1;
+  confidence: TrainingInferenceConfidenceV1;
+  evidence_entity_ids: string[];
+  supporting_factors: string[];
+  review_required: boolean;
+}
+
+export interface TrainingVariableLogicV1 {
+  variable_id: string;
+  reaction_entity_id: string;
+  field: string;
+  variable_role: "changed" | "controlled";
+  baseline_value?: string | number | boolean | null;
+  candidate_value?: string | number | boolean | null;
+  value?: string | number | boolean | null;
+  logic_source: TrainingLogicSourceV1;
+  confidence: TrainingInferenceConfidenceV1;
+  evidence_entity_ids: string[];
+  review_required: boolean;
+}
+
+export type TrainingCausalLinkTypeV1 =
+  | "changed_variable_may_affect_outcome"
+  | "controlled_variable_preserves_comparison"
+  | "procedure_enables_reaction"
+  | "evidence_supports_outcome_claim"
+  | "failure_signal_triggers_review";
+
+export interface TrainingCausalLinkV1 {
+  causal_link_id: string;
+  link_type: TrainingCausalLinkTypeV1;
+  cause: string;
+  effect: string;
+  source_entity_ids: string[];
+  target_entity_ids: string[];
+  logic_source: TrainingLogicSourceV1;
+  confidence: TrainingInferenceConfidenceV1;
+  evidence_entity_ids: string[];
+  review_required: boolean;
+  warnings: string[];
+}
+
 export interface TrainingExpertRoutingV1 {
   route_id: string;
   reaction_entity_id: string;
@@ -335,6 +391,7 @@ export type LoraTaskTypeV1 =
   | "experiment_proposal"
   | "failure_analysis"
   | "experiment_comparison"
+  | "experiment_intent"
   | "reaction_classification"
   | "expert_routing"
   | "consistency_check"
@@ -362,6 +419,9 @@ export interface TrainingExperimentLogicV1 {
   outcome_quality: TrainingOutcomeQualityV1[];
   reaction_taxonomy: TrainingReactionTaxonomyV1[];
   expert_routing: TrainingExpertRoutingV1[];
+  intent_hypotheses: TrainingIntentHypothesisV1[];
+  variable_logic: TrainingVariableLogicV1[];
+  causal_links: TrainingCausalLinkV1[];
   optimization_trajectories: TrainingOptimizationTrajectoryV1[];
   failure_signals: TrainingFailureSignalV1[];
   evidence_links: TrainingEvidenceLinkV1[];
@@ -404,7 +464,8 @@ export type ExperimentDecisionTaskTypeV1 =
   | "condition_recommendation"
   | "experiment_proposal"
   | "failure_analysis"
-  | "experiment_comparison";
+  | "experiment_comparison"
+  | "experiment_intent";
 
 export type TrainingTaskLeakageRiskV1 = "low" | "medium" | "high";
 
@@ -453,6 +514,9 @@ export type TrainingAnnotationTargetTypeV1 =
   | "expert_routing"
   | "optimization_trajectory"
   | "failure_signal"
+  | "intent_hypothesis"
+  | "variable_logic"
+  | "causal_link"
   | "task_example";
 
 export interface TrainingAnnotationCorrectionV1 {

@@ -9,11 +9,13 @@ import type {
   TrainingCanonicalSummaryV1,
   TrainingEvidenceLinkV1,
   TrainingExpertRoutingV1,
+  TrainingCausalLinkV1,
   TrainingExperimentDesignContextV1,
   TrainingExperimentVariableDeltaV1,
   TrainingFailureSignalV1,
   TrainingFieldEvidenceV1,
   TrainingInferenceConfidenceV1,
+  TrainingIntentHypothesisV1,
   TrainingKnowledgeEdgeV1,
   TrainingKnowledgeNodeV1,
   TrainingLoraGenerationHintsV1,
@@ -32,7 +34,8 @@ import type {
   TrainingReactionV1,
   TrainingResolvedReferenceV1,
   TrainingResultV1,
-  TrainingSampleV1
+  TrainingSampleV1,
+  TrainingVariableLogicV1
 } from "./projection-types";
 import type {
   ChemdTrainingExportV2,
@@ -69,6 +72,7 @@ type ObservationPair = NonNullable<ChemdTrainingExportV2["learning_layer"]["obse
 type ProcedureStep = ProcedurePair["steps"][number];
 type ObservationEvent = ObservationPair["events"][number];
 type FieldValue = TrainingFieldEvidenceV1["value"];
+type LogicValue = string | number | boolean | null;
 
 interface FieldEvidenceInput {
   subjectEntityId: string;
@@ -88,6 +92,31 @@ interface LoraHintContext {
   fieldEvidence: TrainingFieldEvidenceV1[];
   missingLogic: TrainingMissingLogicV1[];
   resolvedReferences: TrainingResolvedReferenceV1[];
+}
+
+interface IntentBuildInput {
+  contexts: TrainingExperimentDesignContextV1[];
+  outcomes: TrainingOutcomeLogicV1[];
+  outcomeQuality: TrainingOutcomeQualityV1[];
+  failureSignals: TrainingFailureSignalV1[];
+  procedurePairs: ProcedurePair[];
+}
+
+interface IntentContextInput {
+  context: TrainingExperimentDesignContextV1;
+  outcome?: TrainingOutcomeLogicV1;
+  quality?: TrainingOutcomeQualityV1;
+  failure?: TrainingFailureSignalV1;
+  procedurePairs: ProcedurePair[];
+}
+
+interface CausalLinkBuildInput {
+  record: ChemdTrainingExportV2;
+  contexts: TrainingExperimentDesignContextV1[];
+  outcomes: TrainingOutcomeLogicV1[];
+  failureSignals: TrainingFailureSignalV1[];
+  evidenceLinks: TrainingEvidenceLinkV1[];
+  procedurePairs: ProcedurePair[];
 }
 
 const RAG_EXCLUSION_REASONS = new Set(["no_retrieval_chunks"]);
@@ -133,6 +162,7 @@ const LOW_YIELD_THRESHOLD = 20;
 const LOW_CONVERSION_THRESHOLD = 50;
 const LOW_SELECTIVITY_THRESHOLD = 50;
 const LOW_PURITY_THRESHOLD = 80;
+const DERIVED_LOGIC_SOURCE = "derived" as const;
 const REACTION_TAXONOMY_RULES: Array<{
   family: TrainingReactionFamilyV1;
   tags: string[];
@@ -849,6 +879,278 @@ const buildFailureSignals = (
     }];
   });
 };
+
+const getIntentKind = (
+  input: IntentContextInput
+): TrainingIntentHypothesisV1["intent_kind"] => {
+  if (input.failure) {
+    return "failure_diagnosis";
+  }
+  if (input.context.changed_variables.length > 0) {
+    return "optimization";
+  }
+  if (input.quality?.result_confirmed_by_analysis) {
+    return "characterization";
+  }
+  return input.context.variant_role === "single_run" ? "synthesis" : "baseline_observation";
+};
+
+const getIntentObjective = (
+  input: IntentContextInput
+): string => {
+  const changed = input.context.changed_variables.map((variable) => variable.field).join(", ");
+  if (input.failure) {
+    return "Diagnose the linked outcome and identify review points before using the record for decision training.";
+  }
+  if (changed) {
+    return `Compare the effect of changed variable(s): ${changed}.`;
+  }
+  if (input.quality?.result_confirmed_by_analysis) {
+    return "Connect the reported result with analytical evidence for characterization.";
+  }
+  return input.procedurePairs.length > 0
+    ? "Execute the recorded procedure and capture the linked reaction outcome."
+    : "Represent the baseline experiment facts and available outcome context.";
+};
+
+const getIntentConfidence = (
+  input: IntentContextInput
+): TrainingInferenceConfidenceV1 => {
+  if (input.failure || input.quality?.warnings.length) {
+    return "low";
+  }
+  if (input.quality?.result_confirmed_by_analysis && input.procedurePairs.length > 0) {
+    return "high";
+  }
+  return input.outcome || input.context.changed_variables.length > 0 ? "medium" : "low";
+};
+
+const getIntentFactors = (
+  input: IntentContextInput
+): string[] => uniqueStrings([
+  `variant_role:${input.context.variant_role}`,
+  ...input.context.changed_variables.map((variable) => `changed:${variable.field}`),
+  ...(input.context.controlled_variables.length > 0
+    ? [`controlled_variables:${input.context.controlled_variables.length}`]
+    : []),
+  ...(input.quality?.result_confirmed_by_analysis ? ["result_confirmed_by_analysis"] : []),
+  ...(input.failure ? input.failure.failure_modes.map((mode) => `failure_mode:${mode}`) : []),
+  ...(input.procedurePairs.length > 0 ? [`procedure_pairs:${input.procedurePairs.length}`] : [])
+]);
+
+const buildIntentHypotheses = (
+  input: IntentBuildInput
+): TrainingIntentHypothesisV1[] => {
+  const outcomeByResult = outcomeByResultId(input.outcomes);
+  const qualityByResult = qualityByResultId(input.outcomeQuality);
+  const failureByResult = new Map(input.failureSignals.map((failure) => [failure.result_entity_id, failure]));
+
+  return input.contexts.map((context) => {
+    const outcome = context.linked_result_entity_id
+      ? outcomeByResult.get(context.linked_result_entity_id)
+      : undefined;
+    const quality = context.linked_result_entity_id
+      ? qualityByResult.get(context.linked_result_entity_id)
+      : undefined;
+    const failure = context.linked_result_entity_id
+      ? failureByResult.get(context.linked_result_entity_id)
+      : undefined;
+    const intentInput = { context, outcome, quality, failure, procedurePairs: input.procedurePairs };
+
+    return {
+      intent_id: `intent::${context.context_id}`,
+      intent_kind: getIntentKind(intentInput),
+      objective: getIntentObjective(intentInput),
+      reaction_entity_id: context.reaction_entity_id,
+      ...(context.linked_result_entity_id ? { result_entity_id: context.linked_result_entity_id } : {}),
+      logic_source: DERIVED_LOGIC_SOURCE,
+      confidence: getIntentConfidence(intentInput),
+      evidence_entity_ids: uniqueStrings([
+        ...context.evidence_entity_ids,
+        ...(quality?.evidence_entity_ids ?? []),
+        ...(failure?.evidence_entity_ids ?? []),
+        ...input.procedurePairs.map((pair) => pair.pair_id)
+      ]),
+      supporting_factors: getIntentFactors(intentInput),
+      review_required: Boolean(failure || quality?.warnings.length)
+    };
+  });
+};
+
+const addValueField = (
+  key: "baseline_value" | "candidate_value" | "value",
+  value: LogicValue | undefined
+): Partial<TrainingVariableLogicV1> =>
+  value === undefined ? {} : { [key]: value };
+
+const buildChangedVariableLogic = (
+  context: TrainingExperimentDesignContextV1
+): TrainingVariableLogicV1[] =>
+  context.changed_variables.map((variable) => ({
+    variable_id: `variable::${context.context_id}::changed::${variable.field}`,
+    reaction_entity_id: context.reaction_entity_id,
+    field: variable.field,
+    variable_role: "changed",
+    ...addValueField("baseline_value", variable.baseline_value),
+    ...addValueField("candidate_value", variable.candidate_value),
+    logic_source: DERIVED_LOGIC_SOURCE,
+    confidence: "medium",
+    evidence_entity_ids: context.evidence_entity_ids,
+    review_required: false
+  }));
+
+const buildControlledVariableLogic = (
+  context: TrainingExperimentDesignContextV1,
+  reaction: ExportedReactionV1 | undefined
+): TrainingVariableLogicV1[] => {
+  const values = reaction ? getReactionVariableMap(reaction) : {};
+  return context.controlled_variables.map((field) => ({
+    variable_id: `variable::${context.context_id}::controlled::${field}`,
+    reaction_entity_id: context.reaction_entity_id,
+    field,
+    variable_role: "controlled",
+    ...addValueField("value", values[field]),
+    logic_source: DERIVED_LOGIC_SOURCE,
+    confidence: "medium",
+    evidence_entity_ids: context.evidence_entity_ids,
+    review_required: false
+  }));
+};
+
+const buildVariableLogic = (
+  record: ChemdTrainingExportV2,
+  contexts: TrainingExperimentDesignContextV1[]
+): TrainingVariableLogicV1[] => {
+  const reactionById = new Map(record.semantic_layer.reactions.map((reaction) => [reaction.entity_id, reaction]));
+
+  return contexts.flatMap((context) => [
+    ...buildChangedVariableLogic(context),
+    ...buildControlledVariableLogic(context, reactionById.get(context.reaction_entity_id))
+  ]);
+};
+
+const buildVariableCausalLinks = (
+  contexts: TrainingExperimentDesignContextV1[],
+  outcomes: TrainingOutcomeLogicV1[]
+): TrainingCausalLinkV1[] => {
+  const outcomeByResult = outcomeByResultId(outcomes);
+  return contexts.flatMap((context) => {
+    const outcome = context.linked_result_entity_id
+      ? outcomeByResult.get(context.linked_result_entity_id)
+      : undefined;
+    return context.changed_variables.flatMap((variable) =>
+      outcome && context.linked_result_entity_id
+        ? [{
+            causal_link_id: `causal::${context.context_id}::changed::${variable.field}`,
+            link_type: "changed_variable_may_affect_outcome" as const,
+            cause: `${variable.field} changed between baseline and candidate.`,
+            effect: "The linked result may reflect this changed experimental variable.",
+            source_entity_ids: [context.reaction_entity_id],
+            target_entity_ids: [context.linked_result_entity_id],
+            logic_source: DERIVED_LOGIC_SOURCE,
+            confidence: "medium" as const,
+            evidence_entity_ids: context.evidence_entity_ids,
+            review_required: false,
+            warnings: []
+          }]
+        : []
+    );
+  });
+};
+
+const buildControlledCausalLinks = (
+  contexts: TrainingExperimentDesignContextV1[]
+): TrainingCausalLinkV1[] =>
+  contexts.flatMap((context) =>
+    context.variant_role === "variant" && context.controlled_variables.length > 0
+      ? [{
+          causal_link_id: `causal::${context.context_id}::controlled`,
+          link_type: "controlled_variable_preserves_comparison",
+          cause: `${context.controlled_variables.length} variables are held constant for comparison.`,
+          effect: "The comparison can focus on the changed variables.",
+          source_entity_ids: [context.reaction_entity_id],
+          target_entity_ids: context.baseline_reaction_entity_id
+            ? [context.baseline_reaction_entity_id, context.reaction_entity_id]
+            : [context.reaction_entity_id],
+          logic_source: DERIVED_LOGIC_SOURCE,
+          confidence: "medium",
+          evidence_entity_ids: context.evidence_entity_ids,
+          review_required: false,
+          warnings: []
+        }]
+      : []
+  );
+
+const buildProcedureCausalLinks = (
+  record: ChemdTrainingExportV2,
+  procedurePairs: ProcedurePair[]
+): TrainingCausalLinkV1[] => {
+  const target = record.semantic_layer.reactions.find((reaction) => reaction.is_primary)
+    ?? record.semantic_layer.reactions[0];
+  if (!target) {
+    return [];
+  }
+
+  return procedurePairs
+    .filter((pair) => pair.steps.length > 0)
+    .map((pair) => ({
+      causal_link_id: `causal::${pair.pair_id}::procedure`,
+      link_type: "procedure_enables_reaction",
+      cause: "The recorded procedure supplies ordered operations for the experiment.",
+      effect: "The procedure operationalizes the target reaction.",
+      source_entity_ids: [pair.pair_id],
+      target_entity_ids: [target.entity_id],
+      logic_source: DERIVED_LOGIC_SOURCE,
+      confidence: pair.low_confidence_step_count ? "low" : "medium",
+      evidence_entity_ids: [pair.pair_id, target.entity_id],
+      review_required: Boolean(pair.low_confidence_step_count),
+      warnings: pair.low_confidence_step_count ? ["low_confidence_steps"] : []
+    }));
+};
+
+const buildEvidenceCausalLinks = (
+  evidenceLinks: TrainingEvidenceLinkV1[]
+): TrainingCausalLinkV1[] =>
+  evidenceLinks.map((link) => ({
+    causal_link_id: `causal::${link.evidence_entity_id}::supports::${link.target_entity_id}`,
+    link_type: "evidence_supports_outcome_claim",
+    cause: `${link.evidence_type} evidence is linked to the target entity.`,
+    effect: "The target claim has structured supporting evidence.",
+    source_entity_ids: [link.evidence_entity_id],
+    target_entity_ids: [link.target_entity_id],
+    logic_source: DERIVED_LOGIC_SOURCE,
+    confidence: "medium",
+    evidence_entity_ids: [link.evidence_entity_id, link.target_entity_id],
+    review_required: false,
+    warnings: []
+  }));
+
+const buildFailureCausalLinks = (
+  failureSignals: TrainingFailureSignalV1[]
+): TrainingCausalLinkV1[] =>
+  failureSignals.map((failure) => ({
+    causal_link_id: `causal::${failure.failure_id}::review`,
+    link_type: "failure_signal_triggers_review",
+    cause: `Failure signal(s): ${failure.failure_modes.join(", ")}.`,
+    effect: "The experiment should be reviewed before decision-model evaluation.",
+    source_entity_ids: [failure.result_entity_id],
+    target_entity_ids: [failure.result_entity_id],
+    logic_source: DERIVED_LOGIC_SOURCE,
+    confidence: failure.confidence,
+    evidence_entity_ids: failure.evidence_entity_ids,
+    review_required: true,
+    warnings: failure.warnings
+  }));
+
+const buildCausalLinks = (
+  input: CausalLinkBuildInput
+): TrainingCausalLinkV1[] => [
+  ...buildVariableCausalLinks(input.contexts, input.outcomes),
+  ...buildControlledCausalLinks(input.contexts),
+  ...buildProcedureCausalLinks(input.record, input.procedurePairs),
+  ...buildEvidenceCausalLinks(input.evidenceLinks),
+  ...buildFailureCausalLinks(input.failureSignals)
+];
 
 const rankOutcomeYields = (
   steps: Array<{ resultEntityId?: string; yieldPercent?: number | null }>
@@ -2016,6 +2318,7 @@ const buildRecommendedLoraTasks = (
   const hasExperimentComparison = record.semantic_layer.reactions.length > 1;
   const hasProposalBasis = hasProcedureLogic && hasDecisionBasis;
   const hasNormalizationEvidence = fieldEvidence.some((item) => item.normalized);
+  const hasIntentBasis = hasDecisionBasis || hasProcedureLogic || hasEvidenceLinks;
   const qualityIssueCount = missingLogic.length + (record.quality_layer.training_quality.exclusion_reasons?.length ?? 0);
 
   return [
@@ -2034,6 +2337,7 @@ const buildRecommendedLoraTasks = (
     ...includeTask(hasYieldPrediction, createTaskHint("yield_prediction", "Usable yield targets are available.")),
     ...includeTask(hasDecisionBasis, createTaskHint("condition_recommendation", "Reaction conditions and outcomes are available.")),
     ...includeTask(hasProposalBasis, createTaskHint("experiment_proposal", "Procedure and outcome context are available.")),
+    ...includeTask(hasIntentBasis, createTaskHint("experiment_intent", "Experiment intent and causal logic can be inferred from structured facts.")),
     ...includeTask(hasFailedOutcome, createTaskHint("failure_analysis", "Failed result labels are available.")),
     ...includeTask(hasExperimentComparison, createTaskHint("experiment_comparison", "Multiple reactions can be compared.")),
     ...includeTask(qualityIssueCount > 0, createTaskHint("consistency_check", "Quality warnings or missing logic are available.")),
@@ -2052,6 +2356,7 @@ const buildBlockedLoraTasks = (context: LoraHintContext): LoraTaskHintV1[] => {
   const hasYieldPrediction = record.learning_layer.prediction_instances.some((instance) =>
     instance.usability.usable_for_yield_regression
   );
+  const hasIntentBasis = (hasReactions && record.semantic_layer.results.length > 0) || hasProcedureLogic || hasEvidenceLinks;
 
   return [
     ...includeTask(record.source_layer.raw_children.length === 0, createTaskHint("record_to_chemd", "No source snapshots are available.")),
@@ -2069,6 +2374,7 @@ const buildBlockedLoraTasks = (context: LoraHintContext): LoraTaskHintV1[] => {
       createTaskHint("condition_recommendation", "No reaction/result pair is available.")
     ),
     ...includeTask(!hasProcedureLogic, createTaskHint("experiment_proposal", "No procedure logic is available.")),
+    ...includeTask(!hasIntentBasis, createTaskHint("experiment_intent", "No reaction/result, procedure, or evidence basis is available.")),
     ...includeTask(!record.semantic_layer.results.some((result) => result.status_label === "failed"), createTaskHint("failure_analysis", "No failed result label is available.")),
     ...includeTask(record.semantic_layer.reactions.length < 2, createTaskHint("experiment_comparison", "Fewer than two reactions are available."))
   ];
@@ -2117,6 +2423,28 @@ export const buildTrainingUnderstandingFromRecord = (
   const outcomeQuality = buildOutcomeQuality(record);
   const reactionTaxonomy = buildReactionTaxonomy(record);
   const failureSignals = buildFailureSignals(outcomes, outcomeQuality);
+  const procedurePairs = record.learning_layer.procedure_to_steps ?? [];
+  const evidenceLinks = [
+    ...buildEvidenceLinks(record, EVIDENCE_RELATIONS, "analysis"),
+    ...buildEvidenceLinks(record, ARTIFACT_EVIDENCE_RELATIONS, "artifact")
+  ];
+  const sampleLineage = buildEvidenceLinks(record, SAMPLE_LINEAGE_RELATIONS, "sample");
+  const intentHypotheses = buildIntentHypotheses({
+    contexts: designContexts,
+    outcomes,
+    outcomeQuality,
+    failureSignals,
+    procedurePairs
+  });
+  const variableLogic = buildVariableLogic(record, designContexts);
+  const causalLinks = buildCausalLinks({
+    record,
+    contexts: designContexts,
+    outcomes,
+    failureSignals,
+    evidenceLinks,
+    procedurePairs
+  });
   const optimizationTrajectories = buildOptimizationTrajectories(
     record.document.document_id,
     designContexts,
@@ -2159,13 +2487,13 @@ export const buildTrainingUnderstandingFromRecord = (
       outcome_quality: outcomeQuality,
       reaction_taxonomy: reactionTaxonomy,
       expert_routing: expertRouting,
+      intent_hypotheses: intentHypotheses,
+      variable_logic: variableLogic,
+      causal_links: causalLinks,
       optimization_trajectories: optimizationTrajectories,
       failure_signals: failureSignals,
-      evidence_links: [
-        ...buildEvidenceLinks(record, EVIDENCE_RELATIONS, "analysis"),
-        ...buildEvidenceLinks(record, ARTIFACT_EVIDENCE_RELATIONS, "artifact")
-      ],
-      sample_lineage: buildEvidenceLinks(record, SAMPLE_LINEAGE_RELATIONS, "sample")
+      evidence_links: evidenceLinks,
+      sample_lineage: sampleLineage
     },
     knowledge_graph: {
       nodes: graphNodes,

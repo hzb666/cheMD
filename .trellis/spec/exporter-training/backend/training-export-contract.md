@@ -98,12 +98,19 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
     available outcomes without adding author-facing syntax
   - failure signals for failed, low-yield, low-conversion, low-selectivity,
     low-purity, conflicting, uncertain, or unlinked results
+  - inferred intent hypotheses, variable logic, and causal links generated
+    from existing facts without requiring extra report syntax
   - analysis/artifact evidence links and sample lineage links
 - Reaction taxonomy, expert routing, optimization trajectories, and failure
   signals are derived experiment-understanding features. They must carry
   evidence IDs, warnings, and confidence where applicable, and must not be
   treated as human-verified labels unless an annotation layer later confirms
   them.
+- Intent hypotheses, variable logic, and causal links are inferred logic. Each
+  record must carry stable IDs, `logic_source`, confidence, evidence IDs, and a
+  review flag. Automatically inferred records use `logic_source: "derived"`;
+  future LLM suggestions must use `logic_source: "llm_suggested"` and stay
+  outside source truth until accepted through annotation.
 - `ChemdTrainingUnderstandingV1.resolved_references` must include Markdown
   references and structured `ref`/participant references that affect
   experiment logic.
@@ -124,8 +131,9 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   `ChemdTrainingUnderstandingV1` and emits JSONL-ready `messages` examples for
   record-to-Chemd reconstruction, Chemd repair, normalization explanation,
   procedure reasoning, observation events, evidence tracing, QA with context,
-  yield prediction, condition recommendation, experiment proposal, failure
-  analysis, experiment comparison, reaction classification, and expert routing.
+  experiment intent, yield prediction, condition recommendation, experiment
+  proposal, failure analysis, experiment comparison, reaction classification,
+  and expert routing.
 - Task-projection examples are derived supervision. They must carry quality
   warnings and must not be treated as human-confirmed labels unless a later
   annotation layer explicitly adds that status.
@@ -140,6 +148,10 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   Automatically derived evidence tracing examples are SFT-only and must set
   `usable_for_eval: false`, `holdout_eligible: false`, and at least medium
   leakage risk unless later human annotations create a clean eval target.
+- Experiment-intent task inputs must expose only source facts such as document
+  metadata, reactions, outcomes, procedure summaries, and evidence counts. They
+  must not include `intent_hypotheses`, `variable_logic`, or `causal_links` in
+  the user prompt. Derived experiment-intent examples are SFT-only by default.
 - Task-projection prompts may include structured reaction/design/outcome facts,
   but must not include `source_layer`, raw AST payloads, render/layout fields,
   full audit export data, or RAG-only chunks.
@@ -163,6 +175,8 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 | Sample lineage target kind mismatch | Resolve the reference if possible, but do not emit or project a lineage relation |
 | Multiple sample fields target same entity | Project only the relation whose role matches the source field |
 | Derived evidence tracing task | Keep SFT eligible when warning-free, but never eval/holdout eligible |
+| Inferred intent/causal logic | Emit derived records with evidence IDs and review flags; do not treat as source truth |
+| Experiment-intent task | Keep SFT-only and exclude inferred target records from the prompt |
 
 ### 5. Good/Base/Bad Cases
 
@@ -202,6 +216,11 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 - Assert normalization/evidence tracing task inputs do not expose full
   field-evidence objects, and evidence tracing examples are not eval/holdout
   eligible by default.
+- Assert inferred experiment intent, variable logic, and causal links are
+  present for single-run and variant experiments, carry `logic_source`, and set
+  review flags when evidence is weak.
+- Assert experiment-intent task examples are generated without leaking
+  `intent_hypotheses`, `variable_logic`, or `causal_links` into user prompts.
 
 ### 7. Wrong vs Correct
 
