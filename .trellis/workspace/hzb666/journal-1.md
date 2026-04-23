@@ -853,3 +853,62 @@ Added RAG embedding backfill service and API route with bounded filters, skip/ov
 ### Next Steps
 
 - None - task complete
+
+
+## Session 20: Condition Variation Parallel Attempts
+
+**Date**: 2026-04-23
+**Task**: Condition Variation Parallel Attempts
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+(Add summary)
+
+### Main Changes
+
+| Area | Summary |
+|------|---------|
+| Syntax | Extended `condition-varies` with `condition`, `varies`, `varN`, `resN`, and `noteN` attempt rows. |
+| Semantics | `varN` now represents a concrete condition variation attempt; default mode partially overrides baseline condition and `mode=override` fully replaces it. |
+| References | `@cv.var1` resolves to a `condition_variation_attempt` target for markdown, analysis/TLC refs, and observation target metadata. |
+| Export | Added `semantic_layer.condition_variation_attempts`, attempt relations, retrieval chunks, and storage entity records. |
+| Training | Projects attempt-level design contexts, condition variation logic, variable logic, resolved references, field evidence, and decision task inputs. |
+| Rendering | HTML/DOCX renderers show baseline condition, varied fields, and attempt rows. |
+| Verification | Passed targeted parser/exporter tests, targeted typechecks/eslint, `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `git diff --check`. |
+
+**Key syntax**:
+```chemd
+:::condition-varies #cv-screen
+standard: rxn-standard
+condition: solvent=THF | temperature=25 C | catalyst=Pd
+varies: solvent | temperature
+var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
+res1: res-var1
+note1: Higher yield but impurity visible.
+var2: reaction=rxn-var2 | mode=override | solvent=DMSO | temperature=60 C | catalyst=Ni
+res2: res-var2
+note2: Low conversion by TLC.
+:::
+```
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1e9c2d6` | (see git log) |
+| `c23e950` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 19
+- **Total Sessions**: 20
 - **Last Active**: 2026-04-23
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~855 | Active |
+| `journal-1.md` | ~914 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 20 | 2026-04-23 | Condition Variation Parallel Attempts | `1e9c2d6`, `c23e950` | `develop` |
 | 19 | 2026-04-23 | Condition Varies Block | `1de681f`, `5ad9c4d` | `develop` |
 | 18 | 2026-04-23 | 生成引用和关系训练任务 | `07c2288`, `04364c9` | `develop` |
 | 17 | 2026-04-23 | 导出材料流和步骤依赖 | `e9d88c6`, `a790511` | `develop` |
