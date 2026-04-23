@@ -695,3 +695,38 @@ Added RAG embedding backfill service and API route with bounded filters, skip/ov
 ### Next Steps
 
 - None - task complete
+
+
+## Session 16: 推断实验意图与因果逻辑
+
+**Date**: 2026-04-23
+**Task**: 推断实验意图与因果逻辑
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+自动从实验记录推断 intent_hypotheses、variable_logic 与 causal_links；新增 experiment_intent 训练任务，避免要求用户在实验报告里显式书写大量意图和因果说明；补充 exporter-training 回归测试、契约文档，并归档 Trellis 任务。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0832609` | (see git log) |
+| `327cac7` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
