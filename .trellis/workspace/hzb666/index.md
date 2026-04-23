@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 28
+- **Total Sessions**: 29
 - **Last Active**: 2026-04-24
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1210 | Active |
+| `journal-1.md` | ~1245 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 29 | 2026-04-24 | Chemd syntax best practices and golden record | `e34c1e1`, `b7a6b06` | `develop` |
 | 28 | 2026-04-24 | 完成 agent loop example and best practice | `05bbbf6`, `2ce9560` | `develop` |
 | 27 | 2026-04-24 | 完成 compiler agent loop integration | `e0818ef`, `fd498eb` | `develop` |
 | 26 | 2026-04-24 | 完成 cli repair loop integration | `dc60de9`, `28b62ed` | `develop` |

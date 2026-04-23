@@ -1208,3 +1208,38 @@ note2: Low conversion by TLC.
 ### Next Steps
 
 - None - task complete
+
+
+## Session 29: Chemd syntax best practices and golden record
+
+**Date**: 2026-04-24
+**Task**: Chemd syntax best practices and golden record
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+Added chemd syntax best-practice guidance, a compiler-validated golden experiment record fixture, TLC authoring guidance, README links, and compiler regression coverage for condition variation, sample lineage, and evidence relations.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e34c1e1` | (see git log) |
+| `b7a6b06` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
