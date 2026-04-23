@@ -19,6 +19,10 @@ import type {
   TrainingKnowledgeEdgeV1,
   TrainingKnowledgeNodeV1,
   TrainingLoraGenerationHintsV1,
+  TrainingMaterialFlowEdgeV1,
+  TrainingMaterialFlowGraphV1,
+  TrainingMaterialFlowNodeTypeV1,
+  TrainingMaterialFlowNodeV1,
   TrainingMissingLogicV1,
   TrainingMoleculeV1,
   TrainingNarrativeBlockV1,
@@ -35,6 +39,7 @@ import type {
   TrainingResolvedReferenceV1,
   TrainingResultV1,
   TrainingSampleV1,
+  TrainingStepDependencyEdgeV1,
   TrainingVariableLogicV1
 } from "./projection-types";
 import type {
@@ -119,6 +124,23 @@ interface CausalLinkBuildInput {
   procedurePairs: ProcedurePair[];
 }
 
+interface FlowEdgeInput {
+  flowEdgeId: string;
+  edgeType: TrainingMaterialFlowEdgeV1["edge_type"];
+  fromNodeId: string;
+  toNodeId: string;
+  role?: string;
+  confidence: TrainingInferenceConfidenceV1;
+  evidenceEntityIds: string[];
+  reviewRequired?: boolean;
+  warnings?: string[];
+}
+
+interface RelationMaterialFlowSpec {
+  edgeType: TrainingMaterialFlowEdgeV1["edge_type"];
+  reverse?: boolean;
+}
+
 const RAG_EXCLUSION_REASONS = new Set(["no_retrieval_chunks"]);
 const SAMPLE_LINEAGE_RELATIONS = new Set<ExportedRelationV1["relation_type"]>([
   "sample_derived_from_reaction",
@@ -140,6 +162,23 @@ const ARTIFACT_EVIDENCE_RELATIONS = new Set<ExportedRelationV1["relation_type"]>
   "artifact_supports_analysis",
   "artifact_supports_sample"
 ]);
+const RELATION_MATERIAL_FLOW_SPECS: Partial<Record<ExportedRelationV1["relation_type"], RelationMaterialFlowSpec>> = {
+  result_describes_reaction: { edgeType: "reaction_reports_result", reverse: true },
+  sample_derived_from_reaction: { edgeType: "reaction_generates_sample", reverse: true },
+  sample_related_to_molecule: { edgeType: "molecule_related_to_sample", reverse: true },
+  sample_related_to_result: { edgeType: "result_related_to_sample", reverse: true },
+  sample_derived_from_sample: { edgeType: "sample_derives_from_sample", reverse: true },
+  sample_aliquot_of_sample: { edgeType: "sample_aliquot_from_sample", reverse: true },
+  sample_batch_of_sample: { edgeType: "sample_batch_from_sample", reverse: true },
+  sample_has_artifact: { edgeType: "sample_has_artifact" },
+  artifact_supports_reaction: { edgeType: "artifact_supports_material_claim" },
+  artifact_supports_result: { edgeType: "artifact_supports_material_claim" },
+  artifact_supports_analysis: { edgeType: "artifact_supports_material_claim" },
+  artifact_supports_sample: { edgeType: "artifact_supports_material_claim" },
+  analysis_targets_reaction: { edgeType: "analysis_supports_material_claim" },
+  analysis_targets_result: { edgeType: "analysis_supports_material_claim" },
+  analysis_targets_sample: { edgeType: "analysis_supports_material_claim" }
+};
 type SampleLineageReferenceField = "derived_from" | "aliquot_of" | "batch_of" | "artifacts";
 const SAMPLE_LINEAGE_FIELD_RELATIONS: Record<SampleLineageReferenceField, ReadonlySet<ExportedRelationV1["relation_type"]>> = {
   derived_from: new Set([
@@ -1608,6 +1647,338 @@ const buildKnowledgeEdges = (
   ...fieldEvidence.flatMap(createFieldEdges)
 ];
 
+const toInferenceConfidence = (score: number | null | undefined): TrainingInferenceConfidenceV1 => {
+  if (score === undefined || score === null) {
+    return "unknown";
+  }
+  if (score >= 0.9) {
+    return "high";
+  }
+  return score >= 0.6 ? "medium" : "low";
+};
+
+const createMaterialFlowEdge = (input: FlowEdgeInput): TrainingMaterialFlowEdgeV1 => ({
+  flow_edge_id: input.flowEdgeId,
+  edge_type: input.edgeType,
+  from_node_id: input.fromNodeId,
+  to_node_id: input.toNodeId,
+  ...(input.role ? { role: input.role } : {}),
+  logic_source: DERIVED_LOGIC_SOURCE,
+  confidence: input.confidence,
+  evidence_entity_ids: uniqueStrings(input.evidenceEntityIds),
+  review_required: input.reviewRequired ?? false,
+  warnings: input.warnings ?? []
+});
+
+const entityMaterialNode = (
+  nodeType: TrainingMaterialFlowNodeTypeV1,
+  entity: ObjectEntity
+): TrainingMaterialFlowNodeV1 => ({
+  node_id: entity.entity_id,
+  node_type: nodeType,
+  label: getEntityLabel(entity),
+  entity_id: entity.entity_id,
+  source_entity_ids: [entity.entity_id]
+});
+
+const stepMaterialNode = (
+  documentId: string,
+  pair: ProcedurePair,
+  step: ProcedureStep
+): TrainingMaterialFlowNodeV1 => ({
+  node_id: getStepNodeId(documentId, pair, step),
+  node_type: "procedure_step",
+  label: compactText(step.family, step.source.rawText.slice(0, 80)),
+  step_id: step.stepId,
+  source_entity_ids: [pair.procedure_id ?? pair.pair_id]
+});
+
+const buildMaterialFlowNodeCandidates = (record: ChemdTrainingExportV2): TrainingMaterialFlowNodeV1[] => [
+  ...record.semantic_layer.molecules.map((entity) => entityMaterialNode("molecule", entity)),
+  ...record.semantic_layer.reactions.map((entity) => entityMaterialNode("reaction", entity)),
+  ...record.semantic_layer.results.map((entity) => entityMaterialNode("result", entity)),
+  ...record.semantic_layer.analyses.map((entity) => entityMaterialNode("analysis", entity)),
+  ...record.semantic_layer.samples.map((entity) => entityMaterialNode("sample", entity)),
+  ...record.semantic_layer.artifacts.map((entity) => entityMaterialNode("artifact", entity)),
+  ...(record.learning_layer.procedure_to_steps?.flatMap((pair) =>
+    pair.steps.map((step) => stepMaterialNode(record.document.document_id, pair, step))
+  ) ?? [])
+];
+
+const buildMaterialFlowNodes = (
+  record: ChemdTrainingExportV2,
+  edges: TrainingMaterialFlowEdgeV1[]
+): TrainingMaterialFlowNodeV1[] => {
+  const nodeIds = new Set(edges.flatMap((edge) => [edge.from_node_id, edge.to_node_id]));
+  return buildMaterialFlowNodeCandidates(record).filter((node) => nodeIds.has(node.node_id));
+};
+
+const buildReactionMaterialFlowEdges = (record: ChemdTrainingExportV2): TrainingMaterialFlowEdgeV1[] =>
+  record.semantic_layer.reactions.flatMap((reaction) => [
+    ...reaction.reactants.flatMap((participant) =>
+      participant.target_entity_id
+        ? [createMaterialFlowEdge({
+            flowEdgeId: `flow::${reaction.entity_id}::reactant::${participant.target_entity_id}`,
+            edgeType: "material_input_to_reaction",
+            fromNodeId: participant.target_entity_id,
+            toNodeId: reaction.entity_id,
+            role: participant.raw,
+            confidence: "high",
+            evidenceEntityIds: [participant.target_entity_id, reaction.entity_id]
+          })]
+        : []
+    ),
+    ...reaction.products.flatMap((participant) =>
+      participant.target_entity_id
+        ? [createMaterialFlowEdge({
+            flowEdgeId: `flow::${reaction.entity_id}::product::${participant.target_entity_id}`,
+            edgeType: "reaction_outputs_material",
+            fromNodeId: reaction.entity_id,
+            toNodeId: participant.target_entity_id,
+            role: participant.raw,
+            confidence: "high",
+            evidenceEntityIds: [reaction.entity_id, participant.target_entity_id]
+          })]
+        : []
+    )
+  ]);
+
+const createRelationMaterialFlowEdge = (
+  relation: ExportedRelationV1
+): TrainingMaterialFlowEdgeV1[] => {
+  const spec = RELATION_MATERIAL_FLOW_SPECS[relation.relation_type];
+  if (!spec) {
+    return [];
+  }
+
+  return [createMaterialFlowEdge({
+    flowEdgeId: `flow::${relation.relation_id}`,
+    edgeType: spec.edgeType,
+    fromNodeId: spec.reverse ? relation.to_entity_id : relation.from_entity_id,
+    toNodeId: spec.reverse ? relation.from_entity_id : relation.to_entity_id,
+    role: relation.role,
+    confidence: toInferenceConfidence(relation.confidence ?? 1),
+    evidenceEntityIds: [relation.from_entity_id, relation.to_entity_id]
+  })];
+};
+
+const getStepIoTarget = (
+  item: { reference?: { refId: string; resolved: boolean } },
+  entityByOriginalId: Map<string, ObjectEntity>
+): ObjectEntity | undefined =>
+  item.reference?.resolved ? entityByOriginalId.get(normalizeReferenceId(item.reference.refId)) : undefined;
+
+const buildStepMaterialFlowEdges = (
+  record: ChemdTrainingExportV2,
+  entityByOriginalId: Map<string, ObjectEntity>
+): TrainingMaterialFlowEdgeV1[] =>
+  record.learning_layer.procedure_to_steps?.flatMap((pair) =>
+    pair.steps.flatMap((step) => {
+      const stepNodeId = getStepNodeId(record.document.document_id, pair, step);
+      return [
+        ...(step.inputs ?? []).flatMap((input) => {
+          const target = getStepIoTarget(input, entityByOriginalId);
+          return target ? [createMaterialFlowEdge({
+            flowEdgeId: `flow::${stepNodeId}::input::${target.entity_id}`,
+            edgeType: "step_consumes_material",
+            fromNodeId: target.entity_id,
+            toNodeId: stepNodeId,
+            role: input.raw,
+            confidence: toInferenceConfidence(step.loweringConfidence),
+            evidenceEntityIds: [target.entity_id, pair.procedure_id ?? pair.pair_id],
+            reviewRequired: step.loweringConfidence < 0.6,
+            warnings: step.loweringConfidence < 0.6 ? ["low_confidence_step"] : []
+          })] : [];
+        }),
+        ...(step.outputs ?? []).flatMap((output) => {
+          const target = getStepIoTarget(output, entityByOriginalId);
+          return target ? [createMaterialFlowEdge({
+            flowEdgeId: `flow::${stepNodeId}::output::${target.entity_id}`,
+            edgeType: "step_produces_material",
+            fromNodeId: stepNodeId,
+            toNodeId: target.entity_id,
+            role: output.raw,
+            confidence: toInferenceConfidence(step.loweringConfidence),
+            evidenceEntityIds: [pair.procedure_id ?? pair.pair_id, target.entity_id],
+            reviewRequired: step.loweringConfidence < 0.6,
+            warnings: step.loweringConfidence < 0.6 ? ["low_confidence_step"] : []
+          })] : [];
+        })
+      ];
+    })
+  ) ?? [];
+
+const dedupeMaterialFlowEdges = (
+  edges: TrainingMaterialFlowEdgeV1[]
+): TrainingMaterialFlowEdgeV1[] => Array.from(
+  new Map(edges.map((edge) => [edge.flow_edge_id, edge])).values()
+);
+
+const buildMaterialFlowGraph = (
+  record: ChemdTrainingExportV2,
+  entityByOriginalId: Map<string, ObjectEntity>
+): TrainingMaterialFlowGraphV1 => {
+  const edges = dedupeMaterialFlowEdges([
+    ...buildReactionMaterialFlowEdges(record),
+    ...record.semantic_layer.links.flatMap(createRelationMaterialFlowEdge),
+    ...buildStepMaterialFlowEdges(record, entityByOriginalId)
+  ]);
+
+  return {
+    nodes: buildMaterialFlowNodes(record, edges),
+    edges
+  };
+};
+
+const createStepDependencyEdge = (
+  edge: Omit<TrainingStepDependencyEdgeV1, "logic_source">
+): TrainingStepDependencyEdgeV1 => ({
+  ...edge,
+  logic_source: DERIVED_LOGIC_SOURCE
+});
+
+const buildOrderedStepDependencies = (record: ChemdTrainingExportV2): TrainingStepDependencyEdgeV1[] =>
+  record.learning_layer.procedure_to_steps?.flatMap((pair) =>
+    pair.steps.flatMap((step, index) => {
+      const previous = pair.steps[index - 1];
+      return previous ? [createStepDependencyEdge({
+        dependency_edge_id: `stepdep::${pair.pair_id}::order::${previous.stepId}::${step.stepId}`,
+        dependency_type: "step_order_precedes",
+        source_step_id: getStepNodeId(record.document.document_id, pair, previous),
+        target_step_id: getStepNodeId(record.document.document_id, pair, step),
+        procedure_pair_id: pair.pair_id,
+        reason: "Procedure order places the source step before the target step.",
+        confidence: "medium",
+        evidence_entity_ids: [pair.procedure_id ?? pair.pair_id],
+        review_required: true,
+        warnings: ["positional_order_only"]
+      })] : [];
+    })
+  ) ?? [];
+
+const createExplicitStepDependency = (
+  record: ChemdTrainingExportV2,
+  pair: ProcedurePair,
+  step: ProcedureStep,
+  dependencyId: string
+): TrainingStepDependencyEdgeV1[] => {
+  const dependency = pair.steps.find((candidate) => candidate.stepId === dependencyId);
+  return dependency ? [createStepDependencyEdge({
+    dependency_edge_id: `stepdep::${pair.pair_id}::explicit::${dependencyId}::${step.stepId}`,
+    dependency_type: "explicit_step_dependency",
+    source_step_id: getStepNodeId(record.document.document_id, pair, dependency),
+    target_step_id: getStepNodeId(record.document.document_id, pair, step),
+    procedure_pair_id: pair.pair_id,
+    reason: "The target step explicitly declares a dependency on the source step.",
+    confidence: toInferenceConfidence(step.loweringConfidence),
+    evidence_entity_ids: [pair.procedure_id ?? pair.pair_id],
+    review_required: step.loweringConfidence < 0.6,
+    warnings: step.loweringConfidence < 0.6 ? ["low_confidence_step"] : []
+  })] : [];
+};
+
+const buildExplicitStepDependencies = (record: ChemdTrainingExportV2): TrainingStepDependencyEdgeV1[] =>
+  record.learning_layer.procedure_to_steps?.flatMap((pair) =>
+    pair.steps.flatMap((step) =>
+      (step.dependsOn ?? []).flatMap((dependencyId) =>
+        createExplicitStepDependency(record, pair, step, dependencyId)
+      )
+    )
+  ) ?? [];
+
+const buildOutputConsumptionStepDependencies = (
+  record: ChemdTrainingExportV2,
+  entityByOriginalId: Map<string, ObjectEntity>
+): TrainingStepDependencyEdgeV1[] =>
+  record.learning_layer.procedure_to_steps?.flatMap((pair) => {
+    const producerByEntityId = new Map<string, ProcedureStep>();
+    return pair.steps.flatMap((step) => {
+      const dependencies = (step.inputs ?? []).flatMap((input) => {
+        const target = getStepIoTarget(input, entityByOriginalId);
+        const producer = target ? producerByEntityId.get(target.entity_id) : undefined;
+        return target && producer ? [createStepDependencyEdge({
+          dependency_edge_id: `stepdep::${pair.pair_id}::material::${producer.stepId}::${step.stepId}::${target.entity_id}`,
+          dependency_type: "step_consumes_previous_output",
+          source_step_id: getStepNodeId(record.document.document_id, pair, producer),
+          target_step_id: getStepNodeId(record.document.document_id, pair, step),
+          target_entity_id: target.entity_id,
+          procedure_pair_id: pair.pair_id,
+          reason: "The target step consumes material produced by the source step.",
+          confidence: toInferenceConfidence(Math.min(producer.loweringConfidence, step.loweringConfidence)),
+          evidence_entity_ids: [pair.procedure_id ?? pair.pair_id, target.entity_id],
+          review_required: producer.loweringConfidence < 0.6 || step.loweringConfidence < 0.6,
+          warnings: producer.loweringConfidence < 0.6 || step.loweringConfidence < 0.6 ? ["low_confidence_step"] : []
+        })] : [];
+      });
+      (step.outputs ?? []).forEach((output) => {
+        const target = getStepIoTarget(output, entityByOriginalId);
+        if (target) {
+          producerByEntityId.set(target.entity_id, step);
+        }
+      });
+      return dependencies;
+    });
+  }) ?? [];
+
+const buildArtifactStepDependencies = (
+  record: ChemdTrainingExportV2,
+  entityByOriginalId: Map<string, ObjectEntity>
+): TrainingStepDependencyEdgeV1[] =>
+  record.learning_layer.procedure_to_steps?.flatMap((pair) =>
+    pair.steps.flatMap((step) =>
+      (step.artifacts ?? []).map((artifact) => {
+        const target = entityByOriginalId.get(normalizeReferenceId(artifact.artifactId));
+        return createStepDependencyEdge({
+          dependency_edge_id: `stepdep::${pair.pair_id}::artifact::${step.stepId}::${artifact.artifactId}`,
+          dependency_type: "step_produces_artifact",
+          source_step_id: getStepNodeId(record.document.document_id, pair, step),
+          ...(target ? { target_entity_id: target.entity_id } : {}),
+          procedure_pair_id: pair.pair_id,
+          reason: "The step declares an artifact output.",
+          confidence: toInferenceConfidence(step.loweringConfidence),
+          evidence_entity_ids: uniqueStrings([pair.procedure_id ?? pair.pair_id, ...(target ? [target.entity_id] : [])]),
+          review_required: step.loweringConfidence < 0.6 || !target,
+          warnings: [
+            ...(step.loweringConfidence < 0.6 ? ["low_confidence_step"] : []),
+            ...(!target ? ["artifact_target_unresolved"] : [])
+          ]
+        });
+      })
+    )
+  ) ?? [];
+
+const buildObservationStepDependencies = (record: ChemdTrainingExportV2): TrainingStepDependencyEdgeV1[] => {
+  const stepNodeById = buildStepNodeIndex(record);
+  return record.learning_layer.observation_to_events?.flatMap((pair) =>
+    pair.events.flatMap((event, index) =>
+      event.linkedStepId && stepNodeById.get(event.linkedStepId)
+        ? [createStepDependencyEdge({
+            dependency_edge_id: `stepdep::${pair.pair_id}::observed::${event.linkedStepId}::${event.eventId ?? index}`,
+            dependency_type: "step_observed_by_event",
+            source_step_id: stepNodeById.get(event.linkedStepId) as string,
+            target_event_id: getEventNodeId(record.document.document_id, pair, event, index),
+            reason: "The observation event links back to the source procedure step.",
+            confidence: toInferenceConfidence(event.confidence),
+            evidence_entity_ids: [pair.observation_id ?? pair.pair_id],
+            review_required: event.confidence < 0.6,
+            warnings: event.confidence < 0.6 ? ["low_confidence_observation"] : []
+          })]
+        : []
+    )
+  ) ?? [];
+};
+
+const buildStepDependencies = (
+  record: ChemdTrainingExportV2,
+  entityByOriginalId: Map<string, ObjectEntity>
+): TrainingStepDependencyEdgeV1[] => [
+  ...buildOrderedStepDependencies(record),
+  ...buildExplicitStepDependencies(record),
+  ...buildOutputConsumptionStepDependencies(record, entityByOriginalId),
+  ...buildArtifactStepDependencies(record, entityByOriginalId),
+  ...buildObservationStepDependencies(record)
+];
+
 const findEvidenceRelationsForResult = (
   result: ExportedResultV1,
   record: ChemdTrainingExportV2
@@ -2319,6 +2690,7 @@ const buildRecommendedLoraTasks = (
   const hasProposalBasis = hasProcedureLogic && hasDecisionBasis;
   const hasNormalizationEvidence = fieldEvidence.some((item) => item.normalized);
   const hasIntentBasis = hasDecisionBasis || hasProcedureLogic || hasEvidenceLinks;
+  const hasMaterialFlowBasis = hasSemanticRelations || hasProcedureLogic;
   const qualityIssueCount = missingLogic.length + (record.quality_layer.training_quality.exclusion_reasons?.length ?? 0);
 
   return [
@@ -2338,6 +2710,7 @@ const buildRecommendedLoraTasks = (
     ...includeTask(hasDecisionBasis, createTaskHint("condition_recommendation", "Reaction conditions and outcomes are available.")),
     ...includeTask(hasProposalBasis, createTaskHint("experiment_proposal", "Procedure and outcome context are available.")),
     ...includeTask(hasIntentBasis, createTaskHint("experiment_intent", "Experiment intent and causal logic can be inferred from structured facts.")),
+    ...includeTask(hasMaterialFlowBasis, createTaskHint("material_flow_reasoning", "Material flow and step dependencies can be inferred from structured links.")),
     ...includeTask(hasFailedOutcome, createTaskHint("failure_analysis", "Failed result labels are available.")),
     ...includeTask(hasExperimentComparison, createTaskHint("experiment_comparison", "Multiple reactions can be compared.")),
     ...includeTask(qualityIssueCount > 0, createTaskHint("consistency_check", "Quality warnings or missing logic are available.")),
@@ -2357,6 +2730,7 @@ const buildBlockedLoraTasks = (context: LoraHintContext): LoraTaskHintV1[] => {
     instance.usability.usable_for_yield_regression
   );
   const hasIntentBasis = (hasReactions && record.semantic_layer.results.length > 0) || hasProcedureLogic || hasEvidenceLinks;
+  const hasMaterialFlowBasis = hasSemanticRelations || hasProcedureLogic;
 
   return [
     ...includeTask(record.source_layer.raw_children.length === 0, createTaskHint("record_to_chemd", "No source snapshots are available.")),
@@ -2375,6 +2749,7 @@ const buildBlockedLoraTasks = (context: LoraHintContext): LoraTaskHintV1[] => {
     ),
     ...includeTask(!hasProcedureLogic, createTaskHint("experiment_proposal", "No procedure logic is available.")),
     ...includeTask(!hasIntentBasis, createTaskHint("experiment_intent", "No reaction/result, procedure, or evidence basis is available.")),
+    ...includeTask(!hasMaterialFlowBasis, createTaskHint("material_flow_reasoning", "No semantic relation or procedure logic is available.")),
     ...includeTask(!record.semantic_layer.results.some((result) => result.status_label === "failed"), createTaskHint("failure_analysis", "No failed result label is available.")),
     ...includeTask(record.semantic_layer.reactions.length < 2, createTaskHint("experiment_comparison", "Fewer than two reactions are available."))
   ];
@@ -2445,6 +2820,8 @@ export const buildTrainingUnderstandingFromRecord = (
     evidenceLinks,
     procedurePairs
   });
+  const materialFlowGraph = buildMaterialFlowGraph(record, entityByOriginalId);
+  const stepDependencies = buildStepDependencies(record, entityByOriginalId);
   const optimizationTrajectories = buildOptimizationTrajectories(
     record.document.document_id,
     designContexts,
@@ -2490,6 +2867,8 @@ export const buildTrainingUnderstandingFromRecord = (
       intent_hypotheses: intentHypotheses,
       variable_logic: variableLogic,
       causal_links: causalLinks,
+      material_flow_graph: materialFlowGraph,
+      step_dependencies: stepDependencies,
       optimization_trajectories: optimizationTrajectories,
       failure_signals: failureSignals,
       evidence_links: evidenceLinks,

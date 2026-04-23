@@ -38,6 +38,7 @@ const SYSTEM_PROMPTS: Record<ExperimentDecisionTaskTypeV1, string> = {
   evidence_tracing: "Trace which evidence supports a field or relation. Separate direct evidence from inferred context.",
   qa_with_context: "Answer questions using only supplied Chemd training understanding context. Say when evidence is missing.",
   experiment_intent: "Infer experiment intent and causal logic from structured Chemd facts without inventing unsupported rationale.",
+  material_flow_reasoning: "Reconstruct material flow and step dependencies from structured Chemd facts without leaking target graph fields.",
   reaction_classification: "Classify the reaction using only supplied Chemd experiment facts and return conservative taxonomy labels.",
   expert_routing: "Route the experiment to suitable chemistry or modeling experts using only supplied Chemd experiment facts.",
   yield_prediction: "Use only the supplied Chemd experiment facts to estimate the observed reaction outcome. Do not invent missing chemistry.",
@@ -473,6 +474,24 @@ const getProcedureFacts = (understanding: ChemdTrainingUnderstandingV1): JsonObj
     low_confidence_step_count: pair.low_confidence_step_count ?? 0
   }));
 
+const getProcedureFlowFacts = (understanding: ChemdTrainingUnderstandingV1): JsonObject[] =>
+  understanding.procedure_logic.procedure_to_steps.map((pair) => ({
+    pair_id: pair.pair_id,
+    source_type: pair.source_type,
+    steps: pair.steps.map((step) => ({
+      step_id: step.stepId,
+      family: step.family,
+      stage: step.stage,
+      purpose: step.purpose,
+      inputs: step.inputs?.map((input) => input.raw),
+      outputs: step.outputs?.map((output) => output.raw),
+      depends_on: step.dependsOn,
+      evidence: step.evidence,
+      artifact_count: step.artifacts?.length ?? 0,
+      confidence: step.loweringConfidence
+    }))
+  }));
+
 const buildExperimentIntentExamples = (
   understanding: ChemdTrainingUnderstandingV1
 ): TrainingTaskExampleV1[] => {
@@ -509,6 +528,56 @@ const buildExperimentIntentExamples = (
       causal_links: logic.causal_links
     },
     targetFields: ["intent_hypotheses", "variable_logic", "causal_links"],
+    leakageRisk: "medium",
+    usableForEval: false,
+    derivedLabelConfidence: "medium"
+  })];
+};
+
+const buildMaterialFlowReasoningExamples = (
+  understanding: ChemdTrainingUnderstandingV1
+): TrainingTaskExampleV1[] => {
+  const logic = understanding.experiment_logic;
+  if (logic.material_flow_graph.edges.length === 0 && logic.step_dependencies.length === 0) {
+    return [];
+  }
+
+  const sourceEntityIds = uniqueStrings([
+    ...logic.material_flow_graph.edges.flatMap((edge) => edge.evidence_entity_ids),
+    ...logic.step_dependencies.flatMap((edge) => edge.evidence_entity_ids)
+  ]);
+
+  return [createExample({
+    understanding,
+    taskType: "material_flow_reasoning",
+    suffix: "document",
+    sourceEntityIds,
+    input: {
+      task: "material_flow_reasoning",
+      document: understanding.document,
+      reactions: understanding.entities.reactions.map(getReactionFacts),
+      samples: understanding.entities.samples.map((sample) => ({
+        entity_id: sample.entity_id,
+        name: sample.name,
+        ref_raw: sample.ref_raw,
+        derived_from_raw: sample.derived_from_raw,
+        aliquot_of_raw: sample.aliquot_of_raw,
+        batch_of_raw: sample.batch_of_raw,
+        artifact_refs_raw: sample.artifact_refs_raw
+      })),
+      artifacts: understanding.entities.artifacts.map((artifact) => ({
+        entity_id: artifact.entity_id,
+        artifact_kind: artifact.artifact_kind,
+        ref_raw: artifact.ref_raw
+      })),
+      relation_types: understanding.relations.map((relation) => relation.relation_type),
+      procedure: getProcedureFlowFacts(understanding)
+    },
+    output: {
+      material_flow_graph: logic.material_flow_graph,
+      step_dependencies: logic.step_dependencies
+    },
+    targetFields: ["material_flow_graph", "step_dependencies"],
     leakageRisk: "medium",
     usableForEval: false,
     derivedLabelConfidence: "medium"
@@ -791,6 +860,7 @@ export const buildTrainingTaskDatasetFromUnderstanding = (
     ...buildEvidenceTracingExamples(understanding),
     ...buildQaWithContextExamples(understanding),
     ...buildExperimentIntentExamples(understanding),
+    ...buildMaterialFlowReasoningExamples(understanding),
     ...buildReactionClassificationExamples(understanding),
     ...buildExpertRoutingExamples(understanding),
     ...buildYieldPredictionExamples(understanding),

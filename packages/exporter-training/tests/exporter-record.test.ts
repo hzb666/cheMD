@@ -161,9 +161,13 @@ describe("training export artifacts and projections", () => {
     const experimentIntentExample = dataset.examples.find((example) =>
       example.task_type === "experiment_intent"
     );
+    const materialFlowExample = dataset.examples.find((example) =>
+      example.task_type === "material_flow_reasoning"
+    );
     const normalizationInput = parseTaskUserInput(normalizationExample);
     const evidenceTracingInput = parseTaskUserInput(evidenceTracingExample);
     const experimentIntentInput = parseTaskUserInput(experimentIntentExample);
+    const materialFlowInput = parseTaskUserInput(materialFlowExample);
 
     expect(record.semantic_layer.artifacts[0]).toMatchObject({
       original_id: "spec-main",
@@ -244,6 +248,29 @@ describe("training export artifacts and projections", () => {
         target_entity_ids: ["res::exp-export-artifacts::res-main"]
       })
     ]));
+    expect(understanding.experiment_logic.material_flow_graph.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        edge_type: "reaction_reports_result",
+        from_node_id: "rxn::exp-export-artifacts::rxn-main",
+        to_node_id: "res::exp-export-artifacts::res-main",
+        logic_source: "derived"
+      }),
+      expect.objectContaining({
+        edge_type: "reaction_generates_sample",
+        from_node_id: "rxn::exp-export-artifacts::rxn-main",
+        to_node_id: "sam::exp-export-artifacts::sample-main"
+      }),
+      expect.objectContaining({
+        edge_type: "sample_has_artifact",
+        from_node_id: "sam::exp-export-artifacts::sample-main",
+        to_node_id: "art::exp-export-artifacts::spec-main"
+      })
+    ]));
+    expect(understanding.experiment_logic.step_dependencies).toContainEqual(expect.objectContaining({
+      dependency_type: "step_observed_by_event",
+      source_step_id: "step::exp-export-artifacts::proc-main::s-add",
+      target_event_id: "event::exp-export-artifacts::obs-main::e-color"
+    }));
     expect(understanding.procedure_logic.procedure_to_steps[0]?.steps[0]).toMatchObject({
       stepId: "s-add",
       stage: "charging",
@@ -265,6 +292,7 @@ describe("training export artifacts and projections", () => {
       "observation_events",
       "evidence_tracing",
       "experiment_intent",
+      "material_flow_reasoning",
       "qa_with_context"
     ]));
     expect(normalizationInput).toMatchObject({
@@ -304,8 +332,22 @@ describe("training export artifacts and projections", () => {
     });
     expect(experimentIntentInput).not.toHaveProperty("intent_hypotheses");
     expect(experimentIntentInput).not.toHaveProperty("causal_links");
+    expect(materialFlowExample).toMatchObject({
+      quality: expect.objectContaining({ usable_for_eval: false }),
+      evaluation: expect.objectContaining({
+        holdout_eligible: false,
+        leakage_risk: "medium"
+      })
+    });
+    expect(materialFlowInput).toMatchObject({
+      task: "material_flow_reasoning"
+    });
+    expect(materialFlowInput).not.toHaveProperty("material_flow_graph");
+    expect(materialFlowInput).not.toHaveProperty("step_dependencies");
   });
+});
 
+describe("training export inferred experiment logic", () => {
   it("infers optimization intent and causal variable logic from reaction variants", () => {
     const document = resolveChemd(parseChemd(`---
 id: exp-intent-variants
@@ -373,6 +415,79 @@ yield: 75%
       target_entity_ids: ["res::exp-intent-variants::res-variant"]
     }));
     expect(dataset.quality.task_types).toContain("experiment_intent");
+  });
+
+  it("exports material flow and step dependencies from explicit procedure IO", () => {
+    const document = resolveChemd(parseChemd(`---
+id: exp-material-flow
+title: Material flow
+date: 2026-04-23
+---
+
+:::chemd #mol-start
+kind: molecule
+name: starting material
+:::
+
+:::chemd #mol-intermediate
+kind: molecule
+name: crude intermediate
+:::
+
+:::procedure #proc-flow
+step: add | id=s-charge | inputs=@mol-start | outputs=@mol-intermediate | confidence=0.95
+step: analyze | id=s-analyze | inputs=@mol-intermediate | dependsOn=s-charge | confidence=0.92
+:::
+`));
+    const checked = typecheckDocument(document);
+    const record = exportTrainingRecordFromDocument(document, {
+      typedGraph: checked.typedGraph,
+      stepGraph: checked.stepGraph,
+      exportedAt: "2026-04-23T00:00:00.000Z"
+    });
+    const understanding = buildTrainingUnderstandingFromRecord(record);
+    const dataset = buildTrainingTaskDatasetFromUnderstanding(understanding);
+    const flowEdges = understanding.experiment_logic.material_flow_graph.edges;
+    const dependencies = understanding.experiment_logic.step_dependencies;
+    const materialFlowExample = dataset.examples.find((example) =>
+      example.task_type === "material_flow_reasoning"
+    );
+    const materialFlowInput = parseTaskUserInput(materialFlowExample);
+
+    expect(flowEdges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        edge_type: "step_consumes_material",
+        from_node_id: "mol::exp-material-flow::mol-start",
+        to_node_id: "step::exp-material-flow::proc-flow::s-charge",
+        confidence: "high"
+      }),
+      expect.objectContaining({
+        edge_type: "step_produces_material",
+        from_node_id: "step::exp-material-flow::proc-flow::s-charge",
+        to_node_id: "mol::exp-material-flow::mol-intermediate"
+      })
+    ]));
+    expect(dependencies).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        dependency_type: "step_order_precedes",
+        source_step_id: "step::exp-material-flow::proc-flow::s-charge",
+        target_step_id: "step::exp-material-flow::proc-flow::s-analyze",
+        review_required: true,
+        warnings: ["positional_order_only"]
+      }),
+      expect.objectContaining({
+        dependency_type: "explicit_step_dependency",
+        source_step_id: "step::exp-material-flow::proc-flow::s-charge",
+        target_step_id: "step::exp-material-flow::proc-flow::s-analyze"
+      }),
+      expect.objectContaining({
+        dependency_type: "step_consumes_previous_output",
+        target_entity_id: "mol::exp-material-flow::mol-intermediate"
+      })
+    ]));
+    expect(dataset.quality.task_types).toContain("material_flow_reasoning");
+    expect(materialFlowInput).not.toHaveProperty("material_flow_graph");
+    expect(materialFlowInput).not.toHaveProperty("step_dependencies");
   });
 
   it("does not create lineage relations for mismatched sample target kinds", () => {

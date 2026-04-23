@@ -1,0 +1,6 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/exporter-training/backend/index.md", "reason": "Backend development guide"}
+{"file": ".trellis\\spec\\exporter-training\\backend\\training-export-contract.md", "reason": "training understanding graph contract and leakage rules"}
+{"file": ".trellis\\spec\\exporter-training\\backend\\quality-guidelines.md", "reason": "package validation requirements"}
+{"file": ".trellis\\spec\\guides\\cross-layer-thinking-guide.md", "reason": "projection fields cross API boundaries"}
+{"file": ".trellis\\spec\\guides\\code-reuse-thinking-guide.md", "reason": "reuse existing projection helper patterns"}

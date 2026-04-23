@@ -262,6 +262,81 @@ export interface TrainingCausalLinkV1 {
   warnings: string[];
 }
 
+export type TrainingMaterialFlowNodeTypeV1 =
+  | "molecule"
+  | "reaction"
+  | "result"
+  | "analysis"
+  | "sample"
+  | "artifact"
+  | "procedure_step";
+
+export interface TrainingMaterialFlowNodeV1 {
+  node_id: string;
+  node_type: TrainingMaterialFlowNodeTypeV1;
+  label?: string;
+  entity_id?: string;
+  step_id?: string;
+  source_entity_ids: string[];
+}
+
+export type TrainingMaterialFlowEdgeTypeV1 =
+  | "material_input_to_reaction"
+  | "reaction_outputs_material"
+  | "reaction_reports_result"
+  | "reaction_generates_sample"
+  | "molecule_related_to_sample"
+  | "result_related_to_sample"
+  | "sample_derives_from_sample"
+  | "sample_aliquot_from_sample"
+  | "sample_batch_from_sample"
+  | "sample_has_artifact"
+  | "artifact_supports_material_claim"
+  | "analysis_supports_material_claim"
+  | "step_consumes_material"
+  | "step_produces_material";
+
+export interface TrainingMaterialFlowEdgeV1 {
+  flow_edge_id: string;
+  edge_type: TrainingMaterialFlowEdgeTypeV1;
+  from_node_id: string;
+  to_node_id: string;
+  role?: string;
+  logic_source: TrainingLogicSourceV1;
+  confidence: TrainingInferenceConfidenceV1;
+  evidence_entity_ids: string[];
+  review_required: boolean;
+  warnings: string[];
+}
+
+export interface TrainingMaterialFlowGraphV1 {
+  nodes: TrainingMaterialFlowNodeV1[];
+  edges: TrainingMaterialFlowEdgeV1[];
+}
+
+export type TrainingStepDependencyTypeV1 =
+  | "step_order_precedes"
+  | "explicit_step_dependency"
+  | "step_consumes_previous_output"
+  | "step_produces_artifact"
+  | "step_observed_by_event";
+
+export interface TrainingStepDependencyEdgeV1 {
+  dependency_edge_id: string;
+  dependency_type: TrainingStepDependencyTypeV1;
+  source_step_id: string;
+  target_step_id?: string;
+  target_entity_id?: string;
+  target_event_id?: string;
+  procedure_pair_id?: string;
+  reason: string;
+  logic_source: TrainingLogicSourceV1;
+  confidence: TrainingInferenceConfidenceV1;
+  evidence_entity_ids: string[];
+  review_required: boolean;
+  warnings: string[];
+}
+
 export interface TrainingExpertRoutingV1 {
   route_id: string;
   reaction_entity_id: string;
@@ -392,6 +467,7 @@ export type LoraTaskTypeV1 =
   | "failure_analysis"
   | "experiment_comparison"
   | "experiment_intent"
+  | "material_flow_reasoning"
   | "reaction_classification"
   | "expert_routing"
   | "consistency_check"
@@ -422,6 +498,8 @@ export interface TrainingExperimentLogicV1 {
   intent_hypotheses: TrainingIntentHypothesisV1[];
   variable_logic: TrainingVariableLogicV1[];
   causal_links: TrainingCausalLinkV1[];
+  material_flow_graph: TrainingMaterialFlowGraphV1;
+  step_dependencies: TrainingStepDependencyEdgeV1[];
   optimization_trajectories: TrainingOptimizationTrajectoryV1[];
   failure_signals: TrainingFailureSignalV1[];
   evidence_links: TrainingEvidenceLinkV1[];
@@ -465,7 +543,8 @@ export type ExperimentDecisionTaskTypeV1 =
   | "experiment_proposal"
   | "failure_analysis"
   | "experiment_comparison"
-  | "experiment_intent";
+  | "experiment_intent"
+  | "material_flow_reasoning";
 
 export type TrainingTaskLeakageRiskV1 = "low" | "medium" | "high";
 
@@ -517,6 +596,8 @@ export type TrainingAnnotationTargetTypeV1 =
   | "intent_hypothesis"
   | "variable_logic"
   | "causal_link"
+  | "material_flow_edge"
+  | "step_dependency"
   | "task_example";
 
 export interface TrainingAnnotationCorrectionV1 {
