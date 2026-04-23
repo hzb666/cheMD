@@ -1,0 +1,4 @@
+{"file": ".agents/skills/finish-work/SKILL.md", "reason": "Finish work checklist"}
+{"file": ".agents/skills/check/SKILL.md", "reason": "Code quality check spec"}
+{"file": ".trellis/spec/compiler/backend/quality-guidelines.md", "reason": "verify compiler tests and types"}
+{"file": ".trellis/spec/cli/backend/quality-guidelines.md", "reason": "verify CLI tests, build and output contracts"}
