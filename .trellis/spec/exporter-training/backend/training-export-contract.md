@@ -140,10 +140,11 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   API for experiment-decision SFT/LoRA samples. It consumes only
   `ChemdTrainingUnderstandingV1` and emits JSONL-ready `messages` examples for
   record-to-Chemd reconstruction, Chemd repair, normalization explanation,
-  procedure reasoning, observation events, evidence tracing, QA with context,
-  experiment intent, material flow reasoning, yield prediction, condition
-  recommendation, experiment proposal, failure analysis, experiment comparison,
-  reaction classification, and expert routing.
+  procedure reasoning, observation events, evidence tracing, reference
+  resolution, relation extraction, QA with context, experiment intent, material
+  flow reasoning, yield prediction, condition recommendation, experiment
+  proposal, failure analysis, experiment comparison, reaction classification,
+  and expert routing.
 - Task-projection examples are derived supervision. They must carry quality
   warnings and must not be treated as human-confirmed labels unless a later
   annotation layer explicitly adds that status.
@@ -158,6 +159,12 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   Automatically derived evidence tracing examples are SFT-only and must set
   `usable_for_eval: false`, `holdout_eligible: false`, and at least medium
   leakage risk unless later human annotations create a clean eval target.
+- Reference-resolution task inputs may include raw references, source entity
+  IDs/types/fields, target fields, and candidate entity summaries. They must not
+  include the full `resolved_references` target array in the user prompt.
+- Relation-extraction task inputs may include compact entities and reference
+  facts without `relation_type`. They must not include the full `relations`
+  target array in the user prompt.
 - Experiment-intent task inputs must expose only source facts such as document
   metadata, reactions, outcomes, procedure summaries, and evidence counts. They
   must not include `intent_hypotheses`, `variable_logic`, or `causal_links` in
@@ -190,6 +197,8 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 | Sample lineage target kind mismatch | Resolve the reference if possible, but do not emit or project a lineage relation |
 | Multiple sample fields target same entity | Project only the relation whose role matches the source field |
 | Derived evidence tracing task | Keep SFT eligible when warning-free, but never eval/holdout eligible |
+| Reference-resolution task | Exclude full target references from prompt; keep derived examples SFT-only by default |
+| Relation-extraction task | Exclude full target relations from prompt; keep derived examples SFT-only by default |
 | Inferred intent/causal logic | Emit derived records with evidence IDs and review flags; do not treat as source truth |
 | Experiment-intent task | Keep SFT-only and exclude inferred target records from the prompt |
 | Material flow graph | Emit derived graph edges only from resolved semantic links or step IO |
@@ -234,6 +243,9 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 - Assert normalization/evidence tracing task inputs do not expose full
   field-evidence objects, and evidence tracing examples are not eval/holdout
   eligible by default.
+- Assert reference-resolution and relation-extraction task inputs do not expose
+  full target arrays, while outputs include resolved, unresolved, and semantic
+  relation labels.
 - Assert inferred experiment intent, variable logic, and causal links are
   present for single-run and variant experiments, carry `logic_source`, and set
   review flags when evidence is weak.

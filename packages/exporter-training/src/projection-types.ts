@@ -535,6 +535,8 @@ export type ExperimentDecisionTaskTypeV1 =
   | "procedure_reasoning"
   | "observation_events"
   | "evidence_tracing"
+  | "reference_resolution"
+  | "relation_extraction"
   | "qa_with_context"
   | "reaction_classification"
   | "expert_routing"

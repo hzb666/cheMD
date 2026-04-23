@@ -36,6 +36,8 @@ const SYSTEM_PROMPTS: Record<ExperimentDecisionTaskTypeV1, string> = {
   procedure_reasoning: "Convert Chemd procedure text into ordered canonical experiment steps with conservative confidence.",
   observation_events: "Convert Chemd observation text into structured observation events and link them to known steps when possible.",
   evidence_tracing: "Trace which evidence supports a field or relation. Separate direct evidence from inferred context.",
+  reference_resolution: "Resolve Chemd references to target entities and report unresolved references without inventing targets.",
+  relation_extraction: "Extract semantic Chemd relations from entity and reference facts with stable relation roles.",
   qa_with_context: "Answer questions using only supplied Chemd training understanding context. Say when evidence is missing.",
   experiment_intent: "Infer experiment intent and causal logic from structured Chemd facts without inventing unsupported rationale.",
   material_flow_reasoning: "Reconstruct material flow and step dependencies from structured Chemd facts without leaking target graph fields.",
@@ -430,6 +432,127 @@ const buildEvidenceTracingExamples = (
         usableForEval: false
       })
     );
+
+const stringValue = (value: unknown): string | undefined =>
+  typeof value === "string" && value.trim() ? value : undefined;
+
+const getEntityLabel = (entity: JsonObject): string | undefined =>
+  stringValue(entity.name)
+  ?? stringValue(entity.caption)
+  ?? stringValue(entity.analysis_type)
+  ?? stringValue(entity.artifact_kind)
+  ?? stringValue(entity.original_id)
+  ?? stringValue(entity.entity_id);
+
+const summarizeEntity = (entityType: string, entity: JsonObject): JsonObject => ({
+  entity_type: entityType,
+  entity_id: entity.entity_id,
+  original_id: entity.original_id,
+  label: getEntityLabel(entity)
+});
+
+const getReferenceCandidateEntities = (understanding: ChemdTrainingUnderstandingV1): JsonObject[] => [
+  ...understanding.entities.molecules.map((entity) => summarizeEntity("molecule", entity as JsonObject)),
+  ...understanding.entities.reactions.map((entity) => summarizeEntity("reaction", entity as JsonObject)),
+  ...understanding.entities.results.map((entity) => summarizeEntity("result", entity as JsonObject)),
+  ...understanding.entities.analyses.map((entity) => summarizeEntity("analysis", entity as JsonObject)),
+  ...understanding.entities.samples.map((entity) => summarizeEntity("sample", entity as JsonObject)),
+  ...understanding.entities.artifacts.map((entity) => summarizeEntity("artifact", entity as JsonObject))
+];
+
+const getReferenceResolutionInput = (understanding: ChemdTrainingUnderstandingV1): JsonObject => ({
+  task: "reference_resolution",
+  document: understanding.document,
+  references: understanding.resolved_references.map((reference) => ({
+    raw: reference.raw,
+    source_entity_id: reference.source_entity_id,
+    source_entity_type: reference.source_entity_type,
+    source_field: reference.source_field,
+    target_field: reference.target_field
+  })),
+  candidate_entities: getReferenceCandidateEntities(understanding)
+});
+
+const getReferenceResolutionOutput = (understanding: ChemdTrainingUnderstandingV1): JsonObject => ({
+  resolved_references: understanding.resolved_references.map((reference) => ({
+    raw: reference.raw,
+    source_entity_id: reference.source_entity_id,
+    source_entity_type: reference.source_entity_type,
+    source_field: reference.source_field,
+    target_entity_id: reference.target_entity_id,
+    target_original_id: reference.target_original_id,
+    target_field: reference.target_field,
+    relation_type: reference.relation_type,
+    resolution_status: reference.resolution_status
+  }))
+});
+
+const buildReferenceResolutionExamples = (
+  understanding: ChemdTrainingUnderstandingV1
+): TrainingTaskExampleV1[] => {
+  if (understanding.resolved_references.length === 0) {
+    return [];
+  }
+
+  const sourceEntityIds = uniqueStrings(understanding.resolved_references.flatMap((reference) => [
+    reference.source_entity_id,
+    ...(reference.target_entity_id ? [reference.target_entity_id] : [])
+  ]));
+
+  return [createExample({
+    understanding,
+    taskType: "reference_resolution",
+    suffix: "document",
+    sourceEntityIds,
+    input: getReferenceResolutionInput(understanding),
+    output: getReferenceResolutionOutput(understanding),
+    targetFields: ["resolved_references"],
+    leakageRisk: "medium",
+    usableForEval: false,
+    derivedLabelConfidence: "medium"
+  })];
+};
+
+const getRelationExtractionInput = (understanding: ChemdTrainingUnderstandingV1): JsonObject => ({
+  task: "relation_extraction",
+  document: understanding.document,
+  entities: getReferenceCandidateEntities(understanding),
+  reference_facts: understanding.resolved_references.map((reference) => ({
+    raw: reference.raw,
+    source_entity_id: reference.source_entity_id,
+    source_entity_type: reference.source_entity_type,
+    source_field: reference.source_field,
+    target_entity_id: reference.target_entity_id,
+    target_original_id: reference.target_original_id,
+    target_field: reference.target_field
+  }))
+});
+
+const buildRelationExtractionExamples = (
+  understanding: ChemdTrainingUnderstandingV1
+): TrainingTaskExampleV1[] => {
+  if (understanding.relations.length === 0) {
+    return [];
+  }
+
+  return [createExample({
+    understanding,
+    taskType: "relation_extraction",
+    suffix: "document",
+    sourceEntityIds: uniqueStrings(understanding.relations.flatMap((relation) => [
+      relation.from_entity_id,
+      relation.to_entity_id
+    ])),
+    input: getRelationExtractionInput(understanding),
+    output: {
+      relations: understanding.relations
+    },
+    targetFields: ["relations"],
+    leakageRisk: "medium",
+    usableForEval: false,
+    derivedLabelConfidence: "medium"
+  })];
+};
 
 const buildQaWithContextExamples = (
   understanding: ChemdTrainingUnderstandingV1
@@ -858,6 +981,8 @@ export const buildTrainingTaskDatasetFromUnderstanding = (
     ...buildProcedureReasoningExamples(understanding),
     ...buildObservationEventExamples(understanding),
     ...buildEvidenceTracingExamples(understanding),
+    ...buildReferenceResolutionExamples(understanding),
+    ...buildRelationExtractionExamples(understanding),
     ...buildQaWithContextExamples(understanding),
     ...buildExperimentIntentExamples(understanding),
     ...buildMaterialFlowReasoningExamples(understanding),

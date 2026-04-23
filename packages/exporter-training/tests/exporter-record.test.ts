@@ -16,6 +16,9 @@ type TaskExample = ReturnType<typeof buildTrainingTaskDatasetFromUnderstanding>[
 const parseTaskUserInput = (example: TaskExample | undefined): Record<string, unknown> =>
   JSON.parse(example?.messages.find((message) => message.role === "user")?.content ?? "{}") as Record<string, unknown>;
 
+const parseTaskAssistantOutput = (example: TaskExample | undefined): Record<string, unknown> =>
+  JSON.parse(example?.messages.find((message) => message.role === "assistant")?.content ?? "{}") as Record<string, unknown>;
+
 const artifactTrainingSource = `---
 id: exp-export-artifacts
 title: Export artifacts
@@ -291,6 +294,8 @@ describe("training export artifacts and projections", () => {
       "procedure_reasoning",
       "observation_events",
       "evidence_tracing",
+      "reference_resolution",
+      "relation_extraction",
       "experiment_intent",
       "material_flow_reasoning",
       "qa_with_context"
@@ -549,6 +554,131 @@ path: data/spec-main.pdf
     expect(aliquotReference).not.toHaveProperty("relation_type");
     expect(batchReference).not.toHaveProperty("relation_type");
     expect(artifactReference).not.toHaveProperty("relation_type");
+  });
+});
+
+describe("training export reference and relation task projections", () => {
+  it("generates reference resolution and relation extraction examples", () => {
+    const document = resolveChemd(parseChemd(`---
+id: exp-reference-tasks
+title: Reference tasks
+date: 2026-04-23
+---
+
+:::chemd #mol-a
+kind: molecule
+name: substrate
+:::
+
+:::chemd #rxn-main
+kind: reaction
+reactants: @mol-a
+products: product
+solvent: THF
+:::
+
+:::result #res-main
+ref: rxn-main
+status: success
+yield: 66%
+:::
+
+:::analysis #ana-missing
+type: hplc
+ref: missing-result
+result: trace impurity
+:::
+`));
+    const checked = typecheckDocument(document);
+    const record = exportTrainingRecordFromDocument(document, {
+      typedGraph: checked.typedGraph,
+      exportedAt: "2026-04-23T00:00:00.000Z"
+    });
+    const understanding = buildTrainingUnderstandingFromRecord(record);
+    const dataset = buildTrainingTaskDatasetFromUnderstanding(understanding);
+    const referenceExample = dataset.examples.find((example) =>
+      example.task_type === "reference_resolution"
+    );
+    const relationExample = dataset.examples.find((example) =>
+      example.task_type === "relation_extraction"
+    );
+    const referenceInput = parseTaskUserInput(referenceExample);
+    const relationInput = parseTaskUserInput(relationExample);
+    const referenceOutput = parseTaskAssistantOutput(referenceExample);
+    const relationOutput = parseTaskAssistantOutput(relationExample);
+
+    expect(dataset.quality.task_types).toEqual(expect.arrayContaining([
+      "reference_resolution",
+      "relation_extraction"
+    ]));
+    expect(referenceExample).toMatchObject({
+      quality: expect.objectContaining({ usable_for_eval: false }),
+      evaluation: expect.objectContaining({
+        holdout_eligible: false,
+        leakage_risk: "medium"
+      })
+    });
+    expect(relationExample).toMatchObject({
+      evaluation: expect.objectContaining({
+        holdout_eligible: false,
+        leakage_risk: "medium"
+      })
+    });
+    expect(referenceInput).toMatchObject({
+      task: "reference_resolution",
+      references: expect.arrayContaining([
+        expect.objectContaining({
+          raw: "@mol-a",
+          source_entity_type: "reaction",
+          source_field: "reactants"
+        }),
+        expect.objectContaining({
+          raw: "missing-result",
+          source_entity_type: "analysis",
+          source_field: "ref"
+        })
+      ])
+    });
+    expect(referenceInput).not.toHaveProperty("resolved_references");
+    expect(referenceOutput).toMatchObject({
+      resolved_references: expect.arrayContaining([
+        expect.objectContaining({
+          raw: "@mol-a",
+          target_entity_id: "mol::exp-reference-tasks::mol-a",
+          relation_type: "reaction_uses_molecule",
+          resolution_status: "resolved"
+        }),
+        expect.objectContaining({
+          raw: "missing-result",
+          source_entity_id: "ana::exp-reference-tasks::ana-missing",
+          resolution_status: "unresolved"
+        })
+      ])
+    });
+    expect(relationInput).toMatchObject({
+      task: "relation_extraction",
+      reference_facts: expect.arrayContaining([
+        expect.objectContaining({
+          source_entity_id: "res::exp-reference-tasks::res-main",
+          target_entity_id: "rxn::exp-reference-tasks::rxn-main"
+        })
+      ])
+    });
+    expect(relationInput).not.toHaveProperty("relations");
+    expect(relationOutput).toMatchObject({
+      relations: expect.arrayContaining([
+        expect.objectContaining({
+          relation_type: "reaction_uses_molecule",
+          from_entity_id: "rxn::exp-reference-tasks::rxn-main",
+          to_entity_id: "mol::exp-reference-tasks::mol-a"
+        }),
+        expect.objectContaining({
+          relation_type: "result_describes_reaction",
+          from_entity_id: "res::exp-reference-tasks::res-main",
+          to_entity_id: "rxn::exp-reference-tasks::rxn-main"
+        })
+      ])
+    });
   });
 });
 

@@ -1,0 +1,4 @@
+{"file": ".agents/skills/finish-work/SKILL.md", "reason": "Finish work checklist"}
+{"file": ".agents/skills/check/SKILL.md", "reason": "Code quality check spec"}
+{"file": ".trellis\\spec\\exporter-training\\backend\\training-export-contract.md", "reason": "verify task projection contract and leakage rules"}
+{"file": ".trellis\\spec\\exporter-training\\backend\\quality-guidelines.md", "reason": "verify tests and typecheck"}
