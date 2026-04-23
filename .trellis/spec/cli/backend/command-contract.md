@@ -8,6 +8,7 @@ pnpm chemd export <file> --format json|lnf|rag|training|training-full
 pnpm chemd diff <old-file> <new-file> [--format text|json]
 pnpm chemd changed [--base <ref>] [--format text|json]
 pnpm chemd repair <file> [--format text|json] [--max-iterations <n>] [--write]
+pnpm chemd agent-loop <file> --driver <cmd> [--driver-arg <arg> ...] [--format text|json] [--max-iterations <n>] [--max-repair-iterations <n>] [--write]
 ```
 
 ## Exit Codes
@@ -26,6 +27,15 @@ pnpm chemd repair <file> [--format text|json] [--max-iterations <n>] [--write]
   `max_iterations`, or `stalled`).
 - `2`: invalid CLI usage, unreadable files, write failure, or runtime failure.
 
+`agent-loop` follows the same exit shape:
+
+- `0`: agent loop reached `finalDiagnosis.status === "clean"`.
+- `1`: agent loop stopped with remaining unresolved work
+  (`needs_author_input`, `manual_review`, `mixed`, `fixable`,
+  `max_iterations`, `repair_max_iterations`, `repair_stalled`,
+  or `agent_stalled`).
+- `2`: invalid CLI usage, unreadable files, driver failure, write failure, or runtime failure.
+
 Usage errors print the usage block to stderr. Runtime and Git failures print the
 error message without the usage block.
 
@@ -38,6 +48,8 @@ error message without the usage block.
 - `changed` validates current files. Deleted files skip current validation.
 - `repair` writes its report payload to stdout even when it exits `1`, because
   the report itself is the command output.
+- `agent-loop` also writes its report payload to stdout even when it exits `1`,
+  because the loop report is the command output.
 
 ## Changed Command
 
@@ -111,6 +123,39 @@ iterations: Array<{
 }>
 ```
 
+`agent-loop --format json` emits:
+
+```text
+schemaVersion: "chemd-agent-loop/v0.1"
+filePath: string
+changed: boolean
+maxIterations: number
+maxRepairIterations: number
+stoppedReason: "clean" | "needs_author_input" | "manual_review" | "mixed" | "fixable" | "max_iterations" | "repair_max_iterations" | "repair_stalled" | "agent_stalled"
+writeRequested: boolean
+wroteFile: boolean
+finalDiagnosis: CompilerDiagnosis
+finalSource: string
+iterations: Array<{
+  iteration: number
+  repairStoppedReason: ChemdRepairLoopResult["stoppedReason"]
+  repairDiagnosisStatus: CompilerDiagnosis["status"]
+  summary: CompilerDiagnosis["summary"]
+  appliedSafeFixes: Array<{
+    fixId: string
+    diagnosticCode: string
+    sourceNodeId?: string
+    sourceField?: string
+    title: string
+  }>
+  agentResponse?: {
+    action: "rewrite" | "stop"
+    changedSource: boolean
+    note?: string
+  }
+}>
+```
+
 ## Repair Command
 
 - `repair` must reuse `runChemdRepairLoop(source, { compileOptions: { strictChemdKind: true } })`.
@@ -119,3 +164,48 @@ iterations: Array<{
   `clean`; partially repaired but unresolved source remains in the report only.
 - Text mode prints a human summary; if the final diagnosis is `clean`, the
   source changed, and `--write` is absent, it also prints the repaired source.
+
+## Agent Loop Command
+
+- `agent-loop` must reuse `runChemdAgentLoop(source, { compileOptions: { strictChemdKind: true } })`.
+- `agent-loop` must create the external driver with `spawnSync(command, args, { shell: false })`; do not shell-join user-provided values.
+- `--driver` is required and names the executable to launch.
+- `--driver-arg` is repeatable and appends raw argv entries after the driver command.
+- `--max-iterations` and `--max-repair-iterations` must be positive integers.
+- `--write` only persists the final source when the final diagnosis is `clean`.
+- Text mode prints a human summary; if the final diagnosis is `clean`, the source changed, and `--write` is absent, it also prints the final source.
+
+Driver stdin payload:
+
+```text
+schemaVersion: "chemd-agent-driver-request/v0.1"
+filePath: string
+iteration: number
+source: string
+diagnosis: CompilerDiagnosis
+diagnostics: Diagnostic[]
+repair: {
+  changed: boolean
+  finalDiagnosis: CompilerDiagnosis
+  stoppedReason: ChemdRepairLoopResult["stoppedReason"]
+  totalAppliedSafeFixCount: number
+}
+history: Array<{
+  iteration: number
+  diagnosisStatus: CompilerDiagnosis["status"]
+  repairStoppedReason: ChemdRepairLoopResult["stoppedReason"]
+  safeFixCount: number
+  agentAction?: "rewrite" | "stop"
+  agentChangedSource?: boolean
+  agentNote?: string
+}>
+```
+
+Driver stdout response:
+
+```text
+schemaVersion: "chemd-agent-driver-response/v0.1"
+action: "rewrite" | "stop"
+nextSource?: string   # required when action === "rewrite"
+note?: string
+```

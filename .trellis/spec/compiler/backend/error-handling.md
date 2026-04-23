@@ -27,6 +27,7 @@ interface Diagnostic {
 - Compiler may append compile-only authoring diagnostics after semantic export when it detects LLM/generated-record gaps; these must still surface through `CompileResult.diagnostics` instead of a side channel.
 - Compiler may derive a machine-readable `CompileResult.diagnosis` view from final diagnostics, but that view must be computed from diagnostics/quick fixes rather than inventing a second validation channel with divergent truth.
 - Compiler repair loops must stay deterministic: they may apply only compiler-declared safe fixes and must stop with typed status/reason when authored facts or manual rewrites are still required.
+- Compiler agent loops must reuse the repair loop first, then hand unresolved state to a caller-supplied agent callback; invalid callback responses are contract failures and may throw instead of being downgraded into fake document diagnostics.
 
 ## Examples
 
@@ -36,6 +37,7 @@ interface Diagnostic {
 - `packages/compiler/src/authoring-diagnostics.ts` turns conservative authoring suggestions into actionable compile diagnostics and leaves non-conservative scaffolds out of diagnostics.
 - `packages/compiler/src/diagnosis.ts` classifies final diagnostics into safe fixes, required inputs, and manual-review items for automated compile-fix-recompile loops.
 - `packages/compiler/src/repair-loop.ts` runs bounded compile-fix-recompile loops and must stop before pretending an unresolved document is clean.
+- `packages/compiler/src/agent-loop.ts` runs bounded repair-plus-agent loops and must stop with explicit reasons such as `needs_author_input`, `manual_review`, `repair_max_iterations`, or `agent_stalled`.
 
 ## Throwing Rules
 
@@ -49,3 +51,4 @@ Throw only when the caller cannot continue safely:
 - Do not swallow invalid input silently.
 - Do not convert warnings into thrown exceptions unless the API contract explicitly says it fails hard.
 - Do not invent a new diagnostic code without adding tests that assert the exact code.
+- Do not silently accept malformed agent callback payloads; reject them as runtime contract failures so external drivers fix their protocol instead of masking the bug.

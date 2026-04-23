@@ -42,6 +42,12 @@ runChemdRepairLoop(source: string, options?: {
   compileOptions?: CompileOptions;
   maxIterations?: number;
 }): ChemdRepairLoopResult
+runChemdAgentLoop(source: string, options: {
+  agent: ChemdAgentLoopAgent;
+  compileOptions?: CompileOptions;
+  maxIterations?: number;
+  repairMaxIterations?: number;
+}): Promise<ChemdAgentLoopResult>
 exportTrainingRecordFromDocument(
   document: ChemdDocument,
   options?: ExportTrainingRecordOptions
@@ -78,10 +84,12 @@ Required payload fields:
 | `AuthoringAssistance` | `minimal_sets`, `templates`, `suggestions`; all are conservative, compiler-derived authoring helpers and must not rewrite source truth unless the caller explicitly applies a patch |
 | `CompilerDiagnosis` | `status`, `summary`, `safeFixes`, `requiredInputs`, `manualReviewItems`, `nextActions`; it is a machine-readable execution view over final compile diagnostics |
 | `ChemdRepairLoopResult` | `initialSource`, `finalSource`, `changed`, `iterations`, `totalAppliedSafeFixes`, `finalResult`, `stoppedReason`, `maxIterations`; it is a bounded deterministic safe-fix runner over `compileChemd` |
+| `ChemdAgentLoopResult` | `initialSource`, `finalSource`, `changed`, `iterations`, `totalAppliedSafeFixes`, `finalResult`, `stoppedReason`, `maxIterations`, `repairMaxIterations`; it is a bounded repair-plus-agent runner over `runChemdRepairLoop` |
 
 Diagnostics from `typecheckDocument`, render profile resolution, and compiler-side authoring diagnostics must be merged into `CompileResult.document.diagnostics`; do not throw for semantic validation failures that have a diagnostic code.
 `CompileResult.diagnosis` must be derived from `CompileResult.diagnostics`; do not let diagnosis and diagnostics drift into separate sources of truth.
 `runChemdRepairLoop(...)` must reuse `compileChemd(...)` and compiler-declared safe fixes; it must not invent placeholder content or silently suppress unresolved diagnostics.
+`runChemdAgentLoop(...)` must run `runChemdRepairLoop(...)` before every agent callback, expose unresolved diagnosis/diff context to the callback, and stop with typed loop reasons when the repair stage stalls, exhausts its budget, or the agent produces no source change.
 
 ### 4. Validation & Error Matrix
 
@@ -110,6 +118,7 @@ Good:
 - `compileChemd(source).diagnostics` includes compiler authoring diagnostics for safe fixes and author-input-required summaries, so generated chemd can be validated without opening a separate authoring panel.
 - `compileChemd(source).diagnosis.status` is `fixable` when every actionable item has a deterministic quick fix, and `applyCompilerDiagnosisSafeFixes(source, result.diagnosis)` can drive a compile-fix-recompile loop.
 - `runChemdRepairLoop(source, { maxIterations: 5 })` records each compile pass, applies only safe fixes when progress exists, and stops with `stoppedReason: "clean"` once the final diagnosis is clean.
+- `runChemdAgentLoop(source, { agent, maxIterations: 3, repairMaxIterations: 5 })` records each repair stage plus the agent response, reaches `clean` after an agent rewrite, and reports loop reasons such as `needs_author_input` or `agent_stalled` when unresolved work remains.
 - `trainingExport.semantic_layer.lnf` matches the LNF returned by `compileChemd`.
 - `trainingExport.semantic_layer.artifacts` and `trainingUnderstanding.entities.artifacts`
   preserve authored artifact evidence without leaking audit-only source payloads.
@@ -129,6 +138,7 @@ Bad:
 - Scaffold templates that insert placeholder record content must stay out of diagnostics quick fixes; only conservative suggestion patches may appear under `W_AUTHORING_FIX_AVAILABLE`.
 - `CompileResult.diagnosis` must not treat placeholder scaffolds or informational diagnostics as auto-fixable source truth.
 - `runChemdRepairLoop` must not apply another round of fixes after the iteration budget is exhausted, and it must not report a partially repaired source as `clean` without recompiling it.
+- `runChemdAgentLoop` must not call the agent before running the repair loop, must not discard unresolved diagnosis status when an agent stops, and must not accept malformed rewrite responses that omit `nextSource`.
 
 ### 6. Tests Required
 
@@ -139,6 +149,7 @@ Required assertion points:
 - `packages/compiler/tests/authoring-diagnostics.test.ts`: safe authoring suggestions surface as compile diagnostics, required-input summaries stay warnings, and scaffold templates are not promoted to quick fixes.
 - `packages/compiler/tests/diagnosis.test.ts`: diagnosis status machine, safe-fix application loop, required-input extraction, and manual-review routing stay stable.
 - `packages/compiler/tests/repair-loop.test.ts`: bounded safe-fix loop reaches `clean`, stops on required inputs, and respects `maxIterations`.
+- `packages/compiler/tests/agent-loop.test.ts`: repair-first agent loop skips clean cases, reaches clean after rewrite, preserves unresolved diagnosis when the agent stops, and stops on repair budget exhaustion.
 - `packages/step-ontology/tests/lowering.test.ts`: procedure/observation/analysis lowering emits canonical nodes and warnings.
 - `packages/typechecker/tests/typechecker.test.ts`: typed graph nodes, quantity normalization, and diagnostics are stable.
 - `packages/runtime-lab/tests/runtime-lab.test.ts`: run plan and preflight contract, including `E605`.

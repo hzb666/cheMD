@@ -16,3 +16,4 @@ export {
   type GitChangedFile,
   type GitRunner
 } from "./git-changed";
+export { createProcessAgentLoopDriver } from "./agent-driver";

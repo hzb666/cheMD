@@ -100,6 +100,45 @@ products: product
 :::
 `;
 
+const agentLoopDriverSource = `import { readFileSync } from "node:fs";
+
+const request = JSON.parse(readFileSync(0, "utf8"));
+const schemaVersion = "chemd-agent-driver-response/v0.1";
+const mode = process.argv[2] ?? "rewrite";
+
+if (mode === "stop") {
+  process.stdout.write(JSON.stringify({
+    schemaVersion,
+    action: "stop",
+    note: "need more facts"
+  }));
+  process.exit(0);
+}
+
+const nextSource = request.source.includes(":::result #res-main")
+  ? request.source
+  : \`\${request.source}
+:::result #res-main
+ref: rxn-main
+status: success
+yield: 72%
+:::
+
+:::analysis #ana-main
+ref: rxn-main
+type: tlc
+result: one major spot
+:::
+\`;
+
+process.stdout.write(JSON.stringify({
+  schemaVersion,
+  action: "rewrite",
+  note: "add result and analysis",
+  nextSource
+}));
+`;
+
 const beforeDiffSource = `---
 id: exp-cli-diff
 title: CLI Diff Before
@@ -393,6 +432,122 @@ describe("chemd cli help validation export and repair", () => {
 
     expect(result.exitCode).toBe(EXIT_USAGE);
     expect(result.stderr).toMatch(/Unable to read file/);
+  });
+});
+
+describe("chemd cli agent loop", () => {
+  it("runs agent-loop through an external driver and emits a clean JSON report", async () =>
+    withTempDir(async (dir) => {
+      const filePath = path.join(dir, "agent.chemd.md");
+      const driverPath = path.join(dir, "driver.mjs");
+      writeFileSync(filePath, repairNeedsInputSource);
+      writeFileSync(driverPath, agentLoopDriverSource);
+
+      const stdout = createWriter();
+      const stderr = createWriter();
+      const exitCode = await runChemdCli([
+        "agent-loop",
+        "agent.chemd.md",
+        "--driver",
+        process.execPath,
+        "--driver-arg",
+        driverPath,
+        "--format",
+        "json"
+      ], {
+        cwd: dir,
+        stderr,
+        stdout
+      });
+      const payload = JSON.parse(stdout.value);
+
+      expect(exitCode).toBe(EXIT_OK);
+      expect(payload.schemaVersion).toBe("chemd-agent-loop/v0.1");
+      expect(payload.finalDiagnosis.status).toBe("clean");
+      expect(payload.iterations[0].agentResponse).toMatchObject({
+        action: "rewrite",
+        changedSource: true,
+        note: "add result and analysis"
+      });
+      expect(payload.finalSource).toContain(":::analysis #ana-main");
+      expect(stderr.value).toBe("");
+    }));
+
+  it("writes the final clean source back to disk when agent-loop uses --write", async () =>
+    withTempDir(async (dir) => {
+      const filePath = path.join(dir, "agent-write.chemd.md");
+      const driverPath = path.join(dir, "driver.mjs");
+      writeFileSync(filePath, repairNeedsInputSource);
+      writeFileSync(driverPath, agentLoopDriverSource);
+
+      const stdout = createWriter();
+      const stderr = createWriter();
+      const exitCode = await runChemdCli([
+        "agent-loop",
+        "agent-write.chemd.md",
+        "--driver",
+        process.execPath,
+        "--driver-arg",
+        driverPath,
+        "--write"
+      ], {
+        cwd: dir,
+        stderr,
+        stdout
+      });
+
+      expect(exitCode).toBe(EXIT_OK);
+      expect(stdout.value).toMatch(/wrote file: yes/);
+      expect(readFileSync(filePath, "utf8")).toContain(":::result #res-main");
+      expect(stderr.value).toBe("");
+    }));
+
+  it("returns unresolved diagnosis when the external driver declines to rewrite", async () =>
+    withTempDir(async (dir) => {
+      const filePath = path.join(dir, "agent-stop.chemd.md");
+      const driverPath = path.join(dir, "driver.mjs");
+      writeFileSync(filePath, repairNeedsInputSource);
+      writeFileSync(driverPath, agentLoopDriverSource);
+
+      const stdout = createWriter();
+      const stderr = createWriter();
+      const exitCode = await runChemdCli([
+        "agent-loop",
+        "agent-stop.chemd.md",
+        "--driver",
+        process.execPath,
+        "--driver-arg",
+        driverPath,
+        "--driver-arg",
+        "stop",
+        "--format",
+        "json"
+      ], {
+        cwd: dir,
+        stderr,
+        stdout
+      });
+      const payload = JSON.parse(stdout.value);
+
+      expect(exitCode).toBe(EXIT_VALIDATION_FAILED);
+      expect(payload.stoppedReason).toBe("needs_author_input");
+      expect(payload.finalDiagnosis.status).toBe("needs_author_input");
+      expect(payload.iterations[0].agentResponse).toMatchObject({
+        action: "stop",
+        changedSource: false,
+        note: "need more facts"
+      });
+      expect(stderr.value).toBe("");
+    }));
+
+  it("rejects agent-loop invocations without a driver", async () => {
+    const result = await runInTempDir(
+      ["agent-loop", "agent.chemd.md"],
+      { "agent.chemd.md": repairNeedsInputSource }
+    );
+
+    expect(result.exitCode).toBe(EXIT_USAGE);
+    expect(result.stderr).toMatch(/Agent loop requires --driver <cmd>/);
   });
 });
 

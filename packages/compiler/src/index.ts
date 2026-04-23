@@ -42,6 +42,7 @@ export {
   type DiagnosticWithQuickFixes
 } from "./quick-fix";
 export { applyCompilerDiagnosisSafeFixes } from "./diagnosis";
+export { runChemdAgentLoop } from "./agent-loop";
 export { runChemdRepairLoop } from "./repair-loop";
 export {
   applyAuthoringPatch,
@@ -67,6 +68,15 @@ export type {
   CompilerDiagnosisStatus,
   CompilerDiagnosisSummary
 } from "./diagnosis";
+export type {
+  ChemdAgentLoopAgent,
+  ChemdAgentLoopAgentRequest,
+  ChemdAgentLoopAgentResponse,
+  ChemdAgentLoopIteration,
+  ChemdAgentLoopOptions,
+  ChemdAgentLoopResult,
+  ChemdAgentLoopStoppedReason
+} from "./agent-loop";
 export type {
   ChemdRepairLoopIteration,
   ChemdRepairLoopOptions,
