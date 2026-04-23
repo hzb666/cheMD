@@ -912,3 +912,38 @@ note2: Low conversion by TLC.
 ### Next Steps
 
 - None - task complete
+
+
+## Session 21: 完成实验理解路线图 1-4
+
+**Date**: 2026-04-23
+**Task**: 完成实验理解路线图 1-4
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+实现隐式条件恢复、样品与 artifact 语义画像、证据解释和跨文档实验轨迹导出，补充训练任务投影、契约文档与 Trellis 任务记录。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `75df42c` | (see git log) |
+| `abf1144` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
