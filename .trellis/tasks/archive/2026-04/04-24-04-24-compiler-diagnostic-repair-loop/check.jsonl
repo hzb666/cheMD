@@ -1,0 +1,4 @@
+{"file": ".agents/skills/finish-work/SKILL.md", "reason": "Finish work checklist"}
+{"file": ".agents/skills/check/SKILL.md", "reason": "Code quality check spec"}
+{"file": ".trellis/spec/compiler/backend/language-v03-contracts.md", "reason": "verify compile contract and tests are updated"}
+{"file": ".trellis/spec/compiler/backend/error-handling.md", "reason": "verify diagnosis stays diagnostic-first"}
