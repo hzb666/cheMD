@@ -7,6 +7,7 @@ import type { SourceSpan } from "@chemd/core";
 import type {
   ExportedAnalysisV1,
   ExportedArtifactV1,
+  ExportedConditionVaryV1,
   ExportedDocumentInfo,
   ExportedMarkdownBlockV1,
   ExportedMoleculeV1,
@@ -47,6 +48,7 @@ export type TrainingResultV1 = Omit<ExportedResultV1, SourceMetadataKeys>;
 export type TrainingAnalysisV1 = Omit<ExportedAnalysisV1, SourceMetadataKeys>;
 export type TrainingSampleV1 = Omit<ExportedSampleV1, SourceMetadataKeys>;
 export type TrainingArtifactV1 = Omit<ExportedArtifactV1, SourceMetadataKeys>;
+export type TrainingConditionVaryV1 = Omit<ExportedConditionVaryV1, SourceMetadataKeys>;
 export type TrainingNarrativeBlockV1 = Pick<
   ExportedMarkdownBlockV1,
   "entity_id" | "cleaned_text" | "references" | "inline_chem" | "inline_code" | "links"
@@ -59,13 +61,21 @@ export interface TrainingUnderstandingEntitiesV1 {
   analyses: TrainingAnalysisV1[];
   samples: TrainingSampleV1[];
   artifacts: TrainingArtifactV1[];
+  condition_variations: TrainingConditionVaryV1[];
   narrative_blocks: TrainingNarrativeBlockV1[];
 }
 
 export interface TrainingResolvedReferenceV1 {
   raw: string;
   source_entity_id: string;
-  source_entity_type: "markdown" | "reaction" | "result" | "analysis" | "sample" | "artifact";
+  source_entity_type:
+    | "markdown"
+    | "reaction"
+    | "result"
+    | "analysis"
+    | "sample"
+    | "artifact"
+    | "condition_varies";
   source_field?: string;
   target_entity_id?: string;
   target_original_id?: string;
@@ -241,6 +251,19 @@ export interface TrainingVariableLogicV1 {
   review_required: boolean;
 }
 
+export interface TrainingConditionVariationLogicV1 {
+  variation_id: string;
+  condition_variation_entity_id: string;
+  reaction_entity_id?: string;
+  standard_reaction_entity_id?: string;
+  changed_variables: TrainingExperimentVariableDeltaV1[];
+  logic_source: TrainingLogicSourceV1;
+  confidence: TrainingInferenceConfidenceV1;
+  evidence_entity_ids: string[];
+  review_required: boolean;
+  warnings: string[];
+}
+
 export type TrainingCausalLinkTypeV1 =
   | "changed_variable_may_affect_outcome"
   | "controlled_variable_preserves_comparison"
@@ -361,6 +384,7 @@ export type TrainingKnowledgeNodeType =
   | "analysis"
   | "sample"
   | "artifact"
+  | "condition_variation"
   | "narrative"
   | "procedure"
   | "procedure_step"
@@ -496,6 +520,7 @@ export interface TrainingExperimentLogicV1 {
   reaction_taxonomy: TrainingReactionTaxonomyV1[];
   expert_routing: TrainingExpertRoutingV1[];
   intent_hypotheses: TrainingIntentHypothesisV1[];
+  condition_variations: TrainingConditionVariationLogicV1[];
   variable_logic: TrainingVariableLogicV1[];
   causal_links: TrainingCausalLinkV1[];
   material_flow_graph: TrainingMaterialFlowGraphV1;

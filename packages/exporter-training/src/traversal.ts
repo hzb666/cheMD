@@ -6,7 +6,8 @@ export interface TraversedNode {
 }
 
 const isExportableNode = (node: ChemdNode): node is MarkdownNode | ObjectNode =>
-  node.type === "markdown" || ["molecule", "reaction", "result", "analysis", "sample", "artifact"].includes(node.type);
+  node.type === "markdown"
+  || ["molecule", "reaction", "result", "analysis", "sample", "artifact", "condition_varies"].includes(node.type);
 
 export const collectExportableNodes = (children: ChemdNode[]): TraversedNode[] => {
   const traversed: TraversedNode[] = [];

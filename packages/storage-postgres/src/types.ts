@@ -24,6 +24,7 @@ export type SemanticEntityType =
   | "analysis"
   | "sample"
   | "artifact"
+  | "condition_variation"
   | "narrative";
 
 export interface BuildExperimentStorageInput {

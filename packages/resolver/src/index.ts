@@ -32,7 +32,17 @@ const MAX_TEMPLATE_EXPANSION_DEPTH = 32;
 const MAX_TEMPLATE_EXPANDED_NODES = 2000;
 
 const isObjectNode = (node: ChemdNode): node is ObjectNode =>
-  ["molecule", "reaction", "result", "analysis", "procedure", "observation", "sample", "artifact"].includes(node.type);
+  [
+    "molecule",
+    "reaction",
+    "result",
+    "analysis",
+    "procedure",
+    "observation",
+    "sample",
+    "artifact",
+    "condition_varies"
+  ].includes(node.type);
 
 const getNestedNodes = (node: ChemdNode): ChemdNode[] => {
   if (node.type === "col") {

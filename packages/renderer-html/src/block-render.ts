@@ -3,6 +3,7 @@ import type {
   ArtifactNode,
   ChemdNode,
   ColNode,
+  ConditionVariesNode,
   MoleculeNode,
   ObservationNode,
   ProcedureNode,
@@ -205,6 +206,20 @@ const renderMolecule = (node: MoleculeNode): string =>
     ])}
   </section>`;
 
+const renderConditionVaries = (node: ConditionVariesNode): string =>
+  `<section class="chemd-block chemd-block--condition-varies" data-node-id="${escapeHtml(node.id ?? "")}">
+    ${renderBlockTitle("Condition Variation", node.id)}
+    ${renderFieldList([
+      ["Reaction", node.reaction],
+      ["Standard", node.standard],
+      ...node.changes.map((change): [string, string] => [
+        humanizeIdentifier(change.field),
+        change.raw
+      ]),
+      ["Notes", node.notes]
+    ])}
+  </section>`;
+
 const renderAnalysis = (node: AnalysisNode, options: RenderNodeOptions): string =>
   node.type_name?.toLowerCase() === "tlc"
     ? renderTlcAnalysis(node, findTypedAnalysisNode(node, options.typedNodes)?.normalizedTlc)
@@ -316,6 +331,8 @@ export const renderNode = (
       return renderSample(node);
     case "artifact":
       return renderArtifact(node);
+    case "condition_varies":
+      return renderConditionVaries(node);
     case "template":
       return renderTemplate(node);
     case "col":

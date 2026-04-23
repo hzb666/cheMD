@@ -1,6 +1,7 @@
 import type {
   AnalysisNode,
   ArtifactNode,
+  ConditionVariesNode,
   MoleculeNode,
   ObservationNode,
   ProcedureNode,
@@ -29,6 +30,7 @@ import type {
   QuantityType,
   TypedAnalysisNode,
   TypedArtifactNode,
+  TypedConditionVariesNode,
   TypedMoleculeNode,
   TypedObservationNarrativeNode,
   TypedProcedureNarrativeNode,
@@ -344,6 +346,36 @@ export const buildArtifactNode = (
     instrument: node.instrument,
     notes: node.notes
   } as TypedArtifactNode;
+
+  return output;
+};
+
+export const buildConditionVariesNode = (
+  node: ConditionVariesNode,
+  context: BuildNodeContext
+): BuiltTypedNode => {
+  const output = createBase("condition_varies", node);
+  const reaction = resolveOptionalReference(node.reaction, context.objectIndex, {
+    sourceNodeType: "condition_varies",
+    sourceNodeId: node.id,
+    field: "reaction",
+    expectedTargetKind: "reaction"
+  });
+  const standard = resolveOptionalReference(node.standard, context.objectIndex, {
+    sourceNodeType: "condition_varies",
+    sourceNodeId: node.id,
+    field: "standard",
+    expectedTargetKind: "reaction"
+  });
+
+  output.diagnostics.push(...reaction.diagnostics, ...standard.diagnostics);
+  output.node = {
+    ...output.node,
+    ...(reaction.value ? { reaction: reaction.value } : {}),
+    ...(standard.value ? { standard: standard.value } : {}),
+    changes: node.changes,
+    notes: node.notes
+  } as TypedConditionVariesNode;
 
   return output;
 };

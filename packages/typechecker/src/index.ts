@@ -5,6 +5,7 @@ import type { V03Diagnostic } from "@chemd/diagnostics";
 import {
   buildAnalysisNode,
   buildArtifactNode,
+  buildConditionVariesNode,
   buildMoleculeNode,
   buildObservationNode,
   buildProcedureNode,
@@ -125,6 +126,10 @@ const buildTypedObjectNode = (
 
   if (node.type === "sample") {
     return buildSampleNode(node, { objectIndex });
+  }
+
+  if (node.type === "condition_varies") {
+    return buildConditionVariesNode(node, { objectIndex });
   }
 
   return buildArtifactNode(node, { objectIndex });

@@ -33,7 +33,8 @@ export type ObjectSemanticKind =
   | "procedure"
   | "observation"
   | "sample"
-  | "artifact";
+  | "artifact"
+  | "condition_varies";
 
 export type TemplateParamType =
   | { kind: "string" }
@@ -289,6 +290,22 @@ export interface ArtifactNode extends SourceMappedNode {
   chemistryFeatureRefs?: ChemistryFeatureRef[];
 }
 
+export interface ConditionVariationDelta {
+  field: string;
+  raw: string;
+  baseline?: string;
+  candidate?: string;
+}
+
+export interface ConditionVariesNode extends SourceMappedNode {
+  type: "condition_varies";
+  id?: string;
+  reaction?: string;
+  standard?: string;
+  changes: ConditionVariationDelta[];
+  notes?: string;
+}
+
 export interface UseNode {
   type: "use";
   template: string;
@@ -320,6 +337,7 @@ export type StructuredNode =
   | ObservationNode
   | SampleNode
   | ArtifactNode
+  | ConditionVariesNode
   | TemplateNode
   | UseNode
   | ColNode;
@@ -332,7 +350,8 @@ export type ObjectNode =
   | ProcedureNode
   | ObservationNode
   | SampleNode
-  | ArtifactNode;
+  | ArtifactNode
+  | ConditionVariesNode;
 
 export type ChemdNode = MarkdownNode | StructuredNode;
 

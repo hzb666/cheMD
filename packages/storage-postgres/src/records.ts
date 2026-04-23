@@ -101,6 +101,7 @@ const buildSemanticEntityRecords = (input: BuildExperimentStorageInput): Semanti
     ...mapEntityGroup(input.revisionId, "analysis", entities.analyses),
     ...mapEntityGroup(input.revisionId, "sample", entities.samples),
     ...mapEntityGroup(input.revisionId, "artifact", entities.artifacts),
+    ...mapEntityGroup(input.revisionId, "condition_variation", entities.condition_variations),
     ...mapEntityGroup(input.revisionId, "narrative", entities.narrative_blocks)
   ];
 };

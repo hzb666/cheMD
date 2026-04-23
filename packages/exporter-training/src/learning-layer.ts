@@ -78,6 +78,7 @@ const createRetrievalMetadata = (
   analysis_ids: semanticLayer.analyses.map((analysis) => analysis.entity_id),
   sample_ids: semanticLayer.samples.map((sample) => sample.entity_id),
   artifact_ids: semanticLayer.artifacts.map((artifact) => artifact.entity_id),
+  condition_variation_ids: semanticLayer.condition_variations.map((variation) => variation.entity_id),
   analysis_types: uniqueStrings(semanticLayer.analyses.map((analysis) => analysis.analysis_type))
 });
 
@@ -93,7 +94,10 @@ const buildDocumentSummaryText = (
   semanticLayer.results.length ? `${semanticLayer.results.length} results` : undefined,
   semanticLayer.analyses.length ? `${semanticLayer.analyses.length} analyses` : undefined,
   semanticLayer.samples.length ? `${semanticLayer.samples.length} samples` : undefined,
-  semanticLayer.artifacts.length ? `${semanticLayer.artifacts.length} artifacts` : undefined
+  semanticLayer.artifacts.length ? `${semanticLayer.artifacts.length} artifacts` : undefined,
+  semanticLayer.condition_variations.length
+    ? `${semanticLayer.condition_variations.length} condition variations`
+    : undefined
 );
 
 const getDocumentSummaryEntityIds = (semanticLayer: SemanticLayerV1): string[] => [
@@ -102,8 +106,27 @@ const getDocumentSummaryEntityIds = (semanticLayer: SemanticLayerV1): string[] =
   ...semanticLayer.results.map((result) => result.entity_id),
   ...semanticLayer.analyses.map((analysis) => analysis.entity_id),
   ...semanticLayer.samples.map((sample) => sample.entity_id),
-  ...semanticLayer.artifacts.map((artifact) => artifact.entity_id)
+  ...semanticLayer.artifacts.map((artifact) => artifact.entity_id),
+  ...semanticLayer.condition_variations.map((variation) => variation.entity_id)
 ];
+
+const buildConditionVariationChunks = (
+  document: ExportedDocumentInfo,
+  semanticLayer: SemanticLayerV1,
+  metadata: RetrievalMetadataV1
+): RetrievalChunkV1[] =>
+  semanticLayer.condition_variations.flatMap((variation) =>
+    variation.text_for_embedding
+      ? [{
+          chunk_id: `retrieval::${document.document_id}::${variation.entity_id}`,
+          experiment_id: document.document_id,
+          chunk_type: "condition_variation" as const,
+          source_entity_ids: [variation.entity_id],
+          text: variation.text_for_embedding,
+          metadata
+        }]
+      : []
+  );
 
 const buildRetrievalChunks = (
   document: ExportedDocumentInfo,
@@ -254,6 +277,8 @@ const buildRetrievalChunks = (
       metadata
     });
   });
+
+  chunks.push(...buildConditionVariationChunks(document, semanticLayer, metadata));
 
   return chunks;
 };

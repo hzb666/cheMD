@@ -7,7 +7,8 @@ const OBJECT_NODE_TYPES = new Set([
   "analysis",
   "procedure",
   "observation",
-  "sample"
+  "sample",
+  "condition_varies"
 ]);
 
 const INTERNAL_FIELDS = new Set(["type", "id", "syntaxOrigin", "declaredKind"]);

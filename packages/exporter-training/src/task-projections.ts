@@ -3,6 +3,7 @@ import type {
   ChemdTrainingUnderstandingV1,
   ExperimentDecisionTaskTypeV1,
   TrainingExpertRoutingV1,
+  TrainingConditionVariationLogicV1,
   TrainingExperimentDesignContextV1,
   TrainingInferenceConfidenceV1,
   TrainingOutcomeLogicV1,
@@ -90,6 +91,30 @@ const getDesignContext = (
 ): TrainingExperimentDesignContextV1 | undefined =>
   understanding.experiment_logic.design_contexts.find((context) => context.reaction_entity_id === reactionEntityId);
 
+const getConditionVariationsForReaction = (
+  understanding: ChemdTrainingUnderstandingV1,
+  reactionEntityId: string | undefined
+): TrainingConditionVariationLogicV1[] =>
+  reactionEntityId
+    ? understanding.experiment_logic.condition_variations.filter((variation) =>
+        variation.reaction_entity_id === reactionEntityId
+        || variation.standard_reaction_entity_id === reactionEntityId
+      )
+    : [];
+
+const getConditionVariationFacts = (
+  understanding: ChemdTrainingUnderstandingV1,
+  reactionEntityId?: string
+): JsonObject[] =>
+  getConditionVariationsForReaction(understanding, reactionEntityId).map((variation) => ({
+    condition_variation_entity_id: variation.condition_variation_entity_id,
+    reaction_entity_id: variation.reaction_entity_id,
+    standard_reaction_entity_id: variation.standard_reaction_entity_id,
+    changed_variables: variation.changed_variables,
+    confidence: variation.confidence,
+    warnings: variation.warnings
+  }));
+
 const getReactionFacts = (reaction: TrainingReactionV1 | undefined): JsonObject => ({
   reaction_entity_id: reaction?.entity_id,
   name: reaction?.name,
@@ -114,6 +139,7 @@ const getEntityById = (
     ...understanding.entities.analyses,
     ...understanding.entities.samples,
     ...understanding.entities.artifacts,
+    ...understanding.entities.condition_variations,
     ...understanding.entities.narrative_blocks
   ].find((candidate) => candidate.entity_id === entityId);
 
@@ -220,7 +246,8 @@ const buildRecordToChemdExamples = (
     results: understanding.entities.results.length,
     analyses: understanding.entities.analyses.length,
     samples: understanding.entities.samples.length,
-    artifacts: understanding.entities.artifacts.length
+    artifacts: understanding.entities.artifacts.length,
+    condition_variations: understanding.entities.condition_variations.length
   };
   const sourceEntityIds = uniqueStrings([
     ...understanding.entities.molecules.map((entity) => entity.entity_id),
@@ -228,7 +255,8 @@ const buildRecordToChemdExamples = (
     ...understanding.entities.results.map((entity) => entity.entity_id),
     ...understanding.entities.analyses.map((entity) => entity.entity_id),
     ...understanding.entities.samples.map((entity) => entity.entity_id),
-    ...understanding.entities.artifacts.map((entity) => entity.entity_id)
+    ...understanding.entities.artifacts.map((entity) => entity.entity_id),
+    ...understanding.entities.condition_variations.map((entity) => entity.entity_id)
   ]);
 
   if (sourceEntityIds.length === 0) {
@@ -457,7 +485,10 @@ const getReferenceCandidateEntities = (understanding: ChemdTrainingUnderstanding
   ...understanding.entities.results.map((entity) => summarizeEntity("result", entity as JsonObject)),
   ...understanding.entities.analyses.map((entity) => summarizeEntity("analysis", entity as JsonObject)),
   ...understanding.entities.samples.map((entity) => summarizeEntity("sample", entity as JsonObject)),
-  ...understanding.entities.artifacts.map((entity) => summarizeEntity("artifact", entity as JsonObject))
+  ...understanding.entities.artifacts.map((entity) => summarizeEntity("artifact", entity as JsonObject)),
+  ...understanding.entities.condition_variations.map((entity) =>
+    summarizeEntity("condition_variation", entity as JsonObject)
+  )
 ];
 
 const getReferenceResolutionInput = (understanding: ChemdTrainingUnderstandingV1): JsonObject => ({
@@ -638,6 +669,14 @@ const buildExperimentIntentExamples = (
       task: "experiment_intent",
       document: understanding.document,
       reactions: understanding.entities.reactions.map(getReactionFacts),
+      condition_variations: logic.condition_variations.map((variation) => ({
+        condition_variation_entity_id: variation.condition_variation_entity_id,
+        reaction_entity_id: variation.reaction_entity_id,
+        standard_reaction_entity_id: variation.standard_reaction_entity_id,
+        changed_variables: variation.changed_variables,
+        confidence: variation.confidence,
+        warnings: variation.warnings
+      })),
       outcomes: logic.outcomes.map((outcome) =>
         getOutcomeFacts(outcome, getOutcomeQuality(understanding, outcome.result_entity_id))
       ),
@@ -800,17 +839,27 @@ const buildConditionRecommendationExamples = (
 
     const reaction = getReaction(understanding, context.reaction_entity_id);
     const quality = getOutcomeQuality(understanding, outcome.result_entity_id);
+    const conditionVariations = getConditionVariationFacts(understanding, context.reaction_entity_id);
 
     return [createExample({
       understanding,
       taskType: "condition_recommendation",
       suffix: outcome.result_entity_id,
-      sourceEntityIds: [context.reaction_entity_id, outcome.result_entity_id],
+      sourceEntityIds: uniqueStrings([
+        context.reaction_entity_id,
+        outcome.result_entity_id,
+        ...conditionVariations.flatMap((variation) =>
+          typeof variation.condition_variation_entity_id === "string"
+            ? [variation.condition_variation_entity_id]
+            : []
+        )
+      ]),
       input: {
         task: "condition_recommendation",
         reaction: getReactionFacts(reaction),
         observed_outcome: getOutcomeFacts(outcome, quality),
-        design_context: context
+        design_context: context,
+        condition_variations: conditionVariations
       },
       output: {
         recommendation: getRecommendation(outcome, context),
@@ -928,6 +977,7 @@ const buildExperimentComparisonExamples = (
       : null;
     const baselineQuality = getOutcomeQuality(understanding, baselineOutcome.result_entity_id);
     const candidateQuality = getOutcomeQuality(understanding, candidateOutcome.result_entity_id);
+    const conditionVariations = getConditionVariationFacts(understanding, context.reaction_entity_id);
     const warnings = uniqueStrings([
       ...(baselineQuality?.warnings ?? []),
       ...(candidateQuality?.warnings ?? [])
@@ -937,16 +987,22 @@ const buildExperimentComparisonExamples = (
       understanding,
       taskType: "experiment_comparison",
       suffix: context.reaction_entity_id,
-      sourceEntityIds: [
+      sourceEntityIds: uniqueStrings([
         context.baseline_reaction_entity_id,
         context.reaction_entity_id,
         baselineOutcome.result_entity_id,
-        candidateOutcome.result_entity_id
-      ],
+        candidateOutcome.result_entity_id,
+        ...conditionVariations.flatMap((variation) =>
+          typeof variation.condition_variation_entity_id === "string"
+            ? [variation.condition_variation_entity_id]
+            : []
+        )
+      ]),
       input: {
         task: "experiment_comparison",
         changed_variables: context.changed_variables,
         controlled_variables: context.controlled_variables,
+        condition_variations: conditionVariations,
         baseline_reaction: getReactionFacts(getReaction(understanding, context.baseline_reaction_entity_id)),
         candidate_reaction: getReactionFacts(getReaction(understanding, context.reaction_entity_id))
       },

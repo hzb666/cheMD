@@ -13,6 +13,11 @@
 - Keep public API boundaries typed with exported interfaces or discriminated unions.
 - Keep functions focused; root ESLint enforces complexity, max params, nesting, statements, and function length.
 - Prefer pure transforms from input data to output data.
+- Public author-facing block names may use kebab-case when needed
+  (`:::condition-varies`), but AST node discriminants must stay stable
+  snake_case (`type: "condition_varies"`). Register the block parser in
+  `packages/parser/src/body/block-parsers/index.ts` and add public parser
+  tests for the exact fence syntax.
 
 ## Tests
 

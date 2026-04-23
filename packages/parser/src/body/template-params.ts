@@ -18,7 +18,8 @@ const TEMPLATE_REF_TARGETS = new Set<ObjectSemanticKind>([
   "procedure",
   "observation",
   "sample",
-  "artifact"
+  "artifact",
+  "condition_varies"
 ]);
 
 export const collectTemplateHeaderLines = (

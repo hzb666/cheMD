@@ -201,6 +201,17 @@ const renderArtifactNode = (node: DocxNodeByType<"artifact">): string =>
     ])
   ]);
 
+const renderConditionVariesNode = (node: DocxNodeByType<"condition_varies">): string =>
+  compactLines([
+    renderHeading("Condition Variation", node.id),
+    ...renderFieldLines([
+      ["Reaction", node.reaction],
+      ["Standard", node.standard],
+      ...node.changes.map((change): FieldLine => [normalizeWhitespace(change.field), change.raw]),
+      ["Notes", node.notes]
+    ])
+  ]);
+
 const renderTemplateBindLine = (bind: DocxNodeByType<"template">["bind"]): string | undefined => {
   const values = Object.entries(bind);
   return values.length > 0
@@ -250,6 +261,8 @@ const renderStructuredNode = (node: DocxNode): string => {
       return renderSampleNode(node);
     case "artifact":
       return renderArtifactNode(node);
+    case "condition_varies":
+      return renderConditionVariesNode(node);
     case "template":
       return renderTemplateNode(node);
     case "use":

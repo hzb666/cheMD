@@ -1,6 +1,6 @@
 import type { Diagnostic } from "@chemd/core";
 
-const BLOCK_START_PATTERN = /^:::([a-z][a-z0-9_]*)(?:-\d+)?(?:\s+.*)?$/;
+const BLOCK_START_PATTERN = /^:::([a-z][a-z0-9_]*(?:-[a-z][a-z0-9_]*)*)(?:-\d+)?(?:\s+.*)?$/;
 const NESTED_CHILD_BLOCKS: Record<string, Set<string>> = {
   procedure: new Set(["step"]),
   observation: new Set(["event"])

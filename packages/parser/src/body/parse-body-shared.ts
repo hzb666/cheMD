@@ -7,7 +7,7 @@ import { tokenizeInlineCode } from "../inline/tokenize-inline-code";
 import { tokenizeMarkdownLinks } from "../inline/tokenize-markdown-links";
 import { tokenizeReferences } from "../inline/tokenize-references";
 
-const BLOCK_TYPE_PATTERN = "[a-z][a-z0-9_]*";
+const BLOCK_TYPE_PATTERN = "[a-z][a-z0-9_]*(?:-[a-z][a-z0-9_]*)*";
 const BLOCK_START_PATTERN = new RegExp(`^:::(${BLOCK_TYPE_PATTERN})(?:-(\\d+))?(?:\\s+(.*))?$`);
 const LIST_FIELDS = new Set([
   "reactants",

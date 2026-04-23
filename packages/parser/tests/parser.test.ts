@@ -184,6 +184,35 @@ name: ethanol
     expect(document.children[0]).not.toMatchObject({ smiles: "64-17-5" });
   });
 
+  it("parses condition-varies blocks with structured deltas", () => {
+    const document = parseChemd(`---
+id: exp-condition-varies
+title: Condition varies
+date: 2026-04-23
+---
+
+:::condition-varies #cv-solvent
+reaction: rxn-variant
+standard: rxn-standard
+solvent: THF -> MeCN
+temperature: 25 C -> 40 C
+notes: Solvent and temperature screen.
+:::
+`);
+
+    expect(document.children[0]).toMatchObject({
+      type: "condition_varies",
+      id: "cv-solvent",
+      reaction: "rxn-variant",
+      standard: "rxn-standard",
+      changes: [
+        { field: "solvent", raw: "THF -> MeCN", baseline: "THF", candidate: "MeCN" },
+        { field: "temperature", raw: "25 C -> 40 C", baseline: "25 C", candidate: "40 C" }
+      ],
+      notes: "Solvent and temperature screen."
+    });
+  });
+
   it("attaches quick fixes to strict missing-kind diagnostics", () => {
     const document = parseChemd(`---
 id: exp-missing-kind-fix

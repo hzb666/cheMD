@@ -56,6 +56,7 @@ export interface SourceNodeSnapshot {
     | "observation"
     | "sample"
     | "artifact"
+    | "condition_varies"
     | "col"
     | "template"
     | "use";
@@ -85,6 +86,7 @@ export interface SemanticLayerV1 {
   analyses: ExportedAnalysisV1[];
   samples: ExportedSampleV1[];
   artifacts: ExportedArtifactV1[];
+  condition_variations: ExportedConditionVaryV1[];
   markdown_blocks: ExportedMarkdownBlockV1[];
   links: ExportedRelationV1[];
   lnf?: ChemdLnf;
@@ -271,6 +273,22 @@ export interface ExportedArtifactV1 extends ExportedEntityBase {
   text_for_embedding?: string;
 }
 
+export interface ExportedConditionVariationDeltaV1 {
+  field: string;
+  raw: string;
+  baseline_raw?: string;
+  candidate_raw?: string;
+}
+
+export interface ExportedConditionVaryV1 extends ExportedEntityBase {
+  source_node_type: "condition_varies";
+  reaction_ref_raw?: string;
+  standard_ref_raw?: string;
+  changes: ExportedConditionVariationDeltaV1[];
+  notes?: string;
+  text_for_embedding?: string;
+}
+
 export interface ExportedReferenceTokenV1 {
   raw: string;
   kind: string;
@@ -329,6 +347,8 @@ export interface ExportedRelationV1 {
     | "artifact_supports_result"
     | "artifact_supports_analysis"
     | "artifact_supports_sample"
+    | "condition_variation_targets_reaction"
+    | "condition_variation_compares_standard"
     | "markdown_mentions_entity";
   from_entity_id: string;
   to_entity_id: string;
@@ -345,6 +365,7 @@ export interface RetrievalMetadataV1 {
   analysis_ids?: string[];
   sample_ids?: string[];
   artifact_ids?: string[];
+  condition_variation_ids?: string[];
   analysis_types?: string[];
   status_label?: "success" | "partial" | "failed" | "unknown";
   yield_percent?: number | null;
@@ -366,6 +387,7 @@ export interface RetrievalChunkV1 {
     | "analysis_notes"
     | "sample_notes"
     | "artifact_notes"
+    | "condition_variation"
     | "document_summary";
   source_entity_ids: string[];
   text: string;

@@ -4,6 +4,7 @@ import { parseKeyValueLines } from "../parse-body-shared";
 import { parseAnalysisBlock } from "./analysis";
 import { parseArtifactBlock } from "./artifact";
 import { parseChemdBlock } from "./chemd";
+import { parseConditionVariesBlock } from "./condition-varies";
 import { readStructuredBlockId } from "./common";
 import { parseObservationBlock } from "./observation";
 import { parseProcedureBlock } from "./procedure";
@@ -65,6 +66,7 @@ const PARSERS = new Map<string, BlockParser>([
   ["analysis", parseAnalysisBlock],
   ["artifact", parseArtifactBlock],
   ["sample", parseSampleBlock],
+  ["condition-varies", parseConditionVariesBlock],
   ["procedure", parseProcedureBlock],
   ["observation", parseObservationBlock],
   ["use", parseUseBlock],

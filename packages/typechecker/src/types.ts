@@ -3,6 +3,7 @@ import type {
   ArtifactNode,
   ChemdDocument,
   ChemdNode,
+  ConditionVariesNode,
   MoleculeNode,
   ObservationNode,
   ProvenanceInfo,
@@ -58,7 +59,16 @@ export type AtmosphereValue = BoundedStringValue<AtmosphereLabel>;
 
 export interface ReferenceType {
   kind: "reference";
-  targetKind: "molecule" | "reaction" | "result" | "analysis" | "sample" | "artifact" | "template" | "unknown";
+  targetKind:
+    | "molecule"
+    | "reaction"
+    | "result"
+    | "analysis"
+    | "sample"
+    | "artifact"
+    | "condition_varies"
+    | "template"
+    | "unknown";
   refId: string;
   resolved: boolean;
 }
@@ -196,6 +206,14 @@ export interface TypedArtifactNode extends TypedNodeBase {
   notes?: string;
 }
 
+export interface TypedConditionVariesNode extends TypedNodeBase {
+  kind: "condition_varies";
+  reaction?: ReferenceOrLiteral;
+  standard?: ReferenceOrLiteral;
+  changes: ConditionVariesNode["changes"];
+  notes?: string;
+}
+
 export type TypedSemanticNode =
   | TypedMoleculeNode
   | TypedReactionNode
@@ -206,7 +224,8 @@ export type TypedSemanticNode =
   | TypedStepNode
   | TypedObservationEventNode
   | TypedSampleNode
-  | TypedArtifactNode;
+  | TypedArtifactNode
+  | TypedConditionVariesNode;
 
 export interface TypedSemanticGraph {
   documentId: string;
@@ -242,4 +261,5 @@ export type ObjectNode =
   | ProcedureNode
   | ObservationNode
   | SampleNode
-  | ArtifactNode;
+  | ArtifactNode
+  | ConditionVariesNode;

@@ -11,7 +11,8 @@ export interface TreeNode {
     | "analysis"
     | "procedure"
     | "observation"
-    | "sample";
+    | "sample"
+    | "condition_varies";
 }
 
 const isTreeObjectNode = (
@@ -26,7 +27,8 @@ const isTreeObjectNode = (
       | "analysis"
       | "procedure"
       | "observation"
-      | "sample";
+      | "sample"
+      | "condition_varies";
   }
 > =>
   [
@@ -36,7 +38,8 @@ const isTreeObjectNode = (
     "analysis",
     "procedure",
     "observation",
-    "sample"
+    "sample",
+    "condition_varies"
   ].includes(node.type);
 
 const collectTreeNodes = (children: ChemdNode[]): Array<TreeNode> => {

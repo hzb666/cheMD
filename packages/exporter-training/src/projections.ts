@@ -7,6 +7,8 @@ import type {
   TrainingAnalysisV1,
   TrainingArtifactV1,
   TrainingCanonicalSummaryV1,
+  TrainingConditionVariationLogicV1,
+  TrainingConditionVaryV1,
   TrainingEvidenceLinkV1,
   TrainingExpertRoutingV1,
   TrainingCausalLinkV1,
@@ -46,6 +48,7 @@ import type {
   ChemdTrainingExportV2,
   ExportedAnalysisV1,
   ExportedArtifactV1,
+  ExportedConditionVaryV1,
   ExportedEntityBase,
   ExportedMoleculeV1,
   ExportedReactionV1,
@@ -60,7 +63,8 @@ type ObjectEntity =
   | ExportedResultV1
   | ExportedSampleV1
   | ExportedReactionV1
-  | ExportedArtifactV1;
+  | ExportedArtifactV1
+  | ExportedConditionVaryV1;
 
 type PrimaryRole = TrainingPrimaryEntityV1["role"];
 type SourceStrippedKey =
@@ -161,6 +165,10 @@ const ARTIFACT_EVIDENCE_RELATIONS = new Set<ExportedRelationV1["relation_type"]>
   "artifact_supports_result",
   "artifact_supports_analysis",
   "artifact_supports_sample"
+]);
+const CONDITION_VARIATION_RELATIONS = new Set<ExportedRelationV1["relation_type"]>([
+  "condition_variation_targets_reaction",
+  "condition_variation_compares_standard"
 ]);
 const RELATION_MATERIAL_FLOW_SPECS: Partial<Record<ExportedRelationV1["relation_type"], RelationMaterialFlowSpec>> = {
   result_describes_reaction: { edgeType: "reaction_reports_result", reverse: true },
@@ -340,7 +348,8 @@ const buildEntityIndex = (record: ChemdTrainingExportV2): Map<string, ObjectEnti
     ...record.semantic_layer.results,
     ...record.semantic_layer.analyses,
     ...record.semantic_layer.samples,
-    ...record.semantic_layer.artifacts
+    ...record.semantic_layer.artifacts,
+    ...record.semantic_layer.condition_variations
   ];
 
   return new Map(
@@ -608,6 +617,47 @@ const buildArtifactReferences = (
     )];
   });
 
+const createConditionVariationReference = (
+  record: ChemdTrainingExportV2,
+  entityByOriginalId: Map<string, ObjectEntity>,
+  variation: ExportedConditionVaryV1,
+  field: "reaction" | "standard",
+  raw: string | undefined
+): TrainingResolvedReferenceV1[] => {
+  if (!raw) {
+    return [];
+  }
+
+  const target = entityByOriginalId.get(normalizeReferenceId(raw));
+  const relation = findRelationToTarget(
+    record,
+    variation.entity_id,
+    target?.entity_id,
+    CONDITION_VARIATION_RELATIONS,
+    field
+  );
+
+  return [createStructuredReference(
+    raw,
+    {
+      source_entity_id: variation.entity_id,
+      source_entity_type: "condition_varies",
+      source_field: field
+    },
+    target,
+    relation?.relation_type
+  )];
+};
+
+const buildConditionVariationReferences = (
+  record: ChemdTrainingExportV2,
+  entityByOriginalId: Map<string, ObjectEntity>
+): TrainingResolvedReferenceV1[] =>
+  record.semantic_layer.condition_variations.flatMap((variation) => [
+    ...createConditionVariationReference(record, entityByOriginalId, variation, "reaction", variation.reaction_ref_raw),
+    ...createConditionVariationReference(record, entityByOriginalId, variation, "standard", variation.standard_ref_raw)
+  ]);
+
 const buildResolvedReferences = (
   record: ChemdTrainingExportV2,
   entityByOriginalId: Map<string, ObjectEntity>
@@ -618,7 +668,8 @@ const buildResolvedReferences = (
   ...buildSingleFieldReferences(record, entityByOriginalId, record.semantic_layer.analyses, "analysis"),
   ...buildSingleFieldReferences(record, entityByOriginalId, record.semantic_layer.samples, "sample"),
   ...buildSampleLineageReferences(record, entityByOriginalId),
-  ...buildArtifactReferences(record, entityByOriginalId)
+  ...buildArtifactReferences(record, entityByOriginalId),
+  ...buildConditionVariationReferences(record, entityByOriginalId)
 ];
 
 const buildProcedureLogicPairs = (record: ChemdTrainingExportV2): TrainingProcedureLogicPairV1[] =>
@@ -753,9 +804,71 @@ const buildVariableDeltas = (
   );
 };
 
+const toExplicitDelta = (
+  change: ExportedConditionVaryV1["changes"][number]
+): TrainingExperimentVariableDeltaV1 => ({
+  field: change.field,
+  ...(change.baseline_raw ? { baseline_value: change.baseline_raw } : {}),
+  ...(change.candidate_raw ? { candidate_value: change.candidate_raw } : { candidate_value: change.raw })
+});
+
+const findReactionByRawRef = (
+  reactions: ExportedReactionV1[],
+  rawRef: string | undefined
+): ExportedReactionV1 | undefined =>
+  rawRef
+    ? reactions.find((reaction) => reaction.original_id === normalizeReferenceId(rawRef))
+    : undefined;
+
+const hasConditionEvidence = (context: TrainingExperimentDesignContextV1): boolean =>
+  context.evidence_entity_ids.some((entityId) => entityId.startsWith("cv::"));
+
+const buildExplicitDesignContext = (
+  record: ChemdTrainingExportV2,
+  variation: ExportedConditionVaryV1
+): TrainingExperimentDesignContextV1[] => {
+  const candidate = findReactionByRawRef(record.semantic_layer.reactions, variation.reaction_ref_raw);
+  if (!candidate) {
+    return [];
+  }
+
+  const standard = findReactionByRawRef(record.semantic_layer.reactions, variation.standard_ref_raw);
+  const linkedResult = findLinkedResultForReaction(record, candidate.entity_id);
+  const inferredDeltas = standard ? buildVariableDeltas(standard, candidate) : { controlled: [] };
+
+  return [{
+    context_id: `design::${record.document.document_id}::${candidate.entity_id}`,
+    reaction_entity_id: candidate.entity_id,
+    ...(linkedResult ? { linked_result_entity_id: linkedResult.entity_id } : {}),
+    series_id: `series::${record.document.document_id}::${standard?.entity_id ?? variation.entity_id}`,
+    variant_role: standard?.entity_id === candidate.entity_id ? "baseline" : "variant",
+    ...(standard && standard.entity_id !== candidate.entity_id
+      ? { baseline_reaction_entity_id: standard.entity_id }
+      : {}),
+    changed_variables: variation.changes.map(toExplicitDelta),
+    controlled_variables: inferredDeltas.controlled,
+    evidence_entity_ids: uniqueStrings([
+      variation.entity_id,
+      candidate.entity_id,
+      ...(standard ? [standard.entity_id] : []),
+      ...(linkedResult ? [linkedResult.entity_id] : [])
+    ])
+  }];
+};
+
+const buildExplicitDesignContexts = (
+  record: ChemdTrainingExportV2
+): Map<string, TrainingExperimentDesignContextV1> =>
+  new Map(
+    record.semantic_layer.condition_variations
+      .flatMap((variation) => buildExplicitDesignContext(record, variation))
+      .map((context) => [context.reaction_entity_id, context])
+  );
+
 const buildExperimentDesignContexts = (record: ChemdTrainingExportV2): TrainingExperimentDesignContextV1[] => {
   const baseline = record.semantic_layer.reactions.find((reaction) => reaction.is_primary)
     ?? record.semantic_layer.reactions[0];
+  const explicitContexts = buildExplicitDesignContexts(record);
 
   if (!baseline) {
     return [];
@@ -763,6 +876,11 @@ const buildExperimentDesignContexts = (record: ChemdTrainingExportV2): TrainingE
 
   const seriesId = `series::${record.document.document_id}::${baseline.entity_id}`;
   return record.semantic_layer.reactions.map((reaction) => {
+    const explicitContext = explicitContexts.get(reaction.entity_id);
+    if (explicitContext) {
+      return explicitContext;
+    }
+
     const linkedResult = findLinkedResultForReaction(record, reaction.entity_id);
     const reactionVariables = getReactionVariableMap(reaction);
     const deltas = reaction.entity_id === baseline.entity_id
@@ -789,6 +907,42 @@ const buildExperimentDesignContexts = (record: ChemdTrainingExportV2): TrainingE
     };
   });
 };
+
+const getConditionVariationWarnings = (
+  variation: ExportedConditionVaryV1,
+  candidate: ExportedReactionV1 | undefined,
+  standard: ExportedReactionV1 | undefined
+): string[] => [
+  ...(!candidate ? ["condition_variation_reaction_unresolved"] : []),
+  ...(!standard ? ["condition_variation_standard_unresolved"] : []),
+  ...(variation.changes.length === 0 ? ["condition_variation_without_changes"] : [])
+];
+
+const buildConditionVariationLogic = (
+  record: ChemdTrainingExportV2
+): TrainingConditionVariationLogicV1[] =>
+  record.semantic_layer.condition_variations.map((variation) => {
+    const candidate = findReactionByRawRef(record.semantic_layer.reactions, variation.reaction_ref_raw);
+    const standard = findReactionByRawRef(record.semantic_layer.reactions, variation.standard_ref_raw);
+    const warnings = getConditionVariationWarnings(variation, candidate, standard);
+
+    return {
+      variation_id: `condition-variation::${variation.entity_id}`,
+      condition_variation_entity_id: variation.entity_id,
+      ...(candidate ? { reaction_entity_id: candidate.entity_id } : {}),
+      ...(standard ? { standard_reaction_entity_id: standard.entity_id } : {}),
+      changed_variables: variation.changes.map(toExplicitDelta),
+      logic_source: "explicit",
+      confidence: warnings.length === 0 ? "high" : "low",
+      evidence_entity_ids: uniqueStrings([
+        variation.entity_id,
+        ...(candidate ? [candidate.entity_id] : []),
+        ...(standard ? [standard.entity_id] : [])
+      ]),
+      review_required: warnings.length > 0,
+      warnings
+    };
+  });
 
 const getReactionClassificationText = (reaction: ExportedReactionV1): string =>
   compactText(
@@ -955,6 +1109,9 @@ const getIntentObjective = (
 const getIntentConfidence = (
   input: IntentContextInput
 ): TrainingInferenceConfidenceV1 => {
+  if (hasConditionEvidence(input.context) && input.context.changed_variables.length > 0) {
+    return "high";
+  }
   if (input.failure || input.quality?.warnings.length) {
     return "low";
   }
@@ -1002,7 +1159,7 @@ const buildIntentHypotheses = (
       objective: getIntentObjective(intentInput),
       reaction_entity_id: context.reaction_entity_id,
       ...(context.linked_result_entity_id ? { result_entity_id: context.linked_result_entity_id } : {}),
-      logic_source: DERIVED_LOGIC_SOURCE,
+      logic_source: hasConditionEvidence(context) ? "explicit" : DERIVED_LOGIC_SOURCE,
       confidence: getIntentConfidence(intentInput),
       evidence_entity_ids: uniqueStrings([
         ...context.evidence_entity_ids,
@@ -1056,16 +1213,46 @@ const buildControlledVariableLogic = (
   }));
 };
 
+const getVariableLogicKey = (logic: TrainingVariableLogicV1): string =>
+  `${logic.reaction_entity_id}::${logic.variable_role}::${logic.field}`;
+
+const buildExplicitConditionVariableLogic = (
+  variations: TrainingConditionVariationLogicV1[]
+): TrainingVariableLogicV1[] =>
+  variations.flatMap((variation) =>
+    variation.reaction_entity_id
+      ? variation.changed_variables.map((change) => ({
+          variable_id: `variable::${variation.variation_id}::changed::${change.field}`,
+          reaction_entity_id: variation.reaction_entity_id as string,
+          field: change.field,
+          variable_role: "changed" as const,
+          ...addValueField("baseline_value", change.baseline_value),
+          ...addValueField("candidate_value", change.candidate_value),
+          logic_source: "explicit" as const,
+          confidence: variation.confidence,
+          evidence_entity_ids: variation.evidence_entity_ids,
+          review_required: variation.review_required
+        }))
+      : []
+  );
+
 const buildVariableLogic = (
   record: ChemdTrainingExportV2,
-  contexts: TrainingExperimentDesignContextV1[]
+  contexts: TrainingExperimentDesignContextV1[],
+  conditionVariations: TrainingConditionVariationLogicV1[]
 ): TrainingVariableLogicV1[] => {
   const reactionById = new Map(record.semantic_layer.reactions.map((reaction) => [reaction.entity_id, reaction]));
-
-  return contexts.flatMap((context) => [
+  const explicitLogic = buildExplicitConditionVariableLogic(conditionVariations);
+  const explicitKeys = new Set(explicitLogic.map(getVariableLogicKey));
+  const derivedLogic = contexts.flatMap((context) => [
     ...buildChangedVariableLogic(context),
     ...buildControlledVariableLogic(context, reactionById.get(context.reaction_entity_id))
   ]);
+
+  return [
+    ...derivedLogic.filter((logic) => !explicitKeys.has(getVariableLogicKey(logic))),
+    ...explicitLogic
+  ];
 };
 
 const buildVariableCausalLinks = (
@@ -1077,6 +1264,8 @@ const buildVariableCausalLinks = (
     const outcome = context.linked_result_entity_id
       ? outcomeByResult.get(context.linked_result_entity_id)
       : undefined;
+    const logicSource = hasConditionEvidence(context) ? "explicit" : DERIVED_LOGIC_SOURCE;
+    const confidence = hasConditionEvidence(context) ? "high" : "medium";
     return context.changed_variables.flatMap((variable) =>
       outcome && context.linked_result_entity_id
         ? [{
@@ -1086,8 +1275,8 @@ const buildVariableCausalLinks = (
             effect: "The linked result may reflect this changed experimental variable.",
             source_entity_ids: [context.reaction_entity_id],
             target_entity_ids: [context.linked_result_entity_id],
-            logic_source: DERIVED_LOGIC_SOURCE,
-            confidence: "medium" as const,
+            logic_source: logicSource,
+            confidence,
             evidence_entity_ids: context.evidence_entity_ids,
             review_required: false,
             warnings: []
@@ -1111,8 +1300,8 @@ const buildControlledCausalLinks = (
           target_entity_ids: context.baseline_reaction_entity_id
             ? [context.baseline_reaction_entity_id, context.reaction_entity_id]
             : [context.reaction_entity_id],
-          logic_source: DERIVED_LOGIC_SOURCE,
-          confidence: "medium",
+          logic_source: hasConditionEvidence(context) ? "explicit" : DERIVED_LOGIC_SOURCE,
+          confidence: hasConditionEvidence(context) ? "high" : "medium",
           evidence_entity_ids: context.evidence_entity_ids,
           review_required: false,
           warnings: []
@@ -1466,6 +1655,7 @@ const buildKnowledgeNodes = (
   ...semanticNodesForEntity("analysis", record.semantic_layer.analyses),
   ...semanticNodesForEntity("sample", record.semantic_layer.samples),
   ...semanticNodesForEntity("artifact", record.semantic_layer.artifacts),
+  ...semanticNodesForEntity("condition_variation", record.semantic_layer.condition_variations),
   ...record.semantic_layer.markdown_blocks.map((block) => ({
     node_id: block.entity_id,
     node_type: "narrative" as const,
@@ -2420,13 +2610,34 @@ const buildArtifactFieldEvidence = (record: ChemdTrainingExportV2): TrainingFiel
     })
   ]);
 
+const buildConditionVariationFieldEvidence = (record: ChemdTrainingExportV2): TrainingFieldEvidenceV1[] =>
+  record.semantic_layer.condition_variations.flatMap((variation) =>
+    variation.changes.flatMap((change) => [
+      ...createFieldEvidence({
+        subjectEntityId: variation.entity_id,
+        field: `baseline_${change.field}`,
+        value: change.baseline_raw,
+        rawValue: change.raw,
+        sourceSpan: getFieldSourceSpan(variation, change.field)
+      }),
+      ...createFieldEvidence({
+        subjectEntityId: variation.entity_id,
+        field: `candidate_${change.field}`,
+        value: change.candidate_raw ?? change.raw,
+        rawValue: change.raw,
+        sourceSpan: getFieldSourceSpan(variation, change.field)
+      })
+    ])
+  );
+
 const buildFieldEvidence = (record: ChemdTrainingExportV2): TrainingFieldEvidenceV1[] => [
   ...buildMoleculeFieldEvidence(record),
   ...buildReactionFieldEvidence(record),
   ...buildResultFieldEvidence(record),
   ...buildAnalysisFieldEvidence(record),
   ...buildSampleFieldEvidence(record),
-  ...buildArtifactFieldEvidence(record)
+  ...buildArtifactFieldEvidence(record),
+  ...buildConditionVariationFieldEvidence(record)
 ];
 
 const hasExternalEvidence = (item: TrainingFieldEvidenceV1): boolean =>
@@ -2636,10 +2847,12 @@ const buildCanonicalSummary = (
   const primaryResult = record.semantic_layer.results.find((result) => result.is_primary) ?? record.semantic_layer.results[0];
   const procedureCount = record.learning_layer.procedure_to_steps?.flatMap((pair) => pair.steps).length ?? 0;
   const evidenceCount = countExternalEvidenceReferences(fieldEvidence);
+  const conditionCount = record.semantic_layer.condition_variations.length;
   const text = compactText(
     `Document ${record.document.title} (${record.document.date}).`,
     firstReaction ? `Main reaction candidate ${firstReaction.entity_id}.` : undefined,
     primaryResult ? `Main result candidate ${primaryResult.entity_id}.` : undefined,
+    conditionCount > 0 ? `${conditionCount} explicit condition variation blocks are available.` : undefined,
     fieldEvidence.length > 0 ? `${fieldEvidence.length} training-relevant fields are represented as value nodes.` : undefined,
     evidenceCount > 0 ? `${evidenceCount} external evidence references support field values.` : undefined,
     procedureCount > 0 ? `${procedureCount} procedure steps are available.` : undefined
@@ -2687,9 +2900,10 @@ const buildRecommendedLoraTasks = (
   );
   const hasFailedOutcome = record.semantic_layer.results.some((result) => result.status_label === "failed");
   const hasExperimentComparison = record.semantic_layer.reactions.length > 1;
+  const hasConditionVariations = record.semantic_layer.condition_variations.length > 0;
   const hasProposalBasis = hasProcedureLogic && hasDecisionBasis;
   const hasNormalizationEvidence = fieldEvidence.some((item) => item.normalized);
-  const hasIntentBasis = hasDecisionBasis || hasProcedureLogic || hasEvidenceLinks;
+  const hasIntentBasis = hasDecisionBasis || hasProcedureLogic || hasEvidenceLinks || hasConditionVariations;
   const hasMaterialFlowBasis = hasSemanticRelations || hasProcedureLogic;
   const qualityIssueCount = missingLogic.length + (record.quality_layer.training_quality.exclusion_reasons?.length ?? 0);
 
@@ -2707,12 +2921,18 @@ const buildRecommendedLoraTasks = (
     ...includeTask(hasProcedureLogic, createTaskHint("procedure_reasoning", "Procedure-to-step pairs are available.")),
     ...includeTask(hasObservationLogic, createTaskHint("observation_events", "Observation-to-event pairs are available.")),
     ...includeTask(hasYieldPrediction, createTaskHint("yield_prediction", "Usable yield targets are available.")),
-    ...includeTask(hasDecisionBasis, createTaskHint("condition_recommendation", "Reaction conditions and outcomes are available.")),
+    ...includeTask(
+      hasDecisionBasis || hasConditionVariations,
+      createTaskHint("condition_recommendation", "Reaction conditions or explicit condition variations are available.")
+    ),
     ...includeTask(hasProposalBasis, createTaskHint("experiment_proposal", "Procedure and outcome context are available.")),
     ...includeTask(hasIntentBasis, createTaskHint("experiment_intent", "Experiment intent and causal logic can be inferred from structured facts.")),
     ...includeTask(hasMaterialFlowBasis, createTaskHint("material_flow_reasoning", "Material flow and step dependencies can be inferred from structured links.")),
     ...includeTask(hasFailedOutcome, createTaskHint("failure_analysis", "Failed result labels are available.")),
-    ...includeTask(hasExperimentComparison, createTaskHint("experiment_comparison", "Multiple reactions can be compared.")),
+    ...includeTask(
+      hasExperimentComparison || hasConditionVariations,
+      createTaskHint("experiment_comparison", "Reaction variants or condition variation blocks can be compared.")
+    ),
     ...includeTask(qualityIssueCount > 0, createTaskHint("consistency_check", "Quality warnings or missing logic are available.")),
     ...(entityIds.length > 0 ? [createTaskHint("qa_with_context", "Structured experiment context is available.", entityIds)] : [])
   ];
@@ -2725,11 +2945,15 @@ const buildBlockedLoraTasks = (context: LoraHintContext): LoraTaskHintV1[] => {
   const hasReactions = record.semantic_layer.reactions.length > 0;
   const hasSemanticRelations = record.semantic_layer.links.length > 0;
   const hasEvidenceLinks = fieldEvidence.some(hasExternalEvidence);
+  const hasConditionVariations = record.semantic_layer.condition_variations.length > 0;
   const hasNormalizationEvidence = fieldEvidence.some((item) => item.normalized);
   const hasYieldPrediction = record.learning_layer.prediction_instances.some((instance) =>
     instance.usability.usable_for_yield_regression
   );
-  const hasIntentBasis = (hasReactions && record.semantic_layer.results.length > 0) || hasProcedureLogic || hasEvidenceLinks;
+  const hasIntentBasis = (hasReactions && record.semantic_layer.results.length > 0)
+    || hasProcedureLogic
+    || hasEvidenceLinks
+    || hasConditionVariations;
   const hasMaterialFlowBasis = hasSemanticRelations || hasProcedureLogic;
 
   return [
@@ -2744,14 +2968,17 @@ const buildBlockedLoraTasks = (context: LoraHintContext): LoraTaskHintV1[] => {
     ...includeTask(!hasObservationLogic, createTaskHint("observation_events", "No observation event logic is available.")),
     ...includeTask(!hasYieldPrediction, createTaskHint("yield_prediction", "No usable yield target is available.")),
     ...includeTask(
-      record.semantic_layer.reactions.length === 0 || record.semantic_layer.results.length === 0,
+      !hasConditionVariations && (record.semantic_layer.reactions.length === 0 || record.semantic_layer.results.length === 0),
       createTaskHint("condition_recommendation", "No reaction/result pair is available.")
     ),
     ...includeTask(!hasProcedureLogic, createTaskHint("experiment_proposal", "No procedure logic is available.")),
     ...includeTask(!hasIntentBasis, createTaskHint("experiment_intent", "No reaction/result, procedure, or evidence basis is available.")),
     ...includeTask(!hasMaterialFlowBasis, createTaskHint("material_flow_reasoning", "No semantic relation or procedure logic is available.")),
     ...includeTask(!record.semantic_layer.results.some((result) => result.status_label === "failed"), createTaskHint("failure_analysis", "No failed result label is available.")),
-    ...includeTask(record.semantic_layer.reactions.length < 2, createTaskHint("experiment_comparison", "Fewer than two reactions are available."))
+    ...includeTask(
+      !hasConditionVariations && record.semantic_layer.reactions.length < 2,
+      createTaskHint("experiment_comparison", "Fewer than two reactions are available.")
+    )
   ];
 };
 
@@ -2798,6 +3025,7 @@ export const buildTrainingUnderstandingFromRecord = (
   const outcomeQuality = buildOutcomeQuality(record);
   const reactionTaxonomy = buildReactionTaxonomy(record);
   const failureSignals = buildFailureSignals(outcomes, outcomeQuality);
+  const conditionVariations = buildConditionVariationLogic(record);
   const procedurePairs = record.learning_layer.procedure_to_steps ?? [];
   const evidenceLinks = [
     ...buildEvidenceLinks(record, EVIDENCE_RELATIONS, "analysis"),
@@ -2811,7 +3039,7 @@ export const buildTrainingUnderstandingFromRecord = (
     failureSignals,
     procedurePairs
   });
-  const variableLogic = buildVariableLogic(record, designContexts);
+  const variableLogic = buildVariableLogic(record, designContexts, conditionVariations);
   const causalLinks = buildCausalLinks({
     record,
     contexts: designContexts,
@@ -2849,6 +3077,7 @@ export const buildTrainingUnderstandingFromRecord = (
       analyses: record.semantic_layer.analyses.map(stripSourceFields) as TrainingAnalysisV1[],
       samples: record.semantic_layer.samples.map(stripSourceFields) as TrainingSampleV1[],
       artifacts: record.semantic_layer.artifacts.map(stripSourceFields) as TrainingArtifactV1[],
+      condition_variations: record.semantic_layer.condition_variations.map(stripSourceFields) as TrainingConditionVaryV1[],
       narrative_blocks: buildNarrativeBlocks(record)
     },
     relations: record.semantic_layer.links,
@@ -2865,6 +3094,7 @@ export const buildTrainingUnderstandingFromRecord = (
       reaction_taxonomy: reactionTaxonomy,
       expert_routing: expertRouting,
       intent_hypotheses: intentHypotheses,
+      condition_variations: conditionVariations,
       variable_logic: variableLogic,
       causal_links: causalLinks,
       material_flow_graph: materialFlowGraph,

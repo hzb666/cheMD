@@ -1,0 +1,6 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/exporter-training/backend/index.md", "reason": "Backend development guide"}
+{"file": ".trellis/spec/core/backend/index.md", "reason": "Core AST public API rules"}
+{"file": ".trellis/spec/parser/backend/index.md", "reason": "Parser AST and block parser rules"}
+{"file": ".trellis/spec/exporter-training/backend/training-export-contract.md", "reason": "Training export contract changes"}
+{"file": ".trellis/spec/resolver/backend/index.md", "reason": "Reference graph style relevant to typechecker integration"}

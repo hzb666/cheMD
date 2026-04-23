@@ -49,6 +49,35 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   source entity must not be reused just because it has the same target.
 - `artifact.ref` targeting a reaction/result/analysis/sample produces the
   matching `artifact_supports_*` relation.
+- `condition-varies` blocks are authored as:
+
+  ```chemd
+  :::condition-varies #cv-solvent-screen
+  reaction: rxn-variant
+  standard: rxn-standard
+  solvent: THF -> MeCN
+  temperature: 25 C -> 40 C
+  notes: Optional rationale or observation.
+  :::
+  ```
+
+  Parser output uses `ConditionVariesNode.type = "condition_varies"` with:
+  - `reaction?: string` for the candidate/current reaction raw reference
+  - `standard?: string` for the baseline reaction raw reference
+  - `changes: { field; raw; baseline?; candidate? }[]`
+  - `notes?: string`
+- `condition-varies.reaction` and `condition-varies.standard` must typecheck
+  as reaction references. Invalid or unresolved targets produce normal typed
+  reference diagnostics; they must not invent relation targets.
+- Exported condition variation entities must use `cv::<document_id>::<id>` and
+  appear in `semantic_layer.condition_variations` as
+  `ExportedConditionVaryV1` with `reaction_ref_raw`, `standard_ref_raw`,
+  `changes`, `notes`, and `text_for_embedding`.
+- Resolved condition variation references produce:
+  - `condition_variation_targets_reaction` from the condition variation entity
+    to the candidate reaction with role `reaction`
+  - `condition_variation_compares_standard` from the condition variation entity
+    to the standard reaction with role `standard`
 - Resolved Markdown references produce `markdown_mentions_entity`.
 - `learning_layer.retrieval_chunks` must include available:
   - `document_summary`
@@ -58,6 +87,7 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   - `analysis_notes`
   - `sample_notes`
   - `artifact_notes`
+  - `condition_variation`
 - The full `ChemdTrainingExportV2` is an audit export. Do not feed it directly
   to RAG or LoRA/SFT training jobs.
 - RAG and model-training views must be projections from the full export:
@@ -74,6 +104,7 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   `entities.*` records.
 - `ChemdTrainingUnderstandingV1.knowledge_graph` must preserve:
   - exported entity/narrative nodes
+  - condition variation nodes
   - semantic relation edges
   - procedure, canonical step, observation, and observation event nodes
   - procedure/observation logic edges such as procedure-to-step ordering
@@ -100,6 +131,8 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
     low-purity, conflicting, uncertain, or unlinked results
   - inferred intent hypotheses, variable logic, and causal links generated
     from existing facts without requiring extra report syntax
+  - explicit condition variations and explicit changed variable logic from
+    authored `condition-varies` blocks, using `logic_source: "explicit"`
   - material flow graph nodes/edges derived from reaction participants,
     reaction/result/sample/artifact/analysis relations, and procedure step
     inputs/outputs
@@ -117,13 +150,19 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   review flag. Automatically inferred records use `logic_source: "derived"`;
   future LLM suggestions must use `logic_source: "llm_suggested"` and stay
   outside source truth until accepted through annotation.
+- Explicit `condition-varies` facts may enrich or override derived changed
+  variable facts for the same reaction/field/role. The explicit record keeps
+  raw author delta values (`baseline_value`, `candidate_value`) and high
+  confidence only when both reaction references resolve and at least one change
+  is present.
 - Material flow graph edges and step dependency edges are inferred operational
   logic. Each edge must carry a stable ID, `logic_source`, confidence, evidence
   IDs, review semantics, and warnings. Positional-only step ordering must set
   `review_required: true` with a positional warning.
 - `ChemdTrainingUnderstandingV1.resolved_references` must include Markdown
   references and structured `ref`/participant references that affect
-  experiment logic.
+  experiment logic, including `condition_varies.reaction` and
+  `condition_varies.standard`.
 - `learning_layer.prediction_instances` must avoid leaking linked result text
   into input features. Result entities remain linked as targets/evidence, while
   feature inputs should focus on reaction conditions, participants, quantities,
@@ -166,9 +205,11 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   facts without `relation_type`. They must not include the full `relations`
   target array in the user prompt.
 - Experiment-intent task inputs must expose only source facts such as document
-  metadata, reactions, outcomes, procedure summaries, and evidence counts. They
-  must not include `intent_hypotheses`, `variable_logic`, or `causal_links` in
-  the user prompt. Derived experiment-intent examples are SFT-only by default.
+  metadata, reactions, authored condition variation facts, outcomes, procedure
+  summaries, and evidence counts. They must not include `intent_hypotheses`,
+  `variable_logic`, or `causal_links` in the user prompt. Derived or explicit
+  experiment-intent examples are SFT-only by default unless human annotations
+  later promote them.
 - Material-flow reasoning task inputs must expose only source facts such as
   document metadata, reactions, samples, artifacts, relation types, and
   procedure step facts. They must not include `material_flow_graph` or
@@ -191,6 +232,7 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 | Literal participant | Keep participant as literal; do not emit molecule relation |
 | Empty analysis/sample text | Do not emit an empty retrieval chunk |
 | Empty artifact text | Do not emit an empty artifact retrieval chunk |
+| Empty condition variation text | Do not emit an empty condition variation retrieval chunk |
 | Duplicate relation source | Deduplicate by stable `relation_id` |
 | Field source spans | Strip from clean entities; preserve on field evidence |
 | Derived task label | Mark SFT/eval/holdout eligibility explicitly |
@@ -200,6 +242,8 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 | Reference-resolution task | Exclude full target references from prompt; keep derived examples SFT-only by default |
 | Relation-extraction task | Exclude full target relations from prompt; keep derived examples SFT-only by default |
 | Inferred intent/causal logic | Emit derived records with evidence IDs and review flags; do not treat as source truth |
+| Explicit condition variation | Emit explicit condition variation logic; use low confidence and review-required if reaction or standard is unresolved |
+| Condition variation target kind mismatch | Resolve diagnostics normally, but do not emit candidate/standard semantic relation |
 | Experiment-intent task | Keep SFT-only and exclude inferred target records from the prompt |
 | Material flow graph | Emit derived graph edges only from resolved semantic links or step IO |
 | Positional step dependency | Mark review-required with `positional_order_only` warning |
@@ -208,13 +252,18 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 ### 5. Good/Base/Bad Cases
 
 - Good: reaction + result + sample + analysis + artifact all connected through stable links.
+- Good: `condition-varies` references a candidate and standard reaction, emits
+  condition variation relations, and produces explicit changed variable logic.
 - Base: standalone document still emits a document summary chunk.
-- Bad: unresolved `ref` must not invent a relation.
+- Bad: unresolved `condition-varies.standard` must not invent a standard
+  reaction relation and must keep review-required condition variation logic.
 
 ### 6. Tests Required
 
 - Assert relation types, `from_entity_id`, and `to_entity_id`.
 - Assert chunk types for document, analysis, sample, and artifact content.
+- Assert chunk types for condition variation content when `text_for_embedding`
+  is available.
 - Assert source fields such as `ref_raw` remain visible where they explain links.
 - Assert projections do not leak noisy full-export fields such as `raw_text`,
   `source_layer`, or `semantic_layer.lnf`.
@@ -249,6 +298,9 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 - Assert inferred experiment intent, variable logic, and causal links are
   present for single-run and variant experiments, carry `logic_source`, and set
   review flags when evidence is weak.
+- Assert explicit condition variation entities, references, semantic links,
+  design contexts, variable logic, and experiment-intent inputs/outputs are
+  present for `condition-varies` blocks.
 - Assert experiment-intent task examples are generated without leaking
   `intent_hypotheses`, `variable_logic`, or `causal_links` into user prompts.
 - Assert material flow graph and step dependencies are present for reaction
