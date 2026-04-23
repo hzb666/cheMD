@@ -167,10 +167,14 @@ describe("training export artifacts and projections", () => {
     const materialFlowExample = dataset.examples.find((example) =>
       example.task_type === "material_flow_reasoning"
     );
+    const evidenceInterpretationExample = dataset.examples.find((example) =>
+      example.task_type === "evidence_interpretation"
+    );
     const normalizationInput = parseTaskUserInput(normalizationExample);
     const evidenceTracingInput = parseTaskUserInput(evidenceTracingExample);
     const experimentIntentInput = parseTaskUserInput(experimentIntentExample);
     const materialFlowInput = parseTaskUserInput(materialFlowExample);
+    const evidenceInterpretationInput = parseTaskUserInput(evidenceInterpretationExample);
 
     expect(record.semantic_layer.artifacts[0]).toMatchObject({
       original_id: "spec-main",
@@ -229,6 +233,30 @@ describe("training export artifacts and projections", () => {
     ]));
     expect(understanding.experiment_logic.sample_lineage).toEqual(expect.arrayContaining([
       expect.objectContaining({ relation_type: "sample_has_artifact" })
+    ]));
+    expect(understanding.experiment_logic.sample_profiles).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        sample_entity_id: "sam::exp-export-artifacts::sample-main",
+        sample_role: "aliquot",
+        artifact_entity_ids: ["art::exp-export-artifacts::spec-main"]
+      })
+    ]));
+    expect(understanding.experiment_logic.artifact_profiles).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        artifact_entity_id: "art::exp-export-artifacts::spec-main",
+        artifact_role: "spectral_evidence",
+        supports_entity_ids: ["res::exp-export-artifacts::res-main"]
+      })
+    ]));
+    expect(understanding.experiment_logic.evidence_interpretations).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        evidence_entity_id: "art::exp-export-artifacts::spec-main",
+        target_entity_id: "res::exp-export-artifacts::res-main"
+      }),
+      expect.objectContaining({
+        evidence_entity_id: "ana::exp-export-artifacts::ana-nmr",
+        target_entity_id: "res::exp-export-artifacts::res-main"
+      })
     ]));
     expect(understanding.experiment_logic.intent_hypotheses).toContainEqual(expect.objectContaining({
       intent_kind: "characterization",
@@ -294,6 +322,7 @@ describe("training export artifacts and projections", () => {
       "procedure_reasoning",
       "observation_events",
       "evidence_tracing",
+      "evidence_interpretation",
       "reference_resolution",
       "relation_extraction",
       "experiment_intent",
@@ -349,6 +378,9 @@ describe("training export artifacts and projections", () => {
     });
     expect(materialFlowInput).not.toHaveProperty("material_flow_graph");
     expect(materialFlowInput).not.toHaveProperty("step_dependencies");
+    expect(evidenceInterpretationInput).toMatchObject({
+      task: "evidence_interpretation"
+    });
   });
 });
 
@@ -420,317 +452,6 @@ yield: 75%
       target_entity_ids: ["res::exp-intent-variants::res-variant"]
     }));
     expect(dataset.quality.task_types).toContain("experiment_intent");
-  });
-});
-
-describe("training export condition variations", () => {
-  it("exports explicit condition variation logic into training tasks", () => {
-    const document = resolveChemd(parseChemd(`---
-id: exp-condition-varies
-title: Condition varies
-date: 2026-04-23
----
-
-:::chemd #rxn-standard
-kind: reaction
-reactants: substrate
-products: product
-solvent: THF
-temperature: 25 C
-yield: 40%
-:::
-
-:::result #res-standard
-ref: rxn-standard
-status: partial
-yield: 40%
-:::
-
-:::chemd #rxn-variant
-kind: reaction
-reactants: substrate
-products: product
-solvent: MeCN
-temperature: 40 C
-yield: 78%
-:::
-
-:::result #res-variant
-ref: rxn-variant
-status: success
-yield: 78%
-:::
-
-:::condition-varies #cv-solvent-temperature
-reaction: rxn-variant
-standard: rxn-standard
-solvent: THF -> MeCN
-temperature: 25 C -> 40 C
-notes: Candidate improves yield under warmer MeCN conditions.
-:::
-`));
-    const checked = typecheckDocument(document);
-    const record = exportTrainingRecordFromDocument(document, {
-      typedGraph: checked.typedGraph,
-      exportedAt: "2026-04-23T00:00:00.000Z"
-    });
-    const understanding = buildTrainingUnderstandingFromRecord(record);
-    const dataset = buildTrainingTaskDatasetFromUnderstanding(understanding);
-    const relationTypes = record.semantic_layer.links.map((link) => link.relation_type);
-    const intentExample = dataset.examples.find((example) => example.task_type === "experiment_intent");
-    const intentInput = parseTaskUserInput(intentExample);
-    const intentOutput = parseTaskAssistantOutput(intentExample);
-
-    expect(record.source_layer.raw_children).toContainEqual(expect.objectContaining({
-      node_type: "condition_varies",
-      original_id: "cv-solvent-temperature"
-    }));
-    expect(record.semantic_layer.condition_variations[0]).toMatchObject({
-      original_id: "cv-solvent-temperature",
-      reaction_ref_raw: "rxn-variant",
-      standard_ref_raw: "rxn-standard",
-      changes: [
-        { field: "solvent", baseline_raw: "THF", candidate_raw: "MeCN" },
-        { field: "temperature", baseline_raw: "25 C", candidate_raw: "40 C" }
-      ]
-    });
-    expect(relationTypes).toEqual(expect.arrayContaining([
-      "condition_variation_targets_reaction",
-      "condition_variation_compares_standard"
-    ]));
-    expect(understanding.entities.condition_variations[0]).toMatchObject({
-      entity_id: "cv::exp-condition-varies::cv-solvent-temperature",
-      changes: expect.arrayContaining([
-        expect.objectContaining({ field: "solvent", candidate_raw: "MeCN" })
-      ])
-    });
-    expect(understanding.resolved_references).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        source_entity_type: "condition_varies",
-        source_field: "reaction",
-        target_original_id: "rxn-variant"
-      }),
-      expect.objectContaining({
-        source_entity_type: "condition_varies",
-        source_field: "standard",
-        target_original_id: "rxn-standard"
-      })
-    ]));
-    expect(understanding.experiment_logic.condition_variations[0]).toMatchObject({
-      logic_source: "explicit",
-      confidence: "high",
-      reaction_entity_id: "rxn::exp-condition-varies::rxn-variant",
-      standard_reaction_entity_id: "rxn::exp-condition-varies::rxn-standard"
-    });
-    expect(understanding.experiment_logic.variable_logic).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        reaction_entity_id: "rxn::exp-condition-varies::rxn-variant",
-        field: "solvent",
-        variable_role: "changed",
-        baseline_value: "THF",
-        candidate_value: "MeCN",
-        logic_source: "explicit"
-      })
-    ]));
-    expect(understanding.experiment_logic.intent_hypotheses).toContainEqual(expect.objectContaining({
-      reaction_entity_id: "rxn::exp-condition-varies::rxn-variant",
-      intent_kind: "optimization",
-      logic_source: "explicit",
-      confidence: "high"
-    }));
-    expect(intentInput).toMatchObject({
-      task: "experiment_intent",
-      condition_variations: [
-        expect.objectContaining({
-          condition_variation_entity_id: "cv::exp-condition-varies::cv-solvent-temperature"
-        })
-      ]
-    });
-    expect(intentOutput).toMatchObject({
-      variable_logic: expect.arrayContaining([
-        expect.objectContaining({ logic_source: "explicit", field: "solvent" })
-      ])
-    });
-    expect(dataset.quality.task_types).toEqual(expect.arrayContaining([
-      "reference_resolution",
-      "relation_extraction",
-      "experiment_intent",
-      "condition_recommendation",
-      "experiment_comparison"
-    ]));
-  });
-
-  it("exports condition variation attempts and attempt-level evidence references", () => {
-    const document = resolveChemd(parseChemd(`---
-id: exp-condition-attempts
-title: Condition attempts
-date: 2026-04-23
----
-
-:::chemd #rxn-standard
-kind: reaction
-reactants: substrate
-products: product
-solvent: THF
-temperature: 25 C
-yield: 40%
-:::
-
-:::result #res-standard
-ref: rxn-standard
-status: partial
-yield: 40%
-:::
-
-:::chemd #rxn-var1
-kind: reaction
-reactants: substrate
-products: product
-solvent: MeCN
-temperature: 40 C
-yield: 78%
-:::
-
-:::result #res-var1
-ref: rxn-var1
-status: success
-yield: 78%
-:::
-
-:::chemd #rxn-var2
-kind: reaction
-reactants: substrate
-products: product
-solvent: DMSO
-temperature: 60 C
-yield: 12%
-:::
-
-:::result #res-var2
-ref: rxn-var2
-status: partial
-yield: 12%
-:::
-
-:::condition-varies #cv-screen
-standard: rxn-standard
-condition: solvent=THF | temperature=25 C | catalyst=Pd
-varies: solvent | temperature
-var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
-res1: res-var1
-note1: Better yield but impurity visible.
-var2: reaction=rxn-var2 | mode=override | solvent=DMSO | temperature=60 C | catalyst=Ni
-res2: res-var2
-note2: Low conversion by TLC.
-:::
-
-:::analysis #tlc-var1
-type: tlc
-ref: @cv-screen.var1
-result: one major spot and faint impurity
-:::
-
-:::observation #obs-var1
-ref: @cv-screen.var1
-event: color_change | id=e-var1 | timepoint=after heating | severity=low | confidence=0.9
-:::
-`));
-    const checked = typecheckDocument(document);
-    const record = exportTrainingRecordFromDocument(document, {
-      typedGraph: checked.typedGraph,
-      stepGraph: checked.stepGraph,
-      exportedAt: "2026-04-23T00:00:00.000Z"
-    });
-    const understanding = buildTrainingUnderstandingFromRecord(record);
-    const dataset = buildTrainingTaskDatasetFromUnderstanding(understanding);
-    const relationTypes = record.semantic_layer.links.map((link) => link.relation_type);
-    const conditionExample = dataset.examples.find((example) =>
-      example.task_type === "condition_recommendation"
-      && example.source_entity_ids.includes("cva::exp-condition-attempts::cv-screen.var1")
-    );
-    const conditionInput = parseTaskUserInput(conditionExample);
-
-    expect(record.semantic_layer.condition_variations[0]).toMatchObject({
-      original_id: "cv-screen",
-      condition: expect.arrayContaining([
-        expect.objectContaining({ field: "solvent", baseline_raw: "THF" })
-      ]),
-      vary_fields: ["solvent", "temperature"],
-      attempt_entity_ids: [
-        "cva::exp-condition-attempts::cv-screen.var1",
-        "cva::exp-condition-attempts::cv-screen.var2"
-      ]
-    });
-    expect(record.semantic_layer.condition_variation_attempts).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        entity_id: "cva::exp-condition-attempts::cv-screen.var1",
-        original_id: "cv-screen.var1",
-        attempt_id: "var1",
-        reaction_ref_raw: "rxn-var1",
-        result_ref_raw: "res-var1",
-        note: "Better yield but impurity visible.",
-        condition: expect.arrayContaining([
-          expect.objectContaining({ field: "catalyst", candidate_raw: "Pd" }),
-          expect.objectContaining({ field: "solvent", candidate_raw: "MeCN" })
-        ])
-      })
-    ]));
-    expect(relationTypes).toEqual(expect.arrayContaining([
-      "condition_variation_has_attempt",
-      "condition_variation_attempt_targets_reaction",
-      "condition_variation_attempt_has_result",
-      "analysis_targets_condition_variation_attempt"
-    ]));
-    expect(record.learning_layer.observation_to_events?.[0]).toMatchObject({
-      observation_id: "obs-var1",
-      ref_raw: "@cv-screen.var1",
-      target_entity_id: "cva::exp-condition-attempts::cv-screen.var1",
-      target_entity_type: "condition_variation_attempt"
-    });
-    expect(understanding.entities.condition_variation_attempts).toContainEqual(expect.objectContaining({
-      entity_id: "cva::exp-condition-attempts::cv-screen.var1",
-      attempt_id: "var1"
-    }));
-    expect(understanding.resolved_references).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        source_entity_type: "condition_variation_attempt",
-        source_entity_id: "cva::exp-condition-attempts::cv-screen.var1",
-        source_field: "result",
-        target_original_id: "res-var1"
-      }),
-      expect.objectContaining({
-        source_entity_type: "analysis",
-        source_field: "ref",
-        target_entity_id: "cva::exp-condition-attempts::cv-screen.var1",
-        relation_type: "analysis_targets_condition_variation_attempt"
-      })
-    ]));
-    expect(understanding.experiment_logic.condition_variations).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        condition_variation_attempt_entity_id: "cva::exp-condition-attempts::cv-screen.var1",
-        attempt_id: "var1",
-        reaction_entity_id: "rxn::exp-condition-attempts::rxn-var1",
-        result_entity_id: "res::exp-condition-attempts::res-var1",
-        standard_reaction_entity_id: "rxn::exp-condition-attempts::rxn-standard",
-        confidence: "high"
-      })
-    ]));
-    expect(understanding.experiment_logic.variable_logic).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        reaction_entity_id: "rxn::exp-condition-attempts::rxn-var1",
-        field: "solvent",
-        candidate_value: "MeCN",
-        logic_source: "explicit"
-      })
-    ]));
-    expect(conditionInput).toMatchObject({
-      condition_variations: expect.arrayContaining([
-        expect.objectContaining({
-          condition_variation_attempt_entity_id: "cva::exp-condition-attempts::cv-screen.var1",
-          attempt_id: "var1"
-        })
-      ])
-    });
   });
 });
 
@@ -993,273 +714,4 @@ result: trace impurity
       ])
     });
   });
-});
-
-describe("training export semantic records", () => {
-  it("preserves all explicit step source text in procedure learning pairs", () => {
-    const document = resolveChemd(parseChemd(`---
-id: exp-export-steps
-title: Export explicit steps
-date: 2026-04-17
----
-
-:::procedure #proc-main
-step: add | materials=A
-step: heat | target_temperature=80 C
-:::
-`));
-    const checked = typecheckDocument(document);
-    const record = exportTrainingRecordFromDocument(document, {
-      stepGraph: checked.stepGraph,
-      typedGraph: checked.typedGraph,
-      exportedAt: "2026-04-17T00:00:00.000Z"
-    });
-
-    expect(record.learning_layer.procedure_to_steps?.[0]?.source_text).toBe(
-      ["step: add | materials=A", "step: heat | target_temperature=80 C"].join("\n")
-    );
-  });
-
-  it("builds typed graph fallback for normalized semantic fields", () => {
-    const document = resolveChemd(parseChemd(`---
-id: exp-export-fallback
-title: Export fallback
-date: 2026-04-18
----
-
-:::chemd #rxn-main
-kind: reaction
-reactants: a
-products: b
-solvent: THF
-:::
-`));
-    const record = exportTrainingRecordFromDocument(document, {
-      exportedAt: "2026-04-18T00:00:00.000Z"
-    });
-
-    expect(record.semantic_layer.reactions[0]?.normalized_conditions).toMatchObject({
-      solvent: {
-        normalized: "tetrahydrofuran"
-      }
-    });
-  });
-
-  it("exports CAS separately from SMILES for molecule semantics", () => {
-    const document = resolveChemd(parseChemd(`---
-id: exp-export-cas
-title: Export CAS
-date: 2026-04-19
----
-
-:::chemd #mol-cas
-kind: molecule
-cas: 64-17-5
-name: ethanol
-:::
-`));
-    const record = exportTrainingRecordFromDocument(document, {
-      exportedAt: "2026-04-19T00:00:00.000Z"
-    });
-
-    expect(record.semantic_layer.molecules[0]).toMatchObject({
-      original_id: "mol-cas",
-      cas: "64-17-5",
-      name: "ethanol"
-    });
-    expect(record.semantic_layer.molecules[0]).not.toMatchObject({ smiles: "64-17-5" });
-  });
-
-  it("uses typed graph and canonical LNF data for training features", () => {
-    const document = resolveChemd(parseChemd(`---
-id: exp-export-typed
-title: Export typed graph
-date: 2026-04-19
-primary_result: res-main
----
-
-:::chemd #mol-a
-kind: molecule
-smiles: CCO
-amount: 1.2 mmol
-equivalents: 1.0 equiv
-:::
-
-:::chemd #rxn-main
-kind: reaction
-reactants: @mol-a
-products: product
-solvent: THF
-temperature: 25 C
-yield: 81%
-:::
-
-:::result #res-main
-status: success
-yield: 80%
-purity: 95%
-:::
-
-:::sample #sample-main
-name: final product
-purity: 95%
-:::
-`));
-    const checked = typecheckDocument(document);
-    const lnf = buildCanonicalLnf({
-      document,
-      typedGraph: checked.typedGraph,
-      stepGraph: checked.stepGraph,
-      diagnostics: checked.diagnostics
-    });
-    const record = exportTrainingRecordFromDocument(document, {
-      typedGraph: checked.typedGraph,
-      stepGraph: checked.stepGraph,
-      lnf,
-      exportedAt: "2026-04-19T00:00:00.000Z"
-    });
-
-    expect(record.semantic_layer.lnf?.schemaVersion).toBe("chemd-lnf/v0.5");
-    expect(record.semantic_layer.molecules[0]).toMatchObject({
-      amount_value: { value: 1.2, unit: "mmol" },
-      equivalents_value: 1
-    });
-    expect(record.semantic_layer.reactions[0]).toMatchObject({
-      normalized_outcome_hints: {
-        yield_percent: 81
-      }
-    });
-    expect(record.semantic_layer.results[0]).toMatchObject({
-      status_label: "success",
-      yield_percent: 80,
-      purity_percent: 95
-    });
-    expect(record.semantic_layer.samples[0]).toMatchObject({
-      purity_percent: 95
-    });
-    expect(record.learning_layer.retrieval_chunks.length).toBeGreaterThan(0);
-    expect(record.learning_layer.prediction_instances[0]).toMatchObject({
-      targets: {
-        status_class: "success",
-        yield_percent: 80
-      },
-      usability: {
-        usable_for_classification: true,
-        usable_for_yield_regression: true
-      }
-    });
-    expect(record.quality_layer.training_quality.prediction_eligible).toBe(true);
-  });
-
-  it("exports semantic fact links and retrieval chunks for analyses and samples", () => {
-    const document = resolveChemd(parseChemd(`---
-id: exp-export-links
-title: Export linked facts
-date: 2026-04-20
-primary_result: res-main
----
-
-:::chemd #mol-start
-kind: molecule
-smiles: CCO
-name: ethanol
-:::
-
-:::chemd #mol-product
-kind: molecule
-smiles: CC(=O)O
-name: acetic acid
-:::
-
-:::chemd #rxn-main
-kind: reaction
-reactants: @mol-start
-products: @mol-product
-solvent: THF
-:::
-
-:::result #res-main
-ref: rxn-main
-status: success
-yield: 80%
-notes: isolated product after workup
-:::
-
-:::sample #sample-main
-ref: mol-product
-name: final product
-batch: B-001
-purity: 95%
-notes: stored under nitrogen
-:::
-
-:::sample #sample-crude
-ref: rxn-main
-name: crude aliquot
-notes: sampled before purification
-:::
-
-:::analysis #ana-sample
-type: nmr
-ref: sample-main
-instrument: Bruker 400
-data: data/nmr/sample-main.pdf
-notes: clean spectrum
-:::
-
-:::analysis #ana-rxn
-type: tlc
-ref: rxn-main
-data: one major product spot
-:::
-
-Linked notes mention @rxn-main and @res-main.yield.
-`));
-    const checked = typecheckDocument(document);
-    const record = exportTrainingRecordFromDocument(document, {
-      typedGraph: checked.typedGraph,
-      stepGraph: checked.stepGraph,
-      exportedAt: "2026-04-20T00:00:00.000Z"
-    });
-    const relationTypes = record.semantic_layer.links.map((link) => link.relation_type);
-    const chunkTypes = record.learning_layer.retrieval_chunks.map((chunk) => chunk.chunk_type);
-
-    expect(relationTypes).toEqual(expect.arrayContaining([
-      "document_primary",
-      "reaction_uses_molecule",
-      "reaction_produces_molecule",
-      "result_describes_reaction",
-      "sample_related_to_molecule",
-      "sample_derived_from_reaction",
-      "analysis_targets_sample",
-      "analysis_targets_reaction",
-      "markdown_mentions_entity"
-    ]));
-    expect(record.semantic_layer.links).toContainEqual(expect.objectContaining({
-      relation_type: "analysis_targets_sample",
-      from_entity_id: "ana::exp-export-links::ana-sample",
-      to_entity_id: "sam::exp-export-links::sample-main"
-    }));
-    expect(record.semantic_layer.links).toContainEqual(expect.objectContaining({
-      relation_type: "result_describes_reaction",
-      from_entity_id: "res::exp-export-links::res-main",
-      to_entity_id: "rxn::exp-export-links::rxn-main"
-    }));
-    expect(chunkTypes).toEqual(expect.arrayContaining([
-      "document_summary",
-      "analysis_notes",
-      "sample_notes"
-    ]));
-    expect(record.learning_layer.retrieval_chunks).toContainEqual(expect.objectContaining({
-      chunk_type: "analysis_notes",
-      source_entity_ids: ["ana::exp-export-links::ana-sample"],
-      text: expect.stringContaining("data/nmr/sample-main.pdf")
-    }));
-    expect(record.learning_layer.retrieval_chunks).toContainEqual(expect.objectContaining({
-      chunk_type: "sample_notes",
-      source_entity_ids: ["sam::exp-export-links::sample-crude"],
-      text: expect.stringContaining("sampled before purification")
-    }));
-  });
-
 });

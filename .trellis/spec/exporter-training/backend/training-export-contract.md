@@ -178,6 +178,9 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
     from existing facts without requiring extra report syntax
   - explicit condition variations and explicit changed variable logic from
     authored `condition-varies` blocks, using `logic_source: "explicit"`
+  - implicit condition facts that recover controlled defaults only from
+    authored `condition-varies` baselines or resolved standard reactions; they
+    must never be inferred from bare free text alone
   - material flow graph nodes/edges derived from reaction participants,
     reaction/result/sample/artifact/analysis relations, and procedure step
     inputs/outputs
@@ -185,6 +188,11 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
     previous-step outputs consumed by later steps, artifact outputs, and linked
     observation events
   - analysis/artifact evidence links and sample lineage links
+  - sample profiles and artifact profiles that summarize practical lineage
+    roles, attached evidence, and artifact usage without mutating source truth
+  - evidence interpretations that map structured evidence into support,
+    contradiction, identification, weakening, or quantification claims with
+    field-level source references when available
 - Reaction taxonomy, expert routing, optimization trajectories, and failure
   signals are derived experiment-understanding features. They must carry
   evidence IDs, warnings, and confidence where applicable, and must not be
@@ -204,6 +212,11 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   logic. Each edge must carry a stable ID, `logic_source`, confidence, evidence
   IDs, review semantics, and warnings. Positional-only step ordering must set
   `review_required: true` with a positional warning.
+- Cross-document strategy understanding must be built in a separate aggregation
+  layer. Single-document `ChemdTrainingUnderstandingV1` stays document-scoped,
+  while `buildTrainingCampaignFromUnderstandings()` groups compatible runs into
+  campaign trajectories and `buildTrainingCampaignTaskDataset()` emits
+  cross-document strategy task examples.
 - `ChemdTrainingUnderstandingV1.resolved_references` must include Markdown
   references and structured `ref`/participant references that affect
   experiment logic, including `condition_varies.reaction` and
@@ -216,7 +229,7 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 - LoRA generation hints should distinguish extraction/summary tasks from
   experiment-decision tasks such as record-to-Chemd reconstruction,
   Chemd repair, normalization explanation, procedure reasoning, observation
-  events, evidence tracing, QA with context, yield prediction, condition
+  events, evidence tracing, evidence interpretation, QA with context, yield prediction, condition
   recommendation, experiment proposal, failure analysis, experiment comparison,
   reaction classification, and expert routing.
 - LoRA/SFT JSONL must be generated from `ChemdTrainingUnderstandingV1`,
@@ -225,11 +238,16 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   API for experiment-decision SFT/LoRA samples. It consumes only
   `ChemdTrainingUnderstandingV1` and emits JSONL-ready `messages` examples for
   record-to-Chemd reconstruction, Chemd repair, normalization explanation,
-  procedure reasoning, observation events, evidence tracing, reference
+  procedure reasoning, observation events, evidence tracing, evidence
+  interpretation, reference
   resolution, relation extraction, QA with context, experiment intent, material
   flow reasoning, yield prediction, condition recommendation, experiment
   proposal, failure analysis, experiment comparison, reaction classification,
   and expert routing.
+- `buildTrainingCampaignTaskDataset()` is the cross-document task-projection
+  API. It consumes multiple `ChemdTrainingUnderstandingV1` records and emits
+  `cross_document_strategy` examples without mutating any single-document
+  schema.
 - Task-projection examples are derived supervision. They must carry quality
   warnings and must not be treated as human-confirmed labels unless a later
   annotation layer explicitly adds that status.
@@ -290,12 +308,15 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 | Inferred intent/causal logic | Emit derived records with evidence IDs and review flags; do not treat as source truth |
 | Explicit condition variation | Emit explicit condition variation logic; use low confidence and review-required if reaction or standard is unresolved |
 | Explicit condition attempt | Emit attempt-level logic; use `resN` and `noteN` matching for result/note evidence |
+| Implicit condition recovery | Only inherit defaults from authored condition baselines or resolved standard reactions; mark warnings when authored baseline is absent |
 | Attempt reference from TLC/analysis | Emit `analysis_targets_condition_variation_attempt` when `ref` targets `@cv.varN` |
 | Condition variation target kind mismatch | Resolve diagnostics normally, but do not emit candidate/standard semantic relation |
 | Experiment-intent task | Keep SFT-only and exclude inferred target records from the prompt |
 | Material flow graph | Emit derived graph edges only from resolved semantic links or step IO |
 | Positional step dependency | Mark review-required with `positional_order_only` warning |
 | Material-flow task | Keep SFT-only and exclude target graph fields from the prompt |
+| Evidence interpretation task | Keep source prompts limited to evidence entities, target entities, and source refs; do not leak derived interpretation targets into the input beyond those facts |
+| Cross-document strategy task | Require at least two documents in one grouped trajectory before emitting a campaign example |
 
 ### 5. Good/Base/Bad Cases
 
@@ -304,11 +325,20 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   condition variation relations, and produces explicit changed variable logic.
 - Good: `condition-varies` with `var1`/`var2` emits attempt entities, binds
   `res1`/`note1`, and lets TLC/analysis/observation reference `@cv.var1`.
+- Good: attempt-level baseline inheritance emits implicit condition facts for
+  controlled variables such as catalyst or atmosphere when they come from the
+  authored baseline.
+- Good: linked analysis/artifact evidence emits evidence-interpretation records
+  with source refs and conservative support/weakening labels.
 - Base: standalone document still emits a document summary chunk.
+- Base: campaign aggregation emits no trajectory when only one document matches
+  a series signature.
 - Bad: unresolved `condition-varies.standard` must not invent a standard
   reaction relation and must keep review-required condition variation logic.
 - Bad: unresolved `var1.result` must preserve the raw result ref but must not
   emit `condition_variation_attempt_has_result`.
+- Bad: cross-document aggregation must not overwrite single-document design
+  contexts or rewrite source-truth entities.
 
 ### 6. Tests Required
 
@@ -356,6 +386,12 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 - Assert condition variation attempts, `resN`/`noteN` matching,
   attempt-level references, TLC/analysis attempt links, and observation target
   metadata are present for `condition-varies` attempt blocks.
+- Assert implicit condition facts are emitted only for supported inheritance
+  paths and can drive controlled-variable task inputs without inventing bare
+  free-text defaults.
+- Assert sample profiles, artifact profiles, and evidence interpretations are
+  present in training understanding and that evidence-interpretation examples
+  are generated without leaking derived labels into prompts.
 - Assert experiment-intent task examples are generated without leaking
   `intent_hypotheses`, `variable_logic`, or `causal_links` into user prompts.
 - Assert material flow graph and step dependencies are present for reaction
@@ -363,6 +399,9 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   consumption.
 - Assert material-flow reasoning task examples are generated without leaking
   `material_flow_graph` or `step_dependencies` into user prompts.
+- Assert cross-document campaign aggregation produces grouped trajectories and
+  `cross_document_strategy` examples only when at least two documents share a
+  trajectory signature.
 
 ### 7. Wrong vs Correct
 

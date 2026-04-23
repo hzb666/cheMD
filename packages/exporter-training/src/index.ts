@@ -3,3 +3,4 @@ export * from "./projection-types";
 export * from "./export-record";
 export * from "./projections";
 export * from "./task-projections";
+export * from "./campaign-projections";

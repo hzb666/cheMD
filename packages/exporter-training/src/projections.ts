@@ -10,6 +10,8 @@ import type {
   TrainingConditionVariationAttemptV1,
   TrainingConditionVariationLogicV1,
   TrainingConditionVaryV1,
+  TrainingEvidenceInterpretationKindV1,
+  TrainingEvidenceInterpretationV1,
   TrainingEvidenceLinkV1,
   TrainingExpertRoutingV1,
   TrainingCausalLinkV1,
@@ -30,6 +32,7 @@ import type {
   TrainingMoleculeV1,
   TrainingNarrativeBlockV1,
   TrainingObservationLogicPairV1,
+  TrainingImplicitConditionFactV1,
   TrainingOutcomeQualityV1,
   TrainingOutcomeLogicV1,
   TrainingOptimizationStepV1,
@@ -41,6 +44,8 @@ import type {
   TrainingReactionV1,
   TrainingResolvedReferenceV1,
   TrainingResultV1,
+  TrainingSampleProfileV1,
+  TrainingArtifactProfileV1,
   TrainingSampleV1,
   TrainingStepDependencyEdgeV1,
   TrainingVariableLogicV1
@@ -143,6 +148,12 @@ interface FlowEdgeInput {
   warnings?: string[];
 }
 
+interface SourceRefCandidate {
+  entity_id: string;
+  field?: string;
+  source_span?: TrainingFieldEvidenceV1["source_span"];
+}
+
 interface RelationMaterialFlowSpec {
   edgeType: TrainingMaterialFlowEdgeV1["edge_type"];
   reverse?: boolean;
@@ -221,6 +232,25 @@ const LOW_CONVERSION_THRESHOLD = 50;
 const LOW_SELECTIVITY_THRESHOLD = 50;
 const LOW_PURITY_THRESHOLD = 80;
 const DERIVED_LOGIC_SOURCE = "derived" as const;
+const POSITIVE_EVIDENCE_TERMS = [
+  "clean",
+  "confirmed",
+  "consistent",
+  "matches",
+  "single spot",
+  "complete",
+  "product observed"
+];
+const NEGATIVE_EVIDENCE_TERMS = [
+  "impurity",
+  "impurities",
+  "decomposition",
+  "starting material remains",
+  "incomplete",
+  "multiple spots",
+  "side product",
+  "low conversion"
+];
 const REACTION_TAXONOMY_RULES: Array<{
   family: TrainingReactionFamilyV1;
   tags: string[];
@@ -829,6 +859,30 @@ const getReactionVariableMap = (reaction: ExportedReactionV1): Record<string, st
   pressure: formatNumericWithUnit(reaction.normalized_conditions.pressure) ?? null
 });
 
+const TRACKED_REACTION_FIELDS = [
+  "reaction_name",
+  "reactants",
+  "products",
+  "solvent",
+  "catalyst",
+  "reagents",
+  "atmosphere",
+  "temperature",
+  "time",
+  "pressure"
+];
+
+const getContextImplicitValue = (
+  implicitFacts: TrainingImplicitConditionFactV1[],
+  context: TrainingExperimentDesignContextV1,
+  field: string
+): LogicValue | undefined =>
+  implicitFacts.find((fact) =>
+    fact.reaction_entity_id === context.reaction_entity_id
+    && fact.field === field
+    && fact.evidence_entity_ids.some((entityId) => context.evidence_entity_ids.includes(entityId))
+  )?.value;
+
 const buildVariableDeltas = (
   baseline: ExportedReactionV1,
   candidate: ExportedReactionV1
@@ -1119,6 +1173,102 @@ const buildConditionVariationLogic = (
   return [...legacyLogic, ...buildAttemptConditionVariationLogic(record)];
 };
 
+const buildVariationImplicitConditionFacts = (
+  variation: ExportedConditionVaryV1,
+  candidate: ExportedReactionV1 | undefined,
+  standard: ExportedReactionV1 | undefined
+): TrainingImplicitConditionFactV1[] => {
+  if (!candidate || !standard) {
+    return [];
+  }
+
+  const changedFields = new Set(variation.changes.map((change) => change.field));
+  const authoredBaselineFields = new Set((variation.condition ?? []).map((condition) => condition.field));
+  const candidateValues = getReactionVariableMap(candidate);
+  const standardValues = getReactionVariableMap(standard);
+
+  return TRACKED_REACTION_FIELDS.flatMap((field) => {
+    if (changedFields.has(field) || candidateValues[field] !== null || standardValues[field] === null) {
+      return [];
+    }
+
+    return [{
+      fact_id: `implicit-condition::${variation.entity_id}::${candidate.entity_id}::${field}`,
+      reaction_entity_id: candidate.entity_id,
+      condition_variation_entity_id: variation.entity_id,
+      field,
+      value: standardValues[field],
+      source: "condition_varies_standard_inheritance",
+      confidence: authoredBaselineFields.has(field) ? "high" : "medium",
+      evidence_entity_ids: uniqueStrings([variation.entity_id, candidate.entity_id, standard.entity_id]),
+      review_required: !authoredBaselineFields.has(field),
+      warnings: authoredBaselineFields.has(field) ? [] : ["standard_inherited_without_authored_baseline"]
+    }];
+  });
+};
+
+const buildAttemptImplicitConditionFacts = (
+  record: ChemdTrainingExportV2,
+  attempt: ExportedConditionVariationAttemptV1
+): TrainingImplicitConditionFactV1[] => {
+  const parent = record.semantic_layer.condition_variations.find((variation) =>
+    variation.entity_id === attempt.parent_condition_variation_id
+  );
+  const candidate = findReactionByRawRef(record.semantic_layer.reactions, attempt.reaction_ref_raw);
+  if (!parent || !candidate) {
+    return [];
+  }
+
+  const changedFields = new Set(attempt.changes.map((change) => change.field));
+  return attempt.condition.flatMap((condition) => {
+    if (changedFields.has(condition.field)) {
+      return [];
+    }
+
+    const value = condition.candidate_raw ?? condition.baseline_raw ?? condition.raw;
+    if (value === undefined) {
+      return [];
+    }
+
+    return [{
+      fact_id: `implicit-condition::${attempt.entity_id}::${candidate.entity_id}::${condition.field}`,
+      reaction_entity_id: candidate.entity_id,
+      condition_variation_entity_id: parent.entity_id,
+      condition_variation_attempt_entity_id: attempt.entity_id,
+      field: condition.field,
+      value,
+      source: "condition_varies_attempt_inheritance",
+      confidence: "high",
+      evidence_entity_ids: uniqueStrings([
+        parent.entity_id,
+        attempt.entity_id,
+        candidate.entity_id
+      ]),
+      review_required: false,
+      warnings: []
+    }];
+  });
+};
+
+const buildImplicitConditionFacts = (
+  record: ChemdTrainingExportV2
+): TrainingImplicitConditionFactV1[] => {
+  const facts = [
+    ...record.semantic_layer.condition_variations.flatMap((variation) =>
+      buildVariationImplicitConditionFacts(
+        variation,
+        findReactionByRawRef(record.semantic_layer.reactions, variation.reaction_ref_raw),
+        findReactionByRawRef(record.semantic_layer.reactions, variation.standard_ref_raw)
+      )
+    ),
+    ...record.semantic_layer.condition_variation_attempts.flatMap((attempt) =>
+      buildAttemptImplicitConditionFacts(record, attempt)
+    )
+  ];
+
+  return Array.from(new Map(facts.map((fact) => [fact.fact_id, fact])).values());
+};
+
 const getReactionClassificationText = (reaction: ExportedReactionV1): string =>
   compactText(
     reaction.name,
@@ -1372,7 +1522,8 @@ const buildChangedVariableLogic = (
 
 const buildControlledVariableLogic = (
   context: TrainingExperimentDesignContextV1,
-  reaction: ExportedReactionV1 | undefined
+  reaction: ExportedReactionV1 | undefined,
+  implicitFacts: TrainingImplicitConditionFactV1[]
 ): TrainingVariableLogicV1[] => {
   const values = reaction ? getReactionVariableMap(reaction) : {};
   return context.controlled_variables.map((field) => ({
@@ -1380,9 +1531,9 @@ const buildControlledVariableLogic = (
     reaction_entity_id: context.reaction_entity_id,
     field,
     variable_role: "controlled",
-    ...addValueField("value", values[field]),
-    logic_source: DERIVED_LOGIC_SOURCE,
-    confidence: "medium",
+    ...addValueField("value", values[field] ?? getContextImplicitValue(implicitFacts, context, field)),
+    logic_source: getContextImplicitValue(implicitFacts, context, field) !== undefined ? "explicit" : DERIVED_LOGIC_SOURCE,
+    confidence: getContextImplicitValue(implicitFacts, context, field) !== undefined ? "high" : "medium",
     evidence_entity_ids: context.evidence_entity_ids,
     review_required: false
   }));
@@ -1414,14 +1565,15 @@ const buildExplicitConditionVariableLogic = (
 const buildVariableLogic = (
   record: ChemdTrainingExportV2,
   contexts: TrainingExperimentDesignContextV1[],
-  conditionVariations: TrainingConditionVariationLogicV1[]
+  conditionVariations: TrainingConditionVariationLogicV1[],
+  implicitFacts: TrainingImplicitConditionFactV1[]
 ): TrainingVariableLogicV1[] => {
   const reactionById = new Map(record.semantic_layer.reactions.map((reaction) => [reaction.entity_id, reaction]));
   const explicitLogic = buildExplicitConditionVariableLogic(conditionVariations);
   const explicitKeys = new Set(explicitLogic.map(getVariableLogicKey));
   const derivedLogic = contexts.flatMap((context) => [
     ...buildChangedVariableLogic(context),
-    ...buildControlledVariableLogic(context, reactionById.get(context.reaction_entity_id))
+    ...buildControlledVariableLogic(context, reactionById.get(context.reaction_entity_id), implicitFacts)
   ]);
 
   return [
@@ -1703,6 +1855,250 @@ const buildEvidenceLinks = (
       relation_type: relation.relation_type,
       evidence_type: evidenceType
     }));
+
+const getRelationsFromEntity = (
+  record: ChemdTrainingExportV2,
+  fromEntityId: string,
+  relationTypes?: ReadonlySet<ExportedRelationV1["relation_type"]>
+): ExportedRelationV1[] =>
+  record.semantic_layer.links.filter((relation) =>
+    relation.from_entity_id === fromEntityId
+    && (!relationTypes || relationTypes.has(relation.relation_type))
+  );
+
+const getRelationsToEntity = (
+  record: ChemdTrainingExportV2,
+  toEntityId: string,
+  relationTypes?: ReadonlySet<ExportedRelationV1["relation_type"]>
+): ExportedRelationV1[] =>
+  record.semantic_layer.links.filter((relation) =>
+    relation.to_entity_id === toEntityId
+    && (!relationTypes || relationTypes.has(relation.relation_type))
+  );
+
+const getSampleRole = (
+  record: ChemdTrainingExportV2,
+  sample: ExportedSampleV1
+): TrainingSampleProfileV1["sample_role"] => {
+  const outgoing = getRelationsFromEntity(record, sample.entity_id, SAMPLE_LINEAGE_RELATIONS);
+  const incoming = getRelationsToEntity(record, sample.entity_id, SAMPLE_LINEAGE_RELATIONS);
+  if (outgoing.some((relation) => relation.relation_type === "sample_aliquot_of_sample")) {
+    return "aliquot";
+  }
+  if (outgoing.some((relation) => relation.relation_type === "sample_batch_of_sample")) {
+    return "batch_member";
+  }
+  if (incoming.some((relation) => relation.relation_type === "sample_batch_of_sample")) {
+    return "batch_parent";
+  }
+  if (outgoing.some((relation) => relation.relation_type === "sample_derived_from_reaction")) {
+    return "reaction_output";
+  }
+  if (outgoing.some((relation) => relation.relation_type === "sample_derived_from_sample")) {
+    return "derived_sample";
+  }
+  if (getRelationsToEntity(record, sample.entity_id, new Set(["analysis_targets_sample"])).length > 0) {
+    return "analysis_subject";
+  }
+  if (outgoing.some((relation) => relation.relation_type === "sample_related_to_molecule")) {
+    return "reference_material";
+  }
+  return "unknown";
+};
+
+const buildSampleProfiles = (
+  record: ChemdTrainingExportV2
+): TrainingSampleProfileV1[] =>
+  record.semantic_layer.samples.map((sample) => {
+    const outgoing = getRelationsFromEntity(record, sample.entity_id, SAMPLE_LINEAGE_RELATIONS);
+    const incoming = getRelationsToEntity(record, sample.entity_id, SAMPLE_LINEAGE_RELATIONS);
+    const analysisIds = getRelationsToEntity(record, sample.entity_id, new Set(["analysis_targets_sample"]))
+      .map((relation) => relation.from_entity_id);
+
+    return {
+      sample_entity_id: sample.entity_id,
+      sample_role: getSampleRole(record, sample),
+      parent_entity_ids: outgoing
+        .filter((relation) => relation.relation_type !== "sample_has_artifact")
+        .map((relation) => relation.to_entity_id),
+      child_sample_entity_ids: incoming
+        .filter((relation) =>
+          relation.relation_type === "sample_derived_from_sample"
+          || relation.relation_type === "sample_aliquot_of_sample"
+          || relation.relation_type === "sample_batch_of_sample"
+        )
+        .map((relation) => relation.from_entity_id),
+      artifact_entity_ids: outgoing
+        .filter((relation) => relation.relation_type === "sample_has_artifact")
+        .map((relation) => relation.to_entity_id),
+      analysis_entity_ids: analysisIds,
+      evidence_entity_ids: uniqueStrings([
+        sample.entity_id,
+        ...outgoing.flatMap((relation) => [relation.from_entity_id, relation.to_entity_id]),
+        ...incoming.flatMap((relation) => [relation.from_entity_id, relation.to_entity_id]),
+        ...analysisIds
+      ]),
+      warnings: outgoing.length === 0 && incoming.length === 0 ? ["sample_profile_without_lineage"] : []
+    };
+  });
+
+const getArtifactRole = (
+  artifact: ExportedArtifactV1
+): TrainingArtifactProfileV1["artifact_role"] => {
+  const text = compactText(artifact.artifact_kind, artifact.path, artifact.notes)?.toLowerCase() ?? "";
+  if (hasAnyTerm(text, ["nmr", "ms", "ir", "uv", "spectrum"])) {
+    return "spectral_evidence";
+  }
+  if (hasAnyTerm(text, ["tlc", "lcms", "hplc", "gc", "chrom"])) {
+    return "chromatography_evidence";
+  }
+  if (hasAnyTerm(text, ["image", "photo", ".png", ".jpg", ".jpeg"])) {
+    return "image_evidence";
+  }
+  if (hasAnyTerm(text, ["notebook", "log", ".txt"])) {
+    return "process_record";
+  }
+  return artifact.ref_raw ? "measurement_output" : "unknown";
+};
+
+const buildArtifactProfiles = (
+  record: ChemdTrainingExportV2,
+  stepDependencies: TrainingStepDependencyEdgeV1[]
+): TrainingArtifactProfileV1[] =>
+  record.semantic_layer.artifacts.map((artifact) => {
+    const outgoing = getRelationsFromEntity(record, artifact.entity_id, ARTIFACT_EVIDENCE_RELATIONS);
+    const incomingSampleRelations = getRelationsToEntity(record, artifact.entity_id, new Set(["sample_has_artifact"]));
+    const incomingAnalysisRelations = getRelationsToEntity(record, artifact.entity_id, new Set(["artifact_supports_analysis"]));
+    const producedByStepIds = stepDependencies
+      .filter((edge) => edge.dependency_type === "step_produces_artifact" && edge.target_entity_id === artifact.entity_id)
+      .map((edge) => edge.source_step_id);
+
+    return {
+      artifact_entity_id: artifact.entity_id,
+      artifact_role: getArtifactRole(artifact),
+      supports_entity_ids: outgoing.map((relation) => relation.to_entity_id),
+      sample_entity_ids: incomingSampleRelations.map((relation) => relation.from_entity_id),
+      analysis_entity_ids: outgoing
+        .filter((relation) => relation.relation_type === "artifact_supports_analysis")
+        .map((relation) => relation.to_entity_id)
+        .concat(incomingAnalysisRelations.map((relation) => relation.from_entity_id)),
+      produced_by_step_ids: producedByStepIds,
+      evidence_entity_ids: uniqueStrings([
+        artifact.entity_id,
+        ...outgoing.flatMap((relation) => [relation.to_entity_id]),
+        ...incomingSampleRelations.map((relation) => relation.from_entity_id),
+        ...incomingAnalysisRelations.map((relation) => relation.from_entity_id),
+        ...producedByStepIds
+      ]),
+      warnings: outgoing.length === 0 ? ["artifact_profile_without_support_target"] : []
+    };
+  });
+
+const getEvidenceSourceRefs = (
+  record: ChemdTrainingExportV2,
+  evidenceEntityId: string
+): SourceRefCandidate[] => {
+  const analysis = record.semantic_layer.analyses.find((entity) => entity.entity_id === evidenceEntityId);
+  if (analysis) {
+    return [
+      { entity_id: analysis.entity_id, field: "result", source_span: getFieldSourceSpan(analysis, "result") },
+      { entity_id: analysis.entity_id, field: "data", source_span: getFieldSourceSpan(analysis, "data") },
+      { entity_id: analysis.entity_id, field: "notes", source_span: getFieldSourceSpan(analysis, "notes") }
+    ].filter((item) => item.source_span || item.field === "result");
+  }
+
+  const artifact = record.semantic_layer.artifacts.find((entity) => entity.entity_id === evidenceEntityId);
+  if (artifact) {
+    return [
+      { entity_id: artifact.entity_id, field: "notes", source_span: getFieldSourceSpan(artifact, "notes") },
+      { entity_id: artifact.entity_id, field: "path", source_span: getFieldSourceSpan(artifact, "path") }
+    ].filter((item) => item.source_span || item.field === "notes");
+  }
+
+  return [{ entity_id: evidenceEntityId }];
+};
+
+const inferEvidenceInterpretationFromText = (
+  text: string,
+  kindHint: "analysis" | "artifact"
+): { kind: TrainingEvidenceInterpretationKindV1; signal: string; confidence: TrainingInferenceConfidenceV1 } | undefined => {
+  const lowered = text.toLowerCase();
+  const negative = NEGATIVE_EVIDENCE_TERMS.find((term) => lowered.includes(term));
+  if (negative) {
+    return { kind: "weakens", signal: negative, confidence: "medium" };
+  }
+
+  const positive = POSITIVE_EVIDENCE_TERMS.find((term) => lowered.includes(term));
+  if (!positive) {
+    return undefined;
+  }
+
+  return {
+    kind: kindHint === "analysis" && hasAnyTerm(lowered, ["nmr", "ms", "spectrum"]) ? "identifies" : "supports",
+    signal: positive,
+    confidence: "medium"
+  };
+};
+
+const buildEvidenceInterpretations = (
+  record: ChemdTrainingExportV2,
+  fieldEvidence: TrainingFieldEvidenceV1[],
+  evidenceLinks: TrainingEvidenceLinkV1[]
+): TrainingEvidenceInterpretationV1[] => {
+  const quantifiedFields = new Set(["yield_percent", "conversion_percent", "selectivity_percent", "purity_percent"]);
+  const quantitative = fieldEvidence.flatMap((evidence) =>
+    evidence.evidence_entity_ids
+      .filter((entityId) => entityId !== evidence.subject_entity_id && quantifiedFields.has(evidence.field))
+      .map((entityId) => ({
+        interpretation_id: `evidence-interpretation::${entityId}::${evidence.subject_entity_id}::${evidence.field}`,
+        evidence_entity_id: entityId,
+        target_entity_id: evidence.subject_entity_id,
+        target_field: evidence.field,
+        interpretation_kind: "quantifies" as const,
+        statement: `${entityId} provides structured support for ${evidence.field}.`,
+        logic_source: DERIVED_LOGIC_SOURCE,
+        confidence: (evidence.normalized ? "high" : "medium") as TrainingInferenceConfidenceV1,
+        source_refs: getEvidenceSourceRefs(record, entityId),
+        review_required: false,
+        warnings: []
+      }))
+  );
+
+  const textual = evidenceLinks.flatMap((link) => {
+    const analysis = record.semantic_layer.analyses.find((entity) => entity.entity_id === link.evidence_entity_id);
+    const artifact = record.semantic_layer.artifacts.find((entity) => entity.entity_id === link.evidence_entity_id);
+    const text = compactText(
+      analysis?.result_raw,
+      analysis?.data_raw,
+      analysis?.notes,
+      artifact?.notes
+    );
+    const inferred = text
+      ? inferEvidenceInterpretationFromText(text, analysis ? "analysis" : "artifact")
+      : undefined;
+    if (!inferred) {
+      return [];
+    }
+
+    return [{
+      interpretation_id: `evidence-interpretation::${link.evidence_entity_id}::${link.target_entity_id}::${inferred.kind}`,
+      evidence_entity_id: link.evidence_entity_id,
+      target_entity_id: link.target_entity_id,
+      interpretation_kind: inferred.kind,
+      statement: text as string,
+      extracted_signal: inferred.signal,
+      logic_source: DERIVED_LOGIC_SOURCE,
+      confidence: inferred.confidence,
+      source_refs: getEvidenceSourceRefs(record, link.evidence_entity_id),
+      review_required: false,
+      warnings: []
+    }];
+  });
+
+  return Array.from(new Map(
+    [...quantitative, ...textual].map((item) => [item.interpretation_id, item])
+  ).values());
+};
 
 const getEntityLabel = (entity: ObjectEntity): string | undefined => {
   if ("name" in entity && entity.name) {
@@ -3129,6 +3525,7 @@ const buildRecommendedLoraTasks = (
   const hasNormalizationEvidence = fieldEvidence.some((item) => item.normalized);
   const hasIntentBasis = hasDecisionBasis || hasProcedureLogic || hasEvidenceLinks || hasConditionVariations;
   const hasMaterialFlowBasis = hasSemanticRelations || hasProcedureLogic;
+  const hasEvidenceInterpretation = hasEvidenceLinks;
   const qualityIssueCount = missingLogic.length + (record.quality_layer.training_quality.exclusion_reasons?.length ?? 0);
 
   return [
@@ -3142,6 +3539,7 @@ const buildRecommendedLoraTasks = (
     ...includeTask(hasSemanticRelations, createTaskHint("relation_extraction", "Semantic relations are available.", entityIds)),
     ...includeTask(resolvedReferences.length > 0, createTaskHint("reference_resolution", "Resolved or unresolved references are available.")),
     ...includeTask(hasEvidenceLinks, createTaskHint("evidence_tracing", "External field-level evidence is available.")),
+    ...includeTask(hasEvidenceInterpretation, createTaskHint("evidence_interpretation", "Evidence entities can be interpreted into support or contradiction claims.")),
     ...includeTask(hasProcedureLogic, createTaskHint("procedure_reasoning", "Procedure-to-step pairs are available.")),
     ...includeTask(hasObservationLogic, createTaskHint("observation_events", "Observation-to-event pairs are available.")),
     ...includeTask(hasYieldPrediction, createTaskHint("yield_prediction", "Usable yield targets are available.")),
@@ -3179,6 +3577,7 @@ const buildBlockedLoraTasks = (context: LoraHintContext): LoraTaskHintV1[] => {
     || hasEvidenceLinks
     || hasConditionVariations;
   const hasMaterialFlowBasis = hasSemanticRelations || hasProcedureLogic;
+  const hasEvidenceInterpretation = hasEvidenceLinks;
 
   return [
     ...includeTask(record.source_layer.raw_children.length === 0, createTaskHint("record_to_chemd", "No source snapshots are available.")),
@@ -3188,6 +3587,7 @@ const buildBlockedLoraTasks = (context: LoraHintContext): LoraTaskHintV1[] => {
     ...includeTask(!hasSemanticRelations, createTaskHint("relation_extraction", "No semantic relations are available.")),
     ...includeTask(resolvedReferences.length === 0, createTaskHint("reference_resolution", "No references are available.")),
     ...includeTask(!hasEvidenceLinks, createTaskHint("evidence_tracing", "No external field-level evidence is available.")),
+    ...includeTask(!hasEvidenceInterpretation, createTaskHint("evidence_interpretation", "No evidence entities are available for interpretation.")),
     ...includeTask(!hasProcedureLogic, createTaskHint("procedure_reasoning", "No procedure logic is available.")),
     ...includeTask(!hasObservationLogic, createTaskHint("observation_events", "No observation event logic is available.")),
     ...includeTask(!hasYieldPrediction, createTaskHint("yield_prediction", "No usable yield target is available.")),
@@ -3250,6 +3650,7 @@ export const buildTrainingUnderstandingFromRecord = (
   const reactionTaxonomy = buildReactionTaxonomy(record);
   const failureSignals = buildFailureSignals(outcomes, outcomeQuality);
   const conditionVariations = buildConditionVariationLogic(record);
+  const implicitConditionFacts = buildImplicitConditionFacts(record);
   const procedurePairs = record.learning_layer.procedure_to_steps ?? [];
   const evidenceLinks = [
     ...buildEvidenceLinks(record, EVIDENCE_RELATIONS, "analysis"),
@@ -3263,7 +3664,7 @@ export const buildTrainingUnderstandingFromRecord = (
     failureSignals,
     procedurePairs
   });
-  const variableLogic = buildVariableLogic(record, designContexts, conditionVariations);
+  const variableLogic = buildVariableLogic(record, designContexts, conditionVariations, implicitConditionFacts);
   const causalLinks = buildCausalLinks({
     record,
     contexts: designContexts,
@@ -3274,6 +3675,9 @@ export const buildTrainingUnderstandingFromRecord = (
   });
   const materialFlowGraph = buildMaterialFlowGraph(record, entityByOriginalId);
   const stepDependencies = buildStepDependencies(record, entityByOriginalId);
+  const sampleProfiles = buildSampleProfiles(record);
+  const artifactProfiles = buildArtifactProfiles(record, stepDependencies);
+  const evidenceInterpretations = buildEvidenceInterpretations(record, fieldEvidence, evidenceLinks);
   const optimizationTrajectories = buildOptimizationTrajectories(
     record.document.document_id,
     designContexts,
@@ -3326,8 +3730,12 @@ export const buildTrainingUnderstandingFromRecord = (
       step_dependencies: stepDependencies,
       optimization_trajectories: optimizationTrajectories,
       failure_signals: failureSignals,
+      implicit_condition_facts: implicitConditionFacts,
       evidence_links: evidenceLinks,
-      sample_lineage: sampleLineage
+      evidence_interpretations: evidenceInterpretations,
+      sample_lineage: sampleLineage,
+      sample_profiles: sampleProfiles,
+      artifact_profiles: artifactProfiles
     },
     knowledge_graph: {
       nodes: graphNodes,

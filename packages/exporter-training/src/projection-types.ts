@@ -224,6 +224,9 @@ export interface TrainingFailureSignalV1 {
 }
 
 export type TrainingLogicSourceV1 = "explicit" | "derived" | "llm_suggested";
+export type TrainingImplicitConditionSourceV1 =
+  | "condition_varies_standard_inheritance"
+  | "condition_varies_attempt_inheritance";
 export type TrainingIntentKindV1 =
   | "synthesis"
   | "optimization"
@@ -256,6 +259,20 @@ export interface TrainingVariableLogicV1 {
   confidence: TrainingInferenceConfidenceV1;
   evidence_entity_ids: string[];
   review_required: boolean;
+}
+
+export interface TrainingImplicitConditionFactV1 {
+  fact_id: string;
+  reaction_entity_id: string;
+  condition_variation_entity_id?: string;
+  condition_variation_attempt_entity_id?: string;
+  field: string;
+  value: string | number | boolean | null;
+  source: TrainingImplicitConditionSourceV1;
+  confidence: TrainingInferenceConfidenceV1;
+  evidence_entity_ids: string[];
+  review_required: boolean;
+  warnings: string[];
 }
 
 export interface TrainingConditionVariationLogicV1 {
@@ -387,6 +404,74 @@ export interface TrainingEvidenceLinkV1 {
   evidence_type: "analysis" | "sample" | "artifact";
 }
 
+export type TrainingSampleRoleV1 =
+  | "reaction_output"
+  | "aliquot"
+  | "batch_parent"
+  | "batch_member"
+  | "derived_sample"
+  | "analysis_subject"
+  | "reference_material"
+  | "unknown";
+
+export interface TrainingSampleProfileV1 {
+  sample_entity_id: string;
+  sample_role: TrainingSampleRoleV1;
+  parent_entity_ids: string[];
+  child_sample_entity_ids: string[];
+  artifact_entity_ids: string[];
+  analysis_entity_ids: string[];
+  evidence_entity_ids: string[];
+  warnings: string[];
+}
+
+export type TrainingArtifactRoleV1 =
+  | "spectral_evidence"
+  | "chromatography_evidence"
+  | "image_evidence"
+  | "process_record"
+  | "measurement_output"
+  | "unknown";
+
+export interface TrainingArtifactProfileV1 {
+  artifact_entity_id: string;
+  artifact_role: TrainingArtifactRoleV1;
+  supports_entity_ids: string[];
+  sample_entity_ids: string[];
+  analysis_entity_ids: string[];
+  produced_by_step_ids: string[];
+  evidence_entity_ids: string[];
+  warnings: string[];
+}
+
+export type TrainingEvidenceInterpretationKindV1 =
+  | "supports"
+  | "contradicts"
+  | "quantifies"
+  | "identifies"
+  | "weakens";
+
+export interface TrainingEvidenceSourceRefV1 {
+  entity_id: string;
+  field?: string;
+  source_span?: SourceSpan;
+}
+
+export interface TrainingEvidenceInterpretationV1 {
+  interpretation_id: string;
+  evidence_entity_id: string;
+  target_entity_id: string;
+  target_field?: string;
+  interpretation_kind: TrainingEvidenceInterpretationKindV1;
+  statement: string;
+  extracted_signal?: string;
+  logic_source: TrainingLogicSourceV1;
+  confidence: TrainingInferenceConfidenceV1;
+  source_refs: TrainingEvidenceSourceRefV1[];
+  review_required: boolean;
+  warnings: string[];
+}
+
 export type TrainingKnowledgeNodeType =
   | "document"
   | "molecule"
@@ -495,6 +580,7 @@ export type LoraTaskTypeV1 =
   | "relation_extraction"
   | "reference_resolution"
   | "evidence_tracing"
+  | "evidence_interpretation"
   | "procedure_reasoning"
   | "observation_events"
   | "yield_prediction"
@@ -539,8 +625,12 @@ export interface TrainingExperimentLogicV1 {
   step_dependencies: TrainingStepDependencyEdgeV1[];
   optimization_trajectories: TrainingOptimizationTrajectoryV1[];
   failure_signals: TrainingFailureSignalV1[];
+  implicit_condition_facts: TrainingImplicitConditionFactV1[];
   evidence_links: TrainingEvidenceLinkV1[];
+  evidence_interpretations: TrainingEvidenceInterpretationV1[];
   sample_lineage: TrainingEvidenceLinkV1[];
+  sample_profiles: TrainingSampleProfileV1[];
+  artifact_profiles: TrainingArtifactProfileV1[];
 }
 
 export interface ChemdTrainingUnderstandingV1 {
@@ -572,6 +662,7 @@ export type ExperimentDecisionTaskTypeV1 =
   | "procedure_reasoning"
   | "observation_events"
   | "evidence_tracing"
+  | "evidence_interpretation"
   | "reference_resolution"
   | "relation_extraction"
   | "qa_with_context"
@@ -620,6 +711,75 @@ export interface ChemdTrainingTaskDatasetV1 {
   quality: {
     example_count: number;
     task_types: ExperimentDecisionTaskTypeV1[];
+    sft_eligible_count: number;
+    eval_eligible_count: number;
+    holdout_eligible_count: number;
+    warnings: string[];
+  };
+}
+
+export interface TrainingCampaignRunV1 {
+  run_id: string;
+  document_id: string;
+  reaction_entity_id: string;
+  result_entity_id?: string;
+  series_key: string;
+  date: string;
+  changed_variables: TrainingExperimentVariableDeltaV1[];
+  controlled_variables: string[];
+  status_label?: TrainingOutcomeLogicV1["status_label"];
+  yield_percent?: number | null;
+  intent_kinds: TrainingIntentKindV1[];
+  failure_modes: TrainingFailureModeV1[];
+  evidence_entity_ids: string[];
+}
+
+export interface TrainingCrossDocumentTrajectoryV1 {
+  trajectory_id: string;
+  series_key: string;
+  document_ids: string[];
+  baseline_run_id?: string;
+  best_run_id?: string;
+  runs: TrainingCampaignRunV1[];
+  strategy_labels: string[];
+  rationale: string[];
+  warnings: string[];
+}
+
+export interface ChemdTrainingCampaignV1 {
+  schema_version: "chemd-training-campaign/v0.1";
+  campaign_id: string;
+  documents: Array<Pick<ExportedDocumentInfo, "document_id" | "title" | "date">>;
+  trajectories: TrainingCrossDocumentTrajectoryV1[];
+}
+
+export interface TrainingCampaignTaskExampleV1 {
+  example_id: string;
+  task_type: "cross_document_strategy";
+  source_document_ids: string[];
+  source_entity_ids: string[];
+  messages: TrainingTaskMessageV1[];
+  quality: {
+    supervision: "derived_from_training_understanding";
+    usable_for_sft: boolean;
+    usable_for_eval: boolean;
+    derived_label_confidence?: TrainingInferenceConfidenceV1;
+    warnings: string[];
+  };
+  evaluation: {
+    holdout_eligible: boolean;
+    leakage_risk: TrainingTaskLeakageRiskV1;
+    target_fields: string[];
+  };
+}
+
+export interface ChemdTrainingCampaignTaskDatasetV1 {
+  schema_version: "chemd-training-campaign-task-dataset/v0.1";
+  campaign_id: string;
+  examples: TrainingCampaignTaskExampleV1[];
+  quality: {
+    example_count: number;
+    task_types: Array<TrainingCampaignTaskExampleV1["task_type"]>;
     sft_eligible_count: number;
     eval_eligible_count: number;
     holdout_eligible_count: number;

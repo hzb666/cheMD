@@ -37,6 +37,7 @@ const SYSTEM_PROMPTS: Record<ExperimentDecisionTaskTypeV1, string> = {
   procedure_reasoning: "Convert Chemd procedure text into ordered canonical experiment steps with conservative confidence.",
   observation_events: "Convert Chemd observation text into structured observation events and link them to known steps when possible.",
   evidence_tracing: "Trace which evidence supports a field or relation. Separate direct evidence from inferred context.",
+  evidence_interpretation: "Interpret analytical or artifact evidence into support, contradiction, or quantification claims without inventing chemistry.",
   reference_resolution: "Resolve Chemd references to target entities and report unresolved references without inventing targets.",
   relation_extraction: "Extract semantic Chemd relations from entity and reference facts with stable relation roles.",
   qa_with_context: "Answer questions using only supplied Chemd training understanding context. Say when evidence is missing.",
@@ -118,6 +119,23 @@ const getConditionVariationFacts = (
     confidence: variation.confidence,
     warnings: variation.warnings
   }));
+
+const getImplicitConditionFacts = (
+  understanding: ChemdTrainingUnderstandingV1,
+  reactionEntityId?: string
+): JsonObject[] =>
+  understanding.experiment_logic.implicit_condition_facts
+    .filter((fact) => fact.reaction_entity_id === reactionEntityId)
+    .map((fact) => ({
+      reaction_entity_id: fact.reaction_entity_id,
+      condition_variation_entity_id: fact.condition_variation_entity_id,
+      condition_variation_attempt_entity_id: fact.condition_variation_attempt_entity_id,
+      field: fact.field,
+      value: fact.value,
+      source: fact.source,
+      confidence: fact.confidence,
+      warnings: fact.warnings
+    }));
 
 const getReactionFacts = (reaction: TrainingReactionV1 | undefined): JsonObject => ({
   reaction_entity_id: reaction?.entity_id,
@@ -471,6 +489,35 @@ const buildEvidenceTracingExamples = (
       })
     );
 
+const buildEvidenceInterpretationExamples = (
+  understanding: ChemdTrainingUnderstandingV1
+): TrainingTaskExampleV1[] =>
+  understanding.experiment_logic.evidence_interpretations.map((interpretation) =>
+    createExample({
+      understanding,
+      taskType: "evidence_interpretation",
+      suffix: interpretation.interpretation_id,
+      sourceEntityIds: [interpretation.evidence_entity_id, interpretation.target_entity_id],
+      input: {
+        task: "evidence_interpretation",
+        evidence_entity: getEntityById(understanding, interpretation.evidence_entity_id),
+        target_entity: getEntityById(understanding, interpretation.target_entity_id),
+        target_field: interpretation.target_field,
+        source_refs: interpretation.source_refs
+      },
+      output: {
+        interpretation_kind: interpretation.interpretation_kind,
+        statement: interpretation.statement,
+        extracted_signal: interpretation.extracted_signal
+      },
+      warnings: interpretation.warnings,
+      targetFields: ["interpretation_kind", "statement"],
+      leakageRisk: "medium",
+      usableForEval: interpretation.warnings.length === 0,
+      derivedLabelConfidence: interpretation.confidence
+    })
+  );
+
 const stringValue = (value: unknown): string | undefined =>
   typeof value === "string" && value.trim() ? value : undefined;
 
@@ -694,12 +741,14 @@ const buildExperimentIntentExamples = (
         confidence: variation.confidence,
         warnings: variation.warnings
       })),
+      implicit_condition_facts: logic.implicit_condition_facts,
       outcomes: logic.outcomes.map((outcome) =>
         getOutcomeFacts(outcome, getOutcomeQuality(understanding, outcome.result_entity_id))
       ),
       procedure: getProcedureFacts(understanding),
       evidence_link_count: logic.evidence_links.length,
-      sample_lineage_count: logic.sample_lineage.length
+      sample_lineage_count: logic.sample_lineage.length,
+      evidence_interpretation_count: logic.evidence_interpretations.length
     },
     output: {
       intent_hypotheses: logic.intent_hypotheses,
@@ -749,6 +798,8 @@ const buildMaterialFlowReasoningExamples = (
         artifact_kind: artifact.artifact_kind,
         ref_raw: artifact.ref_raw
       })),
+      sample_profiles: logic.sample_profiles,
+      artifact_profiles: logic.artifact_profiles,
       relation_types: understanding.relations.map((relation) => relation.relation_type),
       procedure: getProcedureFlowFacts(understanding)
     },
@@ -857,6 +908,7 @@ const buildConditionRecommendationExamples = (
     const reaction = getReaction(understanding, context.reaction_entity_id);
     const quality = getOutcomeQuality(understanding, outcome.result_entity_id);
     const conditionVariations = getConditionVariationFacts(understanding, context.reaction_entity_id);
+    const implicitConditionFacts = getImplicitConditionFacts(understanding, context.reaction_entity_id);
 
     return [createExample({
       understanding,
@@ -881,7 +933,8 @@ const buildConditionRecommendationExamples = (
         reaction: getReactionFacts(reaction),
         observed_outcome: getOutcomeFacts(outcome, quality),
         design_context: context,
-        condition_variations: conditionVariations
+        condition_variations: conditionVariations,
+        implicit_condition_facts: implicitConditionFacts
       },
       output: {
         recommendation: getRecommendation(outcome, context),
@@ -1000,6 +1053,7 @@ const buildExperimentComparisonExamples = (
     const baselineQuality = getOutcomeQuality(understanding, baselineOutcome.result_entity_id);
     const candidateQuality = getOutcomeQuality(understanding, candidateOutcome.result_entity_id);
     const conditionVariations = getConditionVariationFacts(understanding, context.reaction_entity_id);
+    const implicitConditionFacts = getImplicitConditionFacts(understanding, context.reaction_entity_id);
     const warnings = uniqueStrings([
       ...(baselineQuality?.warnings ?? []),
       ...(candidateQuality?.warnings ?? [])
@@ -1030,6 +1084,7 @@ const buildExperimentComparisonExamples = (
         changed_variables: context.changed_variables,
         controlled_variables: context.controlled_variables,
         condition_variations: conditionVariations,
+        implicit_condition_facts: implicitConditionFacts,
         baseline_reaction: getReactionFacts(getReaction(understanding, context.baseline_reaction_entity_id)),
         candidate_reaction: getReactionFacts(getReaction(understanding, context.reaction_entity_id))
       },
@@ -1064,6 +1119,7 @@ export const buildTrainingTaskDatasetFromUnderstanding = (
     ...buildProcedureReasoningExamples(understanding),
     ...buildObservationEventExamples(understanding),
     ...buildEvidenceTracingExamples(understanding),
+    ...buildEvidenceInterpretationExamples(understanding),
     ...buildReferenceResolutionExamples(understanding),
     ...buildRelationExtractionExamples(understanding),
     ...buildQaWithContextExamples(understanding),
