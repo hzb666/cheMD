@@ -1,0 +1,6 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/web/backend/index.md", "reason": "Backend development guide"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Diagnostics flow from compiler into CLI and web consumers"}
+{"file": ".trellis/spec/compiler/backend/language-v03-contracts.md", "reason": "CompileResult diagnostics contract changes"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Reuse existing authoring suggestion logic instead of duplicating inference"}
+{"file": ".trellis/spec/compiler/backend/error-handling.md", "reason": "Compiler should prefer diagnostics over throws for generated chemd quality issues"}
