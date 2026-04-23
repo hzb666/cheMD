@@ -135,6 +135,13 @@ const applyInsertFieldLine = (
 };
 
 export const applyAuthoringPatch = (source: string, patch: AuthoringPatch): string => {
+  if (patch.kind === "batch") {
+    return patch.patches.reduce(
+      (currentSource, nextPatch) => applyAuthoringPatch(currentSource, nextPatch),
+      source
+    );
+  }
+
   if (patch.kind === "append_document_text") {
     return applyAppendDocumentText(source, patch.text);
   }

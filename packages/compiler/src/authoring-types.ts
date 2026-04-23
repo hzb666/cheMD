@@ -11,9 +11,14 @@ export type AuthoringSuggestionCategory =
 export type AuthoringTemplateCategory =
   | "starter"
   | "companion"
-  | "optimization";
+  | "optimization"
+  | "scaffold";
 
 export type AuthoringPatch =
+  | {
+      kind: "batch";
+      patches: AuthoringPatch[];
+    }
   | {
       kind: "append_document_text";
       text: string;

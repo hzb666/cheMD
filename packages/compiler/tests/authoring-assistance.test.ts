@@ -155,4 +155,112 @@ date: 2026-04-23
     expect(nextSource).toContain(":::result #res-main");
     expect(nextSource).toContain("ref: rxn-main");
   });
+
+  it("builds grouped reaction scaffolds through batch patches", () => {
+    const source = `---
+id: exp-authoring-scaffold
+title: Reaction scaffold
+date: 2026-04-24
+---
+
+:::chemd #rxn-main
+kind: reaction
+reactants: substrate
+products: product
+solvent: THF
+:::
+`;
+    const result = compileChemd(source);
+    const scaffold = result.authoringAssistance.templates.find((item) =>
+      item.template_id === "scaffold-reaction-support-rxn-main"
+    );
+
+    expect(scaffold).toMatchObject({
+      category: "scaffold"
+    });
+    expect(scaffold).toBeDefined();
+
+    const nextSource = applyAuthoringTemplate(
+      source,
+      scaffold as NonNullable<typeof scaffold>
+    );
+
+    expect(nextSource).toContain(":::result #res-main");
+    expect(nextSource).toContain(":::analysis #ana-main");
+    expect(nextSource).toContain(":::observation #obs-main");
+    expect(nextSource).toContain("ref: rxn-main");
+  });
+
+  it("prefers attempt refs and reuses unlinked analysis or observation blocks in attempt scaffolds", () => {
+    const source = `---
+id: exp-authoring-attempt
+title: Attempt scaffold
+date: 2026-04-24
+primary_reaction: rxn-standard
+---
+
+:::chemd #rxn-standard
+kind: reaction
+reactants: substrate
+products: product
+solvent: THF
+:::
+
+:::chemd #rxn-var1
+kind: reaction
+reactants: substrate
+products: product
+solvent: MeCN
+:::
+
+:::condition-varies #cv-screen
+standard: rxn-standard
+varies: solvent
+var1: reaction=rxn-var1 | solvent=MeCN
+:::
+
+:::analysis #ana-attempt
+type: tlc
+result: one major spot
+:::
+
+:::observation #obs-attempt
+Cloudy after concentration.
+:::
+`;
+    const result = compileChemd(source);
+    const analysisSuggestion = result.authoringAssistance.suggestions.find((item) =>
+      item.suggestion_id === "suggest-analysis-ref-ana-attempt"
+    );
+    const observationSuggestion = result.authoringAssistance.suggestions.find((item) =>
+      item.suggestion_id === "suggest-observation-ref-obs-attempt"
+    );
+    const scaffold = result.authoringAssistance.templates.find((item) =>
+      item.template_id === "scaffold-condition-attempt-cv-screen.var1"
+    );
+
+    expect(analysisSuggestion).toBeDefined();
+    expect(observationSuggestion).toBeDefined();
+    expect(scaffold).toBeDefined();
+
+    const suggestedSource = applyAuthoringSuggestion(
+      source,
+      analysisSuggestion as NonNullable<typeof analysisSuggestion>
+    );
+
+    expect(suggestedSource).toContain(`:::analysis #ana-attempt
+type: tlc
+ref: @cv-screen.var1`);
+
+    const nextSource = applyAuthoringTemplate(
+      source,
+      scaffold as NonNullable<typeof scaffold>
+    );
+
+    expect(nextSource).toContain("res1: res-1");
+    expect(nextSource).toContain(":::result #res-1");
+    expect(nextSource).toContain("ref: rxn-var1");
+    expect(nextSource.match(/:::analysis #/g)).toHaveLength(1);
+    expect(nextSource.match(/:::observation #/g)).toHaveLength(1);
+  });
 });

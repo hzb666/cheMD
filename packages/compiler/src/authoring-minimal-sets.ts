@@ -75,7 +75,7 @@ export const buildAuthoringMinimalSets = (
     ? createMinimalSet({
         checklist_id: "linked-supporting-blocks",
         title: "辅助记录引用",
-        description: "analysis / procedure / observation 应尽量显式或可保守推断地指向 reaction。",
+        description: "analysis / procedure / observation 应尽量显式或可保守推断地指向 reaction 或 attempt。",
         missing_items: referenceNodeIds.filter((nodeId) =>
           !suggestions.some((item) => item.target_block_id === nodeId)
         ).map((nodeId) => `${nodeId}.ref`),

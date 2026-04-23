@@ -15,6 +15,32 @@ interface AuthoringAssistPanelProps {
   onApplyTemplate?: (template: AuthoringTemplate) => void;
 }
 
+const TEMPLATE_CATEGORY_ORDER: AuthoringTemplate["category"][] = [
+  "starter",
+  "scaffold",
+  "optimization",
+  "companion"
+];
+
+const TEMPLATE_CATEGORY_LABELS: Record<AuthoringTemplate["category"], string> = {
+  starter: "Starter",
+  scaffold: "Scaffolds",
+  optimization: "Optimization",
+  companion: "Companions"
+};
+
+const SUGGESTION_CATEGORY_ORDER: AuthoringSuggestion["category"][] = [
+  "reference",
+  "inheritance",
+  "structure"
+];
+
+const SUGGESTION_CATEGORY_LABELS: Record<AuthoringSuggestion["category"], string> = {
+  reference: "Reference",
+  inheritance: "Inheritance",
+  structure: "Structure"
+};
+
 const readStatusTone = (status: AuthoringAssistance["minimal_sets"][number]["status"]): string => {
   if (status === "complete") {
     return "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/35 dark:text-emerald-300";
@@ -51,12 +77,25 @@ const Section = ({
   </section>
 );
 
+const groupByCategory = <T extends { category: string }>(
+  items: T[],
+  order: string[]
+): Array<{ category: string; items: T[] }> =>
+  order.flatMap((category) => {
+    const groupedItems = items.filter((item) => item.category === category);
+    return groupedItems.length > 0
+      ? [{ category, items: groupedItems }]
+      : [];
+  });
+
 export const AuthoringAssistPanel = ({
   assistance,
   actionsEnabled = true,
   onApplySuggestion,
   onApplyTemplate
 }: AuthoringAssistPanelProps) => {
+  const templateGroups = groupByCategory(assistance.templates, TEMPLATE_CATEGORY_ORDER);
+  const suggestionGroups = groupByCategory(assistance.suggestions, SUGGESTION_CATEGORY_ORDER);
   const isEmpty = assistance.minimal_sets.length === 0
     && assistance.templates.length === 0
     && assistance.suggestions.length === 0;
@@ -108,50 +147,84 @@ export const AuthoringAssistPanel = ({
         title="Templates"
         subtitle="常见实验模板，直接插入到当前文档。"
       >
-        <div className="flex flex-wrap gap-2">
-          {assistance.templates.map((template) => (
-            <button
-              key={template.template_id}
-              type="button"
-              disabled={!actionsEnabled}
-              className="playground-topbar-button notion-font-ui h-8 rounded-md border border-border px-3 text-[13px]"
-              onClick={() => onApplyTemplate?.(template)}
-            >
-              {template.title}
-            </button>
-          ))}
-        </div>
+        {templateGroups.length === 0 ? (
+          <p className="notion-font-caption text-[12px] text-muted-foreground">
+            No scaffold or starter templates.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {templateGroups.map((group) => (
+              <div key={group.category} className="space-y-2">
+                <div className="notion-font-label text-[12px] text-muted-foreground">
+                  {TEMPLATE_CATEGORY_LABELS[group.category as AuthoringTemplate["category"]]}
+                </div>
+                <ul className="space-y-2">
+                  {group.items.map((template) => (
+                    <li
+                      key={template.template_id}
+                      className="rounded-md border border-border bg-background px-3 py-2"
+                    >
+                      <div className="notion-font-ui text-[13px] text-foreground">{template.title}</div>
+                      <div className="notion-font-caption text-[12px] text-muted-foreground">
+                        {template.description}
+                      </div>
+                      <div className="mt-2">
+                        <button
+                          type="button"
+                          disabled={!actionsEnabled}
+                          className="playground-topbar-button notion-font-ui h-8 rounded-md border border-border px-3 text-[13px]"
+                          onClick={() => onApplyTemplate?.(template)}
+                        >
+                          Apply
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )}
       </Section>
 
       <Section
         title="Suggestions"
         subtitle="仅在目标唯一、无歧义时给出保守自动补全。"
       >
-        {assistance.suggestions.length === 0 ? (
+        {suggestionGroups.length === 0 ? (
           <p className="notion-font-caption text-[12px] text-muted-foreground">
             No conservative authoring suggestions.
           </p>
         ) : (
-          <ul className="space-y-2">
-            {assistance.suggestions.map((suggestion) => (
-              <li key={suggestion.suggestion_id} className="rounded-md border border-border bg-background px-3 py-2">
-                <div className="notion-font-ui text-[13px] text-foreground">{suggestion.title}</div>
-                <div className="notion-font-caption text-[12px] text-muted-foreground">
-                  {suggestion.description}
+          <div className="space-y-3">
+            {suggestionGroups.map((group) => (
+              <div key={group.category} className="space-y-2">
+                <div className="notion-font-label text-[12px] text-muted-foreground">
+                  {SUGGESTION_CATEGORY_LABELS[group.category as AuthoringSuggestion["category"]]}
                 </div>
-                <div className="mt-2">
-                  <button
-                    type="button"
-                    disabled={!actionsEnabled}
-                    className="playground-topbar-button notion-font-ui h-8 rounded-md border border-border px-3 text-[13px]"
-                    onClick={() => onApplySuggestion?.(suggestion)}
-                  >
-                    Apply
-                  </button>
-                </div>
-              </li>
+                <ul className="space-y-2">
+                  {group.items.map((suggestion) => (
+                    <li key={suggestion.suggestion_id} className="rounded-md border border-border bg-background px-3 py-2">
+                      <div className="notion-font-ui text-[13px] text-foreground">{suggestion.title}</div>
+                      <div className="notion-font-caption text-[12px] text-muted-foreground">
+                        {suggestion.description}
+                      </div>
+                      <div className="mt-2">
+                        <button
+                          type="button"
+                          disabled={!actionsEnabled}
+                          className="playground-topbar-button notion-font-ui h-8 rounded-md border border-border px-3 text-[13px]"
+                          onClick={() => onApplySuggestion?.(suggestion)}
+                        >
+                          Apply
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
       </Section>
     </div>

@@ -170,8 +170,9 @@ Strict compiler diagnostics stay visible, and editor helpers only operate on exp
 | Field | Required behavior |
 |-------|-------------------|
 | `minimal_sets` | Read-only status for authored vs inferable gaps |
-| `templates` | Read-only starter/companion patches; UI may apply them, compiler never auto-applies them |
-| `suggestions` | Conservative only: unique-target ref completion, baseline inheritance, and attempt/result pairing |
+| `templates` | Read-only starter/scaffold/optimization patches; grouped scaffolds may touch multiple locations, UI may apply them, compiler never auto-applies them |
+| `suggestions` | Conservative only: unique-target ref completion, baseline inheritance, attempt/result pairing, and unique attempt refs such as `ref: @cv-id.var1` |
+| `patch.kind` | May be `batch`; UI must route every patch through compiler helpers instead of inspecting or replaying child edits itself |
 
 ### 3. Wrong vs Correct
 

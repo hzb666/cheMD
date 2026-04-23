@@ -1,0 +1,4 @@
+{"file": ".agents/skills/finish-work/SKILL.md", "reason": "Finish work checklist"}
+{"file": ".agents/skills/check/SKILL.md", "reason": "Code quality check spec"}
+{"file": ".trellis/spec/web/frontend/quality-guidelines.md", "reason": "Web changes need targeted tests, typecheck, and eslint"}
+{"file": ".trellis/spec/compiler/backend/quality-guidelines.md", "reason": "Compiler changes need regression tests and package validation"}

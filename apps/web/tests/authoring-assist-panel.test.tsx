@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AuthoringAssistPanel } from "../src/features/editor/components/AuthoringAssistPanel";
 
 describe("AuthoringAssistPanel", () => {
-  it("renders minimum sets, templates, and conservative suggestions", () => {
+  it("renders minimum sets, grouped templates, and grouped suggestions", () => {
     const html = renderToStaticMarkup(
       <AuthoringAssistPanel
         assistance={{
@@ -19,13 +19,16 @@ describe("AuthoringAssistPanel", () => {
             suggestion_ids: ["suggest-result-ref-res-main"]
           }],
           templates: [{
-            template_id: "starter-reaction-result",
-            title: "插入 Reaction + Result 模板",
-            description: "最小 starter",
-            category: "starter",
+            template_id: "scaffold-reaction-support-rxn-main",
+            title: "为 rxn-main 插入记录 Scaffold",
+            description: "补齐 result / TLC / observation。",
+            category: "scaffold",
             patch: {
-              kind: "append_document_text",
-              text: ":::chemd #rxn-main"
+              kind: "batch",
+              patches: [{
+                kind: "append_document_text",
+                text: ":::result #res-main"
+              }]
             }
           }],
           suggestions: [{
@@ -49,7 +52,9 @@ describe("AuthoringAssistPanel", () => {
     );
 
     expect(html).toContain("Minimum Set");
-    expect(html).toContain("插入 Reaction + Result 模板");
+    expect(html).toContain("Scaffolds");
+    expect(html).toContain("为 rxn-main 插入记录 Scaffold");
+    expect(html).toContain("Reference");
     expect(html).toContain("为 res-main 补 ref");
     expect(html).toContain("res-main.ref");
     expect(html).toContain("Apply");

@@ -1,0 +1,7 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/web/backend/index.md", "reason": "Backend development guide"}
+{"file": ".trellis/spec/web/frontend/index.md", "reason": "Frontend development guide"}
+{"file": ".trellis/spec/web/frontend/component-guidelines.md", "reason": "Authoring panel changes must follow existing component patterns"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Reuse existing patch/template patterns instead of duplicating source-edit logic"}
+{"file": ".trellis/spec/compiler/backend/language-v03-contracts.md", "reason": "CompileResult authoringAssistance contract must stay explicit and conservative"}
+{"file": ".trellis/spec/web/frontend/type-safety.md", "reason": "Web must consume authoring assistance through public compiler contracts"}

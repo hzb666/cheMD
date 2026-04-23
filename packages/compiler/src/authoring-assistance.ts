@@ -1,11 +1,10 @@
 import type {
   ChemdDocument,
-  ChemdNode,
-  ConditionVariesNode,
-  ObjectNode
+  ConditionVariesNode
 } from "@chemd/core";
 import type { ChemdTrainingExportV2 } from "@chemd/exporter-training";
 
+import { collectObjectNodes } from "./authoring-document";
 import { buildAuthoringMinimalSets } from "./authoring-minimal-sets";
 import { buildAuthoringTemplates } from "./authoring-templates";
 import type {
@@ -14,18 +13,6 @@ import type {
 } from "./authoring-types";
 
 const CONDITION_FIELDS = ["solvent", "temperature", "catalyst", "time", "atmosphere"] as const;
-
-const collectObjectNodes = (nodes: ChemdNode[]): ObjectNode[] =>
-  nodes.flatMap((node) => {
-    const nested = node.type === "col" && Array.isArray(node.children)
-      ? collectObjectNodes(node.children)
-      : node.type === "template" && Array.isArray(node.body)
-        ? collectObjectNodes(node.body)
-        : [];
-    return node.type !== "markdown" && node.type !== "col" && node.type !== "template" && node.type !== "use"
-      ? [node, ...nested]
-      : nested;
-  });
 
 const createSuggestion = (input: {
   suggestion_id: string;
@@ -72,6 +59,10 @@ const buildRefSuggestions = (
   semanticLayer: ChemdTrainingExportV2["semantic_layer"]
 ): AuthoringSuggestion[] => {
   const objectNodes = collectObjectNodes(document.children);
+  const uniqueAttemptOriginalId = semanticLayer.condition_variation_attempts.length === 1
+    ? semanticLayer.condition_variation_attempts[0]?.original_id
+    : undefined;
+  const uniqueAttemptRef = uniqueAttemptOriginalId ? `@${uniqueAttemptOriginalId}` : undefined;
   const reactionIds = semanticLayer.reactions
     .map((reaction) => reaction.original_id)
     .filter((value): value is string => typeof value === "string" && value.length > 0);
@@ -116,19 +107,26 @@ const buildRefSuggestions = (
       : null;
 
   const otherSuggestions = objectNodes.flatMap((node) => {
-    if (node.type === "analysis" && !node.ref && uniqueReactionId && node.id) {
+    if (node.type === "analysis" && !node.ref && node.id) {
+      const targetRef = uniqueAttemptRef ?? uniqueReactionId;
+      if (!targetRef) {
+        return [];
+      }
+
       return [createSuggestion({
         suggestion_id: `suggest-analysis-ref-${node.id}`,
         title: `为 ${node.id} 补 ref`,
-        description: "当前文档只有一个 reaction，可保守补上 analysis.ref。",
+        description: uniqueAttemptRef
+          ? "当前文档只有一个 condition-varies attempt，可保守补上 analysis.ref。"
+          : "当前文档只有一个 reaction，可保守补上 analysis.ref。",
         target_block_id: node.id,
         patch: {
           kind: "insert_field_line",
           blockId: node.id,
-          line: `ref: ${uniqueReactionId}`,
+          line: `ref: ${targetRef}`,
           anchorFields: ["type"]
         }
-      })];
+      })].filter((value): value is AuthoringSuggestion => Boolean(value));
     }
 
     if (node.type === "procedure" && node.id) {
@@ -136,7 +134,23 @@ const buildRefSuggestions = (
     }
 
     if (node.type === "observation" && node.id) {
-      return !node.ref ? [processNode(node.id, "observation")] : [];
+      if (node.ref) {
+        return [];
+      }
+
+      return uniqueAttemptRef
+        ? [createSuggestion({
+            suggestion_id: `suggest-observation-ref-${node.id}`,
+            title: `为 ${node.id} 补 ref`,
+            description: "当前文档只有一个 condition-varies attempt，可保守补上 observation.ref。",
+            target_block_id: node.id,
+            patch: {
+              kind: "insert_field_line",
+              blockId: node.id,
+              line: `ref: ${uniqueAttemptRef}`
+            }
+          })]
+        : [processNode(node.id, "observation")];
     }
 
     return [];
