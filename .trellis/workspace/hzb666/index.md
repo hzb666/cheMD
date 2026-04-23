@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 17
+- **Total Sessions**: 18
 - **Last Active**: 2026-04-23
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~767 | Active |
+| `journal-1.md` | ~802 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 18 | 2026-04-23 | 生成引用和关系训练任务 | `07c2288`, `04364c9` | `develop` |
 | 17 | 2026-04-23 | 导出材料流和步骤依赖 | `e9d88c6`, `a790511` | `develop` |
 | 16 | 2026-04-23 | 推断实验意图与因果逻辑 | `0832609`, `327cac7` | `develop` |
 | 15 | 2026-04-23 | 完善实验逻辑训练导出 | `9fa181f` | `develop` |

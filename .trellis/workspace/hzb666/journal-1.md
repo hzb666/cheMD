@@ -765,3 +765,38 @@ Added RAG embedding backfill service and API route with bounded filters, skip/ov
 ### Next Steps
 
 - None - task complete
+
+
+## Session 18: 生成引用和关系训练任务
+
+**Date**: 2026-04-23
+**Task**: 生成引用和关系训练任务
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+新增 reference_resolution 与 relation_extraction SFT 任务样本，避免模型只看到最终理解层而没学到引用解析与语义关系抽取过程；覆盖 resolved/unresolved reference、semantic relation 输出和 prompt 防泄漏约束；更新 exporter-training 契约并归档 Trellis 任务。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `07c2288` | (see git log) |
+| `04364c9` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
