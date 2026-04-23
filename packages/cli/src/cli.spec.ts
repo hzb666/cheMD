@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -61,6 +61,42 @@ date: 2026-04-19
 :::chemd #mol-main
 kind: reagent
 smiles: CCO
+:::
+`;
+
+const repairableSource = `---
+id: exp-cli-repair
+title: CLI Repair
+date: 2026-04-24
+---
+
+:::chemd #rxn-main
+kind: reaction
+reactants: substrate
+products: product
+:::
+
+:::result #res-main
+status: success
+yield: 72%
+:::
+
+:::analysis #ana-main
+type: tlc
+result: one major spot
+:::
+`;
+
+const repairNeedsInputSource = `---
+id: exp-cli-repair-input
+title: CLI Repair Input
+date: 2026-04-24
+---
+
+:::chemd #rxn-main
+kind: reaction
+reactants: substrate
+products: product
 :::
 `;
 
@@ -176,7 +212,7 @@ const createGitRunner = ({
   return { status: 1, stdout: "", stderr: `unexpected git args: ${args.join(" ")}` };
 };
 
-describe("chemd cli", () => {
+describe("chemd cli help validation export and repair", () => {
   it("runs package bin help through the local TypeScript loader", () => {
     const result = spawnSync(process.execPath, ["bin/chemd.mjs", "--help"], {
       cwd: packageRoot,
@@ -206,6 +242,66 @@ describe("chemd cli", () => {
     expect(result.exitCode).toBe(EXIT_VALIDATION_FAILED);
     expect(result.stdout).toMatch(/1 error\(s\)/);
     expect(result.stdout).toContain("E_CHEMD_KIND_CONFLICT");
+  });
+
+  it("repairs deterministic safe fixes and prints the clean source in text mode", async () => {
+    const result = await runInTempDir(["repair", "repair.chemd.md"], {
+      "repair.chemd.md": repairableSource
+    });
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(result.stdout).toMatch(/final status: clean/);
+    expect(result.stdout).toMatch(/safe fixes applied: 2/);
+    expect(result.stdout).toContain("ref: rxn-main");
+    expect(result.stderr).toBe("");
+  });
+
+  it("writes the repaired source back to disk when --write is set", async () =>
+    withTempDir(async (dir) => {
+      const filePath = path.join(dir, "repair.chemd.md");
+      writeFileSync(filePath, repairableSource);
+
+      const stdout = createWriter();
+      const stderr = createWriter();
+      const exitCode = await runChemdCli(["repair", "repair.chemd.md", "--write"], {
+        cwd: dir,
+        stderr,
+        stdout
+      });
+
+      expect(exitCode).toBe(EXIT_OK);
+      expect(stdout.value).toMatch(/wrote file: yes/);
+      expect(readFileSync(filePath, "utf8")).toContain("ref: rxn-main");
+      expect(stderr.value).toBe("");
+    }));
+
+  it("emits a structured non-clean repair report when authored facts are still required", async () => {
+    const result = await runInTempDir(
+      ["repair", "repair-input.chemd.md", "--format", "json"],
+      { "repair-input.chemd.md": repairNeedsInputSource }
+    );
+    const payload = JSON.parse(result.stdout);
+
+    expect(result.exitCode).toBe(EXIT_VALIDATION_FAILED);
+    expect(payload.schemaVersion).toBe("chemd-repair/v0.1");
+    expect(payload.finalDiagnosis.status).toBe("needs_author_input");
+    expect(payload.finalDiagnosis.requiredInputs).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        checklistId: "basic-experiment-record"
+      })
+    ]));
+    expect(payload.wroteFile).toBe(false);
+    expect(result.stderr).toBe("");
+  });
+
+  it("rejects invalid repair iteration limits", async () => {
+    const result = await runInTempDir(
+      ["repair", "repair.chemd.md", "--max-iterations", "0"],
+      { "repair.chemd.md": repairableSource }
+    );
+
+    expect(result.exitCode).toBe(EXIT_USAGE);
+    expect(result.stderr).toMatch(/Option --max-iterations must be a positive integer/);
   });
 
   it("exports JSON renderer output", async () => {
@@ -298,7 +394,9 @@ describe("chemd cli", () => {
     expect(result.exitCode).toBe(EXIT_USAGE);
     expect(result.stderr).toMatch(/Unable to read file/);
   });
+});
 
+describe("chemd cli diff", () => {
   it("writes human-readable semantic diff changes", async () => {
     const result = await runInTempDir(["diff", "before.chemd.md", "after.chemd.md"], {
       "after.chemd.md": afterDiffSource,
@@ -395,7 +493,9 @@ describe("chemd cli", () => {
     expect(result.stderr).toMatch(/after\.chemd\.md/);
     expect(result.stderr).toContain("E_CHEMD_KIND_CONFLICT");
   });
+});
 
+describe("chemd cli changed", () => {
   it("validates and diffs modified tracked chemd files", async () => {
     const gitRunner = createGitRunner({
       show: { "HEAD:tracked.chemd.md": beforeDiffSource },

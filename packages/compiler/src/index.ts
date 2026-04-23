@@ -42,6 +42,7 @@ export {
   type DiagnosticWithQuickFixes
 } from "./quick-fix";
 export { applyCompilerDiagnosisSafeFixes } from "./diagnosis";
+export { runChemdRepairLoop } from "./repair-loop";
 export {
   applyAuthoringPatch,
   applyAuthoringSuggestion,
@@ -66,6 +67,12 @@ export type {
   CompilerDiagnosisStatus,
   CompilerDiagnosisSummary
 } from "./diagnosis";
+export type {
+  ChemdRepairLoopIteration,
+  ChemdRepairLoopOptions,
+  ChemdRepairLoopResult,
+  ChemdRepairLoopStoppedReason
+} from "./repair-loop";
 
 export interface CompileResult {
   document: ReturnType<typeof resolveChemd>;

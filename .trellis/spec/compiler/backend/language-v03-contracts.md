@@ -38,6 +38,10 @@ typecheckDocument(document: ChemdDocument, options?: TypecheckOptions): Typechec
 buildRunPlan(input: RunPlanInput): RunPlan
 preflightRun(runPlan: RunPlan, options: PreflightOptions): PreflightResult
 buildCanonicalLnf(input: BuildLnfInput): ChemdLnf
+runChemdRepairLoop(source: string, options?: {
+  compileOptions?: CompileOptions;
+  maxIterations?: number;
+}): ChemdRepairLoopResult
 exportTrainingRecordFromDocument(
   document: ChemdDocument,
   options?: ExportTrainingRecordOptions
@@ -73,9 +77,11 @@ Required payload fields:
 | `ChemdTrainingExportV2.learning_layer` | `retrieval_chunks`, `prediction_instances`, optional `chemistry_feature_refs`, plus optional `procedure_to_steps`, `observation_to_events` from `StepGraph` |
 | `AuthoringAssistance` | `minimal_sets`, `templates`, `suggestions`; all are conservative, compiler-derived authoring helpers and must not rewrite source truth unless the caller explicitly applies a patch |
 | `CompilerDiagnosis` | `status`, `summary`, `safeFixes`, `requiredInputs`, `manualReviewItems`, `nextActions`; it is a machine-readable execution view over final compile diagnostics |
+| `ChemdRepairLoopResult` | `initialSource`, `finalSource`, `changed`, `iterations`, `totalAppliedSafeFixes`, `finalResult`, `stoppedReason`, `maxIterations`; it is a bounded deterministic safe-fix runner over `compileChemd` |
 
 Diagnostics from `typecheckDocument`, render profile resolution, and compiler-side authoring diagnostics must be merged into `CompileResult.document.diagnostics`; do not throw for semantic validation failures that have a diagnostic code.
 `CompileResult.diagnosis` must be derived from `CompileResult.diagnostics`; do not let diagnosis and diagnostics drift into separate sources of truth.
+`runChemdRepairLoop(...)` must reuse `compileChemd(...)` and compiler-declared safe fixes; it must not invent placeholder content or silently suppress unresolved diagnostics.
 
 ### 4. Validation & Error Matrix
 
@@ -103,6 +109,7 @@ Good:
 - `compileChemd(source).authoringAssistance` contains only conservative suggestions and grouped scaffolds: unique-target ref completions, attempt-targeted `@cv-id.varN` refs when unique, baseline inheritance hints, and explicit starter/scaffold templates.
 - `compileChemd(source).diagnostics` includes compiler authoring diagnostics for safe fixes and author-input-required summaries, so generated chemd can be validated without opening a separate authoring panel.
 - `compileChemd(source).diagnosis.status` is `fixable` when every actionable item has a deterministic quick fix, and `applyCompilerDiagnosisSafeFixes(source, result.diagnosis)` can drive a compile-fix-recompile loop.
+- `runChemdRepairLoop(source, { maxIterations: 5 })` records each compile pass, applies only safe fixes when progress exists, and stops with `stoppedReason: "clean"` once the final diagnosis is clean.
 - `trainingExport.semantic_layer.lnf` matches the LNF returned by `compileChemd`.
 - `trainingExport.semantic_layer.artifacts` and `trainingUnderstanding.entities.artifacts`
   preserve authored artifact evidence without leaking audit-only source payloads.
@@ -121,6 +128,7 @@ Bad:
 - `authoringAssistance` must not silently mutate source or semantic truth; editor/UI code must explicitly apply its exported patches, including multi-step `batch` patches for grouped scaffold insertion.
 - Scaffold templates that insert placeholder record content must stay out of diagnostics quick fixes; only conservative suggestion patches may appear under `W_AUTHORING_FIX_AVAILABLE`.
 - `CompileResult.diagnosis` must not treat placeholder scaffolds or informational diagnostics as auto-fixable source truth.
+- `runChemdRepairLoop` must not apply another round of fixes after the iteration budget is exhausted, and it must not report a partially repaired source as `clean` without recompiling it.
 
 ### 6. Tests Required
 
@@ -130,6 +138,7 @@ Required assertion points:
 - `packages/compiler/tests/authoring-assistance.test.ts`: conservative suggestions, grouped scaffolds, attempt refs, and `batch` patch application stay stable.
 - `packages/compiler/tests/authoring-diagnostics.test.ts`: safe authoring suggestions surface as compile diagnostics, required-input summaries stay warnings, and scaffold templates are not promoted to quick fixes.
 - `packages/compiler/tests/diagnosis.test.ts`: diagnosis status machine, safe-fix application loop, required-input extraction, and manual-review routing stay stable.
+- `packages/compiler/tests/repair-loop.test.ts`: bounded safe-fix loop reaches `clean`, stops on required inputs, and respects `maxIterations`.
 - `packages/step-ontology/tests/lowering.test.ts`: procedure/observation/analysis lowering emits canonical nodes and warnings.
 - `packages/typechecker/tests/typechecker.test.ts`: typed graph nodes, quantity normalization, and diagnostics are stable.
 - `packages/runtime-lab/tests/runtime-lab.test.ts`: run plan and preflight contract, including `E605`.

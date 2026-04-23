@@ -1,7 +1,10 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import type { CompileResult } from "@chemd/compiler";
+import type {
+  ChemdRepairLoopResult,
+  CompileResult
+} from "@chemd/compiler";
 import type { Diagnostic } from "@chemd/core";
 
 import {
@@ -20,6 +23,7 @@ const EXPORT_FORMATS = new Set(["json", "lnf", "rag", "training", "training-full
 const DIFF_FORMATS = new Set(["text", "json"]);
 const FORMAT_OPTION = new Set<CliOption>(["format"]);
 const CHANGED_OPTIONS = new Set<CliOption>(["base", "format"]);
+const REPAIR_OPTIONS = new Set<CliOption>(["format", "max-iterations", "write"]);
 
 export const EXIT_OK = 0;
 export const EXIT_VALIDATION_FAILED = 1;
@@ -30,16 +34,24 @@ const usage = [
   "  chemd validate <file...>",
   "  chemd export <file> --format json|lnf|rag|training|training-full",
   "  chemd diff <old-file> <new-file> [--format text|json]",
-  "  chemd changed [--base <ref>] [--format text|json]"
+  "  chemd changed [--base <ref>] [--format text|json]",
+  "  chemd repair <file> [--format text|json] [--max-iterations <n>] [--write]"
 ].join("\n");
 
 type ExportFormat = "json" | "lnf" | "rag" | "training" | "training-full";
 type TextFormat = "text" | "json";
-type CliOption = "base" | "format";
+type CliOption = "base" | "format" | "max-iterations" | "write";
 type CompileChemd = (
   source: string,
   options?: { strictChemdKind?: boolean }
 ) => CompileResult;
+type RunChemdRepairLoop = (
+  source: string,
+  options?: {
+    compileOptions?: { strictChemdKind?: boolean };
+    maxIterations?: number;
+  }
+) => ChemdRepairLoopResult;
 
 interface CliWriter {
   write(chunk: string): unknown;
@@ -50,12 +62,14 @@ type CliCommand =
   | { type: "validate"; filePaths: string[] }
   | { type: "export"; filePath: string; format: ExportFormat }
   | { type: "diff"; beforePath: string; afterPath: string; format: TextFormat }
-  | { type: "changed"; base: string; format: TextFormat };
+  | { type: "changed"; base: string; format: TextFormat }
+  | { type: "repair"; filePath: string; format: TextFormat; maxIterations: number; write: boolean };
 
 interface RunOptions {
   compileChemd?: CompileChemd;
   cwd?: string;
   gitRunner?: GitRunner;
+  runChemdRepairLoop?: RunChemdRepairLoop;
   stderr?: CliWriter;
   stdout?: CliWriter;
 }
@@ -64,6 +78,7 @@ interface NormalizedRunOptions {
   compileChemd?: CompileChemd;
   cwd: string;
   gitRunner?: GitRunner;
+  runChemdRepairLoop?: RunChemdRepairLoop;
   stderr: CliWriter;
   stdout: CliWriter;
 }
@@ -96,6 +111,32 @@ interface ChangedReport {
   schemaVersion: "chemd-changed/v0.1";
   base: string;
   files: ChangedFileReport[];
+}
+
+interface RepairReportIteration {
+  iteration: number;
+  diagnosisStatus: ChemdRepairLoopResult["finalResult"]["diagnosis"]["status"];
+  summary: ChemdRepairLoopResult["finalResult"]["diagnosis"]["summary"];
+  appliedSafeFixes: Array<{
+    fixId: string;
+    diagnosticCode: string;
+    sourceField?: string;
+    sourceNodeId?: string;
+    title: string;
+  }>;
+}
+
+interface RepairReport {
+  schemaVersion: "chemd-repair/v0.1";
+  changed: boolean;
+  filePath: string;
+  finalDiagnosis: ChemdRepairLoopResult["finalResult"]["diagnosis"];
+  finalSource: string;
+  iterations: RepairReportIteration[];
+  maxIterations: number;
+  stoppedReason: ChemdRepairLoopResult["stoppedReason"];
+  writeRequested: boolean;
+  wroteFile: boolean;
 }
 
 class CliUsageError extends Error {
@@ -149,10 +190,25 @@ const readInlineOptionValue = (arg: string, optionName: CliOption): string => {
   return value;
 };
 
-const parseFormatArgs = (args: string[], allowedOptions: ReadonlySet<CliOption>) => {
+const parsePositiveIntegerOption = (value: string, optionName: "max-iterations"): number => {
+  if (!/^\d+$/.test(value)) {
+    throw new CliUsageError(`Option --${optionName} must be a positive integer.`);
+  }
+
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new CliUsageError(`Option --${optionName} must be a positive integer.`);
+  }
+
+  return parsed;
+};
+
+const parseCommandArgs = (args: string[], allowedOptions: ReadonlySet<CliOption>) => {
   const positional: string[] = [];
   let format: string | undefined;
   let base: string | undefined;
+  let maxIterations: number | undefined;
+  let write = false;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -170,6 +226,22 @@ const parseFormatArgs = (args: string[], allowedOptions: ReadonlySet<CliOption>)
     } else if (arg.startsWith("--base=")) {
       assertOptionAllowed("base", allowedOptions);
       base = readInlineOptionValue(arg, "base");
+    } else if (arg === "--max-iterations") {
+      assertOptionAllowed("max-iterations", allowedOptions);
+      maxIterations = parsePositiveIntegerOption(
+        readOptionValue(args, index, "max-iterations"),
+        "max-iterations"
+      );
+      index += 1;
+    } else if (arg.startsWith("--max-iterations=")) {
+      assertOptionAllowed("max-iterations", allowedOptions);
+      maxIterations = parsePositiveIntegerOption(
+        readInlineOptionValue(arg, "max-iterations"),
+        "max-iterations"
+      );
+    } else if (arg === "--write") {
+      assertOptionAllowed("write", allowedOptions);
+      write = true;
     } else if (arg.startsWith("-")) {
       throw new CliUsageError(`Unsupported option: ${arg}`);
     } else {
@@ -177,11 +249,11 @@ const parseFormatArgs = (args: string[], allowedOptions: ReadonlySet<CliOption>)
     }
   }
 
-  return { base, format, positional };
+  return { base, format, maxIterations, positional, write };
 };
 
 const parseExportArgs = (args: string[]): CliCommand => {
-  const { format, positional } = parseFormatArgs(args, FORMAT_OPTION);
+  const { format, positional } = parseCommandArgs(args, FORMAT_OPTION);
 
   if (positional.length !== 1) {
     throw new CliUsageError("Export requires exactly one file path.");
@@ -191,7 +263,7 @@ const parseExportArgs = (args: string[]): CliCommand => {
 };
 
 const parseDiffArgs = (args: string[]): CliCommand => {
-  const { format = "text", positional } = parseFormatArgs(args, FORMAT_OPTION);
+  const { format = "text", positional } = parseCommandArgs(args, FORMAT_OPTION);
 
   if (positional.length !== 2) {
     throw new CliUsageError("Diff requires exactly two file paths.");
@@ -206,7 +278,7 @@ const parseDiffArgs = (args: string[]): CliCommand => {
 };
 
 const parseChangedArgs = (args: string[]): CliCommand => {
-  const { base = "HEAD", format = "text", positional } = parseFormatArgs(args, CHANGED_OPTIONS);
+  const { base = "HEAD", format = "text", positional } = parseCommandArgs(args, CHANGED_OPTIONS);
 
   if (positional.length > 0) {
     throw new CliUsageError(`Unsupported changed argument: ${positional[0]}`);
@@ -221,6 +293,27 @@ const parseChangedArgs = (args: string[]): CliCommand => {
   }
 
   return { type: "changed", base, format: asTextFormat(format, "Changed") };
+};
+
+const parseRepairArgs = (args: string[]): CliCommand => {
+  const {
+    format = "text",
+    maxIterations = 5,
+    positional,
+    write
+  } = parseCommandArgs(args, REPAIR_OPTIONS);
+
+  if (positional.length !== 1) {
+    throw new CliUsageError("Repair requires exactly one file path.");
+  }
+
+  return {
+    type: "repair",
+    filePath: positional[0],
+    format: asTextFormat(format, "Repair"),
+    maxIterations,
+    write
+  };
 };
 
 export const parseChemdCliArgs = (argv: string[]): CliCommand => {
@@ -249,10 +342,17 @@ export const parseChemdCliArgs = (argv: string[]): CliCommand => {
     return parseChangedArgs(rest);
   }
 
+  if (command === "repair") {
+    return parseRepairArgs(rest);
+  }
+
   throw new CliUsageError(`Unknown command: ${command}`);
 };
 
-const loadCompiler = async (): Promise<{ compileChemd: CompileChemd }> => import("@chemd/compiler");
+const loadCompiler = async (): Promise<{
+  compileChemd: CompileChemd;
+  runChemdRepairLoop: RunChemdRepairLoop;
+}> => import("@chemd/compiler");
 
 const readSource = (filePath: string, cwd: string): string => {
   const resolvedPath = path.resolve(cwd, filePath);
@@ -262,6 +362,17 @@ const readSource = (filePath: string, cwd: string): string => {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new CliUsageError(`Unable to read file "${filePath}": ${message}`);
+  }
+};
+
+const writeSource = (filePath: string, cwd: string, source: string): void => {
+  const resolvedPath = path.resolve(cwd, filePath);
+
+  try {
+    writeFileSync(resolvedPath, source, "utf8");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new CliUsageError(`Unable to write file "${filePath}": ${message}`);
   }
 };
 
@@ -525,10 +636,106 @@ const changedFiles = (
   return hasChangedValidationErrors(report) ? EXIT_VALIDATION_FAILED : EXIT_OK;
 };
 
+const toRepairReport = (
+  command: Extract<CliCommand, { type: "repair" }>,
+  filePath: string,
+  result: ChemdRepairLoopResult,
+  wroteFile: boolean
+): RepairReport => ({
+  schemaVersion: "chemd-repair/v0.1",
+  changed: result.changed,
+  filePath,
+  finalDiagnosis: result.finalResult.diagnosis,
+  finalSource: result.finalSource,
+  iterations: result.iterations.map((iteration) => ({
+    iteration: iteration.iteration,
+    diagnosisStatus: iteration.compileResult.diagnosis.status,
+    summary: iteration.compileResult.diagnosis.summary,
+    appliedSafeFixes: iteration.appliedSafeFixes.map((fix) => ({
+      fixId: fix.fixId,
+      diagnosticCode: fix.diagnosticCode,
+      sourceField: fix.sourceField,
+      sourceNodeId: fix.sourceNodeId,
+      title: fix.quickFix.title
+    }))
+  })),
+  maxIterations: command.maxIterations,
+  stoppedReason: result.stoppedReason,
+  writeRequested: command.write,
+  wroteFile
+});
+
+const formatRepairText = (report: RepairReport): string => {
+  const lines = [
+    `Repair ${report.filePath}`,
+    `  stopped: ${report.stoppedReason}`,
+    `  final status: ${report.finalDiagnosis.status}`,
+    `  iterations: ${report.iterations.length}/${report.maxIterations}`,
+    `  changed: ${report.changed ? "yes" : "no"}`,
+    `  wrote file: ${report.wroteFile ? "yes" : "no"}`,
+    `  final diagnostics: ${report.finalDiagnosis.summary.errorCount} error(s), ${report.finalDiagnosis.summary.warningCount} warning(s), ${report.finalDiagnosis.summary.infoCount} info`,
+    `  safe fixes applied: ${report.iterations.reduce((count, iteration) => count + iteration.appliedSafeFixes.length, 0)}`
+  ];
+
+  if (report.finalDiagnosis.requiredInputs.length > 0) {
+    lines.push("  required inputs:");
+    for (const item of report.finalDiagnosis.requiredInputs) {
+      lines.push(`    - ${item.title}`);
+      for (const missingItem of item.missingItems) {
+        lines.push(`      * ${missingItem}`);
+      }
+    }
+  }
+
+  if (report.finalDiagnosis.manualReviewItems.length > 0) {
+    lines.push("  manual review:");
+    for (const item of report.finalDiagnosis.manualReviewItems) {
+      lines.push(`    - ${item.diagnosticCode}: ${item.message}`);
+    }
+  }
+
+  if (!report.writeRequested && report.changed && report.finalDiagnosis.status === "clean") {
+    lines.push("  repaired source:");
+    lines.push(report.finalSource);
+  }
+
+  return lines.join("\n");
+};
+
+const repairFile = (
+  command: Extract<CliCommand, { type: "repair" }>,
+  runChemdRepairLoop: RunChemdRepairLoop,
+  options: NormalizedRunOptions
+): number => {
+  const source = readSource(command.filePath, options.cwd);
+  const repairResult = runChemdRepairLoop(source, {
+    compileOptions: { strictChemdKind: true },
+    maxIterations: command.maxIterations
+  });
+  const shouldWrite = command.write
+    && repairResult.changed
+    && repairResult.finalResult.diagnosis.status === "clean";
+
+  if (shouldWrite) {
+    writeSource(command.filePath, options.cwd, repairResult.finalSource);
+  }
+
+  const report = toRepairReport(command, command.filePath, repairResult, shouldWrite);
+  const output = command.format === "json"
+    ? JSON.stringify(report, null, 2)
+    : formatRepairText(report);
+
+  options.stdout.write(`${output}\n`);
+  return repairResult.finalResult.diagnosis.status === "clean"
+    ? EXIT_OK
+    : EXIT_VALIDATION_FAILED;
+};
+
 const normalizeRunOptions = (options: RunOptions): NormalizedRunOptions => ({
   compileChemd: options.compileChemd,
   cwd: options.cwd ?? process.cwd(),
   gitRunner: options.gitRunner,
+  runChemdRepairLoop: options.runChemdRepairLoop,
   stderr: options.stderr ?? process.stderr,
   stdout: options.stdout ?? process.stdout
 });
@@ -536,6 +743,7 @@ const normalizeRunOptions = (options: RunOptions): NormalizedRunOptions => ({
 const executeCommand = (
   command: Exclude<CliCommand, { type: "help" }>,
   compileChemd: CompileChemd,
+  runChemdRepairLoop: RunChemdRepairLoop,
   options: NormalizedRunOptions
 ): number => {
   if (command.type === "validate") {
@@ -550,7 +758,11 @@ const executeCommand = (
     return diffFiles(command, compileChemd, options);
   }
 
-  return changedFiles(command, compileChemd, options);
+  if (command.type === "changed") {
+    return changedFiles(command, compileChemd, options);
+  }
+
+  return repairFile(command, runChemdRepairLoop, options);
 };
 
 export const runChemdCli = async (
@@ -566,11 +778,11 @@ export const runChemdCli = async (
       return EXIT_OK;
     }
 
-    const compiler = options.compileChemd
-      ? { compileChemd: options.compileChemd }
-      : await loadCompiler();
+    const compiler = await loadCompiler();
+    const compileChemd = options.compileChemd ?? compiler.compileChemd;
+    const runChemdRepairLoop = options.runChemdRepairLoop ?? compiler.runChemdRepairLoop;
 
-    return executeCommand(command, compiler.compileChemd, options);
+    return executeCommand(command, compileChemd, runChemdRepairLoop, options);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (error instanceof CliUsageError) {
