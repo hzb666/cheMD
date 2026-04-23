@@ -1017,3 +1017,38 @@ note2: Low conversion by TLC.
 ### Next Steps
 
 - None - task complete
+
+
+## Session 24: 完成 compiler authoring diagnostics
+
+**Date**: 2026-04-24
+**Task**: 完成 compiler authoring diagnostics
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+为 LLM 生成的实验类 chemd 增加编译期 authoring diagnostics，将保守 suggestion 提升为可应用 quick fix，并限制摘要型诊断只在实验记录语境触发；同步更新测试和 compiler/web 规范。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5a86443` | (see git log) |
+| `99d5fae` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

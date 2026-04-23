@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 23
+- **Total Sessions**: 24
 - **Last Active**: 2026-04-24
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1019 | Active |
+| `journal-1.md` | ~1054 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 24 | 2026-04-24 | 完成 compiler authoring diagnostics | `5a86443`, `99d5fae` | `develop` |
 | 23 | 2026-04-24 | 完成 authoring scaffold 与自动引用增强 | `2ab0198`, `c6165dd` | `develop` |
 | 22 | 2026-04-24 | 完成 authoring UX 与编译推断增强 | `55f6744`, `888c0b8` | `develop` |
 | 21 | 2026-04-23 | 完成实验理解路线图 1-4 | `75df42c`, `abf1144` | `develop` |
