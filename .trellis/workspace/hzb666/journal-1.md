@@ -730,3 +730,38 @@ Added RAG embedding backfill service and API route with bounded filters, skip/ov
 ### Next Steps
 
 - None - task complete
+
+
+## Session 17: 导出材料流和步骤依赖
+
+**Date**: 2026-04-23
+**Task**: 导出材料流和步骤依赖
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+新增 material_flow_graph 与 step_dependencies 派生导出，生成 material_flow_reasoning 训练任务；覆盖 reaction/result/sample/artifact lineage、procedure IO、显式 dependsOn、前步输出消费和 observation linked step；更新 exporter-training 契约并归档 Trellis 任务。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e9d88c6` | (see git log) |
+| `a790511` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
