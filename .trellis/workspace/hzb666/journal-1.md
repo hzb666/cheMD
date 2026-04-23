@@ -1052,3 +1052,38 @@ note2: Low conversion by TLC.
 ### Next Steps
 
 - None - task complete
+
+
+## Session 25: 完成 compiler diagnostic repair loop
+
+**Date**: 2026-04-24
+**Task**: 完成 compiler diagnostic repair loop
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+为 compileChemd 增加 machine-readable diagnosis 输出，区分 safe fixes、required inputs 和 manual review，并提供批量应用 safe quick fixes 的 helper；同时修复 supporting-block 引用已补全后仍被误诊断为缺失的问题。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f2987dd` | (see git log) |
+| `309a049` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
