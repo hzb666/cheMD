@@ -1,0 +1,4 @@
+{"file": ".agents/skills/finish-work/SKILL.md", "reason": "Finish work checklist"}
+{"file": ".agents/skills/check/SKILL.md", "reason": "Code quality check spec"}
+{"file": ".trellis/spec/compiler/backend/language-v03-contracts.md", "reason": "verify repair loop contract and tests"}
+{"file": ".trellis/spec/cli/backend/command-contract.md", "reason": "verify CLI repair command behavior"}
