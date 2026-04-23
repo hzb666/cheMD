@@ -224,6 +224,11 @@ purity: 91%
 Yield: @res-main.yield
 ```
 
+更完整的写作规范与 golden record 示例见：
+
+- `docs/chemd-syntax-best-practices.zh-CN.md`
+- `packages/compiler/fixtures/golden-experiment-record.chemd.md`
+
 ## 编译流水线
 
 `@chemd/compiler` 暴露 `compileChemd(source, options)`。

@@ -1,0 +1,220 @@
+---
+id: exp-golden-suzuki-screen
+title: Suzuki coupling solvent screen
+date: 2026-04-24
+primary_reaction: rxn-var1
+primary_result: res-var1
+---
+
+:::chemd #mol-aryl
+kind: molecule
+name: aryl bromide
+smiles: Brc1ccccc1
+role: substrate
+:::
+
+:::chemd #mol-boron
+kind: molecule
+name: phenylboronic acid
+smiles: OB(O)c1ccccc1
+role: coupling_partner
+:::
+
+:::chemd #mol-product
+kind: molecule
+name: biphenyl product
+smiles: c1ccc(-c2ccccc2)cc1
+role: product
+:::
+
+:::chemd #rxn-standard
+kind: reaction
+name: standard solvent screen entry
+reactants: @mol-aryl | @mol-boron
+products: @mol-product
+reagents: K3PO4
+catalyst: Pd(PPh3)4
+solvent: THF
+temperature: 25 C
+time: 2 h
+atmosphere: nitrogen
+:::
+
+:::chemd #rxn-var1
+kind: reaction
+name: MeCN / 40 C variant
+reactants: @mol-aryl | @mol-boron
+products: @mol-product
+reagents: K3PO4
+catalyst: Pd(PPh3)4
+solvent: MeCN
+temperature: 40 C
+time: 2 h
+atmosphere: nitrogen
+:::
+
+:::chemd #rxn-var2
+kind: reaction
+name: DMF / 60 C override variant
+reactants: @mol-aryl | @mol-boron
+products: @mol-product
+reagents: K3PO4
+catalyst: Pd(dppf)Cl2
+solvent: DMF
+temperature: 60 C
+time: 2 h
+atmosphere: nitrogen
+:::
+
+:::result #res-standard
+ref: rxn-standard
+product: @mol-product
+status: partial
+yield: 41%
+conversion: 58%
+purity: 84%
+notes: Baseline THF entry stops at partial conversion.
+:::
+
+:::result #res-var1
+ref: rxn-var1
+product: @mol-product
+status: success
+yield: 78%
+conversion: 96%
+selectivity: 93%
+purity: 97%
+notes: Best balance of conversion and purity in the solvent screen.
+:::
+
+:::result #res-var2
+ref: rxn-var2
+product: @mol-product
+status: failed
+yield: 18%
+conversion: 25%
+purity: 61%
+notes: Override condition increases impurity and depresses yield.
+:::
+
+:::condition-varies #cv-coupling-screen
+standard: rxn-standard
+condition: solvent=THF | temperature=25 C | catalyst=Pd(PPh3)4 | atmosphere=nitrogen
+varies: solvent | temperature | catalyst
+var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
+res1: res-var1
+note1: Higher conversion while keeping the same catalyst and atmosphere.
+var2: reaction=rxn-var2 | mode=override | solvent=DMF | temperature=60 C | catalyst=Pd(dppf)Cl2 | atmosphere=nitrogen
+res2: res-var2
+note2: Full override worsens impurity profile.
+notes: Compare solvent and temperature first; only the second attempt overrides catalyst.
+:::
+
+:::procedure #proc-var1
+ref: rxn-var1
+reaction: rxn-var1
+evidence: notebook-24,photo-var1
+step: purge | id=s-purge-var1 | stage=setup | evidence=notebook-24 | confidence=0.98
+step: charge | id=s-charge-var1 | stage=charging | purpose=assemble reaction mixture | inputs=@mol-aryl,@mol-boron | evidence=notebook-24 | confidence=0.97
+step: heat | id=s-heat-var1 | stage=reaction | temperature=40 C | duration=2 h | dependsOn=s-charge-var1 | purpose=form product | evidence=notebook-24 | confidence=0.95
+step: sample | id=s-sample-var1 | stage=monitoring | outputs=@sample-aliquot-var1 | dependsOn=s-heat-var1 | evidence=notebook-24 | confidence=0.93
+step: analyze | id=s-analyze-var1 | stage=monitoring | analysisType=tlc | dependsOn=s-sample-var1 | evidence=photo-var1 | confidence=0.92
+step: quench | id=s-quench-var1 | stage=workup | dependsOn=s-analyze-var1 | evidence=notebook-24 | confidence=0.9
+step: purify | id=s-purify-var1 | stage=isolation | outputs=@sample-purified-var1 | dependsOn=s-quench-var1 | evidence=notebook-24 | confidence=0.91
+:::
+
+:::observation #obs-var1
+ref: @cv-coupling-screen.var1
+event: color_change | id=e-color-var1 | timepoint=30 min | severity=low | linkedStep=s-heat-var1 | evidence=photo-var1 | confidence=0.88
+event: precipitation | id=e-solid-var1 | timepoint=after quench | severity=low | linkedStep=s-quench-var1 | evidence=photo-var1b | confidence=0.74
+:::
+
+:::analysis #ana-tlc-var1
+type: tlc
+ref: @cv-coupling-screen.var1
+time: 2 h
+eluent: PE/EA = 4:1
+plate: silica gel GF254
+visualization: UV 254 nm
+result: one major product spot with trace starting material
+data: TLC plate shows product-dominant profile for var1.
+p1: sm 0.78
+p2: crude-var1 0.52 | sm-trace(0.79)
+p3: product-std 0.50
+:::
+
+:::analysis #ana-tlc-var2
+type: tlc
+ref: @cv-coupling-screen.var2
+time: 2 h
+eluent: PE/EA = 4:1
+plate: silica gel GF254
+visualization: UV 254 nm
+result: strong starting material spot with impurity smear
+data: TLC plate indicates low conversion for var2.
+p1: sm 0.78
+p2: crude-var2 0.77 | impurity(0.31)
+p3: product-std 0.50
+:::
+
+:::analysis #ana-hplc-var1
+type: hplc
+ref: res-var1
+method: HPLC area normalization
+instrument: Agilent 1260
+result: 97% area product peak
+data: Main peak at 6.4 min with trace impurity.
+notes: Confirms purified sample purity for the selected variant.
+:::
+
+:::sample #sample-batch-var1
+ref: rxn-var1
+name: crude reaction batch from var1
+derived_from: rxn-var1
+artifacts: art-lcms-var1
+:::
+
+:::sample #sample-aliquot-var1
+ref: rxn-var1
+name: TLC aliquot from var1
+aliquot_of: sample-batch-var1
+artifacts: art-tlc-var1
+:::
+
+:::sample #sample-purified-var1
+ref: res-var1
+name: purified product from var1
+derived_from: sample-batch-var1
+purity: 97%
+artifacts: art-nmr-var1
+:::
+
+:::artifact #art-tlc-var1
+kind: tlc_image
+ref: ana-tlc-var1
+path: data/tlc/var1.png
+notes: TLC image for attempt var1.
+:::
+
+:::artifact #art-tlc-var2
+kind: tlc_image
+ref: ana-tlc-var2
+path: data/tlc/var2.png
+notes: TLC image for attempt var2.
+:::
+
+:::artifact #art-lcms-var1
+kind: lcms_report
+ref: sample-batch-var1
+path: data/lcms/var1.pdf
+notes: LCMS of crude batch confirms product mass before purification.
+:::
+
+:::artifact #art-nmr-var1
+kind: nmr_spectrum
+ref: res-var1
+path: data/nmr/var1.pdf
+checksum: sha256:var1nmr
+instrument: Bruker 400
+notes: Purified product spectrum used as final structural evidence.
+:::

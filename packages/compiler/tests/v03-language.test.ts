@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import { compileChemd } from "../src/index";
@@ -55,6 +57,11 @@ path: data/tlc/spec-main.png
 :::
 `;
 
+const goldenSource = readFileSync(
+  new URL("../fixtures/golden-experiment-record.chemd.md", import.meta.url),
+  "utf8"
+);
+
 describe("chemd-lang v0.3 compiler integration", () => {
   it("keeps the author surface intact and exposes semantic artifacts", () => {
     const result = compileChemd(source);
@@ -95,5 +102,90 @@ describe("chemd-lang v0.3 compiler integration", () => {
         }
       }
     });
+  });
+
+  it("compiles the golden record fixture with explicit experiment logic", () => {
+    const result = compileChemd(goldenSource, { strictChemdKind: true });
+    const diagnostics = result.diagnostics.filter((diagnostic) => diagnostic.severity === "error");
+
+    expect(diagnostics).toHaveLength(0);
+    expect(result.trainingExport.semantic_layer.condition_variations[0]).toMatchObject({
+      original_id: "cv-coupling-screen",
+      standard_ref_raw: "rxn-standard",
+      attempt_entity_ids: expect.arrayContaining([
+        "cva::exp-golden-suzuki-screen::cv-coupling-screen.var1",
+        "cva::exp-golden-suzuki-screen::cv-coupling-screen.var2"
+      ])
+    });
+    expect(result.trainingExport.semantic_layer.condition_variation_attempts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          original_id: "cv-coupling-screen.var1",
+          reaction_ref_raw: "rxn-var1",
+          result_ref_raw: "res-var1"
+        }),
+        expect.objectContaining({
+          original_id: "cv-coupling-screen.var2",
+          reaction_ref_raw: "rxn-var2",
+          result_ref_raw: "res-var2"
+        })
+      ])
+    );
+    expect(result.trainingExport.semantic_layer.links).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        relation_type: "analysis_targets_condition_variation_attempt",
+        from_entity_id: "ana::exp-golden-suzuki-screen::ana-tlc-var1",
+        to_entity_id: "cva::exp-golden-suzuki-screen::cv-coupling-screen.var1"
+      }),
+      expect.objectContaining({
+        relation_type: "condition_variation_attempt_has_result",
+        from_entity_id: "cva::exp-golden-suzuki-screen::cv-coupling-screen.var1",
+        to_entity_id: "res::exp-golden-suzuki-screen::res-var1"
+      }),
+      expect.objectContaining({
+        relation_type: "sample_aliquot_of_sample",
+        from_entity_id: "sam::exp-golden-suzuki-screen::sample-aliquot-var1",
+        to_entity_id: "sam::exp-golden-suzuki-screen::sample-batch-var1"
+      }),
+      expect.objectContaining({
+        relation_type: "artifact_supports_result",
+        from_entity_id: "art::exp-golden-suzuki-screen::art-nmr-var1",
+        to_entity_id: "res::exp-golden-suzuki-screen::res-var1"
+      })
+    ]));
+    expect(result.trainingUnderstanding.experiment_logic.material_flow_graph.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        edge_type: "step_produces_material",
+        from_node_id: "step::exp-golden-suzuki-screen::proc-var1::s-sample-var1",
+        to_node_id: "sam::exp-golden-suzuki-screen::sample-aliquot-var1"
+      }),
+      expect.objectContaining({
+        edge_type: "sample_has_artifact",
+        from_node_id: "sam::exp-golden-suzuki-screen::sample-purified-var1",
+        to_node_id: "art::exp-golden-suzuki-screen::art-nmr-var1"
+      })
+    ]));
+    expect(result.trainingUnderstanding.procedure_logic.procedure_to_steps[0]?.steps).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        stepId: "s-heat-var1",
+        family: "heat"
+      }),
+      expect.objectContaining({
+        stepId: "s-analyze-var1",
+        family: "analyze"
+      })
+    ]));
+    expect(result.trainingUnderstanding.procedure_logic.observation_to_events[0]?.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          eventId: "e-color-var1",
+          linkedStepId: "s-heat-var1"
+        }),
+        expect.objectContaining({
+          eventId: "e-solid-var1",
+          linkedStepId: "s-quench-var1"
+        })
+      ])
+    );
   });
 });

@@ -1,0 +1,4 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/compiler/backend/index.md", "reason": "Backend development guide"}
+{"file": ".trellis/spec/compiler/backend/language-v03-contracts.md", "reason": "Compiler pipeline and canonical chemd surface contract"}
+{"file": ".trellis/spec/exporter-training/backend/training-export-contract.md", "reason": "Condition-varies, sample lineage, artifact evidence, and training-facing semantics"}
