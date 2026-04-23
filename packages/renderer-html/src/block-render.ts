@@ -212,10 +212,24 @@ const renderConditionVaries = (node: ConditionVariesNode): string =>
     ${renderFieldList([
       ["Reaction", node.reaction],
       ["Standard", node.standard],
+      ["Condition", node.condition?.map((variable) =>
+        `${variable.field}=${variable.baseline ?? variable.raw}`
+      ).join(" | ")],
+      ["Varies", node.varyFields?.join(" | ")],
       ...node.changes.map((change): [string, string] => [
         humanizeIdentifier(change.field),
         change.raw
       ]),
+      ...((node.attempts ?? []).map((attempt): [string, string] => [
+        attempt.id,
+        [
+          attempt.reaction ? `reaction=${attempt.reaction}` : undefined,
+          attempt.result ? `result=${attempt.result}` : undefined,
+          attempt.mode ? `mode=${attempt.mode}` : undefined,
+          ...attempt.changes.map((change) => `${change.field}=${change.candidate ?? change.raw}`),
+          attempt.note ? `note=${attempt.note}` : undefined
+        ].filter(Boolean).join(" | ")
+      ])),
       ["Notes", node.notes]
     ])}
   </section>`;

@@ -18,6 +18,10 @@
   snake_case (`type: "condition_varies"`). Register the block parser in
   `packages/parser/src/body/block-parsers/index.ts` and add public parser
   tests for the exact fence syntax.
+- `condition-varies` supports concise optimization rows: `condition` declares
+  baseline variables, `varN` declares one attempt, and `resN`/`noteN` bind to
+  the matching attempt suffix. Preserve `@cv.varN` as an attempt reference
+  target rather than flattening it to the parent block.
 
 ## Tests
 

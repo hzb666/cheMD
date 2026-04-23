@@ -87,6 +87,7 @@ export interface SemanticLayerV1 {
   samples: ExportedSampleV1[];
   artifacts: ExportedArtifactV1[];
   condition_variations: ExportedConditionVaryV1[];
+  condition_variation_attempts: ExportedConditionVariationAttemptV1[];
   markdown_blocks: ExportedMarkdownBlockV1[];
   links: ExportedRelationV1[];
   lnf?: ChemdLnf;
@@ -280,11 +281,35 @@ export interface ExportedConditionVariationDeltaV1 {
   candidate_raw?: string;
 }
 
+export interface ExportedConditionVariationVariableV1 {
+  field: string;
+  raw: string;
+  baseline_raw?: string;
+}
+
+export type ExportedConditionVariationAttemptModeV1 = "partial" | "override";
+
+export interface ExportedConditionVariationAttemptV1 extends ExportedEntityBase {
+  source_node_type: "condition_variation_attempt";
+  parent_condition_variation_id: string;
+  attempt_id: string;
+  mode?: ExportedConditionVariationAttemptModeV1;
+  reaction_ref_raw?: string;
+  result_ref_raw?: string;
+  condition: ExportedConditionVariationDeltaV1[];
+  changes: ExportedConditionVariationDeltaV1[];
+  note?: string;
+  text_for_embedding?: string;
+}
+
 export interface ExportedConditionVaryV1 extends ExportedEntityBase {
   source_node_type: "condition_varies";
   reaction_ref_raw?: string;
   standard_ref_raw?: string;
+  condition?: ExportedConditionVariationVariableV1[];
+  vary_fields?: string[];
   changes: ExportedConditionVariationDeltaV1[];
+  attempt_entity_ids?: string[];
   notes?: string;
   text_for_embedding?: string;
 }
@@ -349,6 +374,12 @@ export interface ExportedRelationV1 {
     | "artifact_supports_sample"
     | "condition_variation_targets_reaction"
     | "condition_variation_compares_standard"
+    | "condition_variation_has_attempt"
+    | "condition_variation_attempt_targets_reaction"
+    | "condition_variation_attempt_compares_standard"
+    | "condition_variation_attempt_has_result"
+    | "analysis_targets_condition_variation"
+    | "analysis_targets_condition_variation_attempt"
     | "markdown_mentions_entity";
   from_entity_id: string;
   to_entity_id: string;
@@ -366,6 +397,7 @@ export interface RetrievalMetadataV1 {
   sample_ids?: string[];
   artifact_ids?: string[];
   condition_variation_ids?: string[];
+  condition_variation_attempt_ids?: string[];
   analysis_types?: string[];
   status_label?: "success" | "partial" | "failed" | "unknown";
   yield_percent?: number | null;
@@ -388,6 +420,7 @@ export interface RetrievalChunkV1 {
     | "sample_notes"
     | "artifact_notes"
     | "condition_variation"
+    | "condition_variation_attempt"
     | "document_summary";
   source_entity_ids: string[];
   text: string;
@@ -480,6 +513,9 @@ export interface ProcedureToStepsPairV03 {
 export interface ObservationToEventsPairV03 {
   pair_id: string;
   observation_id?: string;
+  ref_raw?: string;
+  target_entity_id?: string;
+  target_entity_type?: string;
   source_text: string;
   events: ObservationEventNode[];
   diagnostics: ExportedDiagnostic[];

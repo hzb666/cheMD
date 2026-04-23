@@ -7,6 +7,7 @@ import type { SourceSpan } from "@chemd/core";
 import type {
   ExportedAnalysisV1,
   ExportedArtifactV1,
+  ExportedConditionVariationAttemptV1,
   ExportedConditionVaryV1,
   ExportedDocumentInfo,
   ExportedMarkdownBlockV1,
@@ -49,6 +50,7 @@ export type TrainingAnalysisV1 = Omit<ExportedAnalysisV1, SourceMetadataKeys>;
 export type TrainingSampleV1 = Omit<ExportedSampleV1, SourceMetadataKeys>;
 export type TrainingArtifactV1 = Omit<ExportedArtifactV1, SourceMetadataKeys>;
 export type TrainingConditionVaryV1 = Omit<ExportedConditionVaryV1, SourceMetadataKeys>;
+export type TrainingConditionVariationAttemptV1 = Omit<ExportedConditionVariationAttemptV1, SourceMetadataKeys>;
 export type TrainingNarrativeBlockV1 = Pick<
   ExportedMarkdownBlockV1,
   "entity_id" | "cleaned_text" | "references" | "inline_chem" | "inline_code" | "links"
@@ -62,6 +64,7 @@ export interface TrainingUnderstandingEntitiesV1 {
   samples: TrainingSampleV1[];
   artifacts: TrainingArtifactV1[];
   condition_variations: TrainingConditionVaryV1[];
+  condition_variation_attempts: TrainingConditionVariationAttemptV1[];
   narrative_blocks: TrainingNarrativeBlockV1[];
 }
 
@@ -75,7 +78,8 @@ export interface TrainingResolvedReferenceV1 {
     | "analysis"
     | "sample"
     | "artifact"
-    | "condition_varies";
+    | "condition_varies"
+    | "condition_variation_attempt";
   source_field?: string;
   target_entity_id?: string;
   target_original_id?: string;
@@ -97,6 +101,9 @@ export interface TrainingProcedureLogicPairV1 {
 export interface TrainingObservationLogicPairV1 {
   pair_id: string;
   observation_id?: string;
+  ref_raw?: string;
+  target_entity_id?: string;
+  target_entity_type?: string;
   source_text: string;
   events: ObservationEventNode[];
 }
@@ -254,8 +261,12 @@ export interface TrainingVariableLogicV1 {
 export interface TrainingConditionVariationLogicV1 {
   variation_id: string;
   condition_variation_entity_id: string;
+  condition_variation_attempt_entity_id?: string;
+  attempt_id?: string;
   reaction_entity_id?: string;
+  result_entity_id?: string;
   standard_reaction_entity_id?: string;
+  condition: TrainingExperimentVariableDeltaV1[];
   changed_variables: TrainingExperimentVariableDeltaV1[];
   logic_source: TrainingLogicSourceV1;
   confidence: TrainingInferenceConfidenceV1;
@@ -385,6 +396,7 @@ export type TrainingKnowledgeNodeType =
   | "sample"
   | "artifact"
   | "condition_variation"
+  | "condition_variation_attempt"
   | "narrative"
   | "procedure"
   | "procedure_step"

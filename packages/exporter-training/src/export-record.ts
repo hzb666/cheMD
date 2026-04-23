@@ -80,6 +80,7 @@ export const exportTrainingRecordFromDocument = (
   };
   const learningLayer = buildLearningLayer({
     document: documentInfo,
+    sourceDocument: document,
     semanticLayer,
     stepGraph: options.stepGraph
   });

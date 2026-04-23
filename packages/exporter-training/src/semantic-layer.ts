@@ -14,6 +14,7 @@ import type {
 import type {
   ExportedAnalysisV1,
   ExportedArtifactV1,
+  ExportedConditionVariationAttemptV1,
   ExportedConditionVaryV1,
   ExportedMarkdownBlockV1,
   ExportedMoleculeV1,
@@ -50,7 +51,7 @@ const compactText = (...parts: Array<string | undefined>): string | undefined =>
 };
 
 const buildEntityId = (
-  prefix: "mol" | "rxn" | "res" | "ana" | "sam" | "art" | "cv" | "md",
+  prefix: "mol" | "rxn" | "res" | "ana" | "sam" | "art" | "cv" | "cva" | "md",
   documentId: string,
   originalId: string | undefined,
   nodeIndex: number
@@ -64,7 +65,8 @@ type ExportedObjectEntity =
   | ExportedAnalysisV1
   | ExportedSampleV1
   | ExportedArtifactV1
-  | ExportedConditionVaryV1;
+  | ExportedConditionVaryV1
+  | ExportedConditionVariationAttemptV1;
 
 type RelationType = ExportedRelationV1["relation_type"];
 
@@ -416,6 +418,15 @@ const buildArtifact = (
   text_for_embedding: compactText(node.kind, node.path, node.instrument, node.notes)
 });
 
+const exportConditionDelta = (
+  change: ConditionVariesNode["changes"][number]
+) => ({
+  field: change.field,
+  raw: change.raw,
+  baseline_raw: change.baseline,
+  candidate_raw: change.candidate
+});
+
 const buildConditionVaries = (
   documentId: string,
   node: ConditionVariesNode,
@@ -429,20 +440,57 @@ const buildConditionVaries = (
   ...createEntityBase("condition_varies", node),
   reaction_ref_raw: node.reaction,
   standard_ref_raw: node.standard,
-  changes: node.changes.map((change) => ({
-    field: change.field,
-    raw: change.raw,
-    baseline_raw: change.baseline,
-    candidate_raw: change.candidate
+  condition: node.condition?.map((variable) => ({
+    field: variable.field,
+    raw: variable.raw,
+    baseline_raw: variable.baseline
   })),
+  vary_fields: node.varyFields,
+  changes: node.changes.map(exportConditionDelta),
+  attempt_entity_ids: node.attempts?.map((attempt) =>
+    buildEntityId("cva", documentId, `${node.id ?? nodeIndex}.${attempt.id}`, nodeIndex)
+  ),
   notes: typedConditionVaries?.notes ?? node.notes,
   text_for_embedding: compactText(
     node.reaction ? `reaction ${node.reaction}` : undefined,
     node.standard ? `standard ${node.standard}` : undefined,
+    node.condition?.map((variable) => `${variable.field}=${variable.baseline ?? variable.raw}`).join(" "),
+    node.varyFields?.length ? `varies ${node.varyFields.join(", ")}` : undefined,
     ...node.changes.map((change) => `${change.field}: ${change.raw}`),
+    ...(node.attempts ?? []).map((attempt) => `${attempt.id}: ${attempt.raw}`),
     node.notes
   )
 });
+
+const buildConditionVariationAttempts = (
+  documentId: string,
+  node: ConditionVariesNode,
+  parent: ExportedConditionVaryV1,
+  nodeIndex: number
+): ExportedConditionVariationAttemptV1[] =>
+  (node.attempts ?? []).map((attempt) => ({
+    entity_id: buildEntityId("cva", documentId, `${node.id ?? nodeIndex}.${attempt.id}`, nodeIndex),
+    original_id: node.id ? `${node.id}.${attempt.id}` : attempt.id,
+    node_index: nodeIndex,
+    source_node_type: "condition_variation_attempt",
+    ...createEntityBase("condition_varies", node),
+    parent_condition_variation_id: parent.entity_id,
+    attempt_id: attempt.id,
+    mode: attempt.mode ?? "partial",
+    reaction_ref_raw: attempt.reaction,
+    result_ref_raw: attempt.result,
+    condition: attempt.condition.map(exportConditionDelta),
+    changes: attempt.changes.map(exportConditionDelta),
+    note: attempt.note,
+    text_for_embedding: compactText(
+      `attempt ${attempt.id}`,
+      attempt.reaction ? `reaction ${attempt.reaction}` : undefined,
+      attempt.result ? `result ${attempt.result}` : undefined,
+      attempt.mode ? `mode ${attempt.mode}` : undefined,
+      ...attempt.condition.map((change) => `${change.field}: ${change.candidate ?? change.raw}`),
+      attempt.note
+    )
+  }));
 
 const buildMarkdown = (documentId: string, node: MarkdownNode, nodeIndex: number): ExportedMarkdownBlockV1 => ({
   entity_id: buildEntityId("md", documentId, undefined, nodeIndex),
@@ -510,7 +558,14 @@ const buildEntityIndex = (entities: ExportedObjectEntity[]): Map<string, Exporte
 const getReferencedEntity = (
   reference: string | undefined,
   entityByOriginalId: Map<string, ExportedObjectEntity>
-): ExportedObjectEntity | undefined => reference ? entityByOriginalId.get(normalizeReferenceId(reference)) : undefined;
+): ExportedObjectEntity | undefined => {
+  if (!reference) {
+    return undefined;
+  }
+
+  const withoutPrefix = reference.trim().startsWith("@") ? reference.trim().slice(1) : reference.trim();
+  return entityByOriginalId.get(withoutPrefix) ?? entityByOriginalId.get(normalizeReferenceId(reference));
+};
 
 const uniqueRelations = (relations: ExportedRelationV1[]): ExportedRelationV1[] =>
   Array.from(new Map(relations.map((relation) => [relation.relation_id, relation])).values());
@@ -553,6 +608,12 @@ const getAnalysisRelationType = (target: ExportedObjectEntity | undefined): Rela
   }
   if (target?.source_node_type === "sample") {
     return "analysis_targets_sample";
+  }
+  if ("attempt_id" in (target ?? {})) {
+    return "analysis_targets_condition_variation_attempt";
+  }
+  if (target?.source_node_type === "condition_varies") {
+    return "analysis_targets_condition_variation";
   }
   return undefined;
 };
@@ -731,6 +792,38 @@ const buildConditionVariationLinks = (
     })
   ]);
 
+const buildConditionVariationAttemptLinks = (
+  documentId: string,
+  attempts: ExportedConditionVariationAttemptV1[],
+  entityByOriginalId: Map<string, ExportedObjectEntity>
+): ExportedRelationV1[] =>
+  attempts.flatMap((attempt) => {
+    const parent = entityByOriginalId.get(normalizeReferenceId(attempt.original_id ?? "").split(".")[0] ?? "");
+    const reaction = getReferencedEntity(attempt.reaction_ref_raw, entityByOriginalId);
+    const result = getReferencedEntity(attempt.result_ref_raw, entityByOriginalId);
+    const standard = attempt.parent_condition_variation_id
+      ? [...entityByOriginalId.values()].find((entity) => entity.entity_id === attempt.parent_condition_variation_id)
+      : undefined;
+    const standardReaction = standard?.source_node_type === "condition_varies" && "standard_ref_raw" in standard
+      ? getReferencedEntity(standard.standard_ref_raw, entityByOriginalId)
+      : undefined;
+
+    return [
+      ...(parent?.source_node_type === "condition_varies"
+        ? [createRelation(documentId, "condition_variation_has_attempt", parent.entity_id, attempt.entity_id, "attempt")]
+        : []),
+      ...(reaction?.source_node_type === "reaction"
+        ? [createRelation(documentId, "condition_variation_attempt_targets_reaction", attempt.entity_id, reaction.entity_id, "reaction")]
+        : []),
+      ...(standardReaction?.source_node_type === "reaction"
+        ? [createRelation(documentId, "condition_variation_attempt_compares_standard", attempt.entity_id, standardReaction.entity_id, "standard")]
+        : []),
+      ...(result?.source_node_type === "result"
+        ? [createRelation(documentId, "condition_variation_attempt_has_result", attempt.entity_id, result.entity_id, "result")]
+        : [])
+    ];
+  });
+
 const buildMarkdownMentionLinks = (
   documentId: string,
   markdownBlocks: ExportedMarkdownBlockV1[],
@@ -739,7 +832,9 @@ const buildMarkdownMentionLinks = (
   markdownBlocks.flatMap((block) =>
     block.references.flatMap((reference) => {
       const target = reference.resolution_status === "resolved"
-        ? entityByOriginalId.get(reference.source)
+        ? entityByOriginalId.get(
+            reference.field ? `${reference.source}.${reference.field}` : reference.source
+          ) ?? entityByOriginalId.get(reference.source)
         : undefined;
       return target
         ? [createRelation(documentId, "markdown_mentions_entity", block.entity_id, target.entity_id, reference.field ?? reference.kind)]
@@ -758,7 +853,8 @@ const buildSemanticLinks = (
     ...parts.analyses,
     ...parts.samples,
     ...parts.artifacts,
-    ...parts.conditionVariations
+    ...parts.conditionVariations,
+    ...parts.conditionVariationAttempts
   ];
   const entityByOriginalId = buildEntityIndex(entities);
 
@@ -770,6 +866,7 @@ const buildSemanticLinks = (
     ...buildSampleLinks(documentId, parts.samples, entityByOriginalId),
     ...buildArtifactLinks(documentId, parts.artifacts, entityByOriginalId),
     ...buildConditionVariationLinks(documentId, parts.conditionVariations, entityByOriginalId),
+    ...buildConditionVariationAttemptLinks(documentId, parts.conditionVariationAttempts, entityByOriginalId),
     ...buildMarkdownMentionLinks(documentId, parts.markdownBlocks, entityByOriginalId)
   ]);
 };
@@ -782,6 +879,7 @@ interface SemanticLayerParts {
   samples: ExportedSampleV1[];
   artifacts: ExportedArtifactV1[];
   conditionVariations: ExportedConditionVaryV1[];
+  conditionVariationAttempts: ExportedConditionVariationAttemptV1[];
   markdownBlocks: ExportedMarkdownBlockV1[];
 }
 
@@ -796,6 +894,7 @@ const createSemanticLayerParts = (): SemanticLayerParts => ({
   samples: [],
   artifacts: [],
   conditionVariations: [],
+  conditionVariationAttempts: [],
   markdownBlocks: []
 });
 
@@ -938,12 +1037,14 @@ const collectRelatedEntities = (
     }
 
     if (node.type === "condition_varies") {
-      parts.conditionVariations.push(buildConditionVaries(
+      const parent = buildConditionVaries(
         documentId,
         node,
         nodeIndex,
         getTypedConditionVaries(typedNodes, node)
-      ));
+      );
+      parts.conditionVariations.push(parent);
+      parts.conditionVariationAttempts.push(...buildConditionVariationAttempts(documentId, node, parent, nodeIndex));
     }
   }
 };
@@ -965,7 +1066,17 @@ export const buildSemanticLayer = (
   // Reaction participant 可以用 @id 指向 molecule，索引必须先于 reaction 语义层生成。
   collectRelatedEntities(document, traversedNodes, createMoleculeIndex(parts.molecules), parts, typedNodes);
 
-  const { molecules, reactions, results, analyses, samples, artifacts, conditionVariations, markdownBlocks } = parts;
+  const {
+    molecules,
+    reactions,
+    results,
+    analyses,
+    samples,
+    artifacts,
+    conditionVariations,
+    conditionVariationAttempts,
+    markdownBlocks
+  } = parts;
   const links = buildSemanticLinks(documentId, parts);
 
   return {
@@ -976,6 +1087,7 @@ export const buildSemanticLayer = (
     samples,
     artifacts,
     condition_variations: conditionVariations,
+    condition_variation_attempts: conditionVariationAttempts,
     markdown_blocks: markdownBlocks,
     links
   };

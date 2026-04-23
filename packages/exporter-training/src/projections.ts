@@ -7,6 +7,7 @@ import type {
   TrainingAnalysisV1,
   TrainingArtifactV1,
   TrainingCanonicalSummaryV1,
+  TrainingConditionVariationAttemptV1,
   TrainingConditionVariationLogicV1,
   TrainingConditionVaryV1,
   TrainingEvidenceLinkV1,
@@ -48,6 +49,7 @@ import type {
   ChemdTrainingExportV2,
   ExportedAnalysisV1,
   ExportedArtifactV1,
+  ExportedConditionVariationAttemptV1,
   ExportedConditionVaryV1,
   ExportedEntityBase,
   ExportedMoleculeV1,
@@ -64,7 +66,8 @@ type ObjectEntity =
   | ExportedSampleV1
   | ExportedReactionV1
   | ExportedArtifactV1
-  | ExportedConditionVaryV1;
+  | ExportedConditionVaryV1
+  | ExportedConditionVariationAttemptV1;
 
 type PrimaryRole = TrainingPrimaryEntityV1["role"];
 type SourceStrippedKey =
@@ -158,7 +161,9 @@ const SAMPLE_LINEAGE_RELATIONS = new Set<ExportedRelationV1["relation_type"]>([
 const EVIDENCE_RELATIONS = new Set<ExportedRelationV1["relation_type"]>([
   "analysis_targets_reaction",
   "analysis_targets_result",
-  "analysis_targets_sample"
+  "analysis_targets_sample",
+  "analysis_targets_condition_variation",
+  "analysis_targets_condition_variation_attempt"
 ]);
 const ARTIFACT_EVIDENCE_RELATIONS = new Set<ExportedRelationV1["relation_type"]>([
   "artifact_supports_reaction",
@@ -168,7 +173,11 @@ const ARTIFACT_EVIDENCE_RELATIONS = new Set<ExportedRelationV1["relation_type"]>
 ]);
 const CONDITION_VARIATION_RELATIONS = new Set<ExportedRelationV1["relation_type"]>([
   "condition_variation_targets_reaction",
-  "condition_variation_compares_standard"
+  "condition_variation_compares_standard",
+  "condition_variation_has_attempt",
+  "condition_variation_attempt_targets_reaction",
+  "condition_variation_attempt_compares_standard",
+  "condition_variation_attempt_has_result"
 ]);
 const RELATION_MATERIAL_FLOW_SPECS: Partial<Record<ExportedRelationV1["relation_type"], RelationMaterialFlowSpec>> = {
   result_describes_reaction: { edgeType: "reaction_reports_result", reverse: true },
@@ -185,7 +194,9 @@ const RELATION_MATERIAL_FLOW_SPECS: Partial<Record<ExportedRelationV1["relation_
   artifact_supports_sample: { edgeType: "artifact_supports_material_claim" },
   analysis_targets_reaction: { edgeType: "analysis_supports_material_claim" },
   analysis_targets_result: { edgeType: "analysis_supports_material_claim" },
-  analysis_targets_sample: { edgeType: "analysis_supports_material_claim" }
+  analysis_targets_sample: { edgeType: "analysis_supports_material_claim" },
+  analysis_targets_condition_variation: { edgeType: "analysis_supports_material_claim" },
+  analysis_targets_condition_variation_attempt: { edgeType: "analysis_supports_material_claim" }
 };
 type SampleLineageReferenceField = "derived_from" | "aliquot_of" | "batch_of" | "artifacts";
 const SAMPLE_LINEAGE_FIELD_RELATIONS: Record<SampleLineageReferenceField, ReadonlySet<ExportedRelationV1["relation_type"]>> = {
@@ -349,7 +360,8 @@ const buildEntityIndex = (record: ChemdTrainingExportV2): Map<string, ObjectEnti
     ...record.semantic_layer.analyses,
     ...record.semantic_layer.samples,
     ...record.semantic_layer.artifacts,
-    ...record.semantic_layer.condition_variations
+    ...record.semantic_layer.condition_variations,
+    ...record.semantic_layer.condition_variation_attempts
   ];
 
   return new Map(
@@ -373,6 +385,18 @@ const normalizeReferenceId = (value: string): string =>
   (value.trim().startsWith("@") ? value.trim().slice(1) : value.trim())
     .split(".")[0]
     ?.trim() ?? "";
+
+const getEntityByRawReference = (
+  entityByOriginalId: Map<string, ObjectEntity>,
+  value: string | undefined
+): ObjectEntity | undefined => {
+  if (!value) {
+    return undefined;
+  }
+
+  const withoutPrefix = value.trim().startsWith("@") ? value.trim().slice(1) : value.trim();
+  return entityByOriginalId.get(withoutPrefix) ?? entityByOriginalId.get(normalizeReferenceId(value));
+};
 
 const findRelation = (
   record: ChemdTrainingExportV2,
@@ -485,7 +509,7 @@ const buildResultReferences = (
             source_entity_type: "result",
             source_field: result.reaction_ref_raw ? "reaction" : "ref"
           },
-          entityByOriginalId.get(normalizeReferenceId(reactionRaw)),
+          getEntityByRawReference(entityByOriginalId, reactionRaw),
           relation?.relation_type
         )]
       : [];
@@ -500,7 +524,7 @@ const buildResultReferences = (
               source_entity_type: "result",
               source_field: "product"
             },
-            entityByOriginalId.get(normalizeReferenceId(result.product_ref_raw))
+            getEntityByRawReference(entityByOriginalId, result.product_ref_raw)
           )
         ]
       : references;
@@ -517,7 +541,7 @@ const buildSingleFieldReferences = (
       return [];
     }
 
-    const target = entityByOriginalId.get(normalizeReferenceId(entity.ref_raw));
+    const target = getEntityByRawReference(entityByOriginalId, entity.ref_raw);
     const relation = findRelationToTarget(
       record,
       entity.entity_id,
@@ -566,7 +590,7 @@ const createSampleLineageReference = (
     return [];
   }
 
-  const target = entityByOriginalId.get(normalizeReferenceId(raw));
+  const target = getEntityByRawReference(entityByOriginalId, raw);
   const relation = findRelationToTarget(
     record,
     sample.entity_id,
@@ -596,7 +620,7 @@ const buildArtifactReferences = (
       return [];
     }
 
-    const target = entityByOriginalId.get(normalizeReferenceId(artifact.ref_raw));
+    const target = getEntityByRawReference(entityByOriginalId, artifact.ref_raw);
     const relation = findRelationToTarget(
       record,
       artifact.entity_id,
@@ -628,7 +652,7 @@ const createConditionVariationReference = (
     return [];
   }
 
-  const target = entityByOriginalId.get(normalizeReferenceId(raw));
+  const target = getEntityByRawReference(entityByOriginalId, raw);
   const relation = findRelationToTarget(
     record,
     variation.entity_id,
@@ -655,8 +679,46 @@ const buildConditionVariationReferences = (
 ): TrainingResolvedReferenceV1[] =>
   record.semantic_layer.condition_variations.flatMap((variation) => [
     ...createConditionVariationReference(record, entityByOriginalId, variation, "reaction", variation.reaction_ref_raw),
-    ...createConditionVariationReference(record, entityByOriginalId, variation, "standard", variation.standard_ref_raw)
+    ...createConditionVariationReference(record, entityByOriginalId, variation, "standard", variation.standard_ref_raw),
+    ...record.semantic_layer.condition_variation_attempts
+      .filter((attempt) => attempt.parent_condition_variation_id === variation.entity_id)
+      .flatMap((attempt) => [
+        ...createAttemptReference(record, entityByOriginalId, attempt, "reaction", attempt.reaction_ref_raw),
+        ...createAttemptReference(record, entityByOriginalId, attempt, "result", attempt.result_ref_raw)
+      ])
   ]);
+
+const createAttemptReference = (
+  record: ChemdTrainingExportV2,
+  entityByOriginalId: Map<string, ObjectEntity>,
+  attempt: ExportedConditionVariationAttemptV1,
+  field: "reaction" | "result",
+  raw: string | undefined
+): TrainingResolvedReferenceV1[] => {
+  if (!raw) {
+    return [];
+  }
+
+  const target = getEntityByRawReference(entityByOriginalId, raw);
+  const relation = findRelationToTarget(
+    record,
+    attempt.entity_id,
+    target?.entity_id,
+    CONDITION_VARIATION_RELATIONS,
+    field
+  );
+
+  return [createStructuredReference(
+    raw,
+    {
+      source_entity_id: attempt.entity_id,
+      source_entity_type: "condition_variation_attempt",
+      source_field: field
+    },
+    target,
+    relation?.relation_type
+  )];
+};
 
 const buildResolvedReferences = (
   record: ChemdTrainingExportV2,
@@ -820,6 +882,14 @@ const findReactionByRawRef = (
     ? reactions.find((reaction) => reaction.original_id === normalizeReferenceId(rawRef))
     : undefined;
 
+const findResultByRawRef = (
+  results: ExportedResultV1[],
+  rawRef: string | undefined
+): ExportedResultV1 | undefined =>
+  rawRef
+    ? results.find((result) => result.original_id === normalizeReferenceId(rawRef))
+    : undefined;
+
 const hasConditionEvidence = (context: TrainingExperimentDesignContextV1): boolean =>
   context.evidence_entity_ids.some((entityId) => entityId.startsWith("cv::"));
 
@@ -827,6 +897,12 @@ const buildExplicitDesignContext = (
   record: ChemdTrainingExportV2,
   variation: ExportedConditionVaryV1
 ): TrainingExperimentDesignContextV1[] => {
+  if (record.semantic_layer.condition_variation_attempts.some((attempt) =>
+    attempt.parent_condition_variation_id === variation.entity_id
+  )) {
+    return [];
+  }
+
   const candidate = findReactionByRawRef(record.semantic_layer.reactions, variation.reaction_ref_raw);
   if (!candidate) {
     return [];
@@ -856,12 +932,55 @@ const buildExplicitDesignContext = (
   }];
 };
 
+const buildExplicitAttemptDesignContext = (
+  record: ChemdTrainingExportV2,
+  attempt: ExportedConditionVariationAttemptV1
+): TrainingExperimentDesignContextV1[] => {
+  const parent = record.semantic_layer.condition_variations.find((variation) =>
+    variation.entity_id === attempt.parent_condition_variation_id
+  );
+  const candidate = findReactionByRawRef(record.semantic_layer.reactions, attempt.reaction_ref_raw);
+  if (!parent || !candidate) {
+    return [];
+  }
+
+  const standard = findReactionByRawRef(record.semantic_layer.reactions, parent.standard_ref_raw);
+  const explicitResult = findResultByRawRef(record.semantic_layer.results, attempt.result_ref_raw);
+  const linkedResult = explicitResult ?? findLinkedResultForReaction(record, candidate.entity_id);
+  const controlled = attempt.condition
+    .filter((condition) => !attempt.changes.some((change) => change.field === condition.field))
+    .map((condition) => condition.field);
+
+  return [{
+    context_id: `design::${record.document.document_id}::${attempt.entity_id}`,
+    reaction_entity_id: candidate.entity_id,
+    ...(linkedResult ? { linked_result_entity_id: linkedResult.entity_id } : {}),
+    series_id: `series::${record.document.document_id}::${parent.entity_id}`,
+    variant_role: standard?.entity_id === candidate.entity_id ? "baseline" : "variant",
+    ...(standard && standard.entity_id !== candidate.entity_id
+      ? { baseline_reaction_entity_id: standard.entity_id }
+      : {}),
+    changed_variables: attempt.changes.map(toExplicitDelta),
+    controlled_variables: controlled,
+    evidence_entity_ids: uniqueStrings([
+      parent.entity_id,
+      attempt.entity_id,
+      candidate.entity_id,
+      ...(standard ? [standard.entity_id] : []),
+      ...(linkedResult ? [linkedResult.entity_id] : [])
+    ])
+  }];
+};
+
 const buildExplicitDesignContexts = (
   record: ChemdTrainingExportV2
 ): Map<string, TrainingExperimentDesignContextV1> =>
   new Map(
     record.semantic_layer.condition_variations
       .flatMap((variation) => buildExplicitDesignContext(record, variation))
+      .concat(record.semantic_layer.condition_variation_attempts.flatMap((attempt) =>
+        buildExplicitAttemptDesignContext(record, attempt)
+      ))
       .map((context) => [context.reaction_entity_id, context])
   );
 
@@ -918,19 +1037,72 @@ const getConditionVariationWarnings = (
   ...(variation.changes.length === 0 ? ["condition_variation_without_changes"] : [])
 ];
 
-const buildConditionVariationLogic = (
+const getAttemptWarnings = (
+  attempt: ExportedConditionVariationAttemptV1,
+  candidate: ExportedReactionV1 | undefined,
+  result: ExportedResultV1 | undefined
+): string[] => [
+  ...(!candidate ? ["condition_variation_attempt_reaction_unresolved"] : []),
+  ...(attempt.result_ref_raw && !result ? ["condition_variation_attempt_result_unresolved"] : []),
+  ...(attempt.changes.length === 0 ? ["condition_variation_attempt_without_changes"] : [])
+];
+
+const buildAttemptConditionVariationLogic = (
   record: ChemdTrainingExportV2
 ): TrainingConditionVariationLogicV1[] =>
-  record.semantic_layer.condition_variations.map((variation) => {
+  record.semantic_layer.condition_variation_attempts.map((attempt) => {
+    const parent = record.semantic_layer.condition_variations.find((variation) =>
+      variation.entity_id === attempt.parent_condition_variation_id
+    );
+    const candidate = findReactionByRawRef(record.semantic_layer.reactions, attempt.reaction_ref_raw);
+    const result = findResultByRawRef(record.semantic_layer.results, attempt.result_ref_raw);
+    const standard = findReactionByRawRef(record.semantic_layer.reactions, parent?.standard_ref_raw);
+    const warnings = getAttemptWarnings(attempt, candidate, result);
+
+    return {
+      variation_id: `condition-variation::${attempt.entity_id}`,
+      condition_variation_entity_id: attempt.parent_condition_variation_id,
+      condition_variation_attempt_entity_id: attempt.entity_id,
+      attempt_id: attempt.attempt_id,
+      ...(candidate ? { reaction_entity_id: candidate.entity_id } : {}),
+      ...(result ? { result_entity_id: result.entity_id } : {}),
+      ...(standard ? { standard_reaction_entity_id: standard.entity_id } : {}),
+      condition: attempt.condition.map(toExplicitDelta),
+      changed_variables: attempt.changes.map(toExplicitDelta),
+      logic_source: "explicit",
+      confidence: warnings.length === 0 ? "high" : "low",
+      evidence_entity_ids: uniqueStrings([
+        attempt.parent_condition_variation_id,
+        attempt.entity_id,
+        ...(candidate ? [candidate.entity_id] : []),
+        ...(result ? [result.entity_id] : []),
+        ...(standard ? [standard.entity_id] : [])
+      ]),
+      review_required: warnings.length > 0,
+      warnings
+    };
+  });
+
+const buildConditionVariationLogic = (
+  record: ChemdTrainingExportV2
+): TrainingConditionVariationLogicV1[] => {
+  const legacyLogic: TrainingConditionVariationLogicV1[] = record.semantic_layer.condition_variations.flatMap((variation) => {
+    if (record.semantic_layer.condition_variation_attempts.some((attempt) =>
+      attempt.parent_condition_variation_id === variation.entity_id
+    )) {
+      return [];
+    }
+
     const candidate = findReactionByRawRef(record.semantic_layer.reactions, variation.reaction_ref_raw);
     const standard = findReactionByRawRef(record.semantic_layer.reactions, variation.standard_ref_raw);
     const warnings = getConditionVariationWarnings(variation, candidate, standard);
 
-    return {
+    return [{
       variation_id: `condition-variation::${variation.entity_id}`,
       condition_variation_entity_id: variation.entity_id,
       ...(candidate ? { reaction_entity_id: candidate.entity_id } : {}),
       ...(standard ? { standard_reaction_entity_id: standard.entity_id } : {}),
+      condition: [],
       changed_variables: variation.changes.map(toExplicitDelta),
       logic_source: "explicit",
       confidence: warnings.length === 0 ? "high" : "low",
@@ -941,8 +1113,11 @@ const buildConditionVariationLogic = (
       ]),
       review_required: warnings.length > 0,
       warnings
-    };
+    }];
   });
+
+  return [...legacyLogic, ...buildAttemptConditionVariationLogic(record)];
+};
 
 const getReactionClassificationText = (reaction: ExportedReactionV1): string =>
   compactText(
@@ -1656,6 +1831,7 @@ const buildKnowledgeNodes = (
   ...semanticNodesForEntity("sample", record.semantic_layer.samples),
   ...semanticNodesForEntity("artifact", record.semantic_layer.artifacts),
   ...semanticNodesForEntity("condition_variation", record.semantic_layer.condition_variations),
+  ...semanticNodesForEntity("condition_variation_attempt", record.semantic_layer.condition_variation_attempts),
   ...record.semantic_layer.markdown_blocks.map((block) => ({
     node_id: block.entity_id,
     node_type: "narrative" as const,
@@ -1684,7 +1860,7 @@ const createStepReferenceEdges = (
   entityByOriginalId: Map<string, ObjectEntity>
 ): TrainingKnowledgeEdgeV1[] =>
   [...(step.inputs ?? []), ...(step.outputs ?? [])].flatMap((item) => {
-    const target = item.reference ? entityByOriginalId.get(normalizeReferenceId(item.reference.refId)) : undefined;
+    const target = item.reference ? getEntityByRawReference(entityByOriginalId, item.reference.refId) : undefined;
 
     return target
       ? [{
@@ -1956,7 +2132,7 @@ const getStepIoTarget = (
   item: { reference?: { refId: string; resolved: boolean } },
   entityByOriginalId: Map<string, ObjectEntity>
 ): ObjectEntity | undefined =>
-  item.reference?.resolved ? entityByOriginalId.get(normalizeReferenceId(item.reference.refId)) : undefined;
+  item.reference?.resolved ? getEntityByRawReference(entityByOriginalId, item.reference.refId) : undefined;
 
 const buildStepMaterialFlowEdges = (
   record: ChemdTrainingExportV2,
@@ -2117,7 +2293,7 @@ const buildArtifactStepDependencies = (
   record.learning_layer.procedure_to_steps?.flatMap((pair) =>
     pair.steps.flatMap((step) =>
       (step.artifacts ?? []).map((artifact) => {
-        const target = entityByOriginalId.get(normalizeReferenceId(artifact.artifactId));
+        const target = getEntityByRawReference(entityByOriginalId, artifact.artifactId);
         return createStepDependencyEdge({
           dependency_edge_id: `stepdep::${pair.pair_id}::artifact::${step.stepId}::${artifact.artifactId}`,
           dependency_type: "step_produces_artifact",
@@ -2611,24 +2787,72 @@ const buildArtifactFieldEvidence = (record: ChemdTrainingExportV2): TrainingFiel
   ]);
 
 const buildConditionVariationFieldEvidence = (record: ChemdTrainingExportV2): TrainingFieldEvidenceV1[] =>
-  record.semantic_layer.condition_variations.flatMap((variation) =>
-    variation.changes.flatMap((change) => [
+  [
+    ...record.semantic_layer.condition_variations.flatMap((variation) => [
+      ...(variation.condition ?? []).flatMap((condition) =>
+        createFieldEvidence({
+          subjectEntityId: variation.entity_id,
+          field: `condition_${condition.field}`,
+          value: condition.baseline_raw ?? condition.raw,
+          rawValue: condition.raw,
+          sourceSpan: getFieldSourceSpan(variation, "condition")
+        })
+      ),
+      ...variation.changes.flatMap((change) => [
+        ...createFieldEvidence({
+          subjectEntityId: variation.entity_id,
+          field: `baseline_${change.field}`,
+          value: change.baseline_raw,
+          rawValue: change.raw,
+          sourceSpan: getFieldSourceSpan(variation, change.field)
+        }),
+        ...createFieldEvidence({
+          subjectEntityId: variation.entity_id,
+          field: `candidate_${change.field}`,
+          value: change.candidate_raw ?? change.raw,
+          rawValue: change.raw,
+          sourceSpan: getFieldSourceSpan(variation, change.field)
+        })
+      ])
+    ]),
+    ...record.semantic_layer.condition_variation_attempts.flatMap((attempt) => [
+      ...attempt.condition.flatMap((condition) =>
+        createFieldEvidence({
+          subjectEntityId: attempt.entity_id,
+          field: `condition_${condition.field}`,
+          value: condition.candidate_raw ?? condition.raw,
+          rawValue: condition.raw,
+          evidenceEntityIds: [attempt.parent_condition_variation_id, attempt.entity_id],
+          sourceSpan: getFieldSourceSpan(attempt, attempt.attempt_id)
+        })
+      ),
+      ...attempt.changes.flatMap((change) => [
       ...createFieldEvidence({
-        subjectEntityId: variation.entity_id,
+        subjectEntityId: attempt.entity_id,
         field: `baseline_${change.field}`,
         value: change.baseline_raw,
         rawValue: change.raw,
-        sourceSpan: getFieldSourceSpan(variation, change.field)
+        evidenceEntityIds: [attempt.parent_condition_variation_id, attempt.entity_id],
+        sourceSpan: getFieldSourceSpan(attempt, attempt.attempt_id)
       }),
       ...createFieldEvidence({
-        subjectEntityId: variation.entity_id,
+        subjectEntityId: attempt.entity_id,
         field: `candidate_${change.field}`,
         value: change.candidate_raw ?? change.raw,
         rawValue: change.raw,
-        sourceSpan: getFieldSourceSpan(variation, change.field)
+        evidenceEntityIds: [attempt.parent_condition_variation_id, attempt.entity_id],
+        sourceSpan: getFieldSourceSpan(attempt, attempt.attempt_id)
+      })
+      ]),
+      ...createFieldEvidence({
+        subjectEntityId: attempt.entity_id,
+        field: "note",
+        value: attempt.note,
+        evidenceEntityIds: [attempt.parent_condition_variation_id, attempt.entity_id],
+        sourceSpan: getFieldSourceSpan(attempt, `note${attempt.attempt_id.replace(/^var/, "")}`)
       })
     ])
-  );
+  ];
 
 const buildFieldEvidence = (record: ChemdTrainingExportV2): TrainingFieldEvidenceV1[] => [
   ...buildMoleculeFieldEvidence(record),
@@ -3078,6 +3302,7 @@ export const buildTrainingUnderstandingFromRecord = (
       samples: record.semantic_layer.samples.map(stripSourceFields) as TrainingSampleV1[],
       artifacts: record.semantic_layer.artifacts.map(stripSourceFields) as TrainingArtifactV1[],
       condition_variations: record.semantic_layer.condition_variations.map(stripSourceFields) as TrainingConditionVaryV1[],
+      condition_variation_attempts: record.semantic_layer.condition_variation_attempts.map(stripSourceFields) as TrainingConditionVariationAttemptV1[],
       narrative_blocks: buildNarrativeBlocks(record)
     },
     relations: record.semantic_layer.links,

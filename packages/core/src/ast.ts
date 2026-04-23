@@ -297,12 +297,34 @@ export interface ConditionVariationDelta {
   candidate?: string;
 }
 
+export interface ConditionVariationVariable {
+  field: string;
+  raw: string;
+  baseline?: string;
+}
+
+export type ConditionVariationAttemptMode = "partial" | "override";
+
+export interface ConditionVariationAttempt {
+  id: string;
+  raw: string;
+  mode?: ConditionVariationAttemptMode;
+  reaction?: string;
+  result?: string;
+  note?: string;
+  changes: ConditionVariationDelta[];
+  condition: ConditionVariationDelta[];
+}
+
 export interface ConditionVariesNode extends SourceMappedNode {
   type: "condition_varies";
   id?: string;
   reaction?: string;
   standard?: string;
+  condition?: ConditionVariationVariable[];
+  varyFields?: string[];
   changes: ConditionVariationDelta[];
+  attempts?: ConditionVariationAttempt[];
   notes?: string;
 }
 

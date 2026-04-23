@@ -56,6 +56,7 @@ export type StepReferenceTargetKind =
   | "sample"
   | "artifact"
   | "condition_varies"
+  | "condition_variation_attempt"
   | "template"
   | "unknown";
 

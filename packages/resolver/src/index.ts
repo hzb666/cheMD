@@ -57,6 +57,14 @@ const readNodeField = (node: unknown, field: string): unknown => {
     return undefined;
   }
 
+  if ((node as { type?: string }).type === "condition_varies") {
+    const attempt = (node as Extract<ObjectNode, { type: "condition_varies" }>).attempts
+      ?.find((candidate) => candidate.id === field);
+    if (attempt) {
+      return attempt;
+    }
+  }
+
   return (node as Record<string, unknown>)[field];
 };
 

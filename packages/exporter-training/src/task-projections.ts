@@ -108,8 +108,12 @@ const getConditionVariationFacts = (
 ): JsonObject[] =>
   getConditionVariationsForReaction(understanding, reactionEntityId).map((variation) => ({
     condition_variation_entity_id: variation.condition_variation_entity_id,
+    condition_variation_attempt_entity_id: variation.condition_variation_attempt_entity_id,
+    attempt_id: variation.attempt_id,
     reaction_entity_id: variation.reaction_entity_id,
+    result_entity_id: variation.result_entity_id,
     standard_reaction_entity_id: variation.standard_reaction_entity_id,
+    condition: variation.condition,
     changed_variables: variation.changed_variables,
     confidence: variation.confidence,
     warnings: variation.warnings
@@ -140,6 +144,7 @@ const getEntityById = (
     ...understanding.entities.samples,
     ...understanding.entities.artifacts,
     ...understanding.entities.condition_variations,
+    ...understanding.entities.condition_variation_attempts,
     ...understanding.entities.narrative_blocks
   ].find((candidate) => candidate.entity_id === entityId);
 
@@ -247,7 +252,8 @@ const buildRecordToChemdExamples = (
     analyses: understanding.entities.analyses.length,
     samples: understanding.entities.samples.length,
     artifacts: understanding.entities.artifacts.length,
-    condition_variations: understanding.entities.condition_variations.length
+    condition_variations: understanding.entities.condition_variations.length,
+    condition_variation_attempts: understanding.entities.condition_variation_attempts.length
   };
   const sourceEntityIds = uniqueStrings([
     ...understanding.entities.molecules.map((entity) => entity.entity_id),
@@ -256,7 +262,8 @@ const buildRecordToChemdExamples = (
     ...understanding.entities.analyses.map((entity) => entity.entity_id),
     ...understanding.entities.samples.map((entity) => entity.entity_id),
     ...understanding.entities.artifacts.map((entity) => entity.entity_id),
-    ...understanding.entities.condition_variations.map((entity) => entity.entity_id)
+    ...understanding.entities.condition_variations.map((entity) => entity.entity_id),
+    ...understanding.entities.condition_variation_attempts.map((entity) => entity.entity_id)
   ]);
 
   if (sourceEntityIds.length === 0) {
@@ -405,6 +412,9 @@ const buildObservationEventExamples = (
       input: {
         task: "observation_events",
         source_text: pair.source_text,
+        ref_raw: pair.ref_raw,
+        target_entity_id: pair.target_entity_id,
+        target_entity_type: pair.target_entity_type,
         procedure_steps: understanding.procedure_logic.procedure_to_steps.flatMap((procedure) => procedure.steps)
       },
       output: {
@@ -488,6 +498,9 @@ const getReferenceCandidateEntities = (understanding: ChemdTrainingUnderstanding
   ...understanding.entities.artifacts.map((entity) => summarizeEntity("artifact", entity as JsonObject)),
   ...understanding.entities.condition_variations.map((entity) =>
     summarizeEntity("condition_variation", entity as JsonObject)
+  ),
+  ...understanding.entities.condition_variation_attempts.map((entity) =>
+    summarizeEntity("condition_variation_attempt", entity as JsonObject)
   )
 ];
 
@@ -671,8 +684,12 @@ const buildExperimentIntentExamples = (
       reactions: understanding.entities.reactions.map(getReactionFacts),
       condition_variations: logic.condition_variations.map((variation) => ({
         condition_variation_entity_id: variation.condition_variation_entity_id,
+        condition_variation_attempt_entity_id: variation.condition_variation_attempt_entity_id,
+        attempt_id: variation.attempt_id,
         reaction_entity_id: variation.reaction_entity_id,
+        result_entity_id: variation.result_entity_id,
         standard_reaction_entity_id: variation.standard_reaction_entity_id,
+        condition: variation.condition,
         changed_variables: variation.changed_variables,
         confidence: variation.confidence,
         warnings: variation.warnings
@@ -850,7 +867,12 @@ const buildConditionRecommendationExamples = (
         outcome.result_entity_id,
         ...conditionVariations.flatMap((variation) =>
           typeof variation.condition_variation_entity_id === "string"
-            ? [variation.condition_variation_entity_id]
+            ? [
+                variation.condition_variation_entity_id,
+                ...(typeof variation.condition_variation_attempt_entity_id === "string"
+                  ? [variation.condition_variation_attempt_entity_id]
+                  : [])
+              ]
             : []
         )
       ]),
@@ -994,7 +1016,12 @@ const buildExperimentComparisonExamples = (
         candidateOutcome.result_entity_id,
         ...conditionVariations.flatMap((variation) =>
           typeof variation.condition_variation_entity_id === "string"
-            ? [variation.condition_variation_entity_id]
+            ? [
+                variation.condition_variation_entity_id,
+                ...(typeof variation.condition_variation_attempt_entity_id === "string"
+                  ? [variation.condition_variation_attempt_entity_id]
+                  : [])
+              ]
             : []
         )
       ]),

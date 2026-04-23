@@ -67,6 +67,7 @@ export interface ReferenceType {
     | "sample"
     | "artifact"
     | "condition_varies"
+    | "condition_variation_attempt"
     | "template"
     | "unknown";
   refId: string;
@@ -210,7 +211,10 @@ export interface TypedConditionVariesNode extends TypedNodeBase {
   kind: "condition_varies";
   reaction?: ReferenceOrLiteral;
   standard?: ReferenceOrLiteral;
+  condition?: ConditionVariesNode["condition"];
+  varyFields?: ConditionVariesNode["varyFields"];
   changes: ConditionVariesNode["changes"];
+  attempts?: ConditionVariesNode["attempts"];
   notes?: string;
 }
 

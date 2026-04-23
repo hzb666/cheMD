@@ -213,6 +213,61 @@ notes: Solvent and temperature screen.
     });
   });
 
+  it("parses condition-varies blocks with parallel attempts", () => {
+    const document = parseChemd(`---
+id: exp-condition-attempts
+title: Condition attempts
+date: 2026-04-23
+---
+
+:::condition-varies #cv-screen
+standard: rxn-standard
+condition: solvent=THF | temperature=25 C | catalyst=Pd
+varies: solvent | temperature
+var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
+res1: res-var1
+note1: Higher yield but more impurity.
+var2: reaction=rxn-var2 | mode=override | solvent=DMSO | temperature=60 C | catalyst=Ni
+res2: res-var2
+note2: Trace product by TLC.
+:::
+`);
+
+    expect(document.children[0]).toMatchObject({
+      type: "condition_varies",
+      id: "cv-screen",
+      standard: "rxn-standard",
+      condition: [
+        { field: "solvent", baseline: "THF" },
+        { field: "temperature", baseline: "25 C" },
+        { field: "catalyst", baseline: "Pd" }
+      ],
+      varyFields: ["solvent", "temperature"],
+      attempts: [
+        expect.objectContaining({
+          id: "var1",
+          reaction: "rxn-var1",
+          result: "res-var1",
+          note: "Higher yield but more impurity.",
+          condition: expect.arrayContaining([
+            expect.objectContaining({ field: "catalyst", candidate: "Pd" }),
+            expect.objectContaining({ field: "solvent", candidate: "MeCN" })
+          ])
+        }),
+        expect.objectContaining({
+          id: "var2",
+          mode: "override",
+          reaction: "rxn-var2",
+          result: "res-var2",
+          note: "Trace product by TLC.",
+          condition: expect.arrayContaining([
+            expect.objectContaining({ field: "solvent", candidate: "DMSO" })
+          ])
+        })
+      ]
+    });
+  });
+
   it("attaches quick fixes to strict missing-kind diagnostics", () => {
     const document = parseChemd(`---
 id: exp-missing-kind-fix

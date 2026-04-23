@@ -1,0 +1,7 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/parser/backend/index.md", "reason": "Parser block syntax and tests"}
+{"file": ".trellis/spec/parser/backend/quality-guidelines.md", "reason": "Parser quality and public syntax contract"}
+{"file": ".trellis/spec/core/backend/index.md", "reason": "AST contract owner"}
+{"file": ".trellis/spec/exporter-training/backend/training-export-contract.md", "reason": "Export and training contract"}
+{"file": ".trellis/spec/resolver/backend/index.md", "reason": "Reference resolution boundaries"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Cross-layer payload changes"}

@@ -61,23 +61,66 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   :::
   ```
 
-  Parser output uses `ConditionVariesNode.type = "condition_varies"` with:
+  Parallel optimization attempts are authored as:
+
+  ```chemd
+  :::condition-varies #cv-screen
+  standard: rxn-standard
+  condition: solvent=THF | temperature=25 C | catalyst=Pd
+  varies: solvent | temperature
+  var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
+  res1: res-var1
+  note1: Higher yield but impurity visible.
+  var2: reaction=rxn-var2 | mode=override | solvent=DMSO | temperature=60 C | catalyst=Ni
+  res2: res-var2
+  note2: Low conversion by TLC.
+  :::
+  ```
+
+  `condition` declares the baseline condition variables. Each `varN`
+  represents one parallel reaction attempt. `resN` and `noteN` bind by the
+  same numeric suffix, so `var1` matches `res1` and `note1`. Attempt fields are
+  partial overrides by default; `mode=override` means the attempt condition is a
+  full replacement of the baseline condition.
+- Parser output uses `ConditionVariesNode.type = "condition_varies"` with:
   - `reaction?: string` for the candidate/current reaction raw reference
   - `standard?: string` for the baseline reaction raw reference
+  - `condition?: { field; raw; baseline? }[]`
+  - `varyFields?: string[]`
   - `changes: { field; raw; baseline?; candidate? }[]`
+  - `attempts?: { id; raw; mode?; reaction?; result?; note?; changes; condition }[]`
   - `notes?: string`
-- `condition-varies.reaction` and `condition-varies.standard` must typecheck
-  as reaction references. Invalid or unresolved targets produce normal typed
-  reference diagnostics; they must not invent relation targets.
+- `condition-varies.reaction`, `condition-varies.standard`, and
+  `attempt.reaction` must typecheck as reaction references. `attempt.result`
+  must typecheck as a result reference. Invalid or unresolved targets produce
+  normal typed reference diagnostics; they must not invent relation targets.
+- `@cv-id.var1` and structured `ref: @cv-id.var1` target the attempt entity
+  `condition_variation_attempt`, so TLC/analysis/observation facts can attach
+  to the exact optimization row.
 - Exported condition variation entities must use `cv::<document_id>::<id>` and
   appear in `semantic_layer.condition_variations` as
   `ExportedConditionVaryV1` with `reaction_ref_raw`, `standard_ref_raw`,
-  `changes`, `notes`, and `text_for_embedding`.
+  `condition`, `vary_fields`, `changes`, `attempt_entity_ids`, `notes`, and
+  `text_for_embedding`.
+- Exported condition variation attempt entities must use
+  `cva::<document_id>::<condition_id>.<attempt_id>` and appear in
+  `semantic_layer.condition_variation_attempts` with parent id, attempt id,
+  reaction/result refs, effective condition, changed variables, note, and
+  embedding text.
 - Resolved condition variation references produce:
   - `condition_variation_targets_reaction` from the condition variation entity
     to the candidate reaction with role `reaction`
   - `condition_variation_compares_standard` from the condition variation entity
     to the standard reaction with role `standard`
+  - `condition_variation_has_attempt` from the parent variation to each attempt
+  - `condition_variation_attempt_targets_reaction` from each attempt to its
+    reaction
+  - `condition_variation_attempt_compares_standard` from each attempt to the
+    inherited standard reaction
+  - `condition_variation_attempt_has_result` from each attempt to its matched
+    result
+  - `analysis_targets_condition_variation_attempt` when TLC/analysis `ref`
+    points to `@cv.varN`
 - Resolved Markdown references produce `markdown_mentions_entity`.
 - `learning_layer.retrieval_chunks` must include available:
   - `document_summary`
@@ -88,6 +131,7 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   - `sample_notes`
   - `artifact_notes`
   - `condition_variation`
+  - `condition_variation_attempt`
 - The full `ChemdTrainingExportV2` is an audit export. Do not feed it directly
   to RAG or LoRA/SFT training jobs.
 - RAG and model-training views must be projections from the full export:
@@ -105,6 +149,7 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 - `ChemdTrainingUnderstandingV1.knowledge_graph` must preserve:
   - exported entity/narrative nodes
   - condition variation nodes
+  - condition variation attempt nodes
   - semantic relation edges
   - procedure, canonical step, observation, and observation event nodes
   - procedure/observation logic edges such as procedure-to-step ordering
@@ -162,7 +207,8 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 - `ChemdTrainingUnderstandingV1.resolved_references` must include Markdown
   references and structured `ref`/participant references that affect
   experiment logic, including `condition_varies.reaction` and
-  `condition_varies.standard`.
+  `condition_varies.standard`, attempt reaction/result refs, and analysis refs
+  targeting condition variation attempts.
 - `learning_layer.prediction_instances` must avoid leaking linked result text
   into input features. Result entities remain linked as targets/evidence, while
   feature inputs should focus on reaction conditions, participants, quantities,
@@ -243,6 +289,8 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 | Relation-extraction task | Exclude full target relations from prompt; keep derived examples SFT-only by default |
 | Inferred intent/causal logic | Emit derived records with evidence IDs and review flags; do not treat as source truth |
 | Explicit condition variation | Emit explicit condition variation logic; use low confidence and review-required if reaction or standard is unresolved |
+| Explicit condition attempt | Emit attempt-level logic; use `resN` and `noteN` matching for result/note evidence |
+| Attempt reference from TLC/analysis | Emit `analysis_targets_condition_variation_attempt` when `ref` targets `@cv.varN` |
 | Condition variation target kind mismatch | Resolve diagnostics normally, but do not emit candidate/standard semantic relation |
 | Experiment-intent task | Keep SFT-only and exclude inferred target records from the prompt |
 | Material flow graph | Emit derived graph edges only from resolved semantic links or step IO |
@@ -254,9 +302,13 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 - Good: reaction + result + sample + analysis + artifact all connected through stable links.
 - Good: `condition-varies` references a candidate and standard reaction, emits
   condition variation relations, and produces explicit changed variable logic.
+- Good: `condition-varies` with `var1`/`var2` emits attempt entities, binds
+  `res1`/`note1`, and lets TLC/analysis/observation reference `@cv.var1`.
 - Base: standalone document still emits a document summary chunk.
 - Bad: unresolved `condition-varies.standard` must not invent a standard
   reaction relation and must keep review-required condition variation logic.
+- Bad: unresolved `var1.result` must preserve the raw result ref but must not
+  emit `condition_variation_attempt_has_result`.
 
 ### 6. Tests Required
 
@@ -301,6 +353,9 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 - Assert explicit condition variation entities, references, semantic links,
   design contexts, variable logic, and experiment-intent inputs/outputs are
   present for `condition-varies` blocks.
+- Assert condition variation attempts, `resN`/`noteN` matching,
+  attempt-level references, TLC/analysis attempt links, and observation target
+  metadata are present for `condition-varies` attempt blocks.
 - Assert experiment-intent task examples are generated without leaking
   `intent_hypotheses`, `variable_logic`, or `causal_links` into user prompts.
 - Assert material flow graph and step dependencies are present for reaction

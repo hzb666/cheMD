@@ -367,13 +367,30 @@ export const buildConditionVariesNode = (
     field: "standard",
     expectedTargetKind: "reaction"
   });
+  const attemptDiagnostics = (node.attempts ?? []).flatMap((attempt) => [
+    ...resolveOptionalReference(attempt.reaction, context.objectIndex, {
+      sourceNodeType: "condition_varies",
+      sourceNodeId: node.id,
+      field: `${attempt.id}.reaction`,
+      expectedTargetKind: "reaction"
+    }).diagnostics,
+    ...resolveOptionalReference(attempt.result, context.objectIndex, {
+      sourceNodeType: "condition_varies",
+      sourceNodeId: node.id,
+      field: `${attempt.id}.result`,
+      expectedTargetKind: "result"
+    }).diagnostics
+  ]);
 
-  output.diagnostics.push(...reaction.diagnostics, ...standard.diagnostics);
+  output.diagnostics.push(...reaction.diagnostics, ...standard.diagnostics, ...attemptDiagnostics);
   output.node = {
     ...output.node,
     ...(reaction.value ? { reaction: reaction.value } : {}),
     ...(standard.value ? { standard: standard.value } : {}),
+    condition: node.condition,
+    varyFields: node.varyFields,
     changes: node.changes,
+    attempts: node.attempts,
     notes: node.notes
   } as TypedConditionVariesNode;
 
