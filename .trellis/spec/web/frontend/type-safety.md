@@ -22,6 +22,7 @@ Keep runtime input untrusted until it is narrowed. Shared contracts belong in DT
 - Use public `@chemd/*` exports, not deep package internals.
 - `compileChemd` returns the canonical compile result: document, diagnostics, render options, adapter payload, HTML, JSON, DOCX bridge, `typedSemanticGraph`, `stepGraph`, `runPlan`, `runtimePreflight`, `lnf`, and `trainingExport`.
 - `compileChemd(...).authoringAssistance` is the canonical editor-authoring contract for minimal-set status, starter/companion templates, and conservative source patches.
+- `compileChemd(...).diagnostics` may include compiler-origin authoring diagnostics (`sourceLayer: "compiler"`) that describe generated-record gaps and may expose conservative quick fixes.
 - Diagnostics quick-fix types and compile artifacts must be consumed through public `@chemd/compiler` exports.
 - Render option changes must stay aligned with `@chemd/render-profile` validators and adapter mapping.
 
@@ -173,6 +174,7 @@ Strict compiler diagnostics stay visible, and editor helpers only operate on exp
 | `templates` | Read-only starter/scaffold/optimization patches; grouped scaffolds may touch multiple locations, UI may apply them, compiler never auto-applies them |
 | `suggestions` | Conservative only: unique-target ref completion, baseline inheritance, attempt/result pairing, and unique attempt refs such as `ref: @cv-id.var1` |
 | `patch.kind` | May be `batch`; UI must route every patch through compiler helpers instead of inspecting or replaying child edits itself |
+| diagnostic quick fix | `kind: "apply_authoring_patch"` may appear only for conservative suggestion patches; UI must apply it through `applyDiagnosticQuickFix` |
 
 ### 3. Wrong vs Correct
 

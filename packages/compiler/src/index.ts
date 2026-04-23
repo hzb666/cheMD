@@ -30,6 +30,7 @@ import {
 import { typecheckDocument, type TypedSemanticGraph } from "@chemd/typechecker";
 import type { StepGraph } from "@chemd/step-ontology";
 import { buildAuthoringAssistance } from "./authoring-assistance";
+import { buildAuthoringDiagnostics } from "./authoring-diagnostics";
 import type { AuthoringAssistance } from "./authoring-types";
 export {
   applyDiagnosticQuickFix,
@@ -151,17 +152,24 @@ export const compileChemd = (source: string, options: CompileOptions = {}): Comp
   const ragExport = buildRagExportFromTrainingRecord(trainingExport);
   const trainingUnderstanding = buildTrainingUnderstandingFromRecord(trainingExport);
   const authoringAssistance = buildAuthoringAssistance(document, trainingExport);
+  const authoringDiagnostics = buildAuthoringDiagnostics(authoringAssistance, trainingExport);
+  const compileDocument = authoringDiagnostics.length > 0
+    ? {
+        ...document,
+        diagnostics: [...document.diagnostics, ...authoringDiagnostics]
+      }
+    : document;
   const renderOptions = renderProfileResolution.options;
   const renderAdapterPayload = mapRenderOptionsToAdapterPayload(renderOptions);
-  const html = renderHtml(document, renderOptions, { typedGraph: typecheckResult.typedGraph });
-  const json = renderCompiledJson(document, typecheckResult.typedGraph);
-  const docxBridge = renderDocxBridge(document, renderOptions, renderAdapterPayload, {
+  const html = renderHtml(compileDocument, renderOptions, { typedGraph: typecheckResult.typedGraph });
+  const json = renderCompiledJson(compileDocument, typecheckResult.typedGraph);
+  const docxBridge = renderDocxBridge(compileDocument, renderOptions, renderAdapterPayload, {
     typedGraph: typecheckResult.typedGraph
   });
 
   return {
-    document,
-    diagnostics: document.diagnostics,
+    document: compileDocument,
+    diagnostics: compileDocument.diagnostics,
     renderOptions,
     renderAdapterPayload,
     typedSemanticGraph: typecheckResult.typedGraph,

@@ -24,12 +24,14 @@ interface Diagnostic {
 - Resolver validation should append diagnostics and keep unrelated content renderable.
 - Render profile failures should append diagnostics and fall back to `eln-default` when a requested profile is missing.
 - Compiler code should merge diagnostics from each stage instead of replacing earlier diagnostics.
+- Compiler may append compile-only authoring diagnostics after semantic export when it detects LLM/generated-record gaps; these must still surface through `CompileResult.diagnostics` instead of a side channel.
 
 ## Examples
 
 - `packages/parser/src/frontmatter/parse-frontmatter.ts` records invalid YAML/frontmatter diagnostics and still returns a document body.
 - `packages/resolver/src/index.ts` reports duplicate ids, unresolved references, template cycles, and expansion limits without dropping unrelated content.
 - `packages/render-profile/src/index.ts` reports invalid profile values and clamps unsafe numeric options.
+- `packages/compiler/src/authoring-diagnostics.ts` turns conservative authoring suggestions into actionable compile diagnostics and leaves non-conservative scaffolds out of diagnostics.
 
 ## Throwing Rules
 

@@ -1,5 +1,8 @@
 import type { Diagnostic, DiagnosticQuickFix as CoreDiagnosticQuickFix } from "@chemd/core";
 import type { QuickFix } from "@chemd/diagnostics";
+import { applyAuthoringPatch } from "./authoring-apply";
+import { APPLY_AUTHORING_PATCH_QUICK_FIX_KIND } from "./authoring-diagnostics";
+import type { AuthoringPatch } from "./authoring-types";
 
 export type DiagnosticQuickFix = QuickFix | CoreDiagnosticQuickFix;
 export type DiagnosticWithQuickFixes = Diagnostic;
@@ -12,6 +15,30 @@ const REACTION_FIELD_RE = /^\s*(reac|reactant|reactants|prod|product|products)\s
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
+
+const isAuthoringPatch = (value: unknown): value is AuthoringPatch => {
+  if (!isRecord(value) || typeof value.kind !== "string") {
+    return false;
+  }
+
+  if (value.kind === "append_document_text") {
+    return typeof value.text === "string";
+  }
+
+  if (value.kind === "insert_after_block") {
+    return typeof value.blockId === "string" && typeof value.text === "string";
+  }
+
+  if (value.kind === "insert_field_line") {
+    return typeof value.blockId === "string" && typeof value.line === "string";
+  }
+
+  if (value.kind === "batch") {
+    return Array.isArray(value.patches) && value.patches.every((item) => isAuthoringPatch(item));
+  }
+
+  return false;
+};
 
 const readString = (record: Record<string, unknown>, key: string): string | undefined =>
   typeof record[key] === "string" ? record[key] : undefined;
@@ -187,6 +214,10 @@ export const applyDiagnosticQuickFix = (
   diagnostic: DiagnosticWithQuickFixes,
   quickFix: DiagnosticQuickFix
 ): string => {
+  if (quickFix.kind === APPLY_AUTHORING_PATCH_QUICK_FIX_KIND && isAuthoringPatch(quickFix.patch)) {
+    return applyAuthoringPatch(source, quickFix.patch);
+  }
+
   if (quickFix.kind === "insert_chemd_kind") {
     return applyInsertChemdKind(source, diagnostic, quickFix);
   }
