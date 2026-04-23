@@ -1127,3 +1127,44 @@ note2: Low conversion by TLC.
 ### Next Steps
 
 - None - task complete
+
+
+## Session 27: 完成 compiler agent loop integration
+
+**Date**: 2026-04-24
+**Task**: 完成 compiler agent loop integration
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+(Add summary)
+
+### Main Changes
+
+- 在 `@chemd/compiler` 增加 `runChemdAgentLoop()`，固定 repair-first agent loop contract，保留每轮 repair 结果、agent 响应轨迹、停止原因与 safe-fix 汇总。
+- 在 `@chemd/cli` 增加 `chemd agent-loop <file>`，通过 `--driver` / `--driver-arg` 驱动外部进程，使用 stdin/stdout JSON 协议完成定向重写。
+- 新增 `packages/cli/src/agent-driver.ts`，以非 shell `spawnSync(command, args)` 运行 driver，并校验 request/response schema。
+- 补充 compiler / cli regression tests 与 `.trellis/spec` 契约文档。
+- 验证通过：`pnpm --filter @chemd/compiler test -- agent-loop.test.ts repair-loop.test.ts diagnosis.test.ts authoring-diagnostics.test.ts quick-fix.test.ts authoring-assistance.test.ts`、`pnpm --filter @chemd/compiler typecheck`、`pnpm --filter @chemd/cli test -- cli.spec.ts`、`pnpm --filter @chemd/cli typecheck`、`pnpm --filter @chemd/cli build`、`pnpm lint`、`pnpm test`、`git diff --check`。
+- 额外说明：`pnpm typecheck` 在本轮中先通过过一次，但在 `pnpm build` 后被现有 `apps/web/.next/types` 缺失问题打断；`pnpm build` 仍因既有 `@chemd/web` `/404` prerender `useContext` null 问题失败，均非本轮改动引入。
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e0818ef` | (see git log) |
+| `fd498eb` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
