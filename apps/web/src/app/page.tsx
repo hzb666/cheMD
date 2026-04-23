@@ -7,6 +7,7 @@ import logoMark from "../../../../vision/logo-03.png";
 import { Separator } from "../components/ui/separator";
 import { ThemeToggle } from "../components/theme-toggle";
 import { EditorShell } from "../features/editor/components/EditorShell";
+import { AuthoringAssistPanel } from "../features/editor/components/AuthoringAssistPanel";
 import { OcrImportButton } from "../features/ocr/components/OcrImportButton";
 import { OcrPasteListener } from "../features/ocr/components/OcrPasteListener";
 import { ChemEditorDialog } from "../features/chem-editor/components/ChemEditorDialog";
@@ -18,7 +19,11 @@ import { Button } from "../components/ui/button";
 import PreviewShell from "../features/preview/components/PreviewShell";
 import { Activity, FlaskConical, LoaderCircle } from "lucide-react";
 import {
+  applyAuthoringSuggestion,
+  applyAuthoringTemplate,
   applyDiagnosticQuickFix,
+  type AuthoringSuggestion,
+  type AuthoringTemplate,
   type DiagnosticQuickFix,
   type DiagnosticWithQuickFixes
 } from "@chemd/compiler";
@@ -43,6 +48,13 @@ interface EditorToolbarProps {
 }
 
 type LabStorageStatus = "ready" | "disconnect";
+
+interface SourceActionHandlersInput {
+  previewIsFresh: boolean;
+  setEditorStatus: (next: string | null) => void;
+  applySourceChange: (nextSource: string) => void;
+  getLatestSource: () => string;
+}
 
 const readLabStorageStatusPayload = (value: unknown): LabStorageStatus =>
   typeof value === "object"
@@ -196,11 +208,76 @@ const EditorToolbar = ({
   </>
 );
 
+const createSourceActionHandlers = ({
+  previewIsFresh,
+  setEditorStatus,
+  applySourceChange,
+  getLatestSource
+}: SourceActionHandlersInput) => {
+  const applyPatchedSource = (
+    nextSource: string,
+    successMessage: string,
+    unavailableMessage: string
+  ) => {
+    const currentSource = getLatestSource();
+    if (nextSource === currentSource) {
+      setEditorStatus(unavailableMessage);
+      return;
+    }
+
+    applySourceChange(nextSource);
+    setEditorStatus(successMessage);
+  };
+
+  return {
+    handleApplyQuickFix: (
+      diagnostic: DiagnosticWithQuickFixes,
+      quickFix: DiagnosticQuickFix
+    ) => {
+      if (!previewIsFresh) {
+        setEditorStatus("Wait for preview to update before applying quick fixes");
+        return;
+      }
+
+      applyPatchedSource(
+        applyDiagnosticQuickFix(getLatestSource(), diagnostic, quickFix),
+        "Applied quick fix",
+        "Quick fix unavailable for this source"
+      );
+    },
+    handleApplyAuthoringSuggestion: (suggestion: AuthoringSuggestion) => {
+      if (!previewIsFresh) {
+        setEditorStatus("Wait for preview to update before applying authoring suggestions");
+        return;
+      }
+
+      applyPatchedSource(
+        applyAuthoringSuggestion(getLatestSource(), suggestion),
+        `Applied suggestion: ${suggestion.title}`,
+        "Authoring suggestion unavailable for this source"
+      );
+    },
+    handleApplyAuthoringTemplate: (template: AuthoringTemplate) => {
+      if (!previewIsFresh) {
+        setEditorStatus("Wait for preview to update before inserting templates");
+        return;
+      }
+
+      applyPatchedSource(
+        applyAuthoringTemplate(getLatestSource(), template),
+        `Inserted template: ${template.title}`,
+        "Template unavailable for this source"
+      );
+    }
+  };
+};
+
 const Page = () => {
   const labStorageStatus = useLabStorageStatus();
   const {
     source,
     result,
+    authoringAssistance,
     json,
     compilerOutputCode,
     documentId,
@@ -238,26 +315,16 @@ const Page = () => {
   const logoSrc = typeof logoMark === "string" ? logoMark : logoMark.src;
   const diagnosticCount = result.diagnostics.length;
   const documentSubtitle = [result.document.meta.date, result.document.meta.id].filter(Boolean).join(" · ");
-  const handleApplyQuickFix = (
-    diagnostic: DiagnosticWithQuickFixes,
-    quickFix: DiagnosticQuickFix
-  ) => {
-    if (!previewIsFresh) {
-      setEditorStatus("Wait for preview to update before applying quick fixes");
-      return;
-    }
-
-    const currentSource = getLatestSource();
-    const nextSource = applyDiagnosticQuickFix(currentSource, diagnostic, quickFix);
-
-    if (nextSource === currentSource) {
-      setEditorStatus("Quick fix unavailable for this source");
-      return;
-    }
-
-    applySourceChange(nextSource);
-    setEditorStatus("Applied quick fix");
-  };
+  const {
+    handleApplyQuickFix,
+    handleApplyAuthoringSuggestion,
+    handleApplyAuthoringTemplate
+  } = createSourceActionHandlers({
+    previewIsFresh,
+    setEditorStatus,
+    applySourceChange,
+    getLatestSource
+  });
   const applyOcrFile = (file: File) => {
     if (ocr.loading) {
       return;
@@ -318,6 +385,14 @@ const Page = () => {
                 ocrLoading={ocr.loading}
                 onExportDocx={() => void exportDocx()}
                 onPickOcrFile={applyOcrFile}
+              />
+            )}
+            authoringPanel={(
+              <AuthoringAssistPanel
+                assistance={authoringAssistance}
+                actionsEnabled={previewIsFresh}
+                onApplySuggestion={handleApplyAuthoringSuggestion}
+                onApplyTemplate={handleApplyAuthoringTemplate}
               />
             )}
             statusMessage={exportMessage ?? ocr.error ?? editorStatus}

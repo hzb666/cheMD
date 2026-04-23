@@ -26,6 +26,7 @@ compileChemd(source: string, options?: CompileOptions): CompileResult
   runtimePreflight: PreflightResult;
   lnf: ChemdLnf;
   trainingExport: ChemdTrainingExportV2;
+  authoringAssistance: AuthoringAssistance;
 }
 ```
 
@@ -69,6 +70,7 @@ Required payload fields:
 | `ChemdLnf` | `schemaVersion: "chemd-lnf/v0.5"`, `experiment.document`, `experiment.entities`, `experiment.semantic`, `experiment.workflow`, optional `experiment.runtime`, `experiment.quality` |
 | `ChemdTrainingExportV2.semantic_layer` | Optional `lnf` when caller passes the canonical `ChemdLnf`; semantic links for reaction/result/analysis/sample/artifact facts |
 | `ChemdTrainingExportV2.learning_layer` | `retrieval_chunks`, `prediction_instances`, optional `chemistry_feature_refs`, plus optional `procedure_to_steps`, `observation_to_events` from `StepGraph` |
+| `AuthoringAssistance` | `minimal_sets`, `templates`, `suggestions`; all are conservative, compiler-derived authoring helpers and must not rewrite source truth unless the caller explicitly applies a patch |
 
 Diagnostics from `typecheckDocument` and render profile resolution must be merged into `CompileResult.document.diagnostics`; do not throw for semantic validation failures that have a diagnostic code.
 
@@ -93,6 +95,7 @@ Good:
 - A procedure containing charge, purge, heat/cool, sample, analyze, quench, workup, filter, or isolate text lowers to canonical `CanonicalStepNode` entries.
 - `compileChemd(source).lnf.schemaVersion` is exactly `"chemd-lnf/v0.5"`.
 - `trainingExport.schema_version` is exactly `"chemd-training-export/v0.2"`.
+- `compileChemd(source).authoringAssistance` contains only conservative suggestions: unique-target ref completions, baseline inheritance hints, and starter/companion templates.
 - `trainingExport.semantic_layer.lnf` matches the LNF returned by `compileChemd`.
 - `trainingExport.semantic_layer.artifacts` and `trainingUnderstanding.entities.artifacts`
   preserve authored artifact evidence without leaking audit-only source payloads.
@@ -108,12 +111,14 @@ Bad:
 - Missing runtime capabilities must emit `E605` in preflight instead of deleting the affected step.
 - Invalid quantities must keep raw text and emit diagnostics instead of coercing to zero.
 - Derived field expressions use `field: =...` author syntax, may read references such as `@node.field`, and must fail closed with `E_DERIVED_EXPRESSION_INVALID`.
+- `authoringAssistance` must not silently mutate source or semantic truth; editor/UI code must explicitly apply its exported patches.
 
 ### 6. Tests Required
 
 Required assertion points:
 
 - `packages/compiler/tests/v03-language.test.ts`: `compileChemd` returns all v0.3 artifacts and merges diagnostics.
+- `packages/compiler/tests/authoring-assistance.test.ts`: conservative suggestions, templates, and patch application stay stable.
 - `packages/step-ontology/tests/lowering.test.ts`: procedure/observation/analysis lowering emits canonical nodes and warnings.
 - `packages/typechecker/tests/typechecker.test.ts`: typed graph nodes, quantity normalization, and diagnostics are stable.
 - `packages/runtime-lab/tests/runtime-lab.test.ts`: run plan and preflight contract, including `E605`.

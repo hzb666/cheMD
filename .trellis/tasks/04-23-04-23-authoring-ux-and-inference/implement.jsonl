@@ -1,0 +1,7 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/web/backend/index.md", "reason": "Backend development guide"}
+{"file": ".trellis/spec/web/frontend/index.md", "reason": "Frontend development guide"}
+{"file": ".trellis/spec/exporter-training/backend/training-export-contract.md", "reason": "Authoring inference must stay aligned with semantic/training contracts"}
+{"file": ".trellis/spec/web/frontend/component-guidelines.md", "reason": "Editor panel and authoring UI components"}
+{"file": ".trellis/spec/web/frontend/state-management.md", "reason": "Hook-driven editor state and compile-derived authoring state"}
+{"file": ".trellis/spec/compiler/backend/language-v03-contracts.md", "reason": "Compile result contract extension for authoring assistance"}

@@ -29,11 +29,28 @@ import {
 } from "@chemd/runtime-lab";
 import { typecheckDocument, type TypedSemanticGraph } from "@chemd/typechecker";
 import type { StepGraph } from "@chemd/step-ontology";
+import { buildAuthoringAssistance } from "./authoring-assistance";
+import type { AuthoringAssistance } from "./authoring-types";
 export {
   applyDiagnosticQuickFix,
   type DiagnosticQuickFix,
   type DiagnosticWithQuickFixes
 } from "./quick-fix";
+export {
+  applyAuthoringPatch,
+  applyAuthoringSuggestion,
+  applyAuthoringTemplate
+} from "./authoring-apply";
+export type {
+  AuthoringAssistance,
+  AuthoringMinimalSet,
+  AuthoringMinimalSetStatus,
+  AuthoringPatch,
+  AuthoringSuggestion,
+  AuthoringSuggestionCategory,
+  AuthoringTemplate,
+  AuthoringTemplateCategory
+} from "./authoring-types";
 
 export interface CompileResult {
   document: ReturnType<typeof resolveChemd>;
@@ -48,6 +65,7 @@ export interface CompileResult {
   ragExport: ChemdRagExportV1;
   trainingUnderstanding: ChemdTrainingUnderstandingV1;
   trainingExport: ChemdTrainingExportV2;
+  authoringAssistance: AuthoringAssistance;
   html: string;
   json: string;
   docxBridge: string;
@@ -132,6 +150,7 @@ export const compileChemd = (source: string, options: CompileOptions = {}): Comp
   });
   const ragExport = buildRagExportFromTrainingRecord(trainingExport);
   const trainingUnderstanding = buildTrainingUnderstandingFromRecord(trainingExport);
+  const authoringAssistance = buildAuthoringAssistance(document, trainingExport);
   const renderOptions = renderProfileResolution.options;
   const renderAdapterPayload = mapRenderOptionsToAdapterPayload(renderOptions);
   const html = renderHtml(document, renderOptions, { typedGraph: typecheckResult.typedGraph });
@@ -153,6 +172,7 @@ export const compileChemd = (source: string, options: CompileOptions = {}): Comp
     ragExport,
     trainingUnderstanding,
     trainingExport,
+    authoringAssistance,
     html,
     json,
     docxBridge

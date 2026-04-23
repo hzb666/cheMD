@@ -11,6 +11,7 @@ interface EditorShellProps {
   lineCount: number;
   profileId: string;
   toolbarActions?: ReactNode;
+  authoringPanel?: ReactNode;
   statusMessage?: string | null;
   onSourceChange?: (nextSource: string) => void;
 }
@@ -20,6 +21,7 @@ export const EditorShell = ({
   lineCount,
   profileId: _profileId,
   toolbarActions,
+  authoringPanel,
   statusMessage,
   onSourceChange
 }: EditorShellProps) => (
@@ -51,6 +53,8 @@ export const EditorShell = ({
         {statusMessage}
       </div>
     ) : null}
+
+    {authoringPanel}
 
     <div className="flex-1 min-h-0 p-0 relative">
       <div className="h-full relative z-10 bg-background">

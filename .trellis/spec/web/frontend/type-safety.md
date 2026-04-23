@@ -21,6 +21,7 @@ Keep runtime input untrusted until it is narrowed. Shared contracts belong in DT
 
 - Use public `@chemd/*` exports, not deep package internals.
 - `compileChemd` returns the canonical compile result: document, diagnostics, render options, adapter payload, HTML, JSON, DOCX bridge, `typedSemanticGraph`, `stepGraph`, `runPlan`, `runtimePreflight`, `lnf`, and `trainingExport`.
+- `compileChemd(...).authoringAssistance` is the canonical editor-authoring contract for minimal-set status, starter/companion templates, and conservative source patches.
 - Diagnostics quick-fix types and compile artifacts must be consumed through public `@chemd/compiler` exports.
 - Render option changes must stay aligned with `@chemd/render-profile` validators and adapter mapping.
 
@@ -156,3 +157,37 @@ const target = selectTargetMoleculeBlock(source);
 ```
 
 Strict compiler diagnostics stay visible, and editor helpers only operate on explicit canonical targets.
+
+## Scenario: Authoring Assistance Contract
+
+### 1. Scope / Trigger
+
+- Trigger: editor UI consumes `compileChemd(...).authoringAssistance` to reduce author writing burden.
+- Applies when editing `apps/web/src/app/page.tsx`, `apps/web/src/features/editor/*`, or other compile result consumers.
+
+### 2. Contracts
+
+| Field | Required behavior |
+|-------|-------------------|
+| `minimal_sets` | Read-only status for authored vs inferable gaps |
+| `templates` | Read-only starter/companion patches; UI may apply them, compiler never auto-applies them |
+| `suggestions` | Conservative only: unique-target ref completion, baseline inheritance, and attempt/result pairing |
+
+### 3. Wrong vs Correct
+
+#### Wrong
+
+```typescript
+applySourceChange(compileResult.authoringAssistance.suggestions[0] as unknown as string);
+```
+
+This bypasses the compiler patch helper and loses the source-edit contract.
+
+#### Correct
+
+```typescript
+const nextSource = applyAuthoringSuggestion(source, suggestion);
+applySourceChange(nextSource);
+```
+
+The editor consumes only the public compiler patch helpers and keeps suggestion application explicit.

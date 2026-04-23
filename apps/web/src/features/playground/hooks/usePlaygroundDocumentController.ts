@@ -1,7 +1,7 @@
 "use client";
 
 import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { compileChemd, type CompileResult } from "@chemd/compiler";
+import { compileChemd, type AuthoringAssistance, type CompileResult } from "@chemd/compiler";
 
 import { createCompileScheduler } from "../../editor/lib/compile-scheduler";
 import { parseDocumentIdFromSource } from "../../editor/lib/parse-document-id-from-source";
@@ -23,6 +23,7 @@ export interface PlaygroundCompilerOutputCode {
 export interface PlaygroundDocumentController {
   source: string;
   result: CompileResult;
+  authoringAssistance: AuthoringAssistance;
   json: string;
   compilerOutputCode: PlaygroundCompilerOutputCode;
   documentId: string;
@@ -159,6 +160,7 @@ export const usePlaygroundDocumentController = (): PlaygroundDocumentController 
   return {
     source,
     result,
+    authoringAssistance: result.authoringAssistance,
     json: jsonState.value,
     compilerOutputCode,
     documentId,

@@ -217,6 +217,10 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   while `buildTrainingCampaignFromUnderstandings()` groups compatible runs into
   campaign trajectories and `buildTrainingCampaignTaskDataset()` emits
   cross-document strategy task examples.
+- Compiler/editor authoring assistance may consume semantic-layer and
+  understanding projections to generate conservative writing suggestions, but
+  those suggestions stay outside source truth until a caller explicitly applies
+  the exported source patch.
 - `ChemdTrainingUnderstandingV1.resolved_references` must include Markdown
   references and structured `ref`/participant references that affect
   experiment logic, including `condition_varies.reaction` and
