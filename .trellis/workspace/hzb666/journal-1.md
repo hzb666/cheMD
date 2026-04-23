@@ -800,3 +800,56 @@ Added RAG embedding backfill service and API route with bounded filters, skip/ov
 ### Next Steps
 
 - None - task complete
+
+
+## Session 19: Condition Varies Block
+
+**Date**: 2026-04-23
+**Task**: Condition Varies Block
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+(Add summary)
+
+### Main Changes
+
+| Area | Summary |
+|------|---------|
+| Syntax | Added `:::condition-varies` blocks with `reaction`, `standard`, `notes`, and arbitrary condition delta fields. |
+| Parser/Core | Added `condition_varies` AST support and kebab-case block detection. |
+| Typechecker | Validates both `reaction` and `standard` references as reaction targets. |
+| Export | Emits `semantic_layer.condition_variations`, semantic relations, retrieval chunks, and storage semantic entities. |
+| Training | Projects explicit condition variation facts into resolved references, variable logic, intent/causal logic, comparison tasks, and record-to-chemd tasks. |
+| Rendering/UI | Added HTML/DOCX rendering and document tree support. |
+| Verification | Passed parser/exporter tests, targeted typechecks, web eslint, `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `git diff --check`. |
+
+**Key files**:
+- `packages/parser/src/body/block-parsers/condition-varies.ts`
+- `packages/core/src/ast.ts`
+- `packages/typechecker/src/nodes.ts`
+- `packages/exporter-training/src/semantic-layer.ts`
+- `packages/exporter-training/src/projections.ts`
+- `packages/exporter-training/src/task-projections.ts`
+- `.trellis/spec/exporter-training/backend/training-export-contract.md`
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1de681f` | (see git log) |
+| `5ad9c4d` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
