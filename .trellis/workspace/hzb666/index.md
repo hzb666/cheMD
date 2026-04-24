@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 31
+- **Total Sessions**: 32
 - **Last Active**: 2026-04-24
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1328 | Active |
+| `journal-1.md` | ~1362 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 32 | 2026-04-24 | 简化 chemd 作者输入推断 | `6aff034` | `develop` |
 | 31 | 2026-04-24 | Cross-doc refs and family aggregation | `10e1c14`, `f3e03ae` | `develop` |
 | 30 | 2026-04-24 | Reaction route cross-doc linking | `50b507c`, `4442658` | `develop` |
 | 29 | 2026-04-24 | Chemd syntax best practices and golden record | `e34c1e1`, `b7a6b06` | `develop` |
