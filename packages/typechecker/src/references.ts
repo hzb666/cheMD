@@ -1,3 +1,5 @@
+import { buildScopedReferenceId, parseReferenceId, stripReferencePrefix } from "@chemd/core";
+
 import type { ObjectNode, ReferenceOrLiteral, ReferenceType } from "./types";
 
 const TARGET_KIND_BY_NODE_TYPE: Record<string, ReferenceType["targetKind"]> = {
@@ -15,7 +17,9 @@ const findConditionVariationAttempt = (
   refId: string,
   objectIndex: Map<string, ObjectNode>
 ): boolean => {
-  const [parentId, attemptId] = refId.split(".");
+  const parsed = parseReferenceId(refId);
+  const parentId = parsed?.baseObjectLookupKey ?? refId.split(".")[0];
+  const attemptId = parsed?.childId ?? refId.split(".")[1];
   if (!parentId || !attemptId) {
     return false;
   }
@@ -25,18 +29,27 @@ const findConditionVariationAttempt = (
     && parent.attempts?.some((attempt) => attempt.id === attemptId) === true;
 };
 
-export const createObjectIndex = (nodes: ObjectNode[]): Map<string, ObjectNode> =>
+export const createObjectIndex = (
+  documentId: string,
+  nodes: ObjectNode[]
+): Map<string, ObjectNode> =>
   new Map(
     nodes
       .filter((node) => typeof node.id === "string" && node.id.length > 0)
-      .map((node) => [node.id as string, node])
+      .flatMap((node) => {
+        const id = node.id as string;
+        return [
+          [id, node] as const,
+          [buildScopedReferenceId(documentId, id), node] as const
+        ];
+      })
   );
 
 export const toReferenceOrLiteral = (
   raw: string,
   objectIndex: Map<string, ObjectNode>
 ): ReferenceOrLiteral => {
-  const refId = raw.startsWith("@") ? raw.slice(1).trim() : raw.trim();
+  const refId = stripReferencePrefix(raw);
   const target = objectIndex.get(refId);
   const isAttempt = !target && findConditionVariationAttempt(refId, objectIndex);
 

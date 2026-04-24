@@ -1,5 +1,10 @@
 import { createV03Diagnostic, type V03Diagnostic } from "@chemd/diagnostics";
-import type { StepInputNode, StepInputReference, StepOutputNode } from "@chemd/step-ontology";
+import type {
+  StepInputNode,
+  StepInputReference,
+  StepOutputNode,
+  StepReferenceTargetKind
+} from "@chemd/step-ontology";
 
 import { toReferenceOrLiteral } from "./references";
 import type { ObjectNode, ReferenceType } from "./types";
@@ -21,10 +26,30 @@ interface ResolvedStepParams {
 
 const EXPECTED_STEP_INPUT_TARGET_KIND = "molecule";
 
+const toStepReferenceTargetKind = (
+  targetKind: ReferenceType["targetKind"]
+): StepReferenceTargetKind => {
+  switch (targetKind) {
+    case "molecule":
+    case "reaction":
+    case "result":
+    case "analysis":
+    case "sample":
+    case "artifact":
+    case "condition_varies":
+    case "condition_variation_attempt":
+    case "template":
+    case "unknown":
+      return targetKind;
+    default:
+      return "unknown";
+  }
+};
+
 const toStepInputReference = (reference: ReferenceType): StepInputReference => ({
   kind: "reference",
   refId: reference.refId,
-  targetKind: reference.targetKind,
+  targetKind: toStepReferenceTargetKind(reference.targetKind),
   resolved: reference.resolved
 });
 

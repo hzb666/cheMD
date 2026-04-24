@@ -4,6 +4,8 @@ import type {
   ChemdDocument,
   ChemdNode,
   ConditionVariesNode,
+  ReactionRouteContext,
+  ReferenceTargetKind,
   MoleculeNode,
   ObservationNode,
   ProvenanceInfo,
@@ -59,17 +61,7 @@ export type AtmosphereValue = BoundedStringValue<AtmosphereLabel>;
 
 export interface ReferenceType {
   kind: "reference";
-  targetKind:
-    | "molecule"
-    | "reaction"
-    | "result"
-    | "analysis"
-    | "sample"
-    | "artifact"
-    | "condition_varies"
-    | "condition_variation_attempt"
-    | "template"
-    | "unknown";
+  targetKind: ReferenceTargetKind;
   refId: string;
   resolved: boolean;
 }
@@ -98,6 +90,9 @@ export interface TypedMoleculeNode extends TypedNodeBase {
 
 export interface TypedReactionNode extends TypedNodeBase {
   kind: "reaction";
+  route?: string;
+  prev: ReferenceOrLiteral[];
+  next: ReferenceType[];
   reactants: ReferenceOrLiteral[];
   products: ReferenceOrLiteral[];
   normalizedConditions: NormalizedReactionConditions;
@@ -249,6 +244,7 @@ export type ProcedureMode = "auto" | "explicit" | "lowered";
 
 export interface TypecheckOptions {
   procedureMode?: ProcedureMode;
+  reactionRouteContext?: ReactionRouteContext;
 }
 
 export interface QuantityParseContext {

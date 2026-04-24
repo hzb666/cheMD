@@ -158,6 +158,8 @@ export interface ReactionNode extends SourceMappedNode {
   id?: string;
   syntaxOrigin?: SyntaxOrigin;
   declaredKind?: ChemdSemanticKind;
+  route?: string;
+  prev?: string[];
   reactants?: string[];
   products?: string[];
   conditions?: string[];

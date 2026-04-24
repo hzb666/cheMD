@@ -223,6 +223,15 @@ export interface TrainingFailureSignalV1 {
   warnings: string[];
 }
 
+export interface TrainingReactionRouteStepV1 {
+  route_id: string;
+  reaction_entity_id: string;
+  prev_reaction_entity_ids: string[];
+  next_reaction_entity_ids: string[];
+  step_role: "root" | "intermediate" | "leaf" | "isolated";
+  warnings: string[];
+}
+
 export type TrainingLogicSourceV1 = "explicit" | "derived" | "llm_suggested";
 export type TrainingImplicitConditionSourceV1 =
   | "condition_varies_standard_inheritance"
@@ -547,6 +556,8 @@ export interface TrainingMissingLogicV1 {
     | "analysis_without_target"
     | "sample_without_lineage"
     | "artifact_without_target"
+    | "reaction_route_cycle"
+    | "reaction_route_orphan"
     | "procedure_without_steps"
     | "procedure_without_reaction_link"
     | "observation_without_event"
@@ -625,6 +636,7 @@ export interface TrainingExperimentLogicV1 {
   step_dependencies: TrainingStepDependencyEdgeV1[];
   optimization_trajectories: TrainingOptimizationTrajectoryV1[];
   failure_signals: TrainingFailureSignalV1[];
+  reaction_routes: TrainingReactionRouteStepV1[];
   implicit_condition_facts: TrainingImplicitConditionFactV1[];
   evidence_links: TrainingEvidenceLinkV1[];
   evidence_interpretations: TrainingEvidenceInterpretationV1[];

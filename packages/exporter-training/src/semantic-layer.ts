@@ -10,6 +10,7 @@ import type {
   ResultNode,
   SampleNode
 } from "@chemd/core";
+import { buildReactionEntityIdFromReference } from "@chemd/core";
 
 import type {
   ExportedAnalysisV1,
@@ -258,6 +259,14 @@ const buildReaction = (input: BuildReactionInput): ExportedReactionV1 => {
     source_node_type: "reaction",
     ...createEntityBase("reaction", node),
     ...(isPrimary ? { is_primary: true } : {}),
+    route_raw: node.route,
+    prev_refs_raw: node.prev,
+    resolved_prev_refs_raw: typedReaction?.prev
+      .filter((reference): reference is typeof reference & { kind: "reference"; refId: string } =>
+        reference.kind === "reference" && reference.resolved && reference.targetKind === "reaction"
+      )
+      .map((reference) => reference.refId),
+    next_refs_raw: typedReaction?.next.map((reference) => reference.refId),
     name: node.name,
     caption: node.caption,
     reactants,
@@ -599,6 +608,38 @@ const buildResultLinks = (
       : [];
   });
 
+const resolveReactionRouteTargetId = (
+  rawRef: string | undefined,
+  entityByOriginalId: Map<string, ExportedObjectEntity>
+): string | undefined => {
+  const target = getReferencedEntity(rawRef, entityByOriginalId);
+  if (target?.source_node_type === "reaction") {
+    return target.entity_id;
+  }
+
+  return rawRef ? buildReactionEntityIdFromReference(rawRef) : undefined;
+};
+
+const buildReactionRouteLinks = (
+  documentId: string,
+  reactions: ExportedReactionV1[],
+  entityByOriginalId: Map<string, ExportedObjectEntity>
+): ExportedRelationV1[] =>
+  reactions.flatMap((reaction) => [
+    ...(reaction.resolved_prev_refs_raw ?? []).flatMap((rawRef) => {
+      const targetId = resolveReactionRouteTargetId(rawRef, entityByOriginalId);
+      return targetId
+        ? [createRelation(documentId, "reaction_depends_on_reaction", reaction.entity_id, targetId, "prev")]
+        : [];
+    }),
+    ...(reaction.next_refs_raw ?? []).flatMap((rawRef) => {
+      const targetId = resolveReactionRouteTargetId(rawRef, entityByOriginalId);
+      return targetId
+        ? [createRelation(documentId, "reaction_precedes_reaction", reaction.entity_id, targetId, "next")]
+        : [];
+    })
+  ]);
+
 const getAnalysisRelationType = (target: ExportedObjectEntity | undefined): RelationType | undefined => {
   if (target?.source_node_type === "reaction") {
     return "analysis_targets_reaction";
@@ -861,6 +902,7 @@ const buildSemanticLinks = (
   return uniqueRelations([
     ...buildPrimaryLinks(documentId, entities),
     ...buildReactionParticipantLinks(documentId, parts.reactions),
+    ...buildReactionRouteLinks(documentId, parts.reactions, entityByOriginalId),
     ...buildResultLinks(documentId, parts.results, entityByOriginalId),
     ...buildAnalysisLinks(documentId, parts.analyses, entityByOriginalId),
     ...buildSampleLinks(documentId, parts.samples, entityByOriginalId),

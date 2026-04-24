@@ -18,6 +18,8 @@ describe("canonical LNF builder", () => {
           sourceNodeType: "reaction",
           syntaxOrigin: "chemd",
           declaredKind: "reaction",
+          prev: [],
+          next: [],
           reactants: [],
           products: [],
           normalizedConditions: {
@@ -155,6 +157,8 @@ describe("canonical LNF builder", () => {
           kind: "reaction",
           nodeId: "rxn-main",
           sourceNodeType: "reaction",
+          prev: [],
+          next: [],
           reactants: [{
             kind: "reference",
             targetKind: "molecule",

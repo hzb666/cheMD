@@ -13,7 +13,16 @@ Status: Filled from commit `97d3151`; v0.4 surface semantics below supersede leg
 ### 2. Signatures
 
 ```typescript
-compileChemd(source: string, options?: CompileOptions): CompileResult
+compileChemd(source: string, options?: {
+  reactionRouteContext?: {
+    externalReactions?: Array<{
+      refId: string;
+      routeId?: string;
+      prevRefIds?: string[];
+      label?: string;
+    }>;
+  };
+} & CompileOptions): CompileResult
 ```
 
 `CompileResult` must keep the legacy render fields and add the canonical semantic artifacts:
@@ -34,7 +43,17 @@ compileChemd(source: string, options?: CompileOptions): CompileResult
 Core builders:
 
 ```typescript
-typecheckDocument(document: ChemdDocument, options?: TypecheckOptions): TypecheckResult
+typecheckDocument(document: ChemdDocument, options?: {
+  procedureMode?: "auto" | "explicit" | "lowered";
+  reactionRouteContext?: {
+    externalReactions?: Array<{
+      refId: string;
+      routeId?: string;
+      prevRefIds?: string[];
+      label?: string;
+    }>;
+  };
+}): TypecheckResult
 buildRunPlan(input: RunPlanInput): RunPlan
 preflightRun(runPlan: RunPlan, options: PreflightOptions): PreflightResult
 buildCanonicalLnf(input: BuildLnfInput): ChemdLnf
@@ -90,6 +109,27 @@ Diagnostics from `typecheckDocument`, render profile resolution, and compiler-si
 `CompileResult.diagnosis` must be derived from `CompileResult.diagnostics`; do not let diagnosis and diagnostics drift into separate sources of truth.
 `runChemdRepairLoop(...)` must reuse `compileChemd(...)` and compiler-declared safe fixes; it must not invent placeholder content or silently suppress unresolved diagnostics.
 `runChemdAgentLoop(...)` must run `runChemdRepairLoop(...)` before every agent callback, expose unresolved diagnosis/diff context to the callback, and stop with typed loop reasons when the repair stage stalls, exhausts its budget, or the agent produces no source change.
+Reaction route semantics are explicit and asymmetric:
+
+| Surface field | Behavior |
+|---------------|----------|
+| `reaction.route` | Optional authored route membership string |
+| `reaction.prev` | Optional authored predecessor list; each item may be local `rxn-id` or scoped `doc-id#rxn-id` |
+| `reaction.next` | Never authored; inferred from reverse `prev` edges plus `reactionRouteContext.externalReactions[*].prevRefIds` |
+
+Route graphs and optimization graphs are separate contracts:
+- `condition-varies` stays the contract for condition screening / optimization.
+- `reaction.route` + `reaction.prev` is the contract for total synthesis / stepwise route dependency.
+- Do not overload `condition-varies` attempts to represent synthesis-step order.
+
+Cross-document route linking is opt-in and fail-closed:
+- `typecheckDocument(..., { reactionRouteContext })` may resolve scoped refs such as
+  `route-doc#rxn-step-01` only from the caller-provided `externalReactions`.
+- The compiler must not invent external steps that are absent from
+  `reactionRouteContext`.
+- Local object indexes must resolve both bare `id` and scoped `document-id#id`
+  aliases for the current document so route edges can round-trip in a single
+  reference format.
 
 ### 4. Validation & Error Matrix
 
@@ -101,6 +141,9 @@ Diagnostics from `typecheckDocument`, render profile resolution, and compiler-si
 | `E_TYPED_REFERENCE_MISMATCH` | `@chemd/typechecker` | Typed reference cannot resolve to the expected target kind | Add error; continue graph build |
 | `E_DERIVED_EXPRESSION_INVALID` | `@chemd/typechecker` | `field: =...` derived expression fails static evaluation | Add error and preserve the original raw quantity where applicable |
 | `E_RESULT_REACTION_CONFLICT` | `@chemd/typechecker` | Result `reaction` and `product` fields disagree with the reaction product set | Add warning; keep both references for review |
+| `E_REACTION_ROUTE_CYCLE` | `@chemd/typechecker` | `reaction.prev` edges form a cycle inside one route graph | Add error; keep graph edges for review and manual repair |
+| `W_REACTION_ROUTE_ORPHAN` | `@chemd/typechecker` | Reaction declares a route but stays disconnected inside a multi-step route graph | Add warning; keep node in graph and mark for review |
+| `W_REACTION_ROUTE_MISMATCH` | `@chemd/typechecker` | Reaction `route` disagrees with a resolved predecessor route | Add warning; preserve authored route and predecessor edges |
 | `W805` | `@chemd/step-ontology` | Procedure or observation prose cannot lower confidently | Add warning; keep remaining structured steps/events |
 | `E605` | `@chemd/runtime-lab` | Runtime step requires unavailable capability/equipment | `preflightRun(...).blocking === true`; do not mutate run plan |
 | `W_AUTHORING_FIX_AVAILABLE` | `@chemd/compiler` | Conservative authoring suggestion exists, such as a safe `ref` link or inherited baseline line | Add warning with quick fix kind `apply_authoring_patch`; patch must reuse exported authoring patch logic |
@@ -117,6 +160,9 @@ Good:
 - `compileChemd(source).authoringAssistance` contains only conservative suggestions and grouped scaffolds: unique-target ref completions, attempt-targeted `@cv-id.varN` refs when unique, baseline inheritance hints, and explicit starter/scaffold templates.
 - `compileChemd(source).diagnostics` includes compiler authoring diagnostics for safe fixes and author-input-required summaries, so generated chemd can be validated without opening a separate authoring panel.
 - `compileChemd(source).diagnosis.status` is `fixable` when every actionable item has a deterministic quick fix, and `applyCompilerDiagnosisSafeFixes(source, result.diagnosis)` can drive a compile-fix-recompile loop.
+- `compileChemd(source, { reactionRouteContext })` resolves scoped predecessor refs,
+  infers local/external `next` edges, and preserves route diagnostics in both
+  `diagnostics` and `diagnosis.manualReviewItems`.
 - `runChemdRepairLoop(source, { maxIterations: 5 })` records each compile pass, applies only safe fixes when progress exists, and stops with `stoppedReason: "clean"` once the final diagnosis is clean.
 - `runChemdAgentLoop(source, { agent, maxIterations: 3, repairMaxIterations: 5 })` records each repair stage plus the agent response, reaches `clean` after an agent rewrite, and reports loop reasons such as `needs_author_input` or `agent_stalled` when unresolved work remains.
 - `trainingExport.semantic_layer.lnf` matches the LNF returned by `compileChemd`.
@@ -137,6 +183,9 @@ Bad:
 - `authoringAssistance` must not silently mutate source or semantic truth; editor/UI code must explicitly apply its exported patches, including multi-step `batch` patches for grouped scaffold insertion.
 - Scaffold templates that insert placeholder record content must stay out of diagnostics quick fixes; only conservative suggestion patches may appear under `W_AUTHORING_FIX_AVAILABLE`.
 - `CompileResult.diagnosis` must not treat placeholder scaffolds or informational diagnostics as auto-fixable source truth.
+- Route diagnostics may coexist with authoring diagnostics. When both manual
+  review items and author-input-required warnings are present, diagnosis status
+  is `mixed`, not `manual_review`.
 - `runChemdRepairLoop` must not apply another round of fixes after the iteration budget is exhausted, and it must not report a partially repaired source as `clean` without recompiling it.
 - `runChemdAgentLoop` must not call the agent before running the repair loop, must not discard unresolved diagnosis status when an agent stops, and must not accept malformed rewrite responses that omit `nextSource`.
 
@@ -150,6 +199,9 @@ Required assertion points:
 - `packages/compiler/tests/diagnosis.test.ts`: diagnosis status machine, safe-fix application loop, required-input extraction, and manual-review routing stay stable.
 - `packages/compiler/tests/repair-loop.test.ts`: bounded safe-fix loop reaches `clean`, stops on required inputs, and respects `maxIterations`.
 - `packages/compiler/tests/agent-loop.test.ts`: repair-first agent loop skips clean cases, reaches clean after rewrite, preserves unresolved diagnosis when the agent stops, and stops on repair budget exhaustion.
+- `packages/compiler/tests/reaction-route.test.ts`: scoped `prev` refs resolve
+  through `reactionRouteContext`, inferred `next` edges surface in compile
+  output, and route topology diagnostics reach `diagnosis.manualReviewItems`.
 - `packages/step-ontology/tests/lowering.test.ts`: procedure/observation/analysis lowering emits canonical nodes and warnings.
 - `packages/typechecker/tests/typechecker.test.ts`: typed graph nodes, quantity normalization, and diagnostics are stable.
 - `packages/runtime-lab/tests/runtime-lab.test.ts`: run plan and preflight contract, including `E605`.

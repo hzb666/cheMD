@@ -164,6 +164,153 @@ p1: sm 0.82
   });
 });
 
+describe("reaction route graph", () => {
+  it("resolves reaction prev links, infers next links, and supports scoped local refs", () => {
+    const document = resolveChemd(parseChemd(`---
+id: exp-route-local
+title: route local
+date: 2026-04-24
+---
+
+:::chemd #rxn-step-01
+kind: reaction
+route: route-a
+reactants: a
+products: b
+:::
+
+:::chemd #rxn-step-02
+kind: reaction
+route: route-a
+prev: exp-route-local#rxn-step-01
+reactants: b
+products: c
+:::
+`));
+
+    const result = typecheckDocument(document);
+    const step1 = result.typedGraph.nodes.find((node) => node.kind === "reaction" && node.nodeId === "rxn-step-01");
+    const step2 = result.typedGraph.nodes.find((node) => node.kind === "reaction" && node.nodeId === "rxn-step-02");
+
+    expect(step2).toMatchObject({
+      route: "route-a",
+      prev: [expect.objectContaining({
+        refId: "exp-route-local#rxn-step-01",
+        targetKind: "reaction",
+        resolved: true
+      })]
+    });
+    expect(step1).toMatchObject({
+      next: [expect.objectContaining({
+        refId: "rxn-step-02",
+        targetKind: "reaction",
+        resolved: true
+      })]
+    });
+  });
+
+  it("resolves external prev links and infers external next links when route context is provided", () => {
+    const document = resolveChemd(parseChemd(`---
+id: exp-route-external
+title: route external
+date: 2026-04-24
+---
+
+:::chemd #rxn-step-02
+kind: reaction
+route: route-a
+prev: route-doc#rxn-step-01
+reactants: b
+products: c
+:::
+
+:::chemd #rxn-step-03
+kind: reaction
+route: route-a
+prev: rxn-step-02
+reactants: c
+products: d
+:::
+`));
+
+    const result = typecheckDocument(document, {
+      reactionRouteContext: {
+        externalReactions: [{
+          refId: "route-doc#rxn-step-01",
+          routeId: "route-a",
+          prevRefIds: []
+        }, {
+          refId: "route-doc#rxn-step-04",
+          routeId: "route-a",
+          prevRefIds: ["exp-route-external#rxn-step-03"]
+        }]
+      }
+    });
+    const step2 = result.typedGraph.nodes.find((node) => node.kind === "reaction" && node.nodeId === "rxn-step-02");
+    const step3 = result.typedGraph.nodes.find((node) => node.kind === "reaction" && node.nodeId === "rxn-step-03");
+
+    expect(step2).toMatchObject({
+      prev: [expect.objectContaining({
+        refId: "route-doc#rxn-step-01",
+        targetKind: "reaction",
+        resolved: true
+      })]
+    });
+    expect(step3).toMatchObject({
+      next: [expect.objectContaining({
+        refId: "route-doc#rxn-step-04",
+        targetKind: "reaction",
+        resolved: true
+      })]
+    });
+  });
+
+  it("emits route diagnostics for cycle and orphan steps", () => {
+    const document = resolveChemd(parseChemd(`---
+id: exp-route-diagnostics
+title: route diagnostics
+date: 2026-04-24
+---
+
+:::chemd #rxn-a
+kind: reaction
+route: route-c
+prev: rxn-b
+reactants: a
+products: b
+:::
+
+:::chemd #rxn-b
+kind: reaction
+route: route-c
+prev: rxn-a
+reactants: b
+products: c
+:::
+
+:::chemd #rxn-orphan
+kind: reaction
+route: route-c
+reactants: x
+products: y
+:::
+`));
+
+    const result = typecheckDocument(document);
+
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: "E_REACTION_ROUTE_CYCLE",
+        sourceNodeId: expect.stringMatching(/rxn-[ab]/)
+      }),
+      expect.objectContaining({
+        code: "W_REACTION_ROUTE_ORPHAN",
+        sourceNodeId: "rxn-orphan"
+      })
+    ]));
+  });
+});
+
 describe("typed artifacts and sample lineage", () => {
   it("adds artifact nodes and resolves sample lineage references", () => {
     const document = resolveChemd(parseChemd(`---

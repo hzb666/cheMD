@@ -1,4 +1,5 @@
 import type {
+  TrainingReactionRouteStepV1,
   ChemdRagChunkV1,
   ChemdRagExportV1,
   ChemdTrainingUnderstandingV1,
@@ -50,6 +51,10 @@ import type {
   TrainingStepDependencyEdgeV1,
   TrainingVariableLogicV1
 } from "./projection-types";
+import {
+  buildReactionEntityIdFromReference,
+  stripReferencePrefix
+} from "@chemd/core";
 import type {
   ChemdTrainingExportV2,
   ExportedAnalysisV1,
@@ -209,6 +214,10 @@ const RELATION_MATERIAL_FLOW_SPECS: Partial<Record<ExportedRelationV1["relation_
   analysis_targets_condition_variation: { edgeType: "analysis_supports_material_claim" },
   analysis_targets_condition_variation_attempt: { edgeType: "analysis_supports_material_claim" }
 };
+const REACTION_ROUTE_RELATIONS = new Set<ExportedRelationV1["relation_type"]>([
+  "reaction_depends_on_reaction",
+  "reaction_precedes_reaction"
+]);
 type SampleLineageReferenceField = "derived_from" | "aliquot_of" | "batch_of" | "artifacts";
 const SAMPLE_LINEAGE_FIELD_RELATIONS: Record<SampleLineageReferenceField, ReadonlySet<ExportedRelationV1["relation_type"]>> = {
   derived_from: new Set([
@@ -524,6 +533,55 @@ const buildReactionParticipantReferences = (record: ChemdTrainingExportV2): Trai
       ))
   ]);
 
+const resolveReactionRouteTarget = (
+  entityByOriginalId: Map<string, ObjectEntity>,
+  raw: string
+): { entityId?: string; originalId?: string } => {
+  const target = getEntityByRawReference(entityByOriginalId, raw);
+  if (target?.source_node_type === "reaction") {
+    return {
+      entityId: target.entity_id,
+      originalId: target.original_id
+    };
+  }
+
+  const externalEntityId = buildReactionEntityIdFromReference(raw);
+  return externalEntityId
+    ? {
+        entityId: externalEntityId,
+        originalId: stripReferencePrefix(raw)
+      }
+    : {};
+};
+
+const buildReactionRouteReferences = (
+  record: ChemdTrainingExportV2,
+  entityByOriginalId: Map<string, ObjectEntity>
+): TrainingResolvedReferenceV1[] =>
+  record.semantic_layer.reactions.flatMap((reaction) =>
+    (reaction.prev_refs_raw ?? []).map((raw) => {
+      const target = resolveReactionRouteTarget(entityByOriginalId, raw);
+      const relation = findRelationToTarget(
+        record,
+        reaction.entity_id,
+        target.entityId,
+        REACTION_ROUTE_RELATIONS,
+        "prev"
+      );
+
+      return {
+        raw,
+        source_entity_id: reaction.entity_id,
+        source_entity_type: "reaction" as const,
+        source_field: "prev",
+        ...(target.entityId ? { target_entity_id: target.entityId } : {}),
+        ...(target.originalId ? { target_original_id: target.originalId } : {}),
+        ...(relation ? { relation_type: relation.relation_type } : {}),
+        resolution_status: relation ? "resolved" : "unresolved"
+      };
+    })
+  );
+
 const buildResultReferences = (
   record: ChemdTrainingExportV2,
   entityByOriginalId: Map<string, ObjectEntity>
@@ -756,6 +814,7 @@ const buildResolvedReferences = (
 ): TrainingResolvedReferenceV1[] => [
   ...buildMarkdownReferences(record, entityByOriginalId),
   ...buildReactionParticipantReferences(record),
+  ...buildReactionRouteReferences(record, entityByOriginalId),
   ...buildResultReferences(record, entityByOriginalId),
   ...buildSingleFieldReferences(record, entityByOriginalId, record.semantic_layer.analyses, "analysis"),
   ...buildSingleFieldReferences(record, entityByOriginalId, record.semantic_layer.samples, "sample"),
@@ -2235,8 +2294,34 @@ const buildKnowledgeNodes = (
   })),
   ...buildProcedureNodes(record),
   ...buildObservationNodes(record),
+  ...buildExternalReactionNodes(record),
   ...buildFieldValueNodes(fieldEvidence)
 ];
+
+function buildExternalReactionNodes(record: ChemdTrainingExportV2): TrainingKnowledgeNodeV1[] {
+  const localReactionIds = new Set(record.semantic_layer.reactions.map((reaction) => reaction.entity_id));
+  const externalReactionIds = uniqueStrings(record.semantic_layer.links.flatMap((relation) => {
+    if (!REACTION_ROUTE_RELATIONS.has(relation.relation_type)) {
+      return [];
+    }
+
+    return [relation.from_entity_id, relation.to_entity_id].filter((entityId) =>
+      entityId.startsWith("rxn::") && !localReactionIds.has(entityId)
+    );
+  }));
+
+  return externalReactionIds.map((entityId) => {
+    const parts = entityId.split("::");
+    const originalId = parts.length >= 3 ? `${parts[1]}#${parts[2]}` : entityId;
+
+    return {
+      node_id: entityId,
+      node_type: "reaction" as const,
+      label: parts[2] ?? entityId,
+      original_id: originalId
+    };
+  });
+}
 
 const buildSemanticEdges = (record: ChemdTrainingExportV2): TrainingKnowledgeEdgeV1[] =>
   record.semantic_layer.links.map((relation) => ({
@@ -3347,8 +3432,37 @@ const buildMissingArtifactLogic = (record: ChemdTrainingExportV2): TrainingMissi
           message: "Artifact has no target relation.",
           entity_id: artifact.entity_id,
           field: "ref"
-        }]
+      }]
   );
+
+const buildMissingRouteLogic = (record: ChemdTrainingExportV2): TrainingMissingLogicV1[] =>
+  record.source_layer.diagnostics.flatMap<TrainingMissingLogicV1>((diagnostic) => {
+    const reaction = diagnostic.node_id
+      ? record.semantic_layer.reactions.find((item) => item.original_id === diagnostic.node_id)
+      : undefined;
+
+    if (diagnostic.code === "E_REACTION_ROUTE_CYCLE") {
+      return [{
+        code: "reaction_route_cycle" as const,
+        severity: diagnostic.severity,
+        message: diagnostic.message,
+        ...(reaction ? { entity_id: reaction.entity_id } : {}),
+        field: "prev"
+      }];
+    }
+
+    if (diagnostic.code === "W_REACTION_ROUTE_ORPHAN") {
+      return [{
+        code: "reaction_route_orphan" as const,
+        severity: diagnostic.severity,
+        message: diagnostic.message,
+        ...(reaction ? { entity_id: reaction.entity_id } : {}),
+        field: "route"
+      }];
+    }
+
+    return [];
+  });
 
 const buildMissingProcedureLogic = (record: ChemdTrainingExportV2): TrainingMissingLogicV1[] => [
   ...(record.learning_layer.procedure_to_steps?.flatMap((pair) =>
@@ -3453,6 +3567,7 @@ const buildMissingLogic = (
   ...buildMissingAnalysisLogic(record),
   ...buildMissingSampleLogic(record),
   ...buildMissingArtifactLogic(record),
+  ...buildMissingRouteLogic(record),
   ...buildMissingProcedureLogic(record),
   ...buildMissingObservationLogic(record),
   ...buildConflictingResultLogic(record),
@@ -3489,6 +3604,36 @@ const buildCanonicalSummary = (
       }
     : undefined;
 };
+
+const buildReactionRoutes = (record: ChemdTrainingExportV2): TrainingReactionRouteStepV1[] =>
+  record.semantic_layer.reactions.map((reaction) => {
+    const prevReactionIds = record.semantic_layer.links
+      .filter((relation) =>
+        relation.relation_type === "reaction_depends_on_reaction"
+        && relation.from_entity_id === reaction.entity_id
+      )
+      .map((relation) => relation.to_entity_id);
+    const nextReactionIds = record.semantic_layer.links
+      .filter((relation) =>
+        relation.relation_type === "reaction_precedes_reaction"
+        && relation.from_entity_id === reaction.entity_id
+      )
+      .map((relation) => relation.to_entity_id);
+    const routeDiagnostics = record.source_layer.diagnostics
+      .filter((diagnostic) => diagnostic.node_id === reaction.original_id)
+      .map((diagnostic) => diagnostic.code);
+
+    return {
+      route_id: reaction.route_raw ?? `route::${record.document.document_id}::${reaction.entity_id}`,
+      reaction_entity_id: reaction.entity_id,
+      prev_reaction_entity_ids: uniqueStrings(prevReactionIds),
+      next_reaction_entity_ids: uniqueStrings(nextReactionIds),
+      step_role: prevReactionIds.length === 0
+        ? nextReactionIds.length === 0 ? "isolated" : "root"
+        : nextReactionIds.length === 0 ? "leaf" : "intermediate",
+      warnings: uniqueStrings(routeDiagnostics)
+    };
+  });
 
 const createTaskHint = (
   taskType: LoraTaskTypeV1,
@@ -3678,6 +3823,7 @@ export const buildTrainingUnderstandingFromRecord = (
   const sampleProfiles = buildSampleProfiles(record);
   const artifactProfiles = buildArtifactProfiles(record, stepDependencies);
   const evidenceInterpretations = buildEvidenceInterpretations(record, fieldEvidence, evidenceLinks);
+  const reactionRoutes = buildReactionRoutes(record);
   const optimizationTrajectories = buildOptimizationTrajectories(
     record.document.document_id,
     designContexts,
@@ -3730,6 +3876,7 @@ export const buildTrainingUnderstandingFromRecord = (
       step_dependencies: stepDependencies,
       optimization_trajectories: optimizationTrajectories,
       failure_signals: failureSignals,
+      reaction_routes: reactionRoutes,
       implicit_condition_facts: implicitConditionFacts,
       evidence_links: evidenceLinks,
       evidence_interpretations: evidenceInterpretations,

@@ -9,6 +9,7 @@ import type {
 
 import { collectImplicitChemdValue, pickFirstStringArray, pickFirstStringValue } from "../parse-body-shared";
 import {
+  DEFAULT_LIST_FIELDS,
   parseAllowedFields,
   parseAllowedFieldSpans,
   readChemistryFeatureRefs,
@@ -33,6 +34,8 @@ const CHEMD_FIELDS = new Set([
   "reac",
   "prod",
   "conditions",
+  "route",
+  "prev",
   "reagents",
   "catalyst",
   "solvent",
@@ -147,6 +150,8 @@ const createReactionNode = (
   syntaxOrigin: metadata.syntaxOrigin,
   declaredKind: metadata.declaredKind,
   fieldSpans: metadata.fieldSpans,
+  route: pickFirstStringValue(fields, ["route"]),
+  prev: pickFirstStringArray(fields, ["prev"]),
   reactants: pickFirstStringArray(fields, ["reac", "reactant", "reactants"]) ?? [],
   products: pickFirstStringArray(fields, ["prod", "product", "products"]) ?? [],
   conditions: Array.isArray(fields.conditions) ? fields.conditions : [],
@@ -246,7 +251,9 @@ const reportInferredKind = (
 
 export const parseChemdBlock: BlockParser = ({ headerArg, lines, diagnostics, options }) => {
   const id = readStructuredBlockId(headerArg, diagnostics);
-  const fields = parseAllowedFields(lines, diagnostics, "chemd", CHEMD_FIELDS);
+  const fields = parseAllowedFields(lines, diagnostics, "chemd", CHEMD_FIELDS, {
+    listFields: new Set([...DEFAULT_LIST_FIELDS, "prev"])
+  });
   const fieldSpans = parseAllowedFieldSpans(lines, CHEMD_FIELDS);
   const kindResult = readDeclaredKind(id, fields, diagnostics);
   const declaredKind = kindResult.declaredKind;

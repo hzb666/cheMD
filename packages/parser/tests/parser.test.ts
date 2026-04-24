@@ -48,6 +48,30 @@ name: explicit reaction
     });
   });
 
+  it("parses reaction route fields on chemd blocks", () => {
+    const document = parseChemd(`---
+id: exp-route-parse
+title: Route parse
+date: 2026-04-24
+---
+
+:::chemd #rxn-step-07
+kind: reaction
+route: route-taxol-a
+prev: route-doc#rxn-step-06 | rxn-branch-03
+reactants: a
+products: b
+:::
+`);
+
+    expect(document.children[0]).toMatchObject({
+      type: "reaction",
+      id: "rxn-step-07",
+      route: "route-taxol-a",
+      prev: ["route-doc#rxn-step-06", "rxn-branch-03"]
+    });
+  });
+
   it("can report missing chemd kind in strict mode", () => {
     const document = parseChemd(`---
 id: exp-strict-kind

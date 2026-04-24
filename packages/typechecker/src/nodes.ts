@@ -3,6 +3,7 @@ import type {
   ArtifactNode,
   ConditionVariesNode,
   MoleculeNode,
+  ReactionRouteContext,
   ObservationNode,
   ProcedureNode,
   ReactionNode,
@@ -22,6 +23,7 @@ import {
   parseQuantity
 } from "./normalize";
 import { resolveDerivedField } from "./expressions";
+import { resolveReactionPrevReferences } from "./reaction-routes";
 import { resolveOptionalReference, resolveReferenceList } from "./reference-rules";
 import { resolveResultRelationships, resolveSampleRelationships } from "./relationships";
 import type {
@@ -41,7 +43,9 @@ import type {
 } from "./types";
 
 export interface BuildNodeContext {
+  documentId: string;
   objectIndex: Map<string, ObjectNode>;
+  routeContext?: ReactionRouteContext;
 }
 
 export interface BuiltTypedNode {
@@ -180,11 +184,21 @@ export const buildReactionNode = (
     field: "products",
     expectedTargetKind: "molecule"
   });
+  const prev = resolveReactionPrevReferences({
+    documentId: context.documentId,
+    objectIndex: context.objectIndex,
+    rawValues: node.prev ?? [],
+    routeContext: context.routeContext,
+    sourceNodeId: node.id
+  });
 
-  output.diagnostics.push(...reactants.diagnostics, ...products.diagnostics);
+  output.diagnostics.push(...reactants.diagnostics, ...products.diagnostics, ...prev.diagnostics);
 
   output.node = {
     ...output.node,
+    route: node.route,
+    prev: prev.values,
+    next: [],
     reactants: reactants.values,
     products: products.values,
     normalizedConditions: classifyReactionConditions(node),

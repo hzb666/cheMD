@@ -16,6 +16,7 @@ import {
 } from "./nodes";
 import { buildTypedObservationEventNodes, buildTypedStepNode } from "./graph-nodes";
 import { resolveObservationEvents, validateObservationEventLinks } from "./observations";
+import { augmentReactionRouteGraph } from "./reaction-routes";
 import { createObjectIndex } from "./references";
 import { resolveProcedureSteps } from "./steps";
 import { collectNodes, isObjectNode } from "./traversal";
@@ -45,6 +46,14 @@ interface ProcedureProcessContext {
   accumulator: Accumulator;
   objectIndex: Map<string, ObjectNode>;
   procedureMode: ProcedureMode;
+}
+
+interface ObjectProcessContext {
+  documentId: string;
+  objectIndex: Map<string, ObjectNode>;
+  accumulator: Accumulator;
+  procedureMode: ProcedureMode;
+  options: TypecheckOptions;
 }
 
 const createAccumulator = (): Accumulator => ({
@@ -87,10 +96,10 @@ const processObservation = (node: Extract<ObjectNode, { type: "observation" }>, 
 
 const processObjectNode = (
   node: ObjectNode,
-  objectIndex: Map<string, ObjectNode>,
-  accumulator: Accumulator,
-  procedureMode: ProcedureMode
+  context: ObjectProcessContext
 ) => {
+  const { accumulator, documentId, objectIndex, procedureMode, options } = context;
+
   if (node.type === "procedure") {
     processProcedure(node, { accumulator, objectIndex, procedureMode });
     return;
@@ -101,38 +110,44 @@ const processObjectNode = (
     return;
   }
 
-  appendBuiltNode(accumulator, buildTypedObjectNode(node, objectIndex));
+  appendBuiltNode(accumulator, buildTypedObjectNode(node, documentId, objectIndex, options));
 };
 
 const buildTypedObjectNode = (
   node: Exclude<ObjectNode, { type: "procedure" | "observation" }>,
-  objectIndex: Map<string, ObjectNode>
+  documentId: string,
+  objectIndex: Map<string, ObjectNode>,
+  options: TypecheckOptions
 ): BuiltTypedNode => {
   if (node.type === "molecule") {
-    return buildMoleculeNode(node, { objectIndex });
+    return buildMoleculeNode(node, { documentId, objectIndex });
   }
 
   if (node.type === "reaction") {
-    return buildReactionNode(node, { objectIndex });
+    return buildReactionNode(node, {
+      documentId,
+      objectIndex,
+      routeContext: options.reactionRouteContext
+    });
   }
 
   if (node.type === "result") {
-    return buildResultNode(node, { objectIndex });
+    return buildResultNode(node, { documentId, objectIndex });
   }
 
   if (node.type === "analysis") {
-    return buildAnalysisNode(node, { objectIndex });
+    return buildAnalysisNode(node, { documentId, objectIndex });
   }
 
   if (node.type === "sample") {
-    return buildSampleNode(node, { objectIndex });
+    return buildSampleNode(node, { documentId, objectIndex });
   }
 
   if (node.type === "condition_varies") {
-    return buildConditionVariesNode(node, { objectIndex });
+    return buildConditionVariesNode(node, { documentId, objectIndex });
   }
 
-  return buildArtifactNode(node, { objectIndex });
+  return buildArtifactNode(node, { documentId, objectIndex });
 };
 
 const buildStepGraph = (accumulator: Accumulator): StepGraph => ({
@@ -147,13 +162,28 @@ export const typecheckDocument = (
   options: TypecheckOptions = {}
 ): TypecheckResult => {
   const objectNodes = collectNodes(document.children).filter(isObjectNode);
-  const objectIndex = createObjectIndex(objectNodes);
+  const objectIndex = createObjectIndex(document.meta.id, objectNodes);
   const accumulator = createAccumulator();
   const procedureMode = options.procedureMode ?? "auto";
 
   for (const node of objectNodes) {
-    processObjectNode(node, objectIndex, accumulator, procedureMode);
+    processObjectNode(node, {
+      documentId: document.meta.id,
+      objectIndex,
+      accumulator,
+      procedureMode,
+      options
+    });
   }
+
+  const routeAugmentation = augmentReactionRouteGraph({
+    documentId: document.meta.id,
+    nodes: accumulator.nodes,
+    objectIndex,
+    routeContext: options.reactionRouteContext
+  });
+  accumulator.nodes = routeAugmentation.nodes;
+  accumulator.diagnostics.push(...routeAugmentation.diagnostics);
 
   accumulator.stepGraphDiagnostics.push(
     ...validateObservationEventLinks(accumulator.observationResults, accumulator.stepGraphSteps)

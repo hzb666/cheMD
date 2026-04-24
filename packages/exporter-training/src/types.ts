@@ -173,6 +173,10 @@ export interface NormalizedOutcomeHintsV1 {
 
 export interface ExportedReactionV1 extends ExportedEntityBase {
   source_node_type: "reaction";
+  route_raw?: string;
+  prev_refs_raw?: string[];
+  resolved_prev_refs_raw?: string[];
+  next_refs_raw?: string[];
   name?: string;
   caption?: string;
   reactants: ReactionParticipantV1[];
@@ -372,6 +376,8 @@ export interface ExportedRelationV1 {
     | "artifact_supports_result"
     | "artifact_supports_analysis"
     | "artifact_supports_sample"
+    | "reaction_depends_on_reaction"
+    | "reaction_precedes_reaction"
     | "condition_variation_targets_reaction"
     | "condition_variation_compares_standard"
     | "condition_variation_has_attempt"

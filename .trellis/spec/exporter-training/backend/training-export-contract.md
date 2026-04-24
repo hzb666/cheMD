@@ -122,6 +122,33 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   - `analysis_targets_condition_variation_attempt` when TLC/analysis `ref`
     points to `@cv.varN`
 - Resolved Markdown references produce `markdown_mentions_entity`.
+- Reaction route refs are authored on reactions, not on `condition-varies`:
+
+  ```chemd
+  :::chemd #rxn-step-07
+  kind: reaction
+  route: route-taxol-a
+  prev: report-006#rxn-step-06
+  reactants: substrate-07
+  products: product-07
+  :::
+  ```
+
+  `prev` may list one or more predecessor reactions. `next` is inferred by the
+  compiler/typechecker and must never require authored source fields.
+- Exported reactions must preserve route topology facts when available:
+  - `route_raw?: string`
+  - `prev_refs_raw?: string[]`
+  - `resolved_prev_refs_raw?: string[]`
+  - `next_refs_raw?: string[]`
+- Resolved route references produce:
+  - `reaction_depends_on_reaction`
+  - `reaction_precedes_reaction`
+- When a resolved route ref points outside the current document, the semantic
+  layer must still emit a stable external reaction entity id of the form
+  `rxn::<document_id>::<reaction_id>`. Training-understanding knowledge graphs
+  may include placeholder external reaction nodes so cross-document route edges
+  stay connected inside a document-scoped projection.
 - `learning_layer.retrieval_chunks` must include available:
   - `document_summary`
   - `markdown`
@@ -217,6 +244,15 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   while `buildTrainingCampaignFromUnderstandings()` groups compatible runs into
   campaign trajectories and `buildTrainingCampaignTaskDataset()` emits
   cross-document strategy task examples.
+- Single-document understanding may preserve explicit cross-document route
+  references and placeholder external nodes when the source document authored
+  them. This lets one training example expose direct predecessor/successor
+  relations across reports.
+- Stronger cross-document similarity, such as "same esterification procedure",
+  "same route family with different substrates", or "template-like procedure
+  reuse with changed observations/results", must be emitted by the separate
+  campaign/family aggregation layer. A one-document export must not invent
+  those family links from heuristics alone.
 - Compiler/editor authoring assistance may consume semantic-layer and
   understanding projections to generate conservative writing suggestions, but
   those suggestions stay outside source truth until a caller explicitly applies
@@ -315,6 +351,8 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 | Implicit condition recovery | Only inherit defaults from authored condition baselines or resolved standard reactions; mark warnings when authored baseline is absent |
 | Attempt reference from TLC/analysis | Emit `analysis_targets_condition_variation_attempt` when `ref` targets `@cv.varN` |
 | Condition variation target kind mismatch | Resolve diagnostics normally, but do not emit candidate/standard semantic relation |
+| Explicit cross-document route ref | Preserve it as a resolved reference and route relation when `reactionRouteContext` supplies the external target |
+| Cross-document family similarity without explicit refs | Do not emit it in single-document understanding; require campaign aggregation |
 | Experiment-intent task | Keep SFT-only and exclude inferred target records from the prompt |
 | Material flow graph | Emit derived graph edges only from resolved semantic links or step IO |
 | Positional step dependency | Mark review-required with `positional_order_only` warning |
@@ -327,6 +365,9 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 - Good: reaction + result + sample + analysis + artifact all connected through stable links.
 - Good: `condition-varies` references a candidate and standard reaction, emits
   condition variation relations, and produces explicit changed variable logic.
+- Good: a reaction with `route` + scoped `prev` emits route relations,
+  route summaries, and placeholder external reaction nodes without mutating the
+  local document entity set.
 - Good: `condition-varies` with `var1`/`var2` emits attempt entities, binds
   `res1`/`note1`, and lets TLC/analysis/observation reference `@cv.var1`.
 - Good: attempt-level baseline inheritance emits implicit condition facts for
@@ -387,6 +428,9 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 - Assert explicit condition variation entities, references, semantic links,
   design contexts, variable logic, and experiment-intent inputs/outputs are
   present for `condition-varies` blocks.
+- Assert reaction route fields, route relations, resolved references,
+  placeholder external reaction knowledge nodes, and route summaries are
+  present when reactions author `route` + `prev`.
 - Assert condition variation attempts, `resN`/`noteN` matching,
   attempt-level references, TLC/analysis attempt links, and observation target
   metadata are present for `condition-varies` attempt blocks.
