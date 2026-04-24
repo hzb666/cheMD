@@ -91,4 +91,99 @@ yield: 68%
       ])
     });
   });
+
+  it("groups same-procedure substrate expansions into family trajectories", () => {
+    const sourceA = `---
+id: exp-family-a
+title: Esterification A
+date: 2026-04-21
+---
+
+:::chemd #rxn-a
+kind: reaction
+name: esterification of acid A
+reactants: acid-a | alcohol
+products: ester-a
+reagents: catalytic H2SO4
+:::
+
+:::procedure #proc-a
+step: add | materials=acid-a
+step: add | materials=alcohol
+step: hold | duration=12 h
+step: concentrate
+:::
+
+:::result #res-a
+ref: rxn-a
+status: success
+yield: 61%
+:::
+`;
+    const sourceB = `---
+id: exp-family-b
+title: Esterification B
+date: 2026-04-23
+---
+
+:::chemd #rxn-b
+kind: reaction
+name: esterification of acid B
+reactants: acid-b | alcohol
+products: ester-b
+reagents: catalytic H2SO4
+:::
+
+:::procedure #proc-b
+step: add | materials=acid-b
+step: add | materials=alcohol
+step: hold | duration=12 h
+step: concentrate
+:::
+
+:::result #res-b
+ref: rxn-b
+status: success
+yield: 73%
+:::
+`;
+
+    const understandingA = buildUnderstanding(sourceA, "2026-04-21T00:00:00.000Z");
+    const understandingB = buildUnderstanding(sourceB, "2026-04-23T00:00:00.000Z");
+    const campaign = buildTrainingCampaignFromUnderstandings([understandingA, understandingB]);
+    const dataset = buildTrainingCampaignTaskDataset([understandingA, understandingB]);
+    const familyTrajectory = campaign.trajectories.find((trajectory) => trajectory.trajectory_kind === "substrate_expansion");
+
+    expect(familyTrajectory).toMatchObject({
+      trajectory_kind: "substrate_expansion",
+      reaction_family: "esterification",
+      strategy_labels: expect.arrayContaining(["procedure_template_reuse", "substrate_expansion"]),
+      document_ids: ["exp-family-a", "exp-family-b"]
+    });
+    expect(familyTrajectory?.procedure_signature).toBe("add>add>hold>concentrate");
+    expect(familyTrajectory?.runs).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        document_id: "exp-family-a",
+        reaction_family: "esterification",
+        procedure_signature: "add>add>hold>concentrate"
+      }),
+      expect.objectContaining({
+        document_id: "exp-family-b",
+        reaction_family: "esterification",
+        procedure_signature: "add>add>hold>concentrate"
+      })
+    ]));
+    expect(dataset.examples).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        task_type: "cross_document_strategy",
+        source_document_ids: ["exp-family-a", "exp-family-b"],
+        messages: expect.arrayContaining([
+          expect.objectContaining({
+            role: "assistant",
+            content: expect.stringContaining("\"trajectory_kind\": \"substrate_expansion\"")
+          })
+        ])
+      })
+    ]));
+  });
 });

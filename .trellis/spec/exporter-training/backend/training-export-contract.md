@@ -147,8 +147,13 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 - When a resolved route ref points outside the current document, the semantic
   layer must still emit a stable external reaction entity id of the form
   `rxn::<document_id>::<reaction_id>`. Training-understanding knowledge graphs
-  may include placeholder external reaction nodes so cross-document route edges
-  stay connected inside a document-scoped projection.
+  may include placeholder external entity nodes so cross-document semantic
+  edges stay connected inside a document-scoped projection.
+- The same placeholder rule applies to other resolved cross-document structured
+  refs when the caller supplied a compatible external target context:
+  `mol::`, `rxn::`, `res::`, `ana::`, `sam::`, `art::`, `cv::`, and `cva::`
+  ids may all appear as external placeholder nodes/targets inside semantic
+  links, resolved references, and knowledge graphs.
 - `learning_layer.retrieval_chunks` must include available:
   - `document_summary`
   - `markdown`
@@ -246,13 +251,24 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
   cross-document strategy task examples.
 - Single-document understanding may preserve explicit cross-document route
   references and placeholder external nodes when the source document authored
-  them. This lets one training example expose direct predecessor/successor
-  relations across reports.
+  them. The same rule applies to other structured refs such as result/sample/
+  artifact/condition-varies links when the caller provided compatible external
+  targets. This lets one training example expose direct authored links across
+  reports without inventing family similarity.
 - Stronger cross-document similarity, such as "same esterification procedure",
   "same route family with different substrates", or "template-like procedure
   reuse with changed observations/results", must be emitted by the separate
   campaign/family aggregation layer. A one-document export must not invent
   those family links from heuristics alone.
+- Campaign aggregation must distinguish at least:
+  - `trajectory_kind: "optimization"` for same-reaction optimization runs
+  - `trajectory_kind: "procedure_template"` for same family + same procedure
+    signature reuse across documents
+  - `trajectory_kind: "substrate_expansion"` for same family + same procedure
+    signature with changed participant signatures across documents
+- Campaign runs may carry `reaction_signature`, `reaction_family`, and
+  `procedure_signature`. Cross-document trajectories may additionally carry
+  `reaction_family`, `procedure_signature`, and `shared_features`.
 - Compiler/editor authoring assistance may consume semantic-layer and
   understanding projections to generate conservative writing suggestions, but
   those suggestions stay outside source truth until a caller explicitly applies
@@ -352,6 +368,7 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 | Attempt reference from TLC/analysis | Emit `analysis_targets_condition_variation_attempt` when `ref` targets `@cv.varN` |
 | Condition variation target kind mismatch | Resolve diagnostics normally, but do not emit candidate/standard semantic relation |
 | Explicit cross-document route ref | Preserve it as a resolved reference and route relation when `reactionRouteContext` supplies the external target |
+| Explicit cross-document structured ref | Preserve it as a resolved reference and semantic relation when `referenceContext` supplies the external target |
 | Cross-document family similarity without explicit refs | Do not emit it in single-document understanding; require campaign aggregation |
 | Experiment-intent task | Keep SFT-only and exclude inferred target records from the prompt |
 | Material flow graph | Emit derived graph edges only from resolved semantic links or step IO |
@@ -378,6 +395,9 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 - Base: standalone document still emits a document summary chunk.
 - Base: campaign aggregation emits no trajectory when only one document matches
   a series signature.
+- Good: campaign aggregation may emit `trajectory_kind: "procedure_template"`
+  or `trajectory_kind: "substrate_expansion"` when multiple documents share a
+  procedure signature and reaction family, even if participants differ.
 - Bad: unresolved `condition-varies.standard` must not invent a standard
   reaction relation and must keep review-required condition variation logic.
 - Bad: unresolved `var1.result` must preserve the raw result ref but must not
@@ -450,6 +470,13 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 - Assert cross-document campaign aggregation produces grouped trajectories and
   `cross_document_strategy` examples only when at least two documents share a
   trajectory signature.
+- Assert exporter-training preserves generic cross-document structured refs
+  (reaction/result/sample/artifact/condition-varies/attempt) as semantic
+  relations, resolved references, and placeholder external knowledge-graph
+  nodes when the caller supplies compatible external targets.
+- Assert campaign aggregation can emit `procedure_template` /
+  `substrate_expansion` trajectories with `reaction_family`,
+  `procedure_signature`, and `shared_features`.
 
 ### 7. Wrong vs Correct
 

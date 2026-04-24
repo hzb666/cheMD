@@ -7,7 +7,7 @@ import type {
 } from "@chemd/step-ontology";
 
 import { toReferenceOrLiteral } from "./references";
-import type { ObjectNode, ReferenceType } from "./types";
+import type { ExternalTargetIndex, ObjectNode, ReferenceType } from "./types";
 
 interface ResolvedStepInputs {
   inputs: StepInputNode[];
@@ -88,6 +88,7 @@ const createTypedReferenceMismatchDiagnostic = (
 const resolveStepIo = (
   rawValues: string[],
   objectIndex: Map<string, ObjectNode>,
+  externalTargetIndex: ExternalTargetIndex | undefined,
   stepId: string,
   field: "inputs" | "outputs"
 ): { values: StepInputNode[]; diagnostics: V03Diagnostic[] } => {
@@ -95,7 +96,7 @@ const resolveStepIo = (
   const diagnostics: V03Diagnostic[] = [];
 
   for (const raw of rawValues) {
-    const referenceOrLiteral = toReferenceOrLiteral(raw, objectIndex);
+    const referenceOrLiteral = toReferenceOrLiteral(raw, objectIndex, externalTargetIndex);
     if (referenceOrLiteral.kind === "literal") {
       values.push({ raw });
       continue;
@@ -116,9 +117,10 @@ const resolveStepIo = (
 export const resolveStepInputs = (
   rawInputs: string[],
   objectIndex: Map<string, ObjectNode>,
+  externalTargetIndex: ExternalTargetIndex | undefined,
   stepId: string
 ): ResolvedStepInputs => {
-  const resolved = resolveStepIo(rawInputs, objectIndex, stepId, "inputs");
+  const resolved = resolveStepIo(rawInputs, objectIndex, externalTargetIndex, stepId, "inputs");
 
   return { inputs: resolved.values, diagnostics: resolved.diagnostics };
 };
@@ -126,9 +128,10 @@ export const resolveStepInputs = (
 export const resolveStepOutputs = (
   rawOutputs: string[],
   objectIndex: Map<string, ObjectNode>,
+  externalTargetIndex: ExternalTargetIndex | undefined,
   stepId: string
 ): ResolvedStepOutputs => {
-  const resolved = resolveStepIo(rawOutputs, objectIndex, stepId, "outputs");
+  const resolved = resolveStepIo(rawOutputs, objectIndex, externalTargetIndex, stepId, "outputs");
 
   return { outputs: resolved.values, diagnostics: resolved.diagnostics };
 };
@@ -136,6 +139,7 @@ export const resolveStepOutputs = (
 export const resolveStepParamReferences = (
   params: Record<string, unknown>,
   objectIndex: Map<string, ObjectNode>,
+  externalTargetIndex: ExternalTargetIndex | undefined,
   stepId: string
 ): ResolvedStepParams => {
   const resolvedParams: Record<string, unknown> = {};
@@ -147,7 +151,7 @@ export const resolveStepParamReferences = (
       continue;
     }
 
-    const reference = toReferenceOrLiteral(value, objectIndex);
+    const reference = toReferenceOrLiteral(value, objectIndex, externalTargetIndex);
     resolvedParams[field] = reference;
     if (reference.kind === "reference" && !reference.resolved) {
       diagnostics.push(createTypedReferenceMismatchDiagnostic(stepId, value, reference, field));

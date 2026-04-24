@@ -10,7 +10,11 @@ import type {
   ResultNode,
   SampleNode
 } from "@chemd/core";
-import { buildReactionEntityIdFromReference } from "@chemd/core";
+import {
+  buildEntityIdFromReference,
+  stripReferencePrefix,
+  type ReferenceTargetKind
+} from "@chemd/core";
 
 import type {
   ExportedAnalysisV1,
@@ -30,6 +34,7 @@ import type {
 import { collectExportableNodes } from "./traversal";
 import type {
   QuantityType,
+  ReferenceOrLiteral,
   TypedAnalysisNode,
   TypedArtifactNode,
   TypedConditionVariesNode,
@@ -70,6 +75,20 @@ type ExportedObjectEntity =
   | ExportedConditionVariationAttemptV1;
 
 type RelationType = ExportedRelationV1["relation_type"];
+type ResolvedEntityTarget = Pick<ExportedObjectEntity, "entity_id" | "original_id" | "source_node_type">;
+type LinkTarget = ExportedObjectEntity | ResolvedEntityTarget;
+type EntityIndex = Map<string, ExportedObjectEntity>;
+
+const SOURCE_NODE_TYPE_BY_TARGET_KIND: Partial<Record<ReferenceTargetKind, ResolvedEntityTarget["source_node_type"]>> = {
+  molecule: "molecule",
+  reaction: "reaction",
+  result: "result",
+  analysis: "analysis",
+  sample: "sample",
+  artifact: "artifact",
+  condition_varies: "condition_varies",
+  condition_variation_attempt: "condition_variation_attempt"
+};
 
 const PRIMARY_FIELD_BY_TYPE: Record<PrimaryNodeType, string> = {
   molecule: "primary_molecule",
@@ -203,7 +222,8 @@ const buildMolecule = (
 const createParticipant = (
   role: "reactant" | "product",
   raw: string,
-  moleculeByOriginalId: Map<string, ExportedMoleculeV1>
+  moleculeByOriginalId: Map<string, ExportedMoleculeV1>,
+  typedReference?: ReferenceOrLiteral
 ): ReactionParticipantV1 => {
   if (!raw.startsWith("@")) {
     return {
@@ -216,24 +236,36 @@ const createParticipant = (
   const candidateId = raw.slice(1).trim();
   const molecule = moleculeByOriginalId.get(candidateId);
 
-  if (!molecule) {
+  if (molecule) {
     return {
       role,
       raw,
-      reference_status: "unresolved"
+      reference_status: "resolved",
+      target_entity_id: molecule.entity_id,
+      target_original_id: molecule.original_id,
+      name: molecule.name,
+      smiles: molecule.smiles,
+      canonical_smiles: molecule.canonical_smiles
     };
   }
 
-  return {
-    role,
-    raw,
-    reference_status: "resolved",
-    target_entity_id: molecule.entity_id,
-    target_original_id: molecule.original_id,
-    name: molecule.name,
-    smiles: molecule.smiles,
-    canonical_smiles: molecule.canonical_smiles
-  };
+  const externalTarget = isResolvedReference(typedReference)
+    ? buildExternalReferencedEntity(typedReference.targetKind, typedReference.refId)
+    : undefined;
+
+  return externalTarget?.source_node_type === "molecule"
+    ? {
+        role,
+        raw,
+        reference_status: "resolved",
+        target_entity_id: externalTarget.entity_id,
+        target_original_id: externalTarget.original_id
+      }
+    : {
+        role,
+        raw,
+        reference_status: "unresolved"
+      };
 };
 
 interface BuildReactionInput {
@@ -247,8 +279,12 @@ interface BuildReactionInput {
 
 const buildReaction = (input: BuildReactionInput): ExportedReactionV1 => {
   const { documentId, node, nodeIndex, isPrimary, moleculeByOriginalId, typedReaction } = input;
-  const reactants = asNodeArray(node.reactants).map((raw) => createParticipant("reactant", raw, moleculeByOriginalId));
-  const products = asNodeArray(node.products).map((raw) => createParticipant("product", raw, moleculeByOriginalId));
+  const reactants = asNodeArray(node.reactants).map((raw, index) =>
+    createParticipant("reactant", raw, moleculeByOriginalId, typedReaction?.reactants[index])
+  );
+  const products = asNodeArray(node.products).map((raw, index) =>
+    createParticipant("product", raw, moleculeByOriginalId, typedReaction?.products[index])
+  );
   const conditions = asNodeArray(node.conditions);
   const compactConditions = conditions.length > 0 ? conditions : undefined;
 
@@ -564,6 +600,9 @@ const buildEntityIndex = (entities: ExportedObjectEntity[]): Map<string, Exporte
       .map((entity) => [entity.original_id as string, entity])
   );
 
+const buildEntityIdIndex = (entities: ExportedObjectEntity[]): Map<string, ExportedObjectEntity> =>
+  new Map(entities.map((entity) => [entity.entity_id, entity]));
+
 const getReferencedEntity = (
   reference: string | undefined,
   entityByOriginalId: Map<string, ExportedObjectEntity>
@@ -574,6 +613,101 @@ const getReferencedEntity = (
 
   const withoutPrefix = reference.trim().startsWith("@") ? reference.trim().slice(1) : reference.trim();
   return entityByOriginalId.get(withoutPrefix) ?? entityByOriginalId.get(normalizeReferenceId(reference));
+};
+
+const buildExternalReferencedEntity = (
+  targetKind: ReferenceTargetKind,
+  refId: string
+): ResolvedEntityTarget | undefined => {
+  const entityId = buildEntityIdFromReference(targetKind, refId);
+  const sourceNodeType = SOURCE_NODE_TYPE_BY_TARGET_KIND[targetKind];
+
+  return entityId && sourceNodeType
+    ? {
+        entity_id: entityId,
+        original_id: stripReferencePrefix(refId),
+        source_node_type: sourceNodeType
+      }
+    : undefined;
+};
+
+const isResolvedReference = (
+  reference: ReferenceOrLiteral | undefined
+): reference is Extract<ReferenceOrLiteral, { kind: "reference" }> =>
+  reference?.kind === "reference" && reference.resolved;
+
+const resolveTargetFromReference = (
+  entityByOriginalId: Map<string, ExportedObjectEntity>,
+  reference: ReferenceOrLiteral | undefined
+): ResolvedEntityTarget | undefined => {
+  if (!isResolvedReference(reference)) {
+    return undefined;
+  }
+
+  return getReferencedEntity(reference.refId, entityByOriginalId)
+    ?? buildExternalReferencedEntity(reference.targetKind, reference.refId);
+};
+
+const resolveTargetFromRaw = (
+  entityByOriginalId: Map<string, ExportedObjectEntity>,
+  rawRef: string | undefined,
+  expectedTargetKind: ReferenceTargetKind
+): ResolvedEntityTarget | undefined =>
+  rawRef
+    ? getReferencedEntity(rawRef, entityByOriginalId)
+      ?? buildExternalReferencedEntity(expectedTargetKind, rawRef)
+    : undefined;
+
+const getTargetByEntityId = (
+  entityByEntityId: EntityIndex,
+  entityId: string | undefined
+): LinkTarget | undefined => {
+  if (!entityId) {
+    return undefined;
+  }
+
+  const localTarget = entityByEntityId.get(entityId);
+  if (localTarget) {
+    return localTarget;
+  }
+
+  const [prefix, documentId, ...rest] = entityId.split("::");
+  const originalId = rest.join("::");
+
+  if (!prefix || !documentId || !originalId) {
+    return undefined;
+  }
+
+  const sourceNodeType = (() => {
+    switch (prefix) {
+      case "mol":
+        return "molecule" as const;
+      case "rxn":
+        return "reaction" as const;
+      case "res":
+        return "result" as const;
+      case "ana":
+        return "analysis" as const;
+      case "sam":
+        return "sample" as const;
+      case "art":
+        return "artifact" as const;
+      case "cv":
+        return "condition_varies" as const;
+      case "cva":
+        return "condition_variation_attempt" as const;
+      default:
+        return undefined;
+    }
+  })();
+
+  return sourceNodeType
+    ? {
+        entity_id: entityId,
+        original_id: `${documentId}#${originalId}`,
+        source_node_type: sourceNodeType
+      }
+    : undefined;
 };
 
 const uniqueRelations = (relations: ExportedRelationV1[]): ExportedRelationV1[] =>
@@ -599,10 +733,14 @@ const buildReactionParticipantLinks = (
 const buildResultLinks = (
   documentId: string,
   results: ExportedResultV1[],
-  entityByOriginalId: Map<string, ExportedObjectEntity>
+  entityByOriginalId: Map<string, ExportedObjectEntity>,
+  typedNodes: TypedNodeIndex
 ): ExportedRelationV1[] =>
   results.flatMap((result) => {
-    const target = getReferencedEntity(result.reaction_ref_raw ?? result.ref_raw, entityByOriginalId);
+    const typedResult = result.original_id ? typedNodes.get(result.original_id) : undefined;
+    const target = typedResult?.kind === "result"
+      ? resolveTargetFromReference(entityByOriginalId, typedResult.reaction)
+      : resolveTargetFromRaw(entityByOriginalId, result.reaction_ref_raw ?? result.ref_raw, "reaction");
     return target?.source_node_type === "reaction"
       ? [createRelation(documentId, "result_describes_reaction", result.entity_id, target.entity_id, "reaction")]
       : [];
@@ -612,12 +750,8 @@ const resolveReactionRouteTargetId = (
   rawRef: string | undefined,
   entityByOriginalId: Map<string, ExportedObjectEntity>
 ): string | undefined => {
-  const target = getReferencedEntity(rawRef, entityByOriginalId);
-  if (target?.source_node_type === "reaction") {
-    return target.entity_id;
-  }
-
-  return rawRef ? buildReactionEntityIdFromReference(rawRef) : undefined;
+  const target = resolveTargetFromRaw(entityByOriginalId, rawRef, "reaction");
+  return target?.source_node_type === "reaction" ? target.entity_id : undefined;
 };
 
 const buildReactionRouteLinks = (
@@ -640,7 +774,7 @@ const buildReactionRouteLinks = (
     })
   ]);
 
-const getAnalysisRelationType = (target: ExportedObjectEntity | undefined): RelationType | undefined => {
+const getAnalysisRelationType = (target: LinkTarget | undefined): RelationType | undefined => {
   if (target?.source_node_type === "reaction") {
     return "analysis_targets_reaction";
   }
@@ -650,7 +784,7 @@ const getAnalysisRelationType = (target: ExportedObjectEntity | undefined): Rela
   if (target?.source_node_type === "sample") {
     return "analysis_targets_sample";
   }
-  if ("attempt_id" in (target ?? {})) {
+  if (target?.source_node_type === "condition_variation_attempt" || "attempt_id" in (target ?? {})) {
     return "analysis_targets_condition_variation_attempt";
   }
   if (target?.source_node_type === "condition_varies") {
@@ -662,17 +796,21 @@ const getAnalysisRelationType = (target: ExportedObjectEntity | undefined): Rela
 const buildAnalysisLinks = (
   documentId: string,
   analyses: ExportedAnalysisV1[],
-  entityByOriginalId: Map<string, ExportedObjectEntity>
+  entityByOriginalId: Map<string, ExportedObjectEntity>,
+  typedNodes: TypedNodeIndex
 ): ExportedRelationV1[] =>
   analyses.flatMap((analysis) => {
-    const target = getReferencedEntity(analysis.ref_raw, entityByOriginalId);
+    const typedAnalysis = analysis.original_id ? typedNodes.get(analysis.original_id) : undefined;
+    const target = typedAnalysis?.kind === "analysis"
+      ? resolveTargetFromReference(entityByOriginalId, typedAnalysis.ref)
+      : getReferencedEntity(analysis.ref_raw, entityByOriginalId);
     const relationType = getAnalysisRelationType(target);
     return target && relationType
       ? [createRelation(documentId, relationType, analysis.entity_id, target.entity_id, "ref")]
       : [];
   });
 
-const getSampleRelationType = (target: ExportedObjectEntity | undefined): RelationType | undefined => {
+const getSampleRelationType = (target: LinkTarget | undefined): RelationType | undefined => {
   if (target?.source_node_type === "reaction") {
     return "sample_derived_from_reaction";
   }
@@ -691,53 +829,80 @@ const getSampleRelationType = (target: ExportedObjectEntity | undefined): Relati
 const buildSampleLinks = (
   documentId: string,
   samples: ExportedSampleV1[],
-  entityByOriginalId: Map<string, ExportedObjectEntity>
+  entityByOriginalId: Map<string, ExportedObjectEntity>,
+  typedNodes: TypedNodeIndex
 ): ExportedRelationV1[] =>
-  samples.flatMap((sample) => [
-    ...createSampleRefLink(documentId, sample, sample.ref_raw, "ref", entityByOriginalId),
-    ...createSampleRefLink(documentId, sample, sample.derived_from_raw, "derived_from", entityByOriginalId),
-    ...createSampleLineageLink({
-      documentId,
-      sample,
-      rawRef: sample.aliquot_of_raw,
-      relationType: "sample_aliquot_of_sample",
-      role: "aliquot_of",
-      expectedTargetType: "sample",
-      entityByOriginalId
-    }),
-    ...createSampleLineageLink({
-      documentId,
-      sample,
-      rawRef: sample.batch_of_raw,
-      relationType: "sample_batch_of_sample",
-      role: "batch_of",
-      expectedTargetType: "sample",
-      entityByOriginalId
-    }),
-    ...(sample.artifact_refs_raw ?? []).flatMap((artifactRef) =>
-      createSampleLineageLink({
+  samples.flatMap((sample) => {
+    const typedSample = sample.original_id ? typedNodes.get(sample.original_id) : undefined;
+
+    return [
+      ...createSampleRefLink({
         documentId,
         sample,
-        rawRef: artifactRef,
-        relationType: "sample_has_artifact",
-        role: "artifact",
-        expectedTargetType: "artifact",
-        entityByOriginalId
-      })
-    )
-  ]);
+        rawRef: sample.ref_raw,
+        role: "ref",
+        entityByOriginalId,
+        typedReference: typedSample?.kind === "sample" ? typedSample.ref : undefined
+      }),
+      ...createSampleRefLink({
+        documentId,
+        sample,
+        rawRef: sample.derived_from_raw,
+        role: "derived_from",
+        entityByOriginalId,
+        typedReference: typedSample?.kind === "sample" ? typedSample.derivedFrom : undefined
+      }),
+      ...createSampleLineageLink({
+        documentId,
+        sample,
+        rawRef: sample.aliquot_of_raw,
+        relationType: "sample_aliquot_of_sample",
+        role: "aliquot_of",
+        expectedTargetType: "sample",
+        entityByOriginalId,
+        typedReference: typedSample?.kind === "sample" ? typedSample.aliquotOf : undefined
+      }),
+      ...createSampleLineageLink({
+        documentId,
+        sample,
+        rawRef: sample.batch_of_raw,
+        relationType: "sample_batch_of_sample",
+        role: "batch_of",
+        expectedTargetType: "sample",
+        entityByOriginalId,
+        typedReference: typedSample?.kind === "sample" ? typedSample.batchOf : undefined
+      }),
+      ...(sample.artifact_refs_raw ?? []).flatMap((artifactRef, index) =>
+        createSampleLineageLink({
+          documentId,
+          sample,
+          rawRef: artifactRef,
+          relationType: "sample_has_artifact",
+          role: "artifact",
+          expectedTargetType: "artifact",
+          entityByOriginalId,
+          typedReference: typedSample?.kind === "sample" ? typedSample.artifacts?.[index] : undefined
+        })
+      )
+    ];
+  });
 
-const createSampleRefLink = (
-  documentId: string,
-  sample: ExportedSampleV1,
-  rawRef: string | undefined,
-  role: string,
-  entityByOriginalId: Map<string, ExportedObjectEntity>
-): ExportedRelationV1[] => {
-  const target = getReferencedEntity(rawRef, entityByOriginalId);
+interface SampleRefLinkInput {
+  documentId: string;
+  sample: ExportedSampleV1;
+  rawRef: string | undefined;
+  role: string;
+  entityByOriginalId: Map<string, ExportedObjectEntity>;
+  typedReference?: ReferenceOrLiteral;
+}
+
+const createSampleRefLink = (input: SampleRefLinkInput): ExportedRelationV1[] => {
+  const target = input.typedReference
+    ? resolveTargetFromReference(input.entityByOriginalId, input.typedReference)
+    : getReferencedEntity(input.rawRef, input.entityByOriginalId);
   const relationType = getSampleRelationType(target);
   return target && relationType
-    ? [createRelation(documentId, relationType, sample.entity_id, target.entity_id, role)]
+    ? [createRelation(input.documentId, relationType, input.sample.entity_id, target.entity_id, input.role)]
     : [];
 };
 
@@ -747,18 +912,21 @@ interface SampleLineageLinkInput {
   rawRef: string | undefined;
   relationType: RelationType;
   role: string;
-  expectedTargetType: ExportedObjectEntity["source_node_type"];
+  expectedTargetType: ResolvedEntityTarget["source_node_type"];
   entityByOriginalId: Map<string, ExportedObjectEntity>;
+  typedReference?: ReferenceOrLiteral;
 }
 
 const createSampleLineageLink = (input: SampleLineageLinkInput): ExportedRelationV1[] => {
-  const target = getReferencedEntity(input.rawRef, input.entityByOriginalId);
+  const target = input.typedReference
+    ? resolveTargetFromReference(input.entityByOriginalId, input.typedReference)
+    : resolveTargetFromRaw(input.entityByOriginalId, input.rawRef, input.expectedTargetType === "artifact" ? "artifact" : "sample");
   return target?.source_node_type === input.expectedTargetType
     ? [createRelation(input.documentId, input.relationType, input.sample.entity_id, target.entity_id, input.role)]
     : [];
 };
 
-const getArtifactRelationType = (target: ExportedObjectEntity | undefined): RelationType | undefined => {
+const getArtifactRelationType = (target: LinkTarget | undefined): RelationType | undefined => {
   if (target?.source_node_type === "reaction") {
     return "artifact_supports_reaction";
   }
@@ -777,10 +945,14 @@ const getArtifactRelationType = (target: ExportedObjectEntity | undefined): Rela
 const buildArtifactLinks = (
   documentId: string,
   artifacts: ExportedArtifactV1[],
-  entityByOriginalId: Map<string, ExportedObjectEntity>
+  entityByOriginalId: Map<string, ExportedObjectEntity>,
+  typedNodes: TypedNodeIndex
 ): ExportedRelationV1[] =>
   artifacts.flatMap((artifact) => {
-    const target = getReferencedEntity(artifact.ref_raw, entityByOriginalId);
+    const typedArtifact = artifact.original_id ? typedNodes.get(artifact.original_id) : undefined;
+    const target = typedArtifact?.kind === "artifact"
+      ? resolveTargetFromReference(entityByOriginalId, typedArtifact.ref)
+      : getReferencedEntity(artifact.ref_raw, entityByOriginalId);
     const relationType = getArtifactRelationType(target);
     return target && relationType
       ? [createRelation(documentId, relationType, artifact.entity_id, target.entity_id, "ref")]
@@ -794,10 +966,13 @@ interface ConditionVariationLinkInput {
   relationType: RelationType;
   role: string;
   entityByOriginalId: Map<string, ExportedObjectEntity>;
+  typedReference?: ReferenceOrLiteral;
 }
 
 const createConditionVariationLink = (input: ConditionVariationLinkInput): ExportedRelationV1[] => {
-  const target = getReferencedEntity(input.rawRef, input.entityByOriginalId);
+  const target = input.typedReference
+    ? resolveTargetFromReference(input.entityByOriginalId, input.typedReference)
+    : resolveTargetFromRaw(input.entityByOriginalId, input.rawRef, "reaction");
   return target?.source_node_type === "reaction"
     ? [createRelation(
         input.documentId,
@@ -812,41 +987,47 @@ const createConditionVariationLink = (input: ConditionVariationLinkInput): Expor
 const buildConditionVariationLinks = (
   documentId: string,
   conditionVariations: ExportedConditionVaryV1[],
-  entityByOriginalId: Map<string, ExportedObjectEntity>
+  entityByOriginalId: Map<string, ExportedObjectEntity>,
+  typedNodes: TypedNodeIndex
 ): ExportedRelationV1[] =>
-  conditionVariations.flatMap((variation) => [
-    ...createConditionVariationLink({
-      documentId,
-      conditionVariation: variation,
-      rawRef: variation.reaction_ref_raw,
-      relationType: "condition_variation_targets_reaction",
-      role: "reaction",
-      entityByOriginalId
-    }),
-    ...createConditionVariationLink({
-      documentId,
-      conditionVariation: variation,
-      rawRef: variation.standard_ref_raw,
-      relationType: "condition_variation_compares_standard",
-      role: "standard",
-      entityByOriginalId
-    })
-  ]);
+  conditionVariations.flatMap((variation) => {
+    const typedVariation = variation.original_id ? typedNodes.get(variation.original_id) : undefined;
+
+    return [
+      ...createConditionVariationLink({
+        documentId,
+        conditionVariation: variation,
+        rawRef: variation.reaction_ref_raw,
+        relationType: "condition_variation_targets_reaction",
+        role: "reaction",
+        entityByOriginalId,
+        typedReference: typedVariation?.kind === "condition_varies" ? typedVariation.reaction : undefined
+      }),
+      ...createConditionVariationLink({
+        documentId,
+        conditionVariation: variation,
+        rawRef: variation.standard_ref_raw,
+        relationType: "condition_variation_compares_standard",
+        role: "standard",
+        entityByOriginalId,
+        typedReference: typedVariation?.kind === "condition_varies" ? typedVariation.standard : undefined
+      })
+    ];
+  });
 
 const buildConditionVariationAttemptLinks = (
   documentId: string,
   attempts: ExportedConditionVariationAttemptV1[],
-  entityByOriginalId: Map<string, ExportedObjectEntity>
+  entityByOriginalId: Map<string, ExportedObjectEntity>,
+  entityByEntityId: EntityIndex
 ): ExportedRelationV1[] =>
   attempts.flatMap((attempt) => {
-    const parent = entityByOriginalId.get(normalizeReferenceId(attempt.original_id ?? "").split(".")[0] ?? "");
-    const reaction = getReferencedEntity(attempt.reaction_ref_raw, entityByOriginalId);
-    const result = getReferencedEntity(attempt.result_ref_raw, entityByOriginalId);
-    const standard = attempt.parent_condition_variation_id
-      ? [...entityByOriginalId.values()].find((entity) => entity.entity_id === attempt.parent_condition_variation_id)
-      : undefined;
+    const parent = getTargetByEntityId(entityByEntityId, attempt.parent_condition_variation_id);
+    const reaction = resolveTargetFromRaw(entityByOriginalId, attempt.reaction_ref_raw, "reaction");
+    const result = resolveTargetFromRaw(entityByOriginalId, attempt.result_ref_raw, "result");
+    const standard = getTargetByEntityId(entityByEntityId, attempt.parent_condition_variation_id);
     const standardReaction = standard?.source_node_type === "condition_varies" && "standard_ref_raw" in standard
-      ? getReferencedEntity(standard.standard_ref_raw, entityByOriginalId)
+      ? resolveTargetFromRaw(entityByOriginalId, standard.standard_ref_raw, "reaction")
       : undefined;
 
     return [
@@ -885,7 +1066,8 @@ const buildMarkdownMentionLinks = (
 
 const buildSemanticLinks = (
   documentId: string,
-  parts: SemanticLayerParts
+  parts: SemanticLayerParts,
+  typedNodes: TypedNodeIndex
 ): ExportedRelationV1[] => {
   const entities = [
     ...parts.molecules,
@@ -898,17 +1080,18 @@ const buildSemanticLinks = (
     ...parts.conditionVariationAttempts
   ];
   const entityByOriginalId = buildEntityIndex(entities);
+  const entityByEntityId = buildEntityIdIndex(entities);
 
   return uniqueRelations([
     ...buildPrimaryLinks(documentId, entities),
     ...buildReactionParticipantLinks(documentId, parts.reactions),
     ...buildReactionRouteLinks(documentId, parts.reactions, entityByOriginalId),
-    ...buildResultLinks(documentId, parts.results, entityByOriginalId),
-    ...buildAnalysisLinks(documentId, parts.analyses, entityByOriginalId),
-    ...buildSampleLinks(documentId, parts.samples, entityByOriginalId),
-    ...buildArtifactLinks(documentId, parts.artifacts, entityByOriginalId),
-    ...buildConditionVariationLinks(documentId, parts.conditionVariations, entityByOriginalId),
-    ...buildConditionVariationAttemptLinks(documentId, parts.conditionVariationAttempts, entityByOriginalId),
+    ...buildResultLinks(documentId, parts.results, entityByOriginalId, typedNodes),
+    ...buildAnalysisLinks(documentId, parts.analyses, entityByOriginalId, typedNodes),
+    ...buildSampleLinks(documentId, parts.samples, entityByOriginalId, typedNodes),
+    ...buildArtifactLinks(documentId, parts.artifacts, entityByOriginalId, typedNodes),
+    ...buildConditionVariationLinks(documentId, parts.conditionVariations, entityByOriginalId, typedNodes),
+    ...buildConditionVariationAttemptLinks(documentId, parts.conditionVariationAttempts, entityByOriginalId, entityByEntityId),
     ...buildMarkdownMentionLinks(documentId, parts.markdownBlocks, entityByOriginalId)
   ]);
 };
@@ -1119,7 +1302,7 @@ export const buildSemanticLayer = (
     conditionVariationAttempts,
     markdownBlocks
   } = parts;
-  const links = buildSemanticLinks(documentId, parts);
+  const links = buildSemanticLinks(documentId, parts, typedNodes);
 
   return {
     molecules,

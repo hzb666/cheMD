@@ -52,7 +52,7 @@ import type {
   TrainingVariableLogicV1
 } from "./projection-types";
 import {
-  buildReactionEntityIdFromReference,
+  buildEntityIdFromReference,
   stripReferencePrefix
 } from "@chemd/core";
 import type {
@@ -95,6 +95,20 @@ type ProcedureStep = ProcedurePair["steps"][number];
 type ObservationEvent = ObservationPair["events"][number];
 type FieldValue = TrainingFieldEvidenceV1["value"];
 type LogicValue = string | number | boolean | null;
+type ResolvedReferenceTarget = Pick<ObjectEntity, "entity_id" | "original_id"> & {
+  source_node_type?: ObjectEntity["source_node_type"];
+};
+
+const ENTITY_KIND_BY_PREFIX = {
+  mol: "molecule",
+  rxn: "reaction",
+  res: "result",
+  ana: "analysis",
+  sam: "sample",
+  art: "artifact",
+  cv: "condition_variation",
+  cva: "condition_variation_attempt"
+} as const;
 
 interface FieldEvidenceInput {
   subjectEntityId: string;
@@ -186,14 +200,6 @@ const ARTIFACT_EVIDENCE_RELATIONS = new Set<ExportedRelationV1["relation_type"]>
   "artifact_supports_result",
   "artifact_supports_analysis",
   "artifact_supports_sample"
-]);
-const CONDITION_VARIATION_RELATIONS = new Set<ExportedRelationV1["relation_type"]>([
-  "condition_variation_targets_reaction",
-  "condition_variation_compares_standard",
-  "condition_variation_has_attempt",
-  "condition_variation_attempt_targets_reaction",
-  "condition_variation_attempt_compares_standard",
-  "condition_variation_attempt_has_result"
 ]);
 const RELATION_MATERIAL_FLOW_SPECS: Partial<Record<ExportedRelationV1["relation_type"], RelationMaterialFlowSpec>> = {
   result_describes_reaction: { edgeType: "reaction_reports_result", reverse: true },
@@ -410,6 +416,21 @@ const buildEntityIndex = (record: ChemdTrainingExportV2): Map<string, ObjectEnti
   );
 };
 
+const buildEntityIdIndex = (record: ChemdTrainingExportV2): Map<string, ObjectEntity> => {
+  const entities: ObjectEntity[] = [
+    ...record.semantic_layer.molecules,
+    ...record.semantic_layer.analyses,
+    ...record.semantic_layer.results,
+    ...record.semantic_layer.samples,
+    ...record.semantic_layer.reactions,
+    ...record.semantic_layer.artifacts,
+    ...record.semantic_layer.condition_variations,
+    ...record.semantic_layer.condition_variation_attempts
+  ];
+
+  return new Map(entities.map((entity) => [entity.entity_id, entity]));
+};
+
 const buildNarrativeBlocks = (record: ChemdTrainingExportV2): TrainingNarrativeBlockV1[] =>
   record.semantic_layer.markdown_blocks.map((block) => ({
     entity_id: block.entity_id,
@@ -425,17 +446,62 @@ const normalizeReferenceId = (value: string): string =>
     .split(".")[0]
     ?.trim() ?? "";
 
+const buildExternalTargetFromRawReference = (
+  rawRef: string,
+  targetKind: "molecule" | "reaction" | "result" | "analysis" | "sample" | "artifact" | "condition_varies" | "condition_variation_attempt"
+): ResolvedReferenceTarget | undefined => {
+  const entityId = buildEntityIdFromReference(targetKind, rawRef);
+  const sourceNodeType = targetKind === "condition_varies"
+    ? "condition_varies"
+    : targetKind;
+
+  return entityId
+    ? {
+        entity_id: entityId,
+        original_id: stripReferencePrefix(rawRef),
+        source_node_type: sourceNodeType
+      }
+    : undefined;
+};
+
+const buildExternalTargetFromEntityId = (
+  entityId: string
+): ResolvedReferenceTarget | undefined => {
+  const [prefix, documentId, ...rest] = entityId.split("::");
+  const nodeType = ENTITY_KIND_BY_PREFIX[prefix as keyof typeof ENTITY_KIND_BY_PREFIX];
+  const originalId = rest.join("::");
+
+  return nodeType && documentId && originalId
+    ? {
+        entity_id: entityId,
+        original_id: `${documentId}#${originalId}`,
+        source_node_type: nodeType === "condition_variation" ? "condition_varies" : nodeType
+      }
+    : undefined;
+};
+
 const getEntityByRawReference = (
   entityByOriginalId: Map<string, ObjectEntity>,
-  value: string | undefined
-): ObjectEntity | undefined => {
+  value: string | undefined,
+  expectedTargetKind?: "molecule" | "reaction" | "result" | "analysis" | "sample" | "artifact" | "condition_varies" | "condition_variation_attempt"
+): ResolvedReferenceTarget | undefined => {
   if (!value) {
     return undefined;
   }
 
   const withoutPrefix = value.trim().startsWith("@") ? value.trim().slice(1) : value.trim();
-  return entityByOriginalId.get(withoutPrefix) ?? entityByOriginalId.get(normalizeReferenceId(value));
+  return entityByOriginalId.get(withoutPrefix)
+    ?? entityByOriginalId.get(normalizeReferenceId(value))
+    ?? (expectedTargetKind ? buildExternalTargetFromRawReference(value, expectedTargetKind) : undefined);
 };
+
+const getEntityByEntityId = (
+  entityByEntityId: Map<string, ObjectEntity>,
+  entityId: string | undefined
+): ResolvedReferenceTarget | undefined =>
+  entityId
+    ? entityByEntityId.get(entityId) ?? buildExternalTargetFromEntityId(entityId)
+    : undefined;
 
 const findRelation = (
   record: ChemdTrainingExportV2,
@@ -446,26 +512,22 @@ const findRelation = (
     relation.from_entity_id === fromEntityId && relationTypes.has(relation.relation_type)
   );
 
-const findRelationToTarget = (
+const findOutgoingRelation = (
   record: ChemdTrainingExportV2,
   fromEntityId: string,
-  targetEntityId: string | undefined,
   relationTypes: ReadonlySet<ExportedRelationV1["relation_type"]>,
   role?: string
 ): ExportedRelationV1 | undefined =>
-  targetEntityId
-    ? record.semantic_layer.links.find((relation) =>
-        relation.from_entity_id === fromEntityId
-        && relation.to_entity_id === targetEntityId
-        && relationTypes.has(relation.relation_type)
-        && (!role || relation.role === role)
-      )
-    : undefined;
+  record.semantic_layer.links.find((relation) =>
+    relation.from_entity_id === fromEntityId
+    && relationTypes.has(relation.relation_type)
+    && (!role || relation.role === role)
+  );
 
 const createStructuredReference = (
   raw: string,
   source: Pick<TrainingResolvedReferenceV1, "source_entity_id" | "source_entity_type" | "source_field">,
-  target: ObjectEntity | undefined,
+  target: ResolvedReferenceTarget | undefined,
   relationType?: ExportedRelationV1["relation_type"]
 ): TrainingResolvedReferenceV1 => ({
   raw,
@@ -537,45 +599,35 @@ const resolveReactionRouteTarget = (
   entityByOriginalId: Map<string, ObjectEntity>,
   raw: string
 ): { entityId?: string; originalId?: string } => {
-  const target = getEntityByRawReference(entityByOriginalId, raw);
-  if (target?.source_node_type === "reaction") {
+  const target = getEntityByRawReference(entityByOriginalId, raw, "reaction");
+  if (target?.entity_id) {
     return {
       entityId: target.entity_id,
       originalId: target.original_id
     };
   }
 
-  const externalEntityId = buildReactionEntityIdFromReference(raw);
-  return externalEntityId
-    ? {
-        entityId: externalEntityId,
-        originalId: stripReferencePrefix(raw)
-      }
-    : {};
+  return {};
 };
 
 const buildReactionRouteReferences = (
   record: ChemdTrainingExportV2,
-  entityByOriginalId: Map<string, ObjectEntity>
+  entityByOriginalId: Map<string, ObjectEntity>,
+  entityByEntityId: Map<string, ObjectEntity>
 ): TrainingResolvedReferenceV1[] =>
   record.semantic_layer.reactions.flatMap((reaction) =>
     (reaction.prev_refs_raw ?? []).map((raw) => {
       const target = resolveReactionRouteTarget(entityByOriginalId, raw);
-      const relation = findRelationToTarget(
-        record,
-        reaction.entity_id,
-        target.entityId,
-        REACTION_ROUTE_RELATIONS,
-        "prev"
-      );
+      const relation = findOutgoingRelation(record, reaction.entity_id, REACTION_ROUTE_RELATIONS, "prev");
+      const relationTarget = getEntityByEntityId(entityByEntityId, relation?.to_entity_id);
 
       return {
         raw,
         source_entity_id: reaction.entity_id,
         source_entity_type: "reaction" as const,
         source_field: "prev",
-        ...(target.entityId ? { target_entity_id: target.entityId } : {}),
-        ...(target.originalId ? { target_original_id: target.originalId } : {}),
+        ...((relationTarget?.entity_id ?? target.entityId) ? { target_entity_id: relationTarget?.entity_id ?? target.entityId } : {}),
+        ...((relationTarget?.original_id ?? target.originalId) ? { target_original_id: relationTarget?.original_id ?? target.originalId } : {}),
         ...(relation ? { relation_type: relation.relation_type } : {}),
         resolution_status: relation ? "resolved" : "unresolved"
       };
@@ -597,7 +649,7 @@ const buildResultReferences = (
             source_entity_type: "result",
             source_field: result.reaction_ref_raw ? "reaction" : "ref"
           },
-          getEntityByRawReference(entityByOriginalId, reactionRaw),
+          getEntityByRawReference(entityByOriginalId, reactionRaw, "reaction"),
           relation?.relation_type
         )]
       : [];
@@ -612,7 +664,7 @@ const buildResultReferences = (
               source_entity_type: "result",
               source_field: "product"
             },
-            getEntityByRawReference(entityByOriginalId, result.product_ref_raw)
+            getEntityByRawReference(entityByOriginalId, result.product_ref_raw, "molecule")
           )
         ]
       : references;
@@ -621,6 +673,7 @@ const buildResultReferences = (
 const buildSingleFieldReferences = (
   record: ChemdTrainingExportV2,
   entityByOriginalId: Map<string, ObjectEntity>,
+  entityByEntityId: Map<string, ObjectEntity>,
   entities: Array<ExportedAnalysisV1 | ExportedSampleV1>,
   sourceType: "analysis" | "sample"
 ): TrainingResolvedReferenceV1[] =>
@@ -629,14 +682,10 @@ const buildSingleFieldReferences = (
       return [];
     }
 
-    const target = getEntityByRawReference(entityByOriginalId, entity.ref_raw);
-    const relation = findRelationToTarget(
-      record,
-      entity.entity_id,
-      target?.entity_id,
-      sourceType === "analysis" ? EVIDENCE_RELATIONS : SAMPLE_LINEAGE_RELATIONS,
-      "ref"
-    );
+    const relationTypes = sourceType === "analysis" ? EVIDENCE_RELATIONS : SAMPLE_LINEAGE_RELATIONS;
+    const relation = findOutgoingRelation(record, entity.entity_id, relationTypes, "ref");
+    const target = getEntityByRawReference(entityByOriginalId, entity.ref_raw)
+      ?? getEntityByEntityId(entityByEntityId, relation?.to_entity_id);
 
     return [createStructuredReference(
       entity.ref_raw,
@@ -652,7 +701,8 @@ const buildSingleFieldReferences = (
 
 const buildSampleLineageReferences = (
   record: ChemdTrainingExportV2,
-  entityByOriginalId: Map<string, ObjectEntity>
+  entityByOriginalId: Map<string, ObjectEntity>,
+  entityByEntityId: Map<string, ObjectEntity>
 ): TrainingResolvedReferenceV1[] =>
   record.semantic_layer.samples.flatMap((sample) => [
     ...([
@@ -660,62 +710,79 @@ const buildSampleLineageReferences = (
       ["aliquot_of", sample.aliquot_of_raw],
       ["batch_of", sample.batch_of_raw]
     ] as const).flatMap(([field, raw]) =>
-      createSampleLineageReference(record, entityByOriginalId, sample, field, raw)
+      createSampleLineageReference({
+        record,
+        entityByOriginalId,
+        entityByEntityId,
+        sample,
+        field,
+        raw
+      })
     ),
     ...(sample.artifact_refs_raw ?? []).flatMap((raw) =>
-      createSampleLineageReference(record, entityByOriginalId, sample, "artifacts", raw)
+      createSampleLineageReference({
+        record,
+        entityByOriginalId,
+        entityByEntityId,
+        sample,
+        field: "artifacts",
+        raw
+      })
     )
   ]);
 
-const createSampleLineageReference = (
-  record: ChemdTrainingExportV2,
-  entityByOriginalId: Map<string, ObjectEntity>,
-  sample: ExportedSampleV1,
-  field: SampleLineageReferenceField,
-  raw: string | undefined
-): TrainingResolvedReferenceV1[] => {
-  if (!raw) {
+interface SampleLineageReferenceInput {
+  record: ChemdTrainingExportV2;
+  entityByOriginalId: Map<string, ObjectEntity>;
+  entityByEntityId: Map<string, ObjectEntity>;
+  sample: ExportedSampleV1;
+  field: SampleLineageReferenceField;
+  raw: string | undefined;
+}
+
+const createSampleLineageReference = (input: SampleLineageReferenceInput): TrainingResolvedReferenceV1[] => {
+  if (!input.raw) {
     return [];
   }
 
-  const target = getEntityByRawReference(entityByOriginalId, raw);
-  const relation = findRelationToTarget(
-    record,
-    sample.entity_id,
-    target?.entity_id,
-    SAMPLE_LINEAGE_FIELD_RELATIONS[field],
-    SAMPLE_LINEAGE_FIELD_ROLES[field]
+  const relation = findOutgoingRelation(
+    input.record,
+    input.sample.entity_id,
+    SAMPLE_LINEAGE_FIELD_RELATIONS[input.field],
+    SAMPLE_LINEAGE_FIELD_ROLES[input.field]
   );
+  const explicitTarget = input.field === "artifacts"
+    ? getEntityByRawReference(input.entityByOriginalId, input.raw, "artifact")
+    : input.field === "aliquot_of" || input.field === "batch_of"
+      ? getEntityByRawReference(input.entityByOriginalId, input.raw, "sample")
+      : getEntityByRawReference(input.entityByOriginalId, input.raw);
+  const resolvedTarget = explicitTarget ?? getEntityByEntityId(input.entityByEntityId, relation?.to_entity_id);
 
   return [createStructuredReference(
-    raw,
+    input.raw,
     {
-      source_entity_id: sample.entity_id,
+      source_entity_id: input.sample.entity_id,
       source_entity_type: "sample",
-      source_field: field
+      source_field: input.field
     },
-    target,
+    resolvedTarget,
     relation?.relation_type
   )];
 };
 
 const buildArtifactReferences = (
   record: ChemdTrainingExportV2,
-  entityByOriginalId: Map<string, ObjectEntity>
+  entityByOriginalId: Map<string, ObjectEntity>,
+  entityByEntityId: Map<string, ObjectEntity>
 ): TrainingResolvedReferenceV1[] =>
   record.semantic_layer.artifacts.flatMap((artifact) => {
     if (!artifact.ref_raw) {
       return [];
     }
 
-    const target = getEntityByRawReference(entityByOriginalId, artifact.ref_raw);
-    const relation = findRelationToTarget(
-      record,
-      artifact.entity_id,
-      target?.entity_id,
-      ARTIFACT_EVIDENCE_RELATIONS,
-      "ref"
-    );
+    const relation = findOutgoingRelation(record, artifact.entity_id, ARTIFACT_EVIDENCE_RELATIONS, "ref");
+    const target = getEntityByRawReference(entityByOriginalId, artifact.ref_raw)
+      ?? getEntityByEntityId(entityByEntityId, relation?.to_entity_id);
 
     return [createStructuredReference(
       artifact.ref_raw,
@@ -729,32 +796,35 @@ const buildArtifactReferences = (
     )];
   });
 
-const createConditionVariationReference = (
-  record: ChemdTrainingExportV2,
-  entityByOriginalId: Map<string, ObjectEntity>,
-  variation: ExportedConditionVaryV1,
-  field: "reaction" | "standard",
-  raw: string | undefined
-): TrainingResolvedReferenceV1[] => {
-  if (!raw) {
+interface ConditionVariationReferenceInput {
+  record: ChemdTrainingExportV2;
+  entityByOriginalId: Map<string, ObjectEntity>;
+  entityByEntityId: Map<string, ObjectEntity>;
+  variation: ExportedConditionVaryV1;
+  field: "reaction" | "standard";
+  raw: string | undefined;
+}
+
+const createConditionVariationReference = (input: ConditionVariationReferenceInput): TrainingResolvedReferenceV1[] => {
+  if (!input.raw) {
     return [];
   }
 
-  const target = getEntityByRawReference(entityByOriginalId, raw);
-  const relation = findRelationToTarget(
-    record,
-    variation.entity_id,
-    target?.entity_id,
-    CONDITION_VARIATION_RELATIONS,
-    field
-  );
+  const relationTypeSet = new Set<ExportedRelationV1["relation_type"]>([
+    input.field === "reaction"
+      ? "condition_variation_targets_reaction"
+      : "condition_variation_compares_standard"
+  ]);
+  const relation = findOutgoingRelation(input.record, input.variation.entity_id, relationTypeSet, input.field);
+  const target = getEntityByRawReference(input.entityByOriginalId, input.raw, "reaction")
+    ?? getEntityByEntityId(input.entityByEntityId, relation?.to_entity_id);
 
   return [createStructuredReference(
-    raw,
+    input.raw,
     {
-      source_entity_id: variation.entity_id,
+      source_entity_id: input.variation.entity_id,
       source_entity_type: "condition_varies",
-      source_field: field
+      source_field: input.field
     },
     target,
     relation?.relation_type
@@ -763,45 +833,80 @@ const createConditionVariationReference = (
 
 const buildConditionVariationReferences = (
   record: ChemdTrainingExportV2,
-  entityByOriginalId: Map<string, ObjectEntity>
+  entityByOriginalId: Map<string, ObjectEntity>,
+  entityByEntityId: Map<string, ObjectEntity>
 ): TrainingResolvedReferenceV1[] =>
   record.semantic_layer.condition_variations.flatMap((variation) => [
-    ...createConditionVariationReference(record, entityByOriginalId, variation, "reaction", variation.reaction_ref_raw),
-    ...createConditionVariationReference(record, entityByOriginalId, variation, "standard", variation.standard_ref_raw),
+    ...createConditionVariationReference({
+      record,
+      entityByOriginalId,
+      entityByEntityId,
+      variation,
+      field: "reaction",
+      raw: variation.reaction_ref_raw
+    }),
+    ...createConditionVariationReference({
+      record,
+      entityByOriginalId,
+      entityByEntityId,
+      variation,
+      field: "standard",
+      raw: variation.standard_ref_raw
+    }),
     ...record.semantic_layer.condition_variation_attempts
       .filter((attempt) => attempt.parent_condition_variation_id === variation.entity_id)
       .flatMap((attempt) => [
-        ...createAttemptReference(record, entityByOriginalId, attempt, "reaction", attempt.reaction_ref_raw),
-        ...createAttemptReference(record, entityByOriginalId, attempt, "result", attempt.result_ref_raw)
+        ...createAttemptReference({
+          record,
+          entityByOriginalId,
+          entityByEntityId,
+          attempt,
+          field: "reaction",
+          raw: attempt.reaction_ref_raw
+        }),
+        ...createAttemptReference({
+          record,
+          entityByOriginalId,
+          entityByEntityId,
+          attempt,
+          field: "result",
+          raw: attempt.result_ref_raw
+        })
       ])
   ]);
 
-const createAttemptReference = (
-  record: ChemdTrainingExportV2,
-  entityByOriginalId: Map<string, ObjectEntity>,
-  attempt: ExportedConditionVariationAttemptV1,
-  field: "reaction" | "result",
-  raw: string | undefined
-): TrainingResolvedReferenceV1[] => {
-  if (!raw) {
+interface AttemptReferenceInput {
+  record: ChemdTrainingExportV2;
+  entityByOriginalId: Map<string, ObjectEntity>;
+  entityByEntityId: Map<string, ObjectEntity>;
+  attempt: ExportedConditionVariationAttemptV1;
+  field: "reaction" | "result";
+  raw: string | undefined;
+}
+
+const createAttemptReference = (input: AttemptReferenceInput): TrainingResolvedReferenceV1[] => {
+  if (!input.raw) {
     return [];
   }
 
-  const target = getEntityByRawReference(entityByOriginalId, raw);
-  const relation = findRelationToTarget(
-    record,
-    attempt.entity_id,
-    target?.entity_id,
-    CONDITION_VARIATION_RELATIONS,
-    field
-  );
+  const relationTypeSet = new Set<ExportedRelationV1["relation_type"]>([
+    input.field === "reaction"
+      ? "condition_variation_attempt_targets_reaction"
+      : "condition_variation_attempt_has_result"
+  ]);
+  const relation = findOutgoingRelation(input.record, input.attempt.entity_id, relationTypeSet, input.field);
+  const target = getEntityByRawReference(
+    input.entityByOriginalId,
+    input.raw,
+    input.field === "reaction" ? "reaction" : "result"
+  ) ?? getEntityByEntityId(input.entityByEntityId, relation?.to_entity_id);
 
   return [createStructuredReference(
-    raw,
+    input.raw,
     {
-      source_entity_id: attempt.entity_id,
+      source_entity_id: input.attempt.entity_id,
       source_entity_type: "condition_variation_attempt",
-      source_field: field
+      source_field: input.field
     },
     target,
     relation?.relation_type
@@ -810,17 +915,18 @@ const createAttemptReference = (
 
 const buildResolvedReferences = (
   record: ChemdTrainingExportV2,
-  entityByOriginalId: Map<string, ObjectEntity>
+  entityByOriginalId: Map<string, ObjectEntity>,
+  entityByEntityId: Map<string, ObjectEntity>
 ): TrainingResolvedReferenceV1[] => [
   ...buildMarkdownReferences(record, entityByOriginalId),
   ...buildReactionParticipantReferences(record),
-  ...buildReactionRouteReferences(record, entityByOriginalId),
+  ...buildReactionRouteReferences(record, entityByOriginalId, entityByEntityId),
   ...buildResultReferences(record, entityByOriginalId),
-  ...buildSingleFieldReferences(record, entityByOriginalId, record.semantic_layer.analyses, "analysis"),
-  ...buildSingleFieldReferences(record, entityByOriginalId, record.semantic_layer.samples, "sample"),
-  ...buildSampleLineageReferences(record, entityByOriginalId),
-  ...buildArtifactReferences(record, entityByOriginalId),
-  ...buildConditionVariationReferences(record, entityByOriginalId)
+  ...buildSingleFieldReferences(record, entityByOriginalId, entityByEntityId, record.semantic_layer.analyses, "analysis"),
+  ...buildSingleFieldReferences(record, entityByOriginalId, entityByEntityId, record.semantic_layer.samples, "sample"),
+  ...buildSampleLineageReferences(record, entityByOriginalId, entityByEntityId),
+  ...buildArtifactReferences(record, entityByOriginalId, entityByEntityId),
+  ...buildConditionVariationReferences(record, entityByOriginalId, entityByEntityId)
 ];
 
 const buildProcedureLogicPairs = (record: ChemdTrainingExportV2): TrainingProcedureLogicPairV1[] =>
@@ -2294,32 +2400,43 @@ const buildKnowledgeNodes = (
   })),
   ...buildProcedureNodes(record),
   ...buildObservationNodes(record),
-  ...buildExternalReactionNodes(record),
+  ...buildExternalReferencedNodes(record),
   ...buildFieldValueNodes(fieldEvidence)
 ];
 
-function buildExternalReactionNodes(record: ChemdTrainingExportV2): TrainingKnowledgeNodeV1[] {
-  const localReactionIds = new Set(record.semantic_layer.reactions.map((reaction) => reaction.entity_id));
-  const externalReactionIds = uniqueStrings(record.semantic_layer.links.flatMap((relation) => {
-    if (!REACTION_ROUTE_RELATIONS.has(relation.relation_type)) {
+function buildExternalReferencedNodes(record: ChemdTrainingExportV2): TrainingKnowledgeNodeV1[] {
+  const localEntityIds = new Set([
+    ...record.semantic_layer.molecules.map((entity) => entity.entity_id),
+    ...record.semantic_layer.reactions.map((entity) => entity.entity_id),
+    ...record.semantic_layer.results.map((entity) => entity.entity_id),
+    ...record.semantic_layer.analyses.map((entity) => entity.entity_id),
+    ...record.semantic_layer.samples.map((entity) => entity.entity_id),
+    ...record.semantic_layer.artifacts.map((entity) => entity.entity_id),
+    ...record.semantic_layer.condition_variations.map((entity) => entity.entity_id),
+    ...record.semantic_layer.condition_variation_attempts.map((entity) => entity.entity_id)
+  ]);
+  const externalEntityIds = uniqueStrings(record.semantic_layer.links.flatMap((relation) =>
+    [relation.from_entity_id, relation.to_entity_id].filter((entityId) =>
+      entityId.includes("::") && !localEntityIds.has(entityId)
+    )
+  ));
+
+  return externalEntityIds.flatMap((entityId) => {
+    const target = buildExternalTargetFromEntityId(entityId);
+    if (!target?.source_node_type) {
       return [];
     }
 
-    return [relation.from_entity_id, relation.to_entity_id].filter((entityId) =>
-      entityId.startsWith("rxn::") && !localReactionIds.has(entityId)
-    );
-  }));
+    const nodeType = target.source_node_type === "condition_varies"
+      ? "condition_variation"
+      : target.source_node_type;
 
-  return externalReactionIds.map((entityId) => {
-    const parts = entityId.split("::");
-    const originalId = parts.length >= 3 ? `${parts[1]}#${parts[2]}` : entityId;
-
-    return {
+    return [{
       node_id: entityId,
-      node_type: "reaction" as const,
-      label: parts[2] ?? entityId,
-      original_id: originalId
-    };
+      node_type: nodeType,
+      label: stripReferencePrefix(target.original_id ?? entityId),
+      original_id: target.original_id
+    }];
   });
 }
 
@@ -2612,7 +2729,7 @@ const createRelationMaterialFlowEdge = (
 const getStepIoTarget = (
   item: { reference?: { refId: string; resolved: boolean } },
   entityByOriginalId: Map<string, ObjectEntity>
-): ObjectEntity | undefined =>
+): ResolvedReferenceTarget | undefined =>
   item.reference?.resolved ? getEntityByRawReference(entityByOriginalId, item.reference.refId) : undefined;
 
 const buildStepMaterialFlowEdges = (
@@ -3782,7 +3899,7 @@ export const buildTrainingUnderstandingFromRecord = (
   record: ChemdTrainingExportV2
 ): ChemdTrainingUnderstandingV1 => {
   const entityByOriginalId = buildEntityIndex(record);
-  const resolvedReferences = buildResolvedReferences(record, entityByOriginalId);
+  const resolvedReferences = buildResolvedReferences(record, entityByOriginalId, buildEntityIdIndex(record));
   const primaryEntities = buildPrimaryEntities(record, entityByOriginalId);
   const fieldEvidence = buildFieldEvidence(record);
   const graphNodes = buildKnowledgeNodes(record, fieldEvidence);

@@ -6,11 +6,23 @@ export type ReferenceTargetKind =
   | "template"
   | "unknown";
 
+export interface ExternalReferenceTarget {
+  refId: string;
+  targetKind: ReferenceTargetKind;
+  label?: string;
+  routeId?: string;
+  prevRefIds?: string[];
+}
+
 export interface ExternalReactionRouteTarget {
   refId: string;
   routeId?: string;
   prevRefIds?: string[];
   label?: string;
+}
+
+export interface ReferenceContext {
+  externalTargets?: ExternalReferenceTarget[];
 }
 
 export interface ReactionRouteContext {
@@ -30,6 +42,17 @@ export const stripReferencePrefix = (value: string): string =>
 
 export const buildScopedReferenceId = (documentId: string, objectId: string): string =>
   `${documentId}#${objectId}`;
+
+const ENTITY_PREFIX_BY_TARGET_KIND: Partial<Record<ReferenceTargetKind, string>> = {
+  molecule: "mol",
+  reaction: "rxn",
+  result: "res",
+  analysis: "ana",
+  sample: "sam",
+  artifact: "art",
+  condition_varies: "cv",
+  condition_variation_attempt: "cva"
+};
 
 export const parseReferenceId = (value: string): ParsedReferenceId | undefined => {
   const lookupKey = stripReferencePrefix(value);
@@ -64,5 +87,17 @@ export const buildReactionEntityIdFromReference = (reference: string): string | 
   const parsed = parseReferenceId(reference);
   return parsed?.documentId
     ? `rxn::${parsed.documentId}::${parsed.objectId}`
+    : undefined;
+};
+
+export const buildEntityIdFromReference = (
+  targetKind: ReferenceTargetKind,
+  reference: string
+): string | undefined => {
+  const parsed = parseReferenceId(reference);
+  const prefix = ENTITY_PREFIX_BY_TARGET_KIND[targetKind];
+
+  return parsed?.documentId && prefix
+    ? `${prefix}::${parsed.documentId}::${parsed.objectId}${parsed.childId && prefix === "cva" ? `.${parsed.childId}` : ""}`
     : undefined;
 };

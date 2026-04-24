@@ -3,7 +3,6 @@ import type {
   ArtifactNode,
   ConditionVariesNode,
   MoleculeNode,
-  ReactionRouteContext,
   ObservationNode,
   ProcedureNode,
   ReactionNode,
@@ -30,6 +29,7 @@ import type {
   ObjectNode,
   QuantityClass,
   QuantityType,
+  ExternalTargetIndex,
   TypedAnalysisNode,
   TypedArtifactNode,
   TypedConditionVariesNode,
@@ -45,7 +45,7 @@ import type {
 export interface BuildNodeContext {
   documentId: string;
   objectIndex: Map<string, ObjectNode>;
-  routeContext?: ReactionRouteContext;
+  externalTargetIndex: ExternalTargetIndex;
 }
 
 export interface BuiltTypedNode {
@@ -177,18 +177,18 @@ export const buildReactionNode = (
     sourceNodeId: node.id,
     field: "reactants",
     expectedTargetKind: "molecule"
-  });
+  }, context.externalTargetIndex);
   const products = resolveReferenceList(node.products ?? [], context.objectIndex, {
     sourceNodeType: "reaction",
     sourceNodeId: node.id,
     field: "products",
     expectedTargetKind: "molecule"
-  });
+  }, context.externalTargetIndex);
   const prev = resolveReactionPrevReferences({
     documentId: context.documentId,
     objectIndex: context.objectIndex,
+    externalTargetIndex: context.externalTargetIndex,
     rawValues: node.prev ?? [],
-    routeContext: context.routeContext,
     sourceNodeId: node.id
   });
 
@@ -227,7 +227,7 @@ export const buildResultNode = (
   const conversion = collectQuantity(output, "conversion", "percent", node.conversion, context.objectIndex);
   const selectivity = collectQuantity(output, "selectivity", "percent", node.selectivity, context.objectIndex);
   const purity = collectQuantity(output, "purity", "percent", node.purity, context.objectIndex);
-  const relationships = resolveResultRelationships(node, context.objectIndex);
+  const relationships = resolveResultRelationships(node, context.objectIndex, context.externalTargetIndex);
   const isolatedMass = collectQuantity(
     output,
     "isolated_mass",
@@ -267,7 +267,7 @@ export const buildAnalysisNode = (
     sourceNodeType: "analysis",
     sourceNodeId: node.id,
     field: "ref"
-  });
+  }, context.externalTargetIndex);
 
   output.diagnostics.push(...reference.diagnostics);
   output.node = {
@@ -312,13 +312,13 @@ export const buildSampleNode = (
 ): BuiltTypedNode => {
   const output = createBase("sample", node);
   const purity = collectQuantity(output, "purity", "percent", node.purity, context.objectIndex);
-  const relationships = resolveSampleRelationships(node, context.objectIndex);
+  const relationships = resolveSampleRelationships(node, context.objectIndex, context.externalTargetIndex);
   const artifacts = resolveReferenceList(node.artifacts ?? [], context.objectIndex, {
     sourceNodeType: "sample",
     sourceNodeId: node.id,
     field: "artifacts",
     expectedTargetKind: "artifact"
-  });
+  }, context.externalTargetIndex);
 
   output.diagnostics.push(...relationships.diagnostics, ...artifacts.diagnostics);
 
@@ -348,7 +348,7 @@ export const buildArtifactNode = (
     sourceNodeType: "artifact",
     sourceNodeId: node.id,
     field: "ref"
-  });
+  }, context.externalTargetIndex);
 
   output.diagnostics.push(...reference.diagnostics);
   output.node = {
@@ -374,26 +374,26 @@ export const buildConditionVariesNode = (
     sourceNodeId: node.id,
     field: "reaction",
     expectedTargetKind: "reaction"
-  });
+  }, context.externalTargetIndex);
   const standard = resolveOptionalReference(node.standard, context.objectIndex, {
     sourceNodeType: "condition_varies",
     sourceNodeId: node.id,
     field: "standard",
     expectedTargetKind: "reaction"
-  });
+  }, context.externalTargetIndex);
   const attemptDiagnostics = (node.attempts ?? []).flatMap((attempt) => [
     ...resolveOptionalReference(attempt.reaction, context.objectIndex, {
       sourceNodeType: "condition_varies",
       sourceNodeId: node.id,
       field: `${attempt.id}.reaction`,
       expectedTargetKind: "reaction"
-    }).diagnostics,
+    }, context.externalTargetIndex).diagnostics,
     ...resolveOptionalReference(attempt.result, context.objectIndex, {
       sourceNodeType: "condition_varies",
       sourceNodeId: node.id,
       field: `${attempt.id}.result`,
       expectedTargetKind: "result"
-    }).diagnostics
+    }, context.externalTargetIndex).diagnostics
   ]);
 
   output.diagnostics.push(...reaction.diagnostics, ...standard.diagnostics, ...attemptDiagnostics);

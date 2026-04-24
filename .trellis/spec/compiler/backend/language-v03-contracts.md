@@ -14,6 +14,25 @@ Status: Filled from commit `97d3151`; v0.4 surface semantics below supersede leg
 
 ```typescript
 compileChemd(source: string, options?: {
+  referenceContext?: {
+    externalTargets?: Array<{
+      refId: string;
+      targetKind:
+        | "molecule"
+        | "reaction"
+        | "result"
+        | "analysis"
+        | "procedure"
+        | "observation"
+        | "sample"
+        | "artifact"
+        | "condition_varies"
+        | "condition_variation_attempt";
+      label?: string;
+      routeId?: string;
+      prevRefIds?: string[];
+    }>;
+  };
   reactionRouteContext?: {
     externalReactions?: Array<{
       refId: string;
@@ -45,6 +64,25 @@ Core builders:
 ```typescript
 typecheckDocument(document: ChemdDocument, options?: {
   procedureMode?: "auto" | "explicit" | "lowered";
+  referenceContext?: {
+    externalTargets?: Array<{
+      refId: string;
+      targetKind:
+        | "molecule"
+        | "reaction"
+        | "result"
+        | "analysis"
+        | "procedure"
+        | "observation"
+        | "sample"
+        | "artifact"
+        | "condition_varies"
+        | "condition_variation_attempt";
+      label?: string;
+      routeId?: string;
+      prevRefIds?: string[];
+    }>;
+  };
   reactionRouteContext?: {
     externalReactions?: Array<{
       refId: string;
@@ -123,13 +161,22 @@ Route graphs and optimization graphs are separate contracts:
 - Do not overload `condition-varies` attempts to represent synthesis-step order.
 
 Cross-document route linking is opt-in and fail-closed:
+- `typecheckDocument(..., { referenceContext })` may resolve scoped refs such as
+  `external-doc#res-main`, `external-doc#sample-parent`, or
+  `external-doc#cv-screen.var1` only from the caller-provided
+  `externalTargets`.
 - `typecheckDocument(..., { reactionRouteContext })` may resolve scoped refs such as
   `route-doc#rxn-step-01` only from the caller-provided `externalReactions`.
 - The compiler must not invent external steps that are absent from
-  `reactionRouteContext`.
+  `reactionRouteContext` or external structured targets absent from
+  `referenceContext`.
 - Local object indexes must resolve both bare `id` and scoped `document-id#id`
   aliases for the current document so route edges can round-trip in a single
   reference format.
+- `reactionRouteContext.externalReactions[*]` is a narrow compatibility input;
+  the typechecker/compiler may merge it into the shared external target index
+  as external reactions, but only reaction `prev/next` inference may consume
+  `routeId` / `prevRefIds`.
 
 ### 4. Validation & Error Matrix
 

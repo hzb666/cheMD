@@ -1,13 +1,13 @@
 import {
+  type ExternalReferenceTarget,
   parseReferenceId,
-  stripReferencePrefix,
-  type ExternalReactionRouteTarget,
-  type ReactionRouteContext
+  stripReferencePrefix
 } from "@chemd/core";
 import { createV03Diagnostic, type V03Diagnostic } from "@chemd/diagnostics";
 
 import { toReferenceOrLiteral } from "./references";
 import type {
+  ExternalTargetIndex,
   ObjectNode,
   ReferenceOrLiteral,
   ReferenceType,
@@ -18,8 +18,8 @@ import type {
 interface ResolveReactionPrevInput {
   documentId: string;
   objectIndex: Map<string, ObjectNode>;
+  externalTargetIndex: ExternalTargetIndex;
   rawValues: string[];
-  routeContext?: ReactionRouteContext;
   sourceNodeId?: string;
 }
 
@@ -27,7 +27,7 @@ interface ReactionRouteAugmentationInput {
   documentId: string;
   nodes: TypedSemanticNode[];
   objectIndex: Map<string, ObjectNode>;
-  routeContext?: ReactionRouteContext;
+  externalTargetIndex: ExternalTargetIndex;
 }
 
 interface ReactionRouteAugmentationResult {
@@ -35,23 +35,17 @@ interface ReactionRouteAugmentationResult {
   diagnostics: V03Diagnostic[];
 }
 
-type ExternalReactionIndex = Map<string, ExternalReactionRouteTarget>;
+type ExternalReactionIndex = Map<string, ExternalReferenceTarget>;
 
 const uniqueStrings = (values: string[]): string[] => Array.from(new Set(values));
 
 const createExternalReactionIndex = (
-  routeContext?: ReactionRouteContext
+  externalTargetIndex: ExternalTargetIndex
 ): ExternalReactionIndex =>
   new Map(
-    (routeContext?.externalReactions ?? [])
-      .map((target) => {
-        const refId = stripReferencePrefix(target.refId);
-        return refId
-          ? [{ ...target, refId }, refId] as const
-          : undefined;
-      })
-      .filter((entry): entry is readonly [ExternalReactionRouteTarget, string] => Boolean(entry))
-      .map(([target, refId]) => [refId, target])
+    Array.from(externalTargetIndex.values())
+      .filter((target) => target.targetKind === "reaction")
+      .map((target) => [target.refId, target] as const)
   );
 
 const createRouteReferenceDiagnostic = (
@@ -92,16 +86,12 @@ const createResolvedReactionReference = (refId: string): ReferenceType => ({
 const resolveReactionPrevReference = (
   raw: string,
   objectIndex: Map<string, ObjectNode>,
-  externalReactionIndex: ExternalReactionIndex
+  externalTargetIndex: ExternalTargetIndex
 ): ReferenceType => {
   const normalized = stripReferencePrefix(raw);
-  const local = toReferenceOrLiteral(`@${normalized}`, objectIndex);
+  const local = toReferenceOrLiteral(`@${normalized}`, objectIndex, externalTargetIndex);
   if (local.kind === "reference" && local.resolved) {
     return local;
-  }
-
-  if (externalReactionIndex.has(normalized)) {
-    return createResolvedReactionReference(normalized);
   }
 
   return local.kind === "reference"
@@ -326,9 +316,8 @@ const buildOrphanDiagnostics = (
 export const resolveReactionPrevReferences = (
   input: ResolveReactionPrevInput
 ): { values: ReferenceOrLiteral[]; diagnostics: V03Diagnostic[] } => {
-  const externalReactionIndex = createExternalReactionIndex(input.routeContext);
   const values = input.rawValues.map((raw) =>
-    resolveReactionPrevReference(raw, input.objectIndex, externalReactionIndex)
+    resolveReactionPrevReference(raw, input.objectIndex, input.externalTargetIndex)
   );
 
   return {
@@ -344,7 +333,7 @@ export const augmentReactionRouteGraph = (
 ): ReactionRouteAugmentationResult => {
   const reactions = input.nodes.filter((node): node is TypedReactionNode => node.kind === "reaction");
   const reactionById = new Map(reactions.map((reaction) => [reaction.nodeId, reaction]));
-  const externalReactionIndex = createExternalReactionIndex(input.routeContext);
+  const externalReactionIndex = createExternalReactionIndex(input.externalTargetIndex);
   const nextByReactionId = new Map<string, ReferenceType[]>(reactions.map((reaction) => [reaction.nodeId, []]));
 
   reactions.forEach((reaction) => {

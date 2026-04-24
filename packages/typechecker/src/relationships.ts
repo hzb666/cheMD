@@ -2,7 +2,7 @@ import { createV03Diagnostic, type V03Diagnostic } from "@chemd/diagnostics";
 import type { ResultNode, SampleNode } from "@chemd/core";
 
 import { resolveOptionalReference } from "./reference-rules";
-import type { ObjectNode, ReferenceOrLiteral } from "./types";
+import type { ExternalTargetIndex, ObjectNode, ReferenceOrLiteral } from "./types";
 
 interface ResultRelationshipResolution {
   reaction?: ReferenceOrLiteral;
@@ -112,20 +112,21 @@ const validateMetricConsistency = (
 
 export const resolveResultRelationships = (
   node: ResultNode,
-  objectIndex: Map<string, ObjectNode>
+  objectIndex: Map<string, ObjectNode>,
+  externalTargetIndex?: ExternalTargetIndex
 ): ResultRelationshipResolution => {
   const reaction = resolveOptionalReference(node.reaction ?? node.ref, objectIndex, {
     sourceNodeType: "result",
     sourceNodeId: node.id,
     field: node.reaction ? "reaction" : "ref",
     expectedTargetKind: "reaction"
-  });
+  }, externalTargetIndex);
   const product = resolveOptionalReference(node.product, objectIndex, {
     sourceNodeType: "result",
     sourceNodeId: node.id,
     field: "product",
     expectedTargetKind: "molecule"
-  });
+  }, externalTargetIndex);
   const reactionNode = findReactionNode(reaction.value, objectIndex);
 
   return {
@@ -142,30 +143,31 @@ export const resolveResultRelationships = (
 
 export const resolveSampleRelationships = (
   node: SampleNode,
-  objectIndex: Map<string, ObjectNode>
+  objectIndex: Map<string, ObjectNode>,
+  externalTargetIndex?: ExternalTargetIndex
 ): SampleRelationshipResolution => {
   const ref = resolveOptionalReference(node.ref, objectIndex, {
     sourceNodeType: "sample",
     sourceNodeId: node.id,
     field: "ref"
-  });
+  }, externalTargetIndex);
   const derivedFrom = resolveOptionalReference(node.derived_from, objectIndex, {
     sourceNodeType: "sample",
     sourceNodeId: node.id,
     field: "derived_from"
-  });
+  }, externalTargetIndex);
   const aliquotOf = resolveOptionalReference(node.aliquot_of, objectIndex, {
     sourceNodeType: "sample",
     sourceNodeId: node.id,
     field: "aliquot_of",
     expectedTargetKind: "sample"
-  });
+  }, externalTargetIndex);
   const batchOf = resolveOptionalReference(node.batch_of, objectIndex, {
     sourceNodeType: "sample",
     sourceNodeId: node.id,
     field: "batch_of",
     expectedTargetKind: "sample"
-  });
+  }, externalTargetIndex);
 
   return {
     ...(ref.value ? { ref: ref.value } : {}),

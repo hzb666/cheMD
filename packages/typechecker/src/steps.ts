@@ -20,7 +20,7 @@ import {
   validateStepIds
 } from "./step-rules";
 import { resolveStepInputs, resolveStepOutputs, resolveStepParamReferences } from "./step-references";
-import type { ObjectNode, ProcedureMode, QuantityType } from "./types";
+import type { ExternalTargetIndex, ObjectNode, ProcedureMode, QuantityType } from "./types";
 
 interface ExplicitProcedureResult {
   result: ProcedureLoweringResult;
@@ -32,6 +32,7 @@ interface ExplicitStepContext {
   stepIndex: number;
   step: NonNullable<ProcedureNode["steps"]>[number];
   objectIndex?: Map<string, ObjectNode>;
+  externalTargetIndex?: ExternalTargetIndex;
 }
 
 interface ExplicitStepInputs {
@@ -58,6 +59,7 @@ const readStepId = (node: ProcedureNode, index: number, stepId: string | undefin
 const buildExplicitStepInputs = (
   rawInputs: string[] | undefined,
   objectIndex: Map<string, ObjectNode> | undefined,
+  externalTargetIndex: ExternalTargetIndex | undefined,
   stepId: string
 ): ExplicitStepInputs => {
   if (!rawInputs) {
@@ -68,12 +70,13 @@ const buildExplicitStepInputs = (
     return { inputs: rawInputs.map((raw) => ({ raw })), diagnostics: [] };
   }
 
-  return resolveStepInputs(rawInputs, objectIndex, stepId);
+  return resolveStepInputs(rawInputs, objectIndex, externalTargetIndex, stepId);
 };
 
 const buildExplicitStepOutputs = (
   rawOutputs: string[] | undefined,
   objectIndex: Map<string, ObjectNode> | undefined,
+  externalTargetIndex: ExternalTargetIndex | undefined,
   stepId: string
 ): { outputs?: CanonicalStepNode["outputs"]; diagnostics: V03Diagnostic[] } => {
   if (!rawOutputs) {
@@ -84,13 +87,14 @@ const buildExplicitStepOutputs = (
     return { outputs: rawOutputs.map((raw) => ({ raw })), diagnostics: [] };
   }
 
-  return resolveStepOutputs(rawOutputs, objectIndex, stepId);
+  return resolveStepOutputs(rawOutputs, objectIndex, externalTargetIndex, stepId);
 };
 
 const resolveExplicitStepParams = (
   stepId: string,
   step: NonNullable<ProcedureNode["steps"]>[number],
-  objectIndex: Map<string, ObjectNode> | undefined
+  objectIndex: Map<string, ObjectNode> | undefined,
+  externalTargetIndex: ExternalTargetIndex | undefined
 ): ResolvedStepParams | { diagnostics: V03Diagnostic[]; quantities: QuantityType[] } => {
   if (!isStepFamily(step.family)) {
     return {
@@ -110,7 +114,7 @@ const resolveExplicitStepParams = (
   const normalized = normalizeStepParams(stepId, step.params);
   const defaultedParams = applyStepDefaults(family, normalized.params);
   const resolvedParams = objectIndex
-    ? resolveStepParamReferences(defaultedParams, objectIndex, stepId)
+    ? resolveStepParamReferences(defaultedParams, objectIndex, externalTargetIndex, stepId)
     : { params: defaultedParams, diagnostics: [] };
 
   return {
@@ -129,10 +133,11 @@ const resolveExplicitStepParams = (
 const resolveExplicitStepIo = (
   stepId: string,
   step: NonNullable<ProcedureNode["steps"]>[number],
-  objectIndex: Map<string, ObjectNode> | undefined
+  objectIndex: Map<string, ObjectNode> | undefined,
+  externalTargetIndex: ExternalTargetIndex | undefined
 ): ResolvedStepIo => {
-  const stepInputs = buildExplicitStepInputs(step.inputs, objectIndex, stepId);
-  const stepOutputs = buildExplicitStepOutputs(step.outputs, objectIndex, stepId);
+  const stepInputs = buildExplicitStepInputs(step.inputs, objectIndex, externalTargetIndex, stepId);
+  const stepOutputs = buildExplicitStepOutputs(step.outputs, objectIndex, externalTargetIndex, stepId);
 
   return {
     ...(stepInputs.inputs ? { inputs: stepInputs.inputs } : {}),
@@ -145,15 +150,16 @@ const toExplicitStep = ({
   node,
   stepIndex,
   step,
-  objectIndex
+  objectIndex,
+  externalTargetIndex
 }: ExplicitStepContext): { step?: CanonicalStepNode; quantities: QuantityType[]; diagnostics: V03Diagnostic[] } => {
   const stepId = readStepId(node, stepIndex, step.stepId);
-  const resolvedParams = resolveExplicitStepParams(stepId, step, objectIndex);
+  const resolvedParams = resolveExplicitStepParams(stepId, step, objectIndex, externalTargetIndex);
   if (!("family" in resolvedParams)) {
     return resolvedParams;
   }
 
-  const resolvedIo = resolveExplicitStepIo(stepId, step, objectIndex);
+  const resolvedIo = resolveExplicitStepIo(stepId, step, objectIndex, externalTargetIndex);
   const diagnostics = [...resolvedParams.diagnostics, ...resolvedIo.diagnostics];
 
   return {
@@ -206,14 +212,15 @@ const buildMissingExplicitProcedureResult = (node: ProcedureNode): ProcedureLowe
 
 const buildExplicitProcedureResult = (
   node: ProcedureNode,
-  objectIndex?: Map<string, ObjectNode>
+  objectIndex?: Map<string, ObjectNode>,
+  externalTargetIndex?: ExternalTargetIndex
 ): ExplicitProcedureResult => {
   const diagnostics: V03Diagnostic[] = [];
   const quantities: QuantityType[] = [];
   const steps: CanonicalStepNode[] = [];
 
   node.steps?.forEach((step, index) => {
-    const converted = toExplicitStep({ node, stepIndex: index, step, objectIndex });
+    const converted = toExplicitStep({ node, stepIndex: index, step, objectIndex, externalTargetIndex });
     diagnostics.push(...converted.diagnostics);
     quantities.push(...converted.quantities);
     if (converted.step) {
@@ -238,14 +245,15 @@ const buildExplicitProcedureResult = (
 export const resolveProcedureSteps = (
   node: ProcedureNode,
   procedureMode: ProcedureMode,
-  objectIndex?: Map<string, ObjectNode>
+  objectIndex?: Map<string, ObjectNode>,
+  externalTargetIndex?: ExternalTargetIndex
 ): ExplicitProcedureResult => {
   if (procedureMode === "lowered") {
     return { result: lowerProcedureToSteps({ procedureId: node.id, body: node.body }), quantities: [] };
   }
 
   if (node.steps && node.steps.length > 0) {
-    return buildExplicitProcedureResult(node, objectIndex);
+    return buildExplicitProcedureResult(node, objectIndex, externalTargetIndex);
   }
 
   if (procedureMode === "explicit") {

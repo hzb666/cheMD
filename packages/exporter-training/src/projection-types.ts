@@ -737,6 +737,9 @@ export interface TrainingCampaignRunV1 {
   result_entity_id?: string;
   series_key: string;
   date: string;
+  reaction_signature?: string;
+  reaction_family?: TrainingReactionFamilyV1;
+  procedure_signature?: string;
   changed_variables: TrainingExperimentVariableDeltaV1[];
   controlled_variables: string[];
   status_label?: TrainingOutcomeLogicV1["status_label"];
@@ -746,13 +749,22 @@ export interface TrainingCampaignRunV1 {
   evidence_entity_ids: string[];
 }
 
+export type TrainingCampaignTrajectoryKindV1 =
+  | "optimization"
+  | "procedure_template"
+  | "substrate_expansion";
+
 export interface TrainingCrossDocumentTrajectoryV1 {
   trajectory_id: string;
+  trajectory_kind: TrainingCampaignTrajectoryKindV1;
   series_key: string;
   document_ids: string[];
+  reaction_family?: TrainingReactionFamilyV1;
+  procedure_signature?: string;
   baseline_run_id?: string;
   best_run_id?: string;
   runs: TrainingCampaignRunV1[];
+  shared_features: string[];
   strategy_labels: string[];
   rationale: string[];
   warnings: string[];

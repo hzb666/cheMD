@@ -1,5 +1,5 @@
 import { parseChemd } from "@chemd/parser";
-import type { ChemdDocument, ReactionRouteContext, RenderSelection } from "@chemd/core";
+import type { ChemdDocument, ReactionRouteContext, ReferenceContext, RenderSelection } from "@chemd/core";
 import {
   buildRagExportFromTrainingRecord,
   buildTrainingUnderstandingFromRecord,
@@ -108,6 +108,7 @@ export interface CompileOptions {
   renderSelection?: RenderSelection;
   strictChemdKind?: boolean;
   procedureMode?: "auto" | "explicit" | "lowered";
+  referenceContext?: ReferenceContext;
   reactionRouteContext?: ReactionRouteContext;
 }
 
@@ -143,6 +144,7 @@ export const compileChemd = (source: string, options: CompileOptions = {}): Comp
   const resolvedDocument = resolveChemd(parsedDocument);
   const typecheckResult = typecheckDocument(resolvedDocument, {
     procedureMode: options.procedureMode,
+    referenceContext: options.referenceContext,
     reactionRouteContext: options.reactionRouteContext
   });
   const semanticDocument = typecheckResult.diagnostics.length

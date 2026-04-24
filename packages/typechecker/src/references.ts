@@ -1,6 +1,17 @@
-import { buildScopedReferenceId, parseReferenceId, stripReferencePrefix } from "@chemd/core";
+import {
+  buildScopedReferenceId,
+  parseReferenceId,
+  stripReferencePrefix,
+  type ReactionRouteContext,
+  type ReferenceContext
+} from "@chemd/core";
 
-import type { ObjectNode, ReferenceOrLiteral, ReferenceType } from "./types";
+import type {
+  ExternalTargetIndex,
+  ObjectNode,
+  ReferenceOrLiteral,
+  ReferenceType
+} from "./types";
 
 const TARGET_KIND_BY_NODE_TYPE: Record<string, ReferenceType["targetKind"]> = {
   molecule: "molecule",
@@ -45,15 +56,37 @@ export const createObjectIndex = (
       })
   );
 
+export const createExternalTargetIndex = (
+  referenceContext?: ReferenceContext,
+  reactionRouteContext?: ReactionRouteContext
+): ExternalTargetIndex =>
+  new Map(
+    [
+      ...(referenceContext?.externalTargets ?? []).map((target) => ({
+        ...target,
+        refId: stripReferencePrefix(target.refId)
+      })),
+      ...(reactionRouteContext?.externalReactions ?? []).map((target) => ({
+        ...target,
+        refId: stripReferencePrefix(target.refId),
+        targetKind: "reaction" as const
+      }))
+    ]
+      .filter((target) => target.refId.length > 0)
+      .map((target) => [target.refId, target] as const)
+  );
+
 export const toReferenceOrLiteral = (
   raw: string,
-  objectIndex: Map<string, ObjectNode>
+  objectIndex: Map<string, ObjectNode>,
+  externalTargetIndex?: ExternalTargetIndex
 ): ReferenceOrLiteral => {
   const refId = stripReferencePrefix(raw);
   const target = objectIndex.get(refId);
+  const externalTarget = externalTargetIndex?.get(refId);
   const isAttempt = !target && findConditionVariationAttempt(refId, objectIndex);
 
-  if (!raw.startsWith("@") && !target) {
+  if (!raw.startsWith("@") && !target && !externalTarget) {
     return isAttempt
       ? {
           kind: "reference",
@@ -69,7 +102,9 @@ export const toReferenceOrLiteral = (
     refId,
     targetKind: target
       ? TARGET_KIND_BY_NODE_TYPE[target.type] ?? "unknown"
+      : externalTarget
+        ? externalTarget.targetKind
       : isAttempt ? "condition_variation_attempt" : "unknown",
-    resolved: Boolean(target) || isAttempt
+    resolved: Boolean(target) || Boolean(externalTarget) || isAttempt
   };
 };

@@ -17,10 +17,11 @@ import {
 import { buildTypedObservationEventNodes, buildTypedStepNode } from "./graph-nodes";
 import { resolveObservationEvents, validateObservationEventLinks } from "./observations";
 import { augmentReactionRouteGraph } from "./reaction-routes";
-import { createObjectIndex } from "./references";
+import { createExternalTargetIndex, createObjectIndex } from "./references";
 import { resolveProcedureSteps } from "./steps";
 import { collectNodes, isObjectNode } from "./traversal";
 import type {
+  ExternalTargetIndex,
   ObjectNode,
   ProcedureMode,
   QuantityType,
@@ -45,15 +46,16 @@ interface Accumulator {
 interface ProcedureProcessContext {
   accumulator: Accumulator;
   objectIndex: Map<string, ObjectNode>;
+  externalTargetIndex: ExternalTargetIndex;
   procedureMode: ProcedureMode;
 }
 
 interface ObjectProcessContext {
   documentId: string;
   objectIndex: Map<string, ObjectNode>;
+  externalTargetIndex: ExternalTargetIndex;
   accumulator: Accumulator;
   procedureMode: ProcedureMode;
-  options: TypecheckOptions;
 }
 
 const createAccumulator = (): Accumulator => ({
@@ -77,7 +79,12 @@ const processProcedure = (
   context: ProcedureProcessContext
 ) => {
   const { accumulator, objectIndex, procedureMode } = context;
-  const { result: lowered, quantities } = resolveProcedureSteps(node, procedureMode, objectIndex);
+  const { result: lowered, quantities } = resolveProcedureSteps(
+    node,
+    procedureMode,
+    objectIndex,
+    context.externalTargetIndex
+  );
 
   accumulator.procedureResults.push(lowered);
   accumulator.quantities.push(...quantities);
@@ -98,10 +105,10 @@ const processObjectNode = (
   node: ObjectNode,
   context: ObjectProcessContext
 ) => {
-  const { accumulator, documentId, objectIndex, procedureMode, options } = context;
+  const { accumulator, documentId, objectIndex, externalTargetIndex, procedureMode } = context;
 
   if (node.type === "procedure") {
-    processProcedure(node, { accumulator, objectIndex, procedureMode });
+    processProcedure(node, { accumulator, objectIndex, externalTargetIndex, procedureMode });
     return;
   }
 
@@ -110,44 +117,44 @@ const processObjectNode = (
     return;
   }
 
-  appendBuiltNode(accumulator, buildTypedObjectNode(node, documentId, objectIndex, options));
+  appendBuiltNode(accumulator, buildTypedObjectNode(node, documentId, objectIndex, externalTargetIndex));
 };
 
 const buildTypedObjectNode = (
   node: Exclude<ObjectNode, { type: "procedure" | "observation" }>,
   documentId: string,
   objectIndex: Map<string, ObjectNode>,
-  options: TypecheckOptions
+  externalTargetIndex: ExternalTargetIndex
 ): BuiltTypedNode => {
   if (node.type === "molecule") {
-    return buildMoleculeNode(node, { documentId, objectIndex });
+    return buildMoleculeNode(node, { documentId, objectIndex, externalTargetIndex });
   }
 
   if (node.type === "reaction") {
     return buildReactionNode(node, {
       documentId,
       objectIndex,
-      routeContext: options.reactionRouteContext
+      externalTargetIndex
     });
   }
 
   if (node.type === "result") {
-    return buildResultNode(node, { documentId, objectIndex });
+    return buildResultNode(node, { documentId, objectIndex, externalTargetIndex });
   }
 
   if (node.type === "analysis") {
-    return buildAnalysisNode(node, { documentId, objectIndex });
+    return buildAnalysisNode(node, { documentId, objectIndex, externalTargetIndex });
   }
 
   if (node.type === "sample") {
-    return buildSampleNode(node, { documentId, objectIndex });
+    return buildSampleNode(node, { documentId, objectIndex, externalTargetIndex });
   }
 
   if (node.type === "condition_varies") {
-    return buildConditionVariesNode(node, { documentId, objectIndex });
+    return buildConditionVariesNode(node, { documentId, objectIndex, externalTargetIndex });
   }
 
-  return buildArtifactNode(node, { documentId, objectIndex });
+  return buildArtifactNode(node, { documentId, objectIndex, externalTargetIndex });
 };
 
 const buildStepGraph = (accumulator: Accumulator): StepGraph => ({
@@ -163,6 +170,7 @@ export const typecheckDocument = (
 ): TypecheckResult => {
   const objectNodes = collectNodes(document.children).filter(isObjectNode);
   const objectIndex = createObjectIndex(document.meta.id, objectNodes);
+  const externalTargetIndex = createExternalTargetIndex(options.referenceContext, options.reactionRouteContext);
   const accumulator = createAccumulator();
   const procedureMode = options.procedureMode ?? "auto";
 
@@ -170,9 +178,9 @@ export const typecheckDocument = (
     processObjectNode(node, {
       documentId: document.meta.id,
       objectIndex,
+      externalTargetIndex,
       accumulator,
-      procedureMode,
-      options
+      procedureMode
     });
   }
 
@@ -180,7 +188,7 @@ export const typecheckDocument = (
     documentId: document.meta.id,
     nodes: accumulator.nodes,
     objectIndex,
-    routeContext: options.reactionRouteContext
+    externalTargetIndex
   });
   accumulator.nodes = routeAugmentation.nodes;
   accumulator.diagnostics.push(...routeAugmentation.diagnostics);

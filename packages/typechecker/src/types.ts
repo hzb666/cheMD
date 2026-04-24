@@ -4,7 +4,9 @@ import type {
   ChemdDocument,
   ChemdNode,
   ConditionVariesNode,
+  ExternalReferenceTarget,
   ReactionRouteContext,
+  ReferenceContext,
   ReferenceTargetKind,
   MoleculeNode,
   ObservationNode,
@@ -244,8 +246,11 @@ export type ProcedureMode = "auto" | "explicit" | "lowered";
 
 export interface TypecheckOptions {
   procedureMode?: ProcedureMode;
+  referenceContext?: ReferenceContext;
   reactionRouteContext?: ReactionRouteContext;
 }
+
+export type ExternalTargetIndex = Map<string, ExternalReferenceTarget>;
 
 export interface QuantityParseContext {
   sourceNodeType: string;

@@ -311,6 +311,150 @@ products: y
   });
 });
 
+describe("cross-document structured references", () => {
+  it("resolves scoped references across result analysis sample artifact and condition blocks", () => {
+    const document = resolveChemd(parseChemd(`---
+id: exp-cross-doc-refs
+title: Cross doc refs
+date: 2026-04-24
+---
+
+:::result #res-main
+reaction: ext-doc#rxn-main
+product: ext-doc#mol-product
+yield: 72%
+:::
+
+:::analysis #ana-main
+type: tlc
+ref: ext-doc#cva-screen.var1
+:::
+
+:::sample #sample-main
+ref: ext-doc#res-main
+derived_from: ext-doc#rxn-main
+aliquot_of: ext-doc#sample-parent
+batch_of: ext-doc#sample-batch
+artifacts: ext-doc#art-main
+:::
+
+:::artifact #art-main
+kind: tlc_image
+ref: ext-doc#ana-main
+:::
+
+:::condition-varies #cv-main
+reaction: ext-doc#rxn-main
+standard: ext-doc#rxn-standard
+var1: reaction=ext-doc#rxn-variant | solvent=MeCN
+res1: ext-doc#res-main
+:::
+`));
+
+    const result = typecheckDocument(document, {
+      referenceContext: {
+        externalTargets: [
+          { refId: "ext-doc#rxn-main", targetKind: "reaction" },
+          { refId: "ext-doc#rxn-standard", targetKind: "reaction" },
+          { refId: "ext-doc#rxn-variant", targetKind: "reaction" },
+          { refId: "ext-doc#mol-product", targetKind: "molecule" },
+          { refId: "ext-doc#res-main", targetKind: "result" },
+          { refId: "ext-doc#ana-main", targetKind: "analysis" },
+          { refId: "ext-doc#sample-parent", targetKind: "sample" },
+          { refId: "ext-doc#sample-batch", targetKind: "sample" },
+          { refId: "ext-doc#art-main", targetKind: "artifact" },
+          { refId: "ext-doc#cva-screen.var1", targetKind: "condition_variation_attempt" }
+        ]
+      }
+    });
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.typedGraph.nodes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: "result",
+        reaction: expect.objectContaining({
+          kind: "reference",
+          refId: "ext-doc#rxn-main",
+          targetKind: "reaction",
+          resolved: true
+        }),
+        product: expect.objectContaining({
+          kind: "reference",
+          refId: "ext-doc#mol-product",
+          targetKind: "molecule",
+          resolved: true
+        })
+      }),
+      expect.objectContaining({
+        kind: "analysis",
+        ref: expect.objectContaining({
+          kind: "reference",
+          refId: "ext-doc#cva-screen.var1",
+          targetKind: "condition_variation_attempt",
+          resolved: true
+        })
+      }),
+      expect.objectContaining({
+        kind: "sample",
+        ref: expect.objectContaining({ refId: "ext-doc#res-main", targetKind: "result", resolved: true }),
+        derivedFrom: expect.objectContaining({ refId: "ext-doc#rxn-main", targetKind: "reaction", resolved: true }),
+        aliquotOf: expect.objectContaining({ refId: "ext-doc#sample-parent", targetKind: "sample", resolved: true }),
+        batchOf: expect.objectContaining({ refId: "ext-doc#sample-batch", targetKind: "sample", resolved: true }),
+        artifacts: [expect.objectContaining({ refId: "ext-doc#art-main", targetKind: "artifact", resolved: true })]
+      }),
+      expect.objectContaining({
+        kind: "artifact",
+        ref: expect.objectContaining({
+          kind: "reference",
+          refId: "ext-doc#ana-main",
+          targetKind: "analysis",
+          resolved: true
+        })
+      }),
+      expect.objectContaining({
+        kind: "condition_varies",
+        reaction: expect.objectContaining({ refId: "ext-doc#rxn-main", targetKind: "reaction", resolved: true }),
+        standard: expect.objectContaining({ refId: "ext-doc#rxn-standard", targetKind: "reaction", resolved: true })
+      })
+    ]));
+  });
+
+  it("fails closed when a scoped external target kind does not match the field contract", () => {
+    const document = resolveChemd(parseChemd(`---
+id: exp-cross-doc-mismatch
+title: Cross doc mismatch
+date: 2026-04-24
+---
+
+:::result #res-main
+product: ext-doc#sample-main
+:::
+`));
+
+    const result = typecheckDocument(document, {
+      referenceContext: {
+        externalTargets: [
+          { refId: "ext-doc#sample-main", targetKind: "sample" }
+        ]
+      }
+    });
+
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: "E_TYPED_REFERENCE_MISMATCH",
+        sourceNodeId: "res-main",
+        sourceField: "product",
+        facts: expect.objectContaining({
+          ref_id: "ext-doc#sample-main",
+          expected_target_kind: "molecule",
+          actual_target_kind: "sample",
+          resolved: true
+        })
+      })
+    ]));
+  });
+});
+
 describe("typed artifacts and sample lineage", () => {
   it("adds artifact nodes and resolves sample lineage references", () => {
     const document = resolveChemd(parseChemd(`---

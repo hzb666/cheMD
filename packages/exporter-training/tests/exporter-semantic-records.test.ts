@@ -6,6 +6,7 @@ import { resolveChemd } from "@chemd/resolver";
 import { typecheckDocument } from "@chemd/typechecker";
 
 import {
+  buildTrainingUnderstandingFromRecord,
   exportTrainingRecordFromDocument
 } from "../src/index";
 
@@ -274,5 +275,120 @@ Linked notes mention @rxn-main and @res-main.yield.
       source_entity_ids: ["sam::exp-export-links::sample-crude"],
       text: expect.stringContaining("sampled before purification")
     }));
+  });
+});
+
+describe("training export semantic cross-document records", () => {
+  it("exports generic cross-document structured references into semantic links and understanding", () => {
+    const document = resolveChemd(parseChemd(`---
+id: exp-export-cross-doc
+title: Export cross doc refs
+date: 2026-04-24
+---
+
+:::result #res-local
+reaction: ext-doc#rxn-main
+status: success
+yield: 88%
+:::
+
+:::sample #sample-local
+derived_from: ext-doc#sample-parent
+name: carried sample
+:::
+
+:::artifact #art-local
+ref: ext-doc#res-main
+kind: spectrum_pdf
+path: data/result.pdf
+:::
+
+:::condition-varies #cv-local
+reaction: ext-doc#rxn-main
+standard: ext-doc#rxn-standard
+var1: reaction=ext-doc#rxn-variant | result=ext-doc#res-variant | solvent=MeCN
+:::
+
+:::analysis #ana-local
+type: tlc
+ref: ext-doc#cv-local.var1
+result: one spot
+:::
+`));
+    const checked = typecheckDocument(document, {
+      referenceContext: {
+        externalTargets: [
+          { refId: "ext-doc#rxn-main", targetKind: "reaction" },
+          { refId: "ext-doc#rxn-standard", targetKind: "reaction" },
+          { refId: "ext-doc#rxn-variant", targetKind: "reaction" },
+          { refId: "ext-doc#res-main", targetKind: "result" },
+          { refId: "ext-doc#res-variant", targetKind: "result" },
+          { refId: "ext-doc#sample-parent", targetKind: "sample" },
+          { refId: "ext-doc#cv-local.var1", targetKind: "condition_variation_attempt" }
+        ]
+      }
+    });
+    const record = exportTrainingRecordFromDocument(document, {
+      typedGraph: checked.typedGraph,
+      stepGraph: checked.stepGraph,
+      exportedAt: "2026-04-24T00:00:00.000Z"
+    });
+    const understanding = buildTrainingUnderstandingFromRecord(record);
+
+    expect(record.semantic_layer.links).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        relation_type: "result_describes_reaction",
+        from_entity_id: "res::exp-export-cross-doc::res-local",
+        to_entity_id: "rxn::ext-doc::rxn-main"
+      }),
+      expect.objectContaining({
+        relation_type: "sample_derived_from_sample",
+        from_entity_id: "sam::exp-export-cross-doc::sample-local",
+        to_entity_id: "sam::ext-doc::sample-parent"
+      }),
+      expect.objectContaining({
+        relation_type: "artifact_supports_result",
+        from_entity_id: "art::exp-export-cross-doc::art-local",
+        to_entity_id: "res::ext-doc::res-main"
+      }),
+      expect.objectContaining({
+        relation_type: "condition_variation_targets_reaction",
+        from_entity_id: "cv::exp-export-cross-doc::cv-local",
+        to_entity_id: "rxn::ext-doc::rxn-main"
+      }),
+      expect.objectContaining({
+        relation_type: "condition_variation_attempt_has_result",
+        from_entity_id: "cva::exp-export-cross-doc::cv-local.var1",
+        to_entity_id: "res::ext-doc::res-variant"
+      }),
+      expect.objectContaining({
+        relation_type: "analysis_targets_condition_variation_attempt",
+        from_entity_id: "ana::exp-export-cross-doc::ana-local",
+        to_entity_id: "cva::ext-doc::cv-local.var1"
+      })
+    ]));
+    expect(understanding.resolved_references).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        raw: "ext-doc#rxn-main",
+        source_entity_id: "res::exp-export-cross-doc::res-local",
+        source_field: "reaction",
+        target_entity_id: "rxn::ext-doc::rxn-main",
+        resolution_status: "resolved"
+      }),
+      expect.objectContaining({
+        raw: "ext-doc#cv-local.var1",
+        source_entity_id: "ana::exp-export-cross-doc::ana-local",
+        source_field: "ref",
+        target_entity_id: "cva::ext-doc::cv-local.var1",
+        relation_type: "analysis_targets_condition_variation_attempt",
+        resolution_status: "resolved"
+      })
+    ]));
+    expect(understanding.knowledge_graph.nodes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ node_id: "rxn::ext-doc::rxn-main", node_type: "reaction" }),
+      expect.objectContaining({ node_id: "sam::ext-doc::sample-parent", node_type: "sample" }),
+      expect.objectContaining({ node_id: "res::ext-doc::res-main", node_type: "result" }),
+      expect.objectContaining({ node_id: "cva::ext-doc::cv-local.var1", node_type: "condition_variation_attempt" })
+    ]));
   });
 });
