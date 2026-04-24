@@ -1278,3 +1278,51 @@ Added reaction-level route/prev semantics with inferred next edges, route diagno
 ### Next Steps
 
 - None - task complete
+
+
+## Session 31: Cross-doc refs and family aggregation
+
+**Date**: 2026-04-24
+**Task**: Cross-doc refs and family aggregation
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+(Add summary)
+
+### Main Changes
+
+| Area | Description |
+|------|-------------|
+| Cross-doc refs | Unified `referenceContext` handling across typechecker, compiler, semantic export, and resolved-reference projection for reaction/result/analysis/sample/artifact/condition-varies/attempt refs. |
+| External placeholders | Exporter-training now preserves generic external placeholder entities and knowledge-graph nodes for resolved cross-document structured refs, not only route reactions. |
+| Campaign aggregation | Added cross-document family aggregation with `trajectory_kind` values `optimization`, `procedure_template`, and `substrate_expansion`, plus `reaction_family`, `procedure_signature`, and `shared_features`. |
+| Tests | Added typechecker cross-doc structured-ref regression coverage and exporter-training semantic/campaign regression cases. |
+| Specs | Updated compiler and exporter-training Trellis contracts for shared scoped refs and family aggregation semantics. |
+
+**Validation**
+- `pnpm lint`
+- `pnpm typecheck`
+- `pnpm test`
+- `git diff --check`
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `10e1c14` | (see git log) |
+| `f3e03ae` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
