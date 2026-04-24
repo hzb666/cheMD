@@ -1360,3 +1360,37 @@ Added reaction-level route/prev semantics with inferred next edges, route diagno
 ### Next Steps
 
 - None - task complete
+
+
+## Session 33: 修复 develop 全面审查问题
+
+**Date**: 2026-04-24
+**Task**: 修复 develop 全面审查问题
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+修复 Postgres/RAG/route auth/CLI/OCR/Docker/gitignore 问题，并补齐被忽略的 docs/tests；验证 pnpm lint、pnpm typecheck、pnpm test、ruff、diff-check 通过。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b59bd43` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
