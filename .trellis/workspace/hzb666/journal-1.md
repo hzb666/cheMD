@@ -1243,3 +1243,38 @@ Added chemd syntax best-practice guidance, a compiler-validated golden experimen
 ### Next Steps
 
 - None - task complete
+
+
+## Session 30: Reaction route cross-doc linking
+
+**Date**: 2026-04-24
+**Task**: Reaction route cross-doc linking
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+Added reaction-level route/prev semantics with inferred next edges, route diagnostics, cross-document predecessor resolution, training export route links, and updated Trellis contracts. Verified with pnpm lint, pnpm typecheck, pnpm test, targeted package tests, and git diff --check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `50b507c` | (see git log) |
+| `4442658` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
