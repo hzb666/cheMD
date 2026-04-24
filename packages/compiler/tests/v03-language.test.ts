@@ -61,6 +61,18 @@ const goldenSource = readFileSync(
   new URL("../fixtures/golden-experiment-record.chemd.md", import.meta.url),
   "utf8"
 );
+const totalSynthesisSource = readFileSync(
+  new URL("../fixtures/best-practice-total-synthesis.chemd.md", import.meta.url),
+  "utf8"
+);
+const oneStepSynthesisSource = readFileSync(
+  new URL("../fixtures/best-practice-one-step-synthesis.chemd.md", import.meta.url),
+  "utf8"
+);
+const conditionScreenSource = readFileSync(
+  new URL("../fixtures/best-practice-condition-screen.chemd.md", import.meta.url),
+  "utf8"
+);
 
 describe("chemd-lang v0.3 compiler integration", () => {
   it("keeps the author surface intact and exposes semantic artifacts", () => {
@@ -187,5 +199,109 @@ describe("chemd-lang v0.3 compiler integration", () => {
         })
       ])
     );
+  });
+
+  it("compiles the total synthesis best-practice fixture and infers route edges", () => {
+    const result = compileChemd(totalSynthesisSource, {
+      strictChemdKind: true,
+      reactionRouteContext: {
+        externalReactions: [{
+          refId: "report-step-08#rxn-step-08",
+          routeId: "route-taxol-a",
+          prevRefIds: ["exp-total-synthesis-step-07#rxn-step-07"]
+        }]
+      }
+    });
+    const diagnostics = result.diagnostics.filter((diagnostic) => diagnostic.severity === "error");
+    const step = result.typedSemanticGraph.nodes.find((node) =>
+      node.kind === "reaction" && node.nodeId === "rxn-step-07"
+    );
+
+    expect(diagnostics).toHaveLength(0);
+    expect(step).toMatchObject({
+      route: "route-taxol-a",
+      prev: [expect.objectContaining({
+        refId: "rxn-step-06",
+        targetKind: "reaction",
+        resolved: true
+      })],
+      next: [expect.objectContaining({
+        refId: "report-step-08#rxn-step-08",
+        targetKind: "reaction",
+        resolved: true
+      })]
+    });
+    expect(result.trainingExport.semantic_layer.links).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        relation_type: "reaction_depends_on_reaction",
+        from_entity_id: "rxn::exp-total-synthesis-step-07::rxn-step-07",
+        to_entity_id: "rxn::exp-total-synthesis-step-07::rxn-step-06"
+      }),
+      expect.objectContaining({
+        relation_type: "reaction_precedes_reaction",
+        from_entity_id: "rxn::exp-total-synthesis-step-07::rxn-step-07",
+        to_entity_id: "rxn::report-step-08::rxn-step-08"
+      })
+    ]));
+    expect(result.diagnostics).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: "W_AUTHORING_INPUT_REQUIRED"
+      })
+    ]));
+  });
+
+  it("compiles the one-step synthesis best-practice fixture", () => {
+    const result = compileChemd(oneStepSynthesisSource, { strictChemdKind: true });
+    const diagnostics = result.diagnostics.filter((diagnostic) => diagnostic.severity === "error");
+
+    expect(diagnostics).toHaveLength(0);
+    expect(result.trainingExport.semantic_layer.links).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        relation_type: "artifact_supports_result",
+        from_entity_id: "art::exp-one-step-esterification::art-nmr-main",
+        to_entity_id: "res::exp-one-step-esterification::res-main"
+      })
+    ]));
+    expect(result.trainingUnderstanding.procedure_logic.procedure_to_steps[0]?.steps).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          stepId: "s-heat",
+          family: "heat"
+        }),
+        expect.objectContaining({
+          stepId: "s-purify",
+          family: "purify"
+        })
+      ])
+    );
+  });
+
+  it("compiles the condition screen best-practice fixture", () => {
+    const result = compileChemd(conditionScreenSource, { strictChemdKind: true });
+    const diagnostics = result.diagnostics.filter((diagnostic) => diagnostic.severity === "error");
+
+    expect(diagnostics).toHaveLength(0);
+    expect(result.trainingExport.semantic_layer.condition_variations).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        original_id: "cv-screen",
+        standard_ref_raw: "rxn-standard",
+        attempt_entity_ids: expect.arrayContaining([
+          "cva::exp-condition-screen::cv-screen.var1",
+          "cva::exp-condition-screen::cv-screen.var2"
+        ])
+      })
+    ]));
+    expect(result.trainingExport.semantic_layer.links).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        relation_type: "analysis_targets_condition_variation_attempt",
+        from_entity_id: "ana::exp-condition-screen::ana-tlc-var1",
+        to_entity_id: "cva::exp-condition-screen::cv-screen.var1"
+      }),
+      expect.objectContaining({
+        relation_type: "condition_variation_attempt_has_result",
+        from_entity_id: "cva::exp-condition-screen::cv-screen.var1",
+        to_entity_id: "res::exp-condition-screen::res-var1"
+      })
+    ]));
   });
 });

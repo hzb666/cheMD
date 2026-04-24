@@ -32,12 +32,15 @@ result: one major spot
 
     expect(result.stoppedReason).toBe("clean");
     expect(result.changed).toBe(true);
-    expect(result.totalAppliedSafeFixes).toHaveLength(2);
+    expect(result.totalAppliedSafeFixes).toHaveLength(5);
     expect(result.iterations).toHaveLength(2);
     expect(result.iterations[0]).toMatchObject({
       iteration: 1,
       appliedSafeFixes: expect.arrayContaining([
+        expect.objectContaining({ sourceField: "primary_reaction" }),
+        expect.objectContaining({ sourceField: "primary_result" }),
         expect.objectContaining({ sourceNodeId: "res-main" }),
+        expect.objectContaining({ sourceNodeId: "res-main", sourceField: "product" }),
         expect.objectContaining({ sourceNodeId: "ana-main" })
       ])
     });
@@ -63,8 +66,9 @@ products: product
     });
 
     expect(result.stoppedReason).toBe("needs_author_input");
-    expect(result.changed).toBe(false);
-    expect(result.totalAppliedSafeFixes).toHaveLength(0);
+    expect(result.changed).toBe(true);
+    expect(result.totalAppliedSafeFixes).toHaveLength(1);
+    expect(result.finalSource).toContain("primary_reaction: rxn-main");
     expect(result.finalResult.diagnosis.requiredInputs).toContainEqual(expect.objectContaining({
       checklistId: "basic-experiment-record"
     }));
@@ -102,5 +106,94 @@ result: one major spot
     expect(result.changed).toBe(false);
     expect(result.totalAppliedSafeFixes).toHaveLength(0);
     expect(result.finalResult.diagnosis.status).toBe("fixable");
+  });
+
+  it("canonicalizes missing chemd kind before finishing the repair loop", () => {
+    const source = `---
+id: exp-repair-loop-kind
+title: Repair loop kind
+date: 2026-04-24
+---
+
+:::chemd #rxn-main
+reactants: substrate
+products: product
+:::
+
+:::result #res-main
+status: success
+yield: 72%
+:::`;
+    const result = runChemdRepairLoop(source, {
+      compileOptions: { strictChemdKind: true }
+    });
+
+    expect(result.stoppedReason).toBe("clean");
+    expect(result.changed).toBe(true);
+    expect(result.finalSource).toContain("kind: reaction");
+    expect(result.finalSource).toContain("ref: rxn-main");
+    expect(result.totalAppliedSafeFixes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        diagnosticCode: "W_CHEMD_KIND_AMBIGUOUS",
+        sourceNodeId: "rxn-main"
+      }),
+      expect.objectContaining({
+        diagnosticCode: "W_AUTHORING_FIX_AVAILABLE",
+        sourceNodeId: "res-main"
+      })
+    ]));
+  });
+
+  it("canonicalizes condition screen standard, baseline, varies, and result pairing", () => {
+    const source = `---
+id: exp-repair-loop-condition
+title: Repair loop condition
+date: 2026-04-24
+---
+
+:::chemd #rxn-standard
+kind: reaction
+reactants: substrate
+products: product
+solvent: THF
+temperature: 25 C
+catalyst: Pd
+:::
+
+:::chemd #rxn-var1
+kind: reaction
+reactants: substrate
+products: product
+solvent: MeCN
+temperature: 40 C
+catalyst: Pd
+:::
+
+:::result #res-var1
+ref: rxn-var1
+status: success
+yield: 81%
+:::
+
+:::condition-varies #cv-screen
+var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
+:::
+`;
+    const result = runChemdRepairLoop(source, {
+      compileOptions: { strictChemdKind: true },
+      maxIterations: 5
+    });
+
+    expect(result.stoppedReason).toBe("clean");
+    expect(result.finalSource).toContain("standard: rxn-standard");
+    expect(result.finalSource).toContain("condition: solvent=THF | temperature=25 C | catalyst=Pd");
+    expect(result.finalSource).toContain("varies: solvent | temperature");
+    expect(result.finalSource).toContain("res1: res-var1");
+    expect(result.totalAppliedSafeFixes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ sourceNodeId: "cv-screen", sourceField: "standard" }),
+      expect.objectContaining({ sourceNodeId: "cv-screen", sourceField: "condition" }),
+      expect.objectContaining({ sourceNodeId: "cv-screen", sourceField: "varies" }),
+      expect.objectContaining({ sourceNodeId: "cv-screen", sourceField: "res1" })
+    ]));
   });
 });

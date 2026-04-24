@@ -67,6 +67,11 @@ export const buildAuthoringMinimalSets = (
   semanticLayer: ChemdTrainingExportV2["semantic_layer"],
   suggestions: AuthoringSuggestion[]
 ): AuthoringMinimalSet[] => {
+  const hasRouteGraphSemantics = semanticLayer.reactions.some((reaction) =>
+    typeof reaction.route_raw === "string"
+    || (reaction.prev_refs_raw?.length ?? 0) > 0
+    || (reaction.next_refs_raw?.length ?? 0) > 0
+  );
   const referenceNodes = collectReferenceNodes(document);
   const basicMissing = [
     ...(semanticLayer.reactions.length === 0 ? ["至少一个 reaction 块"] : []),
@@ -101,7 +106,8 @@ export const buildAuthoringMinimalSets = (
         )
       })
     : null;
-  const conditionVariationsPresent = semanticLayer.condition_variations.length > 0 || semanticLayer.reactions.length > 1;
+  const conditionVariationsPresent = semanticLayer.condition_variations.length > 0
+    || (semanticLayer.reactions.length > 1 && !hasRouteGraphSemantics);
   const conditionSet = conditionVariationsPresent
     ? createMinimalSet({
         checklist_id: "condition-optimization",

@@ -33,6 +33,11 @@ export type AuthoringPatch =
       blockId: string;
       line: string;
       anchorFields?: string[];
+    }
+  | {
+      kind: "insert_frontmatter_line";
+      line: string;
+      anchorFields?: string[];
     };
 
 export interface AuthoringSuggestion {

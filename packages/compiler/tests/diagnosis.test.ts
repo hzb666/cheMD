@@ -34,7 +34,7 @@ result: one major spot
     expect(firstPass.diagnosis).toMatchObject({
       status: "fixable",
       summary: {
-        safeFixCount: 2,
+        safeFixCount: 5,
         requiredInputCount: 0,
         manualReviewCount: 0
       },
@@ -48,6 +48,19 @@ result: one major spot
       expect.objectContaining({
         diagnosticCode: "W_AUTHORING_FIX_AVAILABLE",
         sourceNodeId: "ana-main"
+      }),
+      expect.objectContaining({
+        diagnosticCode: "W_AUTHORING_FIX_AVAILABLE",
+        sourceField: "primary_reaction"
+      }),
+      expect.objectContaining({
+        diagnosticCode: "W_AUTHORING_FIX_AVAILABLE",
+        sourceField: "primary_result"
+      }),
+      expect.objectContaining({
+        diagnosticCode: "W_AUTHORING_FIX_AVAILABLE",
+        sourceNodeId: "res-main",
+        sourceField: "product"
       })
     ]));
 
@@ -74,12 +87,12 @@ products: product
     const result = compileChemd(source);
 
     expect(result.diagnosis).toMatchObject({
-      status: "needs_author_input",
+      status: "mixed",
       summary: {
-        safeFixCount: 0,
+        safeFixCount: 1,
         requiredInputCount: 1
       },
-      nextActions: ["ask_for_required_inputs"]
+      nextActions: ["apply_safe_fixes", "recompile", "ask_for_required_inputs"]
     });
     expect(result.diagnosis.requiredInputs).toContainEqual(expect.objectContaining({
       checklistId: "basic-experiment-record",
@@ -110,5 +123,48 @@ smiles: CCO
       diagnosticCode: "E_CHEMD_KIND_CONFLICT",
       severity: "error"
     }));
+  });
+
+  it("treats missing chemd kind as a safe canonicalization fix", () => {
+    const source = `---
+id: exp-diagnosis-kind
+title: Diagnosis kind
+date: 2026-04-24
+---
+
+:::chemd #rxn-main
+reactants: substrate
+products: product
+:::
+
+:::result #res-main
+ref: rxn-main
+status: success
+yield: 72%
+:::`;
+    const firstPass = compileChemd(source, {
+      strictChemdKind: true
+    });
+
+    expect(firstPass.diagnosis).toMatchObject({
+      status: "fixable",
+      summary: {
+        safeFixCount: 4,
+        requiredInputCount: 0,
+        manualReviewCount: 0
+      }
+    });
+    expect(firstPass.diagnosis.safeFixes).toContainEqual(expect.objectContaining({
+      diagnosticCode: "W_CHEMD_KIND_AMBIGUOUS",
+      sourceNodeId: "rxn-main"
+    }));
+
+    const fixedSource = applyCompilerDiagnosisSafeFixes(source, firstPass.diagnosis);
+    const secondPass = compileChemd(fixedSource, {
+      strictChemdKind: true
+    });
+
+    expect(fixedSource).toContain("kind: reaction");
+    expect(secondPass.diagnosis.status).toBe("clean");
   });
 });

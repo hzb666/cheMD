@@ -170,7 +170,7 @@ poetry run python -m unittest discover
 
 | Block | 作用 |
 | --- | --- |
-| `:::chemd` | Molecule 或 reaction block，使用显式 `kind` |
+| `:::chemd` | Molecule 或 reaction block，推荐显式 `kind`，也可省略并由编译器补全 |
 | `:::result` | Outcome status、yield、conversion、selectivity、purity、notes |
 | `:::analysis` | Analysis records 和 TLC-style lane data |
 | `:::sample` | Sample metadata 与 lineage references |
@@ -224,10 +224,12 @@ purity: 91%
 Yield: @res-main.yield
 ```
 
-更完整的写作规范与 golden record 示例见：
+更完整的写作规范与 companion fixture 示例见：
 
 - `docs/chemd-syntax-best-practices.zh-CN.md`
-- `packages/compiler/fixtures/golden-experiment-record.chemd.md`
+- `packages/compiler/fixtures/best-practice-total-synthesis.chemd.md`
+- `packages/compiler/fixtures/best-practice-one-step-synthesis.chemd.md`
+- `packages/compiler/fixtures/best-practice-condition-screen.chemd.md`
 
 ## 编译流水线
 

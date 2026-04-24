@@ -33,6 +33,10 @@ const isAuthoringPatch = (value: unknown): value is AuthoringPatch => {
     return typeof value.blockId === "string" && typeof value.line === "string";
   }
 
+  if (value.kind === "insert_frontmatter_line") {
+    return typeof value.line === "string";
+  }
+
   if (value.kind === "batch") {
     return Array.isArray(value.patches) && value.patches.every((item) => isAuthoringPatch(item));
   }

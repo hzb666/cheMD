@@ -28,6 +28,7 @@ const readSourceField = (patch: AuthoringPatch): string | undefined => {
   }
 
   return patch.kind === "insert_field_line"
+    || patch.kind === "insert_frontmatter_line"
     ? readFieldFromLine(patch.line)
     : undefined;
 };

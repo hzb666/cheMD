@@ -1,0 +1,110 @@
+---
+id: exp-total-synthesis-step-07
+title: Total synthesis step 07
+date: 2026-04-24
+primary_reaction: rxn-step-07
+primary_result: res-step-07
+---
+
+:::chemd #mol-step-06
+kind: molecule
+name: step 06 intermediate
+smiles: CC(C)(C)[Si](C)(C)OCC1OC(CO)C(O)C(O)C1O
+role: substrate
+:::
+
+:::chemd #mol-step-05
+kind: molecule
+name: step 05 intermediate
+smiles: OCC1OC(CO)C(O)C(O)C1O
+role: substrate
+:::
+
+:::chemd #mol-step-07
+kind: molecule
+name: protected intermediate
+smiles: CC(C)(C)[Si](C)(C)OCC1OC(CO)C(O)C(O)C1OTBDMS
+role: product
+:::
+
+:::chemd #rxn-step-06
+kind: reaction
+name: Step 06 intermediate preparation
+route: route-taxol-a
+reactants: @mol-step-05
+products: @mol-step-06
+reagents: TBDMSCl
+solvent: DMF
+temperature: 25 C
+time: 2 h
+:::
+
+:::chemd #rxn-step-07
+kind: reaction
+name: C7 hydroxyl protection
+route: route-taxol-a
+prev: rxn-step-06
+reactants: @mol-step-06
+products: @mol-step-07
+reagents: TBSCl | imidazole
+solvent: DMF
+temperature: 25 C
+time: 3 h
+:::
+
+:::result #res-step-07
+ref: rxn-step-07
+product: @mol-step-07
+status: success
+yield: 81%
+purity: 96%
+:::
+
+:::procedure #proc-step-07
+ref: rxn-step-07
+reaction: rxn-step-07
+step: charge | id=s-charge | inputs=@mol-step-06 | confidence=0.97
+step: hold | id=s-hold | duration=3 h | dependsOn=s-charge | confidence=0.95
+step: sample | id=s-sample | outputs=@sample-aliquot-step-07 | dependsOn=s-hold | confidence=0.93
+step: purify | id=s-purify | outputs=@sample-product-step-07 | dependsOn=s-hold | confidence=0.91
+:::
+
+:::analysis #ana-tlc-step-07
+type: tlc
+ref: rxn-step-07
+time: 3 h
+eluent: PE/EA = 3:1
+plate: silica gel GF254
+visualization: UV 254 nm
+result: starting material mostly consumed, product spot dominant
+data: TLC monitoring before workup.
+p1: sm 0.36
+p2: crude 0.58 | sm-trace(0.37)
+p3: product-std 0.57
+:::
+
+:::sample #sample-batch-step-07
+ref: rxn-step-07
+name: crude step 07 batch
+derived_from: rxn-step-07
+:::
+
+:::sample #sample-aliquot-step-07
+ref: rxn-step-07
+name: TLC aliquot for step 07
+aliquot_of: sample-batch-step-07
+:::
+
+:::sample #sample-product-step-07
+ref: res-step-07
+name: purified protected intermediate
+derived_from: sample-batch-step-07
+artifacts: art-nmr-step-07
+:::
+
+:::artifact #art-nmr-step-07
+kind: nmr_spectrum
+ref: res-step-07
+path: data/nmr/step-07.pdf
+notes: Purified intermediate spectrum.
+:::

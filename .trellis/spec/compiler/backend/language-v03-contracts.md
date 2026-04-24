@@ -159,6 +159,7 @@ Route graphs and optimization graphs are separate contracts:
 - `condition-varies` stays the contract for condition screening / optimization.
 - `reaction.route` + `reaction.prev` is the contract for total synthesis / stepwise route dependency.
 - Do not overload `condition-varies` attempts to represent synthesis-step order.
+- Compiler authoring minimal-set diagnostics must not treat a multi-reaction route document as an implicit condition screen just because it contains more than one reaction; route semantics suppress the `condition-optimization` checklist unless a real `condition-varies` graph exists.
 
 Cross-document route linking is opt-in and fail-closed:
 - `typecheckDocument(..., { referenceContext })` may resolve scoped refs such as
@@ -204,12 +205,14 @@ Good:
 - A procedure containing charge, purge, heat/cool, sample, analyze, quench, workup, filter, or isolate text lowers to canonical `CanonicalStepNode` entries.
 - `compileChemd(source).lnf.schemaVersion` is exactly `"chemd-lnf/v0.5"`.
 - `trainingExport.schema_version` is exactly `"chemd-training-export/v0.2"`.
-- `compileChemd(source).authoringAssistance` contains only conservative suggestions and grouped scaffolds: unique-target ref completions, attempt-targeted `@cv-id.varN` refs when unique, baseline inheritance hints, and explicit starter/scaffold templates.
+- `compileChemd(source).authoringAssistance` contains only conservative suggestions and grouped scaffolds: unique-target ref completions, product-owner `result.ref` completions, unique or result-derived `primary_reaction` / `primary_result` frontmatter completions, single-product `result.product` completions, attempt-targeted `@cv-id.varN` refs when unique, baseline inheritance hints, inferred `condition-varies.varies` fields from authored `varN` deltas, and explicit starter/scaffold templates.
 - `compileChemd(source).diagnostics` includes compiler authoring diagnostics for safe fixes and author-input-required summaries, so generated chemd can be validated without opening a separate authoring panel.
 - `compileChemd(source).diagnosis.status` is `fixable` when every actionable item has a deterministic quick fix, and `applyCompilerDiagnosisSafeFixes(source, result.diagnosis)` can drive a compile-fix-recompile loop.
+- Compiler diagnosis safe fixes may include `insert_frontmatter_line` patches for inferred primary aliases; these patches may only write unique, already-authored object ids.
 - `compileChemd(source, { reactionRouteContext })` resolves scoped predecessor refs,
   infers local/external `next` edges, and preserves route diagnostics in both
   `diagnostics` and `diagnosis.manualReviewItems`.
+- A route-oriented best-practice fixture with `reaction.route` / `reaction.prev` but no `condition-varies` block must not emit `W_AUTHORING_INPUT_REQUIRED` for the condition-optimization checklist.
 - `runChemdRepairLoop(source, { maxIterations: 5 })` records each compile pass, applies only safe fixes when progress exists, and stops with `stoppedReason: "clean"` once the final diagnosis is clean.
 - `runChemdAgentLoop(source, { agent, maxIterations: 3, repairMaxIterations: 5 })` records each repair stage plus the agent response, reaches `clean` after an agent rewrite, and reports loop reasons such as `needs_author_input` or `agent_stalled` when unresolved work remains.
 - `trainingExport.semantic_layer.lnf` matches the LNF returned by `compileChemd`.

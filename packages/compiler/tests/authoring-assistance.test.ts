@@ -43,7 +43,10 @@ Dark red solution formed.
     const assistance = result.authoringAssistance;
 
     expect(assistance.suggestions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ suggestion_id: "suggest-primary-reaction-rxn-main" }),
+      expect.objectContaining({ suggestion_id: "suggest-primary-result-res-main" }),
       expect.objectContaining({ suggestion_id: "suggest-result-ref-res-main" }),
+      expect.objectContaining({ suggestion_id: "suggest-result-product-res-main" }),
       expect.objectContaining({ suggestion_id: "suggest-analysis-ref-ana-main" }),
       expect.objectContaining({ suggestion_id: "suggest-procedure-ref-proc-main" }),
       expect.objectContaining({ suggestion_id: "suggest-observation-ref-obs-main" })
@@ -110,7 +113,6 @@ yield: 81%
 
 :::condition-varies #cv-screen
 standard: rxn-standard
-varies: solvent | temperature
 var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
 :::
 `;
@@ -119,6 +121,7 @@ var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
 
     expect(assistance.suggestions).toEqual(expect.arrayContaining([
       expect.objectContaining({ suggestion_id: "suggest-condition-baseline-cv-screen" }),
+      expect.objectContaining({ suggestion_id: "suggest-condition-varies-cv-screen" }),
       expect.objectContaining({ suggestion_id: "suggest-condition-result-cv-screen.var1" })
     ]));
     expect(assistance.minimal_sets).toContainEqual(expect.objectContaining({
@@ -126,6 +129,115 @@ var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
       status: "fixable_by_suggestion",
       inferable_items: expect.arrayContaining(["cv-screen.condition"])
     }));
+
+    const variesSuggestion = assistance.suggestions.find((item) =>
+      item.suggestion_id === "suggest-condition-varies-cv-screen"
+    );
+
+    expect(variesSuggestion).toBeDefined();
+    expect(applyAuthoringSuggestion(
+      source,
+      variesSuggestion as NonNullable<typeof variesSuggestion>
+    )).toContain("varies: solvent | temperature");
+  });
+
+  it("infers condition standard from the only reaction not used by attempts", () => {
+    const source = `---
+id: exp-authoring-standard
+title: Authoring condition standard
+date: 2026-04-24
+---
+
+:::chemd #rxn-standard
+kind: reaction
+reactants: substrate
+products: product
+solvent: THF
+temperature: 25 C
+:::
+
+:::chemd #rxn-var1
+kind: reaction
+reactants: substrate
+products: product
+solvent: MeCN
+temperature: 40 C
+:::
+
+:::condition-varies #cv-screen
+var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
+:::
+`;
+    const result = compileChemd(source);
+    const standardSuggestion = result.authoringAssistance.suggestions.find((item) =>
+      item.suggestion_id === "suggest-condition-standard-cv-screen"
+    );
+
+    expect(standardSuggestion).toBeDefined();
+    expect(applyAuthoringSuggestion(
+      source,
+      standardSuggestion as NonNullable<typeof standardSuggestion>
+    )).toContain(`:::condition-varies #cv-screen
+standard: rxn-standard
+var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C`);
+  });
+
+  it("infers result refs and primary reaction from unique product ownership", () => {
+    const source = `---
+id: exp-authoring-product-owner
+title: Authoring product owner
+date: 2026-04-24
+primary_result: res-step-02
+---
+
+:::chemd #mol-step-01
+kind: molecule
+smiles: CCO
+:::
+
+:::chemd #mol-step-02
+kind: molecule
+smiles: CC=O
+:::
+
+:::chemd #rxn-step-01
+kind: reaction
+reactants: start
+products: @mol-step-01
+:::
+
+:::chemd #rxn-step-02
+kind: reaction
+reactants: @mol-step-01
+products: @mol-step-02
+:::
+
+:::result #res-step-02
+product: @mol-step-02
+status: success
+yield: 74%
+:::
+`;
+    const result = compileChemd(source);
+    const refSuggestion = result.authoringAssistance.suggestions.find((item) =>
+      item.suggestion_id === "suggest-result-ref-res-step-02"
+    );
+    const primarySuggestion = result.authoringAssistance.suggestions.find((item) =>
+      item.suggestion_id === "suggest-primary-reaction-rxn-step-02"
+    );
+
+    expect(refSuggestion).toBeDefined();
+    expect(primarySuggestion).toBeDefined();
+    expect(applyAuthoringSuggestion(
+      source,
+      refSuggestion as NonNullable<typeof refSuggestion>
+    )).toContain(`:::result #res-step-02
+ref: rxn-step-02
+product: @mol-step-02`);
+    expect(applyAuthoringSuggestion(
+      source,
+      primarySuggestion as NonNullable<typeof primarySuggestion>
+    )).toContain("primary_reaction: rxn-step-02");
   });
 
   it("offers starter templates and can apply them through the shared patch helper", () => {
