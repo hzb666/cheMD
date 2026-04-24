@@ -114,6 +114,8 @@ describe("PostgreSQL storage schema", () => {
     expect(storagePostgresMigrations[0]?.id).toBe("0001_chemd_storage_core");
     expect(sql).toContain("CREATE EXTENSION IF NOT EXISTS vector");
     expect(sql).toContain("CREATE TABLE IF NOT EXISTS chemd_rag_chunk_embeddings");
+    expect(sql).toContain("PRIMARY KEY (revision_id, chunk_id)");
+    expect(sql).toContain("PRIMARY KEY (revision_id, chunk_id, embedding_model)");
     expect(sql).toContain("CREATE TABLE IF NOT EXISTS chemd_training_experience_events");
     expect(sql).toContain("CREATE TABLE IF NOT EXISTS chemd_experiment_pattern_memory");
     expect(sql).toContain("chemd_training_events_condition_pattern_idx");

@@ -23,4 +23,3 @@ packages/renderer-docx/
 - Do not add `components`, `hooks`, or React context directories here.
 - Keep browser-safe exports free of Node-only APIs.
 - Put Node-only APIs behind explicit subpath exports, as `@chemd/compiler/node` does.
-

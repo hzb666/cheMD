@@ -22,7 +22,12 @@ export interface PostgresRuntimeConfig {
   ssl?: boolean;
 }
 
+export interface PostgresPoolConnectionLike extends PostgresQueryClient {
+  release(): void;
+}
+
 export interface PostgresPoolLike extends PostgresQueryClient {
+  connect(): Promise<PostgresPoolConnectionLike>;
   end(): Promise<void>;
 }
 
@@ -122,6 +127,22 @@ export const createPostgresPoolClient = (
 ): PostgresRuntimeClient => ({
   async query(sql: string, values?: readonly unknown[]): Promise<unknown> {
     return pool.query(sql, values);
+  },
+  async transaction<T>(
+    operation: (client: PostgresQueryClient) => Promise<T>
+  ): Promise<T> {
+    const connection = await pool.connect();
+    try {
+      await connection.query("BEGIN");
+      const result = await operation(connection);
+      await connection.query("COMMIT");
+      return result;
+    } catch (error) {
+      await connection.query("ROLLBACK");
+      throw error;
+    } finally {
+      connection.release();
+    }
   },
   async close(): Promise<void> {
     await pool.end();

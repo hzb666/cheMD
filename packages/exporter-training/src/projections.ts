@@ -616,22 +616,72 @@ const buildReactionRouteReferences = (
   entityByEntityId: Map<string, ObjectEntity>
 ): TrainingResolvedReferenceV1[] =>
   record.semantic_layer.reactions.flatMap((reaction) =>
-    (reaction.prev_refs_raw ?? []).map((raw) => {
-      const target = resolveReactionRouteTarget(entityByOriginalId, raw);
-      const relation = findOutgoingRelation(record, reaction.entity_id, REACTION_ROUTE_RELATIONS, "prev");
-      const relationTarget = getEntityByEntityId(entityByEntityId, relation?.to_entity_id);
+    [
+      ...(reaction.prev_refs_raw ?? []).map((raw) =>
+        buildReactionRouteReference({
+          entityByEntityId,
+          entityByOriginalId,
+          raw,
+          reaction,
+          record,
+          sourceField: "prev"
+        })
+      ),
+      ...(reaction.next_refs_raw ?? []).map((raw) =>
+        buildReactionRouteReference({
+          entityByEntityId,
+          entityByOriginalId,
+          raw,
+          reaction,
+          record,
+          sourceField: "next"
+        })
+      )
+    ]
+  );
 
-      return {
-        raw,
-        source_entity_id: reaction.entity_id,
-        source_entity_type: "reaction" as const,
-        source_field: "prev",
-        ...((relationTarget?.entity_id ?? target.entityId) ? { target_entity_id: relationTarget?.entity_id ?? target.entityId } : {}),
-        ...((relationTarget?.original_id ?? target.originalId) ? { target_original_id: relationTarget?.original_id ?? target.originalId } : {}),
-        ...(relation ? { relation_type: relation.relation_type } : {}),
-        resolution_status: relation ? "resolved" : "unresolved"
-      };
-    })
+const buildReactionRouteReference = (input: {
+  entityByEntityId: Map<string, ObjectEntity>;
+  entityByOriginalId: Map<string, ObjectEntity>;
+  raw: string;
+  reaction: ChemdTrainingExportV2["semantic_layer"]["reactions"][number];
+  record: ChemdTrainingExportV2;
+  sourceField: "prev" | "next";
+}): TrainingResolvedReferenceV1 => {
+  const target = resolveReactionRouteTarget(input.entityByOriginalId, input.raw);
+  const relation = findMatchingRouteRelation(
+    input.record,
+    input.reaction.entity_id,
+    input.sourceField,
+    target.entityId
+  );
+  const relationTarget = getEntityByEntityId(input.entityByEntityId, relation?.to_entity_id);
+  const resolvedEntityId = relationTarget?.entity_id ?? target.entityId;
+  const resolvedOriginalId = relationTarget?.original_id ?? target.originalId;
+
+  return {
+    raw: input.raw,
+    source_entity_id: input.reaction.entity_id,
+    source_entity_type: "reaction",
+    source_field: input.sourceField,
+    ...(resolvedEntityId ? { target_entity_id: resolvedEntityId } : {}),
+    ...(resolvedOriginalId ? { target_original_id: resolvedOriginalId } : {}),
+    ...(relation ? { relation_type: relation.relation_type } : {}),
+    resolution_status: relation ? "resolved" : "unresolved"
+  };
+};
+
+const findMatchingRouteRelation = (
+  record: ChemdTrainingExportV2,
+  fromEntityId: string,
+  role: "prev" | "next",
+  targetEntityId: string | undefined
+): ExportedRelationV1 | undefined =>
+  record.semantic_layer.links.find((relation) =>
+    relation.from_entity_id === fromEntityId
+    && REACTION_ROUTE_RELATIONS.has(relation.relation_type)
+    && relation.role === role
+    && (!targetEntityId || relation.to_entity_id === targetEntityId)
   );
 
 const buildResultReferences = (

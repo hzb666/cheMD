@@ -105,7 +105,7 @@ export const postgresTrainingExportErrorResponse = (error: unknown): Response =>
   }
 
   return upstreamFailure(
-    error instanceof Error ? error.message : "postgres training export failed",
+    "postgres training export failed",
     502,
     "E_POSTGRES_TRAINING_EXPORT"
   );

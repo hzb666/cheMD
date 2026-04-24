@@ -62,8 +62,12 @@ packages:
     path: packages/core
   cli:
     path: packages/cli
+  diagnostics:
+    path: packages/diagnostics
   exporter-training:
     path: packages/exporter-training
+  lnf:
+    path: packages/lnf
   parser:
     path: packages/parser
   render-profile:
@@ -76,4 +80,14 @@ packages:
     path: packages/renderer-json
   resolver:
     path: packages/resolver
+  runtime-lab:
+    path: packages/runtime-lab
+  runtime-trace:
+    path: packages/runtime-trace
+  step-ontology:
+    path: packages/step-ontology
+  storage-postgres:
+    path: packages/storage-postgres
+  typechecker:
+    path: packages/typechecker
 default_package: web

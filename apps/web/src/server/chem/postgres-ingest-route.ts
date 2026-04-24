@@ -129,7 +129,7 @@ export const postgresIngestErrorResponse = (error: unknown): Response => {
   }
 
   return upstreamFailure(
-    error instanceof Error ? error.message : "postgres ingest failed",
+    "postgres ingest failed",
     502,
     "E_POSTGRES_INGEST"
   );

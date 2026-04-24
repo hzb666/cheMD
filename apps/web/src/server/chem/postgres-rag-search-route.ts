@@ -1,6 +1,9 @@
-import type { RagChunkRecord } from "@chemd/storage-postgres";
-
 import type { PgvectorDistanceMetric, SimilarRagChunkResult } from "./postgres-rag";
+import {
+  MAX_RAG_SEARCH_EMBEDDING_DIM,
+  readOptionalRagLimit,
+  readRagChunkTypes
+} from "./postgres-rag-route-helpers";
 import type { SearchSimilarRagChunksWithRuntimeInput } from "./postgres-rag-search-service";
 import {
   badRequest,
@@ -11,8 +14,7 @@ import {
 } from "./route-responses";
 import {
   parseJsonObjectBody,
-  readOptionalTrimmedString,
-  readStringArray
+  readOptionalTrimmedString
 } from "./request-parsers";
 
 type RagSearchRouteInput = Omit<
@@ -21,27 +23,21 @@ type RagSearchRouteInput = Omit<
 >;
 
 const distanceMetrics = new Set<string>(["cosine", "l2", "inner_product"]);
-const chunkTypes = new Set<string>([
-  "markdown",
-  "reaction_summary",
-  "result_notes",
-  "analysis_notes",
-  "sample_notes",
-  "document_summary"
-]);
 
 const readRequiredModel = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 
 const readPositiveInteger = (value: unknown): number | null => {
-  if (!Number.isInteger(value) || typeof value !== "number" || value <= 0) {
+  if (
+    !Number.isInteger(value) ||
+    typeof value !== "number" ||
+    value <= 0 ||
+    value > MAX_RAG_SEARCH_EMBEDDING_DIM
+  ) {
     return null;
   }
   return value;
 };
-
-const readOptionalPositiveInteger = (value: unknown): number | undefined | null =>
-  value === undefined ? undefined : readPositiveInteger(value);
 
 const readEmbedding = (value: unknown, dim: number): readonly number[] | null => {
   if (!Array.isArray(value) || value.length !== dim) {
@@ -60,19 +56,6 @@ const readDistanceMetric = (
     return undefined;
   }
   return distanceMetrics.has(metric) ? metric as PgvectorDistanceMetric : null;
-};
-
-const readChunkTypes = (
-  value: unknown
-): readonly RagChunkRecord["chunkType"][] | undefined | null => {
-  if (value === undefined) {
-    return undefined;
-  }
-  const values = readStringArray(value);
-  if (!values || values.some((chunkType) => !chunkTypes.has(chunkType))) {
-    return null;
-  }
-  return values as RagChunkRecord["chunkType"][];
 };
 
 export const parseRagSearchRouteInput = async (
@@ -95,8 +78,8 @@ export const parseRagSearchRouteInput = async (
   }
 
   const distanceMetric = readDistanceMetric(body.distanceMetric);
-  const limit = readOptionalPositiveInteger(body.limit);
-  const parsedChunkTypes = readChunkTypes(body.chunkTypes);
+  const limit = readOptionalRagLimit(body.limit);
+  const parsedChunkTypes = readRagChunkTypes(body.chunkTypes);
   if (distanceMetric === null || limit === null || parsedChunkTypes === null) {
     return badRequest("distanceMetric, limit, or chunkTypes is invalid");
   }
@@ -148,7 +131,7 @@ export const ragSearchErrorResponse = (error: unknown): Response => {
   }
 
   return upstreamFailure(
-    error instanceof Error ? error.message : "postgres rag search failed",
+    "postgres rag search failed",
     502,
     "E_POSTGRES_RAG_SEARCH"
   );

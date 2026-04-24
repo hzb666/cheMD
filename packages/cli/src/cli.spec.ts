@@ -252,7 +252,7 @@ describe("chemd cli help validation export and repair", () => {
 
     expect(result.exitCode).toBe(EXIT_OK);
     expect(result.stdout).toMatch(/final status: clean/);
-    expect(result.stdout).toMatch(/safe fixes applied: 2/);
+    expect(result.stdout).toMatch(/safe fixes applied: 5/);
     expect(result.stdout).toContain("ref: rxn-main");
     expect(result.stderr).toBe("");
   });
@@ -492,6 +492,40 @@ describe("chemd cli agent loop", () => {
         action: "stop",
         changedSource: false,
         note: "need more facts"
+      });
+      expect(stderr.value).toBe("");
+    }));
+
+  it("passes dash-prefixed arguments to the external agent-loop driver", async () =>
+    withTempDir(async (dir) => {
+      const filePath = path.join(dir, "agent-dash.chemd.md");
+      writeFileSync(filePath, repairNeedsInputSource);
+
+      const stdout = createWriter();
+      const stderr = createWriter();
+      const exitCode = await runChemdCli([
+        "agent-loop",
+        "agent-dash.chemd.md",
+        "--driver",
+        process.execPath,
+        "--driver-arg",
+        exampleAgentLoopDriverPath,
+        "--driver-arg",
+        "--mode",
+        "--format",
+        "json"
+      ], {
+        cwd: dir,
+        stderr,
+        stdout
+      });
+      const payload = JSON.parse(stdout.value);
+
+      expect(exitCode).toBe(EXIT_OK);
+      expect(payload.finalDiagnosis.status).toBe("clean");
+      expect(payload.iterations[0].agentResponse).toMatchObject({
+        action: "rewrite",
+        changedSource: true
       });
       expect(stderr.value).toBe("");
     }));

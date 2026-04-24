@@ -5,6 +5,7 @@ import {
   createPostgresRuntimeClient,
   parsePostgresRuntimeConfig,
   type PostgresPoolConstructor,
+  type PostgresPoolConnectionLike,
   type PostgresPoolLike,
   type PostgresRuntimeConfig
 } from "./postgres-client";
@@ -14,10 +15,25 @@ interface QueryCall {
   values?: readonly unknown[];
 }
 
+class FakePoolConnection implements PostgresPoolConnectionLike {
+  readonly calls: QueryCall[] = [];
+  released = false;
+
+  async query(sql: string, values?: readonly unknown[]): Promise<unknown> {
+    this.calls.push({ sql, values });
+    return { rows: [{ connection: true }] };
+  }
+
+  release(): void {
+    this.released = true;
+  }
+}
+
 class FakePool implements PostgresPoolLike {
   static instances: FakePool[] = [];
 
   readonly calls: QueryCall[] = [];
+  readonly connections: FakePoolConnection[] = [];
   closed = false;
 
   constructor(readonly config: PostgresRuntimeConfig) {
@@ -27,6 +43,12 @@ class FakePool implements PostgresPoolLike {
   async query(sql: string, values?: readonly unknown[]): Promise<unknown> {
     this.calls.push({ sql, values });
     return { rows: [{ ok: true }] };
+  }
+
+  async connect(): Promise<PostgresPoolConnectionLike> {
+    const connection = new FakePoolConnection();
+    this.connections.push(connection);
+    return connection;
   }
 
   async end(): Promise<void> {
@@ -122,5 +144,32 @@ describe("postgres runtime client", () => {
     expect(result).toEqual({ rows: [{ ok: true }] });
     expect(pool.calls).toEqual([{ sql: "SELECT 1", values: undefined }]);
     expect(pool.closed).toBe(true);
+  });
+
+  it("runs transactions on a single checked-out pool connection", async () => {
+    const pool = new FakePool({
+      connectionString: "postgres://localhost/existing"
+    });
+    const client = createPostgresPoolClient(pool);
+
+    const { transaction } = client;
+    if (!transaction) {
+      throw new Error("expected pool client to expose transaction()");
+    }
+
+    const result = await transaction(async (transactionClient) => {
+      await transactionClient.query("INSERT INTO chemd VALUES ($1)", ["ok"]);
+      return "committed";
+    });
+
+    const connection = pool.connections[0] as FakePoolConnection;
+    expect(result).toBe("committed");
+    expect(pool.calls).toEqual([]);
+    expect(connection.calls).toEqual([
+      { sql: "BEGIN", values: undefined },
+      { sql: "INSERT INTO chemd VALUES ($1)", values: ["ok"] },
+      { sql: "COMMIT", values: undefined }
+    ]);
+    expect(connection.released).toBe(true);
   });
 });

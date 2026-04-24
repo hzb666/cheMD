@@ -217,6 +217,27 @@ def _placeholder_ocr_response(message: str, *, kind: str) -> Any:
     )
 
 
+def _remote_ocr_error_response(provider: str, error: RuntimeError, *, kind: str) -> Any:
+    LOGGER.warning("Remote %s OCR provider failed: %s", kind, error)
+    return (
+        jsonify(
+            {
+                "status": "failed",
+                "kind": kind,
+                "provider": provider,
+                "candidates": [],
+                "placeholder": False,
+                "error": {
+                    "code": "remote_ocr_provider_failed",
+                    "message": f"Remote {kind} OCR provider failed.",
+                },
+                "warnings": [f"Remote {kind} OCR provider failed."],
+            }
+        ),
+        502,
+    )
+
+
 def _request_remote_json(
     *,
     url: str,
@@ -644,10 +665,13 @@ def ocr() -> Any:
         return jsonify({"message": "imageBase64 is invalid"}), 400
 
     mime_type = payload.get("mimeType")
-    provider_payload = _run_molecule_ocr_with_provider(
-        image_bytes,
-        mime_type if isinstance(mime_type, str) else None,
-    )
+    try:
+        provider_payload = _run_molecule_ocr_with_provider(
+            image_bytes,
+            mime_type if isinstance(mime_type, str) else None,
+        )
+    except RuntimeError as error:
+        return _remote_ocr_error_response(_MOLECULE_OCR_PROVIDER, error, kind="molecule")
     if provider_payload is not None:
         return jsonify(
             _complete_molecule_payload(provider_payload, provider=_MOLECULE_OCR_PROVIDER)
@@ -774,10 +798,13 @@ def reaction_ocr() -> Any:
             return jsonify({"message": "imageBase64 is invalid"}), 400
 
         mime_type = payload.get("mimeType")
-        provider_payload = _run_reaction_ocr_with_provider(
-            image_bytes,
-            mime_type if isinstance(mime_type, str) else None,
-        )
+        try:
+            provider_payload = _run_reaction_ocr_with_provider(
+                image_bytes,
+                mime_type if isinstance(mime_type, str) else None,
+            )
+        except RuntimeError as error:
+            return _remote_ocr_error_response(_REACTION_OCR_PROVIDER, error, kind="reaction")
         if provider_payload is not None:
             return jsonify(
                 _complete_reaction_payload(provider_payload, provider=_REACTION_OCR_PROVIDER)

@@ -247,7 +247,8 @@ const readOptionValue = (
   optionName: CliOption
 ): string => {
   const value = args[index + 1];
-  if (!value || value.startsWith("-")) {
+  const allowsDashValue = optionName === "driver-arg";
+  if (!value || (!allowsDashValue && value.startsWith("-"))) {
     throw new CliUsageError(`Option --${optionName} requires a value.`);
   }
 

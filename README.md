@@ -65,6 +65,7 @@ chemd/
 |-- deploy/
 |   `-- playground/          # Container, reverse proxy, and service assets
 |-- packages/
+|   |-- cli/                 # Command-line validation, repair, diff, and agent-loop tools
 |   |-- compiler/            # Public compile pipeline
 |   |-- core/                # AST, diagnostics, shared primitives
 |   |-- diagnostics/         # Diagnostic model and quick-fix metadata
@@ -79,6 +80,7 @@ chemd/
 |   |-- runtime-lab/         # Runtime plan and preflight model
 |   |-- runtime-trace/       # Runtime trace events and replay helpers
 |   |-- step-ontology/       # Procedure, observation, analysis lowering
+|   |-- storage-postgres/    # PostgreSQL schema, records, RAG, and memory tables
 |   `-- typechecker/         # Typed semantic graph and value diagnostics
 |-- scripts/                 # Local development and migration utilities
 |-- services/
@@ -326,6 +328,7 @@ Chemistry service routes:
 
 | Package | Role |
 | --- | --- |
+| `@chemd/cli` | CLI validation, repair loop, semantic diff, and agent-loop integration |
 | `@chemd/core` | Shared AST, diagnostics, render overrides, chemistry primitives |
 | `@chemd/parser` | Frontmatter, Markdown, inline token, block, reference parsing |
 | `@chemd/resolver` | References, aliases, template expansion, semantic cleanup |

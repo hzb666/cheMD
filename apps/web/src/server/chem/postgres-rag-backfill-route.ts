@@ -1,9 +1,11 @@
-import type { RagChunkRecord } from "@chemd/storage-postgres";
-
 import type {
   BackfillRagChunkEmbeddingsResult,
   BackfillRagChunkEmbeddingsWithRuntimeInput
 } from "./postgres-rag-backfill-service";
+import {
+  readOptionalRagLimit,
+  readRagChunkTypes
+} from "./postgres-rag-route-helpers";
 import {
   badRequest,
   errorResponse,
@@ -13,8 +15,7 @@ import {
 } from "./route-responses";
 import {
   parseJsonObjectBody,
-  readOptionalTrimmedString,
-  readStringArray
+  readOptionalTrimmedString
 } from "./request-parsers";
 
 type RagBackfillRouteInput = Omit<
@@ -22,43 +23,11 @@ type RagBackfillRouteInput = Omit<
   "embeddingRuntime" | "postgresRuntime"
 >;
 
-const chunkTypes = new Set<string>([
-  "markdown",
-  "reaction_summary",
-  "result_notes",
-  "analysis_notes",
-  "sample_notes",
-  "document_summary"
-]);
-
-const readPositiveInteger = (value: unknown): number | null => {
-  if (!Number.isInteger(value) || typeof value !== "number" || value <= 0) {
-    return null;
-  }
-  return value;
-};
-
-const readOptionalPositiveInteger = (value: unknown): number | undefined | null =>
-  value === undefined ? undefined : readPositiveInteger(value);
-
 const readOptionalBoolean = (value: unknown): boolean | undefined | null => {
   if (value === undefined) {
     return undefined;
   }
   return typeof value === "boolean" ? value : null;
-};
-
-const readChunkTypes = (
-  value: unknown
-): readonly RagChunkRecord["chunkType"][] | undefined | null => {
-  if (value === undefined) {
-    return undefined;
-  }
-  const values = readStringArray(value);
-  if (!values || values.some((chunkType) => !chunkTypes.has(chunkType))) {
-    return null;
-  }
-  return values as RagChunkRecord["chunkType"][];
 };
 
 export const parseRagBackfillRouteInput = async (
@@ -69,9 +38,9 @@ export const parseRagBackfillRouteInput = async (
     return badRequest("invalid request body");
   }
 
-  const limit = readOptionalPositiveInteger(body.limit);
+  const limit = readOptionalRagLimit(body.limit);
   const overwriteExisting = readOptionalBoolean(body.overwriteExisting);
-  const parsedChunkTypes = readChunkTypes(body.chunkTypes);
+  const parsedChunkTypes = readRagChunkTypes(body.chunkTypes);
   if (limit === null || overwriteExisting === null || parsedChunkTypes === null) {
     return badRequest("limit, overwriteExisting, or chunkTypes is invalid");
   }
@@ -135,7 +104,7 @@ export const ragBackfillErrorResponse = (error: unknown): Response => {
   }
 
   return upstreamFailure(
-    error instanceof Error ? error.message : "postgres rag backfill failed",
+    "postgres rag backfill failed",
     502,
     "E_POSTGRES_RAG_BACKFILL"
   );

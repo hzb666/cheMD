@@ -12,6 +12,7 @@ import {
 
 export interface PostgresQueryClient {
   query(sql: string, values?: readonly unknown[]): Promise<unknown>;
+  transaction?<T>(operation: (client: PostgresQueryClient) => Promise<T>): Promise<T>;
 }
 
 export interface SaveCompiledExperimentInput {
@@ -37,11 +38,15 @@ const jsonParam = (value: unknown): string | null =>
 
 const withTransaction = async <T>(
   client: PostgresQueryClient,
-  operation: () => Promise<T>
+  operation: (transactionClient: PostgresQueryClient) => Promise<T>
 ): Promise<T> => {
+  if (client.transaction) {
+    return client.transaction(operation);
+  }
+
   await client.query("BEGIN");
   try {
-    const result = await operation();
+    const result = await operation(client);
     await client.query("COMMIT");
     return result;
   } catch (error) {
@@ -201,7 +206,14 @@ const insertFieldEvidence = async (
     `INSERT INTO chemd_field_evidence (
       revision_id, subject_entity_id, field, value, raw_value, value_node_id,
       raw_value_node_id, normalized, evidence_entity_ids, source_relation_ids
-    ) VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7,$8,$9,$10)`,
+    ) VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7,$8,$9,$10)
+    ON CONFLICT (revision_id, subject_entity_id, field, value_node_id) DO UPDATE SET
+      value = EXCLUDED.value,
+      raw_value = EXCLUDED.raw_value,
+      raw_value_node_id = EXCLUDED.raw_value_node_id,
+      normalized = EXCLUDED.normalized,
+      evidence_entity_ids = EXCLUDED.evidence_entity_ids,
+      source_relation_ids = EXCLUDED.source_relation_ids`,
     [
       evidence.revisionId,
       evidence.subject_entity_id,
@@ -225,7 +237,10 @@ const insertRagChunk = async (
     `INSERT INTO chemd_rag_chunks (
       chunk_id, revision_id, experiment_id, chunk_type, source_entity_ids, text, metadata
     ) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb)
-    ON CONFLICT (chunk_id) DO UPDATE SET
+    ON CONFLICT (revision_id, chunk_id) DO UPDATE SET
+      experiment_id = EXCLUDED.experiment_id,
+      chunk_type = EXCLUDED.chunk_type,
+      source_entity_ids = EXCLUDED.source_entity_ids,
       text = EXCLUDED.text,
       metadata = EXCLUDED.metadata`,
     [
@@ -262,12 +277,12 @@ export const writeExperimentStorageRecords = async (
   client: PostgresQueryClient,
   records: ExperimentStorageRecords
 ): Promise<void> => {
-  await withTransaction(client, async () => {
-    await upsertExperiment(client, records);
-    await insertRevision(client, records);
-    await insertCompileRun(client, records);
-    await insertCompileArtifact(client, records);
-    await insertRecordGroups(client, records);
+  await withTransaction(client, async (transactionClient) => {
+    await upsertExperiment(transactionClient, records);
+    await insertRevision(transactionClient, records);
+    await insertCompileRun(transactionClient, records);
+    await insertCompileArtifact(transactionClient, records);
+    await insertRecordGroups(transactionClient, records);
   });
 };
 

@@ -23,6 +23,7 @@ export interface WriteRagChunkEmbeddingsInput {
 
 export interface WrittenRagChunkEmbedding {
   chunkId: string;
+  revisionId: string;
   embeddingModel: string;
   embedding: readonly number[];
 }
@@ -108,11 +109,15 @@ const vectorLiteral = (
 
 const withTransaction = async <T>(
   client: PostgresQueryClient,
-  operation: () => Promise<T>
+  operation: (transactionClient: PostgresQueryClient) => Promise<T>
 ): Promise<T> => {
+  if (client.transaction) {
+    return client.transaction(operation);
+  }
+
   await client.query("BEGIN");
   try {
-    const result = await operation();
+    const result = await operation(client);
     await client.query("COMMIT");
     return result;
   } catch (error) {
@@ -142,11 +147,16 @@ const insertChunkEmbedding = async (
 ): Promise<void> => {
   await client.query(
     `INSERT INTO chemd_rag_chunk_embeddings (
-      chunk_id, embedding_model, embedding
-    ) VALUES ($1,$2,$3::vector)
-    ON CONFLICT (chunk_id, embedding_model) DO UPDATE SET
+      revision_id, chunk_id, embedding_model, embedding
+    ) VALUES ($1,$2,$3,$4::vector)
+    ON CONFLICT (revision_id, chunk_id, embedding_model) DO UPDATE SET
       embedding = EXCLUDED.embedding`,
-    [embedding.chunkId, embedding.embeddingModel, vectorLiteral(embedding.embedding, embedding.embedding.length)]
+    [
+      embedding.revisionId,
+      embedding.chunkId,
+      embedding.embeddingModel,
+      vectorLiteral(embedding.embedding, embedding.embedding.length)
+    ]
   );
 };
 
@@ -161,6 +171,7 @@ const buildChunkEmbeddings = async (
     vectorLiteral(embedding, model.embeddingDim);
     embeddings.push({
       chunkId: chunk.chunkId,
+      revisionId: chunk.revisionId,
       embeddingModel: model.embeddingModel,
       embedding: [...embedding]
     });
@@ -177,10 +188,10 @@ export const writeRagChunkEmbeddings = async (
     return [];
   }
 
-  await withTransaction(input.client, async () => {
-    await upsertEmbeddingModel(input.client, input.model);
+  await withTransaction(input.client, async (transactionClient) => {
+    await upsertEmbeddingModel(transactionClient, input.model);
     for (const embedding of embeddings) {
-      await insertChunkEmbedding(input.client, embedding);
+      await insertChunkEmbedding(transactionClient, embedding);
     }
   });
   return embeddings;
@@ -266,7 +277,9 @@ export const searchSimilarRagChunks = async (
       c.metadata,
       e.embedding ${operator} $2::vector AS distance
     FROM chemd_rag_chunk_embeddings e
-    JOIN chemd_rag_chunks c ON c.chunk_id = e.chunk_id
+    JOIN chemd_rag_chunks c
+      ON c.revision_id = e.revision_id
+      AND c.chunk_id = e.chunk_id
     WHERE ${clauses.join(" AND ")}
     ORDER BY e.embedding ${operator} $2::vector
     LIMIT $${values.length}`,

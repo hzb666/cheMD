@@ -239,7 +239,9 @@ product: @mol-step-02`);
       primarySuggestion as NonNullable<typeof primarySuggestion>
     )).toContain("primary_reaction: rxn-step-02");
   });
+});
 
+describe("authoring assistance templates", () => {
   it("offers starter templates and can apply them through the shared patch helper", () => {
     const source = `---
 id: exp-authoring-empty

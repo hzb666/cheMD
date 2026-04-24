@@ -67,6 +67,26 @@ class ChemServiceReactionOcrRouteTest(ChemServiceAppTestCase):
         self.assertEqual(payload["status"], "failed")
         self.assertIn("unknown reaction ocr provider", payload["warnings"][0].lower())
 
+    def test_reaction_ocr_returns_structured_error_when_remote_provider_fails(self) -> None:
+        with patch.object(self.module, "_REACTION_OCR_PROVIDER", "rxnscribe"):
+            with patch.object(
+                self.module,
+                "_run_reaction_ocr_with_rxnscribe",
+                side_effect=RuntimeError("provider 500 with internal details"),
+            ):
+                response = self.client.post(
+                    "/reaction/ocr",
+                    json={"imageBase64": "YWJj", "mimeType": "image/png"},
+                )
+
+        self.assertEqual(response.status_code, 502)
+        payload = response.get_json()
+        self.assertEqual(payload["status"], "failed")
+        self.assertEqual(payload["kind"], "reaction")
+        self.assertEqual(payload["provider"], "rxnscribe")
+        self.assertEqual(payload["error"]["code"], "remote_ocr_provider_failed")
+        self.assertNotIn("internal details", payload["error"]["message"])
+
 
 class ChemServiceReactionOcrModuleTest(unittest.TestCase):
     def test_request_remote_provider_normalizes_official_style_payload(self) -> None:

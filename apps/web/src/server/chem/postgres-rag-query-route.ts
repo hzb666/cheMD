@@ -1,9 +1,12 @@
-import type { RagChunkRecord } from "@chemd/storage-postgres";
-
 import type {
   SearchRagChunksByQueryInput,
   SearchRagChunksByQueryResult
 } from "./postgres-rag-query-service";
+import {
+  MAX_RAG_QUERY_LENGTH,
+  readOptionalRagLimit,
+  readRagChunkTypes
+} from "./postgres-rag-route-helpers";
 import {
   badRequest,
   errorResponse,
@@ -13,8 +16,7 @@ import {
 } from "./route-responses";
 import {
   parseJsonObjectBody,
-  readOptionalTrimmedString,
-  readStringArray
+  readOptionalTrimmedString
 } from "./request-parsers";
 
 type RagQueryRouteInput = Omit<
@@ -22,40 +24,10 @@ type RagQueryRouteInput = Omit<
   "embeddingRuntime" | "searchRuntime"
 >;
 
-const chunkTypes = new Set<string>([
-  "markdown",
-  "reaction_summary",
-  "result_notes",
-  "analysis_notes",
-  "sample_notes",
-  "document_summary"
-]);
-
 const readRequiredQuery = (value: unknown): string | null =>
-  typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-
-const readPositiveInteger = (value: unknown): number | null => {
-  if (!Number.isInteger(value) || typeof value !== "number" || value <= 0) {
-    return null;
-  }
-  return value;
-};
-
-const readOptionalPositiveInteger = (value: unknown): number | undefined | null =>
-  value === undefined ? undefined : readPositiveInteger(value);
-
-const readChunkTypes = (
-  value: unknown
-): readonly RagChunkRecord["chunkType"][] | undefined | null => {
-  if (value === undefined) {
-    return undefined;
-  }
-  const values = readStringArray(value);
-  if (!values || values.some((chunkType) => !chunkTypes.has(chunkType))) {
-    return null;
-  }
-  return values as RagChunkRecord["chunkType"][];
-};
+  typeof value === "string" && value.trim().length > 0 && value.trim().length <= MAX_RAG_QUERY_LENGTH
+    ? value.trim()
+    : null;
 
 export const parseRagQueryRouteInput = async (
   request: Request
@@ -70,8 +42,8 @@ export const parseRagQueryRouteInput = async (
     return badRequest("query is required");
   }
 
-  const limit = readOptionalPositiveInteger(body.limit);
-  const parsedChunkTypes = readChunkTypes(body.chunkTypes);
+  const limit = readOptionalRagLimit(body.limit);
+  const parsedChunkTypes = readRagChunkTypes(body.chunkTypes);
   if (limit === null || parsedChunkTypes === null) {
     return badRequest("limit or chunkTypes is invalid");
   }
@@ -124,7 +96,7 @@ export const ragQueryErrorResponse = (error: unknown): Response => {
   }
 
   return upstreamFailure(
-    error instanceof Error ? error.message : "postgres rag query failed",
+    "postgres rag query failed",
     502,
     "E_POSTGRES_RAG_QUERY"
   );

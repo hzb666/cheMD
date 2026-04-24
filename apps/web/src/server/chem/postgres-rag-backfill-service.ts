@@ -149,7 +149,8 @@ const selectBackfillChunks = async (
       e.chunk_id IS NOT NULL AS has_embedding
     FROM chemd_rag_chunks c
     LEFT JOIN chemd_rag_chunk_embeddings e
-      ON e.chunk_id = c.chunk_id
+      ON e.revision_id = c.revision_id
+      AND e.chunk_id = c.chunk_id
       AND e.embedding_model = $1
     ${whereSql}
     ORDER BY c.revision_id, c.chunk_id

@@ -95,7 +95,7 @@ export const postgresMemoryLoopErrorResponse = (error: unknown): Response => {
   }
 
   return upstreamFailure(
-    error instanceof Error ? error.message : "postgres memory loop failed",
+    "postgres memory loop failed",
     502,
     "E_POSTGRES_MEMORY_LOOP"
   );

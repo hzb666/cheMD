@@ -78,6 +78,26 @@ class ChemServiceMoleculeRenderingTest(ChemServiceAppTestCase):
         self.assertEqual(payload["structure"]["smiles"], "CCO")
         decimer_mock.assert_called_once()
 
+    def test_ocr_returns_structured_error_when_remote_provider_fails(self) -> None:
+        with patch.object(self.module, "_MOLECULE_OCR_PROVIDER", "decimer"):
+            with patch.object(
+                self.module,
+                "_run_molecule_ocr_with_decimer",
+                side_effect=RuntimeError("provider timeout with internal details"),
+            ):
+                response = self.client.post(
+                    "/ocr",
+                    json={"imageBase64": "YWJj", "mimeType": "image/png"},
+                )
+
+        self.assertEqual(response.status_code, 502)
+        payload = response.get_json()
+        self.assertEqual(payload["status"], "failed")
+        self.assertEqual(payload["kind"], "molecule")
+        self.assertEqual(payload["provider"], "decimer")
+        self.assertEqual(payload["error"]["code"], "remote_ocr_provider_failed")
+        self.assertNotIn("internal details", payload["error"]["message"])
+
     def test_decimer_remote_payload_accepts_uppercase_smiles_key(self) -> None:
         payload = molecule_ocr._map_remote_molecule_payload(
             "DECIMER",

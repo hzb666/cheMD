@@ -13,12 +13,13 @@
     "postgres:smoke": "node scripts/postgres-smoke.mjs",
     "lint": "eslint apps packages scripts eslint.config.mjs vitest.workspace.ts --ext .ts,.tsx,.js,.mjs,.cjs",
     "lint:fix": "eslint apps packages scripts eslint.config.mjs vitest.workspace.ts --ext .ts,.tsx,.js,.mjs,.cjs --fix",
-    "lint:py": "ruff check services/chem-service",
-    "format:check:py": "ruff format --check services/chem-service",
+    "lint:py": "cd services/chem-service && poetry run ruff check app.py chem_service tests",
+    "format:check:py": "cd services/chem-service && poetry run ruff format --check app.py chem_service tests",
     "test:dev-demo": "node --test scripts/dev-demo.test.mjs",
     "test:legacy-surface": "node --test scripts/legacy-surface-tools.test.mjs",
     "test:scripts": "node --test scripts/dev-demo.test.mjs scripts/legacy-surface-tools.test.mjs scripts/postgres-tools.test.mjs",
-    "test": "turbo run test && pnpm run test:scripts",
+    "test:py": "cd services/chem-service && poetry run python -m unittest discover tests",
+    "test": "turbo run test && pnpm run test:scripts && pnpm run test:py",
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {

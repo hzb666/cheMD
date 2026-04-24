@@ -42,4 +42,3 @@ Some packages split implementation files below `src`, for example `packages/pars
 - Do not add package-level runtime side effects on import.
 - Do not duplicate an AST interface locally when it belongs in `@chemd/core`.
 - Do not import from another package's private `src/*` path unless the package has no public contract yet and the test already follows that pattern.
-

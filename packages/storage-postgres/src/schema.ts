@@ -85,17 +85,19 @@ CREATE TABLE IF NOT EXISTS chemd_field_evidence (
   raw_value_node_id text,
   normalized boolean,
   evidence_entity_ids text[] NOT NULL DEFAULT '{}',
-  source_relation_ids text[] NOT NULL DEFAULT '{}'
+  source_relation_ids text[] NOT NULL DEFAULT '{}',
+  PRIMARY KEY (revision_id, subject_entity_id, field, value_node_id)
 );
 
 CREATE TABLE IF NOT EXISTS chemd_rag_chunks (
-  chunk_id text PRIMARY KEY,
+  chunk_id text NOT NULL,
   revision_id text NOT NULL REFERENCES chemd_experiment_revisions(revision_id),
   experiment_id text NOT NULL REFERENCES chemd_experiments(experiment_id),
   chunk_type text NOT NULL,
   source_entity_ids text[] NOT NULL DEFAULT '{}',
   text text NOT NULL,
-  metadata jsonb NOT NULL
+  metadata jsonb NOT NULL,
+  PRIMARY KEY (revision_id, chunk_id)
 );
 
 CREATE TABLE IF NOT EXISTS chemd_embedding_models (
@@ -106,11 +108,15 @@ CREATE TABLE IF NOT EXISTS chemd_embedding_models (
 );
 
 CREATE TABLE IF NOT EXISTS chemd_rag_chunk_embeddings (
-  chunk_id text NOT NULL REFERENCES chemd_rag_chunks(chunk_id) ON DELETE CASCADE,
+  revision_id text NOT NULL,
+  chunk_id text NOT NULL,
   embedding_model text NOT NULL REFERENCES chemd_embedding_models(embedding_model),
   embedding vector NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (chunk_id, embedding_model)
+  PRIMARY KEY (revision_id, chunk_id, embedding_model),
+  FOREIGN KEY (revision_id, chunk_id)
+    REFERENCES chemd_rag_chunks(revision_id, chunk_id)
+    ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS chemd_semantic_diffs (

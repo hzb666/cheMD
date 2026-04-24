@@ -36,4 +36,3 @@ apps/web/
 - Do not put reusable route parsing or response helpers inside an individual route file.
 - Do not import server-only modules into client components or hooks.
 - Do not put feature-specific UI in `src/components/ui`; keep it under `src/features/<feature>`.
-

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type {
   PostgresPoolConstructor,
+  PostgresPoolConnectionLike,
   PostgresPoolLike,
   PostgresRuntimeConfig
 } from "./postgres-client";
@@ -88,6 +89,14 @@ class FakeRuntimePool implements PostgresPoolLike {
       throw new Error("runtime write failed");
     }
     return { rows: [], rowCount: 1 };
+  }
+
+  async connect(): Promise<PostgresPoolConnectionLike> {
+    return {
+      query: async (sql: string, values?: readonly unknown[]): Promise<unknown> =>
+        this.query(sql, values),
+      release: () => undefined
+    };
   }
 
   async end(): Promise<void> {

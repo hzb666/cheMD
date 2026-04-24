@@ -100,9 +100,15 @@ describe("postgres RAG pgvector helpers", () => {
       statements.findIndex((sql) => sql.includes("chemd_rag_chunk_embeddings"))
     );
     expect(statements.filter((sql) => sql.includes("chemd_rag_chunk_embeddings"))).toHaveLength(2);
-    expect(statements.some((sql) => sql.includes("$3::vector"))).toBe(true);
-    expect(client.calls[2]?.values).toEqual(["chunk-reaction", "test-embedding-3", "[0.1,0.2,0.3]"]);
+    expect(statements.some((sql) => sql.includes("$4::vector"))).toBe(true);
+    expect(client.calls[2]?.values).toEqual([
+      "rev-1",
+      "chunk-reaction",
+      "test-embedding-3",
+      "[0.1,0.2,0.3]"
+    ]);
     expect(written.map((embedding) => embedding.chunkId)).toEqual(["chunk-reaction", "chunk-result"]);
+    expect(written.map((embedding) => embedding.revisionId)).toEqual(["rev-1", "rev-1"]);
   });
 
   it("rejects invalid dimensions before running SQL", async () => {
@@ -172,6 +178,7 @@ describe("postgres RAG pgvector helpers", () => {
 
     const statement = normalizedSql(client.calls[0] as QueryCall);
     expect(statement).toContain("e.embedding <=> $2::vector AS distance");
+    expect(statement).toContain("c.revision_id = e.revision_id");
     expect(statement).toContain("c.experiment_id = $3");
     expect(statement).toContain("c.revision_id = $4");
     expect(statement).toContain("c.chunk_type = ANY($5)");

@@ -48,6 +48,7 @@ chemd/
 |-- deploy/
 |   `-- playground/          # Container、reverse proxy 与 service assets
 |-- packages/
+|   |-- cli/                 # CLI validation、repair、diff 与 agent-loop tools
 |   |-- compiler/            # 公开 compile pipeline
 |   |-- core/                # AST、diagnostics、共享原语
 |   |-- diagnostics/         # Diagnostic model 与 quick-fix metadata
@@ -62,6 +63,7 @@ chemd/
 |   |-- runtime-lab/         # Runtime plan 与 preflight model
 |   |-- runtime-trace/       # Runtime trace events 与 replay helpers
 |   |-- step-ontology/       # Procedure、observation、analysis lowering
+|   |-- storage-postgres/    # PostgreSQL schema、records、RAG 与 memory tables
 |   `-- typechecker/         # Typed semantic graph 与 value diagnostics
 |-- scripts/                 # 本地开发与迁移工具
 |-- services/
@@ -310,6 +312,7 @@ Chemistry service routes：
 
 | Package | 职责 |
 | --- | --- |
+| `@chemd/cli` | CLI validation、repair loop、semantic diff 与 agent-loop integration |
 | `@chemd/core` | 共享 AST、diagnostics、render overrides、chemistry primitives |
 | `@chemd/parser` | Frontmatter、Markdown、inline token、block、reference parsing |
 | `@chemd/resolver` | References、aliases、template expansion、semantic cleanup |

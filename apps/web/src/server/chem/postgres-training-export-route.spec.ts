@@ -15,11 +15,19 @@ vi.mock("./postgres-training-export-service", async () => {
   };
 });
 
-const createRequest = (body: unknown): Request =>
+const SESSION_TOKEN = "postgres-route-session";
+
+const createRequest = (body: unknown, authorized = true): Request =>
   new Request("http://localhost/api/chem/postgres/training/export", {
     method: "POST",
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      ...(authorized
+        ? {
+            "x-chemd-session-token": SESSION_TOKEN,
+            cookie: `chemd-session-token=${SESSION_TOKEN}`
+          }
+        : {})
     },
     body: typeof body === "string" ? body : JSON.stringify(body)
   });
@@ -59,6 +67,16 @@ describe("POST /api/chem/postgres/training/export", () => {
   beforeEach(() => {
     exportPostgresTrainingWithRuntimeMock.mockReset();
     vi.resetModules();
+  });
+
+  it("requires a matching session token", async () => {
+    const { POST } = await import("../../app/api/chem/postgres/training/export/route");
+    const response = await POST(createRequest({
+      revisionId: "rev-1"
+    }, false));
+
+    expect(response.status).toBe(403);
+    expect(exportPostgresTrainingWithRuntimeMock).not.toHaveBeenCalled();
   });
 
   it("exports training records with accepted bounded filters", async () => {
@@ -150,7 +168,7 @@ describe("POST /api/chem/postgres/training/export", () => {
     expect(response.status).toBe(502);
     expect(await readJson(response)).toMatchObject({
       code: "E_POSTGRES_TRAINING_EXPORT",
-      message: "select failed"
+      message: "postgres training export failed"
     });
   });
 });

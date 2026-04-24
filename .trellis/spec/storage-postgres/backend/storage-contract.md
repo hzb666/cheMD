@@ -108,9 +108,11 @@ The SQL schema must include:
 CREATE EXTENSION IF NOT EXISTS vector;
 ```
 
-`chemd_rag_chunk_embeddings` must key embeddings by both `chunk_id` and
-`embedding_model`, so new embedding models can be added without replacing the
-RAG chunk truth source.
+`chemd_rag_chunks` must key chunks by `(revision_id, chunk_id)`, and
+`chemd_rag_chunk_embeddings` must key embeddings by
+`(revision_id, chunk_id, embedding_model)`. The embedding table must reference
+the revision-scoped chunk key so identical chunk IDs from different revisions
+cannot collide.
 
 ### 4. Validation & Error Matrix
 
@@ -905,6 +907,9 @@ Route JSON input:
     | "result_notes"
     | "analysis_notes"
     | "sample_notes"
+    | "artifact_notes"
+    | "condition_variation"
+    | "condition_variation_attempt"
     | "document_summary"
   )[];
 }
@@ -930,8 +935,9 @@ HTTP RAG search flow:
 
 ```text
 POST /api/chem/postgres/rag/search
+  -> requireMatchingSessionToken(request)
   -> parseJsonObjectBody(request)
-  -> validate model config, vector, filters
+  -> validate model config, vector, filters, limit <= 100, embeddingDim <= 4096
   -> searchSimilarRagChunksWithRuntime(input)
   -> createPostgresRuntimeClient(runtime)
   -> searchSimilarRagChunks({ client, ...input })
@@ -1064,6 +1070,9 @@ Route JSON input:
     | "result_notes"
     | "analysis_notes"
     | "sample_notes"
+    | "artifact_notes"
+    | "condition_variation"
+    | "condition_variation_attempt"
     | "document_summary"
   )[];
 }
@@ -1090,8 +1099,9 @@ HTTP RAG query flow:
 
 ```text
 POST /api/chem/postgres/rag/query
+  -> requireMatchingSessionToken(request)
   -> parseJsonObjectBody(request)
-  -> validate query and filters
+  -> validate query <= 2000 chars, filters, limit <= 100
   -> createRuntimeEmbeddingProvider(process.env)
   -> POST { input, model } to embedding gateway
   -> validate response vector length and finite values
@@ -1376,8 +1386,9 @@ Backfill flow:
 
 ```text
 POST /api/chem/postgres/rag/backfill
+  -> requireMatchingSessionToken(request)
   -> parseJsonObjectBody(request)
-  -> validate bounded selection
+  -> validate bounded selection and limit <= 100
   -> createRuntimeEmbeddingProvider(process.env)
   -> createPostgresRuntimeClient(process.env)
   -> SELECT chemd_rag_chunks with optional filters

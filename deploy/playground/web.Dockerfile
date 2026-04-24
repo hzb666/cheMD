@@ -7,7 +7,9 @@ WORKDIR /app
 
 RUN corepack enable
 
-COPY . .
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
+COPY apps/web ./apps/web
+COPY packages ./packages
 
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @chemd/web build

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type {
   PostgresPoolConstructor,
+  PostgresPoolConnectionLike,
   PostgresPoolLike,
   PostgresRuntimeConfig
 } from "./postgres-client";
@@ -38,6 +39,14 @@ class FakeRuntimePool implements PostgresPoolLike {
         metadata: { date: "2026-04-22" },
         distance: "0.14"
       }]
+    };
+  }
+
+  async connect(): Promise<PostgresPoolConnectionLike> {
+    return {
+      query: async (sql: string, values?: readonly unknown[]): Promise<unknown> =>
+        this.query(sql, values),
+      release: () => undefined
     };
   }
 
