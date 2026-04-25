@@ -23,6 +23,7 @@
 - 实验逻辑增强：将原始记录连接到 typed entities、resolved references、procedure steps、observations、field evidence、normalization facts 和 knowledge-graph edges。
 - 浏览器工作台，支持源码编辑、渲染预览、diagnostics、结构化输出、导出动作、OCR 入口和 chemistry editor 集成。
 - 编译输出覆盖 HTML 预览、规范化 JSON、DOCX bridge Markdown、canonical LNF、runtime preflight、RAG 检索数据、training understanding 数据和 full audit 数据。
+- repo 级 graph index 与 reaction clustering：从现有实验事实推断路线、步骤复用、条件签名、campaign trajectory 和语义 reaction-similarity edges。
 - 面向 LLM 的导出边界：检索数据与训练理解数据分离，审计用 source detail 不进入模型训练输入。
 - 本地 chemistry API，负责 molecule/reaction 规范化、渲染、OCR provider 适配和结构草稿存储。
 - Playground 部署资产支持 web service 与内部 chemistry service 的组合运行。
@@ -145,6 +146,33 @@ cd services/chem-service
 poetry run python -m unittest discover
 ```
 
+## CLI 工作流
+
+根目录通过 `chemd` script 调用 CLI：
+
+```bash
+pnpm chemd validate examples/report.chemd.md
+pnpm chemd export examples/report.chemd.md --format training-full
+pnpm chemd diff before.chemd.md after.chemd.md --format json
+pnpm chemd graph reports/*.chemd.md --format json
+pnpm chemd repair draft.chemd.md --format text
+pnpm chemd agent-loop draft.chemd.md --format json --max-iterations 3
+```
+
+常用命令：
+
+| 命令 | 作用 |
+| --- | --- |
+| `validate <file...>` | 编译文档并输出 diagnostics |
+| `export <file> --format json\|lnf\|rag\|training\|training-full` | 输出结构化 compiler/exporter payload |
+| `graph <file...> [--format text\|json]` | 从 compiled understandings 构建 repo 级 graph index 与 reaction clusters |
+| `diff <old-file> <new-file> [--format text\|json]` | 比较两份记录的语义变化 |
+| `changed [--base <ref>] [--format text\|json]` | 基于 git status/diff context 验证变更文件 |
+| `repair <file> [--write]` | 应用 compiler-guided safe fixes |
+| `agent-loop <file> [--write]` | 对 LLM 生成的 Chemd 执行迭代诊断与修复 |
+
+`graph` 命令不要求作者手写 graph 专用语法。它会先编译一组实验报告，再推断 document nodes、entity/relation edges、route clusters、family/procedure clusters、condition clusters、campaign trajectories 和语义 reaction-similarity edges。没有 computed chemical fingerprint 时，输出会明确标注，而不会把语义相似性伪装成 RDKit/Tanimoto similarity。
+
 ## 文档语言
 
 `chemd` 文档是带必需 frontmatter 的 Markdown 文件：
@@ -172,7 +200,7 @@ poetry run python -m unittest discover
 
 | Block | 作用 |
 | --- | --- |
-| `:::chemd` | Molecule 或 reaction block，推荐显式 `kind`，也可省略并由编译器补全 |
+| `:::chemd` | Molecule 或 reaction block；`kind` 可显式写出，也可由稳定反应字段推断 |
 | `:::result` | Outcome status、yield、conversion、selectivity、purity、notes |
 | `:::analysis` | Analysis records 和 TLC-style lane data |
 | `:::sample` | Sample metadata 与 lineage references |
@@ -262,7 +290,11 @@ source markdown
 | --- | --- |
 | RAG export | 检索索引与搜索上下文 |
 | Training understanding export | LoRA/SFT 数据集生成与实验知识建模 |
+| Graph index export | repo/campaign graph indexing、reaction clustering 与 similarity traversal |
 | Full audit export | 检查、调试与可追溯性 |
+
+Graph index 是推断式导出。作者只需要写真实实验事实，例如 `reactants`、`products`、`result.ref`、`analysis.ref`、`sample.derived_from`、`route`、`prev` 和 `condition-varies`。导出层会从这些事实生成图索引和聚类视图，而不是要求报告里新增一套 graph 语言。
+repo 级 graph index 会在一个或多个文档编译成 training understanding 后，通过 `buildTrainingGraphIndexFromUnderstandings()` 生成。
 
 ## Web Playground
 
@@ -312,7 +344,7 @@ Chemistry service routes：
 
 | Package | 职责 |
 | --- | --- |
-| `@chemd/cli` | CLI validation、repair loop、semantic diff 与 agent-loop integration |
+| `@chemd/cli` | CLI validation、graph export、repair loop、semantic diff 与 agent-loop integration |
 | `@chemd/core` | 共享 AST、diagnostics、render overrides、chemistry primitives |
 | `@chemd/parser` | Frontmatter、Markdown、inline token、block、reference parsing |
 | `@chemd/resolver` | References、aliases、template expansion、semantic cleanup |
@@ -326,7 +358,7 @@ Chemistry service routes：
 | `@chemd/renderer-html` | HTML preview rendering |
 | `@chemd/renderer-json` | JSON rendering |
 | `@chemd/renderer-docx` | DOCX bridge rendering |
-| `@chemd/exporter-training` | Retrieval、training understanding、audit exports |
+| `@chemd/exporter-training` | Retrieval、training understanding、graph index、clustering、audit exports |
 | `@chemd/storage-postgres` | PostgreSQL schema、storage records、RAG chunks 与 training memory records |
 | `@chemd/compiler` | 公开 compile pipeline |
 | `@chemd/web` | Playground UI 与 server-side routes |

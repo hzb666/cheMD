@@ -37,6 +37,9 @@ playground, and a local Flask/RDKit chemistry service.
 - Compiler output for HTML preview, normalized JSON, DOCX bridge Markdown,
   canonical LNF, runtime preflight, RAG retrieval data, training understanding
   data, and full audit data.
+- Repo-level graph index and reaction clustering derived from existing
+  experiment facts, including routes, procedure reuse, condition signatures,
+  campaign trajectories, and semantic reaction-similarity edges.
 - LLM-oriented exports that separate retrieval data from training understanding
   data, keeping audit-only source detail out of model-training inputs.
 - Local chemistry API for molecule and reaction normalization, rendering, OCR
@@ -162,6 +165,38 @@ cd services/chem-service
 poetry run python -m unittest discover
 ```
 
+## CLI Workflows
+
+The package CLI is available through the root `chemd` script:
+
+```bash
+pnpm chemd validate examples/report.chemd.md
+pnpm chemd export examples/report.chemd.md --format training-full
+pnpm chemd diff before.chemd.md after.chemd.md --format json
+pnpm chemd graph reports/*.chemd.md --format json
+pnpm chemd repair draft.chemd.md --format text
+pnpm chemd agent-loop draft.chemd.md --format json --max-iterations 3
+```
+
+Important commands:
+
+| Command | Purpose |
+| --- | --- |
+| `validate <file...>` | Compile documents and report diagnostics |
+| `export <file> --format json\|lnf\|rag\|training\|training-full` | Emit structured compiler/exporter payloads |
+| `graph <file...> [--format text\|json]` | Build a repo-level graph index and reaction clusters from compiled understandings |
+| `diff <old-file> <new-file> [--format text\|json]` | Compare semantic changes between two records |
+| `changed [--base <ref>] [--format text\|json]` | Validate changed files from git status/diff context |
+| `repair <file> [--write]` | Apply compiler-guided safe fixes |
+| `agent-loop <file> [--write]` | Run iterative diagnosis and repair for generated Chemd |
+
+The `graph` command does not require graph-specific source syntax. It compiles
+one or more experiment reports, then derives document nodes, entity/relation
+edges, route clusters, family/procedure clusters, condition clusters,
+campaign trajectories, and semantic reaction-similarity edges. When computed
+chemical fingerprints are not available, the output marks this explicitly
+instead of presenting semantic similarity as RDKit/Tanimoto similarity.
+
 ## Document Language
 
 `chemd` documents are Markdown files with required frontmatter:
@@ -191,7 +226,7 @@ Structured blocks:
 
 | Block | Role |
 | --- | --- |
-| `:::chemd` | Molecule or reaction block with explicit `kind` |
+| `:::chemd` | Molecule or reaction block; `kind` can be explicit or compiler-inferred from stable reaction fields |
 | `:::result` | Outcome status, yield, conversion, selectivity, purity, notes |
 | `:::analysis` | Analysis records and TLC-style lane data |
 | `:::sample` | Sample metadata and lineage references |
@@ -277,7 +312,16 @@ Data export responsibilities:
 | --- | --- |
 | RAG export | Retrieval indexing and search context |
 | Training understanding export | LoRA/SFT dataset generation and experiment knowledge modeling |
+| Graph index export | Repo/campaign graph indexing, reaction clustering, and similarity traversal |
 | Full audit export | Inspection, debugging, and traceability |
+
+Graph-index output is intentionally inference-driven. Authors write the
+strong experimental facts that belong in a report, such as `reactants`,
+`products`, `result.ref`, `analysis.ref`, `sample.derived_from`, `route`,
+`prev`, and `condition-varies`. The exporter derives the graph and clustering
+projection from those facts rather than adding a separate graph language.
+Repo-level graph indexes are built after compiling one or more documents into
+training understandings, using `buildTrainingGraphIndexFromUnderstandings()`.
 
 ## Web Playground
 
@@ -328,7 +372,7 @@ Chemistry service routes:
 
 | Package | Role |
 | --- | --- |
-| `@chemd/cli` | CLI validation, repair loop, semantic diff, and agent-loop integration |
+| `@chemd/cli` | CLI validation, graph export, repair loop, semantic diff, and agent-loop integration |
 | `@chemd/core` | Shared AST, diagnostics, render overrides, chemistry primitives |
 | `@chemd/parser` | Frontmatter, Markdown, inline token, block, reference parsing |
 | `@chemd/resolver` | References, aliases, template expansion, semantic cleanup |
@@ -342,7 +386,7 @@ Chemistry service routes:
 | `@chemd/renderer-html` | HTML preview rendering |
 | `@chemd/renderer-json` | JSON rendering |
 | `@chemd/renderer-docx` | DOCX bridge rendering |
-| `@chemd/exporter-training` | Retrieval, training understanding, audit exports |
+| `@chemd/exporter-training` | Retrieval, training understanding, graph index, clustering, audit exports |
 | `@chemd/storage-postgres` | PostgreSQL schema, storage records, RAG chunks, and training memory records |
 | `@chemd/compiler` | Public compile pipeline |
 | `@chemd/web` | Playground UI and server-side routes |
