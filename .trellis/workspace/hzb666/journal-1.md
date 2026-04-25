@@ -1394,3 +1394,38 @@ Added reaction-level route/prev semantics with inferred next edges, route diagno
 ### Next Steps
 
 - None - task complete
+
+
+## Session 34: Repo graph index and reaction clustering
+
+**Date**: 2026-04-26
+**Task**: Repo graph index and reaction clustering
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+Added inferred training graph index, reaction semantic clustering, CLI graph export, tests, docs, and archived the Trellis task.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b81c0d1` | (see git log) |
+| `ec1a9ee` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 33
-- **Last Active**: 2026-04-24
+- **Total Sessions**: 34
+- **Last Active**: 2026-04-26
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1396 | Active |
+| `journal-1.md` | ~1431 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 34 | 2026-04-26 | Repo graph index and reaction clustering | `b81c0d1`, `ec1a9ee` | `develop` |
 | 33 | 2026-04-24 | 修复 develop 全面审查问题 | `b59bd43` | `develop` |
 | 32 | 2026-04-24 | 简化 chemd 作者输入推断 | `6aff034` | `develop` |
 | 31 | 2026-04-24 | Cross-doc refs and family aggregation | `10e1c14`, `f3e03ae` | `develop` |
