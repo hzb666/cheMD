@@ -18,6 +18,7 @@
 - 条件筛选看 `condition-varies`
 - `next` 不手写，由编译器推导
 - 能跨文档强引用的地方，都应允许跨文档强引用
+- repo / git 级 graph index 和聚类由导出层推断，不增加作者语法
 
 配套示例见：
 
@@ -735,6 +736,32 @@ prev: route-014#rxn-step-06
 - 同 optimization trajectory
 
 所以如果你希望“这份单条记录本身就让模型看见跨文档依赖”，那就必须把引用写出来。
+
+### 5.5 graph index 和相似性聚类不需要新语法
+
+repo / git 级 graph index 不是新的 Chemd 写法，而是编译后的视图。
+
+作者仍然只需要写真实实验事实：
+
+- 反应的 reactants / products / 条件
+- `result.ref`、`analysis.ref`、`sample.derived_from` 这类强引用
+- 全合成路线里的 `route` 和 `prev`
+- 条件筛选里的 `condition-varies`
+
+导出层会从这些事实自动生成：
+
+- document / entity / relation graph
+- reaction family cluster
+- procedure template cluster
+- route cluster
+- condition signature cluster
+- substrate expansion / optimization trajectory
+- reaction similarity edge
+
+如果没有 RDKit / reaction fingerprint 向量，聚类会明确标成 semantic similarity。
+不要为了让聚类“看起来更强”去手写伪 fingerprint 或伪关系。
+
+也就是说，最佳实践不是增加字段，而是把真实强关系写准，让 compiler 和 graph index 去补全派生关系。
 
 ## 6. 最常见的坏写法
 

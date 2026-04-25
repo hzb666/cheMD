@@ -2,8 +2,10 @@ import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import type {
+  BuildTrainingGraphIndexOptions,
   ChemdAgentLoopAgent,
   ChemdAgentLoopResult,
+  ChemdTrainingGraphIndexV1,
   ChemdRepairLoopResult,
   CompileResult
 } from "@chemd/compiler";
@@ -44,6 +46,7 @@ const usage = [
   "Usage:",
   "  chemd validate <file...>",
   "  chemd export <file> --format json|lnf|rag|training|training-full",
+  "  chemd graph <file...> [--format text|json]",
   "  chemd diff <old-file> <new-file> [--format text|json]",
   "  chemd changed [--base <ref>] [--format text|json]",
   "  chemd repair <file> [--format text|json] [--max-iterations <n>] [--write]",
@@ -64,6 +67,10 @@ type CompileChemd = (
   source: string,
   options?: { strictChemdKind?: boolean }
 ) => CompileResult;
+type BuildTrainingGraphIndex = (
+  understandings: CompileResult["trainingUnderstanding"][],
+  options?: BuildTrainingGraphIndexOptions
+) => ChemdTrainingGraphIndexV1;
 type RunChemdAgentLoop = (
   source: string,
   options: {
@@ -89,6 +96,7 @@ type CliCommand =
   | { type: "help" }
   | { type: "validate"; filePaths: string[] }
   | { type: "export"; filePath: string; format: ExportFormat }
+  | { type: "graph"; filePaths: string[]; format: TextFormat }
   | { type: "diff"; beforePath: string; afterPath: string; format: TextFormat }
   | { type: "changed"; base: string; format: TextFormat }
   | {
@@ -210,6 +218,13 @@ interface AgentLoopReport {
   stoppedReason: ChemdAgentLoopResult["stoppedReason"];
   writeRequested: boolean;
   wroteFile: boolean;
+}
+
+interface CliCompilerServices {
+  buildTrainingGraphIndex: BuildTrainingGraphIndex;
+  compileChemd: CompileChemd;
+  runChemdAgentLoop: RunChemdAgentLoop;
+  runChemdRepairLoop: RunChemdRepairLoop;
 }
 
 class CliUsageError extends Error {
@@ -429,6 +444,20 @@ const parseDiffArgs = (args: string[]): CliCommand => {
   };
 };
 
+const parseGraphArgs = (args: string[]): CliCommand => {
+  const { format = "text", positional } = parseCommandArgs(args, FORMAT_OPTION);
+
+  if (positional.length === 0) {
+    throw new CliUsageError("Graph requires at least one file path.");
+  }
+
+  return {
+    type: "graph",
+    filePaths: positional,
+    format: asTextFormat(format, "Graph")
+  };
+};
+
 const parseChangedArgs = (args: string[]): CliCommand => {
   const { base = "HEAD", format = "text", positional } = parseCommandArgs(args, CHANGED_OPTIONS);
 
@@ -517,6 +546,10 @@ export const parseChemdCliArgs = (argv: string[]): CliCommand => {
     return parseExportArgs(rest);
   }
 
+  if (command === "graph") {
+    return parseGraphArgs(rest);
+  }
+
   if (command === "diff") {
     return parseDiffArgs(rest);
   }
@@ -537,6 +570,7 @@ export const parseChemdCliArgs = (argv: string[]): CliCommand => {
 };
 
 const loadCompiler = async (): Promise<{
+  buildTrainingGraphIndexFromUnderstandings: BuildTrainingGraphIndex;
   compileChemd: CompileChemd;
   runChemdAgentLoop: RunChemdAgentLoop;
   runChemdRepairLoop: RunChemdRepairLoop;
@@ -668,6 +702,62 @@ const exportFile = (
   const payload = selectExportPayload(result, command.format);
 
   options.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
+  return EXIT_OK;
+};
+
+const formatGraphIndexText = (index: ChemdTrainingGraphIndexV1): string => {
+  const lines = [
+    "Chemd graph index",
+    `  documents: ${index.index_scope.document_ids.length}`,
+    `  nodes: ${index.nodes.length}`,
+    `  edges: ${index.edges.length}`,
+    `  reactions: ${index.reaction_features.length}`,
+    `  reaction clusters: ${index.reaction_clusters.length}`,
+    `  reaction similarity edges: ${index.reaction_similarity_edges.length}`
+  ];
+
+  for (const cluster of index.reaction_clusters.slice(0, 20)) {
+    lines.push(
+      `  - ${cluster.basis} ${cluster.key}: ${cluster.member_reaction_entity_ids.length} reaction(s)`
+    );
+  }
+
+  if (index.warnings.length > 0) {
+    lines.push(`  warnings: ${index.warnings.join(", ")}`);
+  }
+
+  return lines.join("\n");
+};
+
+const graphFiles = (
+  command: Extract<CliCommand, { type: "graph" }>,
+  compileChemd: CompileChemd,
+  buildTrainingGraphIndex: BuildTrainingGraphIndex,
+  options: NormalizedRunOptions
+): number => {
+  const compiled = command.filePaths.map((filePath) => ({
+    filePath,
+    result: compileSourceFile(filePath, compileChemd, options)
+  }));
+  const hasErrors = compiled.some((item) =>
+    writeErrorsIfPresent(item.filePath, item.result, options.stderr)
+  );
+
+  if (hasErrors) {
+    return EXIT_VALIDATION_FAILED;
+  }
+
+  const index = buildTrainingGraphIndex(compiled.map((item) => item.result.trainingUnderstanding), {
+    document_sources: compiled.map((item) => ({
+      document_id: item.result.trainingUnderstanding.document.document_id,
+      file_path: item.filePath
+    }))
+  });
+  const output = command.format === "json"
+    ? JSON.stringify(index, null, 2)
+    : formatGraphIndexText(index);
+
+  options.stdout.write(`${output}\n`);
   return EXIT_OK;
 };
 
@@ -1082,32 +1172,39 @@ const normalizeRunOptions = (options: RunOptions): NormalizedRunOptions => ({
 
 const executeCommand = (
   command: Exclude<CliCommand, { type: "help" }>,
-  compileChemd: CompileChemd,
-  runChemdAgentLoop: RunChemdAgentLoop,
-  runChemdRepairLoop: RunChemdRepairLoop,
+  services: CliCompilerServices,
   options: NormalizedRunOptions
 ): Promise<number> => {
   if (command.type === "validate") {
-    return Promise.resolve(validateFiles(command, compileChemd, options));
+    return Promise.resolve(validateFiles(command, services.compileChemd, options));
   }
 
   if (command.type === "export") {
-    return Promise.resolve(exportFile(command, compileChemd, options));
+    return Promise.resolve(exportFile(command, services.compileChemd, options));
+  }
+
+  if (command.type === "graph") {
+    return Promise.resolve(graphFiles(
+      command,
+      services.compileChemd,
+      services.buildTrainingGraphIndex,
+      options
+    ));
   }
 
   if (command.type === "diff") {
-    return Promise.resolve(diffFiles(command, compileChemd, options));
+    return Promise.resolve(diffFiles(command, services.compileChemd, options));
   }
 
   if (command.type === "changed") {
-    return Promise.resolve(changedFiles(command, compileChemd, options));
+    return Promise.resolve(changedFiles(command, services.compileChemd, options));
   }
 
   if (command.type === "repair") {
-    return Promise.resolve(repairFile(command, runChemdRepairLoop, options));
+    return Promise.resolve(repairFile(command, services.runChemdRepairLoop, options));
   }
 
-  return agentLoopFile(command, runChemdAgentLoop, options);
+  return agentLoopFile(command, services.runChemdAgentLoop, options);
 };
 
 export const runChemdCli = async (
@@ -1125,10 +1222,16 @@ export const runChemdCli = async (
 
     const compiler = await loadCompiler();
     const compileChemd = options.compileChemd ?? compiler.compileChemd;
+    const buildTrainingGraphIndex = compiler.buildTrainingGraphIndexFromUnderstandings;
     const runChemdAgentLoop = options.runChemdAgentLoop ?? compiler.runChemdAgentLoop;
     const runChemdRepairLoop = options.runChemdRepairLoop ?? compiler.runChemdRepairLoop;
 
-    return executeCommand(command, compileChemd, runChemdAgentLoop, runChemdRepairLoop, options);
+    return executeCommand(command, {
+      buildTrainingGraphIndex,
+      compileChemd,
+      runChemdAgentLoop,
+      runChemdRepairLoop
+    }, options);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (error instanceof CliUsageError) {

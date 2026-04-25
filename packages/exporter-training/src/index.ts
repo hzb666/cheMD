@@ -4,3 +4,5 @@ export * from "./export-record";
 export * from "./projections";
 export * from "./task-projections";
 export * from "./campaign-projections";
+export * from "./graph-index";
+export * from "./graph-index-types";

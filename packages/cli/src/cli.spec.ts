@@ -170,6 +170,48 @@ smiles: CCC
 :::
 `;
 
+const graphFamilyASource = `---
+id: exp-cli-graph-a
+title: CLI Graph A
+date: 2026-04-21
+---
+
+:::chemd #rxn-a
+kind: reaction
+name: esterification of acid A
+reactants: acid-a | alcohol
+products: ester-a
+:::
+
+:::procedure #proc-a
+step: add | materials=acid-a
+step: add | materials=alcohol
+step: hold | duration=12 h
+step: concentrate
+:::
+`;
+
+const graphFamilyBSource = `---
+id: exp-cli-graph-b
+title: CLI Graph B
+date: 2026-04-23
+---
+
+:::chemd #rxn-b
+kind: reaction
+name: esterification of acid B
+reactants: acid-b | alcohol
+products: ester-b
+:::
+
+:::procedure #proc-b
+step: add | materials=acid-b
+step: add | materials=alcohol
+step: hold | duration=12 h
+step: concentrate
+:::
+`;
+
 const runInTempDir = async (
   argv: string[],
   files: Record<string, string>,
@@ -387,6 +429,42 @@ describe("chemd cli help validation export and repair", () => {
 
     expect(result.exitCode).toBe(EXIT_USAGE);
     expect(result.stderr).toMatch(/Unsupported option: --base/);
+  });
+
+  it("exports a graph index for multiple chemd files", async () => {
+    const result = await runInTempDir(
+      ["graph", "graph-a.chemd.md", "graph-b.chemd.md", "--format", "json"],
+      {
+        "graph-a.chemd.md": graphFamilyASource,
+        "graph-b.chemd.md": graphFamilyBSource
+      }
+    );
+    const payload = JSON.parse(result.stdout);
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(payload.schema_version).toBe("chemd-training-graph-index/v0.1");
+    expect(payload.index_scope.sources).toEqual(expect.arrayContaining([
+      expect.objectContaining({ document_id: "exp-cli-graph-a", file_path: "graph-a.chemd.md" }),
+      expect.objectContaining({ document_id: "exp-cli-graph-b", file_path: "graph-b.chemd.md" })
+    ]));
+    expect(payload.reaction_clusters).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        basis: "family_procedure",
+        reaction_family: "esterification"
+      })
+    ]));
+    expect(payload.reaction_similarity_edges[0]).toMatchObject({
+      basis: expect.arrayContaining(["same_family_procedure"]),
+      warnings: ["semantic_similarity_without_computed_fingerprint"]
+    });
+    expect(result.stderr).toBe("");
+  });
+
+  it("rejects graph without input files", async () => {
+    const result = await runInTempDir(["graph"], {});
+
+    expect(result.exitCode).toBe(EXIT_USAGE);
+    expect(result.stderr).toMatch(/Graph requires at least one file path/);
   });
 
   it("reports missing files", async () => {

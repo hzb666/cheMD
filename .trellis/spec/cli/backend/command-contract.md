@@ -5,6 +5,7 @@
 ```text
 pnpm chemd validate <file...>
 pnpm chemd export <file> --format json|lnf|rag|training|training-full
+pnpm chemd graph <file...> [--format text|json]
 pnpm chemd diff <old-file> <new-file> [--format text|json]
 pnpm chemd changed [--base <ref>] [--format text|json]
 pnpm chemd repair <file> [--format text|json] [--max-iterations <n>] [--write]
@@ -44,6 +45,9 @@ error message without the usage block.
 - `validate` writes diagnostic summaries to stdout.
 - `export` and `diff` must not write business payloads to stdout if any input
   has error diagnostics; they write diagnostics to stderr and return `1`.
+- `graph` follows the same validation boundary as `export`: if any input file
+  has error diagnostics, it writes diagnostics to stderr and suppresses graph
+  payload output.
 - Warnings and info diagnostics do not fail commands by themselves.
 - `changed` validates current files. Deleted files skip current validation.
 - `repair` writes its report payload to stdout even when it exits `1`, because
@@ -96,6 +100,31 @@ files: Array<{
   diff?: SemanticDiff
 }>
 ```
+
+`graph --format json` emits:
+
+```text
+schema_version: "chemd-training-graph-index/v0.1"
+index_scope: {
+  document_ids: string[]
+  sources: Array<{
+    document_id: string
+    file_path?: string
+    commit?: string
+    content_hash?: string
+  }>
+}
+nodes: TrainingGraphIndexNodeV1[]
+edges: TrainingGraphIndexEdgeV1[]
+reaction_features: TrainingReactionGraphFeatureV1[]
+reaction_clusters: TrainingReactionClusterV1[]
+reaction_similarity_edges: TrainingReactionSimilarityEdgeV1[]
+warnings: string[]
+```
+
+Text mode prints counts plus the first reaction clusters. The command is a
+compiled projection over existing document facts; it must not require graph- or
+cluster-specific author syntax.
 
 `repair --format json` emits:
 

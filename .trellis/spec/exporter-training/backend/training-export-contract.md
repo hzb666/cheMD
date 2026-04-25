@@ -269,6 +269,22 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 - Campaign runs may carry `reaction_signature`, `reaction_family`, and
   `procedure_signature`. Cross-document trajectories may additionally carry
   `reaction_family`, `procedure_signature`, and `shared_features`.
+- Repo/campaign graph indexing is a compiled projection over one or more
+  `ChemdTrainingUnderstandingV1` records. It must not add author-facing graph
+  syntax. `buildTrainingGraphIndexFromUnderstandings()` emits:
+  - document and knowledge-graph nodes
+  - semantic/procedure/field-evidence edges
+  - reaction features derived from family, participants, procedure signature,
+    route, condition signature, changed variables, and chemistry feature refs
+  - reaction clusters by reaction signature, family, procedure, family +
+    procedure, route, condition signature, chemistry feature ref, and campaign
+    trajectory
+  - reaction similarity edges whose basis explicitly distinguishes semantic
+    similarity from future computed chemical fingerprints
+- When chemistry feature vectors are absent, graph-index reaction features must
+  set `fingerprint_status: "not_available"` and cluster warnings must say that
+  computed reaction fingerprints are unavailable. A semantic cluster must never
+  pretend to be RDKit/Tanimoto/fingerprint similarity.
 - Compiler/editor authoring assistance may consume semantic-layer and
   understanding projections to generate conservative writing suggestions, but
   those suggestions stay outside source truth until a caller explicitly applies
@@ -376,6 +392,7 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 | Material-flow task | Keep SFT-only and exclude target graph fields from the prompt |
 | Evidence interpretation task | Keep source prompts limited to evidence entities, target entities, and source refs; do not leak derived interpretation targets into the input beyond those facts |
 | Cross-document strategy task | Require at least two documents in one grouped trajectory before emitting a campaign example |
+| Graph-index semantic cluster | Emit explicit semantic basis and fingerprint-unavailable warning when no chemistry vector exists |
 
 ### 5. Good/Base/Bad Cases
 
@@ -477,6 +494,10 @@ buildLearningLayer({ document, semanticLayer, stepGraph }): LearningLayerV1
 - Assert campaign aggregation can emit `procedure_template` /
   `substrate_expansion` trajectories with `reaction_family`,
   `procedure_signature`, and `shared_features`.
+- Assert graph-index projection emits document/knowledge nodes, semantic edges,
+  route/family/procedure clusters, reaction similarity edges, and explicit
+  fingerprint-unavailable warnings when computed chemical fingerprints are not
+  present.
 
 ### 7. Wrong vs Correct
 

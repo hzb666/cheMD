@@ -44,6 +44,11 @@ export {
 export { applyCompilerDiagnosisSafeFixes } from "./diagnosis";
 export { runChemdAgentLoop } from "./agent-loop";
 export { runChemdRepairLoop } from "./repair-loop";
+export { buildTrainingGraphIndexFromUnderstandings } from "@chemd/exporter-training";
+export type {
+  BuildTrainingGraphIndexOptions,
+  ChemdTrainingGraphIndexV1
+} from "@chemd/exporter-training";
 export {
   applyAuthoringPatch,
   applyAuthoringSuggestion,
