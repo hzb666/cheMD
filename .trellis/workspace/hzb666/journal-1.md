@@ -1829,6 +1829,9 @@ Postgres bridge, runtime persistence, status UI, and runtime smoke merged into d
 - `pnpm --filter @chemd/desktop exec eslint src/App.tsx` passed.
 - `pnpm exec eslint scripts/desktop-runtime-smoke.mjs scripts/desktop-runtime-smoke.test.mjs` passed.
 - `pnpm --filter @chemd/desktop tauri:build` passed and produced release exe, MSI, and NSIS installer.
+- Post-session environment probe found no Docker command, no local PostgreSQL
+  CLI/service, and no listener on `127.0.0.1:5432`, so real DB smoke remains
+  environment-blocked rather than passed.
 - `git diff --check` passed; it emitted only a Git LF/CRLF warning on Cargo.toml.
 
 ## Remaining Risk
@@ -1845,6 +1848,71 @@ Postgres bridge, runtime persistence, status UI, and runtime smoke merged into d
 | `35f28ac` | (see git log) |
 | `e4f2586` | (see git log) |
 | `6dce6ba` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 40: Desktop IDE sixth wave persistence loop
+
+**Date**: 2026-05-12
+**Task**: Desktop IDE sixth wave persistence loop
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Desktop Graph/RAG/Agent persistence loop, UI entry, Rust bridge, and runtime smoke merged with full local validation.
+
+### Main Changes
+
+## Completed
+- Planned the sixth desktop persistence loop in the PRD.
+- Merged a desktop runtime persistence payload builder that converts editor Graph/RAG records and optional Agent state into JSON-safe `persist_runtime_graph_rag` payloads with deterministic IDs.
+- Merged the Tauri/Rust `persist_runtime_graph_rag` command and integrated fixes for first-save core row creation: `chemd_experiments`, `chemd_experiment_revisions`, and citation `chemd_rag_chunks` are upserted before Graph/RAG/Agent rows.
+- Merged runtime smoke coverage for the desktop persistence data path. With DB env configured, it writes and reads back core experiment/revision, graph snapshot/nodes/edges, citation chunk/citation, Agent run/tool call, and patch proposal records.
+- Merged the desktop UI `Persist graph` action into the existing Postgres runtime panel. It builds payloads from the current editor source and Agent state, requires Postgres ready + pgvector + schema ready, and shows safe counts plus a graph snapshot summary.
+- Reviewed and closed all sixth-wave child agents, removed safely merged worktrees and branches.
+
+## Verification
+- `pnpm exec vitest run apps/desktop/src/desktop-runtime-persistence.test.ts --config packages/compiler/vitest.config.ts --pool=threads` passed, 5 tests.
+- `pnpm test:scripts` passed, 25 tests.
+- `pnpm desktop:runtime-smoke` passed as SKIP because no `CHEMD_POSTGRES_DATABASE_URL` or `DATABASE_URL` was configured.
+- `pnpm --filter @chemd/desktop typecheck` passed.
+- `pnpm --filter @chemd/desktop build` passed with existing Vite warnings for lucide `use client` and chunk size.
+- `cargo test` in `apps/desktop/src-tauri` passed, 24 tests.
+- `cargo check` in `apps/desktop/src-tauri` passed.
+- `pnpm typecheck` passed, 21 packages.
+- `pnpm test` passed, including Turbo tests, script tests, and 52 Python tests.
+- `pnpm --filter @chemd/desktop exec eslint src/App.tsx src/desktop-contracts.ts src/desktop-runtime-persistence.ts src/desktop-runtime-persistence.test.ts` passed.
+- `pnpm exec eslint scripts/desktop-runtime-smoke.mjs scripts/desktop-runtime-smoke.test.mjs` passed.
+- `git diff --check` passed.
+- `pnpm --filter @chemd/desktop tauri:build` passed and produced release exe, MSI, and NSIS installer.
+
+## Remaining Risk
+- Real PostgreSQL write/read was not executed in this machine because no database URL was configured; the smoke script reports this as SKIP, not pass.
+- The desktop app now has a production-oriented local persistence path, but real runtime proof still requires a configured PostgreSQL instance and user click/smoke execution against that instance.
+- Vite still emits non-failing warnings for lucide module-level `use client` directives and a desktop bundle chunk above 500 kB.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `97eaa18` | (see git log) |
+| `b5bd1cf` | (see git log) |
+| `bbba708` | (see git log) |
+| `24e1016` | (see git log) |
+| `6d45e69` | (see git log) |
 
 ### Testing
 
