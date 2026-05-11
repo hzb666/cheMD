@@ -140,3 +140,36 @@ export interface PostgresGraphRagStorageRecords {
   agentToolCalls: PostgresAgentToolCallRecord[];
   patchProposals: PostgresPatchProposalRecord[];
 }
+
+export interface PostgresGraphRagQuery {
+  sql: string;
+  values: readonly unknown[];
+}
+
+export interface UpsertPostgresGraphSnapshotInput {
+  graphSnapshot: PostgresReactionGraphSnapshotRecord;
+  nodes?: readonly PostgresReactionGraphNodeRecord[];
+  edges?: readonly PostgresReactionGraphEdgeRecord[];
+}
+
+export interface ListPostgresGraphSnapshotSummariesInput {
+  experimentId?: string;
+  graphKind?: PostgresReactionGraphSnapshotRecord["graphKind"];
+  limit?: number;
+}
+
+export interface LoadPostgresGraphDetailInput {
+  graphSnapshotId: string;
+}
+
+export interface PostgresGraphDetailQueries {
+  snapshot: PostgresGraphRagQuery;
+  nodes: PostgresGraphRagQuery;
+  edges: PostgresGraphRagQuery;
+}
+
+export interface ListPendingPostgresPatchProposalsInput {
+  experimentId?: string;
+  baseRevisionId?: string;
+  limit?: number;
+}

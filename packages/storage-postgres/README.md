@@ -54,6 +54,59 @@ call `compileChemd()`, open database connections, execute migrations, or
 generate embeddings. It emits citation sidecar records for existing
 `chemd_rag_chunks`; it does not create a second RAG chunk table.
 
+The repository helpers are query builders only. They return parameterized
+`{ sql, values }` objects so runtime layers can execute them with an injected
+PostgreSQL client inside their own transaction:
+
+```ts
+import {
+  buildListPendingPatchProposalsQuery,
+  buildUpsertGraphSnapshotQueries,
+  buildUpsertRagChunkCitationQuery
+} from "@chemd/storage-postgres";
+
+const graphQueries = records.graphSnapshot
+  ? buildUpsertGraphSnapshotQueries({
+      graphSnapshot: records.graphSnapshot,
+      nodes: records.reactionGraphNodes,
+      edges: records.reactionGraphEdges
+    })
+  : [];
+
+const citationQuery = buildUpsertRagChunkCitationQuery(
+  records.ragChunkCitations[0]
+);
+
+const pendingPatches = buildListPendingPatchProposalsQuery({
+  experimentId: "exp-storage",
+  limit: 50
+});
+```
+
+The helpers target the shared extension tables:
+
+- `chemd_reaction_graph_snapshots`
+- `chemd_reaction_graph_nodes`
+- `chemd_reaction_graph_edges`
+- `chemd_rag_chunk_citations`
+- `chemd_agent_runs`
+- `chemd_agent_tool_calls`
+- `chemd_patch_proposals`
+
+They deliberately reuse the existing primary data model:
+
+- experiments stay in `chemd_experiments`
+- revisions stay in `chemd_experiment_revisions`
+- compiled artifacts stay in `chemd_compile_artifacts`
+- RAG chunks stay in `chemd_rag_chunks`
+- graph citations reference `(revision_id, chunk_id)` in `chemd_rag_chunks`
+- patch proposals point at existing base revisions
+
+There are no desktop-only workspace, document, revision, RAG chunk, embedding,
+or patch tables. Desktop IDE runtime code should compose these query builders
+with the same PostgreSQL client and transaction boundaries used by the rest of
+the app/server layer.
+
 ## Runtime Setup
 
 Use `pnpm postgres:migrate` from the repository root to install the schema
