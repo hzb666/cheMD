@@ -1,0 +1,90 @@
+.desktop-topbar {
+  display: grid;
+  grid-template-columns: minmax(15rem, 22rem) minmax(8rem, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  min-height: 3.25rem;
+  padding: 0 1rem;
+  border-bottom: 1px solid var(--border);
+  background: rgba(248, 250, 252, 0.92);
+}
+
+.desktop-brand {
+  min-width: 0;
+  gap: 0.7rem;
+}
+
+.desktop-logo-mark {
+  display: inline-flex;
+  width: 1.8rem;
+  height: 1.8rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--primary) 26%, white);
+  border-radius: 7px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.desktop-brand-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.desktop-product-name {
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 0.9rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-path-chip {
+  overflow: hidden;
+  width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-runtime-badges {
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.desktop-status-badge {
+  display: inline-flex;
+  min-height: 1.65rem;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+  font-weight: 560;
+  white-space: nowrap;
+}
+
+.desktop-status-dot {
+  width: 0.38rem;
+  height: 0.38rem;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.desktop-status-badge[data-state="success"] {
+  color: var(--success);
+}
+
+.desktop-status-badge[data-state="warning"],
+.desktop-status-badge[data-state="pending"] {
+  color: var(--warning);
+}
+
+.desktop-status-badge[data-state="danger"] {
+  color: var(--danger);
+}

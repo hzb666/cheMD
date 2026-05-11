@@ -1,0 +1,90 @@
+:root {
+  --background: #ffffff;
+  --foreground: rgba(0, 0, 0, 0.95);
+  --card: #ffffff;
+  --muted: #f6f5f4;
+  --muted-foreground: #615d59;
+  --accent: #f2f9ff;
+  --accent-foreground: #097fe8;
+  --primary: #0075de;
+  --primary-foreground: #ffffff;
+  --border: rgba(0, 0, 0, 0.1);
+  --success: #1aae39;
+  --warning: #dd5b00;
+  --danger: #c2410c;
+  --font-sans: Inter, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-border: var(--border);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-sans);
+  text-rendering: optimizeLegibility;
+}
+
+button {
+  font: inherit;
+}
+
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+.desktop-shell {
+  display: flex;
+  min-width: 1024px;
+  height: 100%;
+  min-height: 720px;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--background);
+}
+
+.desktop-brand,
+.desktop-runtime-badges,
+.desktop-topbar-center,
+.desktop-panel-header,
+.desktop-sidebar-action-row,
+.desktop-editor-toolbar,
+.desktop-bottom-tabs,
+.desktop-log-line {
+  display: flex;
+  align-items: center;
+}
+
+.desktop-workspace-name,
+.desktop-path-chip,
+.desktop-panel-meta,
+.desktop-toolbar-text,
+.desktop-file-kind,
+.desktop-sidebar-note,
+.desktop-log-line {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+}

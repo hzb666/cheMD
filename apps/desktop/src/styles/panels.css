@@ -1,0 +1,212 @@
+.desktop-pane {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--background);
+}
+
+.desktop-editor-pane {
+  border-right: 1px solid var(--border);
+}
+
+.desktop-panel-header {
+  min-height: 3rem;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0 0.85rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.desktop-panel-title-group {
+  min-width: 0;
+}
+
+.desktop-panel-eyebrow,
+.desktop-preview-kicker {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 0.64rem;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.desktop-panel-header h2 {
+  overflow: hidden;
+  margin: 0.1rem 0 0;
+  color: var(--foreground);
+  font-size: 0.85rem;
+  font-weight: 640;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-editor-toolbar {
+  gap: 0.45rem;
+  min-height: 2.5rem;
+  padding: 0 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: #fbfcfe;
+}
+
+.desktop-icon-button {
+  width: 1.85rem;
+  height: 1.85rem;
+}
+
+.desktop-toolbar-divider {
+  width: 1px;
+  height: 1.1rem;
+  background: var(--border);
+}
+
+.desktop-editor-surface {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  background:
+    linear-gradient(180deg, #fbfcfe 0%, #f7f9fc 100%),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.03) 1px, transparent 1px),
+    linear-gradient(rgba(15, 23, 42, 0.03) 1px, transparent 1px);
+  background-size: auto, 24px 24px, 24px 24px;
+}
+
+.desktop-editor-surface pre {
+  margin: 0;
+  padding: 1rem 1.1rem;
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  line-height: 1.66;
+  white-space: pre-wrap;
+}
+
+.desktop-tab-list {
+  display: flex;
+  gap: 0.125rem;
+  min-height: 2.5rem;
+  align-items: center;
+  padding: 0 0.7rem;
+  border-bottom: 1px solid var(--border);
+  background: #fbfcfe;
+}
+
+.desktop-tab {
+  min-height: 1.85rem;
+  min-width: 4rem;
+  padding: 0 0.55rem;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 0.74rem;
+}
+
+.desktop-tab[data-active="true"] {
+  background: var(--background);
+  color: var(--foreground);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.03),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.04);
+}
+
+.desktop-preview-surface {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: 0.9rem;
+  background: #f5f7fb;
+}
+
+.desktop-document-preview {
+  min-height: 100%;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #fff;
+}
+
+.desktop-document-preview h3 {
+  margin: 0.45rem 0 0.55rem;
+  font-size: 1rem;
+}
+
+.desktop-document-preview p {
+  max-width: 34rem;
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.desktop-document-preview dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin: 1rem 0 0;
+}
+
+.desktop-document-preview dl > div {
+  padding: 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #fbfcfe;
+}
+
+.desktop-document-preview dt,
+.desktop-document-preview dd {
+  margin: 0;
+}
+
+.desktop-document-preview dt {
+  color: var(--muted-foreground);
+  font-size: 0.7rem;
+}
+
+.desktop-document-preview dd {
+  margin-top: 0.18rem;
+  color: var(--foreground);
+  font-size: 0.8rem;
+}
+
+.desktop-bottom-panel {
+  grid-column: 1 / -1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-top: 1px solid var(--border);
+  background: #fbfcfe;
+}
+
+.desktop-bottom-tabs {
+  gap: 0.2rem;
+  min-height: 2.2rem;
+  padding: 0 0.65rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.desktop-bottom-tab {
+  display: inline-flex;
+  min-height: 1.65rem;
+  align-items: center;
+  gap: 0.32rem;
+  padding: 0 0.55rem;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 0.74rem;
+}
+
+.desktop-bottom-tab[data-active="true"] {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.desktop-log-line {
+  gap: 0.45rem;
+  padding: 0.75rem 0.8rem;
+  font-family: var(--font-mono);
+}
