@@ -59,6 +59,9 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@chemd/agent-tools':
+        specifier: workspace:*
+        version: link:../../packages/agent-tools
       '@chemd/language-service':
         specifier: workspace:*
         version: link:../../packages/language-service

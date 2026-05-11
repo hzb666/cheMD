@@ -92,3 +92,48 @@ isolated.
   decisions.
 - Final integration runs targeted package tests, desktop build/typecheck, Rust
   checks, root `pnpm typecheck`, root `pnpm test`, and `git diff --check`.
+
+## Third-Wave Production Runtime Slices
+
+The third wave closes the remaining runtime gaps without reintroducing a wrapped
+web app architecture.
+
+1. `desktop-ide-sidecar-runtime`
+   - Owns `apps/desktop/src-tauri/**` and `apps/desktop/src/desktop-contracts.ts`.
+   - Adds chem-service sidecar lifecycle commands with explicit start, stop,
+     status, and log tail behavior.
+   - Only manages processes it started; it must not kill unrelated user
+     processes.
+
+2. `desktop-ide-agent-pane`
+   - Owns `apps/desktop/src/App.tsx` and desktop CSS files.
+   - Uses `@chemd/agent-tools` to turn diagnostics/quick fixes into local agent
+     runs, patch proposals, approval decisions, and audit timeline entries.
+   - Applies patches only through explicit user approval.
+
+3. `desktop-ide-postgres-executor`
+   - Owns `packages/storage-postgres/src/graph-rag-*`,
+     `packages/storage-postgres/src/index.ts`, and
+     `packages/storage-postgres/README.md`.
+   - Adds executor and row-mapping helpers around the existing parameterized
+     Graph/RAG query builders.
+   - Keeps all tables generic and shared with the main PostgreSQL model.
+
+4. `desktop-ide-graph-records`
+   - Owns `packages/language-service/**`.
+   - Adds compiler-output-to-Graph/RAG record generation helpers for desktop and
+     server runtimes to persist graph snapshots and citation sidecars.
+   - Does not touch storage schema or desktop UI.
+
+## Third-Wave Acceptance Criteria
+
+- Desktop can start/stop/status the local chem-service sidecar boundary.
+- Desktop Agent pane creates auditable local runs and approved patch proposals
+  from real language-service diagnostics/quick fixes.
+- Graph/RAG query builders can be executed through a typed client interface and
+  map rows back into domain records.
+- Language-service can produce graph/RAG storage records from a compiled source
+  without direct database access.
+- Final verification includes targeted package tests, desktop build,
+  `cargo test`, `cargo check`, root `pnpm typecheck`, root `pnpm test`,
+  `tauri:build`, and `git diff --check`.
