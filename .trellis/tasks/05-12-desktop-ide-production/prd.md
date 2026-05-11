@@ -213,3 +213,54 @@ of leaving Graph/RAG persistence as library-only infrastructure.
 - UI and smoke tests verify the runtime surface from the desktop side.
 - Session recording does not end the workflow if these acceptance criteria or
   final validation are still incomplete.
+
+## Sixth-Wave Desktop Persistence Loop Slices
+
+The sixth wave turns the runtime bridge into an end-user workflow: a desktop
+user can build Graph/RAG records from the current editor state and persist them
+through the configured PostgreSQL runtime, while the app continues to reuse the
+main PostgreSQL schema.
+
+1. `desktop-ide-rust-persist-bridge`
+   - Owns `apps/desktop/src-tauri/src/postgres*`,
+     `apps/desktop/src-tauri/src/lib.rs`, and
+     `apps/desktop/src/desktop-contracts.ts`.
+   - Adds a `persist_runtime_graph_rag` command that accepts normalized runtime
+     Graph/RAG/Agent records, validates required IDs, writes through
+     parameterized SQL in one transaction, and returns counts plus a redacted
+     target summary.
+   - Must not add `desktop_*` or `chemd_desktop_*` tables.
+
+2. `desktop-ide-persist-payload-builder`
+   - Owns `apps/desktop/src/desktop-runtime-persistence.ts` and focused tests.
+   - Converts existing `@chemd/language-service` editor Graph/RAG records and
+     local Agent state into the command payload without importing database
+     drivers or duplicating SQL.
+   - Provides deterministic IDs so repeated saves upsert the same snapshot.
+
+3. `desktop-ide-persist-ui`
+   - Runs after the payload builder contract is integrated.
+   - Owns `apps/desktop/src/App.tsx` and desktop CSS files.
+   - Adds a compact "Persist graph" action, pending/success/failure state, and
+     persisted counts near the existing Postgres runtime panel.
+   - Keeps the light dense workbench style aligned with the web app.
+
+4. `desktop-ide-persist-smoke`
+   - Runs after the bridge and UI are integrated.
+   - Extends `desktop:runtime-smoke` to exercise a minimal runtime persistence
+     payload when database env is configured.
+   - Keeps no-env behavior as an explicit SKIP rather than a false pass.
+
+## Sixth-Wave Acceptance Criteria
+
+- Desktop UI exposes a user-controlled persistence action for the current
+  editor Graph/RAG/Agent snapshot.
+- The Tauri command persists snapshot, nodes, edges, citations, Agent runs, tool
+  calls, and patch proposals through one PostgreSQL transaction.
+- All SQL is parameterized and targets the existing shared schema only.
+- Command and UI responses never leak database passwords or full URLs.
+- Local validation includes targeted desktop/storage/script tests,
+  `pnpm typecheck`, `pnpm test`, Rust `cargo test/check`, desktop build,
+  `tauri:build`, and `git diff --check`.
+- If no database URL is configured, smoke output records SKIP explicitly and the
+  workflow continues to the next production gap instead of stopping.
