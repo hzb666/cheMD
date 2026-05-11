@@ -1429,3 +1429,91 @@ Added inferred training graph index, reaction semantic clustering, CLI graph exp
 ### Next Steps
 
 - None - task complete
+
+
+## Session 35: Integrate desktop IDE production slice
+
+**Date**: 2026-05-12
+**Task**: Integrate desktop IDE production slice
+**Package**: desktop-ide
+**Branch**: `desktop-ide`
+
+### Summary
+
+Integrated the first production desktop IDE slice with Tauri shell, language service, generic Postgres graph/RAG contracts, agent tool guards, docs, and full validation.
+
+### Main Changes
+
+### Main Changes
+
+| Area | Summary |
+|------|---------|
+| Desktop shell | Added `apps/desktop` Vite/React/Tauri v2 skeleton with workspace file commands and a web-aligned IDE shell. |
+| Language service | Added `@chemd/language-service` around `compileChemd` for editor diagnostics, outline, symbols, quick fixes, and Monaco adapters. |
+| Storage/Postgres | Extended `@chemd/storage-postgres` with generic reaction graph, RAG citation, agent run, tool call, and patch proposal contracts. It reuses existing `chemd_experiments`, `chemd_experiment_revisions`, and `chemd_rag_chunks`; no desktop-only parallel schema is introduced. |
+| Agent tools | Added `@chemd/agent-tools` contracts for agent runs, tool calls, evidence, patch proposals, and guarded patch apply decisions requiring approvals, base hash match, and cited evidence. |
+| Docs/Trellis | Added production architecture docs under `docs/desktop-ide-*.zh-CN.md`, README links, and the parallel task packet under `.trellis/tasks/05-12-desktop-ide-production`. |
+
+### Parallel Integration
+
+- Integrated `desktop-ide-agent-tools` as `a0b379d`.
+- Integrated `desktop-ide-language-service` as `1a4bedd`.
+- Integrated corrected `desktop-ide-postgres-graph-rag` as `0ecd1b7`.
+- Integrated `desktop-ide-shell` as `9b1eb48`.
+- Added workspace dependency wiring as `5281d56`.
+- Recorded Trellis task setup as `f09995a`.
+
+### Verification
+
+- [OK] `pnpm --filter @chemd/agent-tools test`
+- [OK] `pnpm --filter @chemd/language-service test`
+- [OK] `pnpm --filter @chemd/storage-postgres test`
+- [OK] `pnpm --filter @chemd/agent-tools typecheck`
+- [OK] `pnpm --filter @chemd/language-service typecheck`
+- [OK] `pnpm --filter @chemd/storage-postgres typecheck`
+- [OK] `pnpm --filter @chemd/desktop typecheck`
+- [OK] `pnpm --filter @chemd/desktop build`
+- [OK] `cargo check` in `apps/desktop/src-tauri`
+- [OK] `pnpm typecheck`
+- [OK] `pnpm run test:py` after `poetry install` restored the service venv dependencies
+- [OK] `pnpm test`
+- [OK] `git diff --check`
+
+### Notes
+
+- `pnpm install` kept existing peer warnings for `ketcher-react` against React 19 and ignored build-script approval warnings for `core-js`, `esbuild`, and `sharp`.
+- `pnpm --filter @chemd/desktop build` emitted the existing Vite warning that `lucide-react` module-level `use client` directives are ignored during bundling.
+- The first broad `pnpm test` run failed only because the freshly created Poetry virtualenv lacked Flask; `poetry install` installed locked Python dependencies and the rerun passed.
+
+### Status
+
+[OK] Integrated on `desktop-ide` and ready for review.
+
+### Next Steps
+
+- Continue from this slice by wiring real desktop workspace persistence and live Postgres-backed graph/RAG queries behind the documented contracts.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `59702a4` | (see git log) |
+| `a0b379d` | (see git log) |
+| `1a4bedd` | (see git log) |
+| `0ecd1b7` | (see git log) |
+| `9b1eb48` | (see git log) |
+| `5281d56` | (see git log) |
+| `f09995a` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
