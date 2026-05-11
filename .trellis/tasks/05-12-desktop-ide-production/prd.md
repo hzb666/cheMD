@@ -174,3 +174,42 @@ model.
 - Final integration repeats targeted validations, root `pnpm typecheck`, root
   `pnpm test`, `cargo test`, `cargo check`, desktop build, `tauri:build`, and
   `git diff --check`.
+
+## Fifth-Wave Postgres Runtime Bridge Slices
+
+The fifth wave connects the desktop IDE to the real PostgreSQL runtime instead
+of leaving Graph/RAG persistence as library-only infrastructure.
+
+1. `desktop-ide-postgres-bridge`
+   - Owns Tauri/Rust Postgres bridge files and `desktop-contracts.ts`.
+   - Adds a `read_postgres_status` command that reads env configuration,
+     redacts secrets, performs bounded connection checks, verifies pgvector, and
+     verifies the existing Graph/RAG tables.
+   - Does not introduce desktop-specific tables.
+
+2. `desktop-ide-postgres-runtime-persistence`
+   - Owns `packages/storage-postgres/src/graph-rag-*`.
+   - Adds a transaction helper that persists runtime Graph/RAG DTOs, citations,
+     Agent runs, tool calls, and patch proposals using the existing executor.
+   - Keeps `@chemd/storage-postgres` independent from desktop packages and `pg`.
+
+3. `desktop-ide-postgres-ui`
+   - Runs after the shared desktop contract is integrated.
+   - Adds compact workbench controls for Postgres status/config visibility and
+     safe manual refresh.
+
+4. `desktop-ide-runtime-smoke`
+   - Runs after bridge and UI integration.
+   - Adds a local smoke path that validates sidecar health, desktop build, and
+     Postgres status behavior without requiring secrets to be committed.
+
+## Fifth-Wave Acceptance Criteria
+
+- Desktop can report whether PostgreSQL is configured, reachable, pgvector is
+  installed, and existing Graph/RAG tables are ready.
+- No command response leaks database passwords or full connection URLs.
+- Runtime Graph/RAG/Agent records can be persisted through one transaction with
+  rollback on failure.
+- UI and smoke tests verify the runtime surface from the desktop side.
+- Session recording does not end the workflow if these acceptance criteria or
+  final validation are still incomplete.
