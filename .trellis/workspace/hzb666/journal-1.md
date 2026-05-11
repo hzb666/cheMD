@@ -1794,3 +1794,66 @@ Integrated sidecar runtime controls, PostgreSQL runtime adapters, and healthz-ba
 ### Next Steps
 
 - None - task complete
+
+
+## Session 39: Desktop IDE fifth wave Postgres runtime bridge
+
+**Date**: 2026-05-12
+**Task**: Desktop IDE fifth wave Postgres runtime bridge
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Postgres bridge, runtime persistence, status UI, and runtime smoke merged into desktop-ide with full local validation.
+
+### Main Changes
+
+## Completed
+- Planned the fifth desktop IDE runtime bridge wave in the PRD.
+- Merged Postgres runtime persistence into `@chemd/storage-postgres` without adding desktop-specific tables.
+- Merged the Tauri Postgres bridge with redacted config discovery, readiness checks, pgvector check, and core Graph/RAG/agent schema table checks.
+- Merged the desktop Postgres status panel while preserving the existing light workbench UI style.
+- Merged `desktop:runtime-smoke` for CI-safe runtime verification that skips cleanly without secrets and runs the existing PostgreSQL smoke path when env is configured.
+- Reviewed and closed all fifth-wave child agents, removed safely merged branches, and cleaned merged worktrees.
+
+## Verification
+- `pnpm --filter @chemd/desktop typecheck` passed.
+- `pnpm --filter @chemd/desktop build` passed with existing Vite warnings for lucide `use client` and chunk size.
+- `pnpm test:scripts` passed, 23 tests.
+- `pnpm desktop:runtime-smoke` passed as SKIP because no `CHEMD_POSTGRES_DATABASE_URL` or `DATABASE_URL` was configured.
+- `pnpm typecheck` passed, 21 packages.
+- `pnpm test` passed, including Turbo tests, script tests, and 52 Python tests.
+- `cargo test` passed, 22 Rust tests.
+- `cargo check` passed.
+- `pnpm --filter @chemd/desktop exec eslint src/App.tsx` passed.
+- `pnpm exec eslint scripts/desktop-runtime-smoke.mjs scripts/desktop-runtime-smoke.test.mjs` passed.
+- `pnpm --filter @chemd/desktop tauri:build` passed and produced release exe, MSI, and NSIS installer.
+- `git diff --check` passed; it emitted only a Git LF/CRLF warning on Cargo.toml.
+
+## Remaining Risk
+- Real PostgreSQL write/read runtime proof was not executed in this environment because no database URL was configured; the new smoke script reports this as SKIP, not pass.
+- The desktop app can report Postgres readiness, but the editor UI still needs an end-user command that persists the current Graph/RAG/agent snapshot through the desktop runtime path.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `cee2092` | (see git log) |
+| `5d72cf3` | (see git log) |
+| `35f28ac` | (see git log) |
+| `e4f2586` | (see git log) |
+| `6dce6ba` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
