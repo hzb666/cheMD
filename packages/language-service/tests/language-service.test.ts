@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildEditorGraphRagRecords,
   compileChemdForEditor,
   toMonacoCodeActions,
   toMonacoMarker
@@ -99,5 +100,168 @@ describe("compileChemdForEditor", () => {
         message: "compiler unavailable"
       }
     });
+  });
+});
+
+describe("buildEditorGraphRagRecords", () => {
+  const createdAt = "2026-05-12T01:02:03.000Z";
+
+  const reactionRouteSource = `---
+id: exp-route-records
+title: Route records
+date: 2026-05-12
+---
+
+:::chemd #mol-a
+kind: molecule
+smiles: CCO
+:::
+
+:::chemd #mol-b
+kind: molecule
+smiles: CC=O
+:::
+
+:::chemd #rxn-step-01
+kind: reaction
+route: route-a
+reactants: mol-a
+products: mol-b
+:::
+
+:::chemd #rxn-step-02
+kind: reaction
+route: route-a
+prev: rxn-step-01
+reactants: mol-b
+products: product-b
+:::
+
+:::result #res-step-02
+reaction: rxn-step-02
+status: success
+yield: 82%
+:::
+`;
+
+  it("builds reaction graph DTOs from outline, entities, route links, and RAG chunks", () => {
+    const records = buildEditorGraphRagRecords({
+      source: reactionRouteSource,
+      documentUri: "file:///route.chemd",
+      experimentId: "exp-route-records",
+      revisionId: "rev-route-1",
+      createdAt
+    });
+
+    expect(records.graphSnapshot).toMatchObject({
+      graphSnapshotId: "rev-route-1::editor-graph-rag",
+      experimentId: "exp-route-records",
+      sourceRevisionIds: ["rev-route-1"],
+      graphKind: "reaction",
+      createdAt
+    });
+    expect(records.reactionGraphNodes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ nodeKind: "block", blockId: "rxn-step-02" }),
+      expect.objectContaining({
+        nodeKind: "entity",
+        entityId: expect.stringContaining("rxn-step-02"),
+        blockId: "rxn-step-02"
+      })
+    ]));
+    expect(records.reactionGraphEdges).toEqual(expect.arrayContaining([
+      expect.objectContaining({ edgeType: "document_order", confidence: "high" }),
+      expect.objectContaining({ edgeType: "block_contains_entity", confidence: "high" }),
+      expect.objectContaining({ edgeType: "route_prev" }),
+      expect.objectContaining({ edgeType: "evidence_link" })
+    ]));
+    expect(records.ragCitationCandidates).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        documentUri: "file:///route.chemd",
+        revisionId: "rev-route-1",
+        entityId: expect.stringContaining("res-step-02"),
+        blockId: "res-step-02",
+        sourceRange: expect.objectContaining({ startLine: 32 }),
+        citation: expect.objectContaining({
+          documentUri: "file:///route.chemd",
+          revisionId: "rev-route-1"
+        })
+      })
+    ]));
+  });
+
+  it("keeps markdown-only documents persistable with fallback source ranges", () => {
+    const records = buildEditorGraphRagRecords({
+      source: `---
+id: exp-markdown-records
+title: Markdown records
+date: 2026-05-12
+---
+
+This observation is plain markdown with no Chemd blocks.
+`,
+      experimentId: "exp-markdown-records",
+      revisionId: "rev-markdown-1",
+      createdAt
+    });
+
+    expect(records.ragCitationCandidates.length).toBeGreaterThan(0);
+    expect(records.ragCitationCandidates[0]).toMatchObject({
+      revisionId: "rev-markdown-1",
+      sourceRange: expect.objectContaining({ startLine: expect.any(Number) }),
+      quality: expect.objectContaining({ range_source: expect.any(String) })
+    });
+  });
+
+  it("links diagnostic evidence to editor source ranges", () => {
+    const records = buildEditorGraphRagRecords({
+      source,
+      experimentId: "exp-language-service",
+      revisionId: "rev-diagnostics-1",
+      createdAt,
+      options: { strictChemdKind: true }
+    });
+
+    expect(records.reactionGraphNodes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        nodeKind: "diagnostic",
+        payload: expect.objectContaining({
+          code: "W_CHEMD_KIND_AMBIGUOUS",
+          source_node_id: "mol-main"
+        })
+      })
+    ]));
+    expect(records.reactionGraphEdges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        edgeType: "diagnostic_evidence",
+        confidence: "high",
+        evidence: expect.objectContaining({
+          diagnostic_code: "W_CHEMD_KIND_AMBIGUOUS",
+          source_node_id: "mol-main",
+          source_range: expect.objectContaining({ startLine: expect.any(Number) })
+        })
+      })
+    ]));
+  });
+
+  it("generates stable ids for the same source and revision", () => {
+    const input = {
+      source: reactionRouteSource,
+      experimentId: "exp-route-records",
+      revisionId: "rev-route-1",
+      createdAt
+    };
+    const first = buildEditorGraphRagRecords(input);
+    const second = buildEditorGraphRagRecords(input);
+
+    expect(second.graphSnapshot.graphSnapshotId).toBe(first.graphSnapshot.graphSnapshotId);
+    expect(second.reactionGraphNodes.map((node) => node.nodeId)).toEqual(
+      first.reactionGraphNodes.map((node) => node.nodeId)
+    );
+    expect(second.reactionGraphEdges.map((edge) => edge.edgeId)).toEqual(
+      first.reactionGraphEdges.map((edge) => edge.edgeId)
+    );
+    expect(second.ragCitationCandidates.map((candidate) => candidate.citationId)).toEqual(
+      first.ragCitationCandidates.map((candidate) => candidate.citationId)
+    );
   });
 });
