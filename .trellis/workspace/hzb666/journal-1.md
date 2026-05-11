@@ -1704,3 +1704,93 @@ Integrated third-wave desktop IDE runtime slices across PostgreSQL Graph/RAG exe
 ### Next Steps
 
 - None - task complete
+
+
+## Session 38: Desktop IDE fourth-wave runtime hardening
+
+**Date**: 2026-05-12
+**Task**: Desktop IDE fourth-wave runtime hardening
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Integrated sidecar runtime controls, PostgreSQL runtime adapters, and healthz-backed sidecar readiness for the desktop IDE.
+
+### Main Changes
+
+## Main Changes
+
+| Area | Summary |
+|------|---------|
+| Fourth-wave planning | Added fourth-wave hardening scope to the desktop IDE PRD for sidecar health, runtime controls, and PostgreSQL runtime adapters. |
+| Sidecar runtime controls | Added compact IDE controls for Start, Stop, Refresh, and Load logs, with a single-operation guard, disabled/loading states, clear user-facing errors, pid/startedAt/detail display, and log tail rendering. |
+| PostgreSQL runtime adapters | Added dependency-free adapter helpers that map editor Graph/RAG DTOs, RAG citation candidates, Agent runs, tool calls, and patch proposals into existing `@chemd/storage-postgres` executor record inputs without desktop-specific tables. |
+| Sidecar health readiness | Promoted sidecar `ready` from process-spawned to `/healthz`-probed readiness, with bounded retry, timeout, degraded status on failure, pid/log preservation, and tests for success, closed port, timeout, ready, and degraded paths. |
+| Integration correction | Corrected the sidecar default health URL to `http://127.0.0.1:18081/healthz`, matching the actual `chem-service` default `CHEM_SERVICE_PORT`. |
+
+## Parallel Integration
+
+- Dispatched three gpt-5.5-high subagents in separate worktrees.
+- Integrated `desktop-ide-runtime-controls` as `9ddbc5d` after UI/concurrency review, desktop lint/typecheck/build, and a timestamp-display compatibility fix.
+- Integrated `desktop-ide-postgres-runtime-adapters` as `1bed7da` after checking dependency isolation, no `desktop_*`/`chemd_desktop_*` tables, storage tests, and typecheck.
+- Integrated `desktop-ide-sidecar-health` as `5e43588` after Rust lifecycle review, cargo test/check, and fixing the default health port to 18081 during integration.
+
+## Verification
+
+- [OK] `pnpm exec eslint apps/desktop/src/App.tsx`
+- [OK] `pnpm --filter @chemd/desktop typecheck`
+- [OK] `pnpm --filter @chemd/desktop build`
+- [OK] `pnpm --filter @chemd/storage-postgres test`
+- [OK] `pnpm --filter @chemd/storage-postgres typecheck`
+- [OK] `cargo test` in `apps/desktop/src-tauri`
+- [OK] `cargo check` in `apps/desktop/src-tauri`
+- [OK] `pnpm typecheck`
+- [OK] `pnpm test`
+- [OK] `pnpm --filter @chemd/desktop tauri:build`
+- [OK] `git diff --check`
+
+## Packaging Evidence
+
+`tauri:build` produced:
+
+- `apps/desktop/src-tauri/target/release/bundle/msi/Chemd Desktop IDE_0.1.0_x64_en-US.msi`
+- `apps/desktop/src-tauri/target/release/bundle/nsis/Chemd Desktop IDE_0.1.0_x64-setup.exe`
+
+## Notes
+
+- Vite still emits non-failing warnings for lucide-react module-level `use client` directives and a desktop bundle chunk above 500 kB.
+- The sidecar health probe currently supports plain HTTP URLs and the default localhost service path; HTTPS/IPv6 URL parsing is not implemented.
+- The desktop app still needs a runtime bridge that actually connects configured PostgreSQL credentials from the desktop environment to the new storage adapters and executor helpers.
+
+## Status
+
+[OK] Fourth production hardening wave integrated on `desktop-ide` and ready for review.
+
+## Next Steps
+
+- Add a desktop runtime bridge for local PostgreSQL connection configuration and smokeable read/write operations.
+- Persist Agent run and patch decisions from the desktop pane through the runtime adapters and executor.
+- Add an end-to-end Tauri smoke that starts the sidecar, observes `/healthz`, and exercises one API call against the app-owned service.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `03138f0` | (see git log) |
+| `9ddbc5d` | (see git log) |
+| `1bed7da` | (see git log) |
+| `5e43588` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
