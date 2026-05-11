@@ -137,3 +137,40 @@ web app architecture.
 - Final verification includes targeted package tests, desktop build,
   `cargo test`, `cargo check`, root `pnpm typecheck`, root `pnpm test`,
   `tauri:build`, and `git diff --check`.
+
+## Fourth-Wave Production Hardening Slices
+
+The fourth wave removes the last placeholder-quality runtime gaps while keeping
+the desktop app aligned with the existing web architecture and PostgreSQL data
+model.
+
+1. `desktop-ide-sidecar-health`
+   - Owns `apps/desktop/src-tauri/src/sidecar*`.
+   - Promotes sidecar `ready` from "process spawned" to health-probed
+     readiness via the chem-service `/healthz` endpoint.
+   - Uses bounded retry and timeout behavior; never kills unrelated processes.
+
+2. `desktop-ide-runtime-controls`
+   - Owns `apps/desktop/src/App.tsx` and desktop CSS files.
+   - Adds compact workbench controls for start, stop, refresh, and log tail
+     inspection.
+   - Keeps UI styling consistent with the web workbench language.
+
+3. `desktop-ide-postgres-runtime-adapters`
+   - Owns `packages/storage-postgres/src/graph-rag-*`.
+   - Adds structural adapter helpers that convert editor Graph/RAG DTOs and
+     agent run data into existing PostgreSQL executor inputs.
+   - Must not introduce desktop-specific tables or a direct dependency on
+     desktop packages.
+
+## Fourth-Wave Acceptance Criteria
+
+- Sidecar `ready` status is backed by a successful `/healthz` response or a
+  clearly degraded status with pid/log evidence.
+- Desktop users can operate the sidecar lifecycle from the IDE without racing
+  concurrent commands or losing visible error context.
+- Graph/RAG and Agent runtime persistence can be prepared from existing DTOs
+  without ad hoc record construction in the desktop UI.
+- Final integration repeats targeted validations, root `pnpm typecheck`, root
+  `pnpm test`, `cargo test`, `cargo check`, desktop build, `tauri:build`, and
+  `git diff --check`.
