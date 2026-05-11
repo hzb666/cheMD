@@ -146,6 +146,10 @@ export interface PostgresGraphRagQuery {
   values: readonly unknown[];
 }
 
+export interface PostgresGraphRagClient {
+  query(sql: string, values?: readonly unknown[]): Promise<unknown>;
+}
+
 export interface UpsertPostgresGraphSnapshotInput {
   graphSnapshot: PostgresReactionGraphSnapshotRecord;
   nodes?: readonly PostgresReactionGraphNodeRecord[];
@@ -166,6 +170,12 @@ export interface PostgresGraphDetailQueries {
   snapshot: PostgresGraphRagQuery;
   nodes: PostgresGraphRagQuery;
   edges: PostgresGraphRagQuery;
+}
+
+export interface PostgresGraphDetail {
+  snapshot?: PostgresReactionGraphSnapshotRecord;
+  nodes: PostgresReactionGraphNodeRecord[];
+  edges: PostgresReactionGraphEdgeRecord[];
 }
 
 export interface ListPendingPostgresPatchProposalsInput {

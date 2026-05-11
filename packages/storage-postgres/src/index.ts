@@ -6,3 +6,5 @@ export * from "./graph-rag-schema";
 export * from "./graph-rag-types";
 export * from "./graph-rag-records";
 export * from "./graph-rag-repository";
+export * from "./graph-rag-row-mappers";
+export * from "./graph-rag-executor";

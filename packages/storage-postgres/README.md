@@ -54,15 +54,31 @@ call `compileChemd()`, open database connections, execute migrations, or
 generate embeddings. It emits citation sidecar records for existing
 `chemd_rag_chunks`; it does not create a second RAG chunk table.
 
-The repository helpers are query builders only. They return parameterized
-`{ sql, values }` objects so runtime layers can execute them with an injected
-PostgreSQL client inside their own transaction:
+The repository helpers expose two layers:
+
+- query builders that return parameterized `{ sql, values }` objects
+- executor helpers that call an injected PostgreSQL client
+
+The client contract is intentionally minimal and does not bind `pg`:
+
+```ts
+export interface PostgresGraphRagClient {
+  query(sql: string, values?: readonly unknown[]): Promise<unknown>;
+}
+```
+
+Runtime code owns the concrete pool, connection lifecycle, and environment
+configuration. It can execute builders itself, or call the executor helpers:
 
 ```ts
 import {
   buildListPendingPatchProposalsQuery,
   buildUpsertGraphSnapshotQueries,
-  buildUpsertRagChunkCitationQuery
+  executeUpsertGraphSnapshotTransactionPlan,
+  listPendingPostgresPatchProposals,
+  loadPostgresGraphDetail,
+  recordPostgresAgentRun,
+  upsertPostgresRagChunkCitation
 } from "@chemd/storage-postgres";
 
 const graphQueries = records.graphSnapshot
@@ -81,7 +97,39 @@ const pendingPatches = buildListPendingPatchProposalsQuery({
   experimentId: "exp-storage",
   limit: 50
 });
+
+if (records.graphSnapshot) {
+  await executeUpsertGraphSnapshotTransactionPlan(client, {
+    graphSnapshot: records.graphSnapshot,
+    nodes: records.reactionGraphNodes,
+    edges: records.reactionGraphEdges
+  });
+}
+
+await upsertPostgresRagChunkCitation(client, records.ragChunkCitations[0]);
+await recordPostgresAgentRun(client, records.agentRuns[0]);
+
+const graph = await loadPostgresGraphDetail(client, {
+  graphSnapshotId: "graph-snapshot-1"
+});
+const patches = await listPendingPostgresPatchProposals(client, {
+  experimentId: "exp-storage",
+  limit: 50
+});
 ```
+
+`executeUpsertGraphSnapshotTransactionPlan()` issues `BEGIN`, the generated
+graph upsert plan, then `COMMIT`; if any query throws, it issues `ROLLBACK` and
+rethrows the original error. The other helpers execute a single parameterized
+query or read rows and map snake_case PostgreSQL fields back to the existing
+camelCase record types. JSONB fields are parsed when drivers return strings and
+passed through when drivers return objects.
+
+If runtime code needs a broader transaction across core experiment writes,
+graph writes, citations, and Agent audit records, run the query builders with
+the transaction client owned by that runtime layer. This package does not open
+connections, read `process.env`, or choose a transaction boundary beyond the
+small graph-snapshot plan helper.
 
 The helpers target the shared extension tables:
 
