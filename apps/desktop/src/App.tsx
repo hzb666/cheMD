@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import { Activity, AlertTriangle, Bot, CheckCircle2, ChevronRight, CircleDot, FileCode2, Files, FlaskConical, GitGraph, Lightbulb, PanelBottom, PlayCircle, Search, Settings, ShieldCheck, Sparkles, Wrench, XCircle } from "lucide-react";
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { Activity, AlertTriangle, Bot, CheckCircle2, ChevronRight, CircleDot, FileCode2, Files, FlaskConical, GitGraph, Lightbulb, PanelBottom, PlayCircle, RefreshCw, ScrollText, Search, Settings, ShieldCheck, Sparkles, Square, Wrench, XCircle } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
 import { appendToolCall, applyPatchDecision, approvePatchDecision, attachEvidence, createAgentRun, createToolResult, getAuditTimeline, proposePatch, rejectPatchDecision, transitionAgentRunStatus, type AgentAuditEvent, type AgentEvidence, type AgentRun, type AgentToolCall, type PatchDecision, type PatchProposal } from "@chemd/agent-tools";
 import { compileChemdForEditor, type ChemdEditorDiagnostic, type ChemdOutlineItem, type ChemdQuickFixProposal, type ChemdTextEdit } from "@chemd/language-service";
@@ -8,6 +8,7 @@ import { compileChemdForEditor, type ChemdEditorDiagnostic, type ChemdOutlineIte
 import { shellFiles, shellSidecarStatus, shellWorkspace, type DesktopCommandError, type DesktopCommandMap, type RuntimeState, type SidecarStatus, type WorkspaceFileEntry, type WorkspaceHandle } from "./desktop-contracts";
 
 type WorkspaceState = "empty" | "opening" | "open" | "error"; type DocumentMode = "sample" | "workspace";
+type SidecarOperation = "start" | "stop" | "refresh" | "logs";
 type AgentMessageTone = "info" | "warning" | "success" | "danger";
 type AgentMessage = { tone: AgentMessageTone; text: string };
 type QuickFixCandidate = { diagnostic: ChemdEditorDiagnostic; quickFix: ChemdQuickFixProposal };
@@ -65,6 +66,13 @@ const getDisplayableError = (error: unknown): string => {
   return "Unknown desktop command failure";
 };
 
+const getSidecarErrorMessage = (error: unknown): string => {
+  const commandError = error as Partial<DesktopCommandError> | undefined;
+  const message = commandError?.message ?? (error instanceof Error ? error.message : String(error));
+  const firstLine = message.split(/\r?\n/, 1)[0].trim();
+  return firstLine || "chem-service command failed";
+};
+
 const getLineStarts = (source: string): number[] => {
   const starts = [0];
   for (let index = 0; index < source.length; index += 1) {
@@ -102,6 +110,17 @@ const createEditorSourceHash = (source: string): string => {
 
 const formatRange = (range: ChemdTextEdit["range"]): string =>
   `L${range.startLine}:C${range.startColumn}-L${range.endLine}:C${range.endColumn}`;
+
+const formatSidecarStartedAt = (startedAt: string | null): string => {
+  if (!startedAt) {
+    return "not running";
+  }
+  const numericTimestamp = Number(startedAt);
+  const date = Number.isFinite(numericTimestamp)
+    ? new Date(numericTimestamp)
+    : new Date(startedAt);
+  return Number.isNaN(date.getTime()) ? startedAt : date.toLocaleString();
+};
 
 const createAgentId = (prefix: string): string =>
   `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -369,6 +388,87 @@ const StatusBadge = ({ label, state, detail }: { label: string; state: RuntimeSt
   <span className="desktop-status-badge" data-state={statusToneByState[state]} title={detail}><span className="desktop-status-dot" />{label}</span>
 );
 
+const SidecarButton = ({
+  label,
+  loadingLabel,
+  icon: Icon,
+  operation,
+  activeOperation,
+  disabled,
+  onClick
+}: {
+  label: string;
+  loadingLabel: string;
+  icon: typeof PlayCircle;
+  operation: SidecarOperation;
+  activeOperation: SidecarOperation | null;
+  disabled: boolean;
+  onClick: () => void;
+}) => {
+  const loading = activeOperation === operation;
+  return (
+    <button type="button" className="desktop-button" disabled={disabled} aria-busy={loading} onClick={onClick}>
+      <Icon size={14} />
+      <span>{loading ? loadingLabel : label}</span>
+    </button>
+  );
+};
+
+const SidecarControlPanel = ({
+  status,
+  logTail,
+  operation,
+  message,
+  errorMessage,
+  onStart,
+  onStop,
+  onRefresh,
+  onLoadLogs
+}: {
+  status: SidecarStatus;
+  logTail: string[];
+  operation: SidecarOperation | null;
+  message: string | null;
+  errorMessage: string | null;
+  onStart: () => void;
+  onStop: () => void;
+  onRefresh: () => void;
+  onLoadLogs: () => void;
+}) => {
+  const busy = operation !== null;
+  const canStart = !busy && status.state !== "ready" && status.pid === null;
+  const canStop = !busy && (status.state === "ready" || status.pid !== null);
+  const visibleLogTail = logTail.length > 0 ? logTail : status.logTail;
+
+  return (
+    <section className="desktop-sidecar-panel" aria-label="chem-service sidecar controls">
+      <div className="desktop-sidecar-heading">
+        <div className="desktop-agent-subhead"><FlaskConical size={14} /><span>chem-service sidecar</span></div>
+        <StatusBadge label={status.label} state={status.state} detail={status.detail} />
+      </div>
+      <div className="desktop-sidecar-actions">
+        <SidecarButton label="Start" loadingLabel="Starting" icon={PlayCircle} operation="start" activeOperation={operation} disabled={!canStart} onClick={onStart} />
+        <SidecarButton label="Stop" loadingLabel="Stopping" icon={Square} operation="stop" activeOperation={operation} disabled={!canStop} onClick={onStop} />
+        <SidecarButton label="Refresh" loadingLabel="Refreshing" icon={RefreshCw} operation="refresh" activeOperation={operation} disabled={busy} onClick={onRefresh} />
+        <SidecarButton label="Load logs" loadingLabel="Loading" icon={ScrollText} operation="logs" activeOperation={operation} disabled={busy} onClick={onLoadLogs} />
+      </div>
+      <dl className="desktop-sidecar-fields">
+        <div><dt>State</dt><dd>{status.state}</dd></div>
+        <div><dt>PID</dt><dd>{status.pid ?? "none"}</dd></div>
+        <div><dt>Started</dt><dd>{formatSidecarStartedAt(status.startedAt)}</dd></div>
+        <div><dt>Detail</dt><dd>{status.detail}</dd></div>
+      </dl>
+      {errorMessage ? <p className="desktop-sidecar-message" data-tone="danger" role="alert">{errorMessage}</p> : null}
+      {message ? <p className="desktop-sidecar-message" data-tone="info">{message}</p> : null}
+      <div className="desktop-sidecar-log" aria-label="chem-service log tail">
+        {visibleLogTail.length > 0
+          ? visibleLogTail.map((line, index) => <code key={`${index}-${line}`}>{line}</code>)
+          : <span>No log tail loaded.</span>}
+      </div>
+    </section>
+  );
+};
+
 const TopBar = ({
   workspace,
   workspaceState,
@@ -620,8 +720,17 @@ const InsightPane = ({
   outline,
   diagnostics,
   mode,
+  sidecarStatus,
+  sidecarLogTail,
+  sidecarOperation,
+  sidecarMessage,
+  sidecarError,
   agentRun,
   agentMessage,
+  onStartSidecar,
+  onStopSidecar,
+  onRefreshSidecar,
+  onLoadSidecarLogs,
   onProposeQuickFix,
   onApprovePatch,
   onApplyPatch,
@@ -630,8 +739,17 @@ const InsightPane = ({
   outline: ChemdOutlineItem[];
   diagnostics: ChemdEditorDiagnostic[];
   mode: DocumentMode;
+  sidecarStatus: SidecarStatus;
+  sidecarLogTail: string[];
+  sidecarOperation: SidecarOperation | null;
+  sidecarMessage: string | null;
+  sidecarError: string | null;
   agentRun: AgentRun | null;
   agentMessage: AgentMessage | null;
+  onStartSidecar: () => void;
+  onStopSidecar: () => void;
+  onRefreshSidecar: () => void;
+  onLoadSidecarLogs: () => void;
   onProposeQuickFix: (candidate: QuickFixCandidate) => void;
   onApprovePatch: () => void;
   onApplyPatch: () => void;
@@ -647,6 +765,17 @@ const InsightPane = ({
     <aside className="desktop-pane desktop-insight-pane" aria-label="Outline and agent">
       <PanelHeader eyebrow="Inspect" title="Outline" meta={`${outline.length} roots`} />
       <div className="desktop-insight-section">{outline.length > 0 ? <OutlineTree items={outline} /> : <p className="desktop-empty-copy">No outline from language service.</p>}</div>
+      <SidecarControlPanel
+        status={sidecarStatus}
+        logTail={sidecarLogTail}
+        operation={sidecarOperation}
+        message={sidecarMessage}
+        errorMessage={sidecarError}
+        onStart={onStartSidecar}
+        onStop={onStopSidecar}
+        onRefresh={onRefreshSidecar}
+        onLoadLogs={onLoadSidecarLogs}
+      />
       <div className="desktop-agent-panel">
         <AgentRunHeader agentRun={agentRun} agentMessage={agentMessage} />
         <AgentEmptyState mode={mode} hasQuickFixes={quickFixes.length > 0} />
@@ -692,6 +821,88 @@ const BottomPanel = ({ diagnostics, compileStatus, errorMessage }: { diagnostics
   );
 };
 
+const useSidecarController = () => {
+  const [status, setStatus] = useState<SidecarStatus>(shellSidecarStatus);
+  const [logTail, setLogTail] = useState<string[]>(shellSidecarStatus.logTail);
+  const [operation, setOperation] = useState<SidecarOperation | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const operationRef = useRef<SidecarOperation | null>(null);
+
+  useEffect(() => {
+    void invokeDesktop("read_sidecar_status", undefined)
+      .then((nextStatus) => {
+        setStatus(nextStatus);
+        setLogTail(nextStatus.logTail);
+      })
+      .catch((nextError: unknown) => {
+        setStatus(shellSidecarStatus);
+        setError(getSidecarErrorMessage(nextError));
+      });
+  }, []);
+
+  const commitStatus = (nextStatus: SidecarStatus, nextMessage: string) => {
+    setStatus(nextStatus);
+    setLogTail(nextStatus.logTail);
+    setMessage(nextMessage);
+    setError(null);
+  };
+
+  const runLifecycleCommand = async (nextOperation: Exclude<SidecarOperation, "logs">) => {
+    if (operationRef.current) return;
+    operationRef.current = nextOperation;
+    setOperation(nextOperation);
+    try {
+      const command = nextOperation === "start"
+        ? "start_sidecar"
+        : nextOperation === "stop"
+          ? "stop_sidecar"
+          : "read_sidecar_status";
+      const nextStatus = await invokeDesktop(command, undefined);
+      const verb = nextOperation === "start" ? "started" : nextOperation === "stop" ? "stopped" : "refreshed";
+      commitStatus(nextStatus, `chem-service ${verb}.`);
+    } catch (nextError: unknown) {
+      setError(getSidecarErrorMessage(nextError));
+      setMessage(null);
+    } finally {
+      operationRef.current = null;
+      setOperation(null);
+    }
+  };
+
+  const loadLogs = async () => {
+    if (operationRef.current) return;
+    operationRef.current = "logs";
+    setOperation("logs");
+    try {
+      const nextLogs = await invokeDesktop("read_sidecar_logs", undefined);
+      const nextStatus = await invokeDesktop("read_sidecar_status", undefined);
+      setStatus(nextStatus);
+      setLogTail(nextLogs.lines);
+      setMessage(`Loaded ${nextLogs.lines.length} log lines.`);
+      setError(null);
+    } catch (nextError: unknown) {
+      setError(getSidecarErrorMessage(nextError));
+      setMessage(null);
+    } finally {
+      operationRef.current = null;
+      setOperation(null);
+    }
+  };
+
+  return {
+    status,
+    logTail,
+    operation,
+    message,
+    error,
+    start: () => void runLifecycleCommand("start"),
+    stop: () => void runLifecycleCommand("stop"),
+    refresh: () => void runLifecycleCommand("refresh"),
+    loadLogs: () => void loadLogs()
+  };
+};
+
 export const App = () => {
   const initialSource = sampleSources["suzuki-screen.chemd.md"];
   const [workspaceState, setWorkspaceState] = useState<WorkspaceState>("empty");
@@ -702,14 +913,10 @@ export const App = () => {
   const [savedSource, setSavedSource] = useState(initialSource);
   const [mode, setMode] = useState<DocumentMode>("sample");
   const [rootPath, setRootPath] = useState("");
-  const [sidecarStatus, setSidecarStatus] = useState<SidecarStatus>(shellSidecarStatus);
   const [message, setMessage] = useState("No workspace is open. Editing bundled sample content.");
   const [agentRun, setAgentRun] = useState<AgentRun | null>(null);
   const [agentMessage, setAgentMessage] = useState<AgentMessage | null>(null);
-
-  useEffect(() => {
-    void invokeDesktop("read_sidecar_status", undefined).then(setSidecarStatus).catch(() => setSidecarStatus(shellSidecarStatus));
-  }, []);
+  const sidecarController = useSidecarController();
 
   const selectedFile = files.find((file) => file.id === selectedFileId) ?? shellFiles[0];
   const output = useMemo(() => compileChemdForEditor({
@@ -829,7 +1036,7 @@ export const App = () => {
 
   return (
     <main className="desktop-shell">
-      <TopBar workspace={workspace} workspaceState={workspaceState} sidecarStatus={sidecarStatus} diagnosticCount={output.diagnostics.length} dirty={source !== savedSource} rootPath={rootPath} canSave={canSave} onRootPathChange={setRootPath} onSave={() => void saveWorkspaceFile()} onOpenWorkspace={() => void openWorkspace()} />
+      <TopBar workspace={workspace} workspaceState={workspaceState} sidecarStatus={sidecarController.status} diagnosticCount={output.diagnostics.length} dirty={source !== savedSource} rootPath={rootPath} canSave={canSave} onRootPathChange={setRootPath} onSave={() => void saveWorkspaceFile()} onOpenWorkspace={() => void openWorkspace()} />
       <div className="desktop-workbench">
         <ActivityRail />
         <Sidebar files={files} selectedFileId={selectedFileId} mode={mode} message={message} onSelectFile={(file) => void selectFile(file)} />
@@ -839,8 +1046,10 @@ export const App = () => {
             outline={output.outline}
             diagnostics={output.diagnostics}
             mode={mode}
+            sidecarStatus={sidecarController.status} sidecarLogTail={sidecarController.logTail} sidecarOperation={sidecarController.operation} sidecarMessage={sidecarController.message} sidecarError={sidecarController.error}
             agentRun={agentRun}
             agentMessage={agentMessage}
+            onStartSidecar={sidecarController.start} onStopSidecar={sidecarController.stop} onRefreshSidecar={sidecarController.refresh} onLoadSidecarLogs={sidecarController.loadLogs}
             onProposeQuickFix={startAgentProposal}
             onApprovePatch={approveAgentPatch}
             onApplyPatch={applyAgentPatch}
