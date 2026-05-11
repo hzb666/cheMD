@@ -11,6 +11,10 @@
   border-right: 1px solid var(--border);
 }
 
+.desktop-insight-pane {
+  background: #fbfcfe;
+}
+
 .desktop-panel-header {
   min-height: 3rem;
   justify-content: space-between;
@@ -60,6 +64,30 @@
   width: 1px;
   height: 1.1rem;
   background: var(--border);
+}
+
+.desktop-editor-textarea {
+  min-height: 0;
+  flex: 1;
+  resize: none;
+  border: 0;
+  outline: 0;
+  padding: 1rem 1.1rem;
+  background:
+    linear-gradient(180deg, #fbfcfe 0%, #f7f9fc 100%),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.03) 1px, transparent 1px),
+    linear-gradient(rgba(15, 23, 42, 0.03) 1px, transparent 1px);
+  background-size: auto, 24px 24px, 24px 24px;
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  line-height: 1.66;
+  tab-size: 2;
+  white-space: pre;
+}
+
+.desktop-editor-textarea:focus {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 24%, transparent);
 }
 
 .desktop-editor-surface {
@@ -180,11 +208,128 @@
   background: #fbfcfe;
 }
 
+.desktop-insight-section {
+  min-height: 0;
+  max-height: 45%;
+  overflow: auto;
+  padding: 0.65rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.desktop-outline-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.desktop-outline-list .desktop-outline-list {
+  margin-left: 0.75rem;
+  padding-left: 0.45rem;
+  border-left: 1px solid var(--border);
+}
+
+.desktop-outline-row {
+  min-width: 0;
+  gap: 0.35rem;
+  min-height: 1.75rem;
+  padding: 0 0.35rem;
+  border-radius: 7px;
+  color: var(--foreground);
+  font-size: 0.75rem;
+}
+
+.desktop-outline-row:hover {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.desktop-outline-kind {
+  flex: 0 0 auto;
+  color: var(--muted-foreground);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.desktop-outline-label,
+.desktop-diagnostic-message,
+.desktop-quickfix-list span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-outline-label {
+  flex: 1;
+}
+
+.desktop-outline-line {
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+}
+
+.desktop-agent-panel {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.65rem;
+  overflow: auto;
+  padding: 0.75rem;
+}
+
+.desktop-agent-heading {
+  gap: 0.45rem;
+  color: var(--foreground);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.desktop-agent-panel p {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.desktop-quickfix-list {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.desktop-quickfix-list button {
+  justify-content: flex-start;
+  gap: 0.42rem;
+  min-height: 2rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--foreground);
+  font-size: 0.74rem;
+}
+
+.desktop-quickfix-list button:hover {
+  border-color: color-mix(in srgb, var(--primary) 28%, var(--border));
+  background: var(--accent);
+}
+
 .desktop-bottom-tabs {
   gap: 0.2rem;
   min-height: 2.2rem;
   padding: 0 0.65rem;
   border-bottom: 1px solid var(--border);
+}
+
+.desktop-diagnostic-summary {
+  gap: 0.32rem;
+  color: var(--muted-foreground);
+  font-size: 0.74rem;
 }
 
 .desktop-bottom-tab {
@@ -209,4 +354,53 @@
   gap: 0.45rem;
   padding: 0.75rem 0.8rem;
   font-family: var(--font-mono);
+}
+
+.desktop-diagnostics-list {
+  min-height: 0;
+  max-height: calc(100% - 2.2rem);
+  overflow: auto;
+}
+
+.desktop-diagnostic-row {
+  min-width: 0;
+  gap: 0.5rem;
+  padding: 0.45rem 0.75rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  color: var(--muted-foreground);
+  font-size: 0.74rem;
+}
+
+.desktop-diagnostic-row strong {
+  flex: 0 0 auto;
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.desktop-diagnostic-row[data-severity="error"] {
+  color: var(--danger);
+}
+
+.desktop-diagnostic-row[data-severity="warning"] {
+  color: var(--warning);
+}
+
+.desktop-diagnostic-row[data-severity="info"] {
+  color: var(--accent-foreground);
+}
+
+@media (max-width: 899px) {
+  .desktop-editor-pane {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .desktop-insight-section {
+    max-height: none;
+  }
+
+  .desktop-bottom-panel {
+    grid-column: auto;
+  }
 }

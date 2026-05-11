@@ -58,11 +58,11 @@ button:not(:disabled) {
 
 .desktop-shell {
   display: flex;
-  min-width: 1024px;
+  min-width: 0;
   height: 100%;
-  min-height: 720px;
+  min-height: 640px;
   flex-direction: column;
-  overflow: hidden;
+  overflow: auto;
   background: var(--background);
 }
 
@@ -73,7 +73,12 @@ button:not(:disabled) {
 .desktop-sidebar-action-row,
 .desktop-editor-toolbar,
 .desktop-bottom-tabs,
-.desktop-log-line {
+.desktop-log-line,
+.desktop-agent-heading,
+.desktop-outline-row,
+.desktop-quickfix-list button,
+.desktop-diagnostic-row,
+.desktop-diagnostic-summary {
   display: flex;
   align-items: center;
 }
@@ -84,7 +89,14 @@ button:not(:disabled) {
 .desktop-toolbar-text,
 .desktop-file-kind,
 .desktop-sidebar-note,
-.desktop-log-line {
+.desktop-log-line,
+.desktop-empty-copy {
   color: var(--muted-foreground);
   font-size: 0.75rem;
+}
+
+@media (min-width: 900px) {
+  .desktop-shell {
+    overflow: hidden;
+  }
 }

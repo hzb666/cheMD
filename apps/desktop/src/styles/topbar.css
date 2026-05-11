@@ -50,6 +50,8 @@
 }
 
 .desktop-runtime-badges {
+  min-width: 0;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.45rem;
 }
@@ -67,6 +69,11 @@
   font-size: 0.72rem;
   font-weight: 560;
   white-space: nowrap;
+}
+
+.desktop-status-badge,
+.desktop-button-primary {
+  flex: 0 0 auto;
 }
 
 .desktop-status-dot {
@@ -87,4 +94,17 @@
 
 .desktop-status-badge[data-state="danger"] {
   color: var(--danger);
+}
+
+@media (max-width: 899px) {
+  .desktop-topbar {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 0.55rem;
+    padding: 0.7rem;
+  }
+
+  .desktop-runtime-badges {
+    justify-content: flex-start;
+  }
 }
