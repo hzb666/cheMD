@@ -49,6 +49,25 @@
   white-space: nowrap;
 }
 
+.desktop-path-input {
+  min-width: 12rem;
+  width: min(34rem, 38vw);
+  height: 1.9rem;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 0 0.55rem;
+  background: #fff;
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  outline: 0;
+}
+
+.desktop-path-input:focus {
+  border-color: color-mix(in srgb, var(--primary) 42%, var(--border));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
 .desktop-runtime-badges {
   min-width: 0;
   flex-wrap: wrap;
@@ -106,5 +125,9 @@
 
   .desktop-runtime-badges {
     justify-content: flex-start;
+  }
+
+  .desktop-path-input {
+    width: 100%;
   }
 }

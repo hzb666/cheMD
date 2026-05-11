@@ -4,9 +4,9 @@ import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 
 import { compileChemdForEditor, type ChemdEditorDiagnostic, type ChemdOutlineItem, type ChemdQuickFixProposal, type ChemdTextEdit } from "@chemd/language-service";
 
-import { shellFiles, shellSidecarStatus, shellWorkspace, type DesktopCommandMap, type RuntimeState, type SidecarStatus, type WorkspaceFileEntry, type WorkspaceHandle } from "./desktop-contracts";
+import { shellFiles, shellSidecarStatus, shellWorkspace, type DesktopCommandError, type DesktopCommandMap, type RuntimeState, type SidecarStatus, type WorkspaceFileEntry, type WorkspaceHandle } from "./desktop-contracts";
 
-type WorkspaceState = "empty" | "opening" | "open" | "error"; type DocumentMode = "sample" | "workspace-fallback";
+type WorkspaceState = "empty" | "opening" | "open" | "error"; type DocumentMode = "sample" | "workspace";
 
 const sampleSources: Record<string, string> = {
   "suzuki-screen.chemd.md": "---\nid: exp-desktop-suzuki\ntitle: Suzuki coupling condition screen\ndate: 2026-05-12\n---\n\n:::chemd #mol-aryl-bromide\nsmiles: Cc1ccc(Br)cc1\n:::\n\n:::chemd #rxn-screen\nkind: reaction\nreactants: mol-aryl-bromide, phenylboronic-acid\nproducts: biaryl-product\nconditions:\n  catalyst: Pd(PPh3)4\n  base: K2CO3\n  solvent: dioxane/water\n:::\n\n:::result #screen-result\nstatus: pending\nyield: 78%\n:::\n",
@@ -26,6 +26,17 @@ const invokeDesktop = async <Command extends keyof DesktopCommandMap>(
 
 const getSampleSource = (file: WorkspaceFileEntry): string =>
   sampleSources[file.name] ?? sampleSources["suzuki-screen.chemd.md"];
+
+const getDisplayableError = (error: unknown): string => {
+  const commandError = error as Partial<DesktopCommandError> | undefined;
+  if (commandError?.message) {
+    return commandError.detail ? `${commandError.message}: ${commandError.detail}` : commandError.message;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return "Unknown desktop command failure";
+};
 
 const getLineStarts = (source: string): number[] => {
   const starts = [0];
@@ -69,6 +80,10 @@ const TopBar = ({
   sidecarStatus,
   diagnosticCount,
   dirty,
+  rootPath,
+  canSave,
+  onRootPathChange,
+  onSave,
   onOpenWorkspace
 }: {
   workspace: WorkspaceHandle;
@@ -76,6 +91,10 @@ const TopBar = ({
   sidecarStatus: SidecarStatus;
   diagnosticCount: number;
   dirty: boolean;
+  rootPath: string;
+  canSave: boolean;
+  onRootPathChange: (value: string) => void;
+  onSave: () => void;
   onOpenWorkspace: () => void;
 }) => (
   <header className="desktop-topbar">
@@ -83,9 +102,19 @@ const TopBar = ({
       <div className="desktop-logo-mark" aria-hidden="true"><FlaskConical size={16} /></div>
       <div className="desktop-brand-copy"><span className="desktop-product-name">Chemd Desktop IDE</span><span className="desktop-workspace-name">{workspace.displayName}</span></div>
     </div>
-    <div className="desktop-topbar-center"><span className="desktop-path-chip" title={workspace.rootHint}>{workspace.rootHint}</span></div>
+    <div className="desktop-topbar-center">
+      <input
+        className="desktop-path-input"
+        value={rootPath}
+        onChange={(event) => onRootPathChange(event.target.value)}
+        placeholder="D:\\path\\to\\workspace"
+        aria-label="Workspace root path"
+      />
+      <span className="desktop-path-chip" title={workspace.rootHint}>{workspace.rootHint}</span>
+    </div>
     <div className="desktop-runtime-badges" aria-label="Runtime status">
       <button type="button" className="desktop-button-primary" disabled={workspaceState === "opening"} onClick={onOpenWorkspace}>{workspaceState === "opening" ? "Opening" : "Open"}</button>
+      <button type="button" className="desktop-button" disabled={!canSave} onClick={onSave}>Save</button>
       <StatusBadge label={workspaceStateLabel[workspaceState]} state={workspaceState === "open" ? "ready" : workspaceState === "error" ? "degraded" : "placeholder"} detail="Workspace access uses open_workspace and list_workspace_files" />
       <StatusBadge label={`${diagnosticCount} diagnostics`} state={diagnosticCount > 0 ? "degraded" : "ready"} detail="Computed by @chemd/language-service" />
       <StatusBadge label={dirty ? "Dirty" : "Saved"} state={dirty ? "degraded" : "ready"} detail="Local editor buffer state" />
@@ -116,7 +145,7 @@ const Sidebar = ({
   onSelectFile: (file: WorkspaceFileEntry) => void;
 }) => (
   <aside className="desktop-sidebar">
-    <PanelHeader eyebrow="Workspace" title="Files" meta={mode === "sample" ? "Sample" : "Tauri"} />
+    <PanelHeader eyebrow="Workspace" title="Files" meta={mode === "sample" ? "Sample" : "Local"} />
     <div className="desktop-sidebar-note" data-mode={mode}><Sparkles size={14} /><span>{message}</span></div>
     <ul className="desktop-file-tree" aria-label="Workspace files">
       {files.map((file) => (
@@ -148,7 +177,7 @@ const EditorPane = ({
 }) => (
   <section className="desktop-pane desktop-editor-pane" aria-label="Editor">
     <PanelHeader eyebrow="Editor" title={fileName} meta={`${lineCount} lines`} />
-    <div className="desktop-editor-toolbar"><Activity size={15} /><span className="desktop-toolbar-text">{mode === "sample" ? "Bundled sample buffer" : "Workspace file selected; content fallback is sample"}</span><span className="desktop-toolbar-divider" /><span className="desktop-toolbar-text">Compiled {new Date(compiledAt).toLocaleTimeString()}</span></div>
+    <div className="desktop-editor-toolbar"><Activity size={15} /><span className="desktop-toolbar-text">{mode === "sample" ? "Bundled sample buffer" : "Local workspace file"}</span><span className="desktop-toolbar-divider" /><span className="desktop-toolbar-text">Compiled {new Date(compiledAt).toLocaleTimeString()}</span></div>
     <textarea className="desktop-editor-textarea" value={source} onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange(event.target.value)} spellCheck={false} aria-label="Chemd source editor" />
   </section>
 );
@@ -225,6 +254,7 @@ export const App = () => {
   const [source, setSource] = useState(initialSource);
   const [savedSource, setSavedSource] = useState(initialSource);
   const [mode, setMode] = useState<DocumentMode>("sample");
+  const [rootPath, setRootPath] = useState("");
   const [sidecarStatus, setSidecarStatus] = useState<SidecarStatus>(shellSidecarStatus);
   const [message, setMessage] = useState("No workspace is open. Editing bundled sample content.");
 
@@ -239,47 +269,80 @@ export const App = () => {
     options: { strictChemdKind: true }
   }), [selectedFile.path, source]);
   const compileError = output.status === "failed" ? output.error.message : undefined;
+  const canSave = mode === "workspace" && selectedFile.kind === "file" && source !== savedSource && workspace.writable;
 
   const openWorkspace = async () => {
     setWorkspaceState("opening");
     try {
-      const nextWorkspace = await invokeDesktop("open_workspace", undefined);
+      const nextWorkspace = await invokeDesktop("open_workspace", { rootPath: rootPath.trim() });
       const nextFiles = await invokeDesktop("list_workspace_files", { workspaceId: nextWorkspace.workspaceId });
       const usableFiles = nextFiles.length > 0 ? nextFiles : shellFiles;
       const firstFile = usableFiles.find((file) => file.kind === "file") ?? usableFiles[0];
-      const nextSource = getSampleSource(firstFile);
+      const nextContent = firstFile.kind === "file"
+        ? await invokeDesktop("read_workspace_file", {
+          workspaceId: nextWorkspace.workspaceId,
+          path: firstFile.path
+        })
+        : undefined;
+      const nextSource = nextContent?.content ?? getSampleSource(firstFile);
       setWorkspace(nextWorkspace);
       setFiles(usableFiles);
       setSelectedFileId(firstFile.id);
       setSource(nextSource);
       setSavedSource(nextSource);
-      setMode("workspace-fallback");
-      setMessage("Workspace commands are connected. File content uses bundled sample fallback until read/write commands exist.");
+      setRootPath(nextWorkspace.rootPath);
+      setMode("workspace");
+      setMessage(`Opened ${usableFiles.length} visible Markdown entries from the local workspace.`);
       setWorkspaceState("open");
     } catch (error: unknown) {
       setWorkspace(shellWorkspace);
       setFiles(shellFiles);
       setMode("sample");
-      setMessage(error instanceof Error ? `Tauri unavailable: ${error.message}` : "Tauri unavailable. Using bundled sample content.");
+      setMessage(`Workspace open failed: ${getDisplayableError(error)}. Using bundled sample content.`);
       setWorkspaceState("error");
     }
   };
 
-  const selectFile = (file: WorkspaceFileEntry) => {
+  const selectFile = async (file: WorkspaceFileEntry) => {
     if (file.kind !== "file") return;
-    const nextSource = getSampleSource(file);
-    setSelectedFileId(file.id);
-    setSource(nextSource);
-    setSavedSource(nextSource);
-    setMessage(mode === "sample" ? "Sample document selected from bundled fallback." : "Workspace file selected. Content remains sample fallback because Rust read command is not available.");
+    try {
+      const nextContent = mode === "workspace"
+        ? await invokeDesktop("read_workspace_file", {
+          workspaceId: workspace.workspaceId,
+          path: file.path
+        })
+        : undefined;
+      const nextSource = nextContent?.content ?? getSampleSource(file);
+      setSelectedFileId(file.id);
+      setSource(nextSource);
+      setSavedSource(nextSource);
+      setMessage(mode === "sample" ? "Sample document selected from bundled fallback." : `Read ${file.path} from the local workspace.`);
+    } catch (error: unknown) {
+      setMessage(`Workspace read failed: ${getDisplayableError(error)}.`);
+    }
+  };
+
+  const saveWorkspaceFile = async () => {
+    if (!canSave) return;
+    try {
+      const result = await invokeDesktop("write_workspace_file", {
+        workspaceId: workspace.workspaceId,
+        path: selectedFile.path,
+        content: source
+      });
+      setSavedSource(source);
+      setMessage(`Saved ${result.path} (${result.bytes} bytes).`);
+    } catch (error: unknown) {
+      setMessage(`Workspace save failed: ${getDisplayableError(error)}.`);
+    }
   };
 
   return (
     <main className="desktop-shell">
-      <TopBar workspace={workspace} workspaceState={workspaceState} sidecarStatus={sidecarStatus} diagnosticCount={output.diagnostics.length} dirty={source !== savedSource} onOpenWorkspace={() => void openWorkspace()} />
+      <TopBar workspace={workspace} workspaceState={workspaceState} sidecarStatus={sidecarStatus} diagnosticCount={output.diagnostics.length} dirty={source !== savedSource} rootPath={rootPath} canSave={canSave} onRootPathChange={setRootPath} onSave={() => void saveWorkspaceFile()} onOpenWorkspace={() => void openWorkspace()} />
       <div className="desktop-workbench">
         <ActivityRail />
-        <Sidebar files={files} selectedFileId={selectedFileId} mode={mode} message={message} onSelectFile={selectFile} />
+        <Sidebar files={files} selectedFileId={selectedFileId} mode={mode} message={message} onSelectFile={(file) => void selectFile(file)} />
         <div className="desktop-main-grid">
           <EditorPane fileName={selectedFile.name} mode={mode} source={source} lineCount={source.split(/\r?\n/).length} compiledAt={output.compiledAt} onChange={setSource} />
           <InsightPane outline={output.outline} diagnostics={output.diagnostics} onApplyQuickFix={(fix) => setSource((current) => applyTextEdits(current, fix.patch.edits))} />
