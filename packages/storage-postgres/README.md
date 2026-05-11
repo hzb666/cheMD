@@ -28,6 +28,32 @@ Chemd source
 semantic facts, field evidence, Training Experience Memory, and Experiment
 Pattern Memory projections.
 
+## Graph/RAG Extension Contract
+
+Desktop IDE uses the existing `@chemd/storage-postgres` main schema as the
+knowledge store. It does not get a parallel desktop-specific schema for
+workspaces, documents, revisions, compiled artifacts, RAG chunks, embeddings,
+semantic diffs, or memory records.
+
+The Graph/RAG extension remains a pure contract layer:
+
+```text
+compiled artifacts + training graph index
+  -> buildPostgresGraphRagStorageRecords()
+  -> reaction graph / RAG citation / Agent audit records
+```
+
+`getPostgresGraphRagExtensionSchemaSql()` exposes the schema fragment for
+shared reaction graph snapshots, graph nodes, graph edges, RAG chunk citations,
+Agent runs, Agent tool calls, and patch proposals. These tables reference the
+existing core tables such as `chemd_experiments`,
+`chemd_experiment_revisions`, and `chemd_rag_chunks`.
+
+The mapper consumes already compiled artifacts and graph records. It does not
+call `compileChemd()`, open database connections, execute migrations, or
+generate embeddings. It emits citation sidecar records for existing
+`chemd_rag_chunks`; it does not create a second RAG chunk table.
+
 ## Runtime Setup
 
 Use `pnpm postgres:migrate` from the repository root to install the schema

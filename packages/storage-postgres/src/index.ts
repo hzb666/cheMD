@@ -2,3 +2,6 @@ export * from "./schema";
 export * from "./types";
 export * from "./records";
 export * from "./memory-loop";
+export * from "./graph-rag-schema";
+export * from "./graph-rag-types";
+export * from "./graph-rag-records";
