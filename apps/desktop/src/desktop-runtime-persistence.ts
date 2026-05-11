@@ -208,6 +208,8 @@ const buildToolCall = (toolCall: AgentToolCall, identity: RuntimeIdentity): Json
     toolCallId: requireString(toolCall.toolCallId, "toolCall.toolCallId"),
     agentRunId: requireString(toolCall.agentRunId, "toolCall.agentRunId"),
     toolName: toolCall.toolName,
+    input: toolCall.payload,
+    output: toolCall.result,
     payload: toolCall.payload,
     result: toolCall.result,
     status: toolCall.status,
@@ -236,6 +238,14 @@ const buildPatch = (run: AgentRun, proposal: PatchProposal, identity: RuntimeIde
     experimentId: identity.experimentId,
     baseRevisionId: proposal.baseRevisionId ?? identity.revisionId,
     defaultBaseRevisionId: identity.revisionId,
+    patch: {
+      documentId: proposal.documentId || identity.documentId,
+      beforeHash: proposal.beforeHash,
+      title: proposal.title,
+      rationale: proposal.rationale,
+      edits: proposal.edits,
+      evidence: proposal.evidence
+    },
     documentId: proposal.documentId || identity.documentId,
     beforeHash: proposal.beforeHash,
     title: proposal.title,
@@ -267,6 +277,7 @@ const buildMetadata = (
   revisionId: identity.revisionId,
   graphSnapshotId: identity.graphSnapshotId,
   sourceHash: `fnv1a:${hashString(input.source)}`,
+  sourceText: input.source,
   sourceLength: input.source.length
 });
 

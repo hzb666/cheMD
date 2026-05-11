@@ -131,7 +131,7 @@ fn probe_database(config: &PostgresRuntimeConfig) -> Result<ProbeResult, String>
     })
 }
 
-fn connect(config: &PostgresRuntimeConfig) -> Result<Client, String> {
+pub(crate) fn connect(config: &PostgresRuntimeConfig) -> Result<Client, String> {
     let mut pg_config = PgConfig::from_str(&config.database_url)
         .map_err(|error| redact_config_detail(&error.to_string(), config))?;
     pg_config.connect_timeout(Duration::from_millis(config.timeout_ms.max(1)));

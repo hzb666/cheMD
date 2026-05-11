@@ -198,14 +198,18 @@ describe("desktop runtime persistence payload builder", () => {
     expect(payload.agentToolCalls[0]).toMatchObject({
       toolCallId: "tool-desktop-1",
       toolName: "query_rag",
-      payload: { query: "yield evidence" },
-      result: { payload: { matchedAt: createdAt, count: 1 } }
+      input: { query: "yield evidence" },
+      output: { payload: { matchedAt: createdAt, count: 1 } }
     });
     expect(payload.patchProposals[0]).toMatchObject({
       patchProposalId: "patch-desktop-1",
       baseRevisionId: document.revisionId,
       status: "applied",
-      appliedAt: createdAt
+      appliedAt: createdAt,
+      patch: {
+        beforeHash: "fnv1a:before",
+        title: "Add reaction note"
+      }
     });
   });
 

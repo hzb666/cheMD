@@ -1,5 +1,10 @@
 mod postgres;
 mod postgres_config;
+mod postgres_runtime_core;
+mod postgres_runtime_graph_cleanup;
+mod postgres_runtime_persist;
+mod postgres_runtime_sql;
+mod postgres_runtime_types;
 mod sidecar;
 mod sidecar_command;
 mod sidecar_log;
@@ -17,6 +22,8 @@ mod workspace_tests;
 
 #[cfg(not(test))]
 use postgres::read_postgres_status;
+#[cfg(not(test))]
+use postgres_runtime_persist::persist_runtime_graph_rag;
 #[cfg(not(test))]
 use sidecar::{
     read_sidecar_logs, read_sidecar_status, start_sidecar, stop_sidecar, SidecarManager,
@@ -42,7 +49,8 @@ pub fn run() {
             stop_sidecar,
             read_sidecar_status,
             read_sidecar_logs,
-            read_postgres_status
+            read_postgres_status,
+            persist_runtime_graph_rag
         ])
         .run(tauri::generate_context!())
         .expect("error while running Chemd Desktop IDE");
