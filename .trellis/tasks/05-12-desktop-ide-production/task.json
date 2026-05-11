@@ -6,7 +6,7 @@
   "status": "planning",
   "dev_type": "fullstack",
   "scope": null,
-  "package": "web",
+  "package": "desktop-ide",
   "priority": "P2",
   "creator": "hzb666",
   "assignee": "hzb666",
@@ -15,7 +15,7 @@
   "branch": null,
   "base_branch": "desktop-ide",
   "worktree_path": null,
-  "current_phase": 0,
+  "current_phase": 3,
   "next_action": [
     {
       "phase": 1,

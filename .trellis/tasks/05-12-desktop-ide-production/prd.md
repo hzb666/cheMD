@@ -33,6 +33,37 @@ Build the first production-oriented implementation slice for Chemd Desktop IDE o
    - Owns `packages/agent-tools/**`.
    - Creates pure Agent tool contracts and safety gates.
 
+## Second-Wave Productionization Slices
+
+The first wave established the production boundaries. The second wave turns
+those boundaries into directly usable local IDE behavior while keeping ownership
+isolated.
+
+1. `desktop-ide-workspace-io`
+   - Owns `apps/desktop/src-tauri/**`.
+   - Replaces placeholder workspace commands with safe local directory, file
+     listing, read, and write commands.
+   - Rejects path traversal and reports structured frontend-displayable errors.
+
+2. `desktop-ide-workbench-ui`
+   - Owns `apps/desktop/src/App.tsx` and `apps/desktop/src/styles/**`.
+   - Connects the shell to `@chemd/language-service` diagnostics, outline, and
+     quick-fix data.
+   - Keeps the UI close to the web product language: dense, calm, and
+     workbench-first.
+
+3. `desktop-ide-postgres-graph-repository`
+   - Owns `packages/storage-postgres/src/graph-rag-*`.
+   - Adds repository/query helpers for graph snapshots, RAG chunk citations,
+     agent runs, tool calls, and patch proposals.
+   - Must keep the schema generic and reuse `chemd_experiments`,
+     `chemd_experiment_revisions`, and `chemd_rag_chunks`.
+
+4. `desktop-ide-agent-orchestration`
+   - Owns `packages/agent-tools/**`.
+   - Adds deterministic local orchestration helpers and an audit timeline.
+   - Does not connect a real LLM provider or require secrets.
+
 ## Acceptance Criteria
 
 - Each slice compiles or reports exact environment blockers.
@@ -49,3 +80,15 @@ Build the first production-oriented implementation slice for Chemd Desktop IDE o
 - No real sidecar packaging finalization.
 - No PostgreSQL runtime connection implementation in `@chemd/storage-postgres`.
 - No silent Agent file writes.
+
+## Updated Acceptance Criteria
+
+- Desktop workspace commands perform real local file operations safely.
+- The React workbench can display a real or sample document with language-service
+  diagnostics and outline data.
+- Graph/RAG repository helpers use parameterized SQL and do not introduce
+  `desktop_*` or `chemd_desktop_*` tables.
+- Agent orchestration blocks illegal state transitions and uncited patch apply
+  decisions.
+- Final integration runs targeted package tests, desktop build/typecheck, Rust
+  checks, root `pnpm typecheck`, root `pnpm test`, and `git diff --check`.
