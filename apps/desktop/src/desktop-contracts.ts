@@ -21,6 +21,12 @@ export interface SidecarStatus {
   label: string;
   detail: string;
   pid: number | null;
+  startedAt: string | null;
+  logTail: string[];
+}
+
+export interface SidecarLogs {
+  lines: string[];
 }
 
 export interface DesktopCommandError {
@@ -73,9 +79,21 @@ export interface DesktopCommandMap {
     };
     output: WorkspaceWriteResult;
   };
+  start_sidecar: {
+    input: void;
+    output: SidecarStatus;
+  };
+  stop_sidecar: {
+    input: void;
+    output: SidecarStatus;
+  };
   read_sidecar_status: {
     input: void;
     output: SidecarStatus;
+  };
+  read_sidecar_logs: {
+    input: void;
+    output: SidecarLogs;
   };
 }
 
@@ -114,5 +132,7 @@ export const shellSidecarStatus: SidecarStatus = {
   state: "placeholder",
   label: "Sidecar idle",
   detail: "chem-service lifecycle boundary is declared but not connected",
-  pid: null
+  pid: null,
+  startedAt: null,
+  logTail: []
 };
