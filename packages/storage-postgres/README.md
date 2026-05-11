@@ -216,6 +216,13 @@ Use `pnpm postgres:migrate` from the repository root to install the schema
 against the configured PostgreSQL database. Use `pnpm postgres:smoke` to run
 schema installation plus a minimal Chemd ingest and RAG chunk read-back.
 
+For the desktop production runtime slice, use `pnpm desktop:runtime-smoke`.
+The command checks the desktop build prerequisites without launching Tauri. If
+no PostgreSQL URL is configured, it prints a clear `SKIP` reason and exits 0 so
+CI and local checkouts can run it safely without secrets. If a database URL is
+available, it reuses the PostgreSQL env loader, runs the schema/smoke path, and
+prints only redacted connection target metadata.
+
 Required database environment:
 
 ```text
