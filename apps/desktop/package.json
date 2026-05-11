@@ -12,6 +12,7 @@
     "tauri:build": "tauri build"
   },
   "dependencies": {
+    "@chemd/language-service": "workspace:*",
     "@tauri-apps/api": "^2.6.1",
     "lucide-react": "^1.7.0",
     "react": "^19.0.0",
