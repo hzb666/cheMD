@@ -220,8 +220,13 @@ For the desktop production runtime slice, use `pnpm desktop:runtime-smoke`.
 The command checks the desktop build prerequisites without launching Tauri. If
 no PostgreSQL URL is configured, it prints a clear `SKIP` reason and exits 0 so
 CI and local checkouts can run it safely without secrets. If a database URL is
-available, it reuses the PostgreSQL env loader, runs the schema/smoke path, and
-prints only redacted connection target metadata.
+available, it reuses the PostgreSQL env loader, runs the schema/smoke path,
+then writes and reads back a minimal desktop runtime Graph/RAG persistence
+payload against the shared PostgreSQL tables. The desktop persistence smoke
+covers the core experiment/revision path, graph snapshot/nodes/edges, citation
+chunk and citation sidecar, Agent run/tool call, and patch proposal records. It
+prints only redacted connection target metadata and record IDs/counts; it does
+not print raw source text, full URLs, or passwords.
 
 Required database environment:
 

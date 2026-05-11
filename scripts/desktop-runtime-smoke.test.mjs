@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildMinimalDesktopRuntimePersistencePayload,
   checkDesktopRuntimePreconditions,
   getPostgresDatabaseUrl,
+  runDesktopRuntimePersistenceSmoke,
   runDesktopRuntimeSmoke,
   runDesktopRuntimeSmokeCli,
   summarizePostgresTarget
@@ -109,6 +111,32 @@ test("runDesktopRuntimeSmoke skips without PostgreSQL env and exits cleanly", as
   assert.match(logger.lines.join("\n"), /SKIP desktop runtime smoke/u);
 });
 
+test("buildMinimalDesktopRuntimePersistencePayload mirrors Tauri command payload shape", () => {
+  const payload = buildMinimalDesktopRuntimePersistencePayload({
+    revisionId: "rev-runtime-shape"
+  });
+
+  assert.deepEqual(Object.keys(payload).sort(), [
+    "agentRuns",
+    "agentToolCalls",
+    "citationCandidates",
+    "createdAt",
+    "edges",
+    "graphSnapshot",
+    "metadata",
+    "nodes",
+    "patchProposals"
+  ]);
+  assert.equal(payload.graphSnapshot.sourceRevisionIds[0], "rev-runtime-shape");
+  assert.equal(payload.nodes.length, 2);
+  assert.equal(payload.edges.length, 1);
+  assert.equal(payload.citationCandidates.length, 1);
+  assert.equal(payload.agentRuns.length, 1);
+  assert.equal(payload.agentToolCalls.length, 1);
+  assert.equal(payload.patchProposals.length, 1);
+  assert.equal(typeof payload.metadata.sourceText, "string");
+});
+
 test("runDesktopRuntimeSmoke redacts env while running smoke in order", async () => {
   const calls = [];
   const logger = createLogger();
@@ -140,6 +168,15 @@ test("runDesktopRuntimeSmoke redacts env while running smoke in order", async ()
         firstChunkId: "chunk-1"
       };
     },
+    persistenceSmoke: async () => {
+      calls.push("persistence-smoke");
+      return {
+        experimentId: "exp-runtime",
+        revisionId: "rev-runtime",
+        graphSnapshotId: "graph-runtime",
+        counts: { graphSnapshots: 1 }
+      };
+    },
     logger
   });
 
@@ -147,13 +184,59 @@ test("runDesktopRuntimeSmoke redacts env while running smoke in order", async ()
     "env-loader",
     "desktop-check",
     "with-client",
-    "postgres-smoke"
+    "postgres-smoke",
+    "persistence-smoke"
   ]);
   assert.equal(result.status, "passed");
   const output = logger.lines.join("\n");
   assert.doesNotMatch(output, /super-secret/u);
   assert.doesNotMatch(output, /postgres:\/\/chemd/u);
   assert.match(output, /host=localhost/u);
+  assert.match(output, /runtime graph: graph-runtime/u);
+});
+
+test("runDesktopRuntimePersistenceSmoke installs schema, writes payload, and verifies readback", async () => {
+  const calls = [];
+  const client = {
+    async query(sql, values) {
+      calls.push({ sql, values });
+      return { rows: [{ count: 1 }] };
+    }
+  };
+  const payload = buildMinimalDesktopRuntimePersistencePayload({
+    revisionId: "rev-runtime-smoke"
+  });
+
+  const result = await runDesktopRuntimePersistenceSmoke({
+    client,
+    revisionId: "rev-runtime-smoke",
+    graphModules: async () => ({
+      getPostgresGraphRagExtensionSchemaSql: () => "CREATE TABLE graph_extension",
+      persistPostgresRuntimeGraphRagRecords: async (_client, input) => {
+        calls.push({ sql: "persist-runtime-graph-rag", values: [input.graphSnapshot.graphSnapshotId] });
+        return { records: { graphSnapshotInput: { graphSnapshot: input.graphSnapshot } } };
+      }
+    }),
+    payloadBuilder: () => payload,
+    coreWriter: async ({ payload: input }) => {
+      calls.push({ sql: "write-core-records", values: [input.graphSnapshot.experimentId] });
+    },
+    persistenceVerifier: async ({ payload: input }) => {
+      calls.push({ sql: "verify-runtime-persistence", values: [input.graphSnapshot.graphSnapshotId] });
+      return { graphSnapshots: 1, graphNodes: 2, graphEdges: 1 };
+    }
+  });
+
+  assert.equal(result.graphSnapshotId, "rev-runtime-smoke::graph");
+  assert.deepEqual(
+    calls.map((call) => call.sql),
+    [
+      "CREATE TABLE graph_extension",
+      "write-core-records",
+      "persist-runtime-graph-rag",
+      "verify-runtime-persistence"
+    ]
+  );
 });
 
 test("runDesktopRuntimeSmoke fails before database work on desktop preflight failure", async () => {
