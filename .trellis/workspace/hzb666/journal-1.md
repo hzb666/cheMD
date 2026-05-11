@@ -1517,3 +1517,96 @@ Integrated the first production desktop IDE slice with Tauri shell, language ser
 ### Next Steps
 
 - None - task complete
+
+
+## Session 36: Integrate desktop IDE productionization wave
+
+**Date**: 2026-05-12
+**Task**: Integrate desktop IDE productionization wave
+**Package**: desktop-ide
+**Branch**: `desktop-ide`
+
+### Summary
+
+Integrated the second desktop IDE productionization wave with real local workspace IO, language-service workbench, graph/RAG repository builders, agent orchestration, and Tauri Windows bundles.
+
+### Main Changes
+
+| Area | Summary |
+|------|---------|
+| Desktop workspace IO | Replaced placeholder Tauri workspace commands with local directory open, bounded Markdown listing, safe file read, and safe file write. Path traversal is rejected and reads are capped. |
+| Desktop workbench | Upgraded the React shell into a usable local IDE workbench with workspace path input, real file read/save, editor buffer dirty state, diagnostics, outline, quick fixes, and web-aligned light workbench styling. |
+| Graph/RAG repository | Added generic `@chemd/storage-postgres` query builders for graph snapshots, graph detail, RAG citations, agent runs, tool calls, patch proposals, and pending patch lists. These reuse `chemd_experiments`, `chemd_experiment_revisions`, and `chemd_rag_chunks`; no desktop-only tables were introduced. |
+| Agent orchestration | Added deterministic local agent run state machine, audit timeline, patch approval/reject/apply decisions, terminal-state guards, approval id matching, duplicate-apply rejection, base hash checks, and citation evidence gates. |
+| Packaging | Added Tauri bundle icon configuration so Windows MSI and NSIS installers build successfully. |
+
+### Parallel Integration
+
+- Integrated `desktop-ide-postgres-graph-repository` as `3b4127d` after checking for desktop-only table names and parameterized SQL.
+- Integrated `desktop-ide-workbench-ui` as `74b3126` after adding the shared `@chemd/language-service` dependency in `c9690d4`.
+- Integrated `desktop-ide-agent-orchestration` as `296551b` after returning it once to require approved decisions before patch apply.
+- Integrated `desktop-ide-workspace-io` as `adf3c41` and added frontend read/write wiring during integration.
+- Fixed Tauri bundle icon config as `59bb8c1` after `tauri:build` exposed the missing icon declaration.
+
+### Verification
+
+- [OK] `pnpm --filter @chemd/storage-postgres test`
+- [OK] `pnpm --filter @chemd/storage-postgres typecheck`
+- [OK] `pnpm --filter @chemd/agent-tools test`
+- [OK] `pnpm --filter @chemd/agent-tools typecheck`
+- [OK] `pnpm --filter @chemd/desktop typecheck`
+- [OK] `pnpm --filter @chemd/desktop build`
+- [OK] `cargo test` in `apps/desktop/src-tauri`
+- [OK] `cargo check` in `apps/desktop/src-tauri`
+- [OK] `pnpm typecheck`
+- [OK] `pnpm test`
+- [OK] `pnpm --filter @chemd/desktop tauri:build`
+- [OK] `git diff --check`
+
+### Packaging Evidence
+
+`tauri:build` produced:
+
+- `apps/desktop/src-tauri/target/release/bundle/msi/Chemd Desktop IDE_0.1.0_x64_en-US.msi`
+- `apps/desktop/src-tauri/target/release/bundle/nsis/Chemd Desktop IDE_0.1.0_x64-setup.exe`
+
+### Notes
+
+- The first `tauri:build` attempt timed out during the long first release compile; a second incremental run exposed a missing `.ico` bundle declaration. After adding `bundle.icon`, the final `tauri:build` passed.
+- Vite still emits non-failing warnings for lucide-react module-level `use client` directives and a desktop bundle chunk over 500 kB.
+- The desktop app now has a real local workspace edit loop. Live Postgres connection UI and real LLM/sidecar orchestration remain next implementation layers on top of the contracts added here.
+
+### Status
+
+[OK] Second productionization wave integrated on `desktop-ide` and ready for review.
+
+### Next Steps
+
+- Wire the desktop agent pane to `@chemd/agent-tools` orchestration state and approved patch proposals.
+- Add a desktop runtime bridge for live Postgres graph/RAG queries using the repository query builders.
+- Add chem-service sidecar lifecycle management beyond the current status boundary.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9a2bfe0` | (see git log) |
+| `c9690d4` | (see git log) |
+| `3b4127d` | (see git log) |
+| `74b3126` | (see git log) |
+| `296551b` | (see git log) |
+| `adf3c41` | (see git log) |
+| `59bb8c1` | (see git log) |
+
+### Testing
+
+- [OK] See Verification section above.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Continue with live Postgres graph/RAG runtime and sidecar-backed agent execution.

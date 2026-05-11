@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 35
+- **Total Sessions**: 36
 - **Last Active**: 2026-05-12
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1519 | Active |
+| `journal-1.md` | ~1614 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 36 | 2026-05-12 | Integrate desktop IDE productionization wave | `9a2bfe0`, `c9690d4`, `3b4127d`, `74b3126`, `296551b`, `adf3c41`, `59bb8c1` | `desktop-ide` |
 | 35 | 2026-05-12 | Integrate desktop IDE production slice | `59702a4`, `a0b379d`, `1a4bedd`, `0ecd1b7`, `9b1eb48`, `5281d56`, `f09995a` | `desktop-ide` |
 | 34 | 2026-04-26 | Repo graph index and reaction clustering | `b81c0d1`, `ec1a9ee` | `develop` |
 | 33 | 2026-04-24 | 修复 develop 全面审查问题 | `b59bd43` | `develop` |
