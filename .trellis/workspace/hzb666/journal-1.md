@@ -1610,3 +1610,97 @@ Integrated the second desktop IDE productionization wave with real local workspa
 ### Next Steps
 
 - Continue with live Postgres graph/RAG runtime and sidecar-backed agent execution.
+
+
+## Session 37: Desktop IDE third-wave runtime integration
+
+**Date**: 2026-05-12
+**Task**: Desktop IDE third-wave runtime integration
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Integrated third-wave desktop IDE runtime slices across PostgreSQL Graph/RAG executor, Agent patch pane, language Graph/RAG DTOs, and chem-service sidecar lifecycle.
+
+### Main Changes
+
+## Main Changes
+
+| Area | Summary |
+|------|---------|
+| Third-wave planning | Extended `.trellis/tasks/05-12-desktop-ide-production/prd.md` with production runtime slices for sidecar lifecycle, Agent patch orchestration, language-service Graph/RAG DTOs, and PostgreSQL executor queries. |
+| Postgres Graph/RAG executor | Added `@chemd/storage-postgres` executor helpers and row mappers for graph snapshots, graph detail, RAG citation lookups, agent runs, tool calls, pending patches, and patch apply reads. This reuses the existing PostgreSQL schema and does not add desktop-specific tables. |
+| Desktop Agent pane | Wired the desktop workbench to `@chemd/agent-tools` for local quick-fix proposals, patch approval/apply/reject decisions, source-hash checks, audit timeline, and explicit user-controlled application. |
+| Language-service Graph/RAG DTOs | Added pure editor DTO builders for graph snapshots, nodes, edges, and RAG citation candidates with source ranges, while keeping database IO in the storage layer. |
+| chem-service sidecar | Added Tauri commands for `start_sidecar`, `stop_sidecar`, `read_sidecar_status`, and `read_sidecar_logs`, managing only the app-owned child process with log tail capture and safe Command+args invocation. |
+
+## Parallel Integration
+
+- Dispatched four gpt-5.5-high subagents in separate branches/worktrees.
+- Integrated `desktop-ide-postgres-graph-executor` as `6a93b32` after checking SQL boundaries and desktop-only table names.
+- Integrated `desktop-ide-agent-pane` as `b7587b9` after desktop lint/typecheck/build and source-hash compatibility review.
+- Integrated `desktop-ide-language-graph-records` as `69ad65e` after confirming no storage dependency and passing language-service tests/typecheck.
+- Integrated `desktop-ide-sidecar-runtime` as `12f0925` after Rust lifecycle/security review, cargo tests, cargo check, and desktop typecheck.
+
+## Verification
+
+- [OK] `pnpm exec eslint apps/desktop/src/App.tsx`
+- [OK] `pnpm --filter @chemd/desktop typecheck`
+- [OK] `pnpm --filter @chemd/desktop build`
+- [OK] `pnpm --filter @chemd/storage-postgres test`
+- [OK] `pnpm --filter @chemd/storage-postgres typecheck`
+- [OK] `pnpm --filter @chemd/language-service test`
+- [OK] `pnpm --filter @chemd/language-service typecheck`
+- [OK] `cargo test` in `apps/desktop/src-tauri`
+- [OK] `cargo check` in `apps/desktop/src-tauri`
+- [OK] `pnpm typecheck`
+- [OK] `pnpm test`
+- [OK] `pnpm --filter @chemd/desktop tauri:build`
+- [OK] `git diff --check`
+
+## Packaging Evidence
+
+`tauri:build` produced:
+
+- `apps/desktop/src-tauri/target/release/bundle/msi/Chemd Desktop IDE_0.1.0_x64_en-US.msi`
+- `apps/desktop/src-tauri/target/release/bundle/nsis/Chemd Desktop IDE_0.1.0_x64-setup.exe`
+
+## Notes
+
+- Vite still emits non-failing warnings for lucide-react module-level `use client` directives and a desktop bundle chunk above 500 kB.
+- Sidecar readiness currently means the chem-service process has spawned; HTTP `/healthz` readiness probing remains the next production hardening layer.
+- The desktop app now has production-oriented local workspace editing, Agent patch approvals, PostgreSQL Graph/RAG query contracts, language-service DTO generation, app-owned chem-service lifecycle management, and reproducible Windows packaging.
+
+## Status
+
+[OK] Third productionization wave integrated on `desktop-ide` and ready for review.
+
+## Next Steps
+
+- Add live Postgres connection configuration in the desktop runtime instead of relying only on repository helpers.
+- Add sidecar health probing and end-to-end smoke against a real chem-service instance.
+- Persist Agent runs and patch decisions through the PostgreSQL executor from the desktop runtime bridge.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e40ff30` | (see git log) |
+| `6a93b32` | (see git log) |
+| `b7587b9` | (see git log) |
+| `69ad65e` | (see git log) |
+| `12f0925` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
