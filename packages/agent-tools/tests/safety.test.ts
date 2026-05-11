@@ -6,41 +6,9 @@ import {
   createToolResult,
   requireCitedEvidence,
   validatePatchProposalBaseHash,
-  validatePatchProposalEvidence,
-  type AgentEvidence,
-  type PatchProposal
+  validatePatchProposalEvidence
 } from "../src/index";
-
-const citedRagEvidence: AgentEvidence = {
-  kind: "rag",
-  summary: "Yield improved after lowering the reaction temperature.",
-  citation: {
-    citationId: "cite-rag-1",
-    sourceLabel: "exp-001 result",
-    documentId: "exp-001",
-    revisionId: "rev-001"
-  }
-};
-
-const proposal: PatchProposal = {
-  patchProposalId: "patch-1",
-  documentId: "doc-1",
-  beforeHash: "sha256:base",
-  title: "Normalize reaction yield",
-  rationale: "Aligns result yield with diagnostic guidance.",
-  edits: [
-    {
-      range: {
-        startLine: 5,
-        startColumn: 1,
-        endLine: 5,
-        endColumn: 10
-      },
-      replacement: "yield: 80%"
-    }
-  ],
-  evidence: [citedRagEvidence]
-};
+import { citedRagEvidence, proposal } from "./fixtures";
 
 describe("@chemd/agent-tools contract", () => {
   it("exposes the allowed desktop agent tool names", () => {
@@ -163,6 +131,47 @@ describe("agent tool safety gates", () => {
       allowed: false,
       error: {
         code: "rag_evidence_missing_citation"
+      }
+    });
+  });
+
+  it("blocks approved patches without any evidence", () => {
+    const result = canApplyApprovedPatch({
+      patchProposal: {
+        ...proposal,
+        evidence: []
+      },
+      userApprovalId: "approval-1",
+      currentBeforeHash: "sha256:base"
+    });
+
+    expect(result).toMatchObject({
+      allowed: false,
+      error: {
+        code: "patch_evidence_missing"
+      }
+    });
+  });
+
+  it("blocks approved patches with uncited non-RAG evidence", () => {
+    const result = canApplyApprovedPatch({
+      patchProposal: {
+        ...proposal,
+        evidence: [
+          {
+            kind: "graph",
+            summary: "Graph neighbor suggests a related reaction."
+          }
+        ]
+      },
+      userApprovalId: "approval-1",
+      currentBeforeHash: "sha256:base"
+    });
+
+    expect(result).toMatchObject({
+      allowed: false,
+      error: {
+        code: "patch_evidence_missing_citation"
       }
     });
   });
