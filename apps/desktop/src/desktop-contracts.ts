@@ -29,6 +29,22 @@ export interface SidecarLogs {
   lines: string[];
 }
 
+export interface PostgresStatus {
+  state: RuntimeState;
+  label: string;
+  detail: string;
+  configured: boolean;
+  source: string | null;
+  host: string | null;
+  database: string | null;
+  user: string | null;
+  ssl: string;
+  vectorInstalled: boolean | null;
+  schemaReady: boolean | null;
+  timeoutMs: number;
+  pool: string | null;
+}
+
 export interface DesktopCommandError {
   code: string;
   message: string;
@@ -95,6 +111,10 @@ export interface DesktopCommandMap {
     input: void;
     output: SidecarLogs;
   };
+  read_postgres_status: {
+    input: void;
+    output: PostgresStatus;
+  };
 }
 
 export const shellWorkspace: WorkspaceHandle = {
@@ -135,4 +155,20 @@ export const shellSidecarStatus: SidecarStatus = {
   pid: null,
   startedAt: null,
   logTail: []
+};
+
+export const shellPostgresStatus: PostgresStatus = {
+  state: "placeholder",
+  label: "Postgres not configured",
+  detail: "Set CHEMD_POSTGRES_DATABASE_URL or DATABASE_URL to enable database checks",
+  configured: false,
+  source: null,
+  host: null,
+  database: null,
+  user: null,
+  ssl: "not configured",
+  vectorInstalled: null,
+  schemaReady: null,
+  timeoutMs: 0,
+  pool: null
 };

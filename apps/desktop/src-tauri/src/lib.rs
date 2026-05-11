@@ -1,3 +1,5 @@
+mod postgres;
+mod postgres_config;
 mod sidecar;
 mod sidecar_command;
 mod sidecar_log;
@@ -7,10 +9,14 @@ mod workspace_io;
 mod workspace_path;
 
 #[cfg(test)]
+mod postgres_tests;
+#[cfg(test)]
 mod sidecar_tests;
 #[cfg(test)]
 mod workspace_tests;
 
+#[cfg(not(test))]
+use postgres::read_postgres_status;
 #[cfg(not(test))]
 use sidecar::{
     read_sidecar_logs, read_sidecar_status, start_sidecar, stop_sidecar, SidecarManager,
@@ -35,7 +41,8 @@ pub fn run() {
             start_sidecar,
             stop_sidecar,
             read_sidecar_status,
-            read_sidecar_logs
+            read_sidecar_logs,
+            read_postgres_status
         ])
         .run(tauri::generate_context!())
         .expect("error while running Chemd Desktop IDE");
