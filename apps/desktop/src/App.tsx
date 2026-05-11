@@ -1,12 +1,17 @@
 import { invoke } from "@tauri-apps/api/core";
-import { Activity, AlertTriangle, Bot, CheckCircle2, ChevronRight, CircleDot, FileCode2, Files, FlaskConical, GitGraph, Lightbulb, PanelBottom, Search, Settings, Sparkles } from "lucide-react";
+import { Activity, AlertTriangle, Bot, CheckCircle2, ChevronRight, CircleDot, FileCode2, Files, FlaskConical, GitGraph, Lightbulb, PanelBottom, PlayCircle, Search, Settings, ShieldCheck, Sparkles, Wrench, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 
+import { appendToolCall, applyPatchDecision, approvePatchDecision, attachEvidence, createAgentRun, createToolResult, getAuditTimeline, proposePatch, rejectPatchDecision, transitionAgentRunStatus, type AgentAuditEvent, type AgentEvidence, type AgentRun, type AgentToolCall, type PatchDecision, type PatchProposal } from "@chemd/agent-tools";
 import { compileChemdForEditor, type ChemdEditorDiagnostic, type ChemdOutlineItem, type ChemdQuickFixProposal, type ChemdTextEdit } from "@chemd/language-service";
 
 import { shellFiles, shellSidecarStatus, shellWorkspace, type DesktopCommandError, type DesktopCommandMap, type RuntimeState, type SidecarStatus, type WorkspaceFileEntry, type WorkspaceHandle } from "./desktop-contracts";
 
 type WorkspaceState = "empty" | "opening" | "open" | "error"; type DocumentMode = "sample" | "workspace";
+type AgentMessageTone = "info" | "warning" | "success" | "danger";
+type AgentMessage = { tone: AgentMessageTone; text: string };
+type QuickFixCandidate = { diagnostic: ChemdEditorDiagnostic; quickFix: ChemdQuickFixProposal };
+type AgentOperationResult = { run: AgentRun; message: AgentMessage };
 
 const sampleSources: Record<string, string> = {
   "suzuki-screen.chemd.md": "---\nid: exp-desktop-suzuki\ntitle: Suzuki coupling condition screen\ndate: 2026-05-12\n---\n\n:::chemd #mol-aryl-bromide\nsmiles: Cc1ccc(Br)cc1\n:::\n\n:::chemd #rxn-screen\nkind: reaction\nreactants: mol-aryl-bromide, phenylboronic-acid\nproducts: biaryl-product\nconditions:\n  catalyst: Pd(PPh3)4\n  base: K2CO3\n  solvent: dioxane/water\n:::\n\n:::result #screen-result\nstatus: pending\nyield: 78%\n:::\n",
@@ -17,6 +22,28 @@ const activityItems = [{ id: "files", label: "Files", icon: Files, active: true 
 
 const statusToneByState: Record<RuntimeState, string> = { ready: "success", placeholder: "pending", degraded: "warning", offline: "danger" };
 const workspaceStateLabel: Record<WorkspaceState, string> = { empty: "Empty", opening: "Opening", open: "Open", error: "Fallback" };
+const agentStatusLabel: Record<AgentRun["status"], string> = {
+  created: "Created",
+  running: "Running",
+  waiting_for_approval: "Awaiting approval",
+  applying_patch: "Applying patch",
+  validating: "Validating",
+  completed: "Completed",
+  failed: "Failed",
+  blocked: "Blocked",
+  canceled: "Canceled"
+};
+const auditEventLabel: Record<AgentAuditEvent["type"], string> = {
+  run_created: "Run",
+  status_transitioned: "Status",
+  tool_call_appended: "Tool",
+  evidence_attached: "Evidence",
+  patch_proposed: "Patch",
+  patch_approved: "Approve",
+  patch_rejected: "Reject",
+  patch_applied: "Apply",
+  decision_blocked: "Blocked"
+};
 
 const invokeDesktop = async <Command extends keyof DesktopCommandMap>(
   command: Command,
@@ -51,7 +78,7 @@ const getOffset = (source: string, line: number, column: number): number => {
   return Math.min(source.length, lineStart + Math.max(0, column - 1));
 };
 
-const applyTextEdits = (source: string, edits: ChemdTextEdit[]): string =>
+const applyTextEdits = (source: string, edits: readonly ChemdTextEdit[]): string =>
   [...edits]
     .sort((left, right) =>
       getOffset(source, right.range.startLine, right.range.startColumn)
@@ -62,6 +89,274 @@ const applyTextEdits = (source: string, edits: ChemdTextEdit[]): string =>
       const end = getOffset(next, edit.range.endLine, edit.range.endColumn);
       return `${next.slice(0, start)}${edit.replacement}${next.slice(end)}`;
     }, source);
+
+const createEditorSourceHash = (source: string): string => {
+  let hash = 2166136261;
+  for (let index = 0; index < source.length; index += 1) {
+    hash ^= source.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return (hash >>> 0).toString(16).padStart(8, "0");
+};
+
+const formatRange = (range: ChemdTextEdit["range"]): string =>
+  `L${range.startLine}:C${range.startColumn}-L${range.endLine}:C${range.endColumn}`;
+
+const createAgentId = (prefix: string): string =>
+  `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+const getLatestPatchProposal = (run: AgentRun | null): PatchProposal | undefined =>
+  run?.patchProposals[run.patchProposals.length - 1];
+
+const findPatchDecision = (
+  run: AgentRun | null,
+  patchProposalId: string | undefined,
+  kind: PatchDecision["kind"]
+): PatchDecision | undefined =>
+  patchProposalId === undefined
+    ? undefined
+    : run?.patchDecisions.find((decision) =>
+        decision.patchProposalId === patchProposalId && decision.kind === kind
+      );
+
+const createDiagnosticEvidence = (
+  diagnostic: ChemdEditorDiagnostic,
+  quickFix: ChemdQuickFixProposal,
+  file: WorkspaceFileEntry
+): AgentEvidence => ({
+  kind: "diagnostic",
+  documentId: file.id,
+  filePath: file.path,
+  sourceRange: diagnostic.range,
+  summary: `${diagnostic.code}: ${diagnostic.message}`,
+  citation: {
+    citationId: `diagnostic:${quickFix.id}`,
+    sourceLabel: `${diagnostic.code} quick fix`,
+    documentId: file.id,
+    filePath: file.path,
+    sourceRange: diagnostic.range
+  }
+});
+
+const createQuickFixPatchProposal = (
+  diagnostic: ChemdEditorDiagnostic,
+  quickFix: ChemdQuickFixProposal,
+  file: WorkspaceFileEntry,
+  evidence: AgentEvidence
+): PatchProposal => ({
+  patchProposalId: createAgentId("patch"),
+  documentId: file.id,
+  baseRevisionId: quickFix.patch.beforeHash,
+  beforeHash: quickFix.patch.beforeHash,
+  title: quickFix.title,
+  rationale: `Use language-service quick fix for ${diagnostic.code}: ${diagnostic.message}`,
+  edits: quickFix.patch.edits,
+  evidence: [evidence]
+});
+
+const createProposalToolCall = ({
+  runId,
+  toolCallId,
+  workspaceId,
+  file,
+  candidate,
+  evidence,
+  at
+}: {
+  runId: string;
+  toolCallId: string;
+  workspaceId: string;
+  file: WorkspaceFileEntry;
+  candidate: QuickFixCandidate;
+  evidence: AgentEvidence;
+  at: string;
+}): AgentToolCall => ({
+  toolCallId,
+  agentRunId: runId,
+  workspaceId,
+  toolName: "propose_repair",
+  payload: {
+    diagnosticCode: candidate.diagnostic.code,
+    quickFixId: candidate.quickFix.id,
+    filePath: file.path
+  },
+  status: "ok",
+  startedAt: at,
+  finishedAt: at,
+  result: createToolResult({
+    toolCallId,
+    status: "ok",
+    payload: {
+      title: candidate.quickFix.title,
+      edits: candidate.quickFix.patch.edits.length
+    },
+    evidence: [evidence]
+  })
+});
+
+const createAgentProposalRun = (
+  candidate: QuickFixCandidate,
+  file: WorkspaceFileEntry,
+  workspaceId: string
+): AgentOperationResult => {
+  const now = new Date().toISOString();
+  const runId = createAgentId("run");
+  const toolCallId = createAgentId("tool");
+  const evidence = createDiagnosticEvidence(candidate.diagnostic, candidate.quickFix, file);
+  const patchProposal = createQuickFixPatchProposal(
+    candidate.diagnostic,
+    candidate.quickFix,
+    file,
+    evidence
+  );
+  const toolCall = createProposalToolCall({
+    runId,
+    toolCallId,
+    workspaceId,
+    file,
+    candidate,
+    evidence,
+    at: now
+  });
+  const createdRun = createAgentRun({
+    agentRunId: runId,
+    workspaceId,
+    goal: `Prepare quick fix patch for ${file.path}`,
+    targetFiles: [file.path],
+    createdAt: now
+  });
+  const runningResult = transitionAgentRunStatus(createdRun, {
+    status: "running",
+    at: now,
+    summary: "Collected current language-service diagnostics."
+  });
+  if (!runningResult.ok) {
+    return { run: runningResult.run, message: { tone: "danger", text: runningResult.error.message } };
+  }
+
+  const toolResult = appendToolCall(runningResult.run, {
+    toolCall,
+    at: now,
+    summary: `Proposed repair from quick fix ${candidate.quickFix.id}.`
+  });
+  if (!toolResult.ok) {
+    return { run: toolResult.run, message: { tone: "danger", text: toolResult.error.message } };
+  }
+
+  const evidenceResult = attachEvidence(toolResult.run, {
+    evidence: [evidence],
+    at: now,
+    summary: `Attached diagnostic evidence for ${candidate.diagnostic.code}.`
+  });
+  if (!evidenceResult.ok) {
+    return { run: evidenceResult.run, message: { tone: "danger", text: evidenceResult.error.message } };
+  }
+
+  const proposalResult = proposePatch(evidenceResult.run, {
+    patchProposal,
+    at: now,
+    summary: `Patch proposal awaits explicit approval: ${patchProposal.title}.`
+  });
+  return {
+    run: proposalResult.run,
+    message: proposalResult.ok
+      ? { tone: "info", text: "Review the patch proposal, then approve before applying." }
+      : { tone: "danger", text: proposalResult.error.message }
+  };
+};
+
+const approveAgentRunPatch = (run: AgentRun): AgentOperationResult | null => {
+  const activeProposal = getLatestPatchProposal(run);
+  if (!activeProposal) return null;
+
+  const result = approvePatchDecision(run, {
+    decisionId: createAgentId("decision"),
+    patchProposalId: activeProposal.patchProposalId,
+    userApprovalId: createAgentId("approval"),
+    reason: "User explicitly approved patch proposal.",
+    decidedAt: new Date().toISOString()
+  });
+  return {
+    run: result.run,
+    message: result.ok
+      ? { tone: "success", text: "Patch approved. Apply is now enabled for the current buffer." }
+      : { tone: "danger", text: result.error.message }
+  };
+};
+
+const applyAgentRunPatch = (
+  run: AgentRun,
+  source: string
+): { result: AgentOperationResult; nextSource?: string } | null => {
+  const activeProposal = getLatestPatchProposal(run);
+  const approvedDecision = findPatchDecision(run, activeProposal?.patchProposalId, "approved");
+  if (!activeProposal || !approvedDecision) return null;
+
+  const appliedResult = applyPatchDecision(run, {
+    decisionId: createAgentId("decision"),
+    patchProposalId: activeProposal.patchProposalId,
+    userApprovalId: approvedDecision.userApprovalId,
+    reason: "Applied approved patch to current editor buffer.",
+    decidedAt: new Date().toISOString(),
+    currentBeforeHash: createEditorSourceHash(source)
+  });
+  if (!appliedResult.ok) {
+    return {
+      result: {
+        run: appliedResult.run,
+        message: { tone: "danger", text: appliedResult.error.message }
+      }
+    };
+  }
+
+  const completedResult = transitionAgentRunStatus(appliedResult.run, {
+    status: "completed",
+    at: new Date().toISOString(),
+    summary: "Applied approved patch to the editor buffer.",
+    finalSummary: "Patch applied locally. Save remains under the normal workspace save flow."
+  });
+  return {
+    nextSource: applyTextEdits(source, activeProposal.edits),
+    result: {
+      run: completedResult.run,
+      message: completedResult.ok
+        ? { tone: "success", text: "Patch applied to the editor buffer. Use Save to persist it." }
+        : { tone: "danger", text: completedResult.error.message }
+    }
+  };
+};
+
+const rejectAgentRunPatch = (run: AgentRun): AgentOperationResult | null => {
+  const activeProposal = getLatestPatchProposal(run);
+  if (!activeProposal) return null;
+
+  const rejectedResult = rejectPatchDecision(run, {
+    decisionId: createAgentId("decision"),
+    patchProposalId: activeProposal.patchProposalId,
+    reason: "User rejected patch proposal.",
+    decidedAt: new Date().toISOString()
+  });
+  if (!rejectedResult.ok) {
+    return {
+      run: rejectedResult.run,
+      message: { tone: "danger", text: rejectedResult.error.message }
+    };
+  }
+
+  const canceledResult = transitionAgentRunStatus(rejectedResult.run, {
+    status: "canceled",
+    at: new Date().toISOString(),
+    summary: "Patch proposal rejected by user.",
+    finalSummary: "No editor changes were applied."
+  });
+  return {
+    run: canceledResult.run,
+    message: canceledResult.ok
+      ? { tone: "warning", text: "Patch rejected. The editor buffer was not changed." }
+      : { tone: "danger", text: canceledResult.error.message }
+  };
+};
 
 const PanelHeader = ({ eyebrow, title, meta }: { eyebrow: string; title: string; meta: string }) => (
   <div className="desktop-panel-header">
@@ -193,28 +488,180 @@ const OutlineTree = ({ items }: { items: ChemdOutlineItem[] }) => (
   </ul>
 );
 
+const getQuickFixCandidates = (diagnostics: ChemdEditorDiagnostic[]): QuickFixCandidate[] =>
+  diagnostics.flatMap((diagnostic) =>
+    diagnostic.quickFixes.map((quickFix) => ({ diagnostic, quickFix }))
+  );
+
+const AgentRunHeader = ({
+  agentRun,
+  agentMessage
+}: {
+  agentRun: AgentRun | null;
+  agentMessage: AgentMessage | null;
+}) => (
+  <>
+    <div className="desktop-agent-heading">
+      <Bot size={15} />
+      <span>Agent run</span>
+      <span className="desktop-agent-status" data-status={agentRun?.status ?? "created"}>
+        {agentRun ? agentStatusLabel[agentRun.status] : "Idle"}
+      </span>
+    </div>
+    {agentMessage ? <p className="desktop-agent-message" data-tone={agentMessage.tone}>{agentMessage.text}</p> : null}
+  </>
+);
+
+const AgentEmptyState = ({
+  mode,
+  hasQuickFixes
+}: {
+  mode: DocumentMode;
+  hasQuickFixes: boolean;
+}) => (
+  mode === "workspace" && hasQuickFixes ? null : (
+    <div className="desktop-agent-empty">
+      {mode !== "workspace"
+        ? "Open a local workspace to let Agent propose edits against real files."
+        : "No language-service quick fixes are available for this buffer."}
+    </div>
+  )
+);
+
+const AgentQuickFixList = ({
+  mode,
+  quickFixes,
+  onProposeQuickFix
+}: {
+  mode: DocumentMode;
+  quickFixes: QuickFixCandidate[];
+  onProposeQuickFix: (candidate: QuickFixCandidate) => void;
+}) => (
+  <div className="desktop-quickfix-list">
+    {quickFixes.length > 0 ? quickFixes.map((candidate) => (
+      <button
+        key={candidate.quickFix.id}
+        type="button"
+        disabled={mode !== "workspace"}
+        onClick={() => onProposeQuickFix(candidate)}
+      >
+        <Lightbulb size={14} />
+        <span>{candidate.quickFix.title}</span>
+      </button>
+    )) : <span className="desktop-empty-copy">No quick fixes available.</span>}
+  </div>
+);
+
+const AgentPatchProposalCard = ({
+  proposal,
+  canApprove,
+  canApply,
+  canReject,
+  onApprovePatch,
+  onApplyPatch,
+  onRejectPatch
+}: {
+  proposal?: PatchProposal;
+  canApprove: boolean;
+  canApply: boolean;
+  canReject: boolean;
+  onApprovePatch: () => void;
+  onApplyPatch: () => void;
+  onRejectPatch: () => void;
+}) => (
+  proposal ? (
+    <div className="desktop-agent-proposal">
+      <div className="desktop-agent-subhead"><Wrench size={14} /><span>{proposal.title}</span></div>
+      <p>{proposal.rationale}</p>
+      <ul className="desktop-agent-edit-list">
+        {proposal.edits.map((edit, index) => (
+          <li key={`${proposal.patchProposalId}-${index}`}>
+            <span>{formatRange(edit.range)}</span>
+            <code>{edit.replacement.split(/\r?\n/, 1)[0] || "empty replacement"}</code>
+          </li>
+        ))}
+      </ul>
+      <div className="desktop-agent-action-row">
+        <button type="button" className="desktop-button" disabled={!canApprove} onClick={onApprovePatch}><ShieldCheck size={14} />Approve</button>
+        <button type="button" className="desktop-button-primary" disabled={!canApply} onClick={onApplyPatch}><PlayCircle size={14} />Apply</button>
+        <button type="button" className="desktop-button" disabled={!canReject} onClick={onRejectPatch}><XCircle size={14} />Reject</button>
+      </div>
+    </div>
+  ) : null
+);
+
+const AgentTimeline = ({ agentRun }: { agentRun: AgentRun | null }) => {
+  const timeline = agentRun ? getAuditTimeline(agentRun) : [];
+  return (
+    <div className="desktop-agent-timeline">
+      <div className="desktop-agent-subhead"><Activity size={14} /><span>Timeline</span></div>
+      {timeline.length > 0 ? timeline.map((event) => (
+        <div key={event.eventId} className="desktop-agent-timeline-row" data-type={event.type}>
+          <span>{auditEventLabel[event.type]}</span>
+          <p>{event.summary}</p>
+          <time dateTime={event.at}>{event.at ? new Date(event.at).toLocaleTimeString() : "now"}</time>
+        </div>
+      )) : <p className="desktop-empty-copy">No agent run has started.</p>}
+    </div>
+  );
+};
+
+const AgentLedger = ({ agentRun }: { agentRun: AgentRun | null }) => (
+  agentRun ? (
+    <div className="desktop-agent-ledger">
+      <span>{agentRun.toolCalls.length} tools</span>
+      <span>{agentRun.evidence.length} evidence</span>
+      <span>{agentRun.patchDecisions.length} decisions</span>
+    </div>
+  ) : null
+);
+
 const InsightPane = ({
   outline,
   diagnostics,
-  onApplyQuickFix
+  mode,
+  agentRun,
+  agentMessage,
+  onProposeQuickFix,
+  onApprovePatch,
+  onApplyPatch,
+  onRejectPatch
 }: {
   outline: ChemdOutlineItem[];
   diagnostics: ChemdEditorDiagnostic[];
-  onApplyQuickFix: (quickFix: ChemdQuickFixProposal) => void;
+  mode: DocumentMode;
+  agentRun: AgentRun | null;
+  agentMessage: AgentMessage | null;
+  onProposeQuickFix: (candidate: QuickFixCandidate) => void;
+  onApprovePatch: () => void;
+  onApplyPatch: () => void;
+  onRejectPatch: () => void;
 }) => {
-  const quickFixes = diagnostics.flatMap((item) => item.quickFixes);
+  const quickFixes = getQuickFixCandidates(diagnostics);
+  const activeProposal = getLatestPatchProposal(agentRun);
+  const approvedDecision = findPatchDecision(agentRun, activeProposal?.patchProposalId, "approved");
+  const rejectedDecision = findPatchDecision(agentRun, activeProposal?.patchProposalId, "rejected");
+  const appliedDecision = findPatchDecision(agentRun, activeProposal?.patchProposalId, "applied");
+
   return (
     <aside className="desktop-pane desktop-insight-pane" aria-label="Outline and agent">
       <PanelHeader eyebrow="Inspect" title="Outline" meta={`${outline.length} roots`} />
       <div className="desktop-insight-section">{outline.length > 0 ? <OutlineTree items={outline} /> : <p className="desktop-empty-copy">No outline from language service.</p>}</div>
       <div className="desktop-agent-panel">
-        <div className="desktop-agent-heading"><Bot size={15} /><span>Agent pane</span></div>
-        <p>Agent tools can consume the current source, diagnostics and selected quick fixes once orchestration commands are connected.</p>
-        <div className="desktop-quickfix-list">
-          {quickFixes.length > 0 ? quickFixes.map((fix) => (
-            <button key={fix.id} type="button" onClick={() => onApplyQuickFix(fix)}><Lightbulb size={14} /><span>{fix.title}</span></button>
-          )) : <span className="desktop-empty-copy">No quick fixes available.</span>}
-        </div>
+        <AgentRunHeader agentRun={agentRun} agentMessage={agentMessage} />
+        <AgentEmptyState mode={mode} hasQuickFixes={quickFixes.length > 0} />
+        <AgentQuickFixList mode={mode} quickFixes={quickFixes} onProposeQuickFix={onProposeQuickFix} />
+        <AgentPatchProposalCard
+          proposal={activeProposal}
+          canApprove={activeProposal !== undefined && approvedDecision === undefined && rejectedDecision === undefined && appliedDecision === undefined}
+          canApply={activeProposal !== undefined && approvedDecision !== undefined && appliedDecision === undefined && rejectedDecision === undefined}
+          canReject={activeProposal !== undefined && rejectedDecision === undefined && appliedDecision === undefined}
+          onApprovePatch={onApprovePatch}
+          onApplyPatch={onApplyPatch}
+          onRejectPatch={onRejectPatch}
+        />
+        <AgentTimeline agentRun={agentRun} />
+        <AgentLedger agentRun={agentRun} />
       </div>
     </aside>
   );
@@ -257,6 +704,8 @@ export const App = () => {
   const [rootPath, setRootPath] = useState("");
   const [sidecarStatus, setSidecarStatus] = useState<SidecarStatus>(shellSidecarStatus);
   const [message, setMessage] = useState("No workspace is open. Editing bundled sample content.");
+  const [agentRun, setAgentRun] = useState<AgentRun | null>(null);
+  const [agentMessage, setAgentMessage] = useState<AgentMessage | null>(null);
 
   useEffect(() => {
     void invokeDesktop("read_sidecar_status", undefined).then(setSidecarStatus).catch(() => setSidecarStatus(shellSidecarStatus));
@@ -270,6 +719,11 @@ export const App = () => {
   }), [selectedFile.path, source]);
   const compileError = output.status === "failed" ? output.error.message : undefined;
   const canSave = mode === "workspace" && selectedFile.kind === "file" && source !== savedSource && workspace.writable;
+
+  useEffect(() => {
+    setAgentRun(null);
+    setAgentMessage(null);
+  }, [mode, selectedFileId]);
 
   const openWorkspace = async () => {
     setWorkspaceState("opening");
@@ -337,6 +791,42 @@ export const App = () => {
     }
   };
 
+  const startAgentProposal = (candidate: QuickFixCandidate) => {
+    if (mode !== "workspace" || selectedFile.kind !== "file") {
+      setAgentMessage({
+        tone: "warning",
+        text: "Open a local workspace file before creating an Agent patch proposal."
+      });
+      return;
+    }
+
+    const result = createAgentProposalRun(candidate, selectedFile, workspace.workspaceId);
+    setAgentRun(result.run);
+    setAgentMessage(result.message);
+  };
+
+  const approveAgentPatch = () => {
+    const result = agentRun ? approveAgentRunPatch(agentRun) : null;
+    if (!result) return;
+    setAgentRun(result.run);
+    setAgentMessage(result.message);
+  };
+
+  const applyAgentPatch = () => {
+    const operation = agentRun ? applyAgentRunPatch(agentRun, source) : null;
+    if (!operation) return;
+    if (operation.nextSource !== undefined) setSource(operation.nextSource);
+    setAgentRun(operation.result.run);
+    setAgentMessage(operation.result.message);
+  };
+
+  const rejectAgentPatch = () => {
+    const result = agentRun ? rejectAgentRunPatch(agentRun) : null;
+    if (!result) return;
+    setAgentRun(result.run);
+    setAgentMessage(result.message);
+  };
+
   return (
     <main className="desktop-shell">
       <TopBar workspace={workspace} workspaceState={workspaceState} sidecarStatus={sidecarStatus} diagnosticCount={output.diagnostics.length} dirty={source !== savedSource} rootPath={rootPath} canSave={canSave} onRootPathChange={setRootPath} onSave={() => void saveWorkspaceFile()} onOpenWorkspace={() => void openWorkspace()} />
@@ -345,7 +835,17 @@ export const App = () => {
         <Sidebar files={files} selectedFileId={selectedFileId} mode={mode} message={message} onSelectFile={(file) => void selectFile(file)} />
         <div className="desktop-main-grid">
           <EditorPane fileName={selectedFile.name} mode={mode} source={source} lineCount={source.split(/\r?\n/).length} compiledAt={output.compiledAt} onChange={setSource} />
-          <InsightPane outline={output.outline} diagnostics={output.diagnostics} onApplyQuickFix={(fix) => setSource((current) => applyTextEdits(current, fix.patch.edits))} />
+          <InsightPane
+            outline={output.outline}
+            diagnostics={output.diagnostics}
+            mode={mode}
+            agentRun={agentRun}
+            agentMessage={agentMessage}
+            onProposeQuickFix={startAgentProposal}
+            onApprovePatch={approveAgentPatch}
+            onApplyPatch={applyAgentPatch}
+            onRejectPatch={rejectAgentPatch}
+          />
           <BottomPanel diagnostics={output.diagnostics} compileStatus={output.status} errorMessage={compileError} />
         </div>
       </div>

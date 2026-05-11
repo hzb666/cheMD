@@ -288,11 +288,73 @@
   font-weight: 650;
 }
 
+.desktop-agent-status {
+  margin-left: auto;
+  padding: 0.16rem 0.42rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--muted-foreground);
+  font-size: 0.67rem;
+  font-weight: 650;
+}
+
+.desktop-agent-status[data-status="waiting_for_approval"],
+.desktop-agent-status[data-status="running"],
+.desktop-agent-status[data-status="applying_patch"],
+.desktop-agent-status[data-status="validating"] {
+  border-color: color-mix(in srgb, var(--primary) 26%, var(--border));
+  color: var(--accent-foreground);
+}
+
+.desktop-agent-status[data-status="completed"] {
+  border-color: color-mix(in srgb, var(--success) 28%, var(--border));
+  color: var(--success);
+}
+
+.desktop-agent-status[data-status="blocked"],
+.desktop-agent-status[data-status="failed"],
+.desktop-agent-status[data-status="canceled"] {
+  border-color: color-mix(in srgb, var(--warning) 28%, var(--border));
+  color: var(--warning);
+}
+
 .desktop-agent-panel p {
   margin: 0;
   color: var(--muted-foreground);
   font-size: 0.75rem;
   line-height: 1.45;
+}
+
+.desktop-agent-message,
+.desktop-agent-empty,
+.desktop-agent-proposal,
+.desktop-agent-timeline {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #fff;
+}
+
+.desktop-agent-message {
+  padding: 0.5rem 0.6rem;
+}
+
+.desktop-agent-message[data-tone="success"] {
+  border-color: color-mix(in srgb, var(--success) 28%, var(--border));
+  color: var(--success);
+}
+
+.desktop-agent-message[data-tone="warning"],
+.desktop-agent-message[data-tone="danger"] {
+  border-color: color-mix(in srgb, var(--warning) 28%, var(--border));
+  color: var(--warning);
+}
+
+.desktop-agent-empty {
+  padding: 0.55rem 0.6rem;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  line-height: 1.4;
 }
 
 .desktop-quickfix-list {
@@ -317,6 +379,110 @@
 .desktop-quickfix-list button:hover {
   border-color: color-mix(in srgb, var(--primary) 28%, var(--border));
   background: var(--accent);
+}
+
+.desktop-agent-proposal {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.65rem;
+}
+
+.desktop-agent-subhead {
+  min-width: 0;
+  gap: 0.42rem;
+  color: var(--foreground);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.desktop-agent-subhead span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-agent-edit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.desktop-agent-edit-list li {
+  display: grid;
+  grid-template-columns: 6.75rem minmax(0, 1fr);
+  gap: 0.45rem;
+  align-items: center;
+  color: var(--muted-foreground);
+  font-size: 0.7rem;
+}
+
+.desktop-agent-edit-list code {
+  min-width: 0;
+  overflow: hidden;
+  padding: 0.2rem 0.35rem;
+  border-radius: 5px;
+  background: #f6f8fa;
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-agent-action-row {
+  gap: 0.4rem;
+}
+
+.desktop-agent-action-row button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.desktop-agent-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.6rem;
+}
+
+.desktop-agent-timeline-row {
+  min-width: 0;
+  gap: 0.45rem;
+  align-items: flex-start;
+  padding-top: 0.35rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.desktop-agent-timeline-row > span {
+  flex: 0 0 3.9rem;
+  color: var(--accent-foreground);
+  font-size: 0.67rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.desktop-agent-timeline-row p {
+  min-width: 0;
+  flex: 1;
+}
+
+.desktop-agent-timeline-row time {
+  flex: 0 0 auto;
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+}
+
+.desktop-agent-ledger {
+  justify-content: space-between;
+  gap: 0.35rem;
+  color: var(--muted-foreground);
+  font-size: 0.69rem;
 }
 
 .desktop-bottom-tabs {

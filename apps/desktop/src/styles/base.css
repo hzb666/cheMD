@@ -56,6 +56,11 @@ button:not(:disabled) {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .desktop-shell {
   display: flex;
   min-width: 0;
@@ -75,8 +80,12 @@ button:not(:disabled) {
 .desktop-bottom-tabs,
 .desktop-log-line,
 .desktop-agent-heading,
+.desktop-agent-subhead,
+.desktop-agent-action-row,
+.desktop-agent-ledger,
 .desktop-outline-row,
 .desktop-quickfix-list button,
+.desktop-agent-timeline-row,
 .desktop-diagnostic-row,
 .desktop-diagnostic-summary {
   display: flex;
