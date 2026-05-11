@@ -1,11 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
-import { Activity, AlertTriangle, Bot, CheckCircle2, ChevronRight, CircleDot, FileCode2, Files, FlaskConical, GitGraph, Lightbulb, PanelBottom, PlayCircle, RefreshCw, ScrollText, Search, Settings, ShieldCheck, Sparkles, Square, Wrench, XCircle } from "lucide-react";
+import { Activity, AlertTriangle, Bot, CheckCircle2, ChevronRight, CircleDot, Database, FileCode2, Files, FlaskConical, GitGraph, Lightbulb, PanelBottom, PlayCircle, RefreshCw, ScrollText, Search, Settings, ShieldCheck, Sparkles, Square, Wrench, XCircle } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
 import { appendToolCall, applyPatchDecision, approvePatchDecision, attachEvidence, createAgentRun, createToolResult, getAuditTimeline, proposePatch, rejectPatchDecision, transitionAgentRunStatus, type AgentAuditEvent, type AgentEvidence, type AgentRun, type AgentToolCall, type PatchDecision, type PatchProposal } from "@chemd/agent-tools";
 import { compileChemdForEditor, type ChemdEditorDiagnostic, type ChemdOutlineItem, type ChemdQuickFixProposal, type ChemdTextEdit } from "@chemd/language-service";
 
-import { shellFiles, shellSidecarStatus, shellWorkspace, type DesktopCommandError, type DesktopCommandMap, type RuntimeState, type SidecarStatus, type WorkspaceFileEntry, type WorkspaceHandle } from "./desktop-contracts";
+import { shellFiles, shellPostgresStatus, shellSidecarStatus, shellWorkspace, type DesktopCommandError, type DesktopCommandMap, type PostgresStatus, type RuntimeState, type SidecarStatus, type WorkspaceFileEntry, type WorkspaceHandle } from "./desktop-contracts";
 
 type WorkspaceState = "empty" | "opening" | "open" | "error"; type DocumentMode = "sample" | "workspace";
 type SidecarOperation = "start" | "stop" | "refresh" | "logs";
@@ -71,6 +71,29 @@ const getSidecarErrorMessage = (error: unknown): string => {
   const message = commandError?.message ?? (error instanceof Error ? error.message : String(error));
   const firstLine = message.split(/\r?\n/, 1)[0].trim();
   return firstLine || "chem-service command failed";
+};
+
+const getPostgresErrorMessage = (error: unknown): string => {
+  const commandError = error as Partial<DesktopCommandError> | undefined;
+  const message = commandError?.message ?? (error instanceof Error ? error.message : String(error));
+  const firstLine = message.split(/\r?\n/, 1)[0].trim();
+  return firstLine || "Postgres status unavailable";
+};
+
+const formatPostgresValue = (value: string | number | boolean | null): string => {
+  if (value === null) return "unknown";
+  if (typeof value === "boolean") return value ? "yes" : "no";
+  return String(value);
+};
+
+const getPostgresBadgeDetail = (status: PostgresStatus): string => {
+  if (!status.configured) return "Postgres is not configured";
+  return [
+    status.source ? `source ${status.source}` : null,
+    status.host ? `host ${status.host}` : null,
+    status.database ? `database ${status.database}` : null,
+    status.user ? `user ${status.user}` : null
+  ].filter(Boolean).join(" / ") || "Postgres is configured; inspect the runtime panel for details";
 };
 
 const getLineStarts = (source: string): number[] => {
@@ -469,10 +492,61 @@ const SidecarControlPanel = ({
   );
 };
 
+const PostgresStatusPanel = ({
+  status,
+  loading,
+  errorMessage,
+  onRefresh
+}: {
+  status: PostgresStatus;
+  loading: boolean;
+  errorMessage: string | null;
+  onRefresh: () => void;
+}) => {
+  const fields: Array<[string, string]> = [
+    ["State", status.state],
+    ["Configured", formatPostgresValue(status.configured)],
+    ["Source", formatPostgresValue(status.source)],
+    ["Host", formatPostgresValue(status.host)],
+    ["Database", formatPostgresValue(status.database)],
+    ["User", formatPostgresValue(status.user)],
+    ["SSL", status.ssl],
+    ["pgvector", formatPostgresValue(status.vectorInstalled)],
+    ["Schema", formatPostgresValue(status.schemaReady)],
+    ["Timeout", `${status.timeoutMs}ms`],
+    ["Detail", status.detail]
+  ];
+
+  return (
+    <section className="desktop-postgres-panel" aria-label="Postgres runtime status">
+      <div className="desktop-postgres-heading">
+        <div className="desktop-agent-subhead"><Database size={14} /><span>Postgres runtime</span></div>
+        <StatusBadge label={status.label} state={status.state} detail={status.detail} />
+      </div>
+      <div className="desktop-postgres-actions">
+        <button type="button" className="desktop-button" disabled={loading} aria-busy={loading} onClick={onRefresh}>
+          <RefreshCw size={14} />
+          <span>{loading ? "Refreshing" : "Refresh Postgres"}</span>
+        </button>
+      </div>
+      {errorMessage ? <p className="desktop-postgres-message" data-tone="danger" role="alert">{errorMessage}</p> : null}
+      <dl className="desktop-postgres-fields">
+        {fields.map(([label, value]) => (
+          <div key={label} className={label === "Detail" ? "desktop-postgres-field-wide" : undefined}>
+            <dt>{label}</dt>
+            <dd title={value}>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+};
+
 const TopBar = ({
   workspace,
   workspaceState,
   sidecarStatus,
+  postgresStatus,
   diagnosticCount,
   dirty,
   rootPath,
@@ -484,6 +558,7 @@ const TopBar = ({
   workspace: WorkspaceHandle;
   workspaceState: WorkspaceState;
   sidecarStatus: SidecarStatus;
+  postgresStatus: PostgresStatus;
   diagnosticCount: number;
   dirty: boolean;
   rootPath: string;
@@ -514,6 +589,7 @@ const TopBar = ({
       <StatusBadge label={`${diagnosticCount} diagnostics`} state={diagnosticCount > 0 ? "degraded" : "ready"} detail="Computed by @chemd/language-service" />
       <StatusBadge label={dirty ? "Dirty" : "Saved"} state={dirty ? "degraded" : "ready"} detail="Local editor buffer state" />
       <StatusBadge label={sidecarStatus.label} state={sidecarStatus.state} detail={sidecarStatus.detail} />
+      <StatusBadge label={`Postgres ${postgresStatus.state}`} state={postgresStatus.state} detail={getPostgresBadgeDetail(postgresStatus)} />
     </div>
   </header>
 );
@@ -725,12 +801,16 @@ const InsightPane = ({
   sidecarOperation,
   sidecarMessage,
   sidecarError,
+  postgresStatus,
+  postgresLoading,
+  postgresError,
   agentRun,
   agentMessage,
   onStartSidecar,
   onStopSidecar,
   onRefreshSidecar,
   onLoadSidecarLogs,
+  onRefreshPostgres,
   onProposeQuickFix,
   onApprovePatch,
   onApplyPatch,
@@ -744,12 +824,16 @@ const InsightPane = ({
   sidecarOperation: SidecarOperation | null;
   sidecarMessage: string | null;
   sidecarError: string | null;
+  postgresStatus: PostgresStatus;
+  postgresLoading: boolean;
+  postgresError: string | null;
   agentRun: AgentRun | null;
   agentMessage: AgentMessage | null;
   onStartSidecar: () => void;
   onStopSidecar: () => void;
   onRefreshSidecar: () => void;
   onLoadSidecarLogs: () => void;
+  onRefreshPostgres: () => void;
   onProposeQuickFix: (candidate: QuickFixCandidate) => void;
   onApprovePatch: () => void;
   onApplyPatch: () => void;
@@ -775,6 +859,12 @@ const InsightPane = ({
         onStop={onStopSidecar}
         onRefresh={onRefreshSidecar}
         onLoadLogs={onLoadSidecarLogs}
+      />
+      <PostgresStatusPanel
+        status={postgresStatus}
+        loading={postgresLoading}
+        errorMessage={postgresError}
+        onRefresh={onRefreshPostgres}
       />
       <div className="desktop-agent-panel">
         <AgentRunHeader agentRun={agentRun} agentMessage={agentMessage} />
@@ -903,6 +993,41 @@ const useSidecarController = () => {
   };
 };
 
+const usePostgresController = () => {
+  const [status, setStatus] = useState<PostgresStatus>(shellPostgresStatus);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const loadingRef = useRef(false);
+
+  const refresh = async () => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    setLoading(true);
+    try {
+      const nextStatus = await invokeDesktop("read_postgres_status", undefined);
+      setStatus(nextStatus);
+      setError(null);
+    } catch (nextError: unknown) {
+      setStatus(shellPostgresStatus);
+      setError(getPostgresErrorMessage(nextError));
+    } finally {
+      loadingRef.current = false;
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void refresh();
+  }, []);
+
+  return {
+    status,
+    loading,
+    error,
+    refresh: () => void refresh()
+  };
+};
+
 export const App = () => {
   const initialSource = sampleSources["suzuki-screen.chemd.md"];
   const [workspaceState, setWorkspaceState] = useState<WorkspaceState>("empty");
@@ -917,6 +1042,7 @@ export const App = () => {
   const [agentRun, setAgentRun] = useState<AgentRun | null>(null);
   const [agentMessage, setAgentMessage] = useState<AgentMessage | null>(null);
   const sidecarController = useSidecarController();
+  const postgresController = usePostgresController();
 
   const selectedFile = files.find((file) => file.id === selectedFileId) ?? shellFiles[0];
   const output = useMemo(() => compileChemdForEditor({
@@ -1036,7 +1162,7 @@ export const App = () => {
 
   return (
     <main className="desktop-shell">
-      <TopBar workspace={workspace} workspaceState={workspaceState} sidecarStatus={sidecarController.status} diagnosticCount={output.diagnostics.length} dirty={source !== savedSource} rootPath={rootPath} canSave={canSave} onRootPathChange={setRootPath} onSave={() => void saveWorkspaceFile()} onOpenWorkspace={() => void openWorkspace()} />
+      <TopBar workspace={workspace} workspaceState={workspaceState} sidecarStatus={sidecarController.status} postgresStatus={postgresController.status} diagnosticCount={output.diagnostics.length} dirty={source !== savedSource} rootPath={rootPath} canSave={canSave} onRootPathChange={setRootPath} onSave={() => void saveWorkspaceFile()} onOpenWorkspace={() => void openWorkspace()} />
       <div className="desktop-workbench">
         <ActivityRail />
         <Sidebar files={files} selectedFileId={selectedFileId} mode={mode} message={message} onSelectFile={(file) => void selectFile(file)} />
@@ -1047,9 +1173,11 @@ export const App = () => {
             diagnostics={output.diagnostics}
             mode={mode}
             sidecarStatus={sidecarController.status} sidecarLogTail={sidecarController.logTail} sidecarOperation={sidecarController.operation} sidecarMessage={sidecarController.message} sidecarError={sidecarController.error}
+            postgresStatus={postgresController.status} postgresLoading={postgresController.loading} postgresError={postgresController.error}
             agentRun={agentRun}
             agentMessage={agentMessage}
             onStartSidecar={sidecarController.start} onStopSidecar={sidecarController.stop} onRefreshSidecar={sidecarController.refresh} onLoadSidecarLogs={sidecarController.loadLogs}
+            onRefreshPostgres={postgresController.refresh}
             onProposeQuickFix={startAgentProposal}
             onApprovePatch={approveAgentPatch}
             onApplyPatch={applyAgentPatch}
