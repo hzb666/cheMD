@@ -54,6 +54,38 @@ call `compileChemd()`, open database connections, execute migrations, or
 generate embeddings. It emits citation sidecar records for existing
 `chemd_rag_chunks`; it does not create a second RAG chunk table.
 
+Runtime code that already has editor Graph/RAG DTOs or Agent tool state can use
+the adapter helpers instead of assembling PostgreSQL records by hand:
+
+```ts
+import {
+  buildPostgresRuntimeGraphRagRecords,
+  buildUpsertGraphSnapshotQueries
+} from "@chemd/storage-postgres";
+
+const runtimeRecords = buildPostgresRuntimeGraphRagRecords({
+  graphSnapshot: editorRecords.graphSnapshot,
+  nodes: editorRecords.reactionGraphNodes,
+  edges: editorRecords.reactionGraphEdges,
+  citationCandidates: editorRecords.ragCitationCandidates,
+  agentRuns,
+  agentToolCalls,
+  patchProposals
+});
+
+const graphQueries = buildUpsertGraphSnapshotQueries(
+  runtimeRecords.graphSnapshotInput
+);
+```
+
+The adapter types intentionally mirror those runtime DTO shapes without
+importing `@chemd/language-service` or `@chemd/agent-tools`. Graph snapshots map
+to `UpsertPostgresGraphSnapshotInput`, citation candidates map to
+`PostgresRagChunkCitationRecord`, and Agent run/tool/patch inputs map to the
+existing Agent audit record types. Missing `createdAt` values are supplied by
+the adapter call, and Agent-style statuses are normalized to the shared
+PostgreSQL status enums.
+
 The repository helpers expose two layers:
 
 - query builders that return parameterized `{ sql, values }` objects
