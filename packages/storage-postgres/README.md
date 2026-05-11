@@ -60,7 +60,8 @@ the adapter helpers instead of assembling PostgreSQL records by hand:
 ```ts
 import {
   buildPostgresRuntimeGraphRagRecords,
-  buildUpsertGraphSnapshotQueries
+  buildUpsertGraphSnapshotQueries,
+  persistPostgresRuntimeGraphRagRecords
 } from "@chemd/storage-postgres";
 
 const runtimeRecords = buildPostgresRuntimeGraphRagRecords({
@@ -76,6 +77,8 @@ const runtimeRecords = buildPostgresRuntimeGraphRagRecords({
 const graphQueries = buildUpsertGraphSnapshotQueries(
   runtimeRecords.graphSnapshotInput
 );
+
+await persistPostgresRuntimeGraphRagRecords(client, runtimeRecords);
 ```
 
 The adapter types intentionally mirror those runtime DTO shapes without
@@ -157,11 +160,31 @@ query or read rows and map snake_case PostgreSQL fields back to the existing
 camelCase record types. JSONB fields are parsed when drivers return strings and
 passed through when drivers return objects.
 
+`persistPostgresRuntimeGraphRagRecords(client, input)` is the production helper
+for fourth-round runtime bridge output. It accepts either
+`PostgresRuntimeGraphRagRecords` or the same input accepted by
+`buildPostgresRuntimeGraphRagRecords()`, then writes graph snapshot data, RAG
+citations, Agent runs, tool calls, and patch proposals in one transaction. The
+write order preserves foreign-key dependencies:
+
+```text
+snapshot
+  -> nodes / edges
+  -> RAG citations
+  -> Agent runs
+  -> Agent tool calls
+  -> patch proposals
+```
+
+The helper still uses only the injected `PostgresGraphRagClient`, existing
+query builders, and executor utilities. It does not create a pool, import `pg`,
+read `process.env`, or add desktop-only tables.
+
 If runtime code needs a broader transaction across core experiment writes,
 graph writes, citations, and Agent audit records, run the query builders with
 the transaction client owned by that runtime layer. This package does not open
 connections, read `process.env`, or choose a transaction boundary beyond the
-small graph-snapshot plan helper.
+graph/RAG helper transactions.
 
 The helpers target the shared extension tables:
 

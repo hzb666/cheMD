@@ -7,6 +7,7 @@ export * from "./graph-rag-types";
 export * from "./graph-rag-records";
 export * from "./graph-rag-runtime-types";
 export * from "./graph-rag-runtime-adapters";
+export * from "./graph-rag-runtime-persistence";
 export * from "./graph-rag-repository";
 export * from "./graph-rag-row-mappers";
 export * from "./graph-rag-executor";
