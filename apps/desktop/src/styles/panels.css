@@ -335,6 +335,8 @@
 }
 
 .desktop-postgres-actions {
+  flex-wrap: wrap;
+  gap: 0.4rem;
   justify-content: flex-start;
 }
 
@@ -394,6 +396,96 @@
   color: var(--danger);
   font-size: 0.72rem;
   line-height: 1.35;
+}
+
+.desktop-postgres-message[data-tone="warning"] {
+  border-color: color-mix(in srgb, var(--warning) 30%, var(--border));
+  background: #fff8ed;
+  color: var(--warning);
+}
+
+.desktop-persist-status {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #fff;
+}
+
+.desktop-persist-status[data-state="pending"] {
+  border-color: color-mix(in srgb, var(--primary) 24%, var(--border));
+  background: #f7fbff;
+}
+
+.desktop-persist-status[data-state="success"] {
+  border-color: color-mix(in srgb, var(--success) 24%, var(--border));
+  background: #f6fff8;
+}
+
+.desktop-persist-status[data-state="failure"] {
+  border-color: color-mix(in srgb, var(--danger) 24%, var(--border));
+  background: #fff7ed;
+}
+
+.desktop-persist-status-row {
+  min-width: 0;
+  gap: 0.45rem;
+  align-items: flex-start;
+}
+
+.desktop-persist-status-row span {
+  flex: 0 0 auto;
+  color: var(--accent-foreground);
+  font-size: 0.64rem;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.desktop-persist-status-row p {
+  min-width: 0;
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.desktop-persist-status[data-state="failure"] .desktop-persist-status-row p {
+  color: var(--danger);
+}
+
+.desktop-persist-summary {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.35rem;
+  margin: 0;
+}
+
+.desktop-persist-summary div {
+  min-width: 0;
+}
+
+.desktop-persist-summary dt,
+.desktop-persist-summary dd {
+  margin: 0;
+}
+
+.desktop-persist-summary dt {
+  color: var(--muted-foreground);
+  font-size: 0.64rem;
+  font-weight: 650;
+  text-transform: uppercase;
+}
+
+.desktop-persist-summary dd {
+  overflow: hidden;
+  margin-top: 0.12rem;
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .desktop-outline-list {

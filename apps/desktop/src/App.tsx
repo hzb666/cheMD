@@ -1,11 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
-import { Activity, AlertTriangle, Bot, CheckCircle2, ChevronRight, CircleDot, Database, FileCode2, Files, FlaskConical, GitGraph, Lightbulb, PanelBottom, PlayCircle, RefreshCw, ScrollText, Search, Settings, ShieldCheck, Sparkles, Square, Wrench, XCircle } from "lucide-react";
+import { Activity, AlertTriangle, Bot, CheckCircle2, ChevronRight, CircleDot, Database, FileCode2, Files, FlaskConical, GitGraph, Lightbulb, PanelBottom, PlayCircle, RefreshCw, ScrollText, Search, Settings, ShieldCheck, Sparkles, Square, UploadCloud, Wrench, XCircle } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
 import { appendToolCall, applyPatchDecision, approvePatchDecision, attachEvidence, createAgentRun, createToolResult, getAuditTimeline, proposePatch, rejectPatchDecision, transitionAgentRunStatus, type AgentAuditEvent, type AgentEvidence, type AgentRun, type AgentToolCall, type PatchDecision, type PatchProposal } from "@chemd/agent-tools";
-import { compileChemdForEditor, type ChemdEditorDiagnostic, type ChemdOutlineItem, type ChemdQuickFixProposal, type ChemdTextEdit } from "@chemd/language-service";
+import { buildEditorGraphRagRecords, compileChemdForEditor, type ChemdEditorDiagnostic, type ChemdLanguageCompileOutput, type ChemdOutlineItem, type ChemdQuickFixProposal, type ChemdTextEdit } from "@chemd/language-service";
 
 import { shellFiles, shellPostgresStatus, shellSidecarStatus, shellWorkspace, type DesktopCommandError, type DesktopCommandMap, type PostgresStatus, type RuntimeState, type SidecarStatus, type WorkspaceFileEntry, type WorkspaceHandle } from "./desktop-contracts";
+import { buildPersistRuntimeGraphRagCommandInput } from "./desktop-runtime-persistence";
 
 type WorkspaceState = "empty" | "opening" | "open" | "error"; type DocumentMode = "sample" | "workspace";
 type SidecarOperation = "start" | "stop" | "refresh" | "logs";
@@ -13,6 +14,56 @@ type AgentMessageTone = "info" | "warning" | "success" | "danger";
 type AgentMessage = { tone: AgentMessageTone; text: string };
 type QuickFixCandidate = { diagnostic: ChemdEditorDiagnostic; quickFix: ChemdQuickFixProposal };
 type AgentOperationResult = { run: AgentRun; message: AgentMessage };
+type PersistOperationState = "idle" | "pending" | "success" | "failure";
+type PersistSummary = {
+  graphSnapshotId: string;
+  counts: DesktopCommandMap["persist_runtime_graph_rag"]["output"]["counts"];
+};
+type PersistState = {
+  state: PersistOperationState;
+  message: string;
+  summary: PersistSummary | null;
+};
+type PersistBuildInput = {
+  source: string;
+  workspace: WorkspaceHandle;
+  file: WorkspaceFileEntry;
+  compileOutput: ChemdLanguageCompileOutput;
+  agentRun: AgentRun | null;
+};
+type PersistControllerInput = PersistBuildInput & {
+  mode: DocumentMode;
+  postgresStatus: PostgresStatus;
+};
+type DesktopWorkbenchProps = {
+  workspace: WorkspaceHandle;
+  workspaceState: WorkspaceState;
+  sidecarController: ReturnType<typeof useSidecarController>;
+  postgresController: ReturnType<typeof usePostgresController>;
+  persistController: ReturnType<typeof usePersistRuntimeController>;
+  output: ChemdLanguageCompileOutput;
+  compileError?: string;
+  files: WorkspaceFileEntry[];
+  selectedFile: WorkspaceFileEntry;
+  selectedFileId: string;
+  mode: DocumentMode;
+  message: string;
+  source: string;
+  savedSource: string;
+  rootPath: string;
+  canSave: boolean;
+  agentRun: AgentRun | null;
+  agentMessage: AgentMessage | null;
+  onRootPathChange: (value: string) => void;
+  onSave: () => void;
+  onOpenWorkspace: () => void;
+  onSelectFile: (file: WorkspaceFileEntry) => void;
+  onSourceChange: (nextSource: string) => void;
+  onProposeQuickFix: (candidate: QuickFixCandidate) => void;
+  onApprovePatch: () => void;
+  onApplyPatch: () => void;
+  onRejectPatch: () => void;
+};
 
 const sampleSources: Record<string, string> = {
   "suzuki-screen.chemd.md": "---\nid: exp-desktop-suzuki\ntitle: Suzuki coupling condition screen\ndate: 2026-05-12\n---\n\n:::chemd #mol-aryl-bromide\nsmiles: Cc1ccc(Br)cc1\n:::\n\n:::chemd #rxn-screen\nkind: reaction\nreactants: mol-aryl-bromide, phenylboronic-acid\nproducts: biaryl-product\nconditions:\n  catalyst: Pd(PPh3)4\n  base: K2CO3\n  solvent: dioxane/water\n:::\n\n:::result #screen-result\nstatus: pending\nyield: 78%\n:::\n",
@@ -129,6 +180,97 @@ const createEditorSourceHash = (source: string): string => {
   }
 
   return (hash >>> 0).toString(16).padStart(8, "0");
+};
+
+const initialPersistState: PersistState = {
+  state: "idle",
+  message: "Graph/RAG payload is ready for a configured Postgres runtime.",
+  summary: null
+};
+
+const redactSensitiveRuntimeText = (message: string): string =>
+  message
+    .replace(/postgres(?:ql)?:\/\/\S+/gi, "postgres://[redacted]")
+    .replace(/(\/\/[^:\s/]+:)[^@\s/]+(@)/g, "$1[redacted]$2")
+    .replace(/\b(?:database_url|password|passwd|pwd)=\S+/gi, (match) => {
+      const [key] = match.split("=", 1);
+      return `${key}=[redacted]`;
+    });
+
+const getPersistErrorMessage = (error: unknown): string => {
+  const commandError = error as Partial<DesktopCommandError> | undefined;
+  const message = commandError?.message ?? (error instanceof Error ? error.message : String(error));
+  const firstLine = message.split(/\r?\n/, 1)[0].trim();
+  return redactSensitiveRuntimeText(firstLine || "Persist graph failed");
+};
+
+const summarizeGraphSnapshotId = (graphSnapshotId: string): string =>
+  graphSnapshotId.length <= 38
+    ? graphSnapshotId
+    : `${graphSnapshotId.slice(0, 16)}...${graphSnapshotId.slice(-16)}`;
+
+const formatPersistCounts = (counts: PersistSummary["counts"]): string =>
+  `${counts.snapshots} snapshot / ${counts.nodes} nodes / ${counts.edges} edges / ${counts.citations} citations / ${counts.agentRuns} agent runs / ${counts.agentToolCalls} tools / ${counts.patchProposals} patches`;
+
+const getPersistDisabledReason = ({
+  mode,
+  file,
+  postgresStatus,
+  compileStatus
+}: {
+  mode: DocumentMode;
+  file: WorkspaceFileEntry;
+  postgresStatus: PostgresStatus;
+  compileStatus: ChemdLanguageCompileOutput["status"];
+}): string | null => {
+  if (mode !== "workspace") return "Open a local workspace file before persisting Graph/RAG records.";
+  if (file.kind !== "file") return "Select a file before persisting Graph/RAG records.";
+  if (!postgresStatus.configured) return "Configure Postgres before persisting Graph/RAG records.";
+  if (postgresStatus.state !== "ready") return "Postgres must be reachable before persisting Graph/RAG records.";
+  if (postgresStatus.vectorInstalled !== true) return "Install pgvector before persisting Graph/RAG records.";
+  if (postgresStatus.schemaReady !== true) return "Run PostgreSQL migrations before persisting Graph/RAG records.";
+  if (compileStatus === "failed") return "Resolve the compile failure before persisting Graph/RAG records.";
+  return null;
+};
+
+const buildPersistCommandInput = ({
+  source,
+  workspace,
+  file,
+  compileOutput,
+  agentRun
+}: PersistBuildInput): DesktopCommandMap["persist_runtime_graph_rag"]["input"] => {
+  const sourceHash = createEditorSourceHash(source);
+  const documentHash = createEditorSourceHash(`${workspace.workspaceId}:${file.path}`);
+  const revisionId = `desktop:${documentHash}:fnv1a:${sourceHash}`;
+  const experimentId = `desktop:${workspace.workspaceId}:${documentHash}`;
+  const records = buildEditorGraphRagRecords({
+    source,
+    documentUri: file.path,
+    experimentId,
+    revisionId,
+    createdAt: new Date().toISOString(),
+    compileOutput
+  });
+  const input = buildPersistRuntimeGraphRagCommandInput({
+    records,
+    source,
+    workspace: {
+      workspaceId: workspace.workspaceId,
+      rootPath: workspace.rootPath,
+      displayName: workspace.displayName
+    },
+    document: {
+      path: file.path,
+      documentId: file.id,
+      documentUri: file.path,
+      name: file.name,
+      revisionId,
+      experimentId
+    },
+    agentRun
+  });
+  return input as unknown as DesktopCommandMap["persist_runtime_graph_rag"]["input"];
 };
 
 const formatRange = (range: ChemdTextEdit["range"]): string =>
@@ -496,12 +638,18 @@ const PostgresStatusPanel = ({
   status,
   loading,
   errorMessage,
-  onRefresh
+  persistState,
+  persistDisabledReason,
+  onRefresh,
+  onPersistGraph
 }: {
   status: PostgresStatus;
   loading: boolean;
   errorMessage: string | null;
+  persistState: PersistState;
+  persistDisabledReason: string | null;
   onRefresh: () => void;
+  onPersistGraph: () => void;
 }) => {
   const fields: Array<[string, string]> = [
     ["State", status.state],
@@ -528,8 +676,31 @@ const PostgresStatusPanel = ({
           <RefreshCw size={14} />
           <span>{loading ? "Refreshing" : "Refresh Postgres"}</span>
         </button>
+        <button
+          type="button"
+          className="desktop-button-primary"
+          disabled={persistState.state === "pending" || persistDisabledReason !== null}
+          aria-busy={persistState.state === "pending"}
+          onClick={onPersistGraph}
+        >
+          {persistState.state === "pending" ? <RefreshCw size={14} /> : <UploadCloud size={14} />}
+          <span>{persistState.state === "pending" ? "Persisting" : "Persist graph"}</span>
+        </button>
       </div>
       {errorMessage ? <p className="desktop-postgres-message" data-tone="danger" role="alert">{errorMessage}</p> : null}
+      {persistDisabledReason ? <p className="desktop-postgres-message" data-tone="warning">{persistDisabledReason}</p> : null}
+      <div className="desktop-persist-status" data-state={persistState.state} aria-live="polite">
+        <div className="desktop-persist-status-row">
+          <span>{persistState.state}</span>
+          <p>{persistState.message}</p>
+        </div>
+        {persistState.summary ? (
+          <dl className="desktop-persist-summary">
+            <div><dt>Graph snapshot</dt><dd title={persistState.summary.graphSnapshotId}>{summarizeGraphSnapshotId(persistState.summary.graphSnapshotId)}</dd></div>
+            <div><dt>Counts</dt><dd>{formatPersistCounts(persistState.summary.counts)}</dd></div>
+          </dl>
+        ) : null}
+      </div>
       <dl className="desktop-postgres-fields">
         {fields.map(([label, value]) => (
           <div key={label} className={label === "Detail" ? "desktop-postgres-field-wide" : undefined}>
@@ -804,6 +975,8 @@ const InsightPane = ({
   postgresStatus,
   postgresLoading,
   postgresError,
+  persistState,
+  persistDisabledReason,
   agentRun,
   agentMessage,
   onStartSidecar,
@@ -811,6 +984,7 @@ const InsightPane = ({
   onRefreshSidecar,
   onLoadSidecarLogs,
   onRefreshPostgres,
+  onPersistGraph,
   onProposeQuickFix,
   onApprovePatch,
   onApplyPatch,
@@ -827,6 +1001,8 @@ const InsightPane = ({
   postgresStatus: PostgresStatus;
   postgresLoading: boolean;
   postgresError: string | null;
+  persistState: PersistState;
+  persistDisabledReason: string | null;
   agentRun: AgentRun | null;
   agentMessage: AgentMessage | null;
   onStartSidecar: () => void;
@@ -834,6 +1010,7 @@ const InsightPane = ({
   onRefreshSidecar: () => void;
   onLoadSidecarLogs: () => void;
   onRefreshPostgres: () => void;
+  onPersistGraph: () => void;
   onProposeQuickFix: (candidate: QuickFixCandidate) => void;
   onApprovePatch: () => void;
   onApplyPatch: () => void;
@@ -864,7 +1041,10 @@ const InsightPane = ({
         status={postgresStatus}
         loading={postgresLoading}
         errorMessage={postgresError}
+        persistState={persistState}
+        persistDisabledReason={persistDisabledReason}
         onRefresh={onRefreshPostgres}
+        onPersistGraph={onPersistGraph}
       />
       <div className="desktop-agent-panel">
         <AgentRunHeader agentRun={agentRun} agentMessage={agentMessage} />
@@ -1028,6 +1208,115 @@ const usePostgresController = () => {
   };
 };
 
+const usePersistRuntimeController = ({
+  mode,
+  file,
+  postgresStatus,
+  source,
+  workspace,
+  compileOutput,
+  agentRun
+}: PersistControllerInput) => {
+  const [state, setState] = useState<PersistState>(initialPersistState);
+  const disabledReason = getPersistDisabledReason({
+    mode,
+    file,
+    postgresStatus,
+    compileStatus: compileOutput.status
+  });
+
+  useEffect(() => {
+    setState(initialPersistState);
+  }, [mode, file.id]);
+
+  const reset = () => setState(initialPersistState);
+  const persist = async () => {
+    if (disabledReason !== null || compileOutput.status === "failed") {
+      setState({ state: "failure", message: disabledReason ?? "Compile failed.", summary: null });
+      return;
+    }
+    setState({ state: "pending", message: "Persisting Graph/RAG payload to Postgres.", summary: null });
+    try {
+      const input = buildPersistCommandInput({ source, workspace, file, compileOutput, agentRun });
+      const result = await invokeDesktop("persist_runtime_graph_rag", input);
+      setState({
+        state: "success",
+        message: result.detail || "Persisted Graph/RAG payload.",
+        summary: { graphSnapshotId: result.graphSnapshotId, counts: result.counts }
+      });
+    } catch (error: unknown) {
+      setState({ state: "failure", message: getPersistErrorMessage(error), summary: null });
+    }
+  };
+
+  return {
+    state,
+    disabledReason,
+    reset,
+    persist: () => void persist()
+  };
+};
+
+const DesktopWorkbench = ({
+  workspace,
+  workspaceState,
+  sidecarController,
+  postgresController,
+  persistController,
+  output,
+  compileError,
+  files,
+  selectedFile,
+  selectedFileId,
+  mode,
+  message,
+  source,
+  savedSource,
+  rootPath,
+  canSave,
+  agentRun,
+  agentMessage,
+  onRootPathChange,
+  onSave,
+  onOpenWorkspace,
+  onSelectFile,
+  onSourceChange,
+  onProposeQuickFix,
+  onApprovePatch,
+  onApplyPatch,
+  onRejectPatch
+}: DesktopWorkbenchProps) => (
+  <main className="desktop-shell">
+    <TopBar workspace={workspace} workspaceState={workspaceState} sidecarStatus={sidecarController.status} postgresStatus={postgresController.status} diagnosticCount={output.diagnostics.length} dirty={source !== savedSource} rootPath={rootPath} canSave={canSave} onRootPathChange={onRootPathChange} onSave={onSave} onOpenWorkspace={onOpenWorkspace} />
+    <div className="desktop-workbench">
+      <ActivityRail />
+      <Sidebar files={files} selectedFileId={selectedFileId} mode={mode} message={message} onSelectFile={onSelectFile} />
+      <div className="desktop-main-grid">
+        <EditorPane fileName={selectedFile.name} mode={mode} source={source} lineCount={source.split(/\r?\n/).length} compiledAt={output.compiledAt} onChange={onSourceChange} />
+        <InsightPane
+          outline={output.outline}
+          diagnostics={output.diagnostics}
+          mode={mode}
+          sidecarStatus={sidecarController.status} sidecarLogTail={sidecarController.logTail} sidecarOperation={sidecarController.operation} sidecarMessage={sidecarController.message} sidecarError={sidecarController.error}
+          postgresStatus={postgresController.status} postgresLoading={postgresController.loading} postgresError={postgresController.error}
+          persistState={persistController.state}
+          persistDisabledReason={persistController.disabledReason}
+          agentRun={agentRun}
+          agentMessage={agentMessage}
+          onStartSidecar={sidecarController.start} onStopSidecar={sidecarController.stop} onRefreshSidecar={sidecarController.refresh} onLoadSidecarLogs={sidecarController.loadLogs}
+          onRefreshPostgres={postgresController.refresh}
+          onPersistGraph={persistController.persist}
+          onProposeQuickFix={onProposeQuickFix}
+          onApprovePatch={onApprovePatch}
+          onApplyPatch={onApplyPatch}
+          onRejectPatch={onRejectPatch}
+        />
+        <BottomPanel diagnostics={output.diagnostics} compileStatus={output.status} errorMessage={compileError} />
+      </div>
+    </div>
+  </main>
+);
+
 export const App = () => {
   const initialSource = sampleSources["suzuki-screen.chemd.md"];
   const [workspaceState, setWorkspaceState] = useState<WorkspaceState>("empty");
@@ -1052,6 +1341,15 @@ export const App = () => {
   }), [selectedFile.path, source]);
   const compileError = output.status === "failed" ? output.error.message : undefined;
   const canSave = mode === "workspace" && selectedFile.kind === "file" && source !== savedSource && workspace.writable;
+  const persistController = usePersistRuntimeController({
+    mode,
+    file: selectedFile,
+    postgresStatus: postgresController.status,
+    source,
+    workspace,
+    compileOutput: output,
+    agentRun
+  });
 
   useEffect(() => {
     setAgentRun(null);
@@ -1124,6 +1422,11 @@ export const App = () => {
     }
   };
 
+  const updateEditorSource = (nextSource: string) => {
+    setSource(nextSource);
+    persistController.reset();
+  };
+
   const startAgentProposal = (candidate: QuickFixCandidate) => {
     if (mode !== "workspace" || selectedFile.kind !== "file") {
       setAgentMessage({
@@ -1148,7 +1451,7 @@ export const App = () => {
   const applyAgentPatch = () => {
     const operation = agentRun ? applyAgentRunPatch(agentRun, source) : null;
     if (!operation) return;
-    if (operation.nextSource !== undefined) setSource(operation.nextSource);
+    if (operation.nextSource !== undefined) updateEditorSource(operation.nextSource);
     setAgentRun(operation.result.run);
     setAgentMessage(operation.result.message);
   };
@@ -1161,31 +1464,17 @@ export const App = () => {
   };
 
   return (
-    <main className="desktop-shell">
-      <TopBar workspace={workspace} workspaceState={workspaceState} sidecarStatus={sidecarController.status} postgresStatus={postgresController.status} diagnosticCount={output.diagnostics.length} dirty={source !== savedSource} rootPath={rootPath} canSave={canSave} onRootPathChange={setRootPath} onSave={() => void saveWorkspaceFile()} onOpenWorkspace={() => void openWorkspace()} />
-      <div className="desktop-workbench">
-        <ActivityRail />
-        <Sidebar files={files} selectedFileId={selectedFileId} mode={mode} message={message} onSelectFile={(file) => void selectFile(file)} />
-        <div className="desktop-main-grid">
-          <EditorPane fileName={selectedFile.name} mode={mode} source={source} lineCount={source.split(/\r?\n/).length} compiledAt={output.compiledAt} onChange={setSource} />
-          <InsightPane
-            outline={output.outline}
-            diagnostics={output.diagnostics}
-            mode={mode}
-            sidecarStatus={sidecarController.status} sidecarLogTail={sidecarController.logTail} sidecarOperation={sidecarController.operation} sidecarMessage={sidecarController.message} sidecarError={sidecarController.error}
-            postgresStatus={postgresController.status} postgresLoading={postgresController.loading} postgresError={postgresController.error}
-            agentRun={agentRun}
-            agentMessage={agentMessage}
-            onStartSidecar={sidecarController.start} onStopSidecar={sidecarController.stop} onRefreshSidecar={sidecarController.refresh} onLoadSidecarLogs={sidecarController.loadLogs}
-            onRefreshPostgres={postgresController.refresh}
-            onProposeQuickFix={startAgentProposal}
-            onApprovePatch={approveAgentPatch}
-            onApplyPatch={applyAgentPatch}
-            onRejectPatch={rejectAgentPatch}
-          />
-          <BottomPanel diagnostics={output.diagnostics} compileStatus={output.status} errorMessage={compileError} />
-        </div>
-      </div>
-    </main>
+    <DesktopWorkbench
+      workspace={workspace} workspaceState={workspaceState}
+      sidecarController={sidecarController} postgresController={postgresController} persistController={persistController}
+      output={output} compileError={compileError}
+      files={files} selectedFile={selectedFile} selectedFileId={selectedFileId}
+      mode={mode} message={message} source={source} savedSource={savedSource}
+      rootPath={rootPath} canSave={canSave} agentRun={agentRun} agentMessage={agentMessage}
+      onRootPathChange={setRootPath} onSourceChange={updateEditorSource}
+      onSave={() => void saveWorkspaceFile()} onOpenWorkspace={() => void openWorkspace()}
+      onSelectFile={(file) => void selectFile(file)} onProposeQuickFix={startAgentProposal}
+      onApprovePatch={approveAgentPatch} onApplyPatch={applyAgentPatch} onRejectPatch={rejectAgentPatch}
+    />
   );
 };
