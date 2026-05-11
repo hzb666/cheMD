@@ -1,5 +1,8 @@
 use crate::{
-    sidecar::SidecarManager,
+    sidecar::{
+        sidecar_health::{probe_health_once, HealthProbeConfig, HealthProbeOutcome},
+        SidecarManager,
+    },
     sidecar_command::{
         command_spec_for_service_dir, default_sidecar_command_spec, find_service_dir_from,
     },
@@ -7,7 +10,11 @@ use crate::{
 };
 use std::{
     fs,
+    io::{Read, Write},
+    net::TcpListener,
     path::{Path, PathBuf},
+    thread,
+    time::Duration,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -124,16 +131,95 @@ fn read_logs_without_started_sidecar_returns_empty_tail() {
 }
 
 #[test]
+fn health_probe_reports_ready_for_http_success() {
+    let server = spawn_http_once("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
+
+    let outcome = probe_health_once(&server.url, Duration::from_millis(300));
+
+    assert_eq!(outcome, HealthProbeOutcome::Ready);
+    server.join();
+}
+
+#[test]
+fn health_probe_reports_not_ready_when_port_is_closed() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("test port should bind");
+    let url = format!("http://{}/healthz", listener.local_addr().unwrap());
+    drop(listener);
+
+    let outcome = probe_health_once(&url, Duration::from_millis(50));
+
+    assert_not_ready_contains(outcome, "connect failed");
+}
+
+#[test]
+fn health_probe_reports_not_ready_when_response_times_out() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("test port should bind");
+    let url = format!("http://{}/healthz", listener.local_addr().unwrap());
+    let handle = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().expect("health request should connect");
+        let mut request = [0_u8; 128];
+        let _ = stream.read(&mut request);
+        thread::sleep(Duration::from_millis(200));
+    });
+
+    let outcome = probe_health_once(&url, Duration::from_millis(50));
+
+    assert_not_ready_contains(outcome, "response failed");
+    handle.join().expect("server thread should finish");
+}
+
+#[test]
+fn start_reports_ready_only_after_healthz_success() {
+    let manager = SidecarManager::default();
+    let server = spawn_http_once("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
+
+    let started = manager
+        .start_with_spec_and_health_config(long_running_command_spec(), health_config(&server.url))
+        .expect("long running command should spawn");
+
+    assert_eq!(json_field(&started, "state"), "ready");
+    assert!(json_field(&started, "detail").contains("/healthz is ready"));
+    assert!(serde_json::to_value(&started)
+        .expect("status should serialize")
+        .get("pid")
+        .and_then(|pid| pid.as_u64())
+        .is_some());
+    server.join();
+    let _ = manager.stop();
+}
+
+#[test]
+fn start_reports_degraded_when_healthz_is_not_ready() {
+    let manager = SidecarManager::default();
+    let listener = TcpListener::bind("127.0.0.1:0").expect("test port should bind");
+    let url = format!("http://{}/healthz", listener.local_addr().unwrap());
+    drop(listener);
+
+    let started = manager
+        .start_with_spec_and_health_config(long_running_command_spec(), health_config(&url))
+        .expect("long running command should spawn");
+
+    assert_eq!(json_field(&started, "state"), "degraded");
+    assert!(json_field(&started, "detail").contains("not ready"));
+    assert!(serde_json::to_value(&started)
+        .expect("status should serialize")
+        .get("pid")
+        .and_then(|pid| pid.as_u64())
+        .is_some());
+    let _ = manager.stop();
+}
+
+#[test]
 fn status_reports_degraded_after_owned_child_exits() {
     let manager = SidecarManager::default();
     let spec = quick_exit_command_spec();
 
     let started = manager
-        .start_with_spec(spec)
+        .start_with_spec_and_health_config(spec, fast_failing_health_config())
         .expect("quick command should spawn");
-    assert_eq!(json_field(&started, "state"), "ready");
+    assert_eq!(json_field(&started, "state"), "degraded");
 
-    std::thread::sleep(std::time::Duration::from_millis(150));
+    thread::sleep(Duration::from_millis(150));
     let status = manager.status().expect("status should be readable");
 
     assert_eq!(json_field(&status, "state"), "degraded");
@@ -166,12 +252,69 @@ where
         .to_string()
 }
 
+fn assert_not_ready_contains(outcome: HealthProbeOutcome, expected: &str) {
+    match outcome {
+        HealthProbeOutcome::Ready => panic!("health probe unexpectedly reported ready"),
+        HealthProbeOutcome::NotReady(detail) => assert!(detail.contains(expected)),
+    }
+}
+
+struct TestHttpServer {
+    url: String,
+    handle: thread::JoinHandle<()>,
+}
+
+impl TestHttpServer {
+    fn join(self) {
+        self.handle.join().expect("server thread should finish");
+    }
+}
+
+fn spawn_http_once(response: &'static str) -> TestHttpServer {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("test server should bind");
+    let url = format!("http://{}/healthz", listener.local_addr().unwrap());
+    let handle = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().expect("health request should connect");
+        let mut request = [0_u8; 128];
+        let _ = stream.read(&mut request);
+        stream
+            .write_all(response.as_bytes())
+            .expect("health response should be written");
+    });
+    TestHttpServer { url, handle }
+}
+
+fn health_config(url: &str) -> HealthProbeConfig {
+    HealthProbeConfig {
+        url: url.into(),
+        attempts: 1,
+        timeout: Duration::from_millis(100),
+        retry_delay: Duration::from_millis(1),
+    }
+}
+
+fn fast_failing_health_config() -> HealthProbeConfig {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("test port should bind");
+    let url = format!("http://{}/healthz", listener.local_addr().unwrap());
+    drop(listener);
+    health_config(&url)
+}
+
 fn quick_exit_command_spec() -> crate::sidecar_command::SidecarCommandSpec {
     crate::sidecar_command::SidecarCommandSpec {
         program: quick_exit_program(),
         args: quick_exit_args(),
         cwd: std::env::temp_dir(),
         label: "quick exit test command".into(),
+    }
+}
+
+fn long_running_command_spec() -> crate::sidecar_command::SidecarCommandSpec {
+    crate::sidecar_command::SidecarCommandSpec {
+        program: long_running_program(),
+        args: long_running_args(),
+        cwd: std::env::temp_dir(),
+        label: "long running test command".into(),
     }
 }
 
@@ -193,6 +336,30 @@ fn quick_exit_program() -> PathBuf {
 #[cfg(not(windows))]
 fn quick_exit_args() -> Vec<String> {
     vec!["-c".into(), "exit 0".into()]
+}
+
+#[cfg(windows)]
+fn long_running_program() -> PathBuf {
+    PathBuf::from("powershell")
+}
+
+#[cfg(windows)]
+fn long_running_args() -> Vec<String> {
+    vec![
+        "-NoProfile".into(),
+        "-Command".into(),
+        "Start-Sleep -Seconds 10".into(),
+    ]
+}
+
+#[cfg(not(windows))]
+fn long_running_program() -> PathBuf {
+    PathBuf::from("sh")
+}
+
+#[cfg(not(windows))]
+fn long_running_args() -> Vec<String> {
+    vec!["-c".into(), "sleep 10".into()]
 }
 
 #[cfg(windows)]

@@ -3,7 +3,10 @@ use crate::{
     sidecar_log::{spawn_log_reader, LogTail, SharedLogTail},
     workspace::DesktopCommandError,
 };
+#[path = "sidecar_health.rs"]
+pub(crate) mod sidecar_health;
 use serde::Serialize;
+use sidecar_health::HealthProbeConfig;
 use std::{
     process::{Child, Command, ExitStatus, Stdio},
     sync::Mutex,
@@ -27,6 +30,7 @@ struct ManagedSidecar {
     started_at: String,
     command_label: String,
     logs: SharedLogTail,
+    health: HealthProbeConfig,
 }
 
 impl Drop for ManagedSidecar {
@@ -66,6 +70,14 @@ impl SidecarManager {
         &self,
         spec: SidecarCommandSpec,
     ) -> Result<SidecarStatus, DesktopCommandError> {
+        self.start_with_spec_and_health_config(spec, HealthProbeConfig::default())
+    }
+
+    pub(crate) fn start_with_spec_and_health_config(
+        &self,
+        spec: SidecarCommandSpec,
+        health: HealthProbeConfig,
+    ) -> Result<SidecarStatus, DesktopCommandError> {
         let mut state = self.lock_state()?;
         if let Some(status) = running_status_if_alive(&mut state)? {
             return Ok(status);
@@ -100,8 +112,9 @@ impl SidecarManager {
             started_at: unix_timestamp_ms(),
             command_label: spec.label,
             logs,
+            health,
         };
-        let status = running_status(&managed, "chem-service sidecar running");
+        let status = managed.health_checked_status(true);
         state.process = Some(managed);
         state.last_status = Some(status.clone());
         Ok(status)
@@ -157,7 +170,7 @@ impl SidecarManager {
                 state.last_status = Some(status.clone());
                 return Ok(status);
             }
-            let status = running_status(managed, "chem-service sidecar running");
+            let status = managed.health_checked_status(false);
             state.last_status = Some(status.clone());
             return Ok(status);
         }
@@ -239,21 +252,7 @@ fn running_status_if_alive(
         state.last_status = Some(status);
         return Ok(None);
     }
-    Ok(Some(running_status(
-        managed,
-        "chem-service sidecar already running",
-    )))
-}
-
-fn running_status(managed: &ManagedSidecar, detail: &str) -> SidecarStatus {
-    SidecarStatus {
-        state: "ready".into(),
-        label: "Sidecar running".into(),
-        detail: format!("{detail} via {}", managed.command_label),
-        pid: Some(managed.pid),
-        started_at: Some(managed.started_at.clone()),
-        log_tail: log_lines(&managed.logs),
-    }
+    Ok(Some(managed.health_checked_status(false)))
 }
 
 fn exited_status(managed: &ManagedSidecar, exit: ExitStatus) -> SidecarStatus {
