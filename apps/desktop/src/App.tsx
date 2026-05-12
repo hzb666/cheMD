@@ -5,11 +5,12 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { appendToolCall, applyPatchDecision, approvePatchDecision, attachEvidence, createAgentRun, createToolResult, getAuditTimeline, proposePatch, rejectPatchDecision, transitionAgentRunStatus, type AgentAuditEvent, type AgentEvidence, type AgentRun, type AgentToolCall, type PatchDecision, type PatchProposal } from "@chemd/agent-tools";
 import { buildEditorGraphRagRecords, compileChemdForEditor, type ChemdEditorDiagnostic, type ChemdLanguageCompileOutput, type ChemdOutlineItem, type ChemdQuickFixProposal, type ChemdTextEdit } from "@chemd/language-service";
 
-import { shellFiles, shellPostgresStatus, shellSidecarStatus, shellWorkspace, type DesktopCommandError, type DesktopCommandMap, type PostgresStatus, type RuntimeState, type SidecarStatus, type WorkspaceFileEntry, type WorkspaceHandle } from "./desktop-contracts";
+import { shellFiles, shellPostgresStatus, shellSidecarStatus, shellWorkspace, type DesktopCommandError, type DesktopCommandMap, type ManagedPostgresStatus, type PostgresStatus, type RuntimeState, type SidecarStatus, type WorkspaceFileEntry, type WorkspaceHandle } from "./desktop-contracts";
 import { buildPersistRuntimeGraphRagCommandInput } from "./desktop-runtime-persistence";
 
 type WorkspaceState = "empty" | "opening" | "open" | "error"; type DocumentMode = "sample" | "workspace";
 type SidecarOperation = "start" | "stop" | "refresh" | "logs";
+type ManagedPostgresOperation = "init" | "start" | "stop" | "migrate" | "refresh";
 type AgentMessageTone = "info" | "warning" | "success" | "danger";
 type AgentMessage = { tone: AgentMessageTone; text: string };
 type QuickFixCandidate = { diagnostic: ChemdEditorDiagnostic; quickFix: ChemdQuickFixProposal };
@@ -35,6 +36,7 @@ type PersistControllerInput = PersistBuildInput & {
   mode: DocumentMode;
   postgresStatus: PostgresStatus;
 };
+type PostgresField = [string, string];
 type DesktopWorkbenchProps = {
   workspace: WorkspaceHandle;
   workspaceState: WorkspaceState;
@@ -74,6 +76,23 @@ const activityItems = [{ id: "files", label: "Files", icon: Files, active: true 
 
 const statusToneByState: Record<RuntimeState, string> = { ready: "success", placeholder: "pending", degraded: "warning", offline: "danger" };
 const workspaceStateLabel: Record<WorkspaceState, string> = { empty: "Empty", opening: "Opening", open: "Open", error: "Fallback" };
+const initialManagedPostgresStatus: ManagedPostgresStatus = {
+  state: "placeholder",
+  label: "Managed Postgres unchecked",
+  detail: "Refresh managed Postgres status to inspect bundled binaries and local configuration.",
+  available: false,
+  reason: "Set CHEMD_MANAGED_POSTGRES_BIN_DIR or bundle PostgreSQL binaries",
+  configured: false,
+  source: null,
+  dataDir: null,
+  host: null,
+  port: null,
+  database: null,
+  user: null,
+  pid: null,
+  startedAt: null,
+  migrationState: "not_initialized"
+};
 const agentStatusLabel: Record<AgentRun["status"], string> = {
   created: "Created",
   running: "Running",
@@ -124,11 +143,20 @@ const getSidecarErrorMessage = (error: unknown): string => {
   return firstLine || "chem-service command failed";
 };
 
+const redactSensitiveRuntimeText = (message: string): string =>
+  message
+    .replace(/postgres(?:ql)?:\/\/\S+/gi, "postgres://[redacted]")
+    .replace(/(\/\/[^:\s/]+:)[^@\s/]+(@)/g, "$1[redacted]$2")
+    .replace(/\b(?:database_url|password|passwd|pwd)=\S+/gi, (match) => {
+      const [key] = match.split("=", 1);
+      return `${key}=[redacted]`;
+    });
+
 const getPostgresErrorMessage = (error: unknown): string => {
   const commandError = error as Partial<DesktopCommandError> | undefined;
   const message = commandError?.message ?? (error instanceof Error ? error.message : String(error));
   const firstLine = message.split(/\r?\n/, 1)[0].trim();
-  return firstLine || "Postgres status unavailable";
+  return redactSensitiveRuntimeText(firstLine || "Postgres status unavailable");
 };
 
 const formatPostgresValue = (value: string | number | boolean | null): string => {
@@ -145,6 +173,107 @@ const getPostgresBadgeDetail = (status: PostgresStatus): string => {
     status.database ? `database ${status.database}` : null,
     status.user ? `user ${status.user}` : null
   ].filter(Boolean).join(" / ") || "Postgres is configured; inspect the runtime panel for details";
+};
+
+const isManagedPostgresSource = (source: string | null): boolean =>
+  source?.startsWith("managed postgres:") ?? false;
+
+const getActivePostgresTarget = (
+  status: PostgresStatus,
+  managedStatus: ManagedPostgresStatus
+): "External" | "Managed" | "None" => {
+  if (status.configured && !isManagedPostgresSource(status.source)) return "External";
+  if (status.configured && isManagedPostgresSource(status.source)) return "Managed";
+  return managedStatus.configured ? "Managed" : "None";
+};
+
+const getPostgresTargetMessage = (
+  status: PostgresStatus,
+  managedStatus: ManagedPostgresStatus
+): string => {
+  const target = getActivePostgresTarget(status, managedStatus);
+  if (target === "External") {
+    return managedStatus.configured
+      ? "External Postgres has priority; Managed Postgres remains available as a local fallback."
+      : "External Postgres is selected from the current runtime configuration.";
+  }
+  if (target === "Managed") {
+    if (!status.configured) {
+      return "Managed Postgres is configured locally; start it and refresh runtime readiness.";
+    }
+    return "No external Postgres source is selected; the runtime is using Managed Postgres configuration.";
+  }
+  return "No Postgres target is configured. Initialize Managed Postgres or set an external Postgres URL.";
+};
+
+const getManagedPostgresUnavailableMessage = (status: ManagedPostgresStatus): string | null => {
+  if (status.available) return null;
+  const reason = status.reason ?? status.detail;
+  return reason.includes("CHEMD_MANAGED_POSTGRES_BIN_DIR")
+    ? reason
+    : `${reason}. Set CHEMD_MANAGED_POSTGRES_BIN_DIR or bundle PostgreSQL binaries.`;
+};
+
+const getExternalConfigured = (status: PostgresStatus): boolean =>
+  status.configured && !isManagedPostgresSource(status.source);
+
+const getExternalPostgresFields = (status: PostgresStatus): PostgresField[] => {
+  if (!getExternalConfigured(status)) {
+    return [
+      ["State", "placeholder"],
+      ["Configured", "no"],
+      ["Source", "not selected"],
+      ["Host", "unknown"],
+      ["Database", "unknown"],
+      ["User", "unknown"],
+      ["SSL", "not configured"],
+      ["pgvector", "unknown"],
+      ["Schema", "unknown"],
+      ["Timeout", "not configured"],
+      ["Detail", "Set CHEMD_POSTGRES_DATABASE_URL or DATABASE_URL to select External Postgres."]
+    ];
+  }
+  return [
+    ["State", status.state],
+    ["Configured", "yes"],
+    ["Source", formatPostgresValue(status.source)],
+    ["Host", formatPostgresValue(status.host)],
+    ["Database", formatPostgresValue(status.database)],
+    ["User", formatPostgresValue(status.user)],
+    ["SSL", status.ssl],
+    ["pgvector", formatPostgresValue(status.vectorInstalled)],
+    ["Schema", formatPostgresValue(status.schemaReady)],
+    ["Timeout", `${status.timeoutMs}ms`],
+    ["Detail", status.detail]
+  ];
+};
+
+const getManagedPostgresFields = (status: ManagedPostgresStatus): PostgresField[] => [
+  ["Available", formatPostgresValue(status.available)],
+  ["Configured", formatPostgresValue(status.configured)],
+  ["Data dir", formatPostgresValue(status.dataDir)],
+  ["Host", formatPostgresValue(status.host)],
+  ["Port", formatPostgresValue(status.port)],
+  ["Database", formatPostgresValue(status.database)],
+  ["User", formatPostgresValue(status.user)],
+  ["PID", formatPostgresValue(status.pid)],
+  ["Migration", status.migrationState],
+  ["Detail", status.detail]
+];
+
+const getManagedPostgresControlState = (
+  status: ManagedPostgresStatus,
+  loading: boolean,
+  operation: ManagedPostgresOperation | null
+) => {
+  const busy = loading || operation !== null;
+  return {
+    canInit: !busy && status.available && !status.configured,
+    canStart: !busy && status.available && status.configured && status.pid === null,
+    canStop: !busy && status.available && status.pid !== null,
+    canMigrate: !busy && status.available && status.configured && status.pid !== null,
+    canRefresh: !busy
+  };
 };
 
 const getLineStarts = (source: string): number[] => {
@@ -187,15 +316,6 @@ const initialPersistState: PersistState = {
   message: "Graph/RAG payload is ready for a configured Postgres runtime.",
   summary: null
 };
-
-const redactSensitiveRuntimeText = (message: string): string =>
-  message
-    .replace(/postgres(?:ql)?:\/\/\S+/gi, "postgres://[redacted]")
-    .replace(/(\/\/[^:\s/]+:)[^@\s/]+(@)/g, "$1[redacted]$2")
-    .replace(/\b(?:database_url|password|passwd|pwd)=\S+/gi, (match) => {
-      const [key] = match.split("=", 1);
-      return `${key}=[redacted]`;
-    });
 
 const getPersistErrorMessage = (error: unknown): string => {
   const commandError = error as Partial<DesktopCommandError> | undefined;
@@ -579,6 +699,32 @@ const SidecarButton = ({
   );
 };
 
+const PostgresControlButton = ({
+  label,
+  loadingLabel,
+  icon: Icon,
+  operation,
+  activeOperation,
+  disabled,
+  onClick
+}: {
+  label: string;
+  loadingLabel: string;
+  icon: typeof PlayCircle;
+  operation: ManagedPostgresOperation;
+  activeOperation: ManagedPostgresOperation | null;
+  disabled: boolean;
+  onClick: () => void;
+}) => {
+  const loading = activeOperation === operation;
+  return (
+    <button type="button" className="desktop-button" disabled={disabled} aria-busy={loading} onClick={onClick}>
+      <Icon size={14} />
+      <span>{loading ? loadingLabel : label}</span>
+    </button>
+  );
+};
+
 const SidecarControlPanel = ({
   status,
   logTail,
@@ -634,47 +780,127 @@ const SidecarControlPanel = ({
   );
 };
 
-const PostgresStatusPanel = ({
+const PostgresFieldGrid = ({ fields, wideLabels = ["Detail"] }: { fields: PostgresField[]; wideLabels?: string[] }) => (
+  <dl className="desktop-postgres-fields">
+    {fields.map(([label, value]) => (
+      <div key={label} className={wideLabels.includes(label) ? "desktop-postgres-field-wide" : undefined}>
+        <dt>{label}</dt>
+        <dd title={value}>{value}</dd>
+      </div>
+    ))}
+  </dl>
+);
+
+const ExternalPostgresSection = ({ status }: { status: PostgresStatus }) => {
+  const externalConfigured = getExternalConfigured(status);
+  return (
+    <div className="desktop-postgres-subpanel">
+      <div className="desktop-postgres-subhead">
+        <span>External Postgres</span>
+        <small>{externalConfigured ? "priority target" : "not selected"}</small>
+      </div>
+      <PostgresFieldGrid fields={getExternalPostgresFields(status)} />
+    </div>
+  );
+};
+
+const ManagedPostgresSection = ({
   status,
   loading,
+  operation,
   errorMessage,
+  message,
+  onInit,
+  onStart,
+  onStop,
+  onMigrate,
+  onRefresh
+}: {
+  status: ManagedPostgresStatus;
+  loading: boolean;
+  operation: ManagedPostgresOperation | null;
+  errorMessage: string | null;
+  message: string | null;
+  onInit: () => void;
+  onStart: () => void;
+  onStop: () => void;
+  onMigrate: () => void;
+  onRefresh: () => void;
+}) => {
+  const unavailableMessage = getManagedPostgresUnavailableMessage(status);
+  const controls = getManagedPostgresControlState(status, loading, operation);
+
+  return (
+    <div className="desktop-postgres-subpanel">
+      <div className="desktop-postgres-subhead">
+        <span>Managed Postgres</span>
+        <small>{status.configured ? "local config" : "local fallback"}</small>
+      </div>
+      <div className="desktop-managed-actions">
+        <PostgresControlButton label="Init" loadingLabel="Initializing" icon={Wrench} operation="init" activeOperation={operation} disabled={!controls.canInit} onClick={onInit} />
+        <PostgresControlButton label="Start" loadingLabel="Starting" icon={PlayCircle} operation="start" activeOperation={operation} disabled={!controls.canStart} onClick={onStart} />
+        <PostgresControlButton label="Stop" loadingLabel="Stopping" icon={Square} operation="stop" activeOperation={operation} disabled={!controls.canStop} onClick={onStop} />
+        <PostgresControlButton label="Migrate" loadingLabel="Migrating" icon={UploadCloud} operation="migrate" activeOperation={operation} disabled={!controls.canMigrate} onClick={onMigrate} />
+        <PostgresControlButton label="Refresh" loadingLabel="Refreshing" icon={RefreshCw} operation="refresh" activeOperation={operation} disabled={!controls.canRefresh} onClick={onRefresh} />
+      </div>
+      {unavailableMessage ? <p className="desktop-postgres-message" data-tone="warning">{unavailableMessage}</p> : null}
+      {errorMessage ? <p className="desktop-postgres-message" data-tone="danger" role="alert">{errorMessage}</p> : null}
+      {message ? <p className="desktop-postgres-message" data-tone="info">{message}</p> : null}
+      <PostgresFieldGrid fields={getManagedPostgresFields(status)} wideLabels={["Data dir", "Detail"]} />
+    </div>
+  );
+};
+
+const PostgresStatusPanel = ({
+  status,
+  managedStatus,
+  loading,
+  managedOperation,
+  errorMessage,
+  managedErrorMessage,
+  managedMessage,
   persistState,
   persistDisabledReason,
   onRefresh,
+  onInitManaged,
+  onStartManaged,
+  onStopManaged,
+  onMigrateManaged,
+  onRefreshManaged,
   onPersistGraph
 }: {
   status: PostgresStatus;
+  managedStatus: ManagedPostgresStatus;
   loading: boolean;
+  managedOperation: ManagedPostgresOperation | null;
   errorMessage: string | null;
+  managedErrorMessage: string | null;
+  managedMessage: string | null;
   persistState: PersistState;
   persistDisabledReason: string | null;
   onRefresh: () => void;
+  onInitManaged: () => void;
+  onStartManaged: () => void;
+  onStopManaged: () => void;
+  onMigrateManaged: () => void;
+  onRefreshManaged: () => void;
   onPersistGraph: () => void;
 }) => {
-  const fields: Array<[string, string]> = [
-    ["State", status.state],
-    ["Configured", formatPostgresValue(status.configured)],
-    ["Source", formatPostgresValue(status.source)],
-    ["Host", formatPostgresValue(status.host)],
-    ["Database", formatPostgresValue(status.database)],
-    ["User", formatPostgresValue(status.user)],
-    ["SSL", status.ssl],
-    ["pgvector", formatPostgresValue(status.vectorInstalled)],
-    ["Schema", formatPostgresValue(status.schemaReady)],
-    ["Timeout", `${status.timeoutMs}ms`],
-    ["Detail", status.detail]
-  ];
-
+  const activeTarget = getActivePostgresTarget(status, managedStatus);
   return (
     <section className="desktop-postgres-panel" aria-label="Postgres runtime status">
       <div className="desktop-postgres-heading">
         <div className="desktop-agent-subhead"><Database size={14} /><span>Postgres runtime</span></div>
         <StatusBadge label={status.label} state={status.state} detail={status.detail} />
       </div>
+      <div className="desktop-postgres-target" data-target={activeTarget.toLowerCase()}>
+        <strong>{activeTarget}</strong>
+        <span>{getPostgresTargetMessage(status, managedStatus)}</span>
+      </div>
       <div className="desktop-postgres-actions">
         <button type="button" className="desktop-button" disabled={loading} aria-busy={loading} onClick={onRefresh}>
           <RefreshCw size={14} />
-          <span>{loading ? "Refreshing" : "Refresh Postgres"}</span>
+          <span>{loading ? "Refreshing" : "Refresh all"}</span>
         </button>
         <button
           type="button"
@@ -701,14 +927,21 @@ const PostgresStatusPanel = ({
           </dl>
         ) : null}
       </div>
-      <dl className="desktop-postgres-fields">
-        {fields.map(([label, value]) => (
-          <div key={label} className={label === "Detail" ? "desktop-postgres-field-wide" : undefined}>
-            <dt>{label}</dt>
-            <dd title={value}>{value}</dd>
-          </div>
-        ))}
-      </dl>
+      <div className="desktop-postgres-split">
+        <ExternalPostgresSection status={status} />
+        <ManagedPostgresSection
+          status={managedStatus}
+          loading={loading}
+          operation={managedOperation}
+          errorMessage={managedErrorMessage}
+          message={managedMessage}
+          onInit={onInitManaged}
+          onStart={onStartManaged}
+          onStop={onStopManaged}
+          onMigrate={onMigrateManaged}
+          onRefresh={onRefreshManaged}
+        />
+      </div>
     </section>
   );
 };
@@ -973,8 +1206,12 @@ const InsightPane = ({
   sidecarMessage,
   sidecarError,
   postgresStatus,
+  managedPostgresStatus,
   postgresLoading,
+  managedPostgresOperation,
   postgresError,
+  managedPostgresError,
+  managedPostgresMessage,
   persistState,
   persistDisabledReason,
   agentRun,
@@ -984,6 +1221,11 @@ const InsightPane = ({
   onRefreshSidecar,
   onLoadSidecarLogs,
   onRefreshPostgres,
+  onInitManagedPostgres,
+  onStartManagedPostgres,
+  onStopManagedPostgres,
+  onMigrateManagedPostgres,
+  onRefreshManagedPostgres,
   onPersistGraph,
   onProposeQuickFix,
   onApprovePatch,
@@ -999,8 +1241,12 @@ const InsightPane = ({
   sidecarMessage: string | null;
   sidecarError: string | null;
   postgresStatus: PostgresStatus;
+  managedPostgresStatus: ManagedPostgresStatus;
   postgresLoading: boolean;
+  managedPostgresOperation: ManagedPostgresOperation | null;
   postgresError: string | null;
+  managedPostgresError: string | null;
+  managedPostgresMessage: string | null;
   persistState: PersistState;
   persistDisabledReason: string | null;
   agentRun: AgentRun | null;
@@ -1010,6 +1256,11 @@ const InsightPane = ({
   onRefreshSidecar: () => void;
   onLoadSidecarLogs: () => void;
   onRefreshPostgres: () => void;
+  onInitManagedPostgres: () => void;
+  onStartManagedPostgres: () => void;
+  onStopManagedPostgres: () => void;
+  onMigrateManagedPostgres: () => void;
+  onRefreshManagedPostgres: () => void;
   onPersistGraph: () => void;
   onProposeQuickFix: (candidate: QuickFixCandidate) => void;
   onApprovePatch: () => void;
@@ -1039,11 +1290,20 @@ const InsightPane = ({
       />
       <PostgresStatusPanel
         status={postgresStatus}
+        managedStatus={managedPostgresStatus}
         loading={postgresLoading}
+        managedOperation={managedPostgresOperation}
         errorMessage={postgresError}
+        managedErrorMessage={managedPostgresError}
+        managedMessage={managedPostgresMessage}
         persistState={persistState}
         persistDisabledReason={persistDisabledReason}
         onRefresh={onRefreshPostgres}
+        onInitManaged={onInitManagedPostgres}
+        onStartManaged={onStartManagedPostgres}
+        onStopManaged={onStopManagedPostgres}
+        onMigrateManaged={onMigrateManagedPostgres}
+        onRefreshManaged={onRefreshManagedPostgres}
         onPersistGraph={onPersistGraph}
       />
       <div className="desktop-agent-panel">
@@ -1175,14 +1435,16 @@ const useSidecarController = () => {
 
 const usePostgresController = () => {
   const [status, setStatus] = useState<PostgresStatus>(shellPostgresStatus);
+  const [managedStatus, setManagedStatus] = useState<ManagedPostgresStatus>(initialManagedPostgresStatus);
   const [loading, setLoading] = useState(false);
+  const [managedOperation, setManagedOperation] = useState<ManagedPostgresOperation | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [managedError, setManagedError] = useState<string | null>(null);
+  const [managedMessage, setManagedMessage] = useState<string | null>(null);
   const loadingRef = useRef(false);
+  const managedOperationRef = useRef<ManagedPostgresOperation | null>(null);
 
-  const refresh = async () => {
-    if (loadingRef.current) return;
-    loadingRef.current = true;
-    setLoading(true);
+  const readRuntimeStatus = async () => {
     try {
       const nextStatus = await invokeDesktop("read_postgres_status", undefined);
       setStatus(nextStatus);
@@ -1190,9 +1452,68 @@ const usePostgresController = () => {
     } catch (nextError: unknown) {
       setStatus(shellPostgresStatus);
       setError(getPostgresErrorMessage(nextError));
+    }
+  };
+
+  const readManagedStatus = async () => {
+    try {
+      const nextStatus = await invokeDesktop("read_managed_postgres_status", undefined);
+      setManagedStatus(nextStatus);
+      setManagedError(null);
+    } catch (nextError: unknown) {
+      setManagedStatus(initialManagedPostgresStatus);
+      setManagedError(getPostgresErrorMessage(nextError));
+    }
+  };
+
+  const refresh = async () => {
+    if (loadingRef.current || managedOperationRef.current) return;
+    loadingRef.current = true;
+    setLoading(true);
+    try {
+      await readRuntimeStatus();
+      await readManagedStatus();
     } finally {
       loadingRef.current = false;
       setLoading(false);
+    }
+  };
+
+  const runManagedCommand = async (operation: ManagedPostgresOperation) => {
+    if (loadingRef.current || managedOperationRef.current) return;
+    managedOperationRef.current = operation;
+    setManagedOperation(operation);
+    setManagedMessage(null);
+    try {
+      const command: keyof Pick<
+        DesktopCommandMap,
+        "initialize_managed_postgres" | "start_managed_postgres" | "stop_managed_postgres" | "migrate_managed_postgres" | "read_managed_postgres_status"
+      > = operation === "init"
+        ? "initialize_managed_postgres"
+        : operation === "start"
+          ? "start_managed_postgres"
+          : operation === "stop"
+            ? "stop_managed_postgres"
+            : operation === "migrate"
+              ? "migrate_managed_postgres"
+              : "read_managed_postgres_status";
+      const nextStatus = await invokeDesktop(command, undefined);
+      setManagedStatus(nextStatus);
+      setManagedError(null);
+      const actionLabel: Record<ManagedPostgresOperation, string> = {
+        init: "initialized",
+        start: "started",
+        stop: "stopped",
+        migrate: "migrated",
+        refresh: "refreshed"
+      };
+      setManagedMessage(`Managed Postgres ${actionLabel[operation]}.`);
+      await readRuntimeStatus();
+    } catch (nextError: unknown) {
+      setManagedError(getPostgresErrorMessage(nextError));
+    } finally {
+      managedOperationRef.current = null;
+      setManagedOperation(null);
     }
   };
 
@@ -1202,9 +1523,18 @@ const usePostgresController = () => {
 
   return {
     status,
+    managedStatus,
     loading,
+    managedOperation,
     error,
-    refresh: () => void refresh()
+    managedError,
+    managedMessage,
+    refresh: () => void refresh(),
+    initializeManaged: () => void runManagedCommand("init"),
+    startManaged: () => void runManagedCommand("start"),
+    stopManaged: () => void runManagedCommand("stop"),
+    migrateManaged: () => void runManagedCommand("migrate"),
+    refreshManaged: () => void runManagedCommand("refresh")
   };
 };
 
@@ -1298,13 +1628,18 @@ const DesktopWorkbench = ({
           diagnostics={output.diagnostics}
           mode={mode}
           sidecarStatus={sidecarController.status} sidecarLogTail={sidecarController.logTail} sidecarOperation={sidecarController.operation} sidecarMessage={sidecarController.message} sidecarError={sidecarController.error}
-          postgresStatus={postgresController.status} postgresLoading={postgresController.loading} postgresError={postgresController.error}
+          postgresStatus={postgresController.status} managedPostgresStatus={postgresController.managedStatus} postgresLoading={postgresController.loading} managedPostgresOperation={postgresController.managedOperation} postgresError={postgresController.error} managedPostgresError={postgresController.managedError} managedPostgresMessage={postgresController.managedMessage}
           persistState={persistController.state}
           persistDisabledReason={persistController.disabledReason}
           agentRun={agentRun}
           agentMessage={agentMessage}
           onStartSidecar={sidecarController.start} onStopSidecar={sidecarController.stop} onRefreshSidecar={sidecarController.refresh} onLoadSidecarLogs={sidecarController.loadLogs}
           onRefreshPostgres={postgresController.refresh}
+          onInitManagedPostgres={postgresController.initializeManaged}
+          onStartManagedPostgres={postgresController.startManaged}
+          onStopManagedPostgres={postgresController.stopManaged}
+          onMigrateManagedPostgres={postgresController.migrateManaged}
+          onRefreshManagedPostgres={postgresController.refreshManaged}
           onPersistGraph={persistController.persist}
           onProposeQuickFix={onProposeQuickFix}
           onApprovePatch={onApprovePatch}
