@@ -74,12 +74,18 @@
     user-select: none;
   }
 
+  body[data-desktop-dock-drag] {
+    cursor: grabbing;
+    user-select: none;
+  }
+
   body[data-desktop-resize-panel="sidebar"],
   body[data-desktop-resize-panel="insight"] {
     cursor: col-resize;
   }
 
-  body[data-desktop-resize-panel="bottom"] {
+  body[data-desktop-resize-panel="bottom"],
+  body[data-desktop-resize-panel="dock"] {
     cursor: row-resize;
   }
 }
@@ -115,7 +121,12 @@
   .desktop-quickfix-list button,
   .desktop-agent-timeline-row,
   .desktop-diagnostic-row,
-  .desktop-diagnostic-summary {
+  .desktop-diagnostic-summary,
+  .desktop-dock-header,
+  .desktop-dock-tabs,
+  .desktop-tool-search,
+  .desktop-tool-result-row,
+  .desktop-graph-node-row {
     @apply flex items-center;
   }
 

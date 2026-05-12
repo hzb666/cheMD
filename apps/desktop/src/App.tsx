@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { Activity, AlertTriangle, Bot, CheckCircle2, ChevronRight, CircleDot, Database, FileCode2, Files, FlaskConical, GitGraph, GripHorizontal, GripVertical, HardDrive, Lightbulb, PanelBottom, PanelBottomClose, PanelBottomOpen, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PlayCircle, RefreshCw, ScrollText, Search, Settings, ShieldCheck, Sparkles, Square, UploadCloud, Wrench, XCircle } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ChangeEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ChangeEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
 import { appendToolCall, applyPatchDecision, approvePatchDecision, attachEvidence, createAgentRun, createToolResult, getAuditTimeline, proposePatch, rejectPatchDecision, transitionAgentRunStatus, type AgentAuditEvent, type AgentEvidence, type AgentRun, type AgentToolCall, type PatchDecision, type PatchProposal } from "@chemd/agent-tools";
 import { buildEditorGraphRagRecords, compileChemdForEditor, type ChemdEditorDiagnostic, type ChemdLanguageCompileOutput, type ChemdOutlineItem, type ChemdQuickFixProposal, type ChemdTextEdit } from "@chemd/language-service";
@@ -78,6 +78,7 @@ type LocalSyncState = {
 type PostgresField = [string, string];
 type ActivityTool = "files" | "search" | "graph" | "agent" | "settings";
 type LayoutPanel = "sidebar" | "insight" | "bottom";
+type InsightDockPanelId = "outline" | "rag" | "graph" | "runtime" | "postgres" | "storage" | "agent" | "settings";
 type DesktopLayoutState = {
   sidebarWidth: number;
   insightWidth: number;
@@ -85,6 +86,12 @@ type DesktopLayoutState = {
   sidebarCollapsed: boolean;
   insightCollapsed: boolean;
   bottomCollapsed: boolean;
+};
+type InsightDockLayout = {
+  order: InsightDockPanelId[];
+  sizes: Record<InsightDockPanelId, number>;
+  minimized: InsightDockPanelId[];
+  active: InsightDockPanelId;
 };
 type DesktopWorkbenchProps = {
   workspace: WorkspaceHandle;
@@ -117,6 +124,7 @@ type DesktopWorkbenchProps = {
   onRejectPatch: () => void;
 };
 type InsightPaneProps = {
+  activeTool: ActivityTool;
   outline: ChemdOutlineItem[];
   diagnostics: ChemdEditorDiagnostic[];
   mode: DocumentMode;
@@ -191,6 +199,50 @@ const initialDesktopLayout: DesktopLayoutState = {
   bottomCollapsed: false
 };
 
+const insightDockPanels: {
+  id: InsightDockPanelId;
+  label: string;
+  eyebrow: string;
+  icon: typeof Files;
+}[] = [
+  { id: "outline", label: "Outline", eyebrow: "Inspect", icon: Files },
+  { id: "rag", label: "RAG Search", eyebrow: "Search", icon: Search },
+  { id: "graph", label: "Reaction Graph", eyebrow: "Graph", icon: GitGraph },
+  { id: "runtime", label: "chem-service", eyebrow: "Runtime", icon: HardDrive },
+  { id: "postgres", label: "Postgres", eyebrow: "Storage", icon: Database },
+  { id: "storage", label: "Local Store", eyebrow: "Offline", icon: HardDrive },
+  { id: "agent", label: "Agent Runs", eyebrow: "Agent", icon: Bot },
+  { id: "settings", label: "Settings", eyebrow: "Config", icon: Settings }
+];
+
+const insightDockMeta = Object.fromEntries(
+  insightDockPanels.map((panel) => [panel.id, panel])
+) as Record<InsightDockPanelId, (typeof insightDockPanels)[number]>;
+
+const initialInsightDockLayout: InsightDockLayout = {
+  order: ["outline", "rag", "graph", "runtime", "postgres", "storage", "agent", "settings"],
+  sizes: {
+    outline: 190,
+    rag: 220,
+    graph: 220,
+    runtime: 260,
+    postgres: 380,
+    storage: 300,
+    agent: 360,
+    settings: 220
+  },
+  minimized: ["rag", "graph", "settings"],
+  active: "outline"
+};
+
+const activityDockPanel: Record<ActivityTool, InsightDockPanelId> = {
+  files: "outline",
+  search: "rag",
+  graph: "graph",
+  agent: "agent",
+  settings: "settings"
+};
+
 const clampLayoutSize = (panel: LayoutPanel, value: number): number => {
   const { min, max } = layoutBounds[panel];
   return Math.min(max, Math.max(min, value));
@@ -247,6 +299,26 @@ const getKeyboardResizeDelta = (panel: LayoutPanel, key: string): number => {
   if (key === "ArrowLeft") return -step;
   return 0;
 };
+
+const clampDockPanelSize = (value: number): number => Math.min(560, Math.max(96, value));
+
+const moveDockPanel = (
+  order: InsightDockPanelId[],
+  source: InsightDockPanelId,
+  target: InsightDockPanelId
+): InsightDockPanelId[] => {
+  if (source === target) return order;
+  const sourceIndex = order.indexOf(source);
+  const targetIndex = order.indexOf(target);
+  if (sourceIndex === -1 || targetIndex === -1) return order;
+  const nextOrder = order.filter((item) => item !== source);
+  // The original target index naturally inserts after the target when dragging down.
+  nextOrder.splice(targetIndex, 0, source);
+  return nextOrder;
+};
+
+const flattenOutlineItems = (items: ChemdOutlineItem[]): ChemdOutlineItem[] =>
+  items.flatMap((item) => [item, ...flattenOutlineItems(item.children ?? [])]);
 
 const statusToneByState: Record<RuntimeState, string> = { ready: "success", placeholder: "pending", degraded: "warning", offline: "danger" };
 const workspaceStateLabel: Record<WorkspaceState, string> = { empty: "Empty", opening: "Opening", open: "Open", error: "Fallback" };
@@ -1745,118 +1817,325 @@ const AgentLedger = ({ agentRun }: { agentRun: AgentRun | null }) => (
   ) : null
 );
 
-const InsightPane = ({
+const RagSearchPanel = ({
   outline,
-  diagnostics,
-  mode,
-  sidecarStatus,
-  sidecarLogTail,
-  sidecarOperation,
-  sidecarMessage,
-  sidecarError,
-  postgresStatus,
-  managedPostgresStatus,
-  postgresLoading,
-  managedPostgresOperation,
-  postgresError,
-  managedPostgresError,
-  managedPostgresMessage,
-  persistState,
-  persistDisabledReason,
-  localStoreStatus,
-  localStoreOperation,
-  localSnapshotState,
-  localSyncState,
-  localStoreDisabledReason,
-  localStoreSyncDisabledReason,
-  localStoreError,
-  agentRun,
-  agentMessage,
-  onStartSidecar,
-  onStopSidecar,
-  onRefreshSidecar,
-  onLoadSidecarLogs,
-  onRefreshPostgres,
-  onInitManagedPostgres,
-  onStartManagedPostgres,
-  onStopManagedPostgres,
-  onMigrateManagedPostgres,
-  onRefreshManagedPostgres,
-  onPersistGraph,
-  onRefreshLocalStore,
-  onSaveLocalSnapshot,
-  onSyncLocalOutbox,
-  onProposeQuickFix,
-  onApprovePatch,
-  onApplyPatch,
-  onRejectPatch
-}: InsightPaneProps) => {
-  const quickFixes = getQuickFixCandidates(diagnostics);
-  const activeProposal = getLatestPatchProposal(agentRun);
-  const approvedDecision = findPatchDecision(agentRun, activeProposal?.patchProposalId, "approved");
-  const rejectedDecision = findPatchDecision(agentRun, activeProposal?.patchProposalId, "rejected");
-  const appliedDecision = findPatchDecision(agentRun, activeProposal?.patchProposalId, "applied");
+  diagnostics
+}: {
+  outline: ChemdOutlineItem[];
+  diagnostics: ChemdEditorDiagnostic[];
+}) => {
+  const [query, setQuery] = useState("");
+  const rows = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    const outlineRows = flattenOutlineItems(outline).map((item) => ({
+      id: `outline-${item.id}`,
+      kind: item.kind,
+      label: item.label,
+      detail: `L${item.range.startLine}`
+    }));
+    const diagnosticRows = diagnostics.map((diagnostic) => ({
+      id: `diagnostic-${diagnostic.code}-${diagnostic.range.startLine}-${diagnostic.range.startColumn}`,
+      kind: diagnostic.severity,
+      label: diagnostic.message,
+      detail: diagnostic.code
+    }));
+    const allRows = [...outlineRows, ...diagnosticRows];
+    if (!normalizedQuery) return allRows.slice(0, 8);
+    return allRows.filter((row) =>
+      `${row.kind} ${row.label} ${row.detail}`.toLowerCase().includes(normalizedQuery)
+    ).slice(0, 12);
+  }, [diagnostics, outline, query]);
 
   return (
-    <aside className="desktop-pane desktop-insight-pane" aria-label="Outline and agent">
-      <PanelHeader eyebrow="Inspect" title="Outline" meta={`${outline.length} roots`} />
-      <div className="desktop-insight-section">{outline.length > 0 ? <OutlineTree items={outline} /> : <p className="desktop-empty-copy">No outline from language service.</p>}</div>
-      <SidecarControlPanel
-        status={sidecarStatus}
-        logTail={sidecarLogTail}
-        operation={sidecarOperation}
-        message={sidecarMessage}
-        errorMessage={sidecarError}
-        onStart={onStartSidecar}
-        onStop={onStopSidecar}
-        onRefresh={onRefreshSidecar}
-        onLoadLogs={onLoadSidecarLogs}
-      />
-      <PostgresStatusPanel
-        status={postgresStatus}
-        managedStatus={managedPostgresStatus}
-        loading={postgresLoading}
-        managedOperation={managedPostgresOperation}
-        errorMessage={postgresError}
-        managedErrorMessage={managedPostgresError}
-        managedMessage={managedPostgresMessage}
-        persistState={persistState}
-        persistDisabledReason={persistDisabledReason}
-        onRefresh={onRefreshPostgres}
-        onInitManaged={onInitManagedPostgres}
-        onStartManaged={onStartManagedPostgres}
-        onStopManaged={onStopManagedPostgres}
-        onMigrateManaged={onMigrateManagedPostgres}
-        onRefreshManaged={onRefreshManagedPostgres}
-        onPersistGraph={onPersistGraph}
-      />
-      <LocalStorePanel
-        status={localStoreStatus}
-        operation={localStoreOperation}
-        snapshotState={localSnapshotState}
-        syncState={localSyncState}
-        disabledReason={localStoreDisabledReason}
-        syncDisabledReason={localStoreSyncDisabledReason}
-        errorMessage={localStoreError}
-        onRefresh={onRefreshLocalStore}
-        onSave={onSaveLocalSnapshot}
-        onSync={onSyncLocalOutbox}
-      />
-      <div className="desktop-agent-panel">
-        <AgentRunHeader agentRun={agentRun} agentMessage={agentMessage} />
-        <AgentEmptyState mode={mode} hasQuickFixes={quickFixes.length > 0} />
-        <AgentQuickFixList mode={mode} quickFixes={quickFixes} onProposeQuickFix={onProposeQuickFix} />
-        <AgentPatchProposalCard
-          proposal={activeProposal}
-          canApprove={activeProposal !== undefined && approvedDecision === undefined && rejectedDecision === undefined && appliedDecision === undefined}
-          canApply={activeProposal !== undefined && approvedDecision !== undefined && appliedDecision === undefined && rejectedDecision === undefined}
-          canReject={activeProposal !== undefined && rejectedDecision === undefined && appliedDecision === undefined}
-          onApprovePatch={onApprovePatch}
-          onApplyPatch={onApplyPatch}
-          onRejectPatch={onRejectPatch}
+    <div className="desktop-tool-panel">
+      <label className="desktop-tool-search">
+        <Search size={14} />
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search symbols, diagnostics, graph text"
+          aria-label="RAG search query"
         />
-        <AgentTimeline agentRun={agentRun} />
-        <AgentLedger agentRun={agentRun} />
+      </label>
+      <div className="desktop-tool-result-list" role="list">
+        {rows.length > 0 ? rows.map((row) => (
+          <div key={row.id} className="desktop-tool-result-row" role="listitem">
+            <span>{row.kind}</span>
+            <strong title={row.label}>{row.label}</strong>
+            <code>{row.detail}</code>
+          </div>
+        )) : <p className="desktop-empty-copy">No matches.</p>}
+      </div>
+    </div>
+  );
+};
+
+const ReactionGraphPanel = ({
+  outline,
+  diagnostics,
+  compileStatus
+}: {
+  outline: ChemdOutlineItem[];
+  diagnostics: ChemdEditorDiagnostic[];
+  compileStatus: "ok" | "failed";
+}) => {
+  const graphNodes = flattenOutlineItems(outline).slice(0, 10);
+  return (
+    <div className="desktop-tool-panel">
+      <div className="desktop-graph-summary">
+        <div><span>Compile</span><strong>{compileStatus}</strong></div>
+        <div><span>Nodes</span><strong>{graphNodes.length}</strong></div>
+        <div><span>Diagnostics</span><strong>{diagnostics.length}</strong></div>
+      </div>
+      <div className="desktop-graph-node-list" role="list">
+        {graphNodes.length > 0 ? graphNodes.map((node) => (
+          <div key={node.id} className="desktop-graph-node-row" role="listitem">
+            <GitGraph size={13} />
+            <span>{node.kind}</span>
+            <strong title={node.label}>{node.label}</strong>
+            <code>L{node.range.startLine}</code>
+          </div>
+        )) : <p className="desktop-empty-copy">No graph nodes.</p>}
+      </div>
+    </div>
+  );
+};
+
+const SettingsDockPanel = ({
+  mode,
+  sidecarStatus,
+  postgresStatus,
+  localStoreStatus
+}: {
+  mode: DocumentMode;
+  sidecarStatus: SidecarStatus;
+  postgresStatus: PostgresStatus;
+  localStoreStatus: LocalStoreStatus;
+}) => (
+  <div className="desktop-tool-panel">
+    <dl className="desktop-settings-grid">
+      <div><dt>Mode</dt><dd>{mode}</dd></div>
+      <div><dt>Sidecar</dt><dd>{sidecarStatus.state}</dd></div>
+      <div><dt>Postgres</dt><dd>{postgresStatus.state}</dd></div>
+      <div><dt>Local Store</dt><dd>{localStoreStatus.state}</dd></div>
+      <div className="desktop-settings-wide"><dt>Postgres source</dt><dd>{postgresStatus.source ?? "not selected"}</dd></div>
+      <div className="desktop-settings-wide"><dt>Local path</dt><dd>{localStoreStatus.storagePath ?? "not initialized"}</dd></div>
+    </dl>
+  </div>
+);
+
+const useInsightDockController = (activeTool: ActivityTool) => {
+  const [dockLayout, setDockLayout] = useState<InsightDockLayout>(initialInsightDockLayout);
+  const activeDockPanel = activityDockPanel[activeTool];
+
+  useEffect(() => {
+    setDockLayout((current) => ({
+      ...current,
+      active: activeDockPanel,
+      minimized: current.minimized.filter((panel) => panel !== activeDockPanel),
+      order: [activeDockPanel, ...current.order.filter((panel) => panel !== activeDockPanel)]
+    }));
+  }, [activeDockPanel]);
+
+  const visiblePanels = dockLayout.order.filter((panel) => !dockLayout.minimized.includes(panel));
+  const minimizedPanels = dockLayout.order.filter((panel) => dockLayout.minimized.includes(panel));
+
+  const activatePanel = (panel: InsightDockPanelId) => {
+    setDockLayout((current) => ({
+      ...current,
+      active: panel,
+      minimized: current.minimized.filter((item) => item !== panel)
+    }));
+  };
+
+  const minimizePanel = (panel: InsightDockPanelId) => {
+    setDockLayout((current) => {
+      const minimized = current.minimized.includes(panel)
+        ? current.minimized
+        : [...current.minimized, panel];
+      const nextVisible = current.order.find((item) => item !== panel && !minimized.includes(item));
+      return {
+        ...current,
+        minimized,
+        active: current.active === panel ? nextVisible ?? panel : current.active
+      };
+    });
+  };
+
+  const beginDockResize = (panel: InsightDockPanelId, event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const startY = event.clientY;
+    const startHeight = dockLayout.sizes[panel];
+    document.body.dataset.desktopResizePanel = "dock";
+
+    const onMove = (moveEvent: PointerEvent) => {
+      const nextHeight = clampDockPanelSize(startHeight + moveEvent.clientY - startY);
+      setDockLayout((current) => ({
+        ...current,
+        sizes: { ...current.sizes, [panel]: nextHeight }
+      }));
+    };
+    const onEnd = () => {
+      delete document.body.dataset.desktopResizePanel;
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onEnd);
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onEnd, { once: true });
+  };
+
+  const beginDockDrag = (panel: InsightDockPanelId, event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    document.body.dataset.desktopDockDrag = panel;
+
+    const onEnd = (endEvent: PointerEvent) => {
+      delete document.body.dataset.desktopDockDrag;
+      const moved = Math.abs(endEvent.clientX - startX) + Math.abs(endEvent.clientY - startY);
+      const targetElement = document.elementFromPoint(endEvent.clientX, endEvent.clientY);
+      const targetPanel = targetElement?.closest("[data-dock-panel]")?.getAttribute("data-dock-panel") as InsightDockPanelId | null;
+      if (moved < 8 || !targetPanel || !insightDockMeta[targetPanel]) return;
+      setDockLayout((current) => ({
+        ...current,
+        active: panel,
+        order: moveDockPanel(current.order, panel, targetPanel)
+      }));
+    };
+
+    window.addEventListener("pointerup", onEnd, { once: true });
+  };
+
+  return {
+    dockLayout,
+    visiblePanels,
+    minimizedPanels,
+    activatePanel,
+    minimizePanel,
+    beginDockResize,
+    beginDockDrag
+  };
+};
+
+const InsightDockTabs = ({
+  panels,
+  onActivate
+}: {
+  panels: InsightDockPanelId[];
+  onActivate: (panel: InsightDockPanelId) => void;
+}) => (
+  <div className="desktop-dock-tabs" aria-label="Minimized dock panels">
+    {panels.map((panel) => {
+      const meta = insightDockMeta[panel];
+      const Icon = meta.icon;
+      return (
+        <button key={panel} type="button" onClick={() => onActivate(panel)} title={meta.label}>
+          <Icon size={13} />
+          <span>{meta.label}</span>
+        </button>
+      );
+    })}
+  </div>
+);
+
+const InsightDockContent = ({
+  panel,
+  props
+}: {
+  panel: InsightDockPanelId;
+  props: InsightPaneProps;
+}) => {
+  const quickFixes = getQuickFixCandidates(props.diagnostics);
+  const activeProposal = getLatestPatchProposal(props.agentRun);
+  const approvedDecision = findPatchDecision(props.agentRun, activeProposal?.patchProposalId, "approved");
+  const rejectedDecision = findPatchDecision(props.agentRun, activeProposal?.patchProposalId, "rejected");
+  const appliedDecision = findPatchDecision(props.agentRun, activeProposal?.patchProposalId, "applied");
+  const contentByPanel: Record<InsightDockPanelId, ReactNode> = {
+    outline: <div className="desktop-insight-section">{props.outline.length > 0 ? <OutlineTree items={props.outline} /> : <p className="desktop-empty-copy">No outline from language service.</p>}</div>,
+    rag: <RagSearchPanel outline={props.outline} diagnostics={props.diagnostics} />,
+    graph: <ReactionGraphPanel outline={props.outline} diagnostics={props.diagnostics} compileStatus={props.diagnostics.some((item) => item.severity === "error") ? "failed" : "ok"} />,
+    runtime: <SidecarControlPanel status={props.sidecarStatus} logTail={props.sidecarLogTail} operation={props.sidecarOperation} message={props.sidecarMessage} errorMessage={props.sidecarError} onStart={props.onStartSidecar} onStop={props.onStopSidecar} onRefresh={props.onRefreshSidecar} onLoadLogs={props.onLoadSidecarLogs} />,
+    postgres: <PostgresStatusPanel status={props.postgresStatus} managedStatus={props.managedPostgresStatus} loading={props.postgresLoading} managedOperation={props.managedPostgresOperation} errorMessage={props.postgresError} managedErrorMessage={props.managedPostgresError} managedMessage={props.managedPostgresMessage} persistState={props.persistState} persistDisabledReason={props.persistDisabledReason} onRefresh={props.onRefreshPostgres} onInitManaged={props.onInitManagedPostgres} onStartManaged={props.onStartManagedPostgres} onStopManaged={props.onStopManagedPostgres} onMigrateManaged={props.onMigrateManagedPostgres} onRefreshManaged={props.onRefreshManagedPostgres} onPersistGraph={props.onPersistGraph} />,
+    storage: <LocalStorePanel status={props.localStoreStatus} operation={props.localStoreOperation} snapshotState={props.localSnapshotState} syncState={props.localSyncState} disabledReason={props.localStoreDisabledReason} syncDisabledReason={props.localStoreSyncDisabledReason} errorMessage={props.localStoreError} onRefresh={props.onRefreshLocalStore} onSave={props.onSaveLocalSnapshot} onSync={props.onSyncLocalOutbox} />,
+    settings: <SettingsDockPanel mode={props.mode} sidecarStatus={props.sidecarStatus} postgresStatus={props.postgresStatus} localStoreStatus={props.localStoreStatus} />,
+    agent: <div className="desktop-agent-panel"><AgentRunHeader agentRun={props.agentRun} agentMessage={props.agentMessage} /><AgentEmptyState mode={props.mode} hasQuickFixes={quickFixes.length > 0} /><AgentQuickFixList mode={props.mode} quickFixes={quickFixes} onProposeQuickFix={props.onProposeQuickFix} /><AgentPatchProposalCard proposal={activeProposal} canApprove={activeProposal !== undefined && approvedDecision === undefined && rejectedDecision === undefined && appliedDecision === undefined} canApply={activeProposal !== undefined && approvedDecision !== undefined && appliedDecision === undefined && rejectedDecision === undefined} canReject={activeProposal !== undefined && rejectedDecision === undefined && appliedDecision === undefined} onApprovePatch={props.onApprovePatch} onApplyPatch={props.onApplyPatch} onRejectPatch={props.onRejectPatch} /><AgentTimeline agentRun={props.agentRun} /><AgentLedger agentRun={props.agentRun} /></div>
+  };
+  return contentByPanel[panel];
+};
+
+const InsightDockFrame = ({
+  panel,
+  layout,
+  props,
+  onActivate,
+  onMinimize,
+  onResize,
+  onPointerDragStart
+}: {
+  panel: InsightDockPanelId;
+  layout: InsightDockLayout;
+  props: InsightPaneProps;
+  onActivate: (panel: InsightDockPanelId) => void;
+  onMinimize: (panel: InsightDockPanelId) => void;
+  onResize: (panel: InsightDockPanelId, event: ReactPointerEvent<HTMLDivElement>) => void;
+  onPointerDragStart: (panel: InsightDockPanelId, event: ReactPointerEvent<HTMLDivElement>) => void;
+}) => {
+  const meta = insightDockMeta[panel];
+  const Icon = meta.icon;
+
+  return (
+    <section
+      className="desktop-dock-panel"
+      data-dock-panel={panel}
+      data-active={layout.active === panel}
+      style={{ "--desktop-dock-panel-height": `${layout.sizes[panel]}px` } as CSSProperties}
+    >
+      <div
+        className="desktop-dock-header"
+        onClick={() => onActivate(panel)}
+        onPointerDown={(event) => onPointerDragStart(panel, event)}
+      >
+        <GripVertical size={13} />
+        <Icon size={14} />
+        <div>
+          <span>{meta.eyebrow}</span>
+          <strong>{meta.label}</strong>
+        </div>
+        <button type="button" aria-label={`Minimize ${meta.label}`} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => {
+          event.stopPropagation();
+          onMinimize(panel);
+        }}>
+          <PanelRightClose size={13} />
+        </button>
+      </div>
+      <div className="desktop-dock-panel-body">
+        <InsightDockContent panel={panel} props={props} />
+      </div>
+      <div className="desktop-dock-splitter" role="separator" aria-label={`${meta.label} split resize`} aria-orientation="horizontal" onPointerDown={(event) => onResize(panel, event)} />
+    </section>
+  );
+};
+
+const InsightPane = (props: InsightPaneProps) => {
+  const dock = useInsightDockController(props.activeTool);
+  return (
+    <aside className="desktop-pane desktop-insight-pane" aria-label="Docked tools">
+      <InsightDockTabs panels={dock.minimizedPanels} onActivate={dock.activatePanel} />
+      <div className="desktop-dock-stack">
+        {dock.visiblePanels.map((panel) => (
+          <InsightDockFrame
+            key={panel}
+            panel={panel}
+            layout={dock.dockLayout}
+            props={props}
+            onActivate={dock.activatePanel}
+            onMinimize={dock.minimizePanel}
+            onResize={dock.beginDockResize}
+            onPointerDragStart={dock.beginDockDrag}
+          />
+        ))}
       </div>
     </aside>
   );
@@ -2390,6 +2669,7 @@ const DesktopWorkbench = ({
           />
           {layout.insightCollapsed ? null : (
             <InsightPane
+              activeTool={activeTool}
               outline={output.outline}
               diagnostics={output.diagnostics}
               mode={mode}
