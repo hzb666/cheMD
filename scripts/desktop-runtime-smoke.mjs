@@ -380,11 +380,13 @@ const runTauriCommandRunnerProcess = ({
   runnerArgs,
   command,
   input,
+  runnerEnv = process.env,
   spawnProcess = spawn
 }) =>
   new Promise((resolve, reject) => {
     const child = spawnProcess(runnerPath, [...runnerArgs, command], {
-      stdio: ["pipe", "pipe", "pipe"]
+      stdio: ["pipe", "pipe", "pipe"],
+      env: runnerEnv
     });
     let stdout = "";
     let stderr = "";
@@ -420,8 +422,9 @@ export const createDesktopTauriCommandRunner = ({
     return undefined;
   }
   const runnerArgs = parseRunnerArgs(env[TAURI_COMMAND_RUNNER_ARGS_ENV]);
+  const runnerEnv = { ...process.env, ...env };
   return ({ command, input }) =>
-    runTauriCommandRunnerProcess({ runnerPath, runnerArgs, command, input, spawnProcess });
+    runTauriCommandRunnerProcess({ runnerPath, runnerArgs, command, input, runnerEnv, spawnProcess });
 };
 
 export const buildMinimalDesktopRuntimePersistencePayload = ({

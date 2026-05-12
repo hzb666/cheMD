@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import test from "node:test";
 
 import {
   buildMinimalDesktopRuntimePersistencePayload,
   checkDesktopRuntimePreconditions,
+  createDesktopTauriCommandRunner,
   discoverManagedPostgresBinaries,
   getPostgresDatabaseUrl,
   runDesktopOfflineLocalStoreSmoke,
@@ -350,6 +352,52 @@ test("runDesktopTauriCommandSmoke skips when no command runner is configured", a
   assert.equal(result.status, "skipped");
   assert.equal(result.reason, "unsupported-tauri-command-runner");
   assert.match(result.detail, /CHEMD_DESKTOP_TAURI_COMMAND_RUNNER/u);
+});
+
+test("createDesktopTauriCommandRunner passes smoke env to the runner process", async () => {
+  let spawnCall;
+  let stdinBody = "";
+  const runner = createDesktopTauriCommandRunner({
+    env: {
+      CHEMD_DESKTOP_TAURI_COMMAND_RUNNER: "runner.exe",
+      CHEMD_DESKTOP_TAURI_COMMAND_RUNNER_ARGS: "[\"--app\",\"desktop\"]",
+      CHEMD_POSTGRES_DATABASE_URL: "postgres://managed:secret@127.0.0.1:15432/chemd_desktop",
+      CHEMD_POSTGRES_SSL: "false"
+    },
+    spawnProcess: (command, args, options) => {
+      spawnCall = { command, args, options };
+      const child = new EventEmitter();
+      child.stdout = new EventEmitter();
+      child.stderr = new EventEmitter();
+      child.stdin = {
+        end(body) {
+          stdinBody = body;
+          queueMicrotask(() => {
+            child.stdout.emit("data", "{\"output\":{\"state\":\"ready\"}}");
+            child.emit("close", 0);
+          });
+        }
+      };
+      return child;
+    }
+  });
+
+  const result = await runner({
+    command: "read_postgres_status",
+    input: { includeSchema: true }
+  });
+
+  assert.equal(result.state, "ready");
+  assert.deepEqual(spawnCall.args, ["--app", "desktop", "read_postgres_status"]);
+  assert.equal(spawnCall.options.env.CHEMD_POSTGRES_SSL, "false");
+  assert.equal(
+    spawnCall.options.env.CHEMD_POSTGRES_DATABASE_URL,
+    "postgres://managed:secret@127.0.0.1:15432/chemd_desktop"
+  );
+  assert.deepEqual(JSON.parse(stdinBody), {
+    command: "read_postgres_status",
+    input: { includeSchema: true }
+  });
 });
 
 test("runDesktopTauriCommandSmoke fails with the command name and original error", async () => {
