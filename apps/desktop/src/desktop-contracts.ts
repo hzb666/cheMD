@@ -263,6 +263,7 @@ export interface LocalOutboxSyncResult extends LocalOutboxSyncSummary {
 export type LocalAuthoringCompileState = "compiled" | "failed" | "pending" | "skipped";
 export type LocalAuthoringStepState = "saved" | "compiled" | "pending" | "failed" | "skipped";
 export type LocalSyncDisplayState = "pending" | "synced" | "failed" | "skipped";
+export type WorkspaceIngestQueueStatus = "pending" | "running" | "synced" | "failed" | "skipped";
 
 export interface LocalAuthoringStepSummary {
   state: LocalAuthoringStepState;
@@ -301,6 +302,55 @@ export interface LocalAuthoringStatus {
   compiled: LocalAuthoringStepSummary;
   snapshot: LocalAuthoringStepSummary;
   sync: LocalOutboxDisplaySummary;
+}
+
+export interface WorkspaceIngestDocumentMetadata {
+  workspaceId: string;
+  documentPath: string;
+  documentHash: string;
+  documentId?: string;
+  revisionId?: string;
+  revisionHash?: string;
+  modifiedAtMs?: number | null;
+}
+
+export interface WorkspaceIngestQueueItem {
+  queueId: string;
+  idempotencyKey: string;
+  workspaceId: string;
+  documentId: string | null;
+  documentPath: string;
+  documentHash: string;
+  revisionHash: string;
+  snapshotHash: string;
+  graphSnapshotId: string | null;
+  status: WorkspaceIngestQueueStatus;
+  failureCount: number;
+  errorSummary: string | null;
+  runtimePayload?: PersistRuntimeGraphRagPayload;
+  metadata: RuntimeJsonObject;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorkspaceIngestQueueErrorSummary {
+  queueId: string;
+  documentPath: string;
+  status: WorkspaceIngestQueueStatus;
+  failureCount: number;
+  retryable: boolean;
+  errorSummary: string;
+}
+
+export interface WorkspaceIngestQueueSummary {
+  pendingCount: number;
+  runningCount: number;
+  syncedCount: number;
+  failedCount: number;
+  skippedCount: number;
+  retryableCount: number;
+  totalCount: number;
+  errors: WorkspaceIngestQueueErrorSummary[];
 }
 
 export interface DesktopCommandError {
