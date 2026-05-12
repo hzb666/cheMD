@@ -730,3 +730,14 @@ IDE/文档工作台，而不是 demo 面板集合。
   可复用逻辑”。
 - 组件化完成后通过 desktop typecheck、focused eslint、desktop build 和相关
   smoke/test。
+
+---
+
+## 9. Release readiness 聚合状态
+
+2026-05-13 追加发布前聚合入口：`pnpm desktop:release-readiness`。该命令只汇总
+Desktop runtime preconditions、offline release preflight 与 diagnostics bundle
+builder 的离线可验证项，并将 clean-machine installer smoke 与真实网络验证明确标记
+为 `skip/not-run`。
+
+说明见 `docs/desktop-ide/release-readiness.zh-CN.md`。
