@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 42
+- **Total Sessions**: 43
 - **Last Active**: 2026-05-12
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~64 | Active |
+| `journal-2.md` | ~131 | Active |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 43 | 2026-05-12 | Desktop IDE 第九轮离线本地优先 | `1249829`, `a52756f`, `024a746`, `02b7733`, `34d93f5`, `f84ca49`, `004ca0d`, `931243e`, `ebcf493`, `5adb8a6` | `desktop-ide` |
 | 42 | 2026-05-12 | Desktop IDE eighth wave PostgreSQL bundle staging | `6e27642`, `038221d` | `desktop-ide` |
 | 41 | 2026-05-12 | Desktop IDE seventh wave managed Postgres runtime | `a8b91c7`, `5212348`, `1d13c54`, `76dd784`, `074f513`, `fe1c121`, `c3a1e46` | `desktop-ide` |
 | 40 | 2026-05-12 | Desktop IDE sixth wave persistence loop | `97eaa18`, `b5bd1cf`, `bbba708`, `24e1016`, `6d45e69` | `desktop-ide` |
