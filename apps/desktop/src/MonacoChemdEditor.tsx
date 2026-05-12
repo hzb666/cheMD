@@ -4,7 +4,16 @@ import type { editor } from "monaco-editor";
 import * as monacoRuntime from "monaco-editor/esm/vs/editor/editor.api.js";
 import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 
-import { toMonacoLanguageServiceModel, type ChemdLanguageCompileOutput, type MonacoMarkerLike } from "@chemd/language-service";
+import {
+  toMonacoLanguageServiceModel,
+  type ChemdLanguageCompileOutput,
+  type MonacoMarkerLike
+} from "@chemd/language-service";
+import {
+  cleanupChemdCompletionOutput,
+  registerChemdCompletionProvider,
+  updateChemdCompletionOutput
+} from "./monaco-chemd-completion";
 
 export const CHEMD_LANGUAGE_ID = "chemd";
 
@@ -58,7 +67,7 @@ const toEditorMarker = (marker: MonacoMarkerLike): editor.IMarkerData => ({
   source: marker.source
 });
 
-const registerChemdLanguage = (monaco: Monaco): void => {
+const registerChemdLanguageMetadata = (monaco: Monaco): void => {
   const languageExists = monaco.languages
     .getLanguages()
     .some((language: { id: string }) => language.id === CHEMD_LANGUAGE_ID);
@@ -70,7 +79,9 @@ const registerChemdLanguage = (monaco: Monaco): void => {
       extensions: [".chemd", ".chemd.md"]
     });
   }
+};
 
+const configureChemdLanguage = (monaco: Monaco): void => {
   monaco.languages.setLanguageConfiguration(CHEMD_LANGUAGE_ID, {
     comments: { lineComment: "//" },
     brackets: [["{", "}"], ["[", "]"], ["(", ")"]],
@@ -82,7 +93,9 @@ const registerChemdLanguage = (monaco: Monaco): void => {
       { open: "'", close: "'" }
     ]
   });
+};
 
+const configureChemdTokens = (monaco: Monaco): void => {
   monaco.languages.setMonarchTokensProvider(CHEMD_LANGUAGE_ID, {
     defaultToken: "",
     tokenizer: {
@@ -101,7 +114,9 @@ const registerChemdLanguage = (monaco: Monaco): void => {
       ]
     }
   });
+};
 
+const defineChemdTheme = (monaco: Monaco): void => {
   monaco.editor.defineTheme(CHEMD_THEME_ID, {
     base: "vs",
     inherit: true,
@@ -126,6 +141,14 @@ const registerChemdLanguage = (monaco: Monaco): void => {
   });
 };
 
+const registerChemdLanguage = (monaco: Monaco): void => {
+  registerChemdLanguageMetadata(monaco);
+  configureChemdLanguage(monaco);
+  configureChemdTokens(monaco);
+  defineChemdTheme(monaco);
+  registerChemdCompletionProvider(monaco, CHEMD_LANGUAGE_ID);
+};
+
 export const MonacoChemdEditor = ({
   value,
   documentPath,
@@ -141,6 +164,13 @@ export const MonacoChemdEditor = ({
     [compileOutput]
   );
   const modelPath = useMemo(() => toModelPath(documentPath), [documentPath]);
+
+  useEffect(() => {
+    updateChemdCompletionOutput(modelPath, compileOutput);
+    return () => {
+      cleanupChemdCompletionOutput(modelPath, compileOutput);
+    };
+  }, [compileOutput, modelPath]);
 
   useEffect(() => {
     onSaveRef.current = onSave;
