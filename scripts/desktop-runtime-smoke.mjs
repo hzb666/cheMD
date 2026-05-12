@@ -28,6 +28,8 @@ const MANAGED_POSTGRES_DIR = "postgres";
 const MANAGED_POSTGRES_DATABASE = "chemd_desktop";
 const MANAGED_POSTGRES_USER = "chemd_desktop";
 const MANAGED_POSTGRES_OWNER = "chemd-desktop-managed-postgres-smoke/v1";
+const LOCAL_STORE_SNAPSHOT_FILE = "runtime-snapshot.json";
+const LOCAL_STORE_OUTBOX_FILE = "outbox.json";
 const RUNTIME_CREATED_AT = "2026-05-12T00:00:00.000Z";
 const RUNTIME_SOURCE = "---\nid: exp-desktop-runtime-smoke\ntitle: Desktop runtime smoke\ndate: 2026-05-12\n---\n\n:::chemd #rxn-runtime-smoke\nkind: reaction\nreactants: aldehyde\nproducts: alcohol\nyield: 72%\n:::\n";
 
@@ -352,6 +354,13 @@ export const loadDesktopRuntimeGraphModules = async () => {
   };
 };
 
+export const loadDesktopLocalStoreModules = async () => {
+  const localStore = await import("../apps/desktop/src/desktop-local-store.ts");
+  return {
+    buildLocalRuntimeSnapshotInput: localStore.buildLocalRuntimeSnapshotInput
+  };
+};
+
 export const buildMinimalDesktopRuntimePersistencePayload = ({
   revisionId = `rev-desktop-runtime-${Date.now()}`,
   createdAt = RUNTIME_CREATED_AT
@@ -387,7 +396,17 @@ export const buildMinimalDesktopRuntimePersistencePayload = ({
     agentRuns: [{ agentRunId, experimentId, revisionId, status: "completed", goal: "Verify desktop runtime persistence", startedAt: createdAt, finishedAt: createdAt }],
     agentToolCalls: [{ toolCallId: `${revisionId}::tool-call`, agentRunId, toolName: "desktop_runtime_smoke", input: { query: "runtime persistence" }, output: { rows: 1 }, status: "ok", createdAt }],
     patchProposals: [{ patchProposalId: `${revisionId}::patch`, agentRunId, experimentId, baseRevisionId: revisionId, patch: { edits: [] }, status: "validated", validationResult: { status: "ok" }, createdAt }],
-    metadata: { documentName: "desktop-runtime-smoke.chemd.md", documentUri: "chemd://desktop-runtime-smoke", sourceHash: "fnv1a:desktop-runtime-smoke", sourceText: RUNTIME_SOURCE },
+    metadata: {
+      workspaceId: "desktop-runtime-smoke-workspace",
+      documentId: "desktop-runtime-smoke-document",
+      documentPath: "experiments/desktop-runtime-smoke.chemd.md",
+      documentName: "desktop-runtime-smoke.chemd.md",
+      documentUri: "chemd://desktop-runtime-smoke",
+      revisionId,
+      graphSnapshotId,
+      sourceHash: "fnv1a:desktop-runtime-smoke",
+      sourceText: RUNTIME_SOURCE
+    },
     createdAt
   };
 };
@@ -494,6 +513,121 @@ export const runDesktopRuntimePersistenceSmoke = async ({
   };
 };
 
+const defaultOfflineLocalStoreRoot = () =>
+  path.join(os.tmpdir(), `chemd-desktop-offline-runtime-smoke-${process.pid}`, "local-store");
+
+const resolveOfflineLocalStoreRoot = ({ rootDir, env }) => {
+  const configured = safeTrim(env.CHEMD_DESKTOP_OFFLINE_SMOKE_DIR);
+  if (!configured) {
+    return defaultOfflineLocalStoreRoot();
+  }
+  return path.isAbsolute(configured) ? configured : path.resolve(rootDir, configured);
+};
+
+const readLocalOutboxFile = ({ outboxPath, fileExists, readTextFile }) => {
+  if (!fileExists(outboxPath)) {
+    return { entries: [] };
+  }
+  return JSON.parse(readTextFile(outboxPath, "utf8"));
+};
+
+const writePrettyJson = ({ filePath, value, makeDir, writeTextFile }) => {
+  const parent = path.dirname(filePath);
+  makeDir(parent, { recursive: true });
+  writeTextFile(filePath, `${JSON.stringify(value, null, 2)}\n`);
+};
+
+const upsertLocalOutboxEntry = ({ outbox, snapshotInput }) => {
+  const existing = outbox.entries.find((entry) => entry.idempotencyKey === snapshotInput.idempotencyKey);
+  if (existing) {
+    existing.payload = snapshotInput.payload;
+    existing.metadata = snapshotInput.metadata;
+    existing.syncStatus = "pending";
+    existing.failureCount = 0;
+    existing.lastError = null;
+    existing.updatedAt = snapshotInput.createdAt;
+    existing.syncedAt = null;
+    return existing;
+  }
+
+  const entry = {
+    ...snapshotInput,
+    syncStatus: "pending",
+    failureCount: 0,
+    lastError: null,
+    updatedAt: snapshotInput.createdAt,
+    syncedAt: null
+  };
+  outbox.entries.push(entry);
+  return entry;
+};
+
+const validateLocalSnapshotInput = (snapshotInput) => {
+  for (const field of ["localId", "idempotencyKey", "createdAt"]) {
+    if (typeof snapshotInput[field] !== "string" || snapshotInput[field].trim().length === 0) {
+      throw new Error(`Local offline snapshot is missing ${field}`);
+    }
+  }
+  if (!snapshotInput.payload || typeof snapshotInput.payload !== "object") {
+    throw new Error("Local offline snapshot payload must be an object");
+  }
+  if (!snapshotInput.metadata || typeof snapshotInput.metadata !== "object" || Array.isArray(snapshotInput.metadata)) {
+    throw new Error("Local offline snapshot metadata must be an object");
+  }
+};
+
+export const runDesktopOfflineLocalStoreSmoke = async ({
+  rootDir = REPO_ROOT,
+  env = process.env,
+  localStoreRoot = resolveOfflineLocalStoreRoot({ rootDir, env }),
+  localStoreModules = loadDesktopLocalStoreModules,
+  payloadBuilder = buildMinimalDesktopRuntimePersistencePayload,
+  fileExists = existsSync,
+  readTextFile = readFileSync,
+  writeTextFile = writeFileSync,
+  makeDir = mkdirSync
+} = {}) => {
+  const modules = await localStoreModules();
+  const payload = payloadBuilder({ revisionId: "rev-desktop-offline-runtime-smoke" });
+  const snapshotInput = modules.buildLocalRuntimeSnapshotInput(payload);
+  validateLocalSnapshotInput(snapshotInput);
+
+  const snapshotPath = path.join(localStoreRoot, LOCAL_STORE_SNAPSHOT_FILE);
+  const outboxPath = path.join(localStoreRoot, LOCAL_STORE_OUTBOX_FILE);
+  const outbox = readLocalOutboxFile({ outboxPath, fileExists, readTextFile });
+  const entry = upsertLocalOutboxEntry({ outbox, snapshotInput });
+  const snapshot = {
+    savedAt: entry.createdAt,
+    localId: entry.localId,
+    idempotencyKey: entry.idempotencyKey,
+    payload: entry.payload,
+    metadata: entry.metadata
+  };
+
+  writePrettyJson({ filePath: snapshotPath, value: snapshot, makeDir, writeTextFile });
+  writePrettyJson({ filePath: outboxPath, value: outbox, makeDir, writeTextFile });
+
+  const writtenOutbox = readLocalOutboxFile({ outboxPath, fileExists, readTextFile });
+  const pendingCount = writtenOutbox.entries.filter((writtenEntry) => writtenEntry.syncStatus === "pending").length;
+  const writtenEntry = writtenOutbox.entries.find((writtenEntry) => writtenEntry.idempotencyKey === snapshotInput.idempotencyKey);
+  if (!writtenEntry) {
+    throw new Error("Local offline outbox read-back failed");
+  }
+
+  return {
+    status: "offline-local-passed",
+    detail: "local offline smoke wrote a runtime snapshot and pending outbox entry; database persistence was not attempted",
+    storeRoot: localStoreRoot,
+    snapshotPath,
+    outboxPath,
+    localId: writtenEntry.localId,
+    idempotencyKey: writtenEntry.idempotencyKey,
+    graphSnapshotId: payload.graphSnapshot.graphSnapshotId,
+    experimentId: payload.graphSnapshot.experimentId,
+    outboxPendingCount: pendingCount
+  };
+};
+
 export const checkDesktopRuntimePreconditions = ({
   rootDir = REPO_ROOT,
   fileExists = existsSync,
@@ -534,6 +668,7 @@ export const runDesktopRuntimeSmoke = async ({
   postgresSmoke = runPostgresSmoke,
   persistenceSmoke = runDesktopRuntimePersistenceSmoke,
   managedPostgres = startManagedPostgresSmokeRuntime,
+  offlineLocalStoreSmoke = runDesktopOfflineLocalStoreSmoke,
   logger = console
 } = {}) => {
   logger.log("Chemd desktop runtime smoke starting.");
@@ -554,8 +689,22 @@ export const runDesktopRuntimeSmoke = async ({
   } else {
     const managed = await managedPostgres({ rootDir, env });
     if (managed.status !== "started") {
-      logger.log(`SKIP desktop runtime smoke: ${managed.reason}.`);
-      return { status: "skipped", reason: "missing-postgres-runtime", detail: managed.reason };
+      logger.log(`SKIP database persistence: ${managed.reason}.`);
+      const offline = await offlineLocalStoreSmoke({ rootDir, env });
+      logger.log("Chemd desktop local offline smoke passed.");
+      logger.log(`local offline store: ${offline.storeRoot}`);
+      logger.log(`local offline snapshot: ${offline.snapshotPath}`);
+      logger.log(`local offline outbox: ${offline.outboxPath}`);
+      logger.log(`local offline verification: pending=${offline.outboxPendingCount}, graph=${offline.graphSnapshotId}`);
+      return {
+        status: "offline-local-passed",
+        database: {
+          status: "skipped",
+          reason: "missing-postgres-runtime",
+          detail: managed.reason
+        },
+        offline
+      };
     }
     smokeEnv = managed.env;
     cleanupManagedPostgres = managed.cleanup;
