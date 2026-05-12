@@ -313,12 +313,16 @@ export interface WorkspaceFileContent {
   path: string;
   content: string;
   bytes: number;
+  contentHash: string;
+  modifiedAtMs: number | null;
   chemdKind?: "document" | "asset" | "unknown";
 }
 
 export interface WorkspaceWriteResult {
   path: string;
   bytes: number;
+  contentHash: string;
+  modifiedAtMs: number | null;
   chemdKind?: "document" | "asset" | "unknown";
 }
 
@@ -350,6 +354,7 @@ export interface DesktopCommandMap {
       rootPath?: string;
       path: string;
       content: string;
+      baseHash?: string;
     };
     output: WorkspaceWriteResult;
   };
