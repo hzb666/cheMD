@@ -948,11 +948,19 @@ proof surface without changing the local-document source of truth.
     `pnpm run test:scripts` 66/66, scripts ESLint, `pnpm desktop:diagnostics-bundle`,
     `pnpm --filter @chemd/desktop typecheck`, and `git diff --check`.
 
-- Blocked branch, not merged:
-  - `desktop-ide-workspace-ingest-ui` has a working UI implementation, but
-    focused ESLint reports complexity/max-lines errors in `LocalStorePanel`.
-  - Project rules require user confirmation before changing complexity lint
-    failures, so this branch remains isolated until approved.
+- `desktop-ide-workspace-ingest-ui` merged through
+  `feat(desktop)：合并 workspace ingest UI`.
+  - Added a Local Store panel action to scan the current workspace through the
+    existing workspace file list, `read_workspace_file`, and language-service
+    compile path.
+  - The first UI version builds an in-memory ingest queue and displays
+    total/pending/skipped/failed/retryable counts plus bounded failure rows.
+  - Main branch validation passed: desktop workspace ingest/local-store Vitest
+    19/19, `pnpm --filter @chemd/desktop typecheck`,
+    `pnpm --filter @chemd/desktop build`, and `git diff --check`.
+  - Focused ESLint still reports `LocalStorePanel` complexity/max-lines errors;
+    per user direction this is recorded as M11 UI componentization/complexity
+    debt and no longer blocks current productization flow.
 
 ## User Offline-First Docs Branch Record
 

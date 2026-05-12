@@ -394,13 +394,22 @@ DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outb
   - 文档覆盖首次离线启动、workspace、编辑/保存/编译/preview/diagnostics、本地
     snapshot/outbox、PostgreSQL/JDBC 配置、同步失败恢复、diagnostics bundle 与
     clean-machine smoke / `SKIP` 解释。
+- Workspace ingest UI：
+  - `feat(desktop)：合并 workspace ingest UI` 将 workspace ingest 扫描入口接入
+    Local Store 面板。
+  - UI 使用现有 workspace 文件列表、`read_workspace_file` 和 language-service compile
+    生成内存 ingest queue，展示 total/pending/skipped/failed/retryable 摘要与失败项。
+  - 主分支验证：workspace ingest/local-store Vitest 19/19、desktop typecheck、
+    desktop build、`git diff --check` 通过。
+  - Focused ESLint 仍有 `LocalStorePanel` 复杂度与函数长度两项错误；按用户要求暂不
+    阻塞产品化主线，归入最终 M11 UI 组件化与复杂度治理。
 
-等待确认后合并：
+当前暂缓债务：
 
-- Workspace ingest UI 已在独立工作树实现，但 focused ESLint 触发复杂度门禁：
+- Workspace ingest UI 已合并，但 focused ESLint 复杂度门禁尚未清零：
   `LocalStorePanel` 超过 `max-lines-per-function` 与 complexity 限制。
-- 按仓库规则，复杂度类修复需用户确认后再拆出非纯透传的 `WorkspaceIngestPanel`。
-- 该工作树暂不合并，避免把 lint failure 带入 `desktop-ide`。
+- 最终 M11 阶段需要拆出有职责的 `WorkspaceIngestPanel`/hook，不能只靠纯 props
+  转发组件搬移复杂度。
 
 ### M4：本地 workspace ingest 与可恢复队列
 
@@ -414,7 +423,9 @@ DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outb
 - 失败重试、取消、继续运行。
 - 文档 hash、source range、compile result hash 和 outbox payload 一一对应。
 
-状态：已补纯 TypeScript workspace ingest runner，可通过依赖注入组合文件列表、读取与 compile，并输出可恢复队列结果。
+状态：已补纯 TypeScript workspace ingest runner，并已在桌面 Local Store 面板接入
+workspace 扫描入口；当前先生成内存 ingest queue 与摘要，后续仍需接入本地 outbox
+幂等执行、取消/重试和大 workspace 后台调度。
 
 验收：
 
