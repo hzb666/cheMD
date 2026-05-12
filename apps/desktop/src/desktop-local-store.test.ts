@@ -10,6 +10,7 @@ import type {
 } from "./desktop-contracts";
 import {
   buildLocalRuntimeSnapshotInput,
+  deriveLocalAuthoringStatus,
   localStoreCommandNames
 } from "./desktop-local-store";
 
@@ -51,6 +52,22 @@ const buildPayload = (
     graphSnapshotId
   },
   createdAt
+});
+
+const buildOutboxEntry = (
+  syncStatus: LocalOutboxSyncStatus,
+  overrides: Partial<LocalOutboxEntry> = {}
+): LocalOutboxEntry => ({
+  ...buildLocalRuntimeSnapshotInput(buildPayload(
+    `rev-${syncStatus}`,
+    `snapshot-${syncStatus}`
+  )),
+  syncStatus,
+  failureCount: syncStatus === "failed" ? 1 : 0,
+  lastError: null,
+  updatedAt: createdAt,
+  syncedAt: syncStatus === "synced" ? createdAt : null,
+  ...overrides
 });
 
 describe("desktop local store contract builder", () => {
@@ -173,5 +190,96 @@ describe("desktop local store contract builder", () => {
     });
     expect(typedResult.target.kind).toBe("external");
     expect(typedResult.syncedCount).toBe(1);
+  });
+
+  it("derives authoring status with pending, synced, failed, and skipped sync counts", () => {
+    const status = deriveLocalAuthoringStatus({
+      documentSaved: true,
+      documentSavedAt: createdAt,
+      compileState: "compiled",
+      compiledAt: createdAt,
+      snapshotResult: {
+        localId: "local-runtime-snapshot:workspace:revision:snapshot",
+        idempotencyKey: "local-runtime-snapshot:fnv1a:12345678",
+        syncStatus: "pending",
+        createdAt,
+        outboxPendingCount: 1
+      },
+      outboxEntries: [
+        buildOutboxEntry("pending"),
+        buildOutboxEntry("synced"),
+        buildOutboxEntry("failed")
+      ],
+      syncResult: {
+        syncedCount: 1,
+        failedCount: 1,
+        skippedCount: 2,
+        entries: []
+      }
+    });
+
+    expect(status.saved.state).toBe("saved");
+    expect(status.compiled.state).toBe("compiled");
+    expect(status.snapshot.state).toBe("saved");
+    expect(status.sync).toMatchObject({
+      state: "failed",
+      pendingCount: 1,
+      syncedCount: 1,
+      failedCount: 1,
+      skippedCount: 2,
+      retryableCount: 2,
+      totalCount: 5
+    });
+  });
+
+  it("redacts and bounds local display error summaries", () => {
+    const status = deriveLocalAuthoringStatus({
+      compileState: "failed",
+      compileError: "DATABASE_URL=postgres://user:secret@localhost:5432/chemd token=abc123 failed with a very long message",
+      snapshotError: "password=hunter2 snapshot failed",
+      outboxEntries: [
+        buildOutboxEntry("failed", {
+          lastError: "postgresql://chemd:secret@127.0.0.1:5432/chemd api_key=sk-test failed because the target is down"
+        })
+      ]
+    }, { maxErrorLength: 80 });
+
+    expect(status.compiled.error).toContain("DATABASE_URL=[redacted]");
+    expect(status.compiled.error).toContain("token=[redacted]");
+    expect(status.compiled.error).not.toContain("secret@localhost");
+    expect(status.snapshot.error).toBe("password=[redacted] snapshot failed");
+    expect(status.sync.lastError).toContain("[redacted database url]");
+    expect(status.sync.lastError).toContain("api_key=[redacted]");
+    expect(status.sync.lastError?.length).toBeLessThanOrEqual(80);
+  });
+
+  it("treats unavailable database sync as queued or skipped local state, not failure", () => {
+    const pendingStatus = deriveLocalAuthoringStatus({
+      localStoreStatus: {
+        state: "offline",
+        label: "Offline local store",
+        detail: "Postgres is unavailable; local queue remains durable.",
+        available: true,
+        storagePath: "C:/tmp/chemd-local-store",
+        outboxPendingCount: 1,
+        outboxFailedCount: 0,
+        lastSavedAt: createdAt,
+        lastSyncedAt: null
+      },
+      databaseAvailable: false,
+      syncUnavailableReason: "Postgres is not configured"
+    });
+
+    expect(pendingStatus.sync.state).toBe("pending");
+    expect(pendingStatus.sync.failedCount).toBe(0);
+    expect(pendingStatus.sync.message).toContain("queued locally");
+
+    const skippedStatus = deriveLocalAuthoringStatus({
+      databaseAvailable: false,
+      syncUnavailableReason: "Postgres is not configured"
+    });
+
+    expect(skippedStatus.sync.state).toBe("skipped");
+    expect(skippedStatus.sync.failedCount).toBe(0);
   });
 });

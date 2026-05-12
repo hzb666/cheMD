@@ -260,6 +260,49 @@ export interface LocalOutboxSyncResult extends LocalOutboxSyncSummary {
   target: LocalOutboxSyncTargetSummary;
 }
 
+export type LocalAuthoringCompileState = "compiled" | "failed" | "pending" | "skipped";
+export type LocalAuthoringStepState = "saved" | "compiled" | "pending" | "failed" | "skipped";
+export type LocalSyncDisplayState = "pending" | "synced" | "failed" | "skipped";
+
+export interface LocalAuthoringStepSummary {
+  state: LocalAuthoringStepState;
+  label: string;
+  detail: string;
+  at: string | null;
+  error: string | null;
+}
+
+export interface LocalOutboxDisplayEntry {
+  localId: string;
+  idempotencyKey: string;
+  syncStatus: LocalOutboxSyncStatus;
+  graphSnapshotId: string | null;
+  failureCount: number;
+  canRetry: boolean;
+  error: string | null;
+}
+
+export interface LocalOutboxDisplaySummary {
+  state: LocalSyncDisplayState;
+  pendingCount: number;
+  syncedCount: number;
+  failedCount: number;
+  skippedCount: number;
+  retryableCount: number;
+  totalCount: number;
+  databaseAvailable: boolean;
+  message: string;
+  lastError: string | null;
+  entries: LocalOutboxDisplayEntry[];
+}
+
+export interface LocalAuthoringStatus {
+  saved: LocalAuthoringStepSummary;
+  compiled: LocalAuthoringStepSummary;
+  snapshot: LocalAuthoringStepSummary;
+  sync: LocalOutboxDisplaySummary;
+}
+
 export interface DesktopCommandError {
   code: string;
   message: string;
