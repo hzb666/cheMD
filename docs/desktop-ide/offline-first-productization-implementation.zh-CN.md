@@ -165,6 +165,7 @@ pnpm --filter @chemd/desktop build
 验证：
 
 ```sh
+pnpm desktop:offline-core-smoke
 pnpm test:scripts
 pnpm desktop:runtime-smoke
 ```
@@ -173,8 +174,13 @@ pnpm desktop:runtime-smoke
 
 ```text
 SKIP database persistence: ...
-Chemd desktop local offline smoke passed.
+Chemd desktop offline core smoke passed.
 ```
+
+`desktop:offline-core-smoke` 是 M1/M3 的 P0 离线核心验收入口。它刻意禁用
+外部 DB env 与 managed PostgreSQL env，只证明本地 snapshot/outbox 可以在无
+DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outbox；它
+不等同于 PostgreSQL shared schema 持久化通过。
 
 ### M4：本地 workspace ingest 与可恢复队列
 
@@ -331,6 +337,13 @@ pnpm --filter @chemd/desktop tauri:build
 - [ ] Monaco diagnostics、preview 与 Problems panel 可离线使用。
 - [ ] 本地 snapshot/outbox 可生成，pending sync 状态可见。
 - [ ] PostgreSQL 不可用只降级知识同步，不阻塞编辑。
+
+当前验证入口：
+
+- `pnpm desktop:offline-core-smoke`：P0 Offline Core smoke，验证本地
+  snapshot/outbox 与 pending count，不接入 PostgreSQL。
+- `pnpm desktop:runtime-smoke`：综合 runtime smoke；无 DB/无 managed
+  binaries 时应先输出 database persistence `SKIP`，再输出 Offline Core PASS。
 
 ### P1：本地知识队列生产可用
 

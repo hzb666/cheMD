@@ -13,6 +13,7 @@
     "postgres:smoke": "node scripts/postgres-smoke.mjs",
     "desktop:postgres:bundle": "node scripts/desktop-postgres-bundle.mjs",
     "desktop:postgres:verify": "node scripts/desktop-postgres-bundle.mjs --verify",
+    "desktop:offline-core-smoke": "node scripts/desktop-offline-core-smoke.mjs",
     "desktop:runtime-smoke": "node scripts/desktop-runtime-smoke.mjs",
     "lint": "eslint apps packages scripts eslint.config.mjs vitest.workspace.ts --ext .ts,.tsx,.js,.mjs,.cjs",
     "lint:fix": "eslint apps packages scripts eslint.config.mjs vitest.workspace.ts --ext .ts,.tsx,.js,.mjs,.cjs --fix",
@@ -20,7 +21,7 @@
     "format:check:py": "cd services/chem-service && poetry run ruff format --check app.py chem_service tests",
     "test:dev-demo": "node --test scripts/dev-demo.test.mjs",
     "test:legacy-surface": "node --test scripts/legacy-surface-tools.test.mjs",
-    "test:scripts": "node --test scripts/dev-demo.test.mjs scripts/legacy-surface-tools.test.mjs scripts/postgres-tools.test.mjs scripts/desktop-runtime-smoke.test.mjs scripts/desktop-postgres-bundle.test.mjs",
+    "test:scripts": "node --test scripts/dev-demo.test.mjs scripts/legacy-surface-tools.test.mjs scripts/postgres-tools.test.mjs scripts/desktop-runtime-smoke.test.mjs scripts/desktop-offline-core-smoke.test.mjs scripts/desktop-postgres-bundle.test.mjs",
     "test:py": "cd services/chem-service && poetry run python -m unittest discover tests",
     "test": "turbo run test && pnpm run test:scripts && pnpm run test:py",
     "typecheck": "turbo run typecheck"

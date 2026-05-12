@@ -830,6 +830,84 @@ export const runDesktopOfflineLocalStoreSmoke = async ({
   };
 };
 
+const OFFLINE_CORE_SKIPPED_DATABASE_DETAIL =
+  "Offline Core smoke runs with database and managed PostgreSQL env disabled";
+
+export const createOfflineCoreSmokeEnv = (env = process.env) => {
+  const {
+    CHEMD_POSTGRES_DATABASE_URL,
+    DATABASE_URL,
+    CHEMD_MANAGED_POSTGRES_BIN_DIR,
+    CHEMD_MANAGED_POSTGRES_RESOURCE_DIR,
+    CHEMD_MANAGED_POSTGRES_HOME,
+    ...offlineEnv
+  } = env;
+  return offlineEnv;
+};
+
+export const validateDesktopOfflineCoreSmokeResult = ({
+  offline,
+  fileExists = existsSync
+}) => {
+  if (!offline || offline.status !== "offline-local-passed") {
+    throw new Error(`Offline Core smoke expected local offline pass, got ${offline?.status ?? "missing"}`);
+  }
+  if (!fileExists(offline.snapshotPath)) {
+    throw new Error(`Offline Core smoke did not write snapshot file: ${offline.snapshotPath}`);
+  }
+  if (!fileExists(offline.outboxPath)) {
+    throw new Error(`Offline Core smoke did not write outbox file: ${offline.outboxPath}`);
+  }
+  if (Number(offline.outboxPendingCount) <= 0) {
+    throw new Error(`Offline Core smoke expected pending outbox entries, got ${offline.outboxPendingCount}`);
+  }
+};
+
+const offlineCoreDatabaseSkip = () => ({
+  status: "skipped",
+  reason: "offline-core-no-postgres-runtime",
+  detail: OFFLINE_CORE_SKIPPED_DATABASE_DETAIL
+});
+
+export const logDesktopOfflineCoreSuccess = ({ logger, offline }) => {
+  logger.log("Chemd desktop offline core smoke passed.");
+  logger.log(`offline core store: ${offline.storeRoot}`);
+  logger.log(`offline core snapshot: ${offline.snapshotPath}`);
+  logger.log(`offline core outbox: ${offline.outboxPath}`);
+  logger.log(`offline core verification: pending=${offline.outboxPendingCount}, graph=${offline.graphSnapshotId}`);
+};
+
+export const runDesktopOfflineCoreSmoke = async ({
+  rootDir = REPO_ROOT,
+  envLoader = loadPostgresEnv,
+  desktopCheck = checkDesktopRuntimePreconditions,
+  offlineLocalStoreSmoke = runDesktopOfflineLocalStoreSmoke,
+  fileExists = existsSync,
+  logger = console
+} = {}) => {
+  logger.log("Chemd desktop offline core smoke starting.");
+  const { env, loadedFiles } = envLoader({ rootDir });
+  logger.log(`Loaded env files: ${formatLoadedEnvFiles(loadedFiles)}`);
+
+  const desktop = desktopCheck({ rootDir });
+  logDesktopChecks(logger, desktop.checks);
+  if (!desktop.ok) {
+    throw new Error("Desktop offline core preflight failed.");
+  }
+
+  const offlineEnv = createOfflineCoreSmokeEnv(env);
+  logger.log(`SKIP database persistence: ${OFFLINE_CORE_SKIPPED_DATABASE_DETAIL}.`);
+  const offline = await offlineLocalStoreSmoke({ rootDir, env: offlineEnv });
+  validateDesktopOfflineCoreSmokeResult({ offline, fileExists });
+  logDesktopOfflineCoreSuccess({ logger, offline });
+
+  return {
+    status: "offline-core-passed",
+    database: offlineCoreDatabaseSkip(),
+    offline
+  };
+};
+
 export const runDesktopReconnectOutboxSyncSmoke = async ({
   client,
   rootDir = REPO_ROOT,
@@ -1088,13 +1166,9 @@ const logDesktopChecks = (logger, checks) => {
 const runOfflineDesktopRuntimeSmoke = async ({ rootDir, env, managed, offlineLocalStoreSmoke, logger }) => {
   logger.log(`SKIP database persistence: ${managed.reason}.`);
   const offline = await offlineLocalStoreSmoke({ rootDir, env });
-  logger.log("Chemd desktop local offline smoke passed.");
-  logger.log(`local offline store: ${offline.storeRoot}`);
-  logger.log(`local offline snapshot: ${offline.snapshotPath}`);
-  logger.log(`local offline outbox: ${offline.outboxPath}`);
-  logger.log(`local offline verification: pending=${offline.outboxPendingCount}, graph=${offline.graphSnapshotId}`);
+  logDesktopOfflineCoreSuccess({ logger, offline });
   return {
-    status: "offline-local-passed",
+    status: "offline-core-passed",
     database: {
       status: "skipped",
       reason: "missing-postgres-runtime",

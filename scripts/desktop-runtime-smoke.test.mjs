@@ -176,7 +176,7 @@ test("runDesktopRuntimeSmoke skips without external env or managed binaries", as
 
   assert.deepEqual(calls, ["env-loader", "desktop-check", "managed-postgres", "offline-local-store"]);
   assert.deepEqual(result, {
-    status: "offline-local-passed",
+    status: "offline-core-passed",
     database: {
       status: "skipped",
       reason: "missing-postgres-runtime",
@@ -195,7 +195,7 @@ test("runDesktopRuntimeSmoke skips without external env or managed binaries", as
     }
   });
   assert.match(logger.lines.join("\n"), /SKIP database persistence/u);
-  assert.match(logger.lines.join("\n"), /Chemd desktop local offline smoke passed/u);
+  assert.match(logger.lines.join("\n"), /Chemd desktop offline core smoke passed/u);
 });
 
 test("buildMinimalDesktopRuntimePersistencePayload mirrors Tauri command payload shape", () => {
