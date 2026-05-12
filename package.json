@@ -14,6 +14,7 @@
     "desktop:postgres:bundle": "node scripts/desktop-postgres-bundle.mjs",
     "desktop:postgres:verify": "node scripts/desktop-postgres-bundle.mjs --verify",
     "desktop:offline-core-smoke": "node scripts/desktop-offline-core-smoke.mjs",
+    "desktop:installer-offline-smoke": "node scripts/desktop-offline-release-smoke.mjs",
     "desktop:offline-release-smoke": "node scripts/desktop-offline-release-smoke.mjs",
     "desktop:runtime-smoke": "node scripts/desktop-runtime-smoke.mjs",
     "lint": "eslint apps packages scripts eslint.config.mjs vitest.workspace.ts --ext .ts,.tsx,.js,.mjs,.cjs",

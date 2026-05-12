@@ -44,6 +44,40 @@ const createPassingDesktopCheck = (calls) => () => {
   };
 };
 
+const createInstallerArtifacts = ({
+  releaseExeSize = 1024,
+  msiSize = 2048,
+  nsisSize = 4096
+} = {}) => () => ({
+  releaseExe:
+    releaseExeSize === null
+      ? undefined
+      : {
+          path: "D:\\repo\\apps\\desktop\\src-tauri\\target\\release\\chemd-desktop.exe",
+          size: releaseExeSize
+        },
+  msiInstallers:
+    msiSize === null
+      ? []
+      : [
+          {
+            path:
+              "D:\\repo\\apps\\desktop\\src-tauri\\target\\release\\bundle\\msi\\Chemd Desktop IDE_0.1.0_x64_en-US.msi",
+            size: msiSize
+          }
+        ],
+  nsisInstallers:
+    nsisSize === null
+      ? []
+      : [
+          {
+            path:
+              "D:\\repo\\apps\\desktop\\src-tauri\\target\\release\\bundle\\nsis\\Chemd Desktop IDE_0.1.0_x64-setup.exe",
+            size: nsisSize
+          }
+        ]
+});
+
 test("getPostgresDatabaseUrl prefers Chemd env and falls back to DATABASE_URL", () => {
   assert.equal(
     getPostgresDatabaseUrl({
@@ -143,15 +177,90 @@ test("checkDesktopOfflineReleaseSmokePreflight passes when dist exists and relea
     rootDir: "D:\\repo",
     fileExists: (filePath) => files.has(filePath),
     readTextFile: (filePath) => files.get(filePath),
+    artifactFinder: createInstallerArtifacts(),
     processLister: async () => ({ status: "passed", processes: [] })
   });
 
   assert.equal(result.status, "passed");
-  assert.equal(result.reason, "release-offline-smoke-preflight-ready");
+  assert.equal(result.reason, "installer-offline-smoke-artifact-preflight-ready");
   assert.equal(result.blockingProcesses.length, 0);
   assert.equal(
     result.checks.find((check) => check.name === "release exe lock")?.status,
     "pass"
+  );
+  assert.equal(
+    result.checks.find((check) => check.name === "MSI installer artifact")?.status,
+    "pass"
+  );
+  assert.equal(
+    result.checks.find((check) => check.name === "NSIS installer artifact")?.status,
+    "pass"
+  );
+});
+
+test("checkDesktopOfflineReleaseSmokePreflight skips when installer artifacts are missing", async () => {
+  const files = new Map([
+    [
+      "D:\\repo\\apps\\desktop\\package.json",
+      JSON.stringify({
+        scripts: {
+          build: "vite build",
+          typecheck: "tsc",
+          "tauri:build": "tauri build"
+        }
+      })
+    ],
+    ["D:\\repo\\apps\\desktop\\dist\\index.html", "<!doctype html>"]
+  ]);
+
+  const result = await checkDesktopOfflineReleaseSmokePreflight({
+    rootDir: "D:\\repo",
+    fileExists: (filePath) => files.has(filePath),
+    readTextFile: (filePath) => files.get(filePath),
+    artifactFinder: createInstallerArtifacts({ msiSize: null, nsisSize: null }),
+    processLister: async () => ({ status: "passed", processes: [] })
+  });
+
+  assert.equal(result.status, "skipped");
+  assert.equal(result.reason, "release-artifacts-missing");
+  assert.equal(
+    result.checks.find((check) => check.name === "MSI installer artifact")?.status,
+    "skip"
+  );
+  assert.equal(
+    result.checks.find((check) => check.name === "NSIS installer artifact")?.status,
+    "skip"
+  );
+});
+
+test("checkDesktopOfflineReleaseSmokePreflight blocks empty installer artifacts", async () => {
+  const files = new Map([
+    [
+      "D:\\repo\\apps\\desktop\\package.json",
+      JSON.stringify({
+        scripts: {
+          build: "vite build",
+          typecheck: "tsc",
+          "tauri:build": "tauri build"
+        }
+      })
+    ],
+    ["D:\\repo\\apps\\desktop\\dist\\index.html", "<!doctype html>"]
+  ]);
+
+  const result = await checkDesktopOfflineReleaseSmokePreflight({
+    rootDir: "D:\\repo",
+    fileExists: (filePath) => files.has(filePath),
+    readTextFile: (filePath) => files.get(filePath),
+    artifactFinder: createInstallerArtifacts({ msiSize: 0 }),
+    processLister: async () => ({ status: "passed", processes: [] })
+  });
+
+  assert.equal(result.status, "blocked");
+  assert.equal(result.reason, "release-artifact-empty");
+  assert.equal(
+    result.checks.find((check) => check.name === "MSI installer artifact")?.status,
+    "blocked"
   );
 });
 
@@ -196,7 +305,7 @@ test("checkDesktopOfflineReleaseSmokePreflight blocks when target release exe is
   assert.equal(result.reason, "release-exe-running");
   assert.equal(result.blockingProcesses[0].pid, 4242);
   assert.equal(exitCode, 2);
-  assert.match(logger.lines.join("\n"), /BLOCKED release Offline Core smoke preflight/u);
+  assert.match(logger.lines.join("\n"), /BLOCKED installer Offline Core artifact preflight/u);
   assert.match(logger.lines.join("\n"), /PID 4242/u);
   assert.match(logger.lines.join("\n"), /Close the listed Chemd Desktop process/u);
 });
@@ -219,6 +328,7 @@ test("checkDesktopOfflineReleaseSmokePreflight reports release exe lock before d
     rootDir: "D:\\repo",
     fileExists: (filePath) => files.has(filePath),
     readTextFile: (filePath) => files.get(filePath),
+    artifactFinder: createInstallerArtifacts(),
     processLister: async () => ({
       status: "passed",
       processes: [
@@ -258,6 +368,7 @@ test("checkDesktopOfflineReleaseSmokePreflight ignores same process name at anot
     rootDir: "D:\\repo",
     fileExists: (filePath) => files.has(filePath),
     readTextFile: (filePath) => files.get(filePath),
+    artifactFinder: createInstallerArtifacts(),
     processLister: async () => ({
       status: "passed",
       processes: [

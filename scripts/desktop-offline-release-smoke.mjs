@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execFile as execFileCallback } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
@@ -21,7 +21,27 @@ const RELEASE_EXE_PATH = path.join(
   "release",
   "chemd-desktop.exe"
 );
+const RELEASE_BUNDLE_DIR = path.join("apps", "desktop", "src-tauri", "target", "release", "bundle");
+const MSI_BUNDLE_DIR = path.join(RELEASE_BUNDLE_DIR, "msi");
+const NSIS_BUNDLE_DIR = path.join(RELEASE_BUNDLE_DIR, "nsis");
 const REQUIRED_DESKTOP_SCRIPTS = ["build", "typecheck", "tauri:build"];
+const INSTALLER_ARTIFACT_CHECKS = [
+  {
+    name: "release exe artifact",
+    key: "releaseExe",
+    missing: `${RELEASE_EXE_PATH} missing; run pnpm --filter @chemd/desktop tauri:build first`
+  },
+  {
+    name: "MSI installer artifact",
+    key: "msiInstallers",
+    missing: `${MSI_BUNDLE_DIR} has no .msi installer; run pnpm --filter @chemd/desktop tauri:build first`
+  },
+  {
+    name: "NSIS installer artifact",
+    key: "nsisInstallers",
+    missing: `${NSIS_BUNDLE_DIR} has no .exe installer; run pnpm --filter @chemd/desktop tauri:build first`
+  }
+];
 
 const readJsonFile = ({ rootDir, relativePath, readTextFile }) =>
   JSON.parse(readTextFile(path.resolve(rootDir, relativePath), "utf8"));
@@ -41,6 +61,44 @@ const normalizePathForCompare = (filePath) => {
 
 const isSamePath = (left, right) =>
   normalizePathForCompare(left) === normalizePathForCompare(right);
+
+const statArtifact = (filePath, statFile) => {
+  try {
+    const stat = statFile(filePath);
+    if (typeof stat.isFile === "function" && !stat.isFile()) {
+      return undefined;
+    }
+    return { path: filePath, size: Number(stat.size ?? 0) };
+  } catch {
+    return undefined;
+  }
+};
+
+const findBundleArtifacts = ({ rootDir, relativeDir, extension, readDir, statFile }) => {
+  const directoryPath = path.resolve(rootDir, relativeDir);
+  let entries;
+  try {
+    entries = readDir(directoryPath, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  return entries
+    .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(extension))
+    .map((entry) => statArtifact(path.join(directoryPath, entry.name), statFile))
+    .filter(Boolean)
+    .sort((left, right) => left.path.localeCompare(right.path));
+};
+
+export const discoverDesktopInstallerArtifacts = ({
+  rootDir = REPO_ROOT,
+  readDir = readdirSync,
+  statFile = statSync
+} = {}) => ({
+  releaseExe: statArtifact(path.resolve(rootDir, RELEASE_EXE_PATH), statFile),
+  msiInstallers: findBundleArtifacts({ rootDir, relativeDir: MSI_BUNDLE_DIR, extension: ".msi", readDir, statFile }),
+  nsisInstallers: findBundleArtifacts({ rootDir, relativeDir: NSIS_BUNDLE_DIR, extension: ".exe", readDir, statFile })
+});
 
 const normalizeProcessRows = (raw) => {
   if (!raw || /^\s*null\s*$/u.test(raw)) {
@@ -118,6 +176,48 @@ const checkDesktopDist = ({ checks, rootDir, fileExists }) => {
   return available;
 };
 
+const addArtifactCheck = ({ checks, name, artifacts, missingDetail }) => {
+  if (artifacts.length === 0) {
+    addCheck(checks, name, "skip", missingDetail);
+    return "skipped";
+  }
+
+  const emptyArtifacts = artifacts.filter((artifact) => artifact.size <= 0);
+  if (emptyArtifacts.length > 0) {
+    addCheck(
+      checks,
+      name,
+      "blocked",
+      `empty artifact(s): ${emptyArtifacts.map((artifact) => artifact.path).join(", ")}`
+    );
+    return "blocked";
+  }
+
+  addCheck(checks, name, "pass", artifacts.map((artifact) => `${artifact.path} (${artifact.size} bytes)`).join("; "));
+  return "passed";
+};
+
+const checkInstallerArtifacts = ({ checks, rootDir, artifactFinder }) => {
+  const artifacts = artifactFinder({ rootDir });
+  const statuses = INSTALLER_ARTIFACT_CHECKS.map((check) =>
+    addArtifactCheck({
+      checks,
+      name: check.name,
+      artifacts: Array.isArray(artifacts[check.key]) ? artifacts[check.key] : [artifacts[check.key]].filter(Boolean),
+      missingDetail: check.missing
+    })
+  );
+
+  if (statuses.includes("blocked")) {
+    return { status: "blocked", reason: "release-artifact-empty" };
+  }
+  if (statuses.includes("skipped")) {
+    return { status: "skipped", reason: "release-artifacts-missing" };
+  }
+
+  return { status: "passed", reason: "installer-artifacts-ready" };
+};
+
 const findReleaseExeLocks = ({ processes, releaseExePath }) =>
   processes.filter((row) => isSamePath(row.executablePath, releaseExePath));
 
@@ -125,6 +225,7 @@ export const checkDesktopOfflineReleaseSmokePreflight = async ({
   rootDir = REPO_ROOT,
   fileExists = existsSync,
   readTextFile = readFileSync,
+  artifactFinder = discoverDesktopInstallerArtifacts,
   processLister = listWindowsChemdDesktopProcesses
 } = {}) => {
   const checks = [];
@@ -172,10 +273,31 @@ export const checkDesktopOfflineReleaseSmokePreflight = async ({
     addCheck(checks, "release exe lock", "skip", processResult.reason);
   }
 
+  const artifactResult = checkInstallerArtifacts({ checks, rootDir, artifactFinder });
+  if (artifactResult.status === "blocked") {
+    return {
+      status: "blocked",
+      reason: artifactResult.reason,
+      releaseExePath,
+      checks,
+      blockingProcesses: []
+    };
+  }
+
   if (!hasDist) {
     return {
       status: "skipped",
       reason: "desktop-dist-missing",
+      releaseExePath,
+      checks,
+      blockingProcesses: []
+    };
+  }
+
+  if (artifactResult.status === "skipped") {
+    return {
+      status: "skipped",
+      reason: artifactResult.reason,
       releaseExePath,
       checks,
       blockingProcesses: []
@@ -195,7 +317,7 @@ export const checkDesktopOfflineReleaseSmokePreflight = async ({
 
   return {
     status: "passed",
-    reason: "release-offline-smoke-preflight-ready",
+    reason: "installer-offline-smoke-artifact-preflight-ready",
     releaseExePath,
     checks,
     blockingProcesses: []
@@ -203,19 +325,19 @@ export const checkDesktopOfflineReleaseSmokePreflight = async ({
 };
 
 const logPreflightResult = ({ logger, result }) => {
-  logger.log("Chemd desktop release Offline Core smoke preflight.");
+  logger.log("Chemd desktop installer Offline Core smoke artifact preflight.");
   for (const check of result.checks) {
     logger.log(`[${check.status.toUpperCase()}] ${check.name}: ${check.detail}`);
   }
 
   if (result.status === "passed") {
-    logger.log("PASS release Offline Core smoke preflight.");
-    logger.log("Next: run pnpm --filter @chemd/desktop tauri:build, then installer Offline Core smoke.");
+    logger.log("PASS installer Offline Core artifact preflight.");
+    logger.log("Boundary: this does not install the app or prove clean-machine Offline Core behavior.");
     return;
   }
 
   if (result.status === "blocked") {
-    logger.log(`BLOCKED release Offline Core smoke preflight: ${result.reason}.`);
+    logger.log(`BLOCKED installer Offline Core artifact preflight: ${result.reason}.`);
     if (result.reason === "release-exe-running") {
       logger.log(`Release exe path: ${result.releaseExePath}`);
       logger.log("Close the listed Chemd Desktop process, or retry with an isolated CARGO_TARGET_DIR.");
@@ -223,10 +345,11 @@ const logPreflightResult = ({ logger, result }) => {
     return;
   }
 
-  logger.log(`SKIP release Offline Core smoke preflight: ${result.reason}.`);
+  logger.log(`SKIP installer Offline Core artifact preflight: ${result.reason}.`);
   if (result.detail) {
     logger.log(result.detail);
   }
+  logger.log("Boundary: missing artifacts or process inspection gaps are not clean-machine smoke results.");
 };
 
 export const runDesktopOfflineReleaseSmokePreflight = async (options = {}) => {

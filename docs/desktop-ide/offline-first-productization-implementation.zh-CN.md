@@ -503,6 +503,7 @@ pnpm --filter @chemd/desktop tauri:build
 - `pnpm --filter @chemd/desktop tauri:build` 已在 `desktop-ide` 工作树通过。
 - 已生成 Windows MSI 与 NSIS 安装包。
 - `pnpm desktop:offline-release-smoke` 已在产物生成后通过 preflight。
+- 第三轮补充 installer artifact preflight，自动检查 release exe、MSI、NSIS 非空产物与目标 exe 路径锁状态，但仍不等同于 clean-machine 安装后 smoke。
 - 还缺少“安装到干净用户环境后启动、打开 workspace、编辑保存、关闭重启恢复”的
   installer Offline Core smoke。
 
