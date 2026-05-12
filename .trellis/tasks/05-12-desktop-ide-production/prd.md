@@ -452,3 +452,59 @@ truth.
   - `pnpm --filter @chemd/desktop tauri:build` produced the release executable,
     MSI bundle, and NSIS installer.
   - `git diff --check` passed.
+
+## Tenth-Wave Reconnect Sync Slices
+
+The tenth wave turns the offline local outbox into a real reconnect workflow.
+It must sync back into the existing shared PostgreSQL Graph/RAG/Agent schema and
+then mark local entries as synced or failed. It must not create desktop-only
+database tables.
+
+1. `desktop-ide-outbox-sync-runtime`
+   - Owns `apps/desktop/src-tauri/src/local_store*`,
+     `apps/desktop/src-tauri/src/postgres_runtime_*`, `apps/desktop/src-tauri/src/postgres*`
+     only when needed for shared persistence reuse, `apps/desktop/src-tauri/src/lib.rs`,
+     and focused Rust tests.
+   - Adds a Tauri command that reads pending local outbox entries, persists each
+     entry's existing Graph/RAG/Agent payload through the shared PostgreSQL
+     runtime path, marks successful entries `synced`, and records bounded
+     failure metadata for failed entries.
+   - Reuses the external/managed PostgreSQL target selection already used by
+     `persist_runtime_graph_rag`.
+   - Preserves idempotency: repeated sync of the same local entry must not
+     create duplicate shared records.
+
+2. `desktop-ide-outbox-sync-contract`
+   - Owns `apps/desktop/src/desktop-contracts.ts`,
+     `apps/desktop/src/desktop-local-store.ts`, and focused TypeScript tests.
+   - Adds typed command/result shapes for outbox sync, including selected
+     target summary, synced count, failed count, skipped count, and per-entry
+     status.
+   - Keeps existing local snapshot types stable.
+
+3. `desktop-ide-outbox-sync-ui`
+   - Runs after runtime and contract integration.
+   - Owns `apps/desktop/src/App.tsx` and desktop CSS files.
+   - Adds a compact `Sync Pending` action in the Offline Local Store panel.
+   - Shows sync result counts and the active External/Managed target without
+     implying local-only entries are shared until sync succeeds.
+
+4. `desktop-ide-outbox-sync-smoke-docs`
+   - Runs after runtime/contract integration.
+   - Owns `scripts/desktop-runtime-smoke.mjs`,
+     `scripts/desktop-runtime-smoke.test.mjs`, and desktop docs.
+   - Adds script-level coverage for offline-save-then-sync when a PostgreSQL
+     runtime is available, and keeps local offline-only smoke behavior when no
+     runtime is available.
+
+## Tenth-Wave Acceptance Criteria
+
+- Pending local outbox entries can be synced to the shared PostgreSQL schema
+  once External or Managed PostgreSQL is available.
+- Successful sync marks entries `synced` with `syncedAt` and clears failure
+  metadata.
+- Failed sync leaves entries local, marks or retains `failed`, increments
+  bounded failure metadata, and never drops the payload silently.
+- Sync results are visible in the UI with counts and safe, redacted errors.
+- Offline-only smoke still passes without PostgreSQL; online smoke proves the
+  sync path when PostgreSQL is configured.
