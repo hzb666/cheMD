@@ -879,3 +879,16 @@ M1 language-service completion core
 - 这些能力直接提升 Chemd 写作质量。
 - 不依赖 TMAP、DB 或新渲染系统。
 - 产出的 workspace symbol index 后续还能服务跨文档引用、hover、definition、Graph/RAG 和 cluster detail。
+---
+
+## 13. 分支状态：desktop-ide-map-completion-ls
+
+更新时间：2026-05-13
+
+本分支只完成 M1.1 `@chemd/language-service` completion core：
+
+- 新增 Monaco-neutral `getChemdCompletions(request)`。
+- 覆盖 Chemd reaction/molecule snippets、Chemd block field suggestions、`kind:` enum value suggestions、`stage:` enum value suggestions。
+- 不接入 `apps/desktop`，不实现 workspace symbol index 或 cross-document references。
+- 验证命令：`pnpm --filter @chemd/language-service test`、`pnpm --filter @chemd/language-service typecheck`、`git diff --check`。
+
