@@ -43,7 +43,8 @@ export const KNOWN_DESKTOP_COMMAND_NAMES = [
   "mark_local_outbox_synced",
   "clear_local_outbox_failures",
   "sync_local_outbox_to_postgres",
-  "persist_runtime_graph_rag"
+  "persist_runtime_graph_rag",
+  "export_diagnostics_bundle"
 ];
 
 const readJsonFile = ({ rootDir, relativePath, readTextFile }) =>
