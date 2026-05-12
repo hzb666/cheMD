@@ -537,6 +537,9 @@ const writePrettyJson = ({ filePath, value, makeDir, writeTextFile }) => {
   writeTextFile(filePath, `${JSON.stringify(value, null, 2)}\n`);
 };
 
+const countLocalOutboxStatus = (outbox, syncStatus) =>
+  outbox.entries.filter((entry) => entry.syncStatus === syncStatus).length;
+
 const upsertLocalOutboxEntry = ({ outbox, snapshotInput }) => {
   const existing = outbox.entries.find((entry) => entry.idempotencyKey === snapshotInput.idempotencyKey);
   if (existing) {
@@ -576,19 +579,21 @@ const validateLocalSnapshotInput = (snapshotInput) => {
   }
 };
 
-export const runDesktopOfflineLocalStoreSmoke = async ({
-  rootDir = REPO_ROOT,
-  env = process.env,
-  localStoreRoot = resolveOfflineLocalStoreRoot({ rootDir, env }),
-  localStoreModules = loadDesktopLocalStoreModules,
-  payloadBuilder = buildMinimalDesktopRuntimePersistencePayload,
-  fileExists = existsSync,
-  readTextFile = readFileSync,
-  writeTextFile = writeFileSync,
-  makeDir = mkdirSync
-} = {}) => {
+const boundedSyncError = (error) => {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.length <= 500 ? message : message.slice(0, 500);
+};
+
+const writeDesktopLocalRuntimeSnapshot = async ({
+  payload,
+  localStoreRoot,
+  localStoreModules,
+  fileExists,
+  readTextFile,
+  writeTextFile,
+  makeDir
+}) => {
   const modules = await localStoreModules();
-  const payload = payloadBuilder({ revisionId: "rev-desktop-offline-runtime-smoke" });
   const snapshotInput = modules.buildLocalRuntimeSnapshotInput(payload);
   validateLocalSnapshotInput(snapshotInput);
 
@@ -608,15 +613,12 @@ export const runDesktopOfflineLocalStoreSmoke = async ({
   writePrettyJson({ filePath: outboxPath, value: outbox, makeDir, writeTextFile });
 
   const writtenOutbox = readLocalOutboxFile({ outboxPath, fileExists, readTextFile });
-  const pendingCount = writtenOutbox.entries.filter((writtenEntry) => writtenEntry.syncStatus === "pending").length;
-  const writtenEntry = writtenOutbox.entries.find((writtenEntry) => writtenEntry.idempotencyKey === snapshotInput.idempotencyKey);
+  const writtenEntry = writtenOutbox.entries.find((candidate) => candidate.idempotencyKey === snapshotInput.idempotencyKey);
   if (!writtenEntry) {
     throw new Error("Local offline outbox read-back failed");
   }
 
   return {
-    status: "offline-local-passed",
-    detail: "local offline smoke wrote a runtime snapshot and pending outbox entry; database persistence was not attempted",
     storeRoot: localStoreRoot,
     snapshotPath,
     outboxPath,
@@ -624,8 +626,150 @@ export const runDesktopOfflineLocalStoreSmoke = async ({
     idempotencyKey: writtenEntry.idempotencyKey,
     graphSnapshotId: payload.graphSnapshot.graphSnapshotId,
     experimentId: payload.graphSnapshot.experimentId,
-    outboxPendingCount: pendingCount
+    outboxPendingCount: countLocalOutboxStatus(writtenOutbox, "pending"),
+    outboxFailedCount: countLocalOutboxStatus(writtenOutbox, "failed")
   };
+};
+
+const updateLocalOutboxSyncEntry = ({
+  outboxPath,
+  idempotencyKey,
+  syncStatus,
+  error,
+  fileExists,
+  readTextFile,
+  writeTextFile,
+  makeDir,
+  now = () => new Date().toISOString()
+}) => {
+  const outbox = readLocalOutboxFile({ outboxPath, fileExists, readTextFile });
+  const entry = outbox.entries.find((candidate) => candidate.idempotencyKey === idempotencyKey);
+  if (!entry) {
+    throw new Error("Local offline outbox sync entry was not found");
+  }
+
+  const updatedAt = now();
+  entry.syncStatus = syncStatus;
+  entry.updatedAt = updatedAt;
+  if (syncStatus === "synced") {
+    entry.failureCount = 0;
+    entry.lastError = null;
+    entry.syncedAt = updatedAt;
+  } else {
+    entry.failureCount = Number(entry.failureCount || 0) + 1;
+    entry.lastError = boundedSyncError(error);
+    entry.syncedAt = null;
+  }
+  writePrettyJson({ filePath: outboxPath, value: outbox, makeDir, writeTextFile });
+
+  return {
+    syncStatus: entry.syncStatus,
+    failureCount: entry.failureCount,
+    lastError: entry.lastError,
+    syncedAt: entry.syncedAt,
+    outboxPendingCount: countLocalOutboxStatus(outbox, "pending"),
+    outboxFailedCount: countLocalOutboxStatus(outbox, "failed")
+  };
+};
+
+export const runDesktopOfflineLocalStoreSmoke = async ({
+  rootDir = REPO_ROOT,
+  env = process.env,
+  localStoreRoot = resolveOfflineLocalStoreRoot({ rootDir, env }),
+  localStoreModules = loadDesktopLocalStoreModules,
+  payloadBuilder = buildMinimalDesktopRuntimePersistencePayload,
+  fileExists = existsSync,
+  readTextFile = readFileSync,
+  writeTextFile = writeFileSync,
+  makeDir = mkdirSync
+} = {}) => {
+  const modules = await localStoreModules();
+  const payload = payloadBuilder({ revisionId: "rev-desktop-offline-runtime-smoke" });
+  const local = await writeDesktopLocalRuntimeSnapshot({
+    payload,
+    localStoreRoot,
+    localStoreModules: async () => modules,
+    fileExists,
+    readTextFile,
+    writeTextFile,
+    makeDir
+  });
+
+  return {
+    status: "offline-local-passed",
+    detail: "local offline smoke wrote a runtime snapshot and pending outbox entry; database persistence was not attempted",
+    ...local
+  };
+};
+
+export const runDesktopReconnectOutboxSyncSmoke = async ({
+  client,
+  rootDir = REPO_ROOT,
+  env = process.env,
+  localStoreRoot = resolveOfflineLocalStoreRoot({ rootDir, env }),
+  revisionId = "rev-desktop-reconnect-runtime-smoke",
+  localStoreModules = loadDesktopLocalStoreModules,
+  payloadBuilder = buildMinimalDesktopRuntimePersistencePayload,
+  persistenceSmoke = runDesktopRuntimePersistenceSmoke,
+  fileExists = existsSync,
+  readTextFile = readFileSync,
+  writeTextFile = writeFileSync,
+  makeDir = mkdirSync,
+  now = () => new Date().toISOString()
+} = {}) => {
+  const payload = payloadBuilder({ revisionId });
+  const local = await writeDesktopLocalRuntimeSnapshot({
+    payload,
+    localStoreRoot,
+    localStoreModules,
+    fileExists,
+    readTextFile,
+    writeTextFile,
+    makeDir
+  });
+
+  try {
+    const persistence = await persistenceSmoke({
+      client,
+      revisionId,
+      payloadBuilder: () => payload
+    });
+    const sync = updateLocalOutboxSyncEntry({
+      outboxPath: local.outboxPath,
+      idempotencyKey: local.idempotencyKey,
+      syncStatus: "synced",
+      fileExists,
+      readTextFile,
+      writeTextFile,
+      makeDir,
+      now
+    });
+    return {
+      status: "script-level-reconnect-sync-passed",
+      detail: "script-level smoke synced a local outbox payload to shared PostgreSQL schema; it is not Tauri command runtime proof",
+      local,
+      sync: {
+        syncedCount: 1,
+        failedCount: 0,
+        skippedCount: 0,
+        ...sync
+      },
+      persistence
+    };
+  } catch (error) {
+    updateLocalOutboxSyncEntry({
+      outboxPath: local.outboxPath,
+      idempotencyKey: local.idempotencyKey,
+      syncStatus: "failed",
+      error,
+      fileExists,
+      readTextFile,
+      writeTextFile,
+      makeDir,
+      now
+    });
+    throw error;
+  }
 };
 
 export const checkDesktopRuntimePreconditions = ({
@@ -667,6 +811,7 @@ export const runDesktopRuntimeSmoke = async ({
   withClient = withPostgresRuntimeClient,
   postgresSmoke = runPostgresSmoke,
   persistenceSmoke = runDesktopRuntimePersistenceSmoke,
+  reconnectSyncSmoke = runDesktopReconnectOutboxSyncSmoke,
   managedPostgres = startManagedPostgresSmokeRuntime,
   offlineLocalStoreSmoke = runDesktopOfflineLocalStoreSmoke,
   logger = console
@@ -716,8 +861,13 @@ export const runDesktopRuntimeSmoke = async ({
       env: smokeEnv,
       operation: async (client) => {
         const postgres = await postgresSmoke({ client });
-        const persistence = await persistenceSmoke({ client });
-        return { postgres, persistence };
+        const reconnectSync = await reconnectSyncSmoke({
+          client,
+          rootDir,
+          env: smokeEnv,
+          persistenceSmoke
+        });
+        return { postgres, reconnectSync, persistence: reconnectSync.persistence };
       }
     });
 
@@ -727,8 +877,10 @@ export const runDesktopRuntimeSmoke = async ({
     logger.log(`compile run: ${result.postgres.compileRunId}`);
     logger.log(`rag chunks: ${result.postgres.ragChunks}`);
     logger.log(`first chunk: ${result.postgres.firstChunkId}`);
-    logger.log(`runtime graph: ${result.persistence.graphSnapshotId}`);
-    logger.log(`runtime verification: ${JSON.stringify(result.persistence.counts)}`);
+    logger.log(`runtime graph: ${result.reconnectSync.persistence.graphSnapshotId}`);
+    logger.log(`runtime verification: ${JSON.stringify(result.reconnectSync.persistence.counts)}`);
+    logger.log(`reconnect outbox sync: synced=${result.reconnectSync.sync.syncedCount}, pending=${result.reconnectSync.sync.outboxPendingCount}, failed=${result.reconnectSync.sync.outboxFailedCount}`);
+    logger.log("reconnect proof: script-level local outbox -> shared PostgreSQL smoke; Tauri command runtime proof is not covered.");
     return { status: "passed", result };
   } finally {
     if (cleanupManagedPostgres) {

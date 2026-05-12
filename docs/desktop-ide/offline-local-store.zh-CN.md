@@ -43,6 +43,21 @@ offline smoke 写入两个 JSON 文件：
 outbox entry 使用 `idempotencyKey` 去重；相同 snapshot 再次保存会更新已有
 pending entry，而不是伪造新的数据库记录。
 
+## 重连同步语义
+
+当外部 PostgreSQL 或 managed PostgreSQL 可用后，待同步 outbox entry 的
+目标仍是共享 PostgreSQL schema。脚本级 smoke 会先写入本地 pending
+snapshot/outbox，再用同一 payload 执行 shared Graph/RAG/Agent 持久化：
+
+- 同步成功：entry 的 `syncStatus` 变为 `synced`，`syncedAt` 写入成功时间，
+  `failureCount` 归零，`lastError` 清空。
+- 同步失败：entry 保留原始 `payload`，`syncStatus` 变为 `failed`，
+  `failureCount` 递增，`lastError` 记录有界错误信息，`syncedAt` 保持为空。
+
+这个重连同步不创建 desktop-only PostgreSQL 表；它复用现有 shared schema：
+experiment、revision、RAG chunk、Graph snapshot、agent run、tool call 与
+patch proposal 相关表。
+
 ## 验证命令
 
 脚本单测：
@@ -58,6 +73,8 @@ pnpm desktop:runtime-smoke
 ```
 
 当外部 DB 存在时，smoke 应输出 PostgreSQL target，并执行数据库写入与读回。
+同时会输出 `reconnect outbox sync`，表示脚本级 local outbox payload 已同步到
+shared PostgreSQL schema。
 
 当没有外部 DB，但 managed PostgreSQL binaries 可用时，smoke 应输出
 managed PostgreSQL target，并执行同一套数据库写入与读回。
@@ -77,6 +94,10 @@ PostgreSQL runtime；后续 local offline 结果只覆盖 JSON outbox contract�
 - Node smoke 无法直接调用 Tauri Rust command；当前验证使用
   `apps/desktop/src/desktop-local-store.ts` 的 TS builder 生成
   `LocalRuntimeSnapshotInput`，再按 Rust local store 文件 contract 写入 JSON。
+- Node reconnect smoke 使用同一 payload builder 与 `@chemd/storage-postgres`
+  持久化路径模拟 shared schema sync contract；它是 script-level reconnect
+  sync smoke，不等同于 `sync_local_outbox_to_postgres` Tauri command runtime
+  proof。
 - offline smoke 不执行数据库 migration，不验证 pgvector，也不读写共享
   PostgreSQL 表。
 - local outbox 只是待同步队列；真正同步到共享 Graph/RAG schema 仍需要在线
