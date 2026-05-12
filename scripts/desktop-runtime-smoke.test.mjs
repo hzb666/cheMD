@@ -4,10 +4,12 @@ import test from "node:test";
 import {
   buildMinimalDesktopRuntimePersistencePayload,
   checkDesktopRuntimePreconditions,
+  discoverManagedPostgresBinaries,
   getPostgresDatabaseUrl,
   runDesktopRuntimePersistenceSmoke,
   runDesktopRuntimeSmoke,
   runDesktopRuntimeSmokeCli,
+  startManagedPostgresSmokeRuntime,
   summarizePostgresTarget
 } from "./desktop-runtime-smoke.mjs";
 
@@ -89,7 +91,24 @@ test("checkDesktopRuntimePreconditions reports missing dist as warn only", () =>
   );
 });
 
-test("runDesktopRuntimeSmoke skips without PostgreSQL env and exits cleanly", async () => {
+test("discoverManagedPostgresBinaries finds dev override binaries", () => {
+  const files = new Set([
+    "D:\\pg\\bin\\initdb.exe",
+    "D:\\pg\\bin\\psql.exe",
+    "D:\\pg\\bin\\postgres.exe"
+  ]);
+
+  const result = discoverManagedPostgresBinaries({
+    env: { CHEMD_MANAGED_POSTGRES_BIN_DIR: "D:\\pg\\bin" },
+    fileExists: (filePath) => files.has(filePath)
+  });
+
+  assert.equal(result.available, true);
+  assert.equal(result.binaries.source, "CHEMD_MANAGED_POSTGRES_BIN_DIR");
+  assert.match(result.binaries.postgres, /postgres\.exe$/u);
+});
+
+test("runDesktopRuntimeSmoke skips without external env or managed binaries", async () => {
   const calls = [];
   const logger = createLogger();
 
@@ -103,11 +122,22 @@ test("runDesktopRuntimeSmoke skips without PostgreSQL env and exits cleanly", as
     withClient: async () => {
       throw new Error("must not connect");
     },
+    managedPostgres: async () => {
+      calls.push("managed-postgres");
+      return {
+        status: "unavailable",
+        reason: "Set CHEMD_MANAGED_POSTGRES_BIN_DIR or bundle PostgreSQL binaries"
+      };
+    },
     logger
   });
 
-  assert.deepEqual(calls, ["env-loader", "desktop-check"]);
-  assert.deepEqual(result, { status: "skipped", reason: "missing-postgres-env" });
+  assert.deepEqual(calls, ["env-loader", "desktop-check", "managed-postgres"]);
+  assert.deepEqual(result, {
+    status: "skipped",
+    reason: "missing-postgres-runtime",
+    detail: "Set CHEMD_MANAGED_POSTGRES_BIN_DIR or bundle PostgreSQL binaries"
+  });
   assert.match(logger.lines.join("\n"), /SKIP desktop runtime smoke/u);
 });
 
@@ -140,6 +170,7 @@ test("buildMinimalDesktopRuntimePersistencePayload mirrors Tauri command payload
 test("runDesktopRuntimeSmoke redacts env while running smoke in order", async () => {
   const calls = [];
   const logger = createLogger();
+  let managedFallbackCalled = false;
 
   const result = await runDesktopRuntimeSmoke({
     rootDir: "D:\\repo",
@@ -156,6 +187,78 @@ test("runDesktopRuntimeSmoke redacts env while running smoke in order", async ()
     desktopCheck: createPassingDesktopCheck(calls),
     withClient: async ({ operation }) => {
       calls.push("with-client");
+      return operation({ query: async () => ({ rows: [] }) });
+    },
+    managedPostgres: async () => {
+      managedFallbackCalled = true;
+      throw new Error("external DB must take priority");
+    },
+    postgresSmoke: async () => {
+      calls.push("postgres-smoke");
+      return {
+        experimentId: "exp-1",
+        revisionId: "rev-1",
+        compileRunId: "rev-1::compile",
+        ragChunks: 1,
+        firstChunkId: "chunk-1"
+      };
+    },
+    persistenceSmoke: async () => {
+      calls.push("persistence-smoke");
+      return {
+        experimentId: "exp-runtime",
+        revisionId: "rev-runtime",
+        graphSnapshotId: "graph-runtime",
+        counts: { graphSnapshots: 1 }
+      };
+    },
+    logger
+  });
+
+  assert.equal(managedFallbackCalled, false);
+  assert.deepEqual(calls, [
+    "env-loader",
+    "desktop-check",
+    "with-client",
+    "postgres-smoke",
+    "persistence-smoke"
+  ]);
+  assert.equal(result.status, "passed");
+  const output = logger.lines.join("\n");
+  assert.doesNotMatch(output, /super-secret/u);
+  assert.doesNotMatch(output, /postgres:\/\/chemd/u);
+  assert.match(output, /host=localhost/u);
+  assert.match(output, /runtime graph: graph-runtime/u);
+});
+
+test("runDesktopRuntimeSmoke starts managed fallback and cleans it after success", async () => {
+  const calls = [];
+  const logger = createLogger();
+
+  const result = await runDesktopRuntimeSmoke({
+    rootDir: "D:\\repo",
+    envLoader: () => {
+      calls.push("env-loader");
+      return { env: {}, loadedFiles: [] };
+    },
+    desktopCheck: createPassingDesktopCheck(calls),
+    managedPostgres: async () => {
+      calls.push("managed-postgres");
+      return {
+        status: "started",
+        env: {
+          CHEMD_POSTGRES_DATABASE_URL:
+            "postgres://chemd_desktop:managed-secret@127.0.0.1:16432/chemd_desktop"
+        },
+        summary:
+          "source=CHEMD_MANAGED_POSTGRES_BIN_DIR, host=127.0.0.1, port=16432, database=chemd_desktop, user=chemd_desktop, password=[REDACTED]",
+        cleanup: async () => {
+          calls.push("managed-cleanup");
+        }
+      };
+    },
+    withClient: async ({ env, operation }) => {
+      calls.push(`with-client:${env.CHEMD_POSTGRES_DATABASE_URL.includes("managed-secret")}`);
       return operation({ query: async () => ({ rows: [] }) });
     },
     postgresSmoke: async () => {
@@ -180,19 +283,118 @@ test("runDesktopRuntimeSmoke redacts env while running smoke in order", async ()
     logger
   });
 
+  assert.equal(result.status, "passed");
   assert.deepEqual(calls, [
     "env-loader",
     "desktop-check",
-    "with-client",
+    "managed-postgres",
+    "with-client:true",
     "postgres-smoke",
-    "persistence-smoke"
+    "persistence-smoke",
+    "managed-cleanup"
   ]);
-  assert.equal(result.status, "passed");
   const output = logger.lines.join("\n");
-  assert.doesNotMatch(output, /super-secret/u);
-  assert.doesNotMatch(output, /postgres:\/\/chemd/u);
-  assert.match(output, /host=localhost/u);
-  assert.match(output, /runtime graph: graph-runtime/u);
+  assert.doesNotMatch(output, /managed-secret/u);
+  assert.match(output, /Managed PostgreSQL target/u);
+});
+
+test("runDesktopRuntimeSmoke cleans managed fallback after database failure", async () => {
+  const calls = [];
+
+  await assert.rejects(
+    () =>
+      runDesktopRuntimeSmoke({
+        envLoader: () => ({ env: {}, loadedFiles: [] }),
+        desktopCheck: createPassingDesktopCheck(calls),
+        managedPostgres: async () => ({
+          status: "started",
+          env: { CHEMD_POSTGRES_DATABASE_URL: "postgres://user:secret@127.0.0.1/db" },
+          summary: "host=127.0.0.1, password=[REDACTED]",
+          cleanup: async () => {
+            calls.push("managed-cleanup");
+          }
+        }),
+        withClient: async () => {
+          throw new Error("managed database unavailable");
+        },
+        logger: createLogger()
+      }),
+    /managed database unavailable/u
+  );
+
+  assert.deepEqual(calls, ["desktop-check", "managed-cleanup"]);
+});
+
+test("startManagedPostgresSmokeRuntime stops owned process on startup failure", async () => {
+  const calls = [];
+  const files = new Set([
+    "D:\\pg\\bin\\initdb.exe",
+    "D:\\pg\\bin\\psql.exe",
+    "D:\\pg\\bin\\postgres.exe"
+  ]);
+  const child = {
+    pid: 42,
+    exitCode: null,
+    signalCode: null,
+    kill() {
+      calls.push("kill");
+      this.exitCode = 1;
+    },
+    once(_event, handler) {
+      handler();
+    }
+  };
+
+  await assert.rejects(
+    () =>
+      startManagedPostgresSmokeRuntime({
+        rootDir: "D:\\repo",
+        env: {
+          CHEMD_MANAGED_POSTGRES_BIN_DIR: "D:\\pg\\bin",
+          CHEMD_MANAGED_POSTGRES_HOME: "D:\\managed"
+        },
+        fileExists: (filePath) => files.has(filePath),
+        readTextFile: () => {
+          throw new Error("unexpected read");
+        },
+        writeTextFile: (filePath) => {
+          calls.push(`write:${filePath.endsWith("managed-postgres.pid.json") ? "pid" : "file"}`);
+        },
+        makeDir: () => {},
+        removeFile: (filePath) => {
+          calls.push(`remove:${filePath.endsWith("managed-postgres.pid.json") ? "pid" : "file"}`);
+        },
+        runCommand: async () => {
+          calls.push("initdb");
+        },
+        spawnProcess: () => {
+          calls.push("spawn");
+          return child;
+        },
+        getPort: async () => 16432,
+        runtimeModules: async () => ({
+          createPostgresRuntimeClient: () => ({
+            query: async () => {
+              throw new Error("not ready");
+            },
+            close: async () => {}
+          })
+        }),
+        readinessAttempts: 1
+      }),
+    /Managed Postgres did not accept connections/u
+  );
+
+  assert.deepEqual(calls, [
+    "write:file",
+    "write:file",
+    "initdb",
+    "remove:file",
+    "spawn",
+    "write:pid",
+    "kill",
+    "remove:pid"
+  ]);
 });
 
 test("runDesktopRuntimePersistenceSmoke installs schema, writes payload, and verifies readback", async () => {
