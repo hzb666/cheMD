@@ -36,6 +36,13 @@ API key 或完整 env 对象。
 DB 时会查找对应的打包资源候选路径；Tauri runtime 侧也按 `resource_dir` 下
 的 `postgres/bin` 与 `postgres` 查找。
 
+生产构建前使用 `pnpm desktop:postgres:bundle -- --source <postgres-dist>` 或
+`CHEMD_POSTGRES_DIST_DIR=<postgres-dist> pnpm desktop:postgres:bundle` 将本机
+或 CI 提供的 PostgreSQL 分发包 staged 到
+`apps/desktop/src-tauri/resources/postgres/bin`，再运行
+`pnpm desktop:postgres:verify`。详细流程见
+[`postgres-bundle-resources.zh-CN.md`](./postgres-bundle-resources.zh-CN.md)。
+
 ## SKIP 条件
 
 如果没有外部 DB env，也没有可用的 managed PostgreSQL binaries，smoke 会输出
