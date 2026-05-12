@@ -937,3 +937,22 @@ M1 language-service completion core
   - `pnpm --filter @chemd/language-service test`：通过，3 files / 22 tests。
   - `pnpm --filter @chemd/language-service typecheck`：通过。
   - `git diff --check`：通过。
+
+### 2026-05-13 desktop-ide-monaco-completion-provider
+
+- 范围：把已合并的 `@chemd/language-service` completion core 接入
+  desktop Monaco editor provider。
+- 产物：在 Chemd language 注册阶段注册
+  `languages.registerCompletionItemProvider(CHEMD_LANGUAGE_ID, ...)`；
+  `apps/desktop/src/monaco-chemd-completion.ts` 承担 provider 注册、
+  compile output map、`ChemdCompletionItem` 到 Monaco item 的映射；
+  `MonacoChemdEditor.tsx` 只负责注册调用与 update/cleanup 生命周期。
+- 边界：不修改 `App.tsx`、root 配置、package/lockfile、Tauri/Rust 或
+  `packages/language-service`；不实现 workspace index/ref completion。
+- 降级：completion provider 内部捕获异常，compile output 缺失或失败时不阻断编辑。
+- 验证：
+  - `pnpm --filter @chemd/desktop typecheck`：通过。
+  - `pnpm --filter @chemd/desktop build`：通过；仅保留 Vite chunk size 和 lucide
+    `use client` bundle warnings。
+  - `pnpm --filter @chemd/desktop exec eslint src/MonacoChemdEditor.tsx src/monaco-chemd-completion.ts`：通过。
+  - `git diff --check`：通过；仅输出 LF/CRLF 工作区提示。
