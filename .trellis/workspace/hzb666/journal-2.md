@@ -573,3 +573,41 @@ Merged Monaco bundle split and diagnostics bundle into desktop-ide, proved remot
 ### Next Steps
 
 - None - task complete
+
+
+## Session 52: Desktop IDE offline support docs and diagnostics context
+
+**Date**: 2026-05-13
+**Task**: Desktop IDE offline support docs and diagnostics context
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Merged the offline-first user/support guide and expanded diagnostics bundle support context. Main validation passed focused diagnostics tests 7/7, script tests 66/66, scripts ESLint, diagnostics bundle generation, desktop typecheck, and diff check. Workspace ingest UI remains isolated pending complexity refactor approval.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7c7d2e0` | (see git log) |
+| `8a3a99f` | (see git log) |
+| `475da69` | (see git log) |
+| `04f8202` | (see git log) |
+| `8f77831` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
