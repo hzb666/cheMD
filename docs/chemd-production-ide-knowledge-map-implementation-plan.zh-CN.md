@@ -911,3 +911,17 @@ M1 language-service completion core
 - 原因：实现反复越过本轮边界，创建新的 `packages/workspace-index` package，而本轮要求只在
   `@chemd/language-service` 内沉淀纯 helper。
 - 处理：停止该子代理，不合并该分支；下一轮重新切分为 language-service-only 工作包。
+
+### 2026-05-13 desktop-ide-map-workspace-symbol-core
+
+- 范围：完成 M3.1 的 `@chemd/language-service` workspace symbol index 纯 helper，不接入
+  `apps/desktop`，不新增 workspace package，不修改 root 配置。
+- 产物：`buildChemdWorkspaceSymbolIndex(entries)` 复用 `compileChemdForEditor()` 的
+  diagnostics/outline/symbols 输出，生成 workspace documents、symbols、`symbolsByKind`、
+  `symbolIdsByName` 与 diagnostics summary。
+- 降级：单文档编译失败只记录 failed document 和 diagnostics，不写入该文档 symbols，也不阻断
+  其他文档入索引。
+- 验证：
+  - `pnpm --filter @chemd/language-service test`：通过，3 files / 22 tests。
+  - `pnpm --filter @chemd/language-service typecheck`：通过。
+  - `git diff --check`：通过。
