@@ -260,3 +260,45 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 46: Desktop IDE panel layout controls and Tailwind merge
+
+**Date**: 2026-05-12
+**Task**: Desktop IDE panel layout controls and Tailwind merge
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+(Add summary)
+
+### Main Changes
+
+| Area | Result |
+|------|--------|
+| Tailwind merge | Reviewed `desktop-ide-tauri-tailwind`, replaced fragile relative color syntax, merged as `988d43c` after resolving `panels.css` against existing local-sync styles. |
+| Desktop layout | Added resizable/collapsible files sidebar, insight sidebar, and bottom diagnostics panel in `2bd3139`. |
+| Activity rail | Replaced inert rail buttons with active state and click handlers; Files restores the left sidebar, other tools restore the insight side panel. |
+| Verification | Ran `pnpm --filter @chemd/desktop exec eslint src/App.tsx vite.config.ts`, `pnpm --filter @chemd/desktop typecheck`, `pnpm --filter @chemd/desktop build`, `git diff --check`, and a temporary Playwright browser smoke for drag/collapse/rail click behavior. |
+| Open worktree state | Eight unrelated Rust/docs/scripts edits remained uncommitted and were not included in the UI commit. |
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `988d43c` | (see git log) |
+| `2bd3139` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
