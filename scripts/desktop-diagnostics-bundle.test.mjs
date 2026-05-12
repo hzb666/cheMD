@@ -38,14 +38,19 @@ const createFiles = (entries) =>
     Object.entries(entries).map(([filePath, content]) => [path.resolve(filePath), content])
   );
 
-const createFileDeps = ({ files, sizes = {} }) => ({
-  fileExists: (filePath) => files.has(path.resolve(filePath)),
-  readTextFile: (filePath) => files.get(path.resolve(filePath)),
-  statFile: (filePath) => ({
-    size: sizes[path.resolve(filePath)] ?? String(files.get(path.resolve(filePath)) ?? "").length,
-    isFile: () => true
-  })
-});
+const createFileDeps = ({ files, directories = [], sizes = {} }) => {
+  const directorySet = new Set(directories.map((directoryPath) => path.resolve(directoryPath)));
+  return {
+    fileExists: (filePath) =>
+      files.has(path.resolve(filePath)) || directorySet.has(path.resolve(filePath)),
+    readTextFile: (filePath) => files.get(path.resolve(filePath)),
+    statFile: (filePath) => ({
+      size: sizes[path.resolve(filePath)] ?? String(files.get(path.resolve(filePath)) ?? "").length,
+      isDirectory: () => directorySet.has(path.resolve(filePath)),
+      isFile: () => files.has(path.resolve(filePath))
+    })
+  };
+};
 
 const gitSkip = async () => ({ status: "skip", reason: "git unavailable in test" });
 
@@ -113,6 +118,8 @@ test("buildDesktopDiagnosticsBundle marks missing dist and artifacts as skip", a
   assert.equal(bundle.desktop.releaseArtifacts.msiInstallers.status, "skip");
   assert.equal(bundle.desktop.releaseArtifacts.nsisInstallers.status, "skip");
   assert.equal(bundle.runtime.releasePreflight.status, "skipped");
+  assert.equal(bundle.supportContext.offlineSmoke.status, "skip");
+  assert.equal(bundle.supportContext.classifications.releasePreflight, "skip");
 });
 
 test("buildDesktopDiagnosticsBundle summarizes existing release artifacts as pass", async () => {
@@ -153,6 +160,77 @@ test("buildDesktopDiagnosticsBundle summarizes existing release artifacts as pas
   assert.equal(bundle.desktop.releaseArtifacts.msiInstallers.count, 1);
   assert.equal(bundle.desktop.releaseArtifacts.nsisInstallers.status, "pass");
   assert.equal(bundle.git.commit, "abc123");
+});
+
+test("buildDesktopDiagnosticsBundle summarizes offline support context without payload secrets", async () => {
+  const rootDir = "D:\\repo";
+  const offlineDir = "D:\\repo\\.chemd\\offline-smoke";
+  const files = createFiles({
+    "D:\\repo\\apps\\desktop\\package.json": desktopPackage,
+    "D:\\repo\\apps\\desktop\\dist\\index.html": "<!doctype html>",
+    "D:\\repo\\.chemd\\offline-smoke\\runtime-snapshot.json": JSON.stringify({
+      savedAt: "2026-05-13T00:00:00.000Z",
+      localId: "local-secret-id",
+      idempotencyKey: "secret-idempotency-key",
+      payload: { databaseUrl: "postgres://chemd:secret@localhost:5432/chemd" },
+      metadata: { workspace: "demo", providerToken: "secret-token" }
+    }),
+    "D:\\repo\\.chemd\\offline-smoke\\outbox.json": JSON.stringify({
+      entries: [
+        { syncStatus: "pending", payload: { token: "secret-token" } },
+        { syncStatus: "failed", lastError: "password=secret" }
+      ]
+    })
+  });
+  const bundle = await buildDesktopDiagnosticsBundle({
+    rootDir,
+    env: { CHEMD_DESKTOP_OFFLINE_SMOKE_DIR: offlineDir },
+    ...createFileDeps({ files, directories: [offlineDir] }),
+    artifactFinder: () => ({ releaseExe: undefined, msiInstallers: [], nsisInstallers: [] }),
+    desktopCheck: passingDesktopCheck,
+    releasePreflight: async () => ({ status: "skipped", reason: "desktop-dist-missing", checks: [] }),
+    gitCommitResolver: gitSkip
+  });
+
+  const serialized = JSON.stringify(bundle);
+  assert.equal(bundle.supportContext.offlineSmoke.status, "pass");
+  assert.equal(bundle.supportContext.offlineSmoke.files.runtimeSnapshot.status, "pass");
+  assert.equal(bundle.supportContext.offlineSmoke.files.outbox.summary.entryCount, 2);
+  assert.equal(bundle.supportContext.offlineSmoke.files.outbox.summary.statusCounts.pending, 1);
+  assert.equal(bundle.supportContext.notRun.find((entry) => entry.name === "provider").status, "skip");
+  assert.doesNotMatch(serialized, /secret-token|secret-idempotency-key|local-secret-id/u);
+  assert.doesNotMatch(serialized, /postgres:\/\/chemd/u);
+});
+
+test("buildDesktopDiagnosticsBundle skips oversized offline smoke files without reading them", async () => {
+  const rootDir = "D:\\repo";
+  const offlineDir = "D:\\repo\\.chemd\\offline-smoke";
+  const runtimeSnapshotPath = "D:\\repo\\.chemd\\offline-smoke\\runtime-snapshot.json";
+  const files = createFiles({
+    "D:\\repo\\apps\\desktop\\package.json": desktopPackage,
+    [runtimeSnapshotPath]: ""
+  });
+  const deps = createFileDeps({
+    files,
+    directories: [offlineDir],
+    sizes: { [path.resolve(runtimeSnapshotPath)]: 100_000 }
+  });
+  const bundle = await buildDesktopDiagnosticsBundle({
+    rootDir,
+    env: { CHEMD_DESKTOP_OFFLINE_SMOKE_DIR: offlineDir },
+    ...deps,
+    readTextFile: (filePath, encoding) => {
+      assert.notEqual(path.resolve(filePath), path.resolve(runtimeSnapshotPath));
+      return deps.readTextFile(filePath, encoding);
+    },
+    artifactFinder: () => ({ releaseExe: undefined, msiInstallers: [], nsisInstallers: [] }),
+    desktopCheck: passingDesktopCheck,
+    releasePreflight: async () => ({ status: "skipped", reason: "desktop-dist-missing", checks: [] }),
+    gitCommitResolver: gitSkip
+  });
+
+  assert.equal(bundle.supportContext.offlineSmoke.files.runtimeSnapshot.status, "skip");
+  assert.equal(bundle.supportContext.offlineSmoke.files.runtimeSnapshot.reason, "file-too-large");
 });
 
 test("runDesktopDiagnosticsBundleCli writes JSON to --output path", async () => {

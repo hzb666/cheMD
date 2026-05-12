@@ -14,6 +14,7 @@ import {
   sanitizeDiagnosticValue,
   summarizeEnvSignals
 } from "./desktop-diagnostics-sanitizer.mjs";
+import { buildDesktopSupportContext } from "./desktop-diagnostics-bundle-support-context.mjs";
 import { REPO_ROOT } from "./postgres-tools.mjs";
 
 const execFile = promisify(execFileCallback);
@@ -215,6 +216,14 @@ export const buildDesktopDiagnosticsBundle = async ({
   execFileImpl = execFile
 } = {}) => {
   const generatedAt = now().toISOString();
+  const distIndex = summarizeFile({
+    rootDir,
+    relativePath: DESKTOP_DIST_INDEX_PATH,
+    fileExists,
+    statFile
+  });
+  const runtimePreflight = summarizeRuntimePreflight({ rootDir, desktopCheck });
+  const releasePreflightSummary = await summarizeReleasePreflight({ rootDir, releasePreflight });
   const bundle = {
     schemaVersion: 1,
     generatedAt,
@@ -229,30 +238,35 @@ export const buildDesktopDiagnosticsBundle = async ({
     git: await gitCommitResolver({ rootDir, execFileImpl }),
     desktop: {
       package: summarizeDesktopPackage({ rootDir, fileExists, readTextFile }),
-      distIndex: summarizeFile({
-        rootDir,
-        relativePath: DESKTOP_DIST_INDEX_PATH,
-        fileExists,
-        statFile
-      }),
+      distIndex,
       releaseArtifacts: summarizeInstallerArtifacts({ rootDir, artifactFinder })
     },
     commands: {
       known: KNOWN_DESKTOP_COMMAND_NAMES
     },
     runtime: {
-      preflight: summarizeRuntimePreflight({ rootDir, desktopCheck }),
+      preflight: runtimePreflight,
       smoke: {
         status: "skip",
         reason: "not-run-by-diagnostics-bundle",
         detail: "Diagnostics bundle records classifications only; it does not run runtime smoke, GUI, network, or database checks."
       },
-      releasePreflight: await summarizeReleasePreflight({ rootDir, releasePreflight })
+      releasePreflight: releasePreflightSummary
     },
     environment: {
       boundary: "Selected process env names only; values are redacted and no .env files are loaded.",
       signals: summarizeEnvSignals(env)
-    }
+    },
+    supportContext: buildDesktopSupportContext({
+      rootDir,
+      env,
+      runtimePreflight,
+      releasePreflight: releasePreflightSummary,
+      desktopDist: distIndex,
+      fileExists,
+      readTextFile,
+      statFile
+    })
   };
 
   return sanitizeDiagnosticValue(bundle);
