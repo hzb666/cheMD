@@ -1925,3 +1925,74 @@ Desktop Graph/RAG/Agent persistence loop, UI entry, Rust bridge, and runtime smo
 ### Next Steps
 
 - None - task complete
+
+
+## Session 41: Desktop IDE seventh wave managed Postgres runtime
+
+**Date**: 2026-05-12
+**Task**: Desktop IDE seventh wave managed Postgres runtime
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+(Add summary)
+
+### Main Changes
+
+| Area | Result |
+|------|--------|
+| Managed Postgres runtime | Added Tauri commands for status, initialize, start, stop, migrate, app-data config, binary discovery, PID ownership, redaction, shared-schema migration verification, and external-env priority. |
+| UI control surface | Added External / Managed Postgres panels in the desktop workbench with init/start/stop/migrate/refresh controls, active-target messaging, loading/error states, and redacted status rendering. |
+| Smoke and docs | Extended desktop runtime smoke to prefer external DB, fallback to managed binaries, clean owned processes, and SKIP with exact reason when binaries are absent. Added managed smoke packaging notes under docs/desktop-ide. |
+| Parallel workflow | Runtime branch, smoke branch, and UI branch were reviewed, merged into desktop-ide, and safe worktrees/branches were cleaned. |
+
+**Commits**:
+- `a8b91c7` chore(desktop)：规划第七轮托管 Postgres
+- `5212348` feat(desktop)：新增托管 Postgres 运行时
+- `1d13c54` feat(desktop)：合入托管 Postgres 运行时
+- `76dd784` feat(desktop)：补充托管 Postgres smoke
+- `074f513` feat(desktop)：合入托管 Postgres smoke
+- `fe1c121` feat(desktop)：增加托管 Postgres 控制面
+- `c3a1e46` feat(desktop)：合入托管 Postgres 控制面
+
+**Validation**:
+- `pnpm test:scripts` passed: 29 script tests.
+- `pnpm desktop:runtime-smoke` exited 0 with explicit SKIP: PostgreSQL binaries are missing `initdb`, `psql`, and `postgres` or `pg_ctl`.
+- `pnpm --filter @chemd/desktop typecheck` passed.
+- `pnpm --filter @chemd/desktop exec eslint src/App.tsx src/desktop-contracts.ts src/styles/base.css src/styles/panels.css` exited 0; CSS files are ignored by ESLint with 2 warnings, no errors.
+- `pnpm --filter @chemd/desktop build` passed; existing lucide `use client` and chunk-size warnings remain.
+- `cargo test` passed: 32 Rust tests.
+- `cargo check` passed.
+- `git diff --check` passed.
+- `pnpm typecheck` passed: 21 workspaces.
+- `pnpm test` passed: Turbo tests, 29 script tests, and 52 Python unittest tests.
+- `pnpm --filter @chemd/desktop tauri:build` passed and produced exe, MSI, and NSIS bundles.
+
+**Remaining Gap**:
+- Current machine/repo has no bundled PostgreSQL binaries, so the managed path is implemented and test-covered but real managed DB smoke is environment-blocked. Next phase should add a packaging/binary acquisition strategy so the app actually ships PostgreSQL binaries instead of relying on `CHEMD_MANAGED_POSTGRES_BIN_DIR`.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a8b91c7` | (see git log) |
+| `5212348` | (see git log) |
+| `1d13c54` | (see git log) |
+| `76dd784` | (see git log) |
+| `074f513` | (see git log) |
+| `fe1c121` | (see git log) |
+| `c3a1e46` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
