@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import { Activity, AlertTriangle, Bot, CheckCircle2, ChevronRight, CircleDot, Database, FileCode2, Files, FlaskConical, GitGraph, HardDrive, Lightbulb, PanelBottom, PlayCircle, RefreshCw, ScrollText, Search, Settings, ShieldCheck, Sparkles, Square, UploadCloud, Wrench, XCircle } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { Activity, AlertTriangle, Bot, CheckCircle2, ChevronRight, CircleDot, Database, FileCode2, Files, FlaskConical, GitGraph, GripHorizontal, GripVertical, HardDrive, Lightbulb, PanelBottom, PanelBottomClose, PanelBottomOpen, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PlayCircle, RefreshCw, ScrollText, Search, Settings, ShieldCheck, Sparkles, Square, UploadCloud, Wrench, XCircle } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ChangeEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 
 import { appendToolCall, applyPatchDecision, approvePatchDecision, attachEvidence, createAgentRun, createToolResult, getAuditTimeline, proposePatch, rejectPatchDecision, transitionAgentRunStatus, type AgentAuditEvent, type AgentEvidence, type AgentRun, type AgentToolCall, type PatchDecision, type PatchProposal } from "@chemd/agent-tools";
 import { buildEditorGraphRagRecords, compileChemdForEditor, type ChemdEditorDiagnostic, type ChemdLanguageCompileOutput, type ChemdOutlineItem, type ChemdQuickFixProposal, type ChemdTextEdit } from "@chemd/language-service";
@@ -76,6 +76,16 @@ type LocalSyncState = {
   summary: LocalSyncSummary | null;
 };
 type PostgresField = [string, string];
+type ActivityTool = "files" | "search" | "graph" | "agent" | "settings";
+type LayoutPanel = "sidebar" | "insight" | "bottom";
+type DesktopLayoutState = {
+  sidebarWidth: number;
+  insightWidth: number;
+  bottomHeight: number;
+  sidebarCollapsed: boolean;
+  insightCollapsed: boolean;
+  bottomCollapsed: boolean;
+};
 type DesktopWorkbenchProps = {
   workspace: WorkspaceHandle;
   workspaceState: WorkspaceState;
@@ -158,7 +168,85 @@ const sampleSources: Record<string, string> = {
   "calibration.chemd.md": "---\nid: exp-desktop-calibration\ntitle: HPLC calibration record\ndate: 2026-05-12\n---\n\n:::sample #std-a\nname: caffeine standard\namount: 2.0 mg\n:::\n\n:::analysis #calibration\nmethod: HPLC-UV\ntarget: caffeine\nresult: linear fit accepted\n:::\n"
 };
 
-const activityItems = [{ id: "files", label: "Files", icon: Files, active: true }, { id: "search", label: "RAG Search", icon: Search, active: false }, { id: "graph", label: "Reaction Graph", icon: GitGraph, active: false }, { id: "agent", label: "Agent Runs", icon: Bot, active: false }, { id: "settings", label: "Settings", icon: Settings, active: false }];
+const activityItems: { id: ActivityTool; label: string; icon: typeof Files }[] = [
+  { id: "files", label: "Files", icon: Files },
+  { id: "search", label: "RAG Search", icon: Search },
+  { id: "graph", label: "Reaction Graph", icon: GitGraph },
+  { id: "agent", label: "Agent Runs", icon: Bot },
+  { id: "settings", label: "Settings", icon: Settings }
+];
+
+const layoutBounds: Record<LayoutPanel, { defaultValue: number; min: number; max: number; step: number }> = {
+  sidebar: { defaultValue: 272, min: 208, max: 420, step: 16 },
+  insight: { defaultValue: 376, min: 320, max: 640, step: 16 },
+  bottom: { defaultValue: 176, min: 104, max: 420, step: 16 }
+};
+
+const initialDesktopLayout: DesktopLayoutState = {
+  sidebarWidth: layoutBounds.sidebar.defaultValue,
+  insightWidth: layoutBounds.insight.defaultValue,
+  bottomHeight: layoutBounds.bottom.defaultValue,
+  sidebarCollapsed: false,
+  insightCollapsed: false,
+  bottomCollapsed: false
+};
+
+const clampLayoutSize = (panel: LayoutPanel, value: number): number => {
+  const { min, max } = layoutBounds[panel];
+  return Math.min(max, Math.max(min, value));
+};
+
+const getLayoutSize = (layout: DesktopLayoutState, panel: LayoutPanel): number => {
+  if (panel === "sidebar") return layout.sidebarWidth;
+  if (panel === "insight") return layout.insightWidth;
+  return layout.bottomHeight;
+};
+
+const setLayoutSize = (
+  layout: DesktopLayoutState,
+  panel: LayoutPanel,
+  value: number
+): DesktopLayoutState => {
+  const nextSize = clampLayoutSize(panel, value);
+  if (panel === "sidebar") return { ...layout, sidebarWidth: nextSize, sidebarCollapsed: false };
+  if (panel === "insight") return { ...layout, insightWidth: nextSize, insightCollapsed: false };
+  return { ...layout, bottomHeight: nextSize, bottomCollapsed: false };
+};
+
+const toggleLayoutPanel = (layout: DesktopLayoutState, panel: LayoutPanel): DesktopLayoutState => {
+  if (panel === "sidebar") return { ...layout, sidebarCollapsed: !layout.sidebarCollapsed };
+  if (panel === "insight") return { ...layout, insightCollapsed: !layout.insightCollapsed };
+  return { ...layout, bottomCollapsed: !layout.bottomCollapsed };
+};
+
+const isLayoutPanelCollapsed = (layout: DesktopLayoutState, panel: LayoutPanel): boolean => {
+  if (panel === "sidebar") return layout.sidebarCollapsed;
+  if (panel === "insight") return layout.insightCollapsed;
+  return layout.bottomCollapsed;
+};
+
+const getResizeDelta = (panel: LayoutPanel, startX: number, startY: number, event: PointerEvent): number => {
+  if (panel === "sidebar") return event.clientX - startX;
+  if (panel === "insight") return startX - event.clientX;
+  return startY - event.clientY;
+};
+
+const getKeyboardResizeDelta = (panel: LayoutPanel, key: string): number => {
+  const step = layoutBounds[panel].step;
+  if (panel === "bottom") {
+    if (key === "ArrowUp") return step;
+    if (key === "ArrowDown") return -step;
+    return 0;
+  }
+  if (panel === "insight") {
+    if (key === "ArrowLeft") return step;
+    if (key === "ArrowRight") return -step;
+    return 0;
+  }
+  if (key === "ArrowRight") return step;
+  if (key === "ArrowLeft") return -step;
+  return 0;
+};
 
 const statusToneByState: Record<RuntimeState, string> = { ready: "success", placeholder: "pending", degraded: "warning", offline: "danger" };
 const workspaceStateLabel: Record<WorkspaceState, string> = { empty: "Empty", opening: "Opening", open: "Open", error: "Fallback" };
@@ -1320,13 +1408,152 @@ const TopBar = ({
   </header>
 );
 
-const ActivityRail = () => (
+const useDesktopLayout = () => {
+  const [layout, setLayout] = useState<DesktopLayoutState>(initialDesktopLayout);
+  const style = useMemo(() => ({
+    "--desktop-sidebar-width": `${layout.sidebarWidth}px`,
+    "--desktop-insight-width": `${layout.insightWidth}px`,
+    "--desktop-bottom-height": `${layout.bottomHeight}px`
+  }) as CSSProperties, [layout.bottomHeight, layout.insightWidth, layout.sidebarWidth]);
+
+  const togglePanel = (panel: LayoutPanel) => {
+    setLayout((current) => toggleLayoutPanel(current, panel));
+  };
+
+  const expandPanel = (panel: LayoutPanel) => {
+    setLayout((current) => {
+      if (!isLayoutPanelCollapsed(current, panel)) return current;
+      return toggleLayoutPanel(current, panel);
+    });
+  };
+
+  const beginResize = (panel: LayoutPanel, event: ReactPointerEvent<HTMLDivElement>) => {
+    if (isLayoutPanelCollapsed(layout, panel)) return;
+    event.preventDefault();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startSize = getLayoutSize(layout, panel);
+    document.body.dataset.desktopResizePanel = panel;
+
+    const onMove = (moveEvent: PointerEvent) => {
+      const delta = getResizeDelta(panel, startX, startY, moveEvent);
+      setLayout((current) => setLayoutSize(current, panel, startSize + delta));
+    };
+    const onEnd = () => {
+      delete document.body.dataset.desktopResizePanel;
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onEnd);
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onEnd, { once: true });
+  };
+
+  const handleKeyDown = (panel: LayoutPanel, event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      togglePanel(panel);
+      return;
+    }
+    const delta = getKeyboardResizeDelta(panel, event.key);
+    if (delta === 0) return;
+    event.preventDefault();
+    setLayout((current) => {
+      const expanded = isLayoutPanelCollapsed(current, panel) ? toggleLayoutPanel(current, panel) : current;
+      return setLayoutSize(expanded, panel, getLayoutSize(expanded, panel) + delta);
+    });
+  };
+
+  const resetPanel = (panel: LayoutPanel) => {
+    setLayout((current) => setLayoutSize(current, panel, layoutBounds[panel].defaultValue));
+  };
+
+  return { layout, style, beginResize, togglePanel, expandPanel, handleKeyDown, resetPanel };
+};
+
+const ActivityRail = ({
+  activeTool,
+  onSelectTool
+}: {
+  activeTool: ActivityTool;
+  onSelectTool: (tool: ActivityTool) => void;
+}) => (
   <nav className="desktop-activity-rail" aria-label="Primary tools">
-    {activityItems.map(({ id, label, icon: Icon, active }) => (
-      <button key={id} type="button" className="desktop-rail-button" data-active={active} aria-label={label} title={label}><Icon size={18} /></button>
+    {activityItems.map(({ id, label, icon: Icon }) => (
+      <button
+        key={id}
+        type="button"
+        className="desktop-rail-button"
+        data-active={id === activeTool}
+        aria-label={label}
+        aria-pressed={id === activeTool}
+        title={label}
+        onClick={() => onSelectTool(id)}
+      >
+        <Icon size={18} />
+      </button>
     ))}
   </nav>
 );
+
+const ResizeHandle = ({
+  panel,
+  collapsed,
+  value,
+  onPointerDown,
+  onKeyDown,
+  onToggle,
+  onReset
+}: {
+  panel: LayoutPanel;
+  collapsed: boolean;
+  value: number;
+  onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
+  onToggle: () => void;
+  onReset: () => void;
+}) => {
+  const orientation = panel === "bottom" ? "horizontal" : "vertical";
+  const label = panel === "sidebar" ? "Files sidebar" : panel === "insight" ? "Insight sidebar" : "Bottom panel";
+  const ToggleIcon = panel === "sidebar"
+    ? collapsed ? PanelLeftOpen : PanelLeftClose
+    : panel === "insight"
+      ? collapsed ? PanelRightOpen : PanelRightClose
+      : collapsed ? PanelBottomOpen : PanelBottomClose;
+  const GripIcon = orientation === "vertical" ? GripVertical : GripHorizontal;
+
+  return (
+    <div
+      className="desktop-resize-handle"
+      data-panel={panel}
+      data-orientation={orientation}
+      data-collapsed={collapsed}
+      role="separator"
+      aria-label={`${label} resize`}
+      aria-orientation={orientation}
+      aria-valuemin={layoutBounds[panel].min}
+      aria-valuemax={layoutBounds[panel].max}
+      aria-valuenow={collapsed ? 0 : value}
+      tabIndex={0}
+      title={`${label}: drag to resize, double-click to reset`}
+      onPointerDown={onPointerDown}
+      onDoubleClick={onReset}
+      onKeyDown={onKeyDown}
+    >
+      <GripIcon className="desktop-resize-grip" size={14} aria-hidden="true" />
+      <button
+        type="button"
+        className="desktop-resize-toggle"
+        aria-label={collapsed ? `Expand ${label}` : `Collapse ${label}`}
+        title={collapsed ? `Expand ${label}` : `Collapse ${label}`}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={onToggle}
+      >
+        <ToggleIcon size={14} />
+      </button>
+    </div>
+  );
+};
 
 const Sidebar = ({
   files,
@@ -2121,52 +2348,96 @@ const DesktopWorkbench = ({
   onApprovePatch,
   onApplyPatch,
   onRejectPatch
-}: DesktopWorkbenchProps) => (
-  <main className="desktop-shell">
-    <TopBar workspace={workspace} workspaceState={workspaceState} sidecarStatus={sidecarController.status} postgresStatus={postgresController.status} diagnosticCount={output.diagnostics.length} dirty={source !== savedSource} rootPath={rootPath} canSave={canSave} onRootPathChange={onRootPathChange} onSave={onSave} onOpenWorkspace={onOpenWorkspace} />
-    <div className="desktop-workbench">
-      <ActivityRail />
-      <Sidebar files={files} selectedFileId={selectedFileId} mode={mode} message={message} onSelectFile={onSelectFile} />
-      <div className="desktop-main-grid">
-        <EditorPane fileName={selectedFile.name} mode={mode} source={source} lineCount={source.split(/\r?\n/).length} compiledAt={output.compiledAt} onChange={onSourceChange} />
-        <InsightPane
-          outline={output.outline}
-          diagnostics={output.diagnostics}
-          mode={mode}
-          sidecarStatus={sidecarController.status} sidecarLogTail={sidecarController.logTail} sidecarOperation={sidecarController.operation} sidecarMessage={sidecarController.message} sidecarError={sidecarController.error}
-          postgresStatus={postgresController.status} managedPostgresStatus={postgresController.managedStatus} postgresLoading={postgresController.loading} managedPostgresOperation={postgresController.managedOperation} postgresError={postgresController.error} managedPostgresError={postgresController.managedError} managedPostgresMessage={postgresController.managedMessage}
-          persistState={persistController.state}
-          persistDisabledReason={persistController.disabledReason}
-          localStoreStatus={localStoreController.status}
-          localStoreOperation={localStoreController.operation}
-          localSnapshotState={localStoreController.snapshotState}
-          localSyncState={localStoreController.syncState}
-          localStoreDisabledReason={localStoreController.disabledReason}
-          localStoreSyncDisabledReason={localStoreController.syncDisabledReason}
-          localStoreError={localStoreController.error}
-          agentRun={agentRun}
-          agentMessage={agentMessage}
-          onStartSidecar={sidecarController.start} onStopSidecar={sidecarController.stop} onRefreshSidecar={sidecarController.refresh} onLoadSidecarLogs={sidecarController.loadLogs}
-          onRefreshPostgres={postgresController.refresh}
-          onInitManagedPostgres={postgresController.initializeManaged}
-          onStartManagedPostgres={postgresController.startManaged}
-          onStopManagedPostgres={postgresController.stopManaged}
-          onMigrateManagedPostgres={postgresController.migrateManaged}
-          onRefreshManagedPostgres={postgresController.refreshManaged}
-          onPersistGraph={persistController.persist}
-          onRefreshLocalStore={localStoreController.refresh}
-          onSaveLocalSnapshot={localStoreController.saveSnapshot}
-          onSyncLocalOutbox={localStoreController.syncPending}
-          onProposeQuickFix={onProposeQuickFix}
-          onApprovePatch={onApprovePatch}
-          onApplyPatch={onApplyPatch}
-          onRejectPatch={onRejectPatch}
+}: DesktopWorkbenchProps) => {
+  const [activeTool, setActiveTool] = useState<ActivityTool>("files");
+  const layoutController = useDesktopLayout();
+  const { layout } = layoutController;
+
+  const selectTool = (tool: ActivityTool) => {
+    setActiveTool(tool);
+    if (tool === "files") {
+      layoutController.expandPanel("sidebar");
+      return;
+    }
+    layoutController.expandPanel("insight");
+  };
+
+  return (
+    <main className="desktop-shell">
+      <TopBar workspace={workspace} workspaceState={workspaceState} sidecarStatus={sidecarController.status} postgresStatus={postgresController.status} diagnosticCount={output.diagnostics.length} dirty={source !== savedSource} rootPath={rootPath} canSave={canSave} onRootPathChange={onRootPathChange} onSave={onSave} onOpenWorkspace={onOpenWorkspace} />
+      <div className="desktop-workbench" style={layoutController.style} data-sidebar-collapsed={layout.sidebarCollapsed}>
+        <ActivityRail activeTool={activeTool} onSelectTool={selectTool} />
+        {layout.sidebarCollapsed ? null : <Sidebar files={files} selectedFileId={selectedFileId} mode={mode} message={message} onSelectFile={onSelectFile} />}
+        <ResizeHandle
+          panel="sidebar"
+          collapsed={layout.sidebarCollapsed}
+          value={layout.sidebarWidth}
+          onPointerDown={(event) => layoutController.beginResize("sidebar", event)}
+          onKeyDown={(event) => layoutController.handleKeyDown("sidebar", event)}
+          onToggle={() => layoutController.togglePanel("sidebar")}
+          onReset={() => layoutController.resetPanel("sidebar")}
         />
-        <BottomPanel diagnostics={output.diagnostics} compileStatus={output.status} errorMessage={compileError} />
+        <div className="desktop-main-grid" data-insight-collapsed={layout.insightCollapsed} data-bottom-collapsed={layout.bottomCollapsed}>
+          <EditorPane fileName={selectedFile.name} mode={mode} source={source} lineCount={source.split(/\r?\n/).length} compiledAt={output.compiledAt} onChange={onSourceChange} />
+          <ResizeHandle
+            panel="insight"
+            collapsed={layout.insightCollapsed}
+            value={layout.insightWidth}
+            onPointerDown={(event) => layoutController.beginResize("insight", event)}
+            onKeyDown={(event) => layoutController.handleKeyDown("insight", event)}
+            onToggle={() => layoutController.togglePanel("insight")}
+            onReset={() => layoutController.resetPanel("insight")}
+          />
+          {layout.insightCollapsed ? null : (
+            <InsightPane
+              outline={output.outline}
+              diagnostics={output.diagnostics}
+              mode={mode}
+              sidecarStatus={sidecarController.status} sidecarLogTail={sidecarController.logTail} sidecarOperation={sidecarController.operation} sidecarMessage={sidecarController.message} sidecarError={sidecarController.error}
+              postgresStatus={postgresController.status} managedPostgresStatus={postgresController.managedStatus} postgresLoading={postgresController.loading} managedPostgresOperation={postgresController.managedOperation} postgresError={postgresController.error} managedPostgresError={postgresController.managedError} managedPostgresMessage={postgresController.managedMessage}
+              persistState={persistController.state}
+              persistDisabledReason={persistController.disabledReason}
+              localStoreStatus={localStoreController.status}
+              localStoreOperation={localStoreController.operation}
+              localSnapshotState={localStoreController.snapshotState}
+              localSyncState={localStoreController.syncState}
+              localStoreDisabledReason={localStoreController.disabledReason}
+              localStoreSyncDisabledReason={localStoreController.syncDisabledReason}
+              localStoreError={localStoreController.error}
+              agentRun={agentRun}
+              agentMessage={agentMessage}
+              onStartSidecar={sidecarController.start} onStopSidecar={sidecarController.stop} onRefreshSidecar={sidecarController.refresh} onLoadSidecarLogs={sidecarController.loadLogs}
+              onRefreshPostgres={postgresController.refresh}
+              onInitManagedPostgres={postgresController.initializeManaged}
+              onStartManagedPostgres={postgresController.startManaged}
+              onStopManagedPostgres={postgresController.stopManaged}
+              onMigrateManagedPostgres={postgresController.migrateManaged}
+              onRefreshManagedPostgres={postgresController.refreshManaged}
+              onPersistGraph={persistController.persist}
+              onRefreshLocalStore={localStoreController.refresh}
+              onSaveLocalSnapshot={localStoreController.saveSnapshot}
+              onSyncLocalOutbox={localStoreController.syncPending}
+              onProposeQuickFix={onProposeQuickFix}
+              onApprovePatch={onApprovePatch}
+              onApplyPatch={onApplyPatch}
+              onRejectPatch={onRejectPatch}
+            />
+          )}
+          <ResizeHandle
+            panel="bottom"
+            collapsed={layout.bottomCollapsed}
+            value={layout.bottomHeight}
+            onPointerDown={(event) => layoutController.beginResize("bottom", event)}
+            onKeyDown={(event) => layoutController.handleKeyDown("bottom", event)}
+            onToggle={() => layoutController.togglePanel("bottom")}
+            onReset={() => layoutController.resetPanel("bottom")}
+          />
+          {layout.bottomCollapsed ? null : <BottomPanel diagnostics={output.diagnostics} compileStatus={output.status} errorMessage={compileError} />}
+        </div>
       </div>
-    </div>
-  </main>
-);
+    </main>
+  );
+};
 
 export const App = () => {
   const initialSource = sampleSources["suzuki-screen.chemd.md"];
@@ -2188,7 +2459,7 @@ export const App = () => {
   const output = useMemo(() => compileChemdForEditor({
     source,
     documentUri: selectedFile.path,
-    options: { strictChemdKind: true }
+    options: { strictChemdKind: true, procedureMode: "auto" }
   }), [selectedFile.path, source]);
   const compileError = output.status === "failed" ? output.error.message : undefined;
   const canSave = mode === "workspace" && selectedFile.kind === "file" && source !== savedSource && workspace.writable;

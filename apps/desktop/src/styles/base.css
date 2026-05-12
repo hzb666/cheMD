@@ -69,6 +69,19 @@
   button:disabled {
     @apply cursor-not-allowed opacity-[0.55];
   }
+
+  body[data-desktop-resize-panel] {
+    user-select: none;
+  }
+
+  body[data-desktop-resize-panel="sidebar"],
+  body[data-desktop-resize-panel="insight"] {
+    cursor: col-resize;
+  }
+
+  body[data-desktop-resize-panel="bottom"] {
+    cursor: row-resize;
+  }
 }
 
 @layer components {
