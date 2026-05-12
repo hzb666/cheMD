@@ -346,6 +346,80 @@
   gap: 0.35rem;
 }
 
+.desktop-postgres-target {
+  min-width: 0;
+  gap: 0.45rem;
+  padding: 0.45rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #fff;
+}
+
+.desktop-postgres-target strong {
+  flex: 0 0 auto;
+  color: var(--accent-foreground);
+  font-size: 0.65rem;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.desktop-postgres-target span {
+  min-width: 0;
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.desktop-postgres-target[data-target="external"] {
+  border-color: color-mix(in srgb, var(--primary) 22%, var(--border));
+  background: #f7fbff;
+}
+
+.desktop-postgres-split {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+}
+
+.desktop-postgres-subpanel {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #fff;
+}
+
+.desktop-postgres-subhead {
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.desktop-postgres-subhead span {
+  color: var(--foreground);
+  font-size: 0.74rem;
+  font-weight: 650;
+}
+
+.desktop-postgres-subhead small {
+  color: var(--muted-foreground);
+  font-size: 0.67rem;
+  font-weight: 650;
+}
+
+.desktop-managed-actions {
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.desktop-managed-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 .desktop-postgres-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -402,6 +476,12 @@
   border-color: color-mix(in srgb, var(--warning) 30%, var(--border));
   background: #fff8ed;
   color: var(--warning);
+}
+
+.desktop-postgres-message[data-tone="info"] {
+  border-color: var(--border);
+  background: #fbfcfe;
+  color: var(--muted-foreground);
 }
 
 .desktop-persist-status {
