@@ -32,6 +32,7 @@ Tauri runtime 的 local store 根目录来自 app data 目录下的 `local-store
 script smoke 为了可重复验证，会写入临时目录，或使用显式目录：
 
 ```sh
+CHEMD_DESKTOP_OFFLINE_SMOKE_DIR=.tmp/desktop-offline-smoke pnpm desktop:offline-core-smoke
 CHEMD_DESKTOP_OFFLINE_SMOKE_DIR=.tmp/desktop-offline-smoke pnpm desktop:runtime-smoke
 ```
 
@@ -42,6 +43,24 @@ offline smoke 写入两个 JSON 文件：
 
 outbox entry 使用 `idempotencyKey` 去重；相同 snapshot 再次保存会更新已有
 pending entry，而不是伪造新的数据库记录。
+
+## Offline Core smoke
+
+`pnpm desktop:offline-core-smoke` 是 M1/M3 的 P0 离线验收入口。它会显式移除
+外部 PostgreSQL env 与 managed PostgreSQL env，只验证无 DB、无 managed
+binaries、无 sidecar 前提下的本地 runtime snapshot/outbox 写入。
+
+通过时输出：
+
+```text
+SKIP database persistence: Offline Core smoke runs with database and managed PostgreSQL env disabled.
+Chemd desktop offline core smoke passed.
+```
+
+这不是 PostgreSQL 持久化通过。`SKIP database persistence` 只说明本次验收刻意
+不使用数据库；`offline core smoke passed` 只证明本地 JSON snapshot/outbox
+存在、pending outbox 数量大于 0，且输出不包含 database URL、password、API
+key 或完整 env。
 
 ## 重连同步语义
 
@@ -66,6 +85,12 @@ patch proposal 相关表。
 pnpm test:scripts
 ```
 
+Offline Core smoke：
+
+```sh
+pnpm desktop:offline-core-smoke
+```
+
 完整 runtime smoke：
 
 ```sh
@@ -82,8 +107,8 @@ managed PostgreSQL target，并执行同一套数据库写入与读回。
 当外部 DB 和 managed binaries 都不可用时，smoke 应输出：
 
 - `SKIP database persistence: ...`
-- `Chemd desktop local offline smoke passed.`
-- local offline store、snapshot 与 outbox 路径
+- `Chemd desktop offline core smoke passed.`
+- offline core store、snapshot 与 outbox 路径
 - pending outbox 数量与 graph snapshot id
 
 这里的 `SKIP database persistence` 是环境分类，表示当前机器没有可用
