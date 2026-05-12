@@ -1,17 +1,22 @@
 :root {
-  --background: #ffffff;
-  --foreground: rgba(0, 0, 0, 0.95);
-  --card: #ffffff;
-  --muted: #f6f5f4;
-  --muted-foreground: #615d59;
-  --accent: #f2f9ff;
-  --accent-foreground: #097fe8;
-  --primary: #0075de;
-  --primary-foreground: #ffffff;
-  --border: rgba(0, 0, 0, 0.1);
-  --success: #1aae39;
-  --warning: #dd5b00;
-  --danger: #c2410c;
+  color-scheme: light;
+  --background: oklch(99.1% 0.003 247.9);
+  --foreground: oklch(21.7% 0.035 257.4);
+  --card: oklch(100% 0 0);
+  --panel: oklch(98.3% 0.006 247.9);
+  --panel-elevated: oklch(96.8% 0.01 247.9);
+  --muted: oklch(96.3% 0.006 74.7);
+  --muted-foreground: oklch(45.8% 0.025 69.5);
+  --accent: oklch(96.3% 0.026 236.6);
+  --accent-foreground: oklch(53.7% 0.176 253.1);
+  --primary: oklch(56.6% 0.194 253.3);
+  --primary-foreground: oklch(100% 0 0);
+  --border: oklch(88.8% 0.012 247.9);
+  --success: oklch(62.7% 0.178 146.6);
+  --warning: oklch(62.9% 0.177 51.8);
+  --danger: oklch(54.6% 0.188 32.1);
+  --grid-line: oklch(51.2% 0.065 257.4 / 0.08);
+  --shadow-low: oklch(21.7% 0.035 257.4 / 0.06);
   --font-sans: Inter, "Segoe UI", system-ui, sans-serif;
   --font-mono: "SFMono-Regular", "Cascadia Code", Consolas, monospace;
 }
@@ -20,6 +25,8 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
+  --color-panel: var(--panel);
+  --color-panel-elevated: var(--panel-elevated);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
@@ -27,95 +34,92 @@
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-border: var(--border);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --font-sans: Inter, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+  --radius-desktop: 7px;
 }
 
-* {
-  box-sizing: border-box;
+@layer base {
+  * {
+    @apply box-border;
+  }
+
+  html,
+  body,
+  #root {
+    @apply h-full min-h-full;
+  }
+
+  body {
+    @apply m-0 bg-background text-foreground font-sans;
+    text-rendering: optimizeLegibility;
+  }
+
+  button {
+    font: inherit;
+  }
+
+  button:not(:disabled) {
+    @apply cursor-pointer;
+  }
+
+  button:disabled {
+    @apply cursor-not-allowed opacity-[0.55];
+  }
 }
 
-html,
-body,
-#root {
-  min-height: 100%;
-  height: 100%;
-}
+@layer components {
+  .desktop-shell {
+    @apply flex h-full min-h-[640px] min-w-0 flex-col overflow-auto bg-background;
+  }
 
-body {
-  margin: 0;
-  color: var(--foreground);
-  background: var(--background);
-  font-family: var(--font-sans);
-  text-rendering: optimizeLegibility;
-}
+  .desktop-brand,
+  .desktop-runtime-badges,
+  .desktop-topbar-center,
+  .desktop-panel-header,
+  .desktop-sidebar-action-row,
+  .desktop-editor-toolbar,
+  .desktop-bottom-tabs,
+  .desktop-log-line,
+  .desktop-agent-heading,
+  .desktop-agent-subhead,
+  .desktop-agent-action-row,
+  .desktop-agent-ledger,
+  .desktop-sidecar-heading,
+  .desktop-sidecar-actions,
+  .desktop-postgres-heading,
+  .desktop-postgres-actions,
+  .desktop-postgres-target,
+  .desktop-postgres-subhead,
+  .desktop-managed-actions,
+  .desktop-local-store-heading,
+  .desktop-local-store-actions,
+  .desktop-persist-status-row,
+  .desktop-outline-row,
+  .desktop-quickfix-list button,
+  .desktop-agent-timeline-row,
+  .desktop-diagnostic-row,
+  .desktop-diagnostic-summary {
+    @apply flex items-center;
+  }
 
-button {
-  font: inherit;
-}
-
-button:not(:disabled) {
-  cursor: pointer;
-}
-
-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.desktop-shell {
-  display: flex;
-  min-width: 0;
-  height: 100%;
-  min-height: 640px;
-  flex-direction: column;
-  overflow: auto;
-  background: var(--background);
-}
-
-.desktop-brand,
-.desktop-runtime-badges,
-.desktop-topbar-center,
-.desktop-panel-header,
-.desktop-sidebar-action-row,
-.desktop-editor-toolbar,
-.desktop-bottom-tabs,
-.desktop-log-line,
-.desktop-agent-heading,
-.desktop-agent-subhead,
-.desktop-agent-action-row,
-.desktop-agent-ledger,
-.desktop-sidecar-heading,
-.desktop-sidecar-actions,
-.desktop-postgres-heading,
-.desktop-postgres-actions,
-.desktop-postgres-target,
-.desktop-postgres-subhead,
-.desktop-managed-actions,
-.desktop-local-store-heading,
-.desktop-local-store-actions,
-.desktop-persist-status-row,
-.desktop-outline-row,
-.desktop-quickfix-list button,
-.desktop-agent-timeline-row,
-.desktop-diagnostic-row,
-.desktop-diagnostic-summary {
-  display: flex;
-  align-items: center;
-}
-
-.desktop-workspace-name,
-.desktop-path-chip,
-.desktop-panel-meta,
-.desktop-toolbar-text,
-.desktop-file-kind,
-.desktop-sidebar-note,
-.desktop-log-line,
-.desktop-empty-copy {
-  color: var(--muted-foreground);
-  font-size: 0.75rem;
+  .desktop-workspace-name,
+  .desktop-path-chip,
+  .desktop-panel-meta,
+  .desktop-toolbar-text,
+  .desktop-file-kind,
+  .desktop-sidebar-note,
+  .desktop-log-line,
+  .desktop-empty-copy {
+    @apply text-xs text-muted-foreground;
+  }
 }
 
 @media (min-width: 900px) {
   .desktop-shell {
-    overflow: hidden;
+    @apply overflow-hidden;
   }
 }
