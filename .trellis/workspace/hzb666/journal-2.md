@@ -684,3 +684,42 @@ Merged offline release readiness aggregation and the Tauri export_diagnostics_bu
 ### Next Steps
 
 - None - task complete
+
+
+## Session 55: Desktop IDE map first wave core packages
+
+**Date**: 2026-05-13
+**Task**: Desktop IDE map first wave core packages
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Merged the map production plan, language-service completion core, and exporter-training reaction cluster view adapter. Main validation passed language-service tests 18/18 plus typecheck, exporter-training tests 23/23 plus typecheck, and diff check. Workspace-index subtask was stopped and not merged because it kept creating a new workspace package outside approved scope.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8131982` | (see git log) |
+| `a5bfa29` | (see git log) |
+| `39f199a` | (see git log) |
+| `4505d50` | (see git log) |
+| `661445f` | (see git log) |
+| `6e0f39a` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
