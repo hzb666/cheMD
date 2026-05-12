@@ -32,6 +32,8 @@ const LOCAL_STORE_SNAPSHOT_FILE = "runtime-snapshot.json";
 const LOCAL_STORE_OUTBOX_FILE = "outbox.json";
 const RUNTIME_CREATED_AT = "2026-05-12T00:00:00.000Z";
 const RUNTIME_SOURCE = "---\nid: exp-desktop-runtime-smoke\ntitle: Desktop runtime smoke\ndate: 2026-05-12\n---\n\n:::chemd #rxn-runtime-smoke\nkind: reaction\nreactants: aldehyde\nproducts: alcohol\nyield: 72%\n:::\n";
+const TAURI_COMMAND_RUNNER_ENV = "CHEMD_DESKTOP_TAURI_COMMAND_RUNNER";
+const TAURI_COMMAND_RUNNER_ARGS_ENV = "CHEMD_DESKTOP_TAURI_COMMAND_RUNNER_ARGS";
 
 const safeTrim = (value) => (typeof value === "string" ? value.trim() : "");
 
@@ -359,6 +361,67 @@ export const loadDesktopLocalStoreModules = async () => {
   return {
     buildLocalRuntimeSnapshotInput: localStore.buildLocalRuntimeSnapshotInput
   };
+};
+
+const parseRunnerArgs = (value) => {
+  const trimmed = safeTrim(value);
+  if (!trimmed) {
+    return [];
+  }
+  const parsed = JSON.parse(trimmed);
+  if (!Array.isArray(parsed) || parsed.some((arg) => typeof arg !== "string")) {
+    throw new Error(`${TAURI_COMMAND_RUNNER_ARGS_ENV} must be a JSON string array`);
+  }
+  return parsed;
+};
+
+const runTauriCommandRunnerProcess = ({
+  runnerPath,
+  runnerArgs,
+  command,
+  input,
+  spawnProcess = spawn
+}) =>
+  new Promise((resolve, reject) => {
+    const child = spawnProcess(runnerPath, [...runnerArgs, command], {
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout?.on("data", (chunk) => {
+      stdout += String(chunk);
+    });
+    child.stderr?.on("data", (chunk) => {
+      stderr += String(chunk);
+    });
+    child.once("error", reject);
+    child.once("close", (code) => {
+      if (code !== 0) {
+        reject(new Error(`runner exited ${code}: ${stderr.trim() || stdout.trim() || "no output"}`));
+        return;
+      }
+      const body = stdout.trim();
+      if (!body) {
+        resolve(undefined);
+        return;
+      }
+      const parsed = JSON.parse(body);
+      resolve(Object.hasOwn(parsed, "output") ? parsed.output : parsed);
+    });
+    child.stdin?.end(`${JSON.stringify({ command, input: input ?? null })}\n`);
+  });
+
+export const createDesktopTauriCommandRunner = ({
+  env = process.env,
+  spawnProcess = spawn
+} = {}) => {
+  const runnerPath = safeTrim(env[TAURI_COMMAND_RUNNER_ENV]);
+  if (!runnerPath) {
+    return undefined;
+  }
+  const runnerArgs = parseRunnerArgs(env[TAURI_COMMAND_RUNNER_ARGS_ENV]);
+  return ({ command, input }) =>
+    runTauriCommandRunnerProcess({ runnerPath, runnerArgs, command, input, spawnProcess });
 };
 
 export const buildMinimalDesktopRuntimePersistencePayload = ({
@@ -772,6 +835,159 @@ export const runDesktopReconnectOutboxSyncSmoke = async ({
   }
 };
 
+const commandErrorMessage = (error) => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (error && typeof error === "object") {
+    return JSON.stringify(error);
+  }
+  return String(error);
+};
+
+const invokeSmokeCommand = async ({ commandRunner, command, input, commands }) => {
+  commands.push(command);
+  try {
+    return await commandRunner({ command, input });
+  } catch (error) {
+    throw new Error(`Tauri command ${command} failed: ${commandErrorMessage(error)}`);
+  }
+};
+
+const requireOutboxEntry = ({ entries, localId, idempotencyKey, syncStatus, phase }) => {
+  if (!Array.isArray(entries)) {
+    throw new Error(`Tauri command smoke expected ${phase} outbox entries to be an array`);
+  }
+  const entry = entries.find((candidate) =>
+    candidate?.localId === localId || candidate?.idempotencyKey === idempotencyKey
+  );
+  if (!entry) {
+    throw new Error(`Tauri command smoke did not find ${phase} outbox entry ${localId}`);
+  }
+  if (entry.syncStatus !== syncStatus) {
+    throw new Error(`Tauri command smoke expected ${phase} outbox status ${syncStatus}, got ${entry.syncStatus}`);
+  }
+  return entry;
+};
+
+const requireSyncedOutboxResult = ({ sync, localId, idempotencyKey }) => {
+  if (Number(sync?.syncedCount ?? 0) <= 0) {
+    throw new Error("Tauri command smoke did not sync any local outbox entries");
+  }
+  const entry = sync.entries?.find((candidate) =>
+    candidate?.localId === localId || candidate?.idempotencyKey === idempotencyKey
+  );
+  if (!entry || entry.syncStatus !== "synced") {
+    throw new Error(`Tauri command smoke did not sync local outbox entry ${localId}`);
+  }
+  return entry;
+};
+
+const saveCommandLocalSnapshot = async ({
+  commandRunner,
+  localStoreModules,
+  payloadBuilder,
+  revisionId,
+  commands
+}) => {
+  const modules = await localStoreModules();
+  const payload = payloadBuilder({ revisionId });
+  const snapshotInput = modules.buildLocalRuntimeSnapshotInput(payload);
+  validateLocalSnapshotInput(snapshotInput);
+  const saved = await invokeSmokeCommand({
+    commandRunner,
+    command: "save_local_runtime_snapshot",
+    input: snapshotInput,
+    commands
+  });
+  if (saved?.syncStatus !== "pending") {
+    throw new Error(`Tauri command smoke expected saved snapshot to be pending, got ${saved?.syncStatus}`);
+  }
+  return { payload, snapshotInput, saved };
+};
+
+export const runDesktopTauriCommandSmoke = async ({
+  env = process.env,
+  postgresMode = getPostgresDatabaseUrl(env) ? "external" : "managed",
+  commandRunner = createDesktopTauriCommandRunner({ env }),
+  localStoreModules = loadDesktopLocalStoreModules,
+  payloadBuilder = buildMinimalDesktopRuntimePersistencePayload,
+  revisionId = "rev-desktop-tauri-command-runtime-smoke"
+} = {}) => {
+  if (!commandRunner) {
+    return {
+      status: "skipped",
+      reason: "unsupported-tauri-command-runner",
+      detail: `Set ${TAURI_COMMAND_RUNNER_ENV} or inject commandRunner to run real Tauri command smoke`
+    };
+  }
+
+  const commands = [];
+  if (postgresMode === "managed") {
+    await invokeSmokeCommand({ commandRunner, command: "initialize_managed_postgres", commands });
+    await invokeSmokeCommand({ commandRunner, command: "start_managed_postgres", commands });
+    await invokeSmokeCommand({ commandRunner, command: "migrate_managed_postgres", commands });
+  }
+
+  const postgresStatus = await invokeSmokeCommand({ commandRunner, command: "read_postgres_status", commands });
+  const localStoreStatus = await invokeSmokeCommand({ commandRunner, command: "read_local_store_status", commands });
+  const { payload, saved } = await saveCommandLocalSnapshot({
+    commandRunner,
+    localStoreModules,
+    payloadBuilder,
+    revisionId,
+    commands
+  });
+  const pending = await invokeSmokeCommand({
+    commandRunner,
+    command: "list_local_outbox",
+    input: { syncStatus: "pending", limit: 10 },
+    commands
+  });
+  const pendingEntry = requireOutboxEntry({
+    entries: pending,
+    localId: saved.localId,
+    idempotencyKey: saved.idempotencyKey,
+    syncStatus: "pending",
+    phase: "pending"
+  });
+  const sync = await invokeSmokeCommand({ commandRunner, command: "sync_local_outbox_to_postgres", commands });
+  const syncEntry = requireSyncedOutboxResult({
+    sync,
+    localId: saved.localId,
+    idempotencyKey: saved.idempotencyKey
+  });
+  const synced = await invokeSmokeCommand({
+    commandRunner,
+    command: "list_local_outbox",
+    input: { syncStatus: "synced", limit: 10 },
+    commands
+  });
+  const syncedEntry = requireOutboxEntry({
+    entries: synced,
+    localId: saved.localId,
+    idempotencyKey: saved.idempotencyKey,
+    syncStatus: "synced",
+    phase: "synced"
+  });
+
+  return {
+    status: "tauri-command-passed",
+    detail: "Tauri command smoke verified local outbox pending -> synced through desktop commands",
+    postgresMode,
+    commands,
+    postgresStatus,
+    localStoreStatus,
+    graphSnapshotId: payload.graphSnapshot.graphSnapshotId,
+    localId: saved.localId,
+    idempotencyKey: saved.idempotencyKey,
+    pendingEntry,
+    sync,
+    syncEntry,
+    syncedEntry
+  };
+};
+
 export const checkDesktopRuntimePreconditions = ({
   rootDir = REPO_ROOT,
   fileExists = existsSync,
@@ -804,18 +1020,136 @@ const logDesktopChecks = (logger, checks) => {
   }
 };
 
-export const runDesktopRuntimeSmoke = async ({
-  rootDir = REPO_ROOT,
-  envLoader = loadPostgresEnv,
-  desktopCheck = checkDesktopRuntimePreconditions,
-  withClient = withPostgresRuntimeClient,
-  postgresSmoke = runPostgresSmoke,
-  persistenceSmoke = runDesktopRuntimePersistenceSmoke,
-  reconnectSyncSmoke = runDesktopReconnectOutboxSyncSmoke,
-  managedPostgres = startManagedPostgresSmokeRuntime,
-  offlineLocalStoreSmoke = runDesktopOfflineLocalStoreSmoke,
-  logger = console
-} = {}) => {
+const runOfflineDesktopRuntimeSmoke = async ({ rootDir, env, managed, offlineLocalStoreSmoke, logger }) => {
+  logger.log(`SKIP database persistence: ${managed.reason}.`);
+  const offline = await offlineLocalStoreSmoke({ rootDir, env });
+  logger.log("Chemd desktop local offline smoke passed.");
+  logger.log(`local offline store: ${offline.storeRoot}`);
+  logger.log(`local offline snapshot: ${offline.snapshotPath}`);
+  logger.log(`local offline outbox: ${offline.outboxPath}`);
+  logger.log(`local offline verification: pending=${offline.outboxPendingCount}, graph=${offline.graphSnapshotId}`);
+  return {
+    status: "offline-local-passed",
+    database: {
+      status: "skipped",
+      reason: "missing-postgres-runtime",
+      detail: managed.reason
+    },
+    offline
+  };
+};
+
+const prepareDesktopRuntimeSmokeTarget = async ({
+  rootDir,
+  env,
+  managedPostgres,
+  offlineLocalStoreSmoke,
+  logger
+}) => {
+  const databaseUrl = getPostgresDatabaseUrl(env);
+  if (databaseUrl) {
+    logger.log(`PostgreSQL target: ${summarizePostgresTarget(databaseUrl)}`);
+    return { smokeEnv: env, postgresMode: "external" };
+  }
+
+  const managed = await managedPostgres({ rootDir, env });
+  if (managed.status !== "started") {
+    return {
+      completed: await runOfflineDesktopRuntimeSmoke({
+        rootDir,
+        env,
+        managed,
+        offlineLocalStoreSmoke,
+        logger
+      })
+    };
+  }
+
+  logger.log(`Managed PostgreSQL target: ${managed.summary}`);
+  return {
+    smokeEnv: managed.env,
+    postgresMode: "managed",
+    cleanupManagedPostgres: managed.cleanup
+  };
+};
+
+const runConnectedDesktopRuntimeSmoke = async ({
+  rootDir,
+  smokeEnv,
+  postgresMode,
+  withClient,
+  postgresSmoke,
+  reconnectSyncSmoke,
+  persistenceSmoke,
+  tauriCommandSmoke
+}) =>
+  withClient({
+    env: smokeEnv,
+    operation: async (client) => {
+      const postgres = await postgresSmoke({ client });
+      const reconnectSync = await reconnectSyncSmoke({
+        client,
+        rootDir,
+        env: smokeEnv,
+        persistenceSmoke
+      });
+      const tauriCommand = await tauriCommandSmoke({
+        rootDir,
+        env: smokeEnv,
+        postgresMode
+      });
+      return { postgres, reconnectSync, persistence: reconnectSync.persistence, tauriCommand };
+    }
+  });
+
+const logDesktopRuntimeSuccess = (logger, result) => {
+  logger.log("Chemd desktop runtime smoke passed.");
+  logger.log(`experiment: ${result.postgres.experimentId}`);
+  logger.log(`revision: ${result.postgres.revisionId}`);
+  logger.log(`compile run: ${result.postgres.compileRunId}`);
+  logger.log(`rag chunks: ${result.postgres.ragChunks}`);
+  logger.log(`first chunk: ${result.postgres.firstChunkId}`);
+  logger.log(`runtime graph: ${result.reconnectSync.persistence.graphSnapshotId}`);
+  logger.log(`runtime verification: ${JSON.stringify(result.reconnectSync.persistence.counts)}`);
+  logger.log(`reconnect outbox sync: synced=${result.reconnectSync.sync.syncedCount}, pending=${result.reconnectSync.sync.outboxPendingCount}, failed=${result.reconnectSync.sync.outboxFailedCount}`);
+  logger.log("reconnect proof: script-level local outbox -> shared PostgreSQL smoke.");
+  if (result.tauriCommand.status === "skipped") {
+    logger.log(`SKIP Tauri command smoke: ${result.tauriCommand.detail}`);
+    return;
+  }
+  logger.log(`Tauri command smoke passed: graph=${result.tauriCommand.graphSnapshotId}, local=${result.tauriCommand.localId}, synced=${result.tauriCommand.sync.syncedCount}`);
+};
+
+const createDesktopRuntimeSmokeOptions = (options) => ({
+  rootDir: REPO_ROOT,
+  envLoader: loadPostgresEnv,
+  desktopCheck: checkDesktopRuntimePreconditions,
+  withClient: withPostgresRuntimeClient,
+  postgresSmoke: runPostgresSmoke,
+  persistenceSmoke: runDesktopRuntimePersistenceSmoke,
+  reconnectSyncSmoke: runDesktopReconnectOutboxSyncSmoke,
+  tauriCommandSmoke: runDesktopTauriCommandSmoke,
+  managedPostgres: startManagedPostgresSmokeRuntime,
+  offlineLocalStoreSmoke: runDesktopOfflineLocalStoreSmoke,
+  logger: console,
+  ...options
+});
+
+export const runDesktopRuntimeSmoke = async (options = {}) => {
+  const {
+    rootDir,
+    envLoader,
+    desktopCheck,
+    withClient,
+    postgresSmoke,
+    persistenceSmoke,
+    reconnectSyncSmoke,
+    tauriCommandSmoke,
+    managedPostgres,
+    offlineLocalStoreSmoke,
+    logger
+  } = createDesktopRuntimeSmokeOptions(options);
+
   logger.log("Chemd desktop runtime smoke starting.");
   const { env, loadedFiles } = envLoader({ rootDir });
   logger.log(`Loaded env files: ${formatLoadedEnvFiles(loadedFiles)}`);
@@ -826,65 +1160,34 @@ export const runDesktopRuntimeSmoke = async ({
     throw new Error("Desktop runtime preflight failed.");
   }
 
-  const databaseUrl = getPostgresDatabaseUrl(env);
-  let smokeEnv = env;
-  let cleanupManagedPostgres;
-  if (databaseUrl) {
-    logger.log(`PostgreSQL target: ${summarizePostgresTarget(databaseUrl)}`);
-  } else {
-    const managed = await managedPostgres({ rootDir, env });
-    if (managed.status !== "started") {
-      logger.log(`SKIP database persistence: ${managed.reason}.`);
-      const offline = await offlineLocalStoreSmoke({ rootDir, env });
-      logger.log("Chemd desktop local offline smoke passed.");
-      logger.log(`local offline store: ${offline.storeRoot}`);
-      logger.log(`local offline snapshot: ${offline.snapshotPath}`);
-      logger.log(`local offline outbox: ${offline.outboxPath}`);
-      logger.log(`local offline verification: pending=${offline.outboxPendingCount}, graph=${offline.graphSnapshotId}`);
-      return {
-        status: "offline-local-passed",
-        database: {
-          status: "skipped",
-          reason: "missing-postgres-runtime",
-          detail: managed.reason
-        },
-        offline
-      };
-    }
-    smokeEnv = managed.env;
-    cleanupManagedPostgres = managed.cleanup;
-    logger.log(`Managed PostgreSQL target: ${managed.summary}`);
+  const target = await prepareDesktopRuntimeSmokeTarget({
+    rootDir,
+    env,
+    managedPostgres,
+    offlineLocalStoreSmoke,
+    logger
+  });
+  if (target.completed) {
+    return target.completed;
   }
 
   try {
-    const result = await withClient({
-      env: smokeEnv,
-      operation: async (client) => {
-        const postgres = await postgresSmoke({ client });
-        const reconnectSync = await reconnectSyncSmoke({
-          client,
-          rootDir,
-          env: smokeEnv,
-          persistenceSmoke
-        });
-        return { postgres, reconnectSync, persistence: reconnectSync.persistence };
-      }
+    const result = await runConnectedDesktopRuntimeSmoke({
+      rootDir,
+      smokeEnv: target.smokeEnv,
+      postgresMode: target.postgresMode,
+      withClient,
+      postgresSmoke,
+      reconnectSyncSmoke,
+      persistenceSmoke,
+      tauriCommandSmoke
     });
 
-    logger.log("Chemd desktop runtime smoke passed.");
-    logger.log(`experiment: ${result.postgres.experimentId}`);
-    logger.log(`revision: ${result.postgres.revisionId}`);
-    logger.log(`compile run: ${result.postgres.compileRunId}`);
-    logger.log(`rag chunks: ${result.postgres.ragChunks}`);
-    logger.log(`first chunk: ${result.postgres.firstChunkId}`);
-    logger.log(`runtime graph: ${result.reconnectSync.persistence.graphSnapshotId}`);
-    logger.log(`runtime verification: ${JSON.stringify(result.reconnectSync.persistence.counts)}`);
-    logger.log(`reconnect outbox sync: synced=${result.reconnectSync.sync.syncedCount}, pending=${result.reconnectSync.sync.outboxPendingCount}, failed=${result.reconnectSync.sync.outboxFailedCount}`);
-    logger.log("reconnect proof: script-level local outbox -> shared PostgreSQL smoke; Tauri command runtime proof is not covered.");
+    logDesktopRuntimeSuccess(logger, result);
     return { status: "passed", result };
   } finally {
-    if (cleanupManagedPostgres) {
-      await cleanupManagedPostgres();
+    if (target.cleanupManagedPostgres) {
+      await target.cleanupManagedPostgres();
     }
   }
 };

@@ -11,6 +11,7 @@ import {
   runDesktopRuntimePersistenceSmoke,
   runDesktopRuntimeSmoke,
   runDesktopRuntimeSmokeCli,
+  runDesktopTauriCommandSmoke,
   startManagedPostgresSmokeRuntime,
   summarizePostgresTarget
 } from "./desktop-runtime-smoke.mjs";
@@ -338,6 +339,120 @@ test("runDesktopReconnectOutboxSyncSmoke keeps payload and marks failure", async
   assert.equal(outbox.entries[0].payload.graphSnapshot.graphSnapshotId, "rev-desktop-reconnect-runtime-smoke::graph");
 });
 
+test("runDesktopTauriCommandSmoke skips when no command runner is configured", async () => {
+  const result = await runDesktopTauriCommandSmoke({
+    env: {},
+    localStoreModules: async () => {
+      throw new Error("must not load local store modules without runner");
+    }
+  });
+
+  assert.equal(result.status, "skipped");
+  assert.equal(result.reason, "unsupported-tauri-command-runner");
+  assert.match(result.detail, /CHEMD_DESKTOP_TAURI_COMMAND_RUNNER/u);
+});
+
+test("runDesktopTauriCommandSmoke fails with the command name and original error", async () => {
+  const calls = [];
+
+  await assert.rejects(
+    () =>
+      runDesktopTauriCommandSmoke({
+        commandRunner: async ({ command }) => {
+          calls.push(command);
+          if (command === "start_managed_postgres") {
+            throw new Error("managed start failed");
+          }
+          return { state: "ready" };
+        }
+      }),
+    /Tauri command start_managed_postgres failed: managed start failed/u
+  );
+
+  assert.deepEqual(calls, ["initialize_managed_postgres", "start_managed_postgres"]);
+});
+
+test("runDesktopTauriCommandSmoke validates managed command order and pending to synced outbox", async () => {
+  const calls = [];
+  let saved;
+
+  const result = await runDesktopTauriCommandSmoke({
+    postgresMode: "managed",
+    revisionId: "rev-tauri-command-smoke",
+    localStoreModules: async () => ({
+      buildLocalRuntimeSnapshotInput: (payload) => ({
+        localId: `local:${payload.graphSnapshot.graphSnapshotId}`,
+        idempotencyKey: `idem:${payload.graphSnapshot.graphSnapshotId}`,
+        payload,
+        metadata: {
+          localStoreKind: "runtime_graph_rag_snapshot",
+          graphSnapshotId: payload.graphSnapshot.graphSnapshotId
+        },
+        createdAt: payload.createdAt
+      })
+    }),
+    commandRunner: async ({ command, input }) => {
+      calls.push({ command, input });
+      if (command === "read_postgres_status") {
+        return { state: "ready", configured: true, schemaReady: true };
+      }
+      if (command === "read_local_store_status") {
+        return { state: "ready", available: true, outboxPendingCount: 0, outboxFailedCount: 0 };
+      }
+      if (command === "save_local_runtime_snapshot") {
+        saved = {
+          localId: input.localId,
+          idempotencyKey: input.idempotencyKey,
+          syncStatus: "pending",
+          createdAt: input.createdAt,
+          outboxPendingCount: 1
+        };
+        return saved;
+      }
+      if (command === "list_local_outbox" && input.syncStatus === "pending") {
+        return [{ ...saved, syncStatus: "pending", failureCount: 0, lastError: null, syncedAt: null }];
+      }
+      if (command === "sync_local_outbox_to_postgres") {
+        return {
+          state: "ready",
+          syncedCount: 1,
+          failedCount: 0,
+          skippedCount: 0,
+          entries: [{ localId: saved.localId, idempotencyKey: saved.idempotencyKey, syncStatus: "synced" }]
+        };
+      }
+      if (command === "list_local_outbox" && input.syncStatus === "synced") {
+        return [{ ...saved, syncStatus: "synced", failureCount: 0, lastError: null, syncedAt: "2026-05-12T00:00:01.000Z" }];
+      }
+      return { state: "ready" };
+    }
+  });
+
+  assert.equal(result.status, "tauri-command-passed");
+  assert.equal(result.graphSnapshotId, "rev-tauri-command-smoke::graph");
+  assert.equal(result.sync.syncedCount, 1);
+  assert.equal(result.pendingEntry.syncStatus, "pending");
+  assert.equal(result.syncedEntry.syncStatus, "synced");
+  assert.deepEqual(
+    calls.map((call) => call.command),
+    [
+      "initialize_managed_postgres",
+      "start_managed_postgres",
+      "migrate_managed_postgres",
+      "read_postgres_status",
+      "read_local_store_status",
+      "save_local_runtime_snapshot",
+      "list_local_outbox",
+      "sync_local_outbox_to_postgres",
+      "list_local_outbox"
+    ]
+  );
+  assert.equal(
+    calls.find((call) => call.command === "save_local_runtime_snapshot").input.payload.graphSnapshot.graphSnapshotId,
+    "rev-tauri-command-smoke::graph"
+  );
+});
+
 test("runDesktopRuntimeSmoke redacts env while running smoke in order", async () => {
   const calls = [];
   const logger = createLogger();
@@ -425,7 +540,7 @@ test("runDesktopRuntimeSmoke redacts env while running smoke in order", async ()
   assert.match(output, /host=localhost/u);
   assert.match(output, /runtime graph: graph-runtime/u);
   assert.match(output, /reconnect outbox sync: synced=1, pending=0, failed=0/u);
-  assert.match(output, /Tauri command runtime proof is not covered/u);
+  assert.match(output, /SKIP Tauri command smoke/u);
 });
 
 test("runDesktopRuntimeSmoke starts managed fallback and cleans it after success", async () => {
