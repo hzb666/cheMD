@@ -1,5 +1,8 @@
 #![cfg_attr(test, allow(dead_code))]
 
+use crate::managed_postgres_config::{
+    managed_config_candidate_roots, managed_env_source, ManagedPostgresPaths,
+};
 use std::{collections::BTreeMap, env, fs, path::Path};
 use url::Url;
 
@@ -48,6 +51,20 @@ pub(crate) fn load_postgres_config_from_repo(
     repo_root: Option<&Path>,
 ) -> Option<PostgresRuntimeConfig> {
     select_postgres_config(config_sources(repo_root))
+}
+
+#[cfg(test)]
+pub(crate) fn load_postgres_config_from_managed_root(
+    repo_root: Option<&Path>,
+    managed_root: Option<&Path>,
+) -> Option<PostgresRuntimeConfig> {
+    let mut sources = config_sources(repo_root);
+    if let Some(root) = managed_root {
+        if let Some(source) = managed_env_source(&ManagedPostgresPaths::for_root(root)) {
+            sources.push(source);
+        }
+    }
+    select_postgres_config(sources)
 }
 
 pub(crate) fn select_postgres_config(sources: Vec<EnvSource>) -> Option<PostgresRuntimeConfig> {
@@ -117,18 +134,22 @@ pub(crate) fn redact_config_detail(detail: &str, config: &PostgresRuntimeConfig)
 
 fn config_sources(repo_root: Option<&Path>) -> Vec<EnvSource> {
     let mut sources = vec![process_source()];
-    let Some(repo_root) = repo_root else {
-        return sources;
-    };
+    if let Some(repo_root) = repo_root {
+        sources.extend(
+            [
+                repo_root.join(".env.local"),
+                repo_root.join(".env"),
+                repo_root.join("apps").join("web").join(".env.local"),
+                repo_root.join("apps").join("web").join(".env"),
+            ]
+            .into_iter()
+            .filter_map(|path| file_source(repo_root, &path)),
+        );
+    }
     sources.extend(
-        [
-            repo_root.join(".env.local"),
-            repo_root.join(".env"),
-            repo_root.join("apps").join("web").join(".env.local"),
-            repo_root.join("apps").join("web").join(".env"),
-        ]
-        .into_iter()
-        .filter_map(|path| file_source(repo_root, &path)),
+        managed_config_candidate_roots()
+            .into_iter()
+            .filter_map(|root| managed_env_source(&ManagedPostgresPaths::for_root(&root))),
     );
     sources
 }
