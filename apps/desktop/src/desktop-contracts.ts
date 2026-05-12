@@ -188,6 +188,50 @@ export interface PersistRuntimeGraphRagResult {
   target: PostgresTargetSummary;
 }
 
+export type LocalOutboxSyncStatus = "pending" | "synced" | "failed";
+
+export interface LocalStoreStatus {
+  state: RuntimeState;
+  label: string;
+  detail: string;
+  available: boolean;
+  storagePath: string | null;
+  outboxPendingCount: number;
+  outboxFailedCount: number;
+  lastSavedAt: string | null;
+  lastSyncedAt: string | null;
+}
+
+export interface LocalRuntimeSnapshotInput {
+  localId: string;
+  idempotencyKey: string;
+  payload: PersistRuntimeGraphRagPayload;
+  metadata: RuntimeJsonObject;
+  createdAt: string;
+}
+
+export interface LocalOutboxEntry extends LocalRuntimeSnapshotInput {
+  syncStatus: LocalOutboxSyncStatus;
+  failureCount: number;
+  lastError: string | null;
+  updatedAt: string;
+  syncedAt: string | null;
+}
+
+export interface SaveLocalRuntimeSnapshotResult {
+  localId: string;
+  idempotencyKey: string;
+  syncStatus: LocalOutboxSyncStatus;
+  createdAt: string;
+  outboxPendingCount: number;
+}
+
+export interface LocalOutboxMutationResult {
+  updated: number;
+  outboxPendingCount: number;
+  outboxFailedCount: number;
+}
+
 export interface DesktopCommandError {
   code: string;
   message: string;
@@ -283,6 +327,32 @@ export interface DesktopCommandMap {
       payload: PersistRuntimeGraphRagPayload;
     };
     output: PersistRuntimeGraphRagResult;
+  };
+  read_local_store_status: {
+    input: void;
+    output: LocalStoreStatus;
+  };
+  save_local_runtime_snapshot: {
+    input: LocalRuntimeSnapshotInput;
+    output: SaveLocalRuntimeSnapshotResult;
+  };
+  list_local_outbox: {
+    input: {
+      syncStatus?: LocalOutboxSyncStatus;
+      limit?: number;
+    };
+    output: LocalOutboxEntry[];
+  };
+  mark_local_outbox_synced: {
+    input: {
+      localIds: string[];
+      syncedAt?: string;
+    };
+    output: LocalOutboxMutationResult;
+  };
+  clear_local_outbox_failures: {
+    input: void;
+    output: LocalOutboxMutationResult;
   };
 }
 
