@@ -32,6 +32,19 @@ export {
 export {
   buildEditorGraphRagRecords
 } from "./graph-rag-records";
+export {
+  buildChemdWorkspaceSymbolIndex,
+  findChemdWorkspaceSymbolById,
+  findChemdWorkspaceSymbolsByKind,
+  findChemdWorkspaceSymbolsByName
+} from "./workspace-symbol-index";
+export type {
+  ChemdWorkspaceDiagnosticsSummary,
+  ChemdWorkspaceSymbol,
+  ChemdWorkspaceSymbolDocument,
+  ChemdWorkspaceSymbolDocumentEntry,
+  ChemdWorkspaceSymbolIndex
+} from "./workspace-symbol-types";
 export type {
   BuildEditorGraphRagRecordsInput,
   EditorGraphRagRecords,
