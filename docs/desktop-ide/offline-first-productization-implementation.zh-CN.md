@@ -1,6 +1,6 @@
 # Desktop IDE 离线优先完全产品化实施文档
 
-状态：实施中，第二轮离线优先产品化已集成
+状态：实施中，离线优先用户/支持指南已补齐
 更新时间：2026-05-13
 适用范围：`apps/desktop`、Tauri runtime、Monaco language service、local store、PostgreSQL/pgvector sync、Graph、RAG、Agent、`chem-service` sidecar、installer/release。
 
@@ -604,7 +604,7 @@ token 或 password。
 - [ ] installer、签名、升级策略明确。
 - [ ] release smoke 覆盖干净机器 Offline Core。
 - [ ] diagnostics bundle 覆盖 app、sidecar、sync、provider。
-- [ ] 用户文档覆盖离线工作、连接 DB、同步失败恢复。
+- [x] 用户文档覆盖离线工作、连接 DB、同步失败恢复。
 
 当前 release 构建状态：
 
@@ -635,6 +635,8 @@ token 或 password。
 diagnostics bundle 同样是支持分层判断工具，不是产品通过证明；若 dist、installer
 产物或环境探测缺失，应在 JSON 中标记 `SKIP` / `BLOCKED` 并继续生成诊断包。
 
+用户与支持人员操作说明见
+`docs/desktop-ide/user-offline-first-guide.zh-CN.md`；release artifact preflight
 详细说明见 `docs/desktop-ide/release-offline-smoke.zh-CN.md`。
 
 ---
