@@ -376,6 +376,21 @@ export interface WorkspaceWriteResult {
   chemdKind?: "document" | "asset" | "unknown";
 }
 
+export interface DiagnosticsBundleSummary {
+  generatedAt: string;
+  commandCount: number;
+  boundarySkipCount: number;
+  supportCommandCount: number;
+}
+
+export interface DiagnosticsBundleExportResult {
+  state: RuntimeState;
+  label: string;
+  detail: string;
+  outputPath: string;
+  summary: DiagnosticsBundleSummary;
+}
+
 export interface DesktopCommandMap {
   open_workspace: {
     input: {
@@ -484,6 +499,10 @@ export interface DesktopCommandMap {
     input: void;
     output: LocalOutboxSyncResult;
   };
+  export_diagnostics_bundle: {
+    input: void;
+    output: DiagnosticsBundleExportResult;
+  };
 }
 
 export const shellWorkspace: WorkspaceHandle = {
@@ -540,4 +559,17 @@ export const shellPostgresStatus: PostgresStatus = {
   schemaReady: null,
   timeoutMs: 0,
   pool: null
+};
+
+export const shellDiagnosticsBundleResult: DiagnosticsBundleExportResult = {
+  state: "placeholder",
+  label: "Diagnostics bundle not exported",
+  detail: "Use Tauri export_diagnostics_bundle to write an offline redacted JSON bundle",
+  outputPath: "",
+  summary: {
+    generatedAt: "",
+    commandCount: 22,
+    boundarySkipCount: 5,
+    supportCommandCount: 4
+  }
 };
