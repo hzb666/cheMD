@@ -377,13 +377,23 @@ DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outb
     为 `SKIP`，不阻塞后续产品化推进。
 - Diagnostics bundle：
   - `c3f84fb feat(desktop)：合并诊断包脚本` 合并 `pnpm desktop:diagnostics-bundle`。
+  - `04f8202 feat(desktop)：合并诊断包支持上下文` 扩充离线支持上下文。
   - 入口生成离线、脱敏 JSON；记录平台、Node、git commit、desktop package、
     产物摘要、桌面命令清单、runtime/release preflight 分类与选定 env 名称。
+  - 支持上下文增加固定 support command 清单、offline smoke 目录摘要、preflight
+    可读分类，以及 sidecar/log/sync/provider 未运行时的明确 `SKIP` 边界。
   - 采集过程不启动 GUI、不联网、不读取 `.env`，因此可在真实网络或运行期服务不可用
     时继续作为支持诊断入口。
   - 合并后将单文件脚本拆成 CLI、core、sanitizer 三个模块，避免新增大文件。
-  - 主分支验证：diagnostics 定向测试 5/5、`pnpm run test:scripts` 64/64、
-    scripts ESLint 通过、`pnpm desktop:diagnostics-bundle` 可生成 JSON。
+  - 主分支验证：diagnostics 定向测试 7/7、`pnpm run test:scripts` 66/66、
+    scripts ESLint 通过、desktop typecheck 通过、`pnpm desktop:diagnostics-bundle`
+    可生成 JSON。
+- 用户/支持文档：
+  - `8a3a99f docs(desktop)：合并离线优先用户指南` 合并
+    `docs/desktop-ide/user-offline-first-guide.zh-CN.md`。
+  - 文档覆盖首次离线启动、workspace、编辑/保存/编译/preview/diagnostics、本地
+    snapshot/outbox、PostgreSQL/JDBC 配置、同步失败恢复、diagnostics bundle 与
+    clean-machine smoke / `SKIP` 解释。
 
 等待确认后合并：
 
@@ -541,10 +551,11 @@ pnpm desktop:diagnostics-bundle
 
 `desktop:diagnostics-bundle` 是支持闭环的离线诊断入口：它生成脱敏 JSON
 诊断包，记录平台、Node 版本、git commit、desktop package version、frontend
-dist、release exe/MSI/NSIS 产物摘要、已知 Tauri command 名称，以及 runtime
-smoke/preflight 的分类摘要。它不会启动 GUI、不会联网、不会读取 `.env` 文件、
-不会运行重型 runtime smoke，也不会输出完整 env、database URL、API key、
-token 或 password。
+dist、release exe/MSI/NSIS 产物摘要、已知 Tauri command 名称、runtime
+smoke/preflight 的分类摘要，以及固定范围的 support context。它不会启动 GUI、
+不会联网、不会读取 `.env` 文件、不会运行重型 runtime smoke，也不会输出完整
+env、database URL、API key、token 或 password。诊断包说明见
+`docs/desktop-ide/diagnostics-bundle.zh-CN.md`。
 
 ---
 

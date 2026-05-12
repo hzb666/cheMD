@@ -930,6 +930,24 @@ proof surface without changing the local-document source of truth.
     `pnpm run test:scripts` 64/64, scripts ESLint, `pnpm desktop:diagnostics-bundle`,
     and `git diff --check` with only CRLF worktree warnings.
 
+- `desktop-ide-user-offline-docs` merged through
+  `8a3a99f docs(desktop)：合并离线优先用户指南`.
+  - Added `docs/desktop-ide/user-offline-first-guide.zh-CN.md`.
+  - The guide covers Offline Core, local document authority, workspace open/save,
+    compile/preview/diagnostics, local snapshot/outbox, PostgreSQL/JDBC setup,
+    sync recovery, diagnostics bundle, clean-machine smoke, and `SKIP`
+    semantics.
+
+- `desktop-ide-diagnostics-support-context` merged through
+  `04f8202 feat(desktop)：合并诊断包支持上下文`.
+  - Added offline support context to the diagnostics bundle.
+  - The context includes fixed support commands, bounded offline smoke file
+    summaries, preflight classifications, and explicit not-run `SKIP` entries
+    for sidecar/log/sync/provider/Tauri command smoke.
+  - Main branch validation passed: focused diagnostics test 7/7,
+    `pnpm run test:scripts` 66/66, scripts ESLint, `pnpm desktop:diagnostics-bundle`,
+    `pnpm --filter @chemd/desktop typecheck`, and `git diff --check`.
+
 - Blocked branch, not merged:
   - `desktop-ide-workspace-ingest-ui` has a working UI implementation, but
     focused ESLint reports complexity/max-lines errors in `LocalStorePanel`.
