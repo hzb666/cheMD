@@ -535,3 +535,41 @@ Merged Monaco desktop editor, workspace ingest runner, installer artifact smoke,
 ### Next Steps
 
 - None - task complete
+
+
+## Session 51: Desktop IDE fourth wave diagnostics hardening
+
+**Date**: 2026-05-13
+**Task**: Desktop IDE fourth wave diagnostics hardening
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Merged Monaco bundle split and diagnostics bundle into desktop-ide, proved remote PostgreSQL runtime smoke with redacted logs, validated diagnostics bundle on main, and kept workspace ingest UI isolated pending complexity-lint refactor approval.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8a4cd28` | (see git log) |
+| `137a936` | (see git log) |
+| `2921c3c` | (see git log) |
+| `c3f84fb` | (see git log) |
+| `c1cf09b` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
