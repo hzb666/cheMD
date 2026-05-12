@@ -1,8 +1,32 @@
-import type { ChemdLanguageCompileOutput, ChemdSourceRange } from "./types";
+import type {
+  ChemdEditorDiagnostic,
+  ChemdLanguageCompileOutput,
+  ChemdSourceRange
+} from "./types";
 
 export interface ChemdEditorPosition {
   line: number;
   column: number;
+}
+
+export interface ChemdWorkspaceSymbol {
+  symbolId: string;
+  documentUri: string;
+  documentId: string;
+  localId: string;
+  kind: string;
+  label: string;
+  range: ChemdSourceRange;
+  summary?: string;
+  sourceHash?: string;
+  stale?: boolean;
+}
+
+export interface ChemdWorkspaceSymbolIndex {
+  version: "chemd-workspace-symbol-index/v0.1";
+  generatedAt: string;
+  symbols: ChemdWorkspaceSymbol[];
+  diagnostics: ChemdEditorDiagnostic[];
 }
 
 export type ChemdCompletionTriggerKind =
@@ -18,12 +42,17 @@ export interface ChemdCompletionRequest {
   triggerKind?: ChemdCompletionTriggerKind;
   triggerCharacter?: string;
   compileOutput?: ChemdLanguageCompileOutput;
+  workspaceIndex?: ChemdWorkspaceSymbolIndex;
+  externalSymbols?: ChemdWorkspaceSymbol[];
 }
 
 export type ChemdCompletionItemKind =
   | "snippet"
   | "field"
-  | "value";
+  | "value"
+  | "reference"
+  | "template"
+  | "quick_fix";
 
 export interface ChemdCompletionItem {
   id: string;
@@ -36,6 +65,7 @@ export interface ChemdCompletionItem {
   sortText?: string;
   filterText?: string;
   range: ChemdSourceRange;
+  data?: Record<string, unknown>;
 }
 
 export interface ChemdCompletionList {
@@ -47,6 +77,12 @@ export interface ChemdCompletionList {
 export type ChemdCompletionBlockKind =
   | "molecule"
   | "reaction"
+  | "result"
+  | "procedure"
+  | "step"
+  | "template"
+  | "use"
+  | "condition_varies"
   | "unknown";
 
 export interface ChemdCompletionContext {
@@ -59,6 +95,9 @@ export interface ChemdCompletionContext {
   range: ChemdSourceRange;
   isFrontmatter: boolean;
   isChemdBlock: boolean;
+  isUseHeaderPosition: boolean;
+  isReferencePosition: boolean;
+  isStepFamilyPosition: boolean;
   isFieldKeyPosition: boolean;
   isFieldValuePosition: boolean;
   fieldKey?: string;

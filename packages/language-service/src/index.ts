@@ -12,7 +12,9 @@ export type {
   ChemdCompletionList,
   ChemdCompletionRequest,
   ChemdCompletionTriggerKind,
-  ChemdEditorPosition
+  ChemdEditorPosition,
+  ChemdWorkspaceSymbol,
+  ChemdWorkspaceSymbolIndex
 } from "./completion-types";
 export {
   compileChemdForEditor,

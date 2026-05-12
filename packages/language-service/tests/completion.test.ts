@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { getChemdCompletions } from "../src/index";
+import {
+  compileChemdForEditor,
+  getChemdCompletions,
+  type ChemdWorkspaceSymbol
+} from "../src/index";
 
 const withCursor = (source: string): { source: string; cursorOffset: number } => {
   const cursorOffset = source.indexOf("|");
@@ -55,6 +59,88 @@ stage: |
       "purification",
       "analysis"
     ]);
+  });
+
+  it("suggests procedure step family values", () => {
+    expect(labelsFor(`:::procedure #proc-main
+step: hea|
+:::`)).toEqual(["heat"]);
+  });
+
+  it("filters current-document references by field context", () => {
+    const compileOutput = compileChemdForEditor({
+      source: `---
+id: exp-completion
+title: Completion
+date: 2026-05-13
+---
+
+:::chemd #mol-a
+kind: molecule
+smiles: CCO
+:::
+
+:::chemd #rxn-a
+kind: reaction
+reactants: @mol-a
+products: product-a
+:::
+`
+    });
+    const items = getChemdCompletions({
+      ...withCursor(`:::chemd #rxn-edit
+kind: reaction
+reactants: @|
+:::`),
+      documentUri: "file:///current.chemd",
+      compileOutput,
+      triggerKind: "trigger-character",
+      triggerCharacter: "@"
+    }).items;
+
+    expect(items.map((item) => item.label)).toContain("@mol-a");
+    expect(items.map((item) => item.label)).not.toContain("@rxn-a");
+    expect(items.find((item) => item.label === "@mol-a")).toMatchObject({
+      kind: "reference",
+      insertText: "@mol-a",
+      range: {
+        startLine: 3,
+        startColumn: 12,
+        endLine: 3,
+        endColumn: 13
+      }
+    });
+  });
+
+  it("accepts external symbols for cross-document reference suggestions", () => {
+    const externalSymbols: ChemdWorkspaceSymbol[] = [{
+      symbolId: "route-doc#rxn-main",
+      documentUri: "file:///route-doc.chemd",
+      documentId: "route-doc",
+      localId: "rxn-main",
+      kind: "reaction",
+      label: "rxn-main",
+      range: {
+        startLine: 7,
+        startColumn: 1,
+        endLine: 12,
+        endColumn: 4
+      },
+      summary: "Route step"
+    }];
+    const items = getChemdCompletions({
+      ...withCursor(`:::result #res-main
+reaction: |
+:::`),
+      externalSymbols
+    }).items;
+
+    expect(items).toEqual([expect.objectContaining({
+      label: "route-doc#rxn-main",
+      kind: "reference",
+      insertText: "route-doc#rxn-main",
+      documentation: "Route step"
+    })]);
   });
 
   it("suggests reaction block fields and omits existing fields", () => {
