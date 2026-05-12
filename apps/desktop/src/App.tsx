@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { Activity, AlertTriangle, Bot, CheckCircle2, ChevronRight, CircleDot, Database, FileCode2, Files, FlaskConical, GitGraph, GripHorizontal, GripVertical, HardDrive, Lightbulb, PanelBottom, PanelBottomClose, PanelBottomOpen, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PlayCircle, RefreshCw, ScrollText, Search, Settings, ShieldCheck, Sparkles, Square, UploadCloud, Wrench, XCircle } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ChangeEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
 import { appendToolCall, applyPatchDecision, approvePatchDecision, attachEvidence, createAgentRun, createToolResult, getAuditTimeline, proposePatch, rejectPatchDecision, transitionAgentRunStatus, type AgentAuditEvent, type AgentEvidence, type AgentRun, type AgentToolCall, type PatchDecision, type PatchProposal } from "@chemd/agent-tools";
 import { buildEditorGraphRagRecords, compileChemdForEditor, type ChemdEditorDiagnostic, type ChemdLanguageCompileOutput, type ChemdOutlineItem, type ChemdQuickFixProposal, type ChemdTextEdit } from "@chemd/language-service";
@@ -8,6 +8,7 @@ import { buildEditorGraphRagRecords, compileChemdForEditor, type ChemdEditorDiag
 import { shellFiles, shellPostgresStatus, shellSidecarStatus, shellWorkspace, type DesktopCommandError, type DesktopCommandMap, type LocalStoreStatus, type ManagedPostgresStatus, type PostgresStatus, type RuntimeState, type SidecarStatus, type WorkspaceFileEntry, type WorkspaceHandle } from "./desktop-contracts";
 import { buildLocalRuntimeSnapshotInput } from "./desktop-local-store";
 import { buildPersistRuntimeGraphRagCommandInput } from "./desktop-runtime-persistence";
+import { MonacoChemdEditor } from "./MonacoChemdEditor";
 
 type WorkspaceState = "empty" | "opening" | "open" | "error"; type DocumentMode = "sample" | "workspace";
 type SidecarOperation = "start" | "stop" | "refresh" | "logs";
@@ -1770,20 +1771,24 @@ const EditorPane = ({
   fileName,
   mode,
   source,
+  compileOutput,
   lineCount,
   compiledAt,
   workspaceConflict,
   onChange,
+  onSave,
   onReloadWorkspaceConflict,
   onKeepLocalWorkspaceConflict
 }: {
   fileName: string;
   mode: DocumentMode;
   source: string;
+  compileOutput: ChemdLanguageCompileOutput;
   lineCount: number;
   compiledAt: string;
   workspaceConflict: WorkspaceConflictState | null;
   onChange: (next: string) => void;
+  onSave: () => void;
   onReloadWorkspaceConflict: () => void;
   onKeepLocalWorkspaceConflict: () => void;
 }) => (
@@ -1797,7 +1802,13 @@ const EditorPane = ({
         onKeepLocal={onKeepLocalWorkspaceConflict}
       />
     ) : null}
-    <textarea className="desktop-editor-textarea" value={source} onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange(event.target.value)} spellCheck={false} aria-label="Chemd source editor" />
+    <MonacoChemdEditor
+      value={source}
+      documentPath={compileOutput.documentUri ?? fileName}
+      compileOutput={compileOutput}
+      onChange={onChange}
+      onSave={onSave}
+    />
   </section>
 );
 
@@ -2877,10 +2888,12 @@ const DesktopWorkbench = ({
             fileName={selectedFile.name}
             mode={mode}
             source={source}
+            compileOutput={output}
             lineCount={source.split(/\r?\n/).length}
             compiledAt={output.compiledAt}
             workspaceConflict={workspaceConflict}
             onChange={onSourceChange}
+            onSave={onSave}
             onReloadWorkspaceConflict={onReloadWorkspaceConflict}
             onKeepLocalWorkspaceConflict={onKeepLocalWorkspaceConflict}
           />
