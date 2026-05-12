@@ -50,6 +50,26 @@ export interface PostgresTargetSummary {
   ssl: string; timeoutMs: number; pool: string | null;
 }
 
+export type ManagedPostgresMigrationState = "not_initialized" | "pending" | "applied" | "failed";
+
+export interface ManagedPostgresStatus {
+  state: RuntimeState;
+  label: string;
+  detail: string;
+  available: boolean;
+  reason: string | null;
+  configured: boolean;
+  source: string | null;
+  dataDir: string | null;
+  host: string | null;
+  port: number | null;
+  database: string | null;
+  user: string | null;
+  pid: number | null;
+  startedAt: string | null;
+  migrationState: ManagedPostgresMigrationState;
+}
+
 export interface RuntimeGraphSourceRange {
   start?: number; end?: number; startLine?: number; startColumn?: number; endLine?: number; endColumn?: number;
 }
@@ -237,6 +257,26 @@ export interface DesktopCommandMap {
   read_postgres_status: {
     input: void;
     output: PostgresStatus;
+  };
+  read_managed_postgres_status: {
+    input: void;
+    output: ManagedPostgresStatus;
+  };
+  initialize_managed_postgres: {
+    input: void;
+    output: ManagedPostgresStatus;
+  };
+  start_managed_postgres: {
+    input: void;
+    output: ManagedPostgresStatus;
+  };
+  stop_managed_postgres: {
+    input: void;
+    output: ManagedPostgresStatus;
+  };
+  migrate_managed_postgres: {
+    input: void;
+    output: ManagedPostgresStatus;
   };
   persist_runtime_graph_rag: {
     input: {

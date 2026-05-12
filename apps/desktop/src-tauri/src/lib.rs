@@ -1,3 +1,7 @@
+mod managed_postgres;
+mod managed_postgres_config;
+mod managed_postgres_migrations;
+mod managed_postgres_process;
 mod postgres;
 mod postgres_config;
 mod postgres_runtime_core;
@@ -21,6 +25,11 @@ mod sidecar_tests;
 mod workspace_tests;
 
 #[cfg(not(test))]
+use managed_postgres::{
+    initialize_managed_postgres, migrate_managed_postgres, read_managed_postgres_status,
+    start_managed_postgres, stop_managed_postgres, ManagedPostgresManager,
+};
+#[cfg(not(test))]
 use postgres::read_postgres_status;
 #[cfg(not(test))]
 use postgres_runtime_persist::persist_runtime_graph_rag;
@@ -40,6 +49,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(WorkspaceRegistry::default())
         .manage(SidecarManager::default())
+        .manage(ManagedPostgresManager::default())
         .invoke_handler(tauri::generate_handler![
             open_workspace,
             list_workspace_files,
@@ -50,6 +60,11 @@ pub fn run() {
             read_sidecar_status,
             read_sidecar_logs,
             read_postgres_status,
+            read_managed_postgres_status,
+            initialize_managed_postgres,
+            start_managed_postgres,
+            stop_managed_postgres,
+            migrate_managed_postgres,
             persist_runtime_graph_rag
         ])
         .run(tauri::generate_context!())
