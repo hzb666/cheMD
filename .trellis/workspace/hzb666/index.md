@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 47
+- **Total Sessions**: 48
 - **Last Active**: 2026-05-13
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~359 | Active |
+| `journal-2.md` | ~456 | Active |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 48 | 2026-05-13 | Desktop IDE sidebar tabs and dock preview | `cc6da87`, `13d1ccf` | `desktop-ide` |
 | 47 | 2026-05-13 | Desktop IDE dock panels and rail routing | `02207f2`, `076859f` | `desktop-ide` |
 | 46 | 2026-05-12 | Desktop IDE panel layout controls and Tailwind merge | `988d43c`, `2bd3139` | `desktop-ide` |
 | 45 | 2026-05-12 | Desktop IDE 第十一轮 runtime proof 与分发证明 | `79ee4b0`, `9d27ebe`, `0a21ce6`, `d8b10c1`, `92d29a8`, `74edabf`, `2c62fab`, `cf1ff3a`, `10abb49` | `desktop-ide` |

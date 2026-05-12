@@ -357,3 +357,100 @@ Notes:
 ### Next Steps
 
 - None - task complete
+
+
+## Session 48: Desktop IDE offline-first first wave
+
+**Date**: 2026-05-13
+**Task**: Desktop IDE offline-first first wave
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Merged the first offline-first productization wave: workspace content hashes and baseHash conflict detection, language-service worker contracts, local authoring status derivation, dedicated Offline Core smoke, integration contract sync, and implementation docs. Verification passed except tauri:build, which was blocked by a running release exe and isolated target timeout.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `076859f` | (see git log) |
+| `246df83` | (see git log) |
+| `888159b` | (see git log) |
+| `e06a546` | (see git log) |
+| `a84fccc` | (see git log) |
+| `13d1ccf` | (see git log) |
+| `9839692` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 48: Desktop IDE sidebar tabs and dock preview
+
+**Date**: 2026-05-13
+**Task**: Desktop IDE sidebar tabs and dock preview
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Added sidebar tab windows, refined scrollbars, dock drag preview, and refreshed Tauri release.
+
+### Main Changes
+
+Completed the desktop IDE UI refinement pass.
+
+Changes:
+- Added thin light global scrollbars with darker/thicker hover state.
+- Reworked the left sidebar into two height-filling windows instead of one stacked feed of content.
+- Added primary sidebar tabs for Files, Outline, and Problems.
+- Added secondary sidebar tabs for Workspace and Summary.
+- Added a semi-transparent dock drag preview so panel reordering is visible before mouse release.
+- Preserved the web-aligned flat desktop visual style.
+
+Verification:
+- pnpm --filter @chemd/desktop exec eslint src/App.tsx vite.config.ts: pass.
+- pnpm --filter @chemd/desktop typecheck: pass.
+- git diff --check -- apps/desktop/src/App.tsx apps/desktop/src/styles/base.css apps/desktop/src/styles/workbench.css apps/desktop/src/styles/panels.css: pass.
+- pnpm --filter @chemd/desktop build: pass, with existing lucide use-client and chunk-size warnings.
+- pnpm dlx @playwright/test test apps/desktop/.smoke-ui.spec.cjs --config apps/desktop/.playwright-ui.config.cjs --reporter=line --timeout=90000: pass. Temporary smoke files were removed.
+- pnpm --filter @chemd/desktop tauri:build: pass. Release exe and MSI/NSIS bundles were refreshed.
+
+Notes:
+- Commit cc6da87 contains the UI changes.
+- Commit 13d1ccf was present after the background workspace-save contract sync completed.
+- The release app at apps/desktop/src-tauri/target/release/chemd-desktop.exe was rebuilt after closing the stale workspace release process.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `cc6da87` | (see git log) |
+| `13d1ccf` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
