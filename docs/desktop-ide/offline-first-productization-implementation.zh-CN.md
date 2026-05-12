@@ -543,3 +543,57 @@ pnpm --filter @chemd/desktop tauri:build
 4. Graph/RAG 在完全离线时是否需要本地向量索引，还是第一版仅在 PostgreSQL 可用时启用？
 5. Agent 第一版是否只读，还是允许 patch proposal？
 6. release MVP 是否先只支持 Windows，还是同步规划 macOS/Linux？
+
+---
+
+## 8. 最终产品化收尾项
+
+以下两项放在所有核心功能、验证、发布路径完成之后执行，不改变前文 M0-M9 和当前
+离线优先实施顺序。
+
+### M10：桌面端视觉样式重构
+
+目标：在功能生产可用后，统一重构 Desktop IDE 的视觉样式，使其更接近成熟桌面
+IDE/文档工作台，而不是 demo 面板集合。
+
+参考方向：
+
+- 参考用户提供截图：左侧轻量活动栏与文件树、淡色半透明侧栏、大面积无干扰编辑
+  画布、顶部紧凑 tab/title 区、低噪声图标工具栏。
+- 保持 Chemd 专业化学实验记录属性，但视觉上收敛为安静、轻量、可长时间工作的
+  桌面端文档 IDE。
+- 减少装饰性卡片、厚重边框和高对比容器；优先使用分栏、状态栏、工具栏、面板
+  dock 和可扫描列表。
+
+验收：
+
+- 不改变核心功能与数据流。
+- 主要编辑路径在浅色主题下具备足够留白、层级和可读性。
+- 文件树、编辑器、Problems、Preview、Graph/RAG/Agent 面板视觉语言一致。
+- UI 文案不解释功能本身，控件通过图标、状态和 tooltip 表达用途。
+
+### M11：UI 组件化与大文件拆分
+
+目标：在视觉收尾后，对 Desktop IDE UI 做结构性组件化，拆分 `App.tsx` 等大文件，
+沉淀可复用组件、hook 和纯逻辑，降低长期维护复杂度。
+
+参考基线：
+
+- 借鉴 `D:\Code\LabStorageManager\docs\2026-03-24-lint_complexity_summary.md`
+  的复杂度治理原则。
+- 优先抽离纯函数、业务判断、数据映射、副作用流程和已重复出现的局部 hook。
+- 谨慎抽离只负责转发 props 的中转壳组件；不要把复杂度从函数体搬到超大 props
+  interface。
+- 组件拆分必须以职责边界、复用证据或可测试性为依据，而不是单纯追求文件变短。
+
+验收：
+
+- `App.tsx` 不再承载全部 IDE shell、runtime panels、agent panels、workspace
+  controller 和 editor 逻辑。
+- props drilling 明显减少，跨组件状态按 workspace、editor、runtime、storage、
+  agent 等职责收口。
+- 样式 className、布局语义和业务行为保持不变。
+- 每批拆分前明确“不改哪些业务逻辑、不改哪些视觉表现、删除哪些中转层、沉淀哪些
+  可复用逻辑”。
+- 组件化完成后通过 desktop typecheck、focused eslint、desktop build 和相关
+  smoke/test。
