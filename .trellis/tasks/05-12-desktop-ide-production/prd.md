@@ -596,3 +596,46 @@ PostgreSQL binaries to the repository.
 - Validation includes focused script tests, `pnpm test:scripts`,
   `pnpm desktop:runtime-smoke`, root typecheck/test, desktop build/Tauri build,
   and `git diff --check`.
+
+## Eleventh-Wave Execution Record
+
+- `desktop-ide-postgres-dist-proof` merged through
+  `0a21ce6 feat(desktop)：合入 PostgreSQL 分发证明`.
+  - `scripts/desktop-postgres-bundle.mjs` now writes a staging manifest with
+    source, target, platform, binary requirements, bin-only/full mode, and a
+    verification summary.
+  - `--require-full` rejects bin-only development sources for production
+    distribution proof.
+  - Desktop PostgreSQL docs now distinguish external DB, installer bundled
+    managed DB, and offline local outbox modes.
+  - Integrated validation: focused bundle tests passed 11 tests, script lint
+    passed for bundle files, and `pnpm test:scripts` passed before merge.
+
+- `desktop-ide-tauri-command-smoke` merged through
+  `74edabf feat(desktop)：合入 Tauri command smoke`.
+  - `desktop:runtime-smoke` now includes a Tauri command-level smoke runner
+    abstraction and reports explicit SKIP when no runner is configured.
+  - The command-level path verifies pending local outbox -> synced outbox using
+    desktop command calls, without bypassing the existing shared Graph/RAG
+    persistence target.
+  - Integration review added `92d29a8 fix(desktop)：传递 command smoke 运行环境`
+    so runner subprocesses inherit the smoke env and managed PostgreSQL
+    temporary connection data.
+  - Integrated validation: focused runtime smoke tests passed 20 tests and
+    `pnpm test:scripts` passed before merge.
+
+- Current integrated validation:
+  - `node --test scripts/desktop-runtime-smoke.test.mjs scripts/desktop-postgres-bundle.test.mjs`
+    passed 31 tests.
+  - `pnpm test:scripts` passed 47 script tests.
+  - `pnpm desktop:runtime-smoke` passed the offline local path on this machine;
+    database persistence remains an environment SKIP because no external DB or
+    managed PostgreSQL binaries are available.
+  - `git diff --check` passed.
+
+- Remaining production proof gap:
+  - Real DB proof needs either external PostgreSQL env or staged managed
+    PostgreSQL binaries.
+  - Real command-level proof needs a configured
+    `CHEMD_DESKTOP_TAURI_COMMAND_RUNNER` that can invoke the packaged desktop
+    commands against that DB runtime.

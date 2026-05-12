@@ -350,3 +350,54 @@ PostgreSQL 表，并在 UI、契约、smoke 与文档中保持同步语义一致
   这属于环境阻塞，不是代码测试失败。
 - 下一轮应补齐可分发/可下载的 PostgreSQL runtime 来源，或提供受控外部
   PostgreSQL 验证环境，再执行 Tauri command 级端到端同步 proof。
+
+### 2026-05-12 第十一轮：runtime proof 与分发证明
+
+目标：把第十轮剩余的“真实 runtime proof”缺口拆成两个可执行面：
+PostgreSQL 分发/staging provenance，以及 Tauri command-level smoke harness。
+这一轮仍不提交 PostgreSQL 二进制，也不新增 desktop-only 数据库表。
+
+已合并范围：
+
+- PostgreSQL staging：`desktop:postgres:bundle` 成功后写入
+  `chemd-postgres-bundle-manifest.json`，记录 source、target、platform、
+  required binaries、bin-only/full distribution 模式与 verification summary。
+- 生产校验：新增 `--require-full`，用于拒绝 bin-only 开发来源或缺失完整
+  distribution manifest 的 staged 结果。
+- Runtime 文档：新增 `postgres-runtime-distribution.zh-CN.md`，明确外部
+  PostgreSQL、installer bundled managed PostgreSQL、无 DB offline outbox 三类
+  runtime 路径及其取舍。
+- Command-level smoke：`desktop:runtime-smoke` 现在区分 script-level
+  reconnect proof、Tauri command smoke、offline local-only smoke。没有
+  `CHEMD_DESKTOP_TAURI_COMMAND_RUNNER` 时明确 SKIP，不把 command proof
+  伪装成通过。
+- Tauri command runner：支持通过 runner 依次调用
+  `initialize_managed_postgres`、`start_managed_postgres`、
+  `migrate_managed_postgres`、`read_postgres_status`、
+  `save_local_runtime_snapshot`、`list_local_outbox`、
+  `sync_local_outbox_to_postgres`，并验证 outbox 从 `pending` 变为 `synced`。
+  runner 子进程会继承 smoke env，避免 managed PostgreSQL 临时连接信息丢失。
+
+合并提交：
+
+- `79ee4b0`：规划第十一轮 runtime proof。
+- `0a21ce6`：合入 PostgreSQL 分发证明。
+- `74edabf`：合入 Tauri command smoke。
+
+已运行验证：
+
+- `node --test scripts/desktop-runtime-smoke.test.mjs scripts/desktop-postgres-bundle.test.mjs`：
+  通过 31 个测试。
+- `pnpm test:scripts`：通过 47 个脚本测试。
+- `pnpm desktop:runtime-smoke`：通过离线本地 snapshot/outbox 验证；
+  数据库持久化仍因本机缺少 PostgreSQL runtime 被显式 SKIP。
+- `git diff --check`：通过。
+
+仍需真实环境证明：
+
+- 当前机器没有外部 `CHEMD_POSTGRES_DATABASE_URL` / `DATABASE_URL`，也没有
+  staged/managed PostgreSQL binaries，因此还不能在本机证明 shared schema
+  数据库写入。
+- 当前没有配置真实 `CHEMD_DESKTOP_TAURI_COMMAND_RUNNER`，所以
+  command-level smoke harness 已有可注入测试与 SKIP 分类，但尚未完成真实
+  app/driver proof。
