@@ -1,3 +1,4 @@
+mod diagnostics_bundle;
 mod local_store;
 mod local_store_io;
 mod local_store_status;
@@ -24,6 +25,8 @@ mod workspace_io;
 mod workspace_path;
 
 #[cfg(test)]
+mod diagnostics_bundle_tests;
+#[cfg(test)]
 mod local_store_sync_tests;
 #[cfg(test)]
 mod local_store_tests;
@@ -34,6 +37,8 @@ mod sidecar_tests;
 #[cfg(test)]
 mod workspace_tests;
 
+#[cfg(not(test))]
+use diagnostics_bundle::export_diagnostics_bundle;
 #[cfg(not(test))]
 use local_store::{
     clear_local_outbox_failures, list_local_outbox, mark_local_outbox_synced,
@@ -88,7 +93,8 @@ pub fn run() {
             mark_local_outbox_synced,
             clear_local_outbox_failures,
             sync_local_outbox_to_postgres,
-            persist_runtime_graph_rag
+            persist_runtime_graph_rag,
+            export_diagnostics_bundle
         ])
         .run(tauri::generate_context!())
         .expect("error while running Chemd Desktop IDE");

@@ -64,3 +64,11 @@ pnpm desktop:offline-release-smoke
 
 其中 diagnostics bundle 是最低成本入口；后续 smoke 命令才会根据自身边界执行
 更重的本地验证。
+
+## Tauri command 边界
+
+桌面端同时暴露 `export_diagnostics_bundle` Tauri command，作为产品内支持闭环的
+最小离线导出能力。该 command 与脚本版保持相同安全边界：只写入系统临时目录中的
+脱敏 JSON，不启动 GUI 外部进程、不联网、不读取 `.env`，也不要求 sidecar 或
+PostgreSQL 可用。sidecar、任意日志目录、数据库检查、provider 与 Tauri command
+smoke 均在 bundle 内标记为 `SKIP`。
