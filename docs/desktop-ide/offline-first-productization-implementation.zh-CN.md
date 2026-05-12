@@ -312,6 +312,8 @@ DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outb
 - 失败重试、取消、继续运行。
 - 文档 hash、source range、compile result hash 和 outbox payload 一一对应。
 
+状态：已补纯 TypeScript workspace ingest runner，可通过依赖注入组合文件列表、读取与 compile，并输出可恢复队列结果。
+
 验收：
 
 - 大 workspace ingest 不阻塞编辑。

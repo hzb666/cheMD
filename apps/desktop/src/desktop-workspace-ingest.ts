@@ -2,6 +2,8 @@ import type {
   PersistRuntimeGraphRagPayload,
   RuntimeJsonObject,
   RuntimeJsonValue,
+  WorkspaceFileContent,
+  WorkspaceFileEntry,
   WorkspaceIngestDocumentMetadata,
   WorkspaceIngestQueueItem,
   WorkspaceIngestQueueStatus,
@@ -31,6 +33,15 @@ export interface DeriveWorkspaceIngestQueueSummaryOptions {
   maxErrorLength?: number;
   maxRetryFailures?: number;
 }
+
+type MaybePromise<T> = T | Promise<T>;
+type WorkspaceIngestFileContent = string | Pick<WorkspaceFileContent, "content" | "modifiedAtMs">;
+
+export interface RunWorkspaceIngestInput { workspaceId: string; files: readonly WorkspaceFileEntry[];
+  readFile: (file: WorkspaceFileEntry) => MaybePromise<WorkspaceIngestFileContent>;
+  compile: (source: string) => MaybePromise<unknown>;
+  existingItems?: readonly WorkspaceIngestQueueItem[]; createdAt?: string; }
+export interface RunWorkspaceIngestResult { items: WorkspaceIngestQueueItem[]; summary: WorkspaceIngestQueueSummary; }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -67,6 +78,15 @@ const stableStringify = (value: unknown): string => {
 
 const stableHash = (value: unknown): string =>
   `${HASH_PREFIX}:${hashString(stableStringify(value))}`;
+
+const isChemdMarkdown = (file: WorkspaceFileEntry): boolean =>
+  file.kind === "file" && file.path.toLowerCase().endsWith(".chemd.md");
+const isPlainMarkdown = (file: WorkspaceFileEntry): boolean =>
+  file.kind === "file" && file.path.toLowerCase().endsWith(".md");
+const toSourceText = (content: WorkspaceIngestFileContent): string =>
+  typeof content === "string" ? content : content.content;
+const toModifiedAtMs = (content: WorkspaceIngestFileContent): number | null | undefined =>
+  typeof content === "string" ? undefined : content.modifiedAtMs;
 
 const getMetadataString = (metadata: RuntimeJsonObject | undefined, key: string): string | undefined => {
   const value = metadata?.[key];
@@ -114,6 +134,7 @@ const buildMetadata = (
   documentId: input.document.documentId ?? null,
   documentPath: input.document.documentPath,
   documentHash: input.document.documentHash,
+  sourceHash: input.document.documentHash,
   revisionId: input.document.revisionId ?? getMetadataString(input.runtimePayload?.metadata, "revisionId") ?? null,
   revisionHash,
   snapshotHash,
@@ -196,4 +217,84 @@ export const deriveWorkspaceIngestQueueSummary = (
     totalCount: items.length,
     errors
   };
+};
+
+const buildDocumentMetadata = (
+  workspaceId: string, file: WorkspaceFileEntry, source: string, modifiedAtMs?: number | null
+): WorkspaceIngestDocumentMetadata => {
+  const documentHash = stableHash({ kind: "workspace-source", source });
+  const revisionHash = stableHash({ workspaceId, documentPath: file.path, documentHash });
+  return { workspaceId, documentId: file.id, documentPath: file.path, documentHash, revisionHash, modifiedAtMs };
+};
+
+const findExistingItem = (
+  input: RunWorkspaceIngestInput, document: WorkspaceIngestDocumentMetadata
+): WorkspaceIngestQueueItem | undefined =>
+  input.existingItems?.find((item) =>
+    item.workspaceId === input.workspaceId
+    && item.documentPath === document.documentPath
+    && item.documentHash === document.documentHash
+  );
+
+const buildSkippedMarkdownItem = (input: RunWorkspaceIngestInput, file: WorkspaceFileEntry): WorkspaceIngestQueueItem => {
+  const documentHash = stableHash({ kind: "non-chemd-markdown", path: file.path });
+  const revisionHash = stableHash({ workspaceId: input.workspaceId, documentPath: file.path, documentHash });
+  return buildWorkspaceIngestQueueItem({
+    document: { workspaceId: input.workspaceId, documentId: file.id, documentPath: file.path, documentHash, revisionHash },
+    status: "skipped",
+    metadata: { skipReason: "non_chemd_markdown" },
+    createdAt: input.createdAt,
+    updatedAt: input.createdAt
+  });
+};
+
+const getErrorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+const buildFailedItem = (
+  input: RunWorkspaceIngestInput, file: WorkspaceFileEntry, source: string, error: unknown, modifiedAtMs?: number | null
+): WorkspaceIngestQueueItem => {
+  const document = buildDocumentMetadata(input.workspaceId, file, source, modifiedAtMs);
+  const previous = findExistingItem(input, document);
+  return buildWorkspaceIngestQueueItem({
+    document,
+    status: "failed",
+    failureCount: (previous?.failureCount ?? 0) + 1,
+    errorSummary: getErrorMessage(error),
+    createdAt: previous?.createdAt ?? input.createdAt,
+    updatedAt: input.createdAt
+  });
+};
+
+const processChemdFile = async (
+  input: RunWorkspaceIngestInput,
+  file: WorkspaceFileEntry
+): Promise<WorkspaceIngestQueueItem> => {
+  let content: WorkspaceIngestFileContent = "";
+  try {
+    content = await input.readFile(file);
+    const source = toSourceText(content);
+    const document = buildDocumentMetadata(input.workspaceId, file, source, toModifiedAtMs(content));
+    const existing = findExistingItem(input, document);
+    if (existing?.status === "synced") return existing;
+    return buildWorkspaceIngestQueueItem({
+      document,
+      compileOutput: await input.compile(source),
+      status: "pending",
+      createdAt: existing?.createdAt ?? input.createdAt,
+      updatedAt: input.createdAt
+    });
+  } catch (error) {
+    return buildFailedItem(input, file, toSourceText(content), error, toModifiedAtMs(content));
+  }
+};
+
+export const runWorkspaceIngest = async (input: RunWorkspaceIngestInput): Promise<RunWorkspaceIngestResult> => {
+  const workspaceId = requireText(input.workspaceId, "workspaceId");
+  const normalizedInput = { ...input, workspaceId };
+  const items: WorkspaceIngestQueueItem[] = [];
+  for (const file of normalizedInput.files) {
+    if (isChemdMarkdown(file)) items.push(await processChemdFile(normalizedInput, file));
+    else if (isPlainMarkdown(file)) items.push(buildSkippedMarkdownItem(normalizedInput, file));
+  }
+  return { items, summary: deriveWorkspaceIngestQueueSummary(items) };
 };
