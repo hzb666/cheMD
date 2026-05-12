@@ -411,6 +411,9 @@ pnpm --filter @chemd/desktop tauri:build
   snapshot/outbox 与 pending count，不接入 PostgreSQL。
 - `pnpm desktop:runtime-smoke`：综合 runtime smoke；无 DB/无 managed
   binaries 时应先输出 database persistence `SKIP`，再输出 Offline Core PASS。
+- `pnpm desktop:offline-release-smoke`：release Offline Core smoke preflight，
+  检查 desktop scripts、frontend dist 与 release exe 文件锁；输出
+  `PASS` / `SKIP` / `BLOCKED`，但不杀进程、不打印 env/secrets。
 
 ### P1：本地知识队列生产可用
 
@@ -440,6 +443,19 @@ pnpm --filter @chemd/desktop tauri:build
 - [ ] release smoke 覆盖干净机器 Offline Core。
 - [ ] diagnostics bundle 覆盖 app、sidecar、sync、provider。
 - [ ] 用户文档覆盖离线工作、连接 DB、同步失败恢复。
+
+当前 release smoke 前置分类：
+
+- `PASS`：`apps/desktop` scripts、`dist/index.html` 与 release exe 锁检查均满足，
+  可以继续运行 `pnpm --filter @chemd/desktop tauri:build`。
+- `SKIP`：缺少 dist 或无法可靠检查进程占用；这是环境/前置产物不足，不代表产品
+  失败或通过。
+- `BLOCKED`：目标
+  `apps/desktop/src-tauri/target/release/chemd-desktop.exe` 正由同路径进程运行，
+  或必要 desktop script 缺失；用户需关闭输出中的 PID，或改用隔离
+  `CARGO_TARGET_DIR` 重试。
+
+详细说明见 `docs/desktop-ide/release-offline-smoke.zh-CN.md`。
 
 ---
 
