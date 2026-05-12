@@ -508,3 +508,26 @@ database tables.
 - Sync results are visible in the UI with counts and safe, redacted errors.
 - Offline-only smoke still passes without PostgreSQL; online smoke proves the
   sync path when PostgreSQL is configured.
+
+## Tenth-Wave Execution Record
+
+- `desktop-ide-outbox-sync-runtime` merged through
+  `9bdddf7 feat(desktop)：合入本地 outbox 重连同步运行时`.
+  - Added `sync_local_outbox_to_postgres` and wired it into the Tauri invoke
+    handler.
+  - The command reads pending local outbox entries and reuses the existing
+    shared PostgreSQL Graph/RAG/Agent persistence path.
+  - Successful entries are marked `synced`; failed entries retain payload and
+    bounded failure metadata.
+  - Integrated validation: `cargo test` passed 43 tests and `cargo check`
+    passed.
+
+- `desktop-ide-outbox-sync-contract` merged through
+  `6c9d684 feat(desktop)：合入本地 outbox 同步契约`.
+  - TypeScript contracts now expose `sync_local_outbox_to_postgres`, sync
+    target metadata, per-entry results, and summary counts.
+  - Integrated validation: desktop typecheck passed, focused Vitest passed 7
+    tests, eslint passed, and `git diff --check` passed.
+
+- Remaining tenth-wave work is split into `desktop-ide-outbox-sync-ui` and
+  `desktop-ide-outbox-sync-smoke-docs`.
