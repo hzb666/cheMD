@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import type {
   DesktopCommandMap,
   LocalOutboxEntry,
+  LocalOutboxSyncEntryResult,
+  LocalOutboxSyncResult,
   LocalOutboxSyncStatus,
   PersistRuntimeGraphRagPayload
 } from "./desktop-contracts";
@@ -58,7 +60,8 @@ describe("desktop local store contract builder", () => {
       saveSnapshot: "save_local_runtime_snapshot",
       listOutbox: "list_local_outbox",
       markSynced: "mark_local_outbox_synced",
-      clearFailures: "clear_local_outbox_failures"
+      clearFailures: "clear_local_outbox_failures",
+      syncOutbox: "sync_local_outbox_to_postgres"
     });
   });
 
@@ -132,5 +135,43 @@ describe("desktop local store contract builder", () => {
 
     expect(entry.syncStatus).toBe("synced");
     expect(entry.syncedAt).toBe(createdAt);
+  });
+
+  it("locks the sync local outbox command output shape", () => {
+    const entry: LocalOutboxSyncEntryResult = {
+      localId: "local-runtime-snapshot:workspace:revision:snapshot",
+      idempotencyKey: "local-runtime-snapshot:fnv1a:12345678",
+      syncStatus: "synced",
+      graphSnapshotId: "snapshot-local-1"
+    };
+    const result: DesktopCommandMap["sync_local_outbox_to_postgres"]["output"] = {
+      state: "ready",
+      label: "Local outbox synced",
+      detail: "Synced 1 pending local runtime snapshot to PostgreSQL",
+      target: {
+        kind: "external",
+        source: "CHEMD_POSTGRES_DATABASE_URL",
+        host: "127.0.0.1",
+        database: "chemd",
+        user: "chemd",
+        ssl: "disable",
+        timeoutMs: 5000,
+        pool: "external"
+      },
+      syncedCount: 1,
+      failedCount: 0,
+      skippedCount: 0,
+      entries: [entry]
+    };
+    const typedResult: LocalOutboxSyncResult = result;
+
+    expect(typedResult.entries[0]).toMatchObject({
+      localId: entry.localId,
+      idempotencyKey: entry.idempotencyKey,
+      syncStatus: "synced",
+      graphSnapshotId: "snapshot-local-1"
+    });
+    expect(typedResult.target.kind).toBe("external");
+    expect(typedResult.syncedCount).toBe(1);
   });
 });

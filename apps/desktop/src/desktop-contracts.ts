@@ -232,6 +232,34 @@ export interface LocalOutboxMutationResult {
   outboxFailedCount: number;
 }
 
+export type LocalOutboxSyncTargetKind = "external" | "managed";
+
+export interface LocalOutboxSyncTargetSummary extends PostgresTargetSummary {
+  kind: LocalOutboxSyncTargetKind;
+}
+
+export interface LocalOutboxSyncEntryResult {
+  localId: string;
+  idempotencyKey: string;
+  syncStatus: LocalOutboxSyncStatus;
+  graphSnapshotId?: string;
+  error?: string;
+}
+
+export interface LocalOutboxSyncSummary {
+  syncedCount: number;
+  failedCount: number;
+  skippedCount: number;
+  entries: LocalOutboxSyncEntryResult[];
+}
+
+export interface LocalOutboxSyncResult extends LocalOutboxSyncSummary {
+  state: RuntimeState;
+  label: string;
+  detail: string;
+  target: LocalOutboxSyncTargetSummary;
+}
+
 export interface DesktopCommandError {
   code: string;
   message: string;
@@ -353,6 +381,10 @@ export interface DesktopCommandMap {
   clear_local_outbox_failures: {
     input: void;
     output: LocalOutboxMutationResult;
+  };
+  sync_local_outbox_to_postgres: {
+    input: void;
+    output: LocalOutboxSyncResult;
   };
 }
 
