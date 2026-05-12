@@ -5,9 +5,10 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type Keyboard
 import { appendToolCall, applyPatchDecision, approvePatchDecision, attachEvidence, createAgentRun, createToolResult, getAuditTimeline, proposePatch, rejectPatchDecision, transitionAgentRunStatus, type AgentAuditEvent, type AgentEvidence, type AgentRun, type AgentToolCall, type PatchDecision, type PatchProposal } from "@chemd/agent-tools";
 import { buildEditorGraphRagRecords, compileChemdForEditor, type ChemdEditorDiagnostic, type ChemdLanguageCompileOutput, type ChemdOutlineItem, type ChemdQuickFixProposal, type ChemdTextEdit } from "@chemd/language-service";
 
-import { shellFiles, shellPostgresStatus, shellSidecarStatus, shellWorkspace, type DesktopCommandError, type DesktopCommandMap, type LocalStoreStatus, type ManagedPostgresStatus, type PostgresStatus, type RuntimeState, type SidecarStatus, type WorkspaceFileEntry, type WorkspaceHandle } from "./desktop-contracts";
+import { shellFiles, shellPostgresStatus, shellSidecarStatus, shellWorkspace, type DesktopCommandError, type DesktopCommandMap, type LocalStoreStatus, type ManagedPostgresStatus, type PostgresStatus, type RuntimeState, type SidecarStatus, type WorkspaceFileEntry, type WorkspaceHandle, type WorkspaceIngestQueueItem, type WorkspaceIngestQueueSummary } from "./desktop-contracts";
 import { buildLocalRuntimeSnapshotInput } from "./desktop-local-store";
 import { buildPersistRuntimeGraphRagCommandInput } from "./desktop-runtime-persistence";
+import { runWorkspaceIngest } from "./desktop-workspace-ingest";
 import { MonacoChemdEditor } from "./MonacoChemdEditor";
 
 type WorkspaceState = "empty" | "opening" | "open" | "error"; type DocumentMode = "sample" | "workspace";
@@ -82,6 +83,18 @@ type LocalSyncState = {
   message: string;
   summary: LocalSyncSummary | null;
 };
+type WorkspaceIngestState = {
+  state: PersistOperationState;
+  message: string;
+  items: WorkspaceIngestQueueItem[];
+  summary: WorkspaceIngestQueueSummary | null;
+};
+type WorkspaceIngestControllerInput = {
+  mode: DocumentMode;
+  workspaceState: WorkspaceState;
+  workspace: WorkspaceHandle;
+  files: WorkspaceFileEntry[];
+};
 type PostgresField = [string, string];
 type ActivityTool = "files" | "search" | "graph" | "agent" | "settings";
 type LayoutPanel = "sidebar" | "insight" | "bottom";
@@ -113,6 +126,7 @@ type DesktopWorkbenchProps = {
   postgresController: ReturnType<typeof usePostgresController>;
   persistController: ReturnType<typeof usePersistRuntimeController>;
   localStoreController: ReturnType<typeof useLocalStoreController>;
+  workspaceIngestController: ReturnType<typeof useWorkspaceIngestController>;
   output: ChemdLanguageCompileOutput;
   compileError?: string;
   files: WorkspaceFileEntry[];
@@ -165,6 +179,8 @@ type InsightPaneProps = {
   localStoreDisabledReason: string | null;
   localStoreSyncDisabledReason: string | null;
   localStoreError: string | null;
+  workspaceIngestState: WorkspaceIngestState;
+  workspaceIngestDisabledReason: string | null;
   agentRun: AgentRun | null;
   agentMessage: AgentMessage | null;
   onStartSidecar: () => void;
@@ -181,6 +197,7 @@ type InsightPaneProps = {
   onRefreshLocalStore: () => void;
   onSaveLocalSnapshot: () => void;
   onSyncLocalOutbox: () => void;
+  onRunWorkspaceIngest: () => void;
   onProposeQuickFix: (candidate: QuickFixCandidate) => void;
   onApprovePatch: () => void;
   onApplyPatch: () => void;
@@ -620,6 +637,12 @@ const initialLocalSyncState: LocalSyncState = {
   message: "Sync Pending shares only pending outbox entries after Postgres readiness checks pass.",
   summary: null
 };
+const initialWorkspaceIngestState: WorkspaceIngestState = {
+  state: "idle",
+  message: "Scan/Ingest reads workspace files and builds an in-memory queue only; it does not write DB or Local Store outbox entries.",
+  items: [],
+  summary: null
+};
 
 const getPersistErrorMessage = (error: unknown): string => {
   const commandError = error as Partial<DesktopCommandError> | undefined;
@@ -653,6 +676,9 @@ const summarizeLocalId = (value: string): string =>
 
 const formatLocalSyncCounts = (summary: LocalSyncSummary): string =>
   `${summary.syncedCount} synced / ${summary.failedCount} failed / ${summary.skippedCount} skipped`;
+
+const formatWorkspaceIngestCounts = (summary: WorkspaceIngestQueueSummary): string =>
+  `${summary.totalCount} total / ${summary.pendingCount} pending / ${summary.skippedCount} skipped / ${summary.failedCount} failed / ${summary.retryableCount} retryable`;
 
 const formatLocalTimestamp = (value: string | null): string => {
   if (!value) return "never";
@@ -709,6 +735,22 @@ const getLocalSyncDisabledReason = ({
   if (postgresStatus.state !== "ready") return "Postgres must be reachable before syncing pending outbox entries.";
   if (postgresStatus.vectorInstalled !== true) return "Install pgvector before syncing pending outbox entries.";
   if (postgresStatus.schemaReady !== true) return "Run PostgreSQL migrations before syncing pending outbox entries.";
+  return null;
+};
+
+const getWorkspaceIngestDisabledReason = ({
+  mode,
+  workspaceState,
+  files
+}: {
+  mode: DocumentMode;
+  workspaceState: WorkspaceState;
+  files: WorkspaceFileEntry[];
+}): string | null => {
+  if (mode !== "workspace" || workspaceState !== "open") return "Open a local workspace before scanning workspace ingest.";
+  if (!files.some((file) => file.kind === "file" && file.path.toLowerCase().endsWith(".md"))) {
+    return "No Markdown files are visible in the current workspace.";
+  }
   return null;
 };
 
@@ -1336,27 +1378,35 @@ const LocalStorePanel = ({
   operation,
   snapshotState,
   syncState,
+  workspaceIngestState,
   disabledReason,
   syncDisabledReason,
+  workspaceIngestDisabledReason,
   errorMessage,
   onRefresh,
   onSave,
-  onSync
+  onSync,
+  onRunWorkspaceIngest
 }: {
   status: LocalStoreStatus;
   operation: LocalStoreOperation | null;
   snapshotState: LocalSnapshotState;
   syncState: LocalSyncState;
+  workspaceIngestState: WorkspaceIngestState;
   disabledReason: string | null;
   syncDisabledReason: string | null;
+  workspaceIngestDisabledReason: string | null;
   errorMessage: string | null;
   onRefresh: () => void;
   onSave: () => void;
   onSync: () => void;
+  onRunWorkspaceIngest: () => void;
 }) => {
   const busy = operation !== null;
   const saveDisabled = busy || disabledReason !== null || !status.available;
   const syncDisabled = busy || syncDisabledReason !== null;
+  const ingestBusy = workspaceIngestState.state === "pending";
+  const ingestDisabled = ingestBusy || workspaceIngestDisabledReason !== null;
   const unavailableMessage = status.available
     ? null
     : "Local Store is unavailable. Refresh status before relying on the offline outbox.";
@@ -1370,6 +1420,44 @@ const LocalStorePanel = ({
       <p className="desktop-local-store-copy">
         Local Store writes the current Graph/RAG/Agent snapshot to a local JSON cache/outbox. External or Managed Postgres remains the sync target after reconnect.
       </p>
+      <div className="desktop-workspace-ingest-status" data-state={workspaceIngestState.state} aria-live="polite">
+        <div className="desktop-workspace-ingest-header">
+          <div className="desktop-agent-subhead"><Files size={14} /><span>Workspace Ingest</span></div>
+          <button
+            type="button"
+            className="desktop-button-primary"
+            disabled={ingestDisabled}
+            aria-busy={ingestBusy}
+            onClick={onRunWorkspaceIngest}
+          >
+            {ingestBusy ? <RefreshCw size={14} /> : <FileCode2 size={14} />}
+            <span>{ingestBusy ? "Scanning" : "Scan/Ingest current workspace"}</span>
+          </button>
+        </div>
+        <p>{workspaceIngestState.message}</p>
+        {workspaceIngestDisabledReason ? (
+          <p className="desktop-local-store-message" data-tone="warning">{workspaceIngestDisabledReason}</p>
+        ) : null}
+        {workspaceIngestState.summary ? (
+          <dl className="desktop-workspace-ingest-summary">
+            <div><dt>Total</dt><dd>{workspaceIngestState.summary.totalCount}</dd></div>
+            <div><dt>Pending</dt><dd>{workspaceIngestState.summary.pendingCount}</dd></div>
+            <div><dt>Skipped</dt><dd>{workspaceIngestState.summary.skippedCount}</dd></div>
+            <div><dt>Failed</dt><dd>{workspaceIngestState.summary.failedCount}</dd></div>
+            <div><dt>Retryable</dt><dd>{workspaceIngestState.summary.retryableCount}</dd></div>
+          </dl>
+        ) : null}
+        {workspaceIngestState.summary?.errors.length ? (
+          <ul className="desktop-workspace-ingest-errors" aria-label="Workspace ingest failures">
+            {workspaceIngestState.summary.errors.slice(0, 4).map((error) => (
+              <li key={error.queueId}>
+                <code title={error.documentPath}>{error.documentPath}</code>
+                <span title={error.errorSummary}>{error.errorSummary}</span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
       <div className="desktop-local-store-actions">
         <LocalStoreButton
           label="Refresh Local"
@@ -2246,7 +2334,7 @@ const InsightDockContent = ({
     graph: <ReactionGraphPanel outline={props.outline} diagnostics={props.diagnostics} compileStatus={props.diagnostics.some((item) => item.severity === "error") ? "failed" : "ok"} />,
     runtime: <SidecarControlPanel status={props.sidecarStatus} logTail={props.sidecarLogTail} operation={props.sidecarOperation} message={props.sidecarMessage} errorMessage={props.sidecarError} onStart={props.onStartSidecar} onStop={props.onStopSidecar} onRefresh={props.onRefreshSidecar} onLoadLogs={props.onLoadSidecarLogs} />,
     postgres: <PostgresStatusPanel status={props.postgresStatus} managedStatus={props.managedPostgresStatus} loading={props.postgresLoading} managedOperation={props.managedPostgresOperation} errorMessage={props.postgresError} managedErrorMessage={props.managedPostgresError} managedMessage={props.managedPostgresMessage} persistState={props.persistState} persistDisabledReason={props.persistDisabledReason} onRefresh={props.onRefreshPostgres} onInitManaged={props.onInitManagedPostgres} onStartManaged={props.onStartManagedPostgres} onStopManaged={props.onStopManagedPostgres} onMigrateManaged={props.onMigrateManagedPostgres} onRefreshManaged={props.onRefreshManagedPostgres} onPersistGraph={props.onPersistGraph} />,
-    storage: <LocalStorePanel status={props.localStoreStatus} operation={props.localStoreOperation} snapshotState={props.localSnapshotState} syncState={props.localSyncState} disabledReason={props.localStoreDisabledReason} syncDisabledReason={props.localStoreSyncDisabledReason} errorMessage={props.localStoreError} onRefresh={props.onRefreshLocalStore} onSave={props.onSaveLocalSnapshot} onSync={props.onSyncLocalOutbox} />,
+    storage: <LocalStorePanel status={props.localStoreStatus} operation={props.localStoreOperation} snapshotState={props.localSnapshotState} syncState={props.localSyncState} workspaceIngestState={props.workspaceIngestState} disabledReason={props.localStoreDisabledReason} syncDisabledReason={props.localStoreSyncDisabledReason} workspaceIngestDisabledReason={props.workspaceIngestDisabledReason} errorMessage={props.localStoreError} onRefresh={props.onRefreshLocalStore} onSave={props.onSaveLocalSnapshot} onSync={props.onSyncLocalOutbox} onRunWorkspaceIngest={props.onRunWorkspaceIngest} />,
     settings: <SettingsDockPanel mode={props.mode} sidecarStatus={props.sidecarStatus} postgresStatus={props.postgresStatus} localStoreStatus={props.localStoreStatus} />,
     agent: <div className="desktop-agent-panel"><AgentRunHeader agentRun={props.agentRun} agentMessage={props.agentMessage} /><AgentEmptyState mode={props.mode} hasQuickFixes={quickFixes.length > 0} /><AgentQuickFixList mode={props.mode} quickFixes={quickFixes} onProposeQuickFix={props.onProposeQuickFix} /><AgentPatchProposalCard proposal={activeProposal} canApprove={activeProposal !== undefined && approvedDecision === undefined && rejectedDecision === undefined && appliedDecision === undefined} canApply={activeProposal !== undefined && approvedDecision !== undefined && appliedDecision === undefined && rejectedDecision === undefined} canReject={activeProposal !== undefined && rejectedDecision === undefined && appliedDecision === undefined} onApprovePatch={props.onApprovePatch} onApplyPatch={props.onApplyPatch} onRejectPatch={props.onRejectPatch} /><AgentTimeline agentRun={props.agentRun} /><AgentLedger agentRun={props.agentRun} /></div>
   };
@@ -2757,6 +2845,75 @@ const useLocalStoreController = ({
   };
 };
 
+const useWorkspaceIngestController = ({
+  mode,
+  workspaceState,
+  workspace,
+  files
+}: WorkspaceIngestControllerInput) => {
+  const [state, setState] = useState<WorkspaceIngestState>(initialWorkspaceIngestState);
+  const runningRef = useRef(false);
+  const disabledReason = getWorkspaceIngestDisabledReason({ mode, workspaceState, files });
+
+  useEffect(() => {
+    setState(initialWorkspaceIngestState);
+  }, [mode, workspace.workspaceId]);
+
+  const runIngest = async () => {
+    if (runningRef.current) return;
+    if (disabledReason !== null) {
+      setState({ ...initialWorkspaceIngestState, state: "failure", message: disabledReason });
+      return;
+    }
+    runningRef.current = true;
+    setState((current) => ({
+      ...current,
+      state: "pending",
+      message: "Scanning workspace files and compiling Chemd documents into an in-memory ingest queue."
+    }));
+    try {
+      const result = await runWorkspaceIngest({
+        workspaceId: workspace.workspaceId,
+        files,
+        existingItems: state.items,
+        readFile: (file) => invokeDesktop("read_workspace_file", {
+          workspaceId: workspace.workspaceId,
+          path: file.path
+        }),
+        compile: (source, file) => {
+          const output = compileChemdForEditor({
+            source,
+            documentUri: file.path,
+            options: { strictChemdKind: true, procedureMode: "auto" }
+          });
+          if (output.status === "failed") throw output.error;
+          return output;
+        }
+      });
+      setState({
+        state: "success",
+        message: `Workspace ingest scan finished: ${formatWorkspaceIngestCounts(result.summary)}. Queue items stay in memory only.`,
+        items: result.items,
+        summary: result.summary
+      });
+    } catch (error: unknown) {
+      setState((current) => ({
+        ...current,
+        state: "failure",
+        message: getCommandErrorMessage(error, "Workspace ingest failed before queue summary was built.")
+      }));
+    } finally {
+      runningRef.current = false;
+    }
+  };
+
+  return {
+    state,
+    disabledReason,
+    runIngest: () => void runIngest()
+  };
+};
+
 const useAgentPatchController = ({
   agentRun,
   setAgentRun,
@@ -2818,6 +2975,7 @@ const DesktopWorkbench = ({
   postgresController,
   persistController,
   localStoreController,
+  workspaceIngestController,
   output,
   compileError,
   files,
@@ -2923,6 +3081,8 @@ const DesktopWorkbench = ({
               localStoreDisabledReason={localStoreController.disabledReason}
               localStoreSyncDisabledReason={localStoreController.syncDisabledReason}
               localStoreError={localStoreController.error}
+              workspaceIngestState={workspaceIngestController.state}
+              workspaceIngestDisabledReason={workspaceIngestController.disabledReason}
               agentRun={agentRun}
               agentMessage={agentMessage}
               onStartSidecar={sidecarController.start} onStopSidecar={sidecarController.stop} onRefreshSidecar={sidecarController.refresh} onLoadSidecarLogs={sidecarController.loadLogs}
@@ -2936,6 +3096,7 @@ const DesktopWorkbench = ({
               onRefreshLocalStore={localStoreController.refresh}
               onSaveLocalSnapshot={localStoreController.saveSnapshot}
               onSyncLocalOutbox={localStoreController.syncPending}
+              onRunWorkspaceIngest={workspaceIngestController.runIngest}
               onProposeQuickFix={onProposeQuickFix}
               onApprovePatch={onApprovePatch}
               onApplyPatch={onApplyPatch}
@@ -3139,6 +3300,12 @@ export const App = () => {
     compileOutput: output,
     agentRun
   });
+  const workspaceIngestController = useWorkspaceIngestController({
+    mode: workspaceController.mode,
+    workspaceState: workspaceController.workspaceState,
+    workspace: workspaceController.workspace,
+    files: workspaceController.files
+  });
 
   const updateEditorSource = (nextSource: string) => {
     workspaceController.setSource(nextSource);
@@ -3160,7 +3327,7 @@ export const App = () => {
   return (
     <DesktopWorkbench
       workspace={workspaceController.workspace} workspaceState={workspaceController.workspaceState}
-      sidecarController={sidecarController} postgresController={postgresController} persistController={persistController} localStoreController={localStoreController}
+      sidecarController={sidecarController} postgresController={postgresController} persistController={persistController} localStoreController={localStoreController} workspaceIngestController={workspaceIngestController}
       output={output} compileError={compileError}
       files={workspaceController.files} selectedFile={workspaceController.selectedFile} selectedFileId={workspaceController.selectedFileId}
       mode={workspaceController.mode} message={workspaceController.message} source={workspaceController.source} savedSource={workspaceController.savedSource} workspaceConflict={workspaceController.workspaceConflict}

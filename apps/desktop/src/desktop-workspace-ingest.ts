@@ -41,7 +41,7 @@ export interface RunWorkspaceIngestInput {
   workspaceId: string;
   files: readonly WorkspaceFileEntry[];
   readFile: (file: WorkspaceFileEntry) => MaybePromise<WorkspaceIngestFileContent>;
-  compile: (source: string) => MaybePromise<unknown>;
+  compile: (source: string, file: WorkspaceFileEntry) => MaybePromise<unknown>;
   existingItems?: readonly WorkspaceIngestQueueItem[];
   createdAt?: string;
 }
@@ -310,7 +310,7 @@ const processChemdFile = async (
     if (existing?.status === "synced") return existing;
     return buildWorkspaceIngestQueueItem({
       document,
-      compileOutput: await input.compile(source),
+      compileOutput: await input.compile(source, file),
       status: "pending",
       createdAt: existing?.createdAt ?? input.createdAt,
       updatedAt: input.createdAt
