@@ -736,3 +736,78 @@ sync/enrichment layer and must not gate basic authoring.
   - Second attempt with isolated `CARGO_TARGET_DIR=.tmp/tauri-build-target`
     exceeded the tool timeout and was stopped.
   - Treat this as an environment/process-lock blocker, not as a product pass.
+
+## Thirteenth-Wave Offline-First Productization Slices
+
+The thirteenth wave closes the immediate P0 gaps from the twelfth wave and
+prepares the next P1 ingest loop without changing the local-document source of
+truth.
+
+1. `desktop-ide-workspace-conflict-ui`
+   - Owns `apps/desktop/src/App.tsx` and panel styling.
+   - Turns `workspace_file_conflict` into a visible reload/keep-local decision
+     panel.
+   - Must not overwrite externally modified files without user choice.
+
+2. `desktop-ide-workspace-ingest-queue`
+   - Owns the desktop ingest contract and tests.
+   - Adds local ingest entry/queue/summary contracts for pending, running,
+     synced, failed, and skipped states.
+   - Keeps payloads derived from document metadata, compile result, and runtime
+     persistence payloads.
+
+3. `desktop-ide-offline-release-smoke`
+   - Owns release preflight script, script tests, package script, and release
+     smoke docs.
+   - Adds `desktop:offline-release-smoke` with PASS/SKIP/BLOCKED semantics.
+   - Detects release exe process locks by exact path, does not kill processes,
+     and does not print env/secrets.
+
+## Thirteenth-Wave Execution Record
+
+- `desktop-ide-workspace-ingest-queue` merged through
+  `ac8c792 feat(desktop)：合并 workspace ingest 队列契约`.
+  - Added `apps/desktop/src/desktop-workspace-ingest.ts`.
+  - Added focused Vitest coverage for queue derivation, summary counts, retry
+    eligibility, and redacted failure display.
+
+- `desktop-ide-workspace-conflict-ui` merged through
+  `e237e9b fix(desktop)：合并 workspace 保存冲突 UI`.
+  - Workspace save conflicts now surface a dedicated conflict panel.
+  - Users can reload from disk or keep local editing while preserving the editor
+    buffer.
+
+- `desktop-ide-offline-release-smoke` merged through
+  `3cbefc8 feat(desktop)：合并 release 离线 smoke 前置检查`.
+  - Added `pnpm desktop:offline-release-smoke`.
+  - Added release preflight documentation and 5 script tests, increasing
+    `test:scripts` coverage to 57 tests.
+
+- Current integrated validation:
+  - Focused desktop local-store/ingest Vitest passed 15 tests.
+  - `pnpm run test:scripts` passed 57 script tests.
+  - `pnpm --filter @chemd/desktop typecheck` passed.
+  - Desktop focused ESLint passed for changed TS/TSX files; CSS remains ignored
+    by existing lint config.
+  - `pnpm desktop:offline-core-smoke` passed with Offline Core PASS.
+  - `pnpm desktop:offline-release-smoke` passed with release preflight PASS.
+  - `pnpm --filter @chemd/desktop build` passed with existing lucide/chunk
+    warnings.
+  - `cargo test --manifest-path apps\desktop\src-tauri\Cargo.toml workspace`
+    passed 8 workspace tests.
+  - `git diff --check` passed.
+  - `pnpm typecheck` passed all 21 workspaces.
+  - `pnpm test` passed Turbo tests, 57 script tests, and 52 Python tests.
+  - `pnpm --filter @chemd/desktop tauri:build` passed and produced release exe,
+    MSI, and NSIS installer artifacts.
+  - `pnpm desktop:runtime-smoke` passed Offline Core and explicitly skipped
+    database persistence because PostgreSQL binaries were unavailable.
+
+- Remaining production gaps:
+  - Monaco has not replaced the textarea yet.
+  - The Windows installer artifacts exist, but clean-machine installer Offline
+    Core smoke has not been run.
+  - Workspace ingest has contracts and tests, but not the full UI scan/retry/
+    cancel loop.
+  - Real PostgreSQL sync proof still needs either external DB env or staged
+    managed PostgreSQL binaries.

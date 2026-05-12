@@ -1,7 +1,7 @@
 # Chemd Desktop IDE 生产化计划
 
-状态：架构计划草案
-更新时间：2026-05-12
+状态：架构计划，离线优先实施以 `docs/desktop-ide/offline-first-productization-implementation.zh-CN.md` 为当前执行源
+更新时间：2026-05-13
 适用范围：`apps/desktop`、桌面运行时、语言服务、Graph、RAG、Agent 编排、PostgreSQL 持久化、`chem-service` sidecar
 
 ---

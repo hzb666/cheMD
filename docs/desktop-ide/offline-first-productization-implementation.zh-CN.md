@@ -1,6 +1,6 @@
 # Desktop IDE 离线优先完全产品化实施文档
 
-状态：实施计划
+状态：实施中，第二轮离线优先产品化已集成
 更新时间：2026-05-13
 适用范围：`apps/desktop`、Tauri runtime、Monaco language service、local store、PostgreSQL/pgvector sync、Graph、RAG、Agent、`chem-service` sidecar、installer/release。
 
@@ -249,6 +249,57 @@ DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outb
   exe 锁与隔离 release 编译超时阻塞。
 - Monaco 仍未替换 textarea；本轮只完成 language-service core 与 adapter DTO。
 
+### 2026-05-13 第二轮执行记录：冲突 UI、ingest 队列与 release smoke
+
+已合并范围：
+
+- Workspace conflict UI：
+  - `workspace_file_conflict` 现在进入专门的冲突决策面板。
+  - 用户可以选择 reload from disk 或 keep local editing；不会静默覆盖外部变更。
+  - reload 后会刷新 `source`、`savedSource` 与 `savedContentHash`。
+- Workspace ingest 队列契约：
+  - 新增本地 ingest entry、queue、summary 与 retry eligibility。
+  - 支持 `pending`、`running`、`synced`、`failed`、`skipped` 状态。
+  - 队列 payload 由 document metadata、compile result 与 runtime payload 派生。
+- Release Offline Core smoke preflight：
+  - 新增 `pnpm desktop:offline-release-smoke`。
+  - 检查 desktop scripts、`dist/index.html` 与 release exe 文件锁。
+  - 输出 `PASS`、`SKIP`、`BLOCKED`；不杀进程、不打印 env/secrets。
+
+已验证：
+
+- `pnpm exec vitest run apps/desktop/src/desktop-local-store.test.ts apps/desktop/src/desktop-workspace-ingest.test.ts --config packages/compiler/vitest.config.ts --pool=threads`：
+  通过 15 个测试。
+- `pnpm run test:scripts`：通过 57 个脚本测试。
+- `pnpm --filter @chemd/desktop typecheck`：通过。
+- `pnpm --filter @chemd/desktop exec eslint src/App.tsx src/styles/panels.css src/desktop-contracts.ts src/desktop-workspace-ingest.ts src/desktop-workspace-ingest.test.ts`：
+  通过；`panels.css` 仍有既有 ignore warning。
+- `pnpm desktop:offline-core-smoke`：通过，输出 Offline Core PASS。
+- `pnpm desktop:offline-release-smoke`：通过，输出 release preflight PASS。
+- `pnpm --filter @chemd/desktop build`：通过；保留既有 lucide `use client` 与
+  chunk size warning。
+- `cargo test --manifest-path apps\desktop\src-tauri\Cargo.toml workspace`：
+  通过 8 个 workspace 测试。
+- `git diff --check`：通过。
+- `pnpm typecheck`：通过 21 个 workspace。
+- `pnpm test`：通过 Turbo tests、57 个脚本测试与 52 个 Python 测试。
+- `pnpm --filter @chemd/desktop tauri:build`：通过，生成 release exe、MSI 与 NSIS：
+  - `apps/desktop/src-tauri/target/release/chemd-desktop.exe`
+  - `apps/desktop/src-tauri/target/release/bundle/msi/Chemd Desktop IDE_0.1.0_x64_en-US.msi`
+  - `apps/desktop/src-tauri/target/release/bundle/nsis/Chemd Desktop IDE_0.1.0_x64-setup.exe`
+- `pnpm desktop:runtime-smoke`：通过 Offline Core 路径；database persistence 因本机
+  缺少 PostgreSQL binaries 被明确标记为 `SKIP`。
+
+当前剩余 P0/P1 缺口：
+
+- Monaco 仍未替换 textarea；language-service core 已具备，但 UI 还不是生产 IDE
+  编辑器体验。
+- 安装包已生成，但尚未执行干净安装后的人工/自动 Offline Core smoke。
+- workspace ingest 目前是本地队列契约，还未接入 UI 扫描、取消、重试与 outbox
+  幂等同步执行。
+- PostgreSQL 真实同步仍需要外部 DB env 或 managed PostgreSQL binaries；无 DB 只证明
+  Offline Core PASS，不证明 shared schema 持久化。
+
 ### M4：本地 workspace ingest 与可恢复队列
 
 目标：把单文档 authoring 扩展为本地 workspace 级知识准备。
@@ -399,11 +450,12 @@ pnpm --filter @chemd/desktop tauri:build
 
 ### P0：离线基本功能生产可用
 
-- [ ] 无 DB、无网络、无 sidecar 时，桌面 app 可启动。
-- [ ] 可打开 workspace、编辑 `.chemd.md`、保存、关闭、重启并恢复。
+- [x] 无 DB、无网络、无 sidecar 时，桌面 app 的 Offline Core smoke 可通过。
+- [x] 可打开 workspace、编辑 `.chemd.md`、保存，且保存冲突有 reload/keep local
+  决策面板。
 - [ ] Monaco diagnostics、preview 与 Problems panel 可离线使用。
-- [ ] 本地 snapshot/outbox 可生成，pending sync 状态可见。
-- [ ] PostgreSQL 不可用只降级知识同步，不阻塞编辑。
+- [x] 本地 snapshot/outbox 可生成，pending sync 状态可见。
+- [x] PostgreSQL 不可用只降级知识同步，不阻塞编辑。
 
 当前验证入口：
 
@@ -418,9 +470,9 @@ pnpm --filter @chemd/desktop tauri:build
 ### P1：本地知识队列生产可用
 
 - [ ] workspace ingest 可本地运行并生成 outbox。
-- [ ] outbox 支持 pending、synced、failed、retry。
+- [x] outbox/ingest 契约支持 pending、synced、failed、skipped 与 retry eligibility。
 - [ ] 本地队列幂等，不重复生成知识记录。
-- [ ] 文件变更和 base revision 冲突有显式处理。
+- [x] 文件变更和 base revision 冲突有显式处理。
 
 ### P2：PostgreSQL 同步生产可用
 
@@ -443,6 +495,14 @@ pnpm --filter @chemd/desktop tauri:build
 - [ ] release smoke 覆盖干净机器 Offline Core。
 - [ ] diagnostics bundle 覆盖 app、sidecar、sync、provider。
 - [ ] 用户文档覆盖离线工作、连接 DB、同步失败恢复。
+
+当前 release 构建状态：
+
+- `pnpm --filter @chemd/desktop tauri:build` 已在 `desktop-ide` 工作树通过。
+- 已生成 Windows MSI 与 NSIS 安装包。
+- `pnpm desktop:offline-release-smoke` 已在产物生成后通过 preflight。
+- 还缺少“安装到干净用户环境后启动、打开 workspace、编辑保存、关闭重启恢复”的
+  installer Offline Core smoke。
 
 当前 release smoke 前置分类：
 
