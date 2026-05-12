@@ -280,3 +280,73 @@ Chemd Desktop IDE
 4. 新建 Agent tool contract 类型草案，不接 LLM，不写文件。
 
 第一批不要实现 Graph UI、RAG UI 或 Agent UI。先把运行时边界和语言服务骨架打稳。
+
+---
+
+## 9. 当前实施记录
+
+### 2026-05-12 第十轮：local outbox 重连同步
+
+目标：在离线本地优先能力之上，实现 local outbox 到共享
+PostgreSQL Graph/RAG/Agent schema 的重连同步，不新增 desktop-only
+PostgreSQL 表，并在 UI、契约、smoke 与文档中保持同步语义一致。
+
+已合并范围：
+
+- Rust/Tauri runtime：新增 `sync_local_outbox_to_postgres` command，
+  读取 pending local outbox entry，复用既有
+  `persist_runtime_graph_rag` 共享持久化路径，成功后标记 `synced`，
+  失败后保留 payload、递增 failure count 并记录脱敏错误。
+- TypeScript contract：补齐 `LocalOutboxSyncResult`、
+  `LocalOutboxSyncEntryResult`、同步目标类型与
+  `localStoreCommandNames.syncOutbox`。
+- Desktop UI：Offline Local Store 面板新增 `Sync Pending` 入口，
+  仅在 Postgres 已配置、状态 ready、pgvector 与 schema 就绪且存在
+  pending outbox 时可执行，并展示 synced、failed、skipped 与目标摘要。
+- Runtime smoke：`desktop:runtime-smoke` 增加脚本级
+  local outbox -> shared PostgreSQL 同步 smoke；无外部 DB 且缺 managed
+  PostgreSQL binaries 时仍显式 `SKIP database persistence`，随后验证本地
+  JSON snapshot/outbox contract。
+- 文档：更新 `docs/desktop-ide/offline-local-store.zh-CN.md` 与
+  `docs/desktop-ide/managed-postgres-smoke.zh-CN.md`，明确脚本级 smoke
+  与 Tauri command 真实 runtime proof 的边界。
+
+合并提交：
+
+- `1e2327a`：规划第十轮 outbox 重连同步。
+- `9bdddf7`：合入本地 outbox 重连同步运行时。
+- `6c9d684`：合入本地 outbox 同步契约。
+- `66a918e`：记录第十轮底层同步合并。
+- `3812138`：合入 outbox 重连同步 smoke。
+- `3059a57`：合入本地 outbox 同步入口。
+
+验证结果：
+
+- `cargo test --manifest-path apps\desktop\src-tauri\Cargo.toml`：通过
+  43 个 Rust 测试。
+- `cargo check --manifest-path apps\desktop\src-tauri\Cargo.toml`：通过。
+- `pnpm --filter @chemd/desktop typecheck`：通过。
+- `pnpm exec vitest run apps/desktop/src/desktop-local-store.test.ts --config packages/compiler/vitest.config.ts --pool=threads`：
+  通过 7 个测试。
+- `pnpm --filter @chemd/desktop exec eslint src/App.tsx src/desktop-contracts.ts src/desktop-local-store.ts src/desktop-local-store.test.ts src/styles/base.css src/styles/panels.css`：
+  通过；仅保留既有 CSS ignore warning。
+- `pnpm --filter @chemd/desktop build`：通过；仅保留既有
+  lucide `use client` 与 chunk size warning。
+- `pnpm test:scripts`：通过 39 个脚本测试。
+- `pnpm desktop:runtime-smoke`：通过离线本地 snapshot/outbox 验证；
+  数据库持久化因本机缺少 `initdb`、`psql`、`postgres` 或 `pg_ctl`
+  被显式标记为 `SKIP database persistence`。
+- `pnpm typecheck`：通过 21 个 workspace。
+- `pnpm test`：通过 Turbo 测试、39 个脚本测试与 52 个 Python 测试。
+- `pnpm --filter @chemd/desktop tauri:build`：通过，产出 release exe、
+  MSI 与 NSIS installer。
+- `git diff --check`：通过。
+
+剩余生产验证缺口：
+
+- 本机当前没有外部 PostgreSQL 配置，也没有可用 managed PostgreSQL
+  二进制，因此尚未在真实桌面 runtime 中证明
+  `sync_local_outbox_to_postgres` 能把 pending outbox 同步到真实数据库。
+  这属于环境阻塞，不是代码测试失败。
+- 下一轮应补齐可分发/可下载的 PostgreSQL runtime 来源，或提供受控外部
+  PostgreSQL 验证环境，再执行 Tauri command 级端到端同步 proof。
