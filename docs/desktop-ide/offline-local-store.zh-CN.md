@@ -97,6 +97,18 @@ pnpm desktop:offline-core-smoke
 pnpm desktop:runtime-smoke
 ```
 
+release Offline Core smoke preflight：
+
+```sh
+pnpm desktop:offline-release-smoke
+```
+
+该 preflight 只判断安装包离线验收能否进入下一步：desktop scripts 是否存在、
+`apps/desktop/dist/index.html` 是否已生成，以及 Windows release exe 是否被同路径
+进程占用。输出 `BLOCKED` 时只报告 PID/path 和建议关闭进程或使用隔离
+`CARGO_TARGET_DIR`，不会杀进程；输出 `SKIP` 时表示前置产物或检测环境不足。
+详细分类见 `docs/desktop-ide/release-offline-smoke.zh-CN.md`。
+
 当外部 DB 存在时，smoke 应输出 PostgreSQL target，并执行数据库写入与读回。
 同时会输出 `reconnect outbox sync`，表示脚本级 local outbox payload 已同步到
 shared PostgreSQL schema。

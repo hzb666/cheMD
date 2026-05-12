@@ -17,6 +17,11 @@ import {
   startManagedPostgresSmokeRuntime,
   summarizePostgresTarget
 } from "./desktop-runtime-smoke.mjs";
+import {
+  checkDesktopOfflineReleaseSmokePreflight,
+  runDesktopOfflineReleaseSmokePreflight,
+  runDesktopOfflineReleaseSmokePreflightCli
+} from "./desktop-offline-release-smoke.mjs";
 
 const createLogger = () => {
   const lines = [];
@@ -117,6 +122,177 @@ test("checkDesktopRuntimePreconditions reports missing dist as warn only", () =>
     result.checks.find((check) => check.name === "desktop dist artifact")?.status,
     "warn"
   );
+});
+
+test("checkDesktopOfflineReleaseSmokePreflight passes when dist exists and release exe is not running", async () => {
+  const files = new Map([
+    [
+      "D:\\repo\\apps\\desktop\\package.json",
+      JSON.stringify({
+        scripts: {
+          build: "vite build",
+          typecheck: "tsc",
+          "tauri:build": "tauri build"
+        }
+      })
+    ],
+    ["D:\\repo\\apps\\desktop\\dist\\index.html", "<!doctype html>"]
+  ]);
+
+  const result = await checkDesktopOfflineReleaseSmokePreflight({
+    rootDir: "D:\\repo",
+    fileExists: (filePath) => files.has(filePath),
+    readTextFile: (filePath) => files.get(filePath),
+    processLister: async () => ({ status: "passed", processes: [] })
+  });
+
+  assert.equal(result.status, "passed");
+  assert.equal(result.reason, "release-offline-smoke-preflight-ready");
+  assert.equal(result.blockingProcesses.length, 0);
+  assert.equal(
+    result.checks.find((check) => check.name === "release exe lock")?.status,
+    "pass"
+  );
+});
+
+test("checkDesktopOfflineReleaseSmokePreflight blocks when target release exe is running", async () => {
+  const files = new Map([
+    [
+      "D:\\repo\\apps\\desktop\\package.json",
+      JSON.stringify({
+        scripts: {
+          build: "vite build",
+          typecheck: "tsc",
+          "tauri:build": "tauri build"
+        }
+      })
+    ],
+    ["D:\\repo\\apps\\desktop\\dist\\index.html", "<!doctype html>"]
+  ]);
+  const logger = createLogger();
+
+  const result = await runDesktopOfflineReleaseSmokePreflight({
+    rootDir: "D:\\repo",
+    fileExists: (filePath) => files.has(filePath),
+    readTextFile: (filePath) => files.get(filePath),
+    processLister: async () => ({
+      status: "passed",
+      processes: [
+        {
+          pid: 4242,
+          executablePath:
+            "D:\\repo\\apps\\desktop\\src-tauri\\target\\release\\chemd-desktop.exe"
+        }
+      ]
+    }),
+    logger
+  });
+  const exitCode = await runDesktopOfflineReleaseSmokePreflightCli({
+    runner: async () => result,
+    logger: createLogger()
+  });
+
+  assert.equal(result.status, "blocked");
+  assert.equal(result.reason, "release-exe-running");
+  assert.equal(result.blockingProcesses[0].pid, 4242);
+  assert.equal(exitCode, 2);
+  assert.match(logger.lines.join("\n"), /BLOCKED release Offline Core smoke preflight/u);
+  assert.match(logger.lines.join("\n"), /PID 4242/u);
+  assert.match(logger.lines.join("\n"), /Close the listed Chemd Desktop process/u);
+});
+
+test("checkDesktopOfflineReleaseSmokePreflight reports release exe lock before dist skip", async () => {
+  const files = new Map([
+    [
+      "D:\\repo\\apps\\desktop\\package.json",
+      JSON.stringify({
+        scripts: {
+          build: "vite build",
+          typecheck: "tsc",
+          "tauri:build": "tauri build"
+        }
+      })
+    ]
+  ]);
+
+  const result = await checkDesktopOfflineReleaseSmokePreflight({
+    rootDir: "D:\\repo",
+    fileExists: (filePath) => files.has(filePath),
+    readTextFile: (filePath) => files.get(filePath),
+    processLister: async () => ({
+      status: "passed",
+      processes: [
+        {
+          pid: 5151,
+          executablePath:
+            "D:\\repo\\apps\\desktop\\src-tauri\\target\\release\\chemd-desktop.exe"
+        }
+      ]
+    })
+  });
+
+  assert.equal(result.status, "blocked");
+  assert.equal(result.reason, "release-exe-running");
+  assert.equal(
+    result.checks.find((check) => check.name === "desktop dist")?.status,
+    "skip"
+  );
+});
+
+test("checkDesktopOfflineReleaseSmokePreflight ignores same process name at another path", async () => {
+  const files = new Map([
+    [
+      "D:\\repo\\apps\\desktop\\package.json",
+      JSON.stringify({
+        scripts: {
+          build: "vite build",
+          typecheck: "tsc",
+          "tauri:build": "tauri build"
+        }
+      })
+    ],
+    ["D:\\repo\\apps\\desktop\\dist\\index.html", "<!doctype html>"]
+  ]);
+
+  const result = await checkDesktopOfflineReleaseSmokePreflight({
+    rootDir: "D:\\repo",
+    fileExists: (filePath) => files.has(filePath),
+    readTextFile: (filePath) => files.get(filePath),
+    processLister: async () => ({
+      status: "passed",
+      processes: [
+        {
+          pid: 1234,
+          executablePath:
+            "D:\\repo\\apps\\desktop\\src-tauri\\target\\debug\\chemd-desktop.exe"
+        }
+      ]
+    })
+  });
+
+  assert.equal(result.status, "passed");
+  assert.equal(result.blockingProcesses.length, 0);
+});
+
+test("runDesktopOfflineReleaseSmokePreflightCli maps skip to 0 and errors to 1", async () => {
+  const skipped = await runDesktopOfflineReleaseSmokePreflightCli({
+    runner: async () => ({
+      status: "skipped",
+      reason: "desktop-dist-missing",
+      checks: [],
+      blockingProcesses: []
+    }),
+    logger: createLogger()
+  });
+  const failed = await runDesktopOfflineReleaseSmokePreflightCli({
+    runner: async () => {
+      throw new Error("boom");
+    },
+    logger: createLogger()
+  });
+
+  assert.equal(skipped, 0);
+  assert.equal(failed, 1);
 });
 
 test("discoverManagedPostgresBinaries finds dev override binaries", () => {
