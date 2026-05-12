@@ -1,24 +1,37 @@
 #!/usr/bin/env node
 
-import { existsSync, readFileSync } from "node:fs";
+import { execFile as execFileCallback, spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import net from "node:net";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
+import { promisify } from "node:util";
 
 import {
   formatLoadedEnvFiles,
   loadPostgresEnv,
+  loadRuntimeModules,
   REPO_ROOT,
   runPostgresSmoke,
   withPostgresRuntimeClient
 } from "./postgres-tools.mjs";
 
+const execFile = promisify(execFileCallback);
 const DESKTOP_APP_DIR = path.join("apps", "desktop");
 const DESKTOP_PACKAGE_PATH = path.join(DESKTOP_APP_DIR, "package.json");
 const TAURI_CONFIG_PATH = path.join(DESKTOP_APP_DIR, "src-tauri", "tauri.conf.json");
 const DESKTOP_DIST_INDEX_PATH = path.join(DESKTOP_APP_DIR, "dist", "index.html");
+const MANAGED_POSTGRES_DIR = "postgres";
+const MANAGED_POSTGRES_DATABASE = "chemd_desktop";
+const MANAGED_POSTGRES_USER = "chemd_desktop";
+const MANAGED_POSTGRES_OWNER = "chemd-desktop-managed-postgres-smoke/v1";
 const RUNTIME_CREATED_AT = "2026-05-12T00:00:00.000Z";
 const RUNTIME_SOURCE = "---\nid: exp-desktop-runtime-smoke\ntitle: Desktop runtime smoke\ndate: 2026-05-12\n---\n\n:::chemd #rxn-runtime-smoke\nkind: reaction\nreactants: aldehyde\nproducts: alcohol\nyield: 72%\n:::\n";
+
+const safeTrim = (value) => (typeof value === "string" ? value.trim() : "");
 
 const readJsonFile = ({ rootDir, relativePath, readTextFile }) =>
   JSON.parse(readTextFile(path.resolve(rootDir, relativePath), "utf8"));
@@ -85,6 +98,249 @@ export const summarizePostgresTarget = (databaseUrl) => {
     ].join(", ");
   } catch {
     return "configured=true, url=[REDACTED]";
+  }
+};
+
+export const managedPostgresCandidateDirs = ({ rootDir = REPO_ROOT, env = process.env } = {}) => {
+  const candidates = [];
+  const devBinDir = safeTrim(env.CHEMD_MANAGED_POSTGRES_BIN_DIR);
+  const resourceDir = safeTrim(env.CHEMD_MANAGED_POSTGRES_RESOURCE_DIR);
+  if (devBinDir) {
+    candidates.push({ dir: devBinDir, source: "CHEMD_MANAGED_POSTGRES_BIN_DIR" });
+  }
+  if (resourceDir) {
+    candidates.push({ dir: path.join(resourceDir, "postgres", "bin"), source: "bundled PostgreSQL binaries" });
+    candidates.push({ dir: path.join(resourceDir, "postgres"), source: "bundled PostgreSQL binaries" });
+  }
+  for (const relativePath of [
+    path.join("apps", "desktop", "src-tauri", "resources", "postgres", "bin"),
+    path.join("apps", "desktop", "src-tauri", "resources", "postgres"),
+    path.join("apps", "desktop", "src-tauri", "target", "release", "resources", "postgres", "bin"),
+    path.join("apps", "desktop", "src-tauri", "target", "release", "resources", "postgres"),
+    path.join("apps", "desktop", "src-tauri", "target", "debug", "resources", "postgres", "bin"),
+    path.join("apps", "desktop", "src-tauri", "target", "debug", "resources", "postgres")
+  ]) {
+    candidates.push({ dir: path.resolve(rootDir, relativePath), source: "bundled PostgreSQL binaries" });
+  }
+  return candidates;
+};
+
+const executableInDir = ({ dir, name, fileExists }) => {
+  const plain = path.join(dir, name);
+  if (fileExists(plain)) {
+    return plain;
+  }
+  if (process.platform === "win32") {
+    const exe = path.join(dir, `${name}.exe`);
+    if (fileExists(exe)) {
+      return exe;
+    }
+  }
+  return "";
+};
+
+export const discoverManagedPostgresBinaries = ({
+  rootDir = REPO_ROOT,
+  env = process.env,
+  fileExists = existsSync
+} = {}) => {
+  const candidates = managedPostgresCandidateDirs({ rootDir, env });
+  if (candidates.length === 0) {
+    return { available: false, reason: "Set CHEMD_MANAGED_POSTGRES_BIN_DIR or bundle PostgreSQL binaries" };
+  }
+
+  for (const candidate of candidates) {
+    const initdb = executableInDir({ dir: candidate.dir, name: "initdb", fileExists });
+    const psql = executableInDir({ dir: candidate.dir, name: "psql", fileExists });
+    const postgres = executableInDir({ dir: candidate.dir, name: "postgres", fileExists });
+    const pgCtl = executableInDir({ dir: candidate.dir, name: "pg_ctl", fileExists });
+    if (initdb && psql && (postgres || pgCtl)) {
+      return { available: true, binaries: { initdb, psql, postgres, pgCtl, source: candidate.source } };
+    }
+  }
+
+  return {
+    available: false,
+    reason: "PostgreSQL binaries are missing initdb, psql, and postgres or pg_ctl"
+  };
+};
+
+const randomManagedPassword = () => `chemd_${randomBytes(12).toString("hex")}`;
+
+const getFreePort = () =>
+  new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      server.close(() => resolve(address.port));
+    });
+  });
+
+const managedDatabaseUrl = (config, database = config.database) =>
+  `postgres://${encodeURIComponent(config.user)}:${encodeURIComponent(config.password)}@${config.host}:${config.port}/${encodeURIComponent(database)}`;
+
+const summarizeManagedTarget = (config, source) => [
+  `source=${source}`,
+  `host=${config.host}`,
+  `port=${config.port}`,
+  `database=${config.database}`,
+  `user=${config.user}`,
+  "password=[REDACTED]"
+].join(", ");
+
+const readManagedConfig = ({ configFile, fileExists, readTextFile }) => {
+  if (!fileExists(configFile)) {
+    return undefined;
+  }
+  return JSON.parse(readTextFile(configFile, "utf8"));
+};
+
+const createManagedConfig = async ({ configFile, fileExists, readTextFile, writeTextFile, getPort }) => {
+  const existing = readManagedConfig({ configFile, fileExists, readTextFile });
+  if (existing) {
+    return existing;
+  }
+  const config = {
+    host: "127.0.0.1",
+    port: await getPort(),
+    database: MANAGED_POSTGRES_DATABASE,
+    user: MANAGED_POSTGRES_USER,
+    password: randomManagedPassword(),
+    createdAt: new Date().toISOString()
+  };
+  writeTextFile(configFile, `${JSON.stringify(config, null, 2)}\n`);
+  return config;
+};
+
+const runInitdb = async ({ binaries, paths, config, runCommand, writeTextFile, removeFile }) => {
+  const pwfile = path.join(paths.runDir, "postgres.pw");
+  writeTextFile(pwfile, config.password);
+  try {
+    await runCommand(binaries.initdb, [
+      "-D", paths.dataDir,
+      "-U", config.user,
+      "--encoding=UTF8",
+      "--auth-host=scram-sha-256",
+      "--auth-local=trust",
+      "--pwfile", pwfile
+    ]);
+  } finally {
+    removeFile(pwfile);
+  }
+};
+
+const waitForManagedPostgres = async ({ env, runtimeModules, attempts = 40 }) => {
+  const { createPostgresRuntimeClient } = await runtimeModules();
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const client = createPostgresRuntimeClient({ env });
+    try {
+      await client.query("SELECT 1", []);
+      await client.close();
+      return;
+    } catch {
+      await client.close().catch(() => {});
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  }
+  throw new Error("Managed Postgres did not accept connections before timeout.");
+};
+
+const quoteIdent = (value) => `"${String(value).replaceAll("\"", "\"\"")}"`;
+
+const ensureManagedDatabase = async ({ config, runtimeModules }) => {
+  const { createPostgresRuntimeClient } = await runtimeModules();
+  const client = createPostgresRuntimeClient({
+    env: { CHEMD_POSTGRES_DATABASE_URL: managedDatabaseUrl(config, "postgres") }
+  });
+  try {
+    const result = await client.query("SELECT 1 FROM pg_database WHERE datname = $1", [config.database]);
+    if (!result.rows?.[0]) {
+      await client.query(`CREATE DATABASE ${quoteIdent(config.database)} OWNER ${quoteIdent(config.user)}`, []);
+    }
+  } finally {
+    await client.close();
+  }
+};
+
+const stopManagedProcess = async ({ child, pidFile, removeFile }) => {
+  if (!child || child.exitCode !== null || child.signalCode !== null) {
+    removeFile(pidFile);
+    return;
+  }
+  child.kill();
+  await new Promise((resolve) => {
+    const timer = setTimeout(resolve, 5_000);
+    child.once?.("exit", () => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
+  removeFile(pidFile);
+};
+
+const defaultManagedRoot = () =>
+  path.join(os.tmpdir(), `chemd-desktop-runtime-smoke-${process.pid}`, MANAGED_POSTGRES_DIR);
+
+export const startManagedPostgresSmokeRuntime = async ({
+  rootDir = REPO_ROOT,
+  env = process.env,
+  fileExists = existsSync,
+  readTextFile = readFileSync,
+  writeTextFile = writeFileSync,
+  makeDir = mkdirSync,
+  removeFile = (filePath) => rmSync(filePath, { force: true }),
+  runCommand = execFile,
+  spawnProcess = spawn,
+  getPort = getFreePort,
+  runtimeModules = loadRuntimeModules,
+  readinessAttempts = 40
+} = {}) => {
+  const availability = discoverManagedPostgresBinaries({ rootDir, env, fileExists });
+  if (!availability.available) {
+    return { status: "unavailable", reason: availability.reason };
+  }
+  if (!availability.binaries.postgres) {
+    return { status: "unavailable", reason: "Managed smoke requires a postgres binary for owned process cleanup" };
+  }
+
+  const managedRoot = safeTrim(env.CHEMD_MANAGED_POSTGRES_HOME) || defaultManagedRoot();
+  const paths = {
+    root: managedRoot,
+    dataDir: path.join(managedRoot, "data"),
+    runDir: path.join(managedRoot, "run"),
+    configFile: path.join(managedRoot, "connection.json"),
+    pidFile: path.join(managedRoot, "managed-postgres.pid.json")
+  };
+  makeDir(paths.root, { recursive: true });
+  makeDir(paths.runDir, { recursive: true });
+  const config = await createManagedConfig({ configFile: paths.configFile, fileExists, readTextFile, writeTextFile, getPort });
+  if (!fileExists(path.join(paths.dataDir, "PG_VERSION"))) {
+    await runInitdb({ binaries: availability.binaries, paths, config, runCommand, writeTextFile, removeFile });
+  }
+  const child = spawnProcess(availability.binaries.postgres, ["-D", paths.dataDir, "-h", config.host, "-p", String(config.port)], {
+    stdio: "ignore",
+    windowsHide: true
+  });
+  writeTextFile(paths.pidFile, `${JSON.stringify({ owner: MANAGED_POSTGRES_OWNER, pid: child.pid, dataDir: paths.dataDir, startedAt: new Date().toISOString() }, null, 2)}\n`);
+  const maintenanceEnv = { CHEMD_POSTGRES_DATABASE_URL: managedDatabaseUrl(config, "postgres") };
+  try {
+    await waitForManagedPostgres({ env: maintenanceEnv, runtimeModules, attempts: readinessAttempts });
+    await ensureManagedDatabase({ config, runtimeModules });
+    return {
+      status: "started",
+      env: {
+        ...env,
+        CHEMD_POSTGRES_DATABASE_URL: managedDatabaseUrl(config),
+        CHEMD_POSTGRES_SSL: env.CHEMD_POSTGRES_SSL || "false",
+        CHEMD_POSTGRES_CONNECTION_TIMEOUT_MS: env.CHEMD_POSTGRES_CONNECTION_TIMEOUT_MS || "5000"
+      },
+      summary: summarizeManagedTarget(config, availability.binaries.source),
+      cleanup: () => stopManagedProcess({ child, pidFile: paths.pidFile, removeFile })
+    };
+  } catch (error) {
+    await stopManagedProcess({ child, pidFile: paths.pidFile, removeFile });
+    throw error;
   }
 };
 
@@ -277,6 +533,7 @@ export const runDesktopRuntimeSmoke = async ({
   withClient = withPostgresRuntimeClient,
   postgresSmoke = runPostgresSmoke,
   persistenceSmoke = runDesktopRuntimePersistenceSmoke,
+  managedPostgres = startManagedPostgresSmokeRuntime,
   logger = console
 } = {}) => {
   logger.log("Chemd desktop runtime smoke starting.");
@@ -290,32 +547,45 @@ export const runDesktopRuntimeSmoke = async ({
   }
 
   const databaseUrl = getPostgresDatabaseUrl(env);
-  if (!databaseUrl) {
-    logger.log(
-      "SKIP desktop runtime smoke: CHEMD_POSTGRES_DATABASE_URL or DATABASE_URL is not configured."
-    );
-    return { status: "skipped", reason: "missing-postgres-env" };
+  let smokeEnv = env;
+  let cleanupManagedPostgres;
+  if (databaseUrl) {
+    logger.log(`PostgreSQL target: ${summarizePostgresTarget(databaseUrl)}`);
+  } else {
+    const managed = await managedPostgres({ rootDir, env });
+    if (managed.status !== "started") {
+      logger.log(`SKIP desktop runtime smoke: ${managed.reason}.`);
+      return { status: "skipped", reason: "missing-postgres-runtime", detail: managed.reason };
+    }
+    smokeEnv = managed.env;
+    cleanupManagedPostgres = managed.cleanup;
+    logger.log(`Managed PostgreSQL target: ${managed.summary}`);
   }
 
-  logger.log(`PostgreSQL target: ${summarizePostgresTarget(databaseUrl)}`);
-  const result = await withClient({
-    env,
-    operation: async (client) => {
-      const postgres = await postgresSmoke({ client });
-      const persistence = await persistenceSmoke({ client });
-      return { postgres, persistence };
-    }
-  });
+  try {
+    const result = await withClient({
+      env: smokeEnv,
+      operation: async (client) => {
+        const postgres = await postgresSmoke({ client });
+        const persistence = await persistenceSmoke({ client });
+        return { postgres, persistence };
+      }
+    });
 
-  logger.log("Chemd desktop runtime smoke passed.");
-  logger.log(`experiment: ${result.postgres.experimentId}`);
-  logger.log(`revision: ${result.postgres.revisionId}`);
-  logger.log(`compile run: ${result.postgres.compileRunId}`);
-  logger.log(`rag chunks: ${result.postgres.ragChunks}`);
-  logger.log(`first chunk: ${result.postgres.firstChunkId}`);
-  logger.log(`runtime graph: ${result.persistence.graphSnapshotId}`);
-  logger.log(`runtime verification: ${JSON.stringify(result.persistence.counts)}`);
-  return { status: "passed", result };
+    logger.log("Chemd desktop runtime smoke passed.");
+    logger.log(`experiment: ${result.postgres.experimentId}`);
+    logger.log(`revision: ${result.postgres.revisionId}`);
+    logger.log(`compile run: ${result.postgres.compileRunId}`);
+    logger.log(`rag chunks: ${result.postgres.ragChunks}`);
+    logger.log(`first chunk: ${result.postgres.firstChunkId}`);
+    logger.log(`runtime graph: ${result.persistence.graphSnapshotId}`);
+    logger.log(`runtime verification: ${JSON.stringify(result.persistence.counts)}`);
+    return { status: "passed", result };
+  } finally {
+    if (cleanupManagedPostgres) {
+      await cleanupManagedPostgres();
+    }
+  }
 };
 
 export const runDesktopRuntimeSmokeCli = async ({
