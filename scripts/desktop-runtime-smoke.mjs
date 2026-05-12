@@ -286,62 +286,121 @@ const stopManagedProcess = async ({ child, pidFile, removeFile }) => {
 const defaultManagedRoot = () =>
   path.join(os.tmpdir(), `chemd-desktop-runtime-smoke-${process.pid}`, MANAGED_POSTGRES_DIR);
 
-export const startManagedPostgresSmokeRuntime = async ({
-  rootDir = REPO_ROOT,
-  env = process.env,
-  fileExists = existsSync,
-  readTextFile = readFileSync,
-  writeTextFile = writeFileSync,
-  makeDir = mkdirSync,
-  removeFile = (filePath) => rmSync(filePath, { force: true }),
-  runCommand = execFile,
-  spawnProcess = spawn,
-  getPort = getFreePort,
-  runtimeModules = loadRuntimeModules,
-  readinessAttempts = 40
-} = {}) => {
-  const availability = discoverManagedPostgresBinaries({ rootDir, env, fileExists });
+const unavailableManagedSmokeStatus = (availability) => {
   if (!availability.available) {
     return { status: "unavailable", reason: availability.reason };
   }
   if (!availability.binaries.postgres) {
     return { status: "unavailable", reason: "Managed smoke requires a postgres binary for owned process cleanup" };
   }
+  return undefined;
+};
 
-  const managedRoot = safeTrim(env.CHEMD_MANAGED_POSTGRES_HOME) || defaultManagedRoot();
-  const paths = {
-    root: managedRoot,
-    dataDir: path.join(managedRoot, "data"),
-    runDir: path.join(managedRoot, "run"),
-    configFile: path.join(managedRoot, "connection.json"),
-    pidFile: path.join(managedRoot, "managed-postgres.pid.json")
-  };
+const managedSmokePaths = (managedRoot) => ({
+  root: managedRoot,
+  dataDir: path.join(managedRoot, "data"),
+  runDir: path.join(managedRoot, "run"),
+  configFile: path.join(managedRoot, "connection.json"),
+  pidFile: path.join(managedRoot, "managed-postgres.pid.json")
+});
+
+const ensureManagedSmokeDataDir = async ({
+  paths,
+  binaries,
+  fileExists,
+  readTextFile,
+  writeTextFile,
+  makeDir,
+  getPort,
+  runCommand,
+  removeFile
+}) => {
   makeDir(paths.root, { recursive: true });
   makeDir(paths.runDir, { recursive: true });
   const config = await createManagedConfig({ configFile: paths.configFile, fileExists, readTextFile, writeTextFile, getPort });
   if (!fileExists(path.join(paths.dataDir, "PG_VERSION"))) {
-    await runInitdb({ binaries: availability.binaries, paths, config, runCommand, writeTextFile, removeFile });
+    await runInitdb({ binaries, paths, config, runCommand, writeTextFile, removeFile });
   }
-  const child = spawnProcess(availability.binaries.postgres, ["-D", paths.dataDir, "-h", config.host, "-p", String(config.port)], {
+  return config;
+};
+
+const spawnManagedSmokePostgres = ({ binaries, paths, config, spawnProcess, writeTextFile }) => {
+  const child = spawnProcess(binaries.postgres, ["-D", paths.dataDir, "-h", config.host, "-p", String(config.port)], {
     stdio: "ignore",
     windowsHide: true
   });
   writeTextFile(paths.pidFile, `${JSON.stringify({ owner: MANAGED_POSTGRES_OWNER, pid: child.pid, dataDir: paths.dataDir, startedAt: new Date().toISOString() }, null, 2)}\n`);
+  return child;
+};
+
+const startedManagedSmokeRuntime = ({ env, config, source, child, paths, removeFile }) => ({
+  status: "started",
+  env: {
+    ...env,
+    CHEMD_POSTGRES_DATABASE_URL: managedDatabaseUrl(config),
+    CHEMD_POSTGRES_SSL: env.CHEMD_POSTGRES_SSL || "false",
+    CHEMD_POSTGRES_CONNECTION_TIMEOUT_MS: env.CHEMD_POSTGRES_CONNECTION_TIMEOUT_MS || "5000"
+  },
+  summary: summarizeManagedTarget(config, source),
+  cleanup: () => stopManagedProcess({ child, pidFile: paths.pidFile, removeFile })
+});
+
+const createManagedPostgresSmokeOptions = (options) => ({
+  rootDir: REPO_ROOT,
+  env: process.env,
+  fileExists: existsSync,
+  readTextFile: readFileSync,
+  writeTextFile: writeFileSync,
+  makeDir: mkdirSync,
+  removeFile: (filePath) => rmSync(filePath, { force: true }),
+  runCommand: execFile,
+  spawnProcess: spawn,
+  getPort: getFreePort,
+  runtimeModules: loadRuntimeModules,
+  readinessAttempts: 40,
+  ...options
+});
+
+export const startManagedPostgresSmokeRuntime = async (options = {}) => {
+  const {
+    rootDir,
+    env,
+    fileExists,
+    readTextFile,
+    writeTextFile,
+    makeDir,
+    removeFile,
+    runCommand,
+    spawnProcess,
+    getPort,
+    runtimeModules,
+    readinessAttempts
+  } = createManagedPostgresSmokeOptions(options);
+  const availability = discoverManagedPostgresBinaries({ rootDir, env, fileExists });
+  const unavailable = unavailableManagedSmokeStatus(availability);
+  if (unavailable) {
+    return unavailable;
+  }
+
+  const managedRoot = safeTrim(env.CHEMD_MANAGED_POSTGRES_HOME) || defaultManagedRoot();
+  const paths = managedSmokePaths(managedRoot);
+  const config = await ensureManagedSmokeDataDir({
+    paths,
+    binaries: availability.binaries,
+    fileExists,
+    readTextFile,
+    writeTextFile,
+    makeDir,
+    getPort,
+    runCommand,
+    removeFile
+  });
+  const child = spawnManagedSmokePostgres({ binaries: availability.binaries, paths, config, spawnProcess, writeTextFile });
   const maintenanceEnv = { CHEMD_POSTGRES_DATABASE_URL: managedDatabaseUrl(config, "postgres") };
   try {
     await waitForManagedPostgres({ env: maintenanceEnv, runtimeModules, attempts: readinessAttempts });
     await ensureManagedDatabase({ config, runtimeModules });
-    return {
-      status: "started",
-      env: {
-        ...env,
-        CHEMD_POSTGRES_DATABASE_URL: managedDatabaseUrl(config),
-        CHEMD_POSTGRES_SSL: env.CHEMD_POSTGRES_SSL || "false",
-        CHEMD_POSTGRES_CONNECTION_TIMEOUT_MS: env.CHEMD_POSTGRES_CONNECTION_TIMEOUT_MS || "5000"
-      },
-      summary: summarizeManagedTarget(config, availability.binaries.source),
-      cleanup: () => stopManagedProcess({ child, pidFile: paths.pidFile, removeFile })
-    };
+    return startedManagedSmokeRuntime({ env, config, source: availability.binaries.source, child, paths, removeFile });
   } catch (error) {
     await stopManagedProcess({ child, pidFile: paths.pidFile, removeFile });
     throw error;
