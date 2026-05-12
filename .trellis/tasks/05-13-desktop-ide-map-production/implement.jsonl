@@ -1,0 +1,7 @@
+{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
+{"file": ".trellis/spec/web/frontend/index.md", "reason": "Frontend development guide"}
+{"file": ".trellis\\spec\\guides\\cross-layer-thinking-guide.md", "reason": "Cross-layer contracts for IDE, workspace index, rendering, map, and persistence"}
+{"file": ".trellis\\spec\\guides\\code-reuse-thinking-guide.md", "reason": "Search and reuse existing language-service and desktop helper patterns"}
+{"file": ".trellis\\spec\\web\\frontend\\component-guidelines.md", "reason": "Desktop React components should stay small, typed, and composed"}
+{"file": ".trellis\\spec\\storage-postgres\\backend\\storage-contract.md", "reason": "Persistence and Graph/RAG records must keep storage package pure"}
+{"file": ".trellis\\spec\\web\\frontend\\quality-guidelines.md", "reason": "Frontend validation commands and complexity constraints"}
