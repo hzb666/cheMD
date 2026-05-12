@@ -12,7 +12,7 @@ import { buildPersistRuntimeGraphRagCommandInput } from "./desktop-runtime-persi
 type WorkspaceState = "empty" | "opening" | "open" | "error"; type DocumentMode = "sample" | "workspace";
 type SidecarOperation = "start" | "stop" | "refresh" | "logs";
 type ManagedPostgresOperation = "init" | "start" | "stop" | "migrate" | "refresh";
-type LocalStoreOperation = "refresh" | "save";
+type LocalStoreOperation = "refresh" | "save" | "sync";
 type AgentMessageTone = "info" | "warning" | "success" | "danger";
 type AgentMessage = { tone: AgentMessageTone; text: string };
 type QuickFixCandidate = { diagnostic: ChemdEditorDiagnostic; quickFix: ChemdQuickFixProposal };
@@ -40,6 +40,7 @@ type PersistControllerInput = PersistBuildInput & {
 };
 type LocalStoreControllerInput = PersistBuildInput & {
   mode: DocumentMode;
+  postgresStatus: PostgresStatus;
 };
 type AgentPatchControllerInput = {
   agentRun: AgentRun | null;
@@ -60,6 +61,19 @@ type LocalSnapshotState = {
   state: PersistOperationState;
   message: string;
   summary: LocalSnapshotSummary | null;
+};
+type LocalSyncEntryResult = DesktopCommandMap["sync_local_outbox_to_postgres"]["output"]["entries"][number];
+type LocalSyncSummary = {
+  syncedCount: number;
+  failedCount: number;
+  skippedCount: number;
+  target: DesktopCommandMap["sync_local_outbox_to_postgres"]["output"]["target"];
+  failedEntries: LocalSyncEntryResult[];
+};
+type LocalSyncState = {
+  state: PersistOperationState;
+  message: string;
+  summary: LocalSyncSummary | null;
 };
 type PostgresField = [string, string];
 type DesktopWorkbenchProps = {
@@ -113,7 +127,9 @@ type InsightPaneProps = {
   localStoreStatus: LocalStoreStatus;
   localStoreOperation: LocalStoreOperation | null;
   localSnapshotState: LocalSnapshotState;
+  localSyncState: LocalSyncState;
   localStoreDisabledReason: string | null;
+  localStoreSyncDisabledReason: string | null;
   localStoreError: string | null;
   agentRun: AgentRun | null;
   agentMessage: AgentMessage | null;
@@ -130,6 +146,7 @@ type InsightPaneProps = {
   onPersistGraph: () => void;
   onRefreshLocalStore: () => void;
   onSaveLocalSnapshot: () => void;
+  onSyncLocalOutbox: () => void;
   onProposeQuickFix: (candidate: QuickFixCandidate) => void;
   onApprovePatch: () => void;
   onApplyPatch: () => void;
@@ -410,6 +427,11 @@ const initialLocalSnapshotState: LocalSnapshotState = {
   message: "Local Store is an offline cache/outbox. It does not mean Postgres sync has succeeded.",
   summary: null
 };
+const initialLocalSyncState: LocalSyncState = {
+  state: "idle",
+  message: "Sync Pending shares only pending outbox entries after Postgres readiness checks pass.",
+  summary: null
+};
 
 const getPersistErrorMessage = (error: unknown): string => {
   const commandError = error as Partial<DesktopCommandError> | undefined;
@@ -425,6 +447,11 @@ const getLocalStoreErrorMessage = (error: unknown): string => {
   return redactSensitiveRuntimeText(firstLine || "Local Store command failed");
 };
 
+const getLocalOutboxErrorText = (error: string | undefined): string => {
+  const safeError = redactSensitiveRuntimeText((error ?? "No entry error reported").split(/\r?\n/, 1)[0].trim());
+  return safeError.length <= 120 ? safeError : `${safeError.slice(0, 117)}...`;
+};
+
 const summarizeGraphSnapshotId = (graphSnapshotId: string): string =>
   graphSnapshotId.length <= 38
     ? graphSnapshotId
@@ -435,6 +462,9 @@ const formatPersistCounts = (counts: PersistSummary["counts"]): string =>
 
 const summarizeLocalId = (value: string): string =>
   value.length <= 34 ? value : `${value.slice(0, 14)}...${value.slice(-14)}`;
+
+const formatLocalSyncCounts = (summary: LocalSyncSummary): string =>
+  `${summary.syncedCount} synced / ${summary.failedCount} failed / ${summary.skippedCount} skipped`;
 
 const formatLocalTimestamp = (value: string | null): string => {
   if (!value) return "never";
@@ -475,6 +505,22 @@ const getLocalSnapshotDisabledReason = ({
   if (mode !== "workspace") return "Open a local workspace file before saving an offline snapshot.";
   if (file.kind !== "file") return "Select a file before saving an offline snapshot.";
   if (compileStatus === "failed") return "Resolve the compile failure before saving an offline snapshot.";
+  return null;
+};
+
+const getLocalSyncDisabledReason = ({
+  localStoreStatus,
+  postgresStatus
+}: {
+  localStoreStatus: LocalStoreStatus;
+  postgresStatus: PostgresStatus;
+}): string | null => {
+  if (!localStoreStatus.available) return "Local Store must be available before syncing pending outbox entries.";
+  if (localStoreStatus.outboxPendingCount <= 0) return "No pending Local Store entries to sync.";
+  if (!postgresStatus.configured) return "Configure Postgres before syncing pending outbox entries.";
+  if (postgresStatus.state !== "ready") return "Postgres must be reachable before syncing pending outbox entries.";
+  if (postgresStatus.vectorInstalled !== true) return "Install pgvector before syncing pending outbox entries.";
+  if (postgresStatus.schemaReady !== true) return "Run PostgreSQL migrations before syncing pending outbox entries.";
   return null;
 };
 
@@ -1101,21 +1147,28 @@ const LocalStorePanel = ({
   status,
   operation,
   snapshotState,
+  syncState,
   disabledReason,
+  syncDisabledReason,
   errorMessage,
   onRefresh,
-  onSave
+  onSave,
+  onSync
 }: {
   status: LocalStoreStatus;
   operation: LocalStoreOperation | null;
   snapshotState: LocalSnapshotState;
+  syncState: LocalSyncState;
   disabledReason: string | null;
+  syncDisabledReason: string | null;
   errorMessage: string | null;
   onRefresh: () => void;
   onSave: () => void;
+  onSync: () => void;
 }) => {
   const busy = operation !== null;
   const saveDisabled = busy || disabledReason !== null || !status.available;
+  const syncDisabled = busy || syncDisabledReason !== null;
   const unavailableMessage = status.available
     ? null
     : "Local Store is unavailable. Refresh status before relying on the offline outbox.";
@@ -1148,9 +1201,19 @@ const LocalStorePanel = ({
           disabled={saveDisabled}
           onClick={onSave}
         />
+        <LocalStoreButton
+          label="Sync Pending"
+          loadingLabel="Syncing"
+          icon={UploadCloud}
+          operation="sync"
+          activeOperation={operation}
+          disabled={syncDisabled}
+          onClick={onSync}
+        />
       </div>
       {unavailableMessage ? <p className="desktop-local-store-message" data-tone="warning">{unavailableMessage}</p> : null}
       {disabledReason ? <p className="desktop-local-store-message" data-tone="warning">{disabledReason}</p> : null}
+      {syncDisabledReason ? <p className="desktop-local-store-message" data-tone="warning">{syncDisabledReason}</p> : null}
       {errorMessage ? <p className="desktop-local-store-message" data-tone="danger" role="alert">{errorMessage}</p> : null}
       <div className="desktop-local-snapshot-status" data-state={snapshotState.state} aria-live="polite">
         <div className="desktop-persist-status-row">
@@ -1163,6 +1226,34 @@ const LocalStorePanel = ({
             <div><dt>Pending</dt><dd>{snapshotState.summary.pendingCount}</dd></div>
             <div><dt>Idempotency</dt><dd title={snapshotState.summary.idempotencyKey}>{summarizeLocalId(snapshotState.summary.idempotencyKey)}</dd></div>
           </dl>
+        ) : null}
+      </div>
+      <div className="desktop-local-sync-status" data-state={syncState.state} aria-live="polite">
+        <div className="desktop-persist-status-row">
+          <span>{syncState.state}</span>
+          <p>{syncState.message}</p>
+        </div>
+        {syncState.summary ? (
+          <>
+            <dl className="desktop-persist-summary">
+              <div><dt>Counts</dt><dd>{formatLocalSyncCounts(syncState.summary)}</dd></div>
+              <div><dt>Target</dt><dd>{syncState.summary.target.kind}</dd></div>
+              <div><dt>Source</dt><dd title={redactSensitiveRuntimeText(syncState.summary.target.source)}>{redactSensitiveRuntimeText(syncState.summary.target.source)}</dd></div>
+              <div><dt>Host</dt><dd>{formatPostgresValue(syncState.summary.target.host)}</dd></div>
+              <div><dt>Database</dt><dd>{formatPostgresValue(syncState.summary.target.database)}</dd></div>
+              <div><dt>User</dt><dd>{formatPostgresValue(syncState.summary.target.user)}</dd></div>
+            </dl>
+            {syncState.summary.failedEntries.length > 0 ? (
+              <ul className="desktop-local-sync-errors" aria-label="Local outbox sync failures">
+                {syncState.summary.failedEntries.slice(0, 4).map((entry) => (
+                  <li key={entry.localId}>
+                    <code title={entry.localId}>{summarizeLocalId(entry.localId)}</code>
+                    <span title={getLocalOutboxErrorText(entry.error)}>{getLocalOutboxErrorText(entry.error)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </>
         ) : null}
       </div>
       <dl className="desktop-local-store-fields">
@@ -1448,7 +1539,9 @@ const InsightPane = ({
   localStoreStatus,
   localStoreOperation,
   localSnapshotState,
+  localSyncState,
   localStoreDisabledReason,
+  localStoreSyncDisabledReason,
   localStoreError,
   agentRun,
   agentMessage,
@@ -1465,6 +1558,7 @@ const InsightPane = ({
   onPersistGraph,
   onRefreshLocalStore,
   onSaveLocalSnapshot,
+  onSyncLocalOutbox,
   onProposeQuickFix,
   onApprovePatch,
   onApplyPatch,
@@ -1513,10 +1607,13 @@ const InsightPane = ({
         status={localStoreStatus}
         operation={localStoreOperation}
         snapshotState={localSnapshotState}
+        syncState={localSyncState}
         disabledReason={localStoreDisabledReason}
+        syncDisabledReason={localStoreSyncDisabledReason}
         errorMessage={localStoreError}
         onRefresh={onRefreshLocalStore}
         onSave={onSaveLocalSnapshot}
+        onSync={onSyncLocalOutbox}
       />
       <div className="desktop-agent-panel">
         <AgentRunHeader agentRun={agentRun} agentMessage={agentMessage} />
@@ -1802,6 +1899,7 @@ const usePersistRuntimeController = ({
 const useLocalStoreController = ({
   mode,
   file,
+  postgresStatus,
   source,
   workspace,
   compileOutput,
@@ -1809,6 +1907,7 @@ const useLocalStoreController = ({
 }: LocalStoreControllerInput) => {
   const [status, setStatus] = useState<LocalStoreStatus>(initialLocalStoreStatus);
   const [snapshotState, setSnapshotState] = useState<LocalSnapshotState>(initialLocalSnapshotState);
+  const [syncState, setSyncState] = useState<LocalSyncState>(initialLocalSyncState);
   const [operation, setOperation] = useState<LocalStoreOperation | null>(null);
   const [error, setError] = useState<string | null>(null);
   const operationRef = useRef<LocalStoreOperation | null>(null);
@@ -1816,6 +1915,10 @@ const useLocalStoreController = ({
     mode,
     file,
     compileStatus: compileOutput.status
+  });
+  const syncDisabledReason = getLocalSyncDisabledReason({
+    localStoreStatus: status,
+    postgresStatus
   });
 
   const readStatus = async (): Promise<LocalStoreStatus | null> => {
@@ -1874,8 +1977,43 @@ const useLocalStoreController = ({
     }
   };
 
+  const syncPending = async () => {
+    if (operationRef.current) return;
+    if (syncDisabledReason !== null) {
+      setSyncState({ state: "failure", message: syncDisabledReason, summary: null });
+      return;
+    }
+    operationRef.current = "sync";
+    setOperation("sync");
+    setSyncState({ state: "pending", message: "Syncing pending Local Store entries to Postgres.", summary: null });
+    try {
+      const result = await invokeDesktop("sync_local_outbox_to_postgres", undefined);
+      const failedEntries = result.entries.filter((entry) => entry.syncStatus === "failed" || entry.error !== undefined);
+      setSyncState({
+        state: result.failedCount > 0 ? "failure" : "success",
+        message: result.detail || (result.failedCount > 0
+          ? "Sync finished with failed entries. Local failures remain visible in the outbox."
+          : "Synced pending Local Store entries to Postgres."),
+        summary: {
+          syncedCount: result.syncedCount,
+          failedCount: result.failedCount,
+          skippedCount: result.skippedCount,
+          target: result.target,
+          failedEntries
+        }
+      });
+      await readStatus();
+    } catch (nextError: unknown) {
+      setSyncState({ state: "failure", message: getLocalStoreErrorMessage(nextError), summary: null });
+    } finally {
+      operationRef.current = null;
+      setOperation(null);
+    }
+  };
+
   useEffect(() => {
     setSnapshotState(initialLocalSnapshotState);
+    setSyncState(initialLocalSyncState);
   }, [mode, file.id]);
 
   useEffect(() => {
@@ -1885,12 +2023,18 @@ const useLocalStoreController = ({
   return {
     status,
     snapshotState,
+    syncState,
     operation,
     disabledReason,
+    syncDisabledReason,
     error,
-    reset: () => setSnapshotState(initialLocalSnapshotState),
+    reset: () => {
+      setSnapshotState(initialLocalSnapshotState);
+      setSyncState(initialLocalSyncState);
+    },
     refresh: () => void refresh(),
-    saveSnapshot: () => void saveSnapshot()
+    saveSnapshot: () => void saveSnapshot(),
+    syncPending: () => void syncPending()
   };
 };
 
@@ -1996,7 +2140,9 @@ const DesktopWorkbench = ({
           localStoreStatus={localStoreController.status}
           localStoreOperation={localStoreController.operation}
           localSnapshotState={localStoreController.snapshotState}
+          localSyncState={localStoreController.syncState}
           localStoreDisabledReason={localStoreController.disabledReason}
+          localStoreSyncDisabledReason={localStoreController.syncDisabledReason}
           localStoreError={localStoreController.error}
           agentRun={agentRun}
           agentMessage={agentMessage}
@@ -2010,6 +2156,7 @@ const DesktopWorkbench = ({
           onPersistGraph={persistController.persist}
           onRefreshLocalStore={localStoreController.refresh}
           onSaveLocalSnapshot={localStoreController.saveSnapshot}
+          onSyncLocalOutbox={localStoreController.syncPending}
           onProposeQuickFix={onProposeQuickFix}
           onApprovePatch={onApprovePatch}
           onApplyPatch={onApplyPatch}
@@ -2057,6 +2204,7 @@ export const App = () => {
   const localStoreController = useLocalStoreController({
     mode,
     file: selectedFile,
+    postgresStatus: postgresController.status,
     source,
     workspace,
     compileOutput: output,
