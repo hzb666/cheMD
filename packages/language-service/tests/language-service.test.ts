@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   buildEditorGraphRagRecords,
   compileChemdForEditor,
+  compileChemdLanguageServiceRequest,
   toMonacoCodeActions,
+  toMonacoLanguageServiceModel,
   toMonacoMarker
 } from "../src/index";
 
@@ -48,6 +50,10 @@ describe("compileChemdForEditor", () => {
     });
     expect(diagnostic?.quickFixes[0]).toMatchObject({
       diagnosticCode: "W_CHEMD_KIND_AMBIGUOUS",
+      sourceRange: expect.objectContaining({
+        startLine: expect.any(Number),
+        startColumn: expect.any(Number)
+      }),
       patch: {
         beforeHash: expect.any(String),
         edits: [expect.objectContaining({
@@ -74,6 +80,15 @@ describe("compileChemdForEditor", () => {
     const warning = output.diagnostics.find((item) => item.severity === "warning");
     expect(warning ? toMonacoMarker(warning).severity : undefined).toBe(4);
     expect(warning ? toMonacoCodeActions(warning) : []).toEqual(expect.any(Array));
+
+    const model = toMonacoLanguageServiceModel(output);
+    expect(model).toMatchObject({
+      status: "ok",
+      markers: expect.any(Array),
+      codeActions: expect.any(Array),
+      outline: output.outline,
+      symbols: output.symbols
+    });
   });
 
   it("returns stable failed output when compile throws", () => {
@@ -100,6 +115,103 @@ describe("compileChemdForEditor", () => {
         message: "compiler unavailable"
       }
     });
+  });
+
+  it("returns stale compile responses without invoking the compiler", () => {
+    let compileCount = 0;
+    const response = compileChemdLanguageServiceRequest({
+      requestId: "compile-1",
+      type: "compile",
+      payload: { source }
+    }, {
+      compileChemd: () => {
+        compileCount += 1;
+        throw new Error("stale requests should not compile");
+      }
+    }, {
+      latestRequestId: "compile-2"
+    });
+
+    expect(response).toEqual({
+      requestId: "compile-1",
+      type: "compile",
+      status: "stale",
+      stale: true
+    });
+    expect(compileCount).toBe(0);
+  });
+
+  it("turns compiler failures into structured worker errors", () => {
+    const response = compileChemdLanguageServiceRequest({
+      requestId: "compile-failure",
+      type: "compile",
+      payload: { source }
+    }, {
+      compileChemd: () => {
+        throw new Error("compiler unavailable");
+      },
+      now: () => new Date("2026-05-12T00:00:00.000Z")
+    });
+
+    expect(response).toMatchObject({
+      requestId: "compile-failure",
+      type: "compile",
+      status: "error",
+      error: {
+        code: "LS_COMPILE_FAILED",
+        message: "compiler unavailable"
+      },
+      payload: {
+        status: "failed",
+        compiledAt: "2026-05-12T00:00:00.000Z"
+      }
+    });
+  });
+
+  it("keeps quick fixes as proposals and leaves source untouched", () => {
+    const originalSource = source;
+    const output = compileChemdForEditor({
+      source,
+      options: { strictChemdKind: true }
+    });
+    const proposal = output.diagnostics
+      .flatMap((diagnostic) => diagnostic.quickFixes)[0];
+
+    expect(source).toBe(originalSource);
+    expect(proposal.patch.beforeHash).toEqual(expect.any(String));
+    expect(proposal.patch.edits[0].replacement).not.toBe(source);
+    expect(proposal.patch.edits[0].replacement).toContain("kind: molecule");
+  });
+
+  it("keeps empty and incomplete documents inside stable editor ranges", () => {
+    const emptyOutput = compileChemdForEditor({ source: "" });
+    const incompleteOutput = compileChemdForEditor({
+      source: ":::chemd #mol-open\nkind: molecule\nsmiles: CCO"
+    });
+
+    expect(emptyOutput.status).toBe("ok");
+    expect(incompleteOutput.status).toBe("ok");
+    expect(emptyOutput.outline[0]?.range).toEqual({
+      startLine: 1,
+      startColumn: 1,
+      endLine: 1,
+      endColumn: 1
+    });
+    expect(incompleteOutput.outline).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "mol-open",
+        range: expect.objectContaining({
+          startLine: 1,
+          startColumn: 1,
+          endLine: 3
+        })
+      })
+    ]));
+    expect(incompleteOutput.diagnostics.every((diagnostic) =>
+      diagnostic.range.startLine >= 1
+        && diagnostic.range.startColumn >= 1
+        && diagnostic.range.endLine >= diagnostic.range.startLine
+    )).toBe(true);
   });
 });
 

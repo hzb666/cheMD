@@ -4,6 +4,16 @@ export {
   type ChemdLanguageServiceDependencies
 } from "./compile";
 export {
+  compileChemdLanguageServiceRequest,
+  createStaleCompileResponse,
+  type ChemdLanguageCompileErrorResponse,
+  type ChemdLanguageCompileOkResponse,
+  type ChemdLanguageCompileRequest,
+  type ChemdLanguageCompileRequestState,
+  type ChemdLanguageCompileResponse,
+  type ChemdLanguageCompileStaleResponse
+} from "./worker";
+export {
   buildEditorGraphRagRecords
 } from "./graph-rag-records";
 export type {
@@ -18,10 +28,12 @@ export type {
 export type * from "./types";
 export {
   toMonacoCodeActions,
+  toMonacoLanguageServiceModel,
   toMonacoMarker,
   toMonacoRange,
   toMonacoSeverity,
   type MonacoCodeActionLike,
+  type MonacoLanguageServiceModel,
   type MonacoMarkerLike,
   type MonacoMarkerSeverity,
   type MonacoRangeLike

@@ -1,7 +1,10 @@
 import type {
   ChemdEditorDiagnostic,
+  ChemdLanguageCompileOutput,
+  ChemdOutlineItem,
   ChemdQuickFixProposal,
-  ChemdSourceRange
+  ChemdSourceRange,
+  ChemdSymbol
 } from "./types";
 
 export type MonacoMarkerSeverity = 1 | 2 | 4 | 8;
@@ -30,6 +33,17 @@ export interface MonacoCodeActionLike {
     }>;
   };
   data: ChemdQuickFixProposal;
+}
+
+export interface MonacoLanguageServiceModel {
+  status: ChemdLanguageCompileOutput["status"];
+  documentUri?: string;
+  compiledAt: string;
+  markers: MonacoMarkerLike[];
+  codeActions: MonacoCodeActionLike[];
+  outline: ChemdOutlineItem[];
+  symbols: ChemdSymbol[];
+  error?: Extract<ChemdLanguageCompileOutput, { status: "failed" }>["error"];
 }
 
 export const toMonacoRange = (range: ChemdSourceRange): MonacoRangeLike => ({
@@ -76,3 +90,18 @@ export const toMonacoCodeActions = (
     data: proposal
   }));
 };
+
+export const toMonacoLanguageServiceModel = (
+  output: ChemdLanguageCompileOutput
+): MonacoLanguageServiceModel => ({
+  status: output.status,
+  documentUri: output.documentUri,
+  compiledAt: output.compiledAt,
+  markers: output.diagnostics.map((diagnostic) => toMonacoMarker(diagnostic)),
+  codeActions: output.diagnostics.flatMap((diagnostic) =>
+    toMonacoCodeActions(diagnostic)
+  ),
+  outline: output.outline,
+  symbols: output.symbols,
+  ...(output.status === "failed" ? { error: output.error } : {})
+});
