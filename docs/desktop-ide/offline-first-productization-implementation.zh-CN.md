@@ -358,6 +358,31 @@ DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outb
 - PostgreSQL 真实同步仍需要外部 DB env 或 managed PostgreSQL binaries；无 DB 只证明
   Offline Core PASS，不证明 shared schema 持久化。
 
+### 2026-05-13 第四轮进行中：bundle 拆分与远端 PostgreSQL proof
+
+已完成：
+
+- Monaco bundle split：
+  - `apps/desktop/vite.config.ts` 已用 `manualChunks` 拆分 `monaco` 与
+    `react-vendor`。
+  - desktop build 主入口从约 3.2 MB 降到约 468 KB。
+  - Monaco 仍作为独立大 chunk 触发 size warning；未通过提高阈值掩盖。
+- 远端 PostgreSQL runtime smoke：
+  - 使用外部 PostgreSQL 连接完成 `pnpm desktop:runtime-smoke`。
+  - 输出已脱敏：`host=103.24.219.156, port=5632, database=postgres, user=postgres,
+    password=[REDACTED]`。
+  - shared schema persistence、runtime Graph/RAG verification、local outbox reconnect
+    sync 均通过。
+  - Tauri command smoke 仍因未配置 `CHEMD_DESKTOP_TAURI_COMMAND_RUNNER` 被明确标记
+    为 `SKIP`，不阻塞后续产品化推进。
+
+等待确认后合并：
+
+- Workspace ingest UI 已在独立工作树实现，但 focused ESLint 触发复杂度门禁：
+  `LocalStorePanel` 超过 `max-lines-per-function` 与 complexity 限制。
+- 按仓库规则，复杂度类修复需用户确认后再拆出非纯透传的 `WorkspaceIngestPanel`。
+- 该工作树暂不合并，避免把 lint failure 带入 `desktop-ide`。
+
 ### M4：本地 workspace ingest 与可恢复队列
 
 目标：把单文档 authoring 扩展为本地 workspace 级知识准备。
@@ -542,6 +567,13 @@ pnpm --filter @chemd/desktop tauri:build
 - [ ] migration、pgvector、schema version 状态可见。
 - [ ] 外部 DB 与 managed DB 使用同一 shared schema。
 - [ ] sync 成功、失败、冲突都有 UI 和日志。
+
+当前验证状态：
+
+- 外部 PostgreSQL script-level runtime smoke 已通过，包含 shared schema 写入与本地
+  outbox reconnect sync。
+- Tauri command-level proof 尚未配置 runner，当前按环境型 `SKIP` 处理，不阻塞离线
+  优先主线。
 
 ### P3：Graph/RAG/Agent 产品化
 

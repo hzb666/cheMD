@@ -895,3 +895,28 @@ proof surface without changing the local-document source of truth.
     managed PostgreSQL binaries.
   - Monaco is integrated, but bundle splitting/performance tuning is still a
     release optimization item.
+
+## Fifteenth-Wave In-Progress Record
+
+- `desktop-ide-monaco-bundle-split` merged through
+  `8a4cd28 build(desktop)：拆分 Monaco 构建 chunk`.
+  - `apps/desktop/vite.config.ts` now uses a conservative `manualChunks`
+    function for `monaco` and `react-vendor`.
+  - Desktop build main entry dropped from roughly 3.2 MB to roughly 468 KB.
+  - Monaco remains a separate large chunk and still emits a size warning; the
+    warning threshold was not raised.
+
+- External PostgreSQL runtime proof:
+  - `pnpm desktop:runtime-smoke` passed against the remote PostgreSQL target.
+  - Logged target metadata was redacted: host, port, database, and user only;
+    password was `[REDACTED]`.
+  - Shared schema persistence, runtime Graph/RAG verification, and local outbox
+    reconnect sync passed.
+  - Tauri command smoke remains an environment SKIP because
+    `CHEMD_DESKTOP_TAURI_COMMAND_RUNNER` is not configured.
+
+- Blocked branch, not merged:
+  - `desktop-ide-workspace-ingest-ui` has a working UI implementation, but
+    focused ESLint reports complexity/max-lines errors in `LocalStorePanel`.
+  - Project rules require user confirmation before changing complexity lint
+    failures, so this branch remains isolated until approved.
