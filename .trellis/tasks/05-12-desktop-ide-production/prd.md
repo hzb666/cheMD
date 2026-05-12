@@ -935,3 +935,29 @@ proof surface without changing the local-document source of truth.
     focused ESLint reports complexity/max-lines errors in `LocalStorePanel`.
   - Project rules require user confirmation before changing complexity lint
     failures, so this branch remains isolated until approved.
+
+## User Offline-First Docs Branch Record
+
+- Branch/worktree:
+  - `desktop-ide-user-offline-docs`
+  - `D:\Code\chemd-wt-user-offline-docs`
+- Baseline:
+  - Created from local `desktop-ide` at `193ab83`.
+  - Remote refresh was attempted, but `git fetch origin desktop-ide` failed
+    with `Recv failure: Connection was reset`; treated as a network blocker.
+- Documentation:
+  - Added `docs/desktop-ide/user-offline-first-guide.zh-CN.md` as the
+    production user/support guide for Offline Core, local documents,
+    snapshot/outbox, PostgreSQL configuration, sync recovery, diagnostics
+    bundle, clean-machine smoke, and explicit `SKIP` semantics.
+  - Updated the offline-first implementation status/link so P4 user docs point
+    to the new guide.
+- Validation:
+  - `git diff --check`: passed with only Git LF/CRLF worktree warning.
+  - `pnpm exec markdownlint docs/desktop-ide/user-offline-first-guide.zh-CN.md docs/desktop-ide/offline-first-productization-implementation.zh-CN.md`:
+    not available; command failed because `markdownlint` is not installed in
+    this workspace.
+  - Local Markdown relative-link check: passed.
+- Scope control:
+  - No app code, package scripts, lockfile, root config, or desktop runtime
+    files were modified.
