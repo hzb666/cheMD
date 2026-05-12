@@ -915,6 +915,21 @@ proof surface without changing the local-document source of truth.
   - Tauri command smoke remains an environment SKIP because
     `CHEMD_DESKTOP_TAURI_COMMAND_RUNNER` is not configured.
 
+- `desktop-ide-diagnostics-bundle` merged through
+  `c3f84fb feat(desktop)：合并诊断包脚本`.
+  - Added `pnpm desktop:diagnostics-bundle` for offline, redacted JSON support
+    diagnostics.
+  - The bundle records platform, Node, git commit, desktop package metadata,
+    artifact summaries, known desktop commands, runtime/release preflight
+    classifications, and selected env signal names with values redacted.
+  - It does not start the GUI, open network connections, read `.env` files, or
+    run heavy runtime/database smoke.
+  - Main branch follow-up split the script into CLI, core, and sanitizer modules
+    to keep the new code within file-size boundaries.
+  - Main branch validation passed: focused diagnostics test 5/5,
+    `pnpm run test:scripts` 64/64, scripts ESLint, `pnpm desktop:diagnostics-bundle`,
+    and `git diff --check` with only CRLF worktree warnings.
+
 - Blocked branch, not merged:
   - `desktop-ide-workspace-ingest-ui` has a working UI implementation, but
     focused ESLint reports complexity/max-lines errors in `LocalStorePanel`.

@@ -297,8 +297,8 @@ DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outb
 - 安装包已生成，但尚未执行干净安装后的人工/自动 Offline Core smoke。
 - workspace ingest 目前是本地队列契约，还未接入 UI 扫描、取消、重试与 outbox
   幂等同步执行。
-- PostgreSQL 真实同步仍需要外部 DB env 或 managed PostgreSQL binaries；无 DB 只证明
-  Offline Core PASS，不证明 shared schema 持久化。
+- PostgreSQL 真实同步已用远端 PostgreSQL proof 跑通 shared schema persistence 与
+  outbox reconnect sync；Tauri command runner 仍是本机环境 `SKIP`。
 
 ### 2026-05-13 第三轮执行记录：Monaco、ingest runner 与 installer artifact smoke
 
@@ -375,6 +375,15 @@ DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outb
     sync 均通过。
   - Tauri command smoke 仍因未配置 `CHEMD_DESKTOP_TAURI_COMMAND_RUNNER` 被明确标记
     为 `SKIP`，不阻塞后续产品化推进。
+- Diagnostics bundle：
+  - `c3f84fb feat(desktop)：合并诊断包脚本` 合并 `pnpm desktop:diagnostics-bundle`。
+  - 入口生成离线、脱敏 JSON；记录平台、Node、git commit、desktop package、
+    产物摘要、桌面命令清单、runtime/release preflight 分类与选定 env 名称。
+  - 采集过程不启动 GUI、不联网、不读取 `.env`，因此可在真实网络或运行期服务不可用
+    时继续作为支持诊断入口。
+  - 合并后将单文件脚本拆成 CLI、core、sanitizer 三个模块，避免新增大文件。
+  - 主分支验证：diagnostics 定向测试 5/5、`pnpm run test:scripts` 64/64、
+    scripts ESLint 通过、`pnpm desktop:diagnostics-bundle` 可生成 JSON。
 
 等待确认后合并：
 
