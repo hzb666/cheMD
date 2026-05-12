@@ -57,7 +57,7 @@ const extractFieldCandidates = (
   const valueOffset = prefixLength + (match[0].length - match[3].length - prefixLength);
   const candidates: ReferenceCandidate[] = [];
   let tokenStart = 0;
-  for (const token of match[3].split(/[|,\[\]]/)) {
+  for (const token of match[3].split(/[|,[\]]/)) {
     const relativeStart = match[3].indexOf(token, tokenStart);
     const rawText = token.trim();
     tokenStart = relativeStart + token.length;
