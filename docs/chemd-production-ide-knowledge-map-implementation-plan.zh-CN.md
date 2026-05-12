@@ -914,6 +914,18 @@ M1 language-service completion core
 
 ### 2026-05-13 desktop-ide-map-workspace-symbol-core
 
+- 范围：完成 M3.1 的 `@chemd/language-service` workspace symbol index core。
+- 产物：`buildChemdWorkspaceSymbolIndex()`、`findChemdWorkspaceSymbolById()`、
+  `findChemdWorkspaceSymbolsByName()`、`findChemdWorkspaceSymbolsByKind()`。
+- 行为：多文档可继续索引，单文档 compile failed 时记录 failed document 和 diagnostics，
+  不终止其他文档；输出 symbols by kind/name、source hash、stale 字段与 diagnostics summary。
+- 验证：
+  - `pnpm --filter @chemd/language-service test`：通过，3 files / 22 tests。
+  - `pnpm --filter @chemd/language-service typecheck`：通过。
+  - `git diff --check`：通过。
+
+### 2026-05-13 desktop-ide-map-workspace-symbol-core
+
 - 范围：完成 M3.1 的 `@chemd/language-service` workspace symbol index 纯 helper，不接入
   `apps/desktop`，不新增 workspace package，不修改 root 配置。
 - 产物：`buildChemdWorkspaceSymbolIndex(entries)` 复用 `compileChemdForEditor()` 的

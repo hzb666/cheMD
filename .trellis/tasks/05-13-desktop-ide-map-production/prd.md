@@ -88,3 +88,13 @@ The implementation loop must keep the desktop IDE usable while adding:
     `packages/workspace-index` package.
   - The agent was stopped; workspace indexing will be re-cut as a stricter
     language-service-only slice.
+
+- `desktop-ide-map-workspace-symbol-core` merged through
+  `feat(language-service)：合并 workspace symbol index`.
+  - Added `buildChemdWorkspaceSymbolIndex()` plus lookup helpers under
+    `@chemd/language-service`.
+  - The index records per-document status, source hash, symbols by kind/name,
+    diagnostics summary, and failed-document isolation.
+  - Main validation passed `pnpm --filter @chemd/language-service test` with
+    22 tests, `pnpm --filter @chemd/language-service typecheck`, and
+    `git diff --check`.
