@@ -67,6 +67,51 @@ pub(crate) struct LocalOutboxMutationResult {
     pub(crate) outbox_failed_count: usize,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct LocalOutboxSyncResult {
+    pub(crate) state: String,
+    pub(crate) label: String,
+    pub(crate) detail: String,
+    pub(crate) target: LocalOutboxSyncTargetSummary,
+    pub(crate) synced_count: usize,
+    pub(crate) failed_count: usize,
+    pub(crate) skipped_count: usize,
+    pub(crate) entries: Vec<LocalOutboxSyncEntryResult>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct LocalOutboxSyncTargetSummary {
+    pub(crate) kind: LocalOutboxSyncTargetKind,
+    pub(crate) source: String,
+    pub(crate) host: Option<String>,
+    pub(crate) database: Option<String>,
+    pub(crate) user: Option<String>,
+    pub(crate) ssl: String,
+    pub(crate) timeout_ms: u64,
+    pub(crate) pool: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum LocalOutboxSyncTargetKind {
+    External,
+    Managed,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct LocalOutboxSyncEntryResult {
+    pub(crate) local_id: String,
+    pub(crate) idempotency_key: String,
+    pub(crate) sync_status: LocalSyncStatus,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) graph_snapshot_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) error: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct LocalSnapshotFile {

@@ -1,6 +1,7 @@
 mod local_store;
 mod local_store_io;
 mod local_store_status;
+mod local_store_sync;
 mod local_store_time;
 mod local_store_types;
 mod managed_postgres;
@@ -23,6 +24,8 @@ mod workspace_io;
 mod workspace_path;
 
 #[cfg(test)]
+mod local_store_sync_tests;
+#[cfg(test)]
 mod local_store_tests;
 #[cfg(test)]
 mod postgres_tests;
@@ -36,6 +39,8 @@ use local_store::{
     clear_local_outbox_failures, list_local_outbox, mark_local_outbox_synced,
     read_local_store_status, save_local_runtime_snapshot,
 };
+#[cfg(not(test))]
+use local_store_sync::sync_local_outbox_to_postgres;
 #[cfg(not(test))]
 use managed_postgres::{
     initialize_managed_postgres, migrate_managed_postgres, read_managed_postgres_status,
@@ -82,6 +87,7 @@ pub fn run() {
             list_local_outbox,
             mark_local_outbox_synced,
             clear_local_outbox_failures,
+            sync_local_outbox_to_postgres,
             persist_runtime_graph_rag
         ])
         .run(tauri::generate_context!())
