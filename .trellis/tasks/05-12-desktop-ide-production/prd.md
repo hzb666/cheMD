@@ -531,3 +531,68 @@ database tables.
 
 - Remaining tenth-wave work is split into `desktop-ide-outbox-sync-ui` and
   `desktop-ide-outbox-sync-smoke-docs`.
+
+- `desktop-ide-outbox-sync-smoke-docs` merged through
+  `3812138 feat(desktop)：合入 outbox 重连同步 smoke`.
+  - `desktop:runtime-smoke` now covers script-level local outbox ->
+    shared PostgreSQL sync when a database runtime is available.
+  - Offline-only runs still explicitly skip database persistence and verify the
+    local JSON snapshot/outbox contract.
+
+- `desktop-ide-outbox-sync-ui` merged through
+  `3059a57 feat(desktop)：合入本地 outbox 同步入口`.
+  - The Offline Local Store panel now exposes a gated `Sync Pending` action.
+  - Sync results show synced, failed, skipped, target metadata, and redacted
+    failure details.
+
+- Final tenth-wave validation was recorded in
+  `c3e0045 docs(desktop)：记录第十轮同步验收` and
+  `e6f6a5f chore(trellis)：记录桌面IDE第十轮 outbox 重连同步`.
+  - Rust tests/check, desktop typecheck/build/eslint, focused Vitest,
+    script tests, root typecheck, root test, Tauri build, runtime smoke, and
+    `git diff --check` passed.
+  - `pnpm desktop:runtime-smoke` reported database persistence as SKIP on this
+    machine because no external PostgreSQL env or managed PostgreSQL binaries
+    were available, then verified the offline local outbox path.
+  - The remaining production gap is command-level proof of
+    `sync_local_outbox_to_postgres` against a real PostgreSQL runtime.
+
+## Eleventh-Wave Runtime Proof and Distribution Slices
+
+The eleventh wave closes the proof gap left after reconnect sync. It should make
+PostgreSQL runtime availability explicit and testable without committing
+PostgreSQL binaries to the repository.
+
+1. `desktop-ide-tauri-command-smoke`
+   - Owns `scripts/desktop-runtime-smoke.mjs`,
+     `scripts/desktop-runtime-smoke.test.mjs`, and optional helper scripts.
+   - Adds a command-level smoke runner abstraction for the real Tauri command
+     chain: initialize/start/migrate managed PostgreSQL, save a local runtime
+     snapshot, sync pending outbox, and verify the local entry transitions to
+     `synced`.
+   - If no real Tauri invoke runner is configured, it must report an explicit
+     SKIP/unsupported result instead of claiming command-level proof.
+
+2. `desktop-ide-postgres-dist-proof`
+   - Owns `scripts/desktop-postgres-bundle.mjs`,
+     `scripts/desktop-postgres-bundle.test.mjs`, and desktop PostgreSQL docs.
+   - Adds staging provenance/manifest output for PostgreSQL distributions so
+     CI and release operators can prove which source was staged.
+   - Keeps bin-only local development staging separate from full distribution
+     staging, because bin-only is not enough for offline installer proof.
+
+## Eleventh-Wave Acceptance Criteria
+
+- Script-level smoke, command-level smoke, and offline local-only smoke are
+  reported as distinct outcomes.
+- A real Tauri command-level proof can be run when a Tauri invoke runner and
+  PostgreSQL runtime are available.
+- Without a command runner or database runtime, the result is an explicit
+  environment SKIP, not a product pass.
+- PostgreSQL staging verification emits source, target, platform, required
+  binary, and full-distribution/bin-only provenance without storing secrets.
+- Documentation explains the three production modes: external PostgreSQL,
+  bundled managed PostgreSQL, and offline local outbox.
+- Validation includes focused script tests, `pnpm test:scripts`,
+  `pnpm desktop:runtime-smoke`, root typecheck/test, desktop build/Tauri build,
+  and `git diff --check`.
