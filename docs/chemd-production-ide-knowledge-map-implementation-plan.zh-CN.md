@@ -879,3 +879,17 @@ M1 language-service completion core
 - 这些能力直接提升 Chemd 写作质量。
 - 不依赖 TMAP、DB 或新渲染系统。
 - 产出的 workspace symbol index 后续还能服务跨文档引用、hover、definition、Graph/RAG 和 cluster detail。
+
+---
+
+## 13. 分支状态记录
+
+### 2026-05-13 desktop-ide-map-reaction-clusters
+
+- 范围：完成 M6.1/M6.2 的纯数据 adapter 基础，不包含 UI、App.tsx、TMAP、embedding 或 layout。
+- 产物：`buildReactionClusterViewModel()` 和 `findReactionClusterDetail()` 从 `ChemdTrainingGraphIndexV1` 输出 cluster list/detail、members、similarity edges、evidence summary、citation/source ids 与 warnings。
+- 降级：无 cluster 时返回空 list/detail，并在 summary 标记 `empty_reason: "no_reaction_clusters"`；缺少 shared features 且没有 similarity edge 时追加 `cluster_evidence_not_available`。
+- 验证：
+  - `pnpm --filter @chemd/exporter-training test`：通过，8 files / 23 tests。
+  - `pnpm --filter @chemd/exporter-training typecheck`：通过。
+  - `git diff --check`：通过；仅输出计划文档和 `packages/exporter-training/src/index.ts` 的 LF/CRLF 工作区提示。
