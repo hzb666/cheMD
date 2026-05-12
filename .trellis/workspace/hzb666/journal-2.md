@@ -454,3 +454,43 @@ Notes:
 ### Next Steps
 
 - None - task complete
+
+
+## Session 49: Desktop IDE offline-first second wave
+
+**Date**: 2026-05-13
+**Task**: Desktop IDE offline-first second wave
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Merged workspace conflict UI, workspace ingest queue contract, release Offline Core smoke preflight, updated implementation docs, and verified desktop release build, offline smokes, root typecheck, and root tests.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `326b124` | (see git log) |
+| `bf56ea7` | (see git log) |
+| `8ddd7fa` | (see git log) |
+| `ac8c792` | (see git log) |
+| `e237e9b` | (see git log) |
+| `3cbefc8` | (see git log) |
+| `5af8541` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
