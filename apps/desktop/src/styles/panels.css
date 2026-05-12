@@ -60,6 +60,62 @@
     background: var(--panel);
   }
 
+  .desktop-workspace-conflict {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+    padding: 0.55rem 0.75rem;
+    border-bottom: 1px solid color-mix(in oklch, var(--warning) 30%, var(--border));
+    background: color-mix(in oklch, var(--warning) 8%, var(--card));
+  }
+
+  .desktop-workspace-conflict-copy {
+    display: flex;
+    min-width: 0;
+    align-items: flex-start;
+    gap: 0.45rem;
+  }
+
+  .desktop-workspace-conflict-copy > svg {
+    flex: 0 0 auto;
+    margin-top: 0.08rem;
+    color: var(--warning);
+  }
+
+  .desktop-workspace-conflict-copy div {
+    min-width: 0;
+  }
+
+  .desktop-workspace-conflict-copy strong {
+    display: block;
+    color: var(--foreground);
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .desktop-workspace-conflict-copy p {
+    margin: 0.12rem 0 0;
+    color: var(--muted-foreground);
+    font-size: 0.72rem;
+    line-height: 1.35;
+  }
+
+  .desktop-workspace-conflict-actions {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    justify-content: flex-end;
+  }
+
+  .desktop-workspace-conflict-actions button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    white-space: nowrap;
+  }
+
   .desktop-icon-button {
     width: 1.85rem;
     height: 1.85rem;
@@ -1387,6 +1443,11 @@
     .desktop-editor-pane {
       border-right: 0;
       border-bottom: 1px solid var(--border);
+    }
+
+    .desktop-workspace-conflict {
+      align-items: flex-start;
+      flex-direction: column;
     }
 
     .desktop-insight-section {

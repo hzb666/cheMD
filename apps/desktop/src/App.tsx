@@ -18,6 +18,12 @@ type AgentMessage = { tone: AgentMessageTone; text: string };
 type QuickFixCandidate = { diagnostic: ChemdEditorDiagnostic; quickFix: ChemdQuickFixProposal };
 type AgentOperationResult = { run: AgentRun; message: AgentMessage };
 type PersistOperationState = "idle" | "pending" | "success" | "failure";
+type WorkspaceConflictState = {
+  path: string;
+  message: string;
+  detectedAt: string;
+  reloading: boolean;
+};
 type PersistSummary = {
   graphSnapshotId: string;
   counts: DesktopCommandMap["persist_runtime_graph_rag"]["output"]["counts"];
@@ -115,6 +121,7 @@ type DesktopWorkbenchProps = {
   message: string;
   source: string;
   savedSource: string;
+  workspaceConflict: WorkspaceConflictState | null;
   rootPath: string;
   canSave: boolean;
   agentRun: AgentRun | null;
@@ -124,6 +131,8 @@ type DesktopWorkbenchProps = {
   onOpenWorkspace: () => void;
   onSelectFile: (file: WorkspaceFileEntry) => void;
   onSourceChange: (nextSource: string) => void;
+  onReloadWorkspaceConflict: () => void;
+  onKeepLocalWorkspaceConflict: () => void;
   onProposeQuickFix: (candidate: QuickFixCandidate) => void;
   onApprovePatch: () => void;
   onApplyPatch: () => void;
@@ -394,24 +403,6 @@ const invokeDesktop = async <Command extends keyof DesktopCommandMap>(
 const getSampleSource = (file: WorkspaceFileEntry): string =>
   sampleSources[file.name] ?? sampleSources["suzuki-screen.chemd.md"];
 
-const getDisplayableError = (error: unknown): string => {
-  const commandError = error as Partial<DesktopCommandError> | undefined;
-  if (commandError?.message) {
-    return commandError.detail ? `${commandError.message}: ${commandError.detail}` : commandError.message;
-  }
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return "Unknown desktop command failure";
-};
-
-const getSidecarErrorMessage = (error: unknown): string => {
-  const commandError = error as Partial<DesktopCommandError> | undefined;
-  const message = commandError?.message ?? (error instanceof Error ? error.message : String(error));
-  const firstLine = message.split(/\r?\n/, 1)[0].trim();
-  return firstLine || "chem-service command failed";
-};
-
 const redactSensitiveRuntimeText = (message: string): string =>
   message
     .replace(/postgres(?:ql)?:\/\/\S+/gi, "postgres://[redacted]")
@@ -420,6 +411,30 @@ const redactSensitiveRuntimeText = (message: string): string =>
       const [key] = match.split("=", 1);
       return `${key}=[redacted]`;
     });
+
+const getCommandErrorMessage = (error: unknown, fallback: string): string => {
+  const commandError = error as Partial<DesktopCommandError> | undefined;
+  const message = commandError?.message ?? (error instanceof Error ? error.message : String(error));
+  const firstLine = redactSensitiveRuntimeText(message.split(/\r?\n/, 1)[0].trim());
+  if (!firstLine) return fallback;
+  return firstLine.length <= 140 ? firstLine : `${firstLine.slice(0, 137)}...`;
+};
+
+const getCommandErrorCode = (error: unknown): string | null => {
+  const commandError = error as Partial<DesktopCommandError> | undefined;
+  return typeof commandError?.code === "string" ? commandError.code : null;
+};
+
+const getDisplayableError = (error: unknown): string => {
+  return getCommandErrorMessage(error, "Unknown desktop command failure");
+};
+
+const getSidecarErrorMessage = (error: unknown): string => {
+  const commandError = error as Partial<DesktopCommandError> | undefined;
+  const message = commandError?.message ?? (error instanceof Error ? error.message : String(error));
+  const firstLine = message.split(/\r?\n/, 1)[0].trim();
+  return firstLine || "chem-service command failed";
+};
 
 const getPostgresErrorMessage = (error: unknown): string => {
   const commandError = error as Partial<DesktopCommandError> | undefined;
@@ -1757,20 +1772,61 @@ const EditorPane = ({
   source,
   lineCount,
   compiledAt,
-  onChange
+  workspaceConflict,
+  onChange,
+  onReloadWorkspaceConflict,
+  onKeepLocalWorkspaceConflict
 }: {
   fileName: string;
   mode: DocumentMode;
   source: string;
   lineCount: number;
   compiledAt: string;
+  workspaceConflict: WorkspaceConflictState | null;
   onChange: (next: string) => void;
+  onReloadWorkspaceConflict: () => void;
+  onKeepLocalWorkspaceConflict: () => void;
 }) => (
   <section className="desktop-pane desktop-editor-pane" aria-label="Editor">
     <PanelHeader eyebrow="Editor" title={fileName} meta={`${lineCount} lines`} />
     <div className="desktop-editor-toolbar"><Activity size={15} /><span className="desktop-toolbar-text">{mode === "sample" ? "Bundled sample buffer" : "Local workspace file"}</span><span className="desktop-toolbar-divider" /><span className="desktop-toolbar-text">Compiled {new Date(compiledAt).toLocaleTimeString()}</span></div>
+    {workspaceConflict ? (
+      <WorkspaceConflictPanel
+        conflict={workspaceConflict}
+        onReload={onReloadWorkspaceConflict}
+        onKeepLocal={onKeepLocalWorkspaceConflict}
+      />
+    ) : null}
     <textarea className="desktop-editor-textarea" value={source} onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange(event.target.value)} spellCheck={false} aria-label="Chemd source editor" />
   </section>
+);
+
+const WorkspaceConflictPanel = ({
+  conflict,
+  onReload,
+  onKeepLocal
+}: {
+  conflict: WorkspaceConflictState;
+  onReload: () => void;
+  onKeepLocal: () => void;
+}) => (
+  <div className="desktop-workspace-conflict" role="alert" aria-live="assertive">
+    <div className="desktop-workspace-conflict-copy">
+      <AlertTriangle size={15} aria-hidden="true" />
+      <div>
+        <strong>Workspace file changed on disk</strong>
+        <p>{conflict.message}</p>
+      </div>
+    </div>
+    <div className="desktop-workspace-conflict-actions">
+      <button type="button" className="desktop-button-primary" disabled={conflict.reloading} aria-busy={conflict.reloading} onClick={onReload}>
+        <RefreshCw size={14} />{conflict.reloading ? "Reloading" : "Reload from disk"}
+      </button>
+      <button type="button" className="desktop-button" disabled={conflict.reloading} onClick={onKeepLocal}>
+        Keep local editing
+      </button>
+    </div>
+  </div>
 );
 
 const OutlineTree = ({ items }: { items: ChemdOutlineItem[] }) => (
@@ -2760,6 +2816,7 @@ const DesktopWorkbench = ({
   message,
   source,
   savedSource,
+  workspaceConflict,
   rootPath,
   canSave,
   agentRun,
@@ -2769,6 +2826,8 @@ const DesktopWorkbench = ({
   onOpenWorkspace,
   onSelectFile,
   onSourceChange,
+  onReloadWorkspaceConflict,
+  onKeepLocalWorkspaceConflict,
   onProposeQuickFix,
   onApprovePatch,
   onApplyPatch,
@@ -2814,7 +2873,17 @@ const DesktopWorkbench = ({
           onReset={() => layoutController.resetPanel("sidebar")}
         />
         <div className="desktop-main-grid" data-insight-collapsed={layout.insightCollapsed} data-bottom-collapsed={layout.bottomCollapsed}>
-          <EditorPane fileName={selectedFile.name} mode={mode} source={source} lineCount={source.split(/\r?\n/).length} compiledAt={output.compiledAt} onChange={onSourceChange} />
+          <EditorPane
+            fileName={selectedFile.name}
+            mode={mode}
+            source={source}
+            lineCount={source.split(/\r?\n/).length}
+            compiledAt={output.compiledAt}
+            workspaceConflict={workspaceConflict}
+            onChange={onSourceChange}
+            onReloadWorkspaceConflict={onReloadWorkspaceConflict}
+            onKeepLocalWorkspaceConflict={onKeepLocalWorkspaceConflict}
+          />
           <ResizeHandle
             panel="insight"
             collapsed={layout.insightCollapsed}
@@ -2876,7 +2945,7 @@ const DesktopWorkbench = ({
   );
 };
 
-export const App = () => {
+const useWorkspaceFileController = () => {
   const initialSource = sampleSources["suzuki-screen.chemd.md"];
   const [workspaceState, setWorkspaceState] = useState<WorkspaceState>("empty");
   const [workspace, setWorkspace] = useState<WorkspaceHandle>(shellWorkspace);
@@ -2885,40 +2954,12 @@ export const App = () => {
   const [source, setSource] = useState(initialSource);
   const [savedSource, setSavedSource] = useState(initialSource);
   const [savedContentHash, setSavedContentHash] = useState<string | null>(null);
+  const [workspaceConflict, setWorkspaceConflict] = useState<WorkspaceConflictState | null>(null);
   const [mode, setMode] = useState<DocumentMode>("sample");
   const [rootPath, setRootPath] = useState("");
   const [message, setMessage] = useState("No workspace is open. Editing bundled sample content.");
-  const [agentRun, setAgentRun] = useState<AgentRun | null>(null);
-  const [agentMessage, setAgentMessage] = useState<AgentMessage | null>(null);
-  const sidecarController = useSidecarController();
-  const postgresController = usePostgresController();
-
   const selectedFile = files.find((file) => file.id === selectedFileId) ?? shellFiles[0];
-  const output = useMemo(() => compileChemdForEditor({
-    source,
-    documentUri: selectedFile.path,
-    options: { strictChemdKind: true, procedureMode: "auto" }
-  }), [selectedFile.path, source]);
-  const compileError = output.status === "failed" ? output.error.message : undefined;
   const canSave = mode === "workspace" && selectedFile.kind === "file" && source !== savedSource && workspace.writable;
-  const persistController = usePersistRuntimeController({
-    mode,
-    file: selectedFile,
-    postgresStatus: postgresController.status,
-    source,
-    workspace,
-    compileOutput: output,
-    agentRun
-  });
-  const localStoreController = useLocalStoreController({
-    mode,
-    file: selectedFile,
-    postgresStatus: postgresController.status,
-    source,
-    workspace,
-    compileOutput: output,
-    agentRun
-  });
 
   const openWorkspace = async () => {
     setWorkspaceState("opening");
@@ -2941,6 +2982,7 @@ export const App = () => {
       setSource(nextSource);
       setSavedSource(nextSource);
       setSavedContentHash(nextContentHash);
+      setWorkspaceConflict(null);
       setRootPath(nextWorkspace.rootPath);
       setMode("workspace");
       setMessage(`Opened ${usableFiles.length} visible Markdown entries from the local workspace.`);
@@ -2968,10 +3010,39 @@ export const App = () => {
       setSource(nextSource);
       setSavedSource(nextSource);
       setSavedContentHash(nextContent?.contentHash ?? null);
+      setWorkspaceConflict(null);
       setMessage(mode === "sample" ? "Sample document selected from bundled fallback." : `Read ${file.path} from the local workspace.`);
     } catch (error: unknown) {
       setMessage(`Workspace read failed: ${getDisplayableError(error)}.`);
     }
+  };
+
+  const reloadWorkspaceConflict = async () => {
+    if (!workspaceConflict || mode !== "workspace" || selectedFile.kind !== "file") return;
+    setWorkspaceConflict((current) => current ? { ...current, reloading: true } : current);
+    try {
+      const nextContent = await invokeDesktop("read_workspace_file", {
+        workspaceId: workspace.workspaceId,
+        path: selectedFile.path
+      });
+      setSource(nextContent.content);
+      setSavedSource(nextContent.content);
+      setSavedContentHash(nextContent.contentHash);
+      setWorkspaceConflict(null);
+      setMessage(`Reloaded ${nextContent.path} from disk.`);
+    } catch (error: unknown) {
+      const nextMessage = `Reload failed: ${getDisplayableError(error)}. Local edits are still in the editor.`;
+      setWorkspaceConflict((current) => current
+        ? { ...current, message: nextMessage, reloading: false }
+        : current);
+      setMessage(nextMessage);
+    }
+  };
+
+  const keepLocalWorkspaceConflict = () => {
+    if (!workspaceConflict) return;
+    setWorkspaceConflict(null);
+    setMessage("Kept local editor changes. Save remains guarded by the last saved file hash.");
   };
 
   const saveWorkspaceFile = async () => {
@@ -2985,14 +3056,79 @@ export const App = () => {
       });
       setSavedSource(source);
       setSavedContentHash(result.contentHash);
+      setWorkspaceConflict(null);
       setMessage(`Saved ${result.path} (${result.bytes} bytes).`);
     } catch (error: unknown) {
+      if (getCommandErrorCode(error) === "workspace_file_conflict") {
+        setWorkspaceConflict({
+          path: selectedFile.path,
+          message: "The file changed on disk after this buffer was loaded. Reload from disk or keep editing the local buffer.",
+          detectedAt: new Date().toISOString(),
+          reloading: false
+        });
+        setMessage("Workspace save conflict. Local editor content was not overwritten.");
+        return;
+      }
       setMessage(`Workspace save failed: ${getDisplayableError(error)}.`);
     }
   };
 
+  return {
+    workspaceState,
+    workspace,
+    files,
+    selectedFile,
+    selectedFileId,
+    source,
+    savedSource,
+    workspaceConflict,
+    mode,
+    rootPath,
+    message,
+    canSave,
+    setRootPath,
+    setSource,
+    openWorkspace,
+    selectFile,
+    saveWorkspaceFile,
+    reloadWorkspaceConflict,
+    keepLocalWorkspaceConflict
+  };
+};
+
+export const App = () => {
+  const workspaceController = useWorkspaceFileController();
+  const [agentRun, setAgentRun] = useState<AgentRun | null>(null);
+  const [agentMessage, setAgentMessage] = useState<AgentMessage | null>(null);
+  const sidecarController = useSidecarController();
+  const postgresController = usePostgresController();
+  const output = useMemo(() => compileChemdForEditor({
+    source: workspaceController.source,
+    documentUri: workspaceController.selectedFile.path,
+    options: { strictChemdKind: true, procedureMode: "auto" }
+  }), [workspaceController.selectedFile.path, workspaceController.source]);
+  const compileError = output.status === "failed" ? output.error.message : undefined;
+  const persistController = usePersistRuntimeController({
+    mode: workspaceController.mode,
+    file: workspaceController.selectedFile,
+    postgresStatus: postgresController.status,
+    source: workspaceController.source,
+    workspace: workspaceController.workspace,
+    compileOutput: output,
+    agentRun
+  });
+  const localStoreController = useLocalStoreController({
+    mode: workspaceController.mode,
+    file: workspaceController.selectedFile,
+    postgresStatus: postgresController.status,
+    source: workspaceController.source,
+    workspace: workspaceController.workspace,
+    compileOutput: output,
+    agentRun
+  });
+
   const updateEditorSource = (nextSource: string) => {
-    setSource(nextSource);
+    workspaceController.setSource(nextSource);
     persistController.reset();
     localStoreController.reset();
   };
@@ -3001,24 +3137,27 @@ export const App = () => {
     agentRun,
     setAgentRun,
     setAgentMessage,
-    mode,
-    file: selectedFile,
-    workspace,
-    source,
+    mode: workspaceController.mode,
+    file: workspaceController.selectedFile,
+    workspace: workspaceController.workspace,
+    source: workspaceController.source,
     onSourceChange: updateEditorSource
   });
 
   return (
     <DesktopWorkbench
-      workspace={workspace} workspaceState={workspaceState}
+      workspace={workspaceController.workspace} workspaceState={workspaceController.workspaceState}
       sidecarController={sidecarController} postgresController={postgresController} persistController={persistController} localStoreController={localStoreController}
       output={output} compileError={compileError}
-      files={files} selectedFile={selectedFile} selectedFileId={selectedFileId}
-      mode={mode} message={message} source={source} savedSource={savedSource}
-      rootPath={rootPath} canSave={canSave} agentRun={agentRun} agentMessage={agentMessage}
-      onRootPathChange={setRootPath} onSourceChange={updateEditorSource}
-      onSave={() => void saveWorkspaceFile()} onOpenWorkspace={() => void openWorkspace()}
-      onSelectFile={(file) => void selectFile(file)} onProposeQuickFix={agentPatchController.proposeQuickFix}
+      files={workspaceController.files} selectedFile={workspaceController.selectedFile} selectedFileId={workspaceController.selectedFileId}
+      mode={workspaceController.mode} message={workspaceController.message} source={workspaceController.source} savedSource={workspaceController.savedSource} workspaceConflict={workspaceController.workspaceConflict}
+      rootPath={workspaceController.rootPath} canSave={workspaceController.canSave} agentRun={agentRun} agentMessage={agentMessage}
+      onRootPathChange={workspaceController.setRootPath} onSourceChange={updateEditorSource}
+      onSave={() => void workspaceController.saveWorkspaceFile()} onOpenWorkspace={() => void workspaceController.openWorkspace()}
+      onSelectFile={(file) => void workspaceController.selectFile(file)}
+      onReloadWorkspaceConflict={() => void workspaceController.reloadWorkspaceConflict()}
+      onKeepLocalWorkspaceConflict={workspaceController.keepLocalWorkspaceConflict}
+      onProposeQuickFix={agentPatchController.proposeQuickFix}
       onApprovePatch={agentPatchController.approvePatch} onApplyPatch={agentPatchController.applyPatch} onRejectPatch={agentPatchController.rejectPatch}
     />
   );
