@@ -5,6 +5,13 @@
 目标：生产可用
 适用范围：Chemd Desktop IDE、Monaco language service、语义节点渲染、workspace 引用库、反应关联、反应聚类、TMAP layout、Graph/RAG/训练闭环
 
+当前执行分支：
+
+- 主集成分支：`desktop-ide-map`
+- 主集成工作树：`D:\Code\chemd-wt-desktop-ide-map`
+- 基线提交：`8131982 docs(desktop)：添加地图生产实施计划`
+- 已合入基础：`desktop-ide` 现有 Tauri / Monaco / language-service / Postgres runtime 基线
+
 输入 PRD：
 
 - [Chemd Monaco 自动补全与 Snippets PRD](./chemd-monaco-autocomplete-prd.zh-CN.md)
@@ -13,6 +20,35 @@
 - [Chemd 语义节点渲染 PRD](./chemd-semantic-node-rendering-prd.zh-CN.md)
 - [Chemd 反应聚类与 TMAP 地图 PRD](./chemd-reaction-clustering-tmap-prd.zh-CN.md)
 - 外部工作树证据：`D:\Code\chemd-wt-desktop-ide-docs\docs\desktop-ide\offline-first-productization-implementation.zh-CN.md`
+
+---
+
+## 0. 实施状态记录
+
+### 2026-05-13：M0 基线与第一轮并行切片
+
+已完成：
+
+- [x] 从当前 `HEAD` 新建 `desktop-ide-map` 分支和主工作树。
+- [x] 将现有 `desktop-ide` 基线快进合入 `desktop-ide-map`。
+- [x] 将本轮 PRD 与生产实施计划提交为主分支执行来源。
+- [x] 创建并启动 Trellis 任务：`.trellis/tasks/05-13-desktop-ide-map-production`。
+- [x] 修正该任务的过期 Trellis 默认上下文路径，并通过 `task.py validate`。
+
+第一轮并行任务：
+
+| 分支 | 工作树 | 目标 | 写入边界 |
+| --- | --- | --- | --- |
+| `desktop-ide-map-completion-ls` | `D:\Code\chemd-wt-map-completion-ls` | Monaco-neutral completion/snippet language-service core | `packages/language-service/**` |
+| `desktop-ide-map-workspace-index` | `D:\Code\chemd-wt-map-workspace-index` | workspace symbol/reference index data layer | `packages/workspace-index/**` |
+| `desktop-ide-map-reaction-clusters` | `D:\Code\chemd-wt-map-reaction-clusters` | reaction cluster/map-ready data layer | `packages/reaction-map/**` |
+| `desktop-ide-map-semantic-rendering` | `D:\Code\chemd-wt-map-semantic-rendering` | semantic render DTO/tree data layer | `packages/semantic-rendering/**` |
+
+串行保留给主架构工作树：
+
+- 根 `package.json` / `pnpm-lock.yaml` / `tsconfig.base.json` 的统一接入。
+- `apps/desktop` 中 Monaco providers、workspace index、reaction map panel、semantic preview 的 UI 接入。
+- `.trellis` 记录、最终验证、合并和安全清理。
 
 ---
 
