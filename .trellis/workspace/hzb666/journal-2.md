@@ -611,3 +611,39 @@ Merged the offline-first user/support guide and expanded diagnostics bundle supp
 ### Next Steps
 
 - None - task complete
+
+
+## Session 53: Desktop IDE workspace ingest UI merge
+
+**Date**: 2026-05-13
+**Task**: Desktop IDE workspace ingest UI merge
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Merged workspace ingest UI into the desktop Local Store panel. Main validation passed workspace ingest/local-store Vitest 19/19, desktop typecheck, desktop build, and diff check. Focused ESLint still reports LocalStorePanel complexity/max-lines and is recorded as M11 componentization debt per user direction.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `49b1558` | (see git log) |
+| `db72a45` | (see git log) |
+| `771e0f9` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
