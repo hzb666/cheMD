@@ -7,6 +7,10 @@
 - `CHEMD_POSTGRES_DATABASE_URL`
 - `DATABASE_URL`
 
+外部 URL 可以是标准 PostgreSQL URL，也可以是 JDBC 风格 URL，例如
+`jdbc:postgresql://103.24.219.156:5632/postgres`。脚本会在创建连接前归一化
+JDBC 前缀；日志仍只输出脱敏后的目标摘要。
+
 当这两个变量都不存在时，smoke 会尝试使用桌面 IDE 自带的
 PostgreSQL binaries 启动本地托管实例，然后执行现有 PostgreSQL
 smoke、共享 schema 初始化、runtime Graph/RAG/Agent 持久化与读回验证。

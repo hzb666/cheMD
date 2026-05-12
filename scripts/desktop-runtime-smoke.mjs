@@ -14,6 +14,7 @@ import {
   formatLoadedEnvFiles,
   loadPostgresEnv,
   loadRuntimeModules,
+  normalizePostgresDatabaseUrl,
   REPO_ROOT,
   runPostgresSmoke,
   withPostgresRuntimeClient
@@ -88,7 +89,9 @@ const checkDesktopDistArtifact = ({ checks, rootDir, fileExists }) => {
 };
 
 export const getPostgresDatabaseUrl = (env) =>
-  env.CHEMD_POSTGRES_DATABASE_URL?.trim() || env.DATABASE_URL?.trim() || "";
+  normalizePostgresDatabaseUrl(
+    env.CHEMD_POSTGRES_DATABASE_URL?.trim() || env.DATABASE_URL?.trim() || ""
+  );
 
 export const summarizePostgresTarget = (databaseUrl) => {
   try {

@@ -9,6 +9,16 @@ Desktop IDE 的 PostgreSQL runtime 有三条生产相关路径。它们解决的
 
 使用 `CHEMD_POSTGRES_DATABASE_URL` 或 `DATABASE_URL` 指向外部 PostgreSQL。
 这是最轻的 installer 路径，因为安装包不需要携带 PostgreSQL binaries。
+桌面端 runtime 与 `desktop:runtime-smoke` 都接受标准 PostgreSQL URL，也接受
+JDBC 风格 PostgreSQL URL：
+
+```text
+CHEMD_POSTGRES_DATABASE_URL=jdbc:postgresql://103.24.219.156:5632/postgres
+```
+
+如果 JDBC URL 通过 query 参数提供 `user` / `password`，runtime 会在连接前
+归一化为标准 PostgreSQL URL，并且日志只输出 host、port、database、user 与
+脱敏后的 password。
 
 能力边界：
 

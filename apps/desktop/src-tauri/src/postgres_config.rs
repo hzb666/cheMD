@@ -132,6 +132,31 @@ pub(crate) fn redact_config_detail(detail: &str, config: &PostgresRuntimeConfig)
     redacted
 }
 
+pub(crate) fn normalize_postgres_database_url(value: &str) -> String {
+    let trimmed = value.trim();
+    let Some(without_jdbc) = strip_jdbc_prefix(trimmed) else {
+        return trimmed.into();
+    };
+    let Ok(mut url) = Url::parse(without_jdbc) else {
+        return trimmed.into();
+    };
+    let user = query_value(&url, "user");
+    let password = query_value(&url, "password");
+
+    if url.username().is_empty() {
+        if let Some(user) = user.as_deref() {
+            let _ = url.set_username(user);
+        }
+    }
+    if url.password().is_none() {
+        if let Some(password) = password.as_deref() {
+            let _ = url.set_password(Some(password));
+        }
+    }
+    remove_url_query_credentials(&mut url);
+    url.to_string()
+}
+
 fn config_sources(repo_root: Option<&Path>) -> Vec<EnvSource> {
     let mut sources = vec![process_source()];
     if let Some(repo_root) = repo_root {
@@ -198,7 +223,7 @@ fn select_database_url(sources: &[EnvSource]) -> Option<SelectedDatabaseUrl> {
                 continue;
             }
             return Some(SelectedDatabaseUrl {
-                database_url: value.trim().into(),
+                database_url: normalize_postgres_database_url(value),
                 source: format!("{}:{key}", source.label),
             });
         }
@@ -279,6 +304,27 @@ fn query_value(url: &Url, key: &str) -> Option<String> {
     url.query_pairs()
         .find(|(name, _)| name == key)
         .map(|(_, value)| value.into_owned())
+}
+
+fn strip_jdbc_prefix(value: &str) -> Option<&str> {
+    let prefix = value.get(..5)?;
+    if prefix.eq_ignore_ascii_case("jdbc:") {
+        value.get(5..)
+    } else {
+        None
+    }
+}
+
+fn remove_url_query_credentials(url: &mut Url) {
+    let retained = url
+        .query_pairs()
+        .filter(|(name, _)| name != "user" && name != "password")
+        .map(|(name, value)| (name.into_owned(), value.into_owned()))
+        .collect::<Vec<_>>();
+    url.set_query(None);
+    for (name, value) in retained {
+        url.query_pairs_mut().append_pair(&name, &value);
+    }
 }
 
 fn unquote_env_value(value: &str) -> String {

@@ -8,8 +8,8 @@ use crate::{
     managed_postgres_process::{pid_file_owns_data_dir, write_pid_file, ManagedPostgresPidFile},
     postgres::{schema_ready_from_rows, status_without_config, CORE_SCHEMA_TABLES},
     postgres_config::{
-        load_postgres_config_from_managed_root, parse_env_file, redact_postgres_url,
-        select_postgres_config, EnvSource,
+        load_postgres_config_from_managed_root, normalize_postgres_database_url, parse_env_file,
+        redact_postgres_url, select_postgres_config, EnvSource,
     },
     postgres_runtime_persist::validate_runtime_graph_rag_input,
     postgres_runtime_types::{
@@ -80,6 +80,38 @@ fn config_selection_prefers_process_env_and_redacts_url() {
         redact_postgres_url(&config.database_url),
         "postgres://process_user:%3Credacted%3E@db.process/chemd?sslmode=require"
     );
+}
+
+#[test]
+fn jdbc_postgres_urls_are_normalized_before_runtime_use() {
+    assert_eq!(
+        normalize_postgres_database_url(" jdbc:postgresql://103.24.219.156:5632/postgres "),
+        "postgresql://103.24.219.156:5632/postgres"
+    );
+    assert_eq!(
+        normalize_postgres_database_url(
+            "jdbc:postgresql://103.24.219.156:5632/postgres?user=chemd&password=secret&sslmode=require"
+        ),
+        "postgresql://chemd:secret@103.24.219.156:5632/postgres?sslmode=require"
+    );
+
+    let config = select_postgres_config(vec![source(
+        "process env",
+        &[(
+            "CHEMD_POSTGRES_DATABASE_URL",
+            "jdbc:postgresql://103.24.219.156:5632/postgres?user=chemd&password=secret",
+        )],
+    )])
+    .expect("jdbc config should be selected");
+
+    assert_eq!(
+        config.database_url,
+        "postgresql://chemd:secret@103.24.219.156:5632/postgres"
+    );
+    assert_eq!(config.host.as_deref(), Some("103.24.219.156"));
+    assert_eq!(config.database.as_deref(), Some("postgres"));
+    assert_eq!(config.user.as_deref(), Some("chemd"));
+    assert_eq!(config.password.as_deref(), Some("secret"));
 }
 
 #[test]

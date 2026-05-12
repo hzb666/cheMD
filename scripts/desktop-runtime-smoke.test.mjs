@@ -51,6 +51,13 @@ test("getPostgresDatabaseUrl prefers Chemd env and falls back to DATABASE_URL", 
     getPostgresDatabaseUrl({ DATABASE_URL: " postgres://fallback " }),
     "postgres://fallback"
   );
+  assert.equal(
+    getPostgresDatabaseUrl({
+      CHEMD_POSTGRES_DATABASE_URL:
+        "jdbc:postgresql://103.24.219.156:5632/postgres?user=chemd&password=secret"
+    }),
+    "postgresql://chemd:secret@103.24.219.156:5632/postgres"
+  );
 });
 
 test("summarizePostgresTarget redacts passwords and avoids full URL logging", () => {
@@ -63,6 +70,22 @@ test("summarizePostgresTarget redacts passwords and avoids full URL logging", ()
   assert.match(summary, /password=\[REDACTED\]/u);
   assert.doesNotMatch(summary, /super-secret/u);
   assert.doesNotMatch(summary, /postgres:\/\/chemd/u);
+});
+
+test("summarizePostgresTarget handles normalized JDBC targets", () => {
+  const summary = summarizePostgresTarget(
+    getPostgresDatabaseUrl({
+      CHEMD_POSTGRES_DATABASE_URL:
+        "jdbc:postgresql://103.24.219.156:5632/postgres?user=chemd&password=secret"
+    })
+  );
+
+  assert.match(summary, /host=103\.24\.219\.156/u);
+  assert.match(summary, /port=5632/u);
+  assert.match(summary, /database=postgres/u);
+  assert.match(summary, /user=chemd/u);
+  assert.doesNotMatch(summary, /secret/u);
+  assert.doesNotMatch(summary, /jdbc:postgresql/u);
 });
 
 test("checkDesktopRuntimePreconditions reports missing dist as warn only", () => {
