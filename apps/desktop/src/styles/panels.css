@@ -870,6 +870,117 @@
     gap: 0.35rem;
   }
 
+  .desktop-workspace-ingest-status {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding: 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--panel);
+  }
+
+  .desktop-workspace-ingest-status[data-state="pending"] {
+    border-color: color-mix(in oklch, var(--primary) 24%, var(--border));
+    background: color-mix(in oklch, var(--primary) 6%, var(--card));
+  }
+
+  .desktop-workspace-ingest-status[data-state="success"] {
+    border-color: color-mix(in oklch, var(--success) 24%, var(--border));
+    background: color-mix(in oklch, var(--success) 7%, var(--card));
+  }
+
+  .desktop-workspace-ingest-status[data-state="failure"] {
+    border-color: color-mix(in oklch, var(--danger) 24%, var(--border));
+    background: color-mix(in oklch, var(--danger) 7%, var(--card));
+  }
+
+  .desktop-workspace-ingest-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .desktop-workspace-ingest-header button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .desktop-workspace-ingest-status > p {
+    margin: 0;
+    color: var(--muted-foreground);
+    font-size: 0.72rem;
+    line-height: 1.35;
+  }
+
+  .desktop-workspace-ingest-summary {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.35rem;
+    margin: 0;
+  }
+
+  .desktop-workspace-ingest-summary div {
+    min-width: 0;
+    padding: 0.38rem 0.42rem;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--card);
+  }
+
+  .desktop-workspace-ingest-summary dt,
+  .desktop-workspace-ingest-summary dd {
+    margin: 0;
+  }
+
+  .desktop-workspace-ingest-summary dt {
+    color: var(--muted-foreground);
+    font-size: 0.62rem;
+    font-weight: 650;
+    text-transform: uppercase;
+  }
+
+  .desktop-workspace-ingest-summary dd {
+    margin-top: 0.1rem;
+    color: var(--foreground);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+  }
+
+  .desktop-workspace-ingest-errors {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .desktop-workspace-ingest-errors li {
+    display: grid;
+    grid-template-columns: 8rem minmax(0, 1fr);
+    gap: 0.45rem;
+    align-items: start;
+    color: var(--danger);
+    font-size: 0.68rem;
+  }
+
+  .desktop-workspace-ingest-errors code,
+  .desktop-workspace-ingest-errors span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .desktop-workspace-ingest-errors code {
+    color: var(--foreground);
+    font-family: var(--font-mono);
+  }
+
   .desktop-local-store-message {
     margin: 0;
     padding: 0.45rem 0.5rem;
