@@ -264,3 +264,55 @@ main PostgreSQL schema.
   `tauri:build`, and `git diff --check`.
 - If no database URL is configured, smoke output records SKIP explicitly and the
   workflow continues to the next production gap instead of stopping.
+
+## Seventh-Wave Managed Local Postgres Runtime Slices
+
+The seventh wave makes the desktop IDE usable without a separately installed
+PostgreSQL service. The app should prefer explicit external configuration when
+present, but otherwise manage a local bundled PostgreSQL + pgvector runtime from
+the desktop host.
+
+1. `desktop-ide-managed-postgres-runtime`
+   - Owns `apps/desktop/src-tauri/src/managed_postgres*`,
+     `apps/desktop/src-tauri/src/postgres_config.rs`,
+     `apps/desktop/src-tauri/src/lib.rs`, and focused Rust tests.
+   - Adds managed runtime discovery, status, init, start, stop, migration, and
+     connection URL generation.
+   - Supports `CHEMD_MANAGED_POSTGRES_BIN_DIR` for development and packaged
+     resource discovery for production.
+   - Stores data under the app data directory by default and never logs the
+     generated password or full URL.
+
+2. `desktop-ide-managed-postgres-contract-ui`
+   - Runs after the runtime command contract is integrated.
+   - Owns `apps/desktop/src/desktop-contracts.ts`, `apps/desktop/src/App.tsx`,
+     and desktop CSS files.
+   - Adds a compact Managed / External Postgres surface to the existing runtime
+     panel, with initialize/start/stop/migrate/refresh actions and visible
+     state, port, data dir, schema status, and safe error messages.
+
+3. `desktop-ide-managed-postgres-smoke`
+   - Runs after managed runtime integration.
+   - Owns `scripts/desktop-runtime-smoke.mjs`,
+     `scripts/desktop-runtime-smoke.test.mjs`, and docs.
+   - If external DB env is missing but managed binaries are discoverable, starts
+     a managed local Postgres instance, runs migrations, then executes the real
+     desktop runtime smoke path against that instance.
+   - If neither external DB nor managed binaries are available, reports a
+     precise SKIP reason rather than claiming success.
+
+## Seventh-Wave Acceptance Criteria
+
+- Desktop can run with no user-provided `DATABASE_URL` when bundled/managed
+  Postgres binaries are available.
+- Managed runtime commands use bounded process control and only manage the app's
+  own data directory and process.
+- The generated connection URL is available to runtime code but never displayed
+  with password or full URL in UI/logs.
+- Migrations can initialize the shared Chemd PostgreSQL schema in the managed
+  database.
+- The existing Postgres status and `Persist graph` flow work against either
+  external or managed Postgres.
+- Local validation includes Rust tests/checks, desktop typecheck/build,
+  script tests, `desktop:runtime-smoke`, root `pnpm typecheck`, root
+  `pnpm test`, `tauri:build`, and `git diff --check`.
