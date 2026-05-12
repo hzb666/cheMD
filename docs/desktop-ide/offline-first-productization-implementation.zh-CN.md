@@ -182,6 +182,73 @@ Chemd desktop offline core smoke passed.
 DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outbox；它
 不等同于 PostgreSQL shared schema 持久化通过。
 
+### 2026-05-13 第一轮执行记录：P0/M1/M2/M3 基础闭环
+
+已合并范围：
+
+- Workspace 文件可靠性：
+  - `read_workspace_file` / `write_workspace_file` 返回 `contentHash` 与
+    `modifiedAtMs`。
+  - `write_workspace_file` 支持可选 `baseHash`，保存前发现外部修改或删除时
+    返回 `workspace_file_conflict`，不覆盖本地文件。
+  - 写入改为同目录临时文件、flush、replace commit。
+- Language Service core：
+  - 新增 compile worker request/response contract。
+  - 支持 stale compile response 与结构化 compile error response。
+  - Monaco adapter 新增聚合 model，输出 markers、code actions、outline 与
+    symbols。
+- Local authoring status contract：
+  - 新增 `deriveLocalAuthoringStatus`，将 saved、compiled、snapshot saved、
+    pending sync、sync failed 派生为 UI 可消费状态。
+  - outbox display summary 支持 pending、synced、failed、skipped 计数、重试
+    eligibility 与脱敏错误摘要。
+- Offline Core smoke：
+  - 新增 `pnpm desktop:offline-core-smoke`，独立验证无 DB、无 managed
+    binaries、无 sidecar 时的本地 snapshot/outbox P0 路径。
+  - `desktop:runtime-smoke` 的无 DB 分支现在明确区分 database persistence
+    `SKIP` 与 Offline Core PASS。
+
+已验证：
+
+- `pnpm --filter @chemd/language-service test`：通过 11 个测试。
+- `pnpm exec vitest run apps/desktop/src/desktop-local-store.test.ts --config packages/compiler/vitest.config.ts --pool=threads`：
+  通过 10 个测试。
+- `cargo test --manifest-path apps\desktop\src-tauri\Cargo.toml workspace`：
+  通过 8 个 workspace 测试。
+- `pnpm run test:scripts`：通过 52 个脚本测试。
+- `pnpm --filter @chemd/desktop typecheck`：通过。
+- `pnpm --filter @chemd/desktop exec eslint src/App.tsx src/desktop-contracts.ts src/desktop-local-store.ts src/desktop-local-store.test.ts`：
+  通过。
+- `cargo check --manifest-path apps\desktop\src-tauri\Cargo.toml`：通过。
+- `pnpm desktop:offline-core-smoke`：通过，输出 Offline Core PASS。
+- `pnpm --filter @chemd/desktop build`：通过；保留既有 lucide `use client` 与
+  chunk size warning。
+- `cargo test --manifest-path apps\desktop\src-tauri\Cargo.toml`：通过 47 个
+  Rust 测试。
+- `pnpm desktop:runtime-smoke`：通过 Offline Core 路径；database persistence
+  因本机缺少 PostgreSQL binaries 被明确标记为 `SKIP`。
+- `pnpm typecheck`：通过 21 个 workspace。
+- `pnpm test`：通过 Turbo tests、52 个脚本测试与 52 个 Python 测试。
+- `git diff --check`：通过。
+
+未通过/阻塞：
+
+- `pnpm --filter @chemd/desktop tauri:build`：
+  - 第一次失败于 Windows 文件锁：旧
+    `apps/desktop/src-tauri/target/release/chemd-desktop.exe` 正在运行，
+    Rust release build 无法删除旧 exe，返回 `os error 5`。
+  - 第二次使用隔离 `CARGO_TARGET_DIR=.tmp/tauri-build-target` 绕开旧 exe，
+    但 release 编译超过 5 分钟超时；已终止本次启动的 cargo/rustc 进程。
+  - 该项归类为本地环境/进程占用阻塞，不记录为通过。
+
+剩余 P0 缺口：
+
+- UI 尚未把 workspace conflict 以专门的 reload/keep local 决策面板呈现；当前
+  只能通过通用错误消息展示 `workspace_file_conflict`。
+- 尚未完成真实 installer Offline Core smoke，因为 Tauri build 被本地 release
+  exe 锁与隔离 release 编译超时阻塞。
+- Monaco 仍未替换 textarea；本轮只完成 language-service core 与 adapter DTO。
+
 ### M4：本地 workspace ingest 与可恢复队列
 
 目标：把单文档 authoring 扩展为本地 workspace 级知识准备。

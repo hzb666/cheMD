@@ -647,3 +647,92 @@ PostgreSQL binaries to the repository.
   - Real command-level proof needs a configured
     `CHEMD_DESKTOP_TAURI_COMMAND_RUNNER` that can invoke the packaged desktop
     commands against that DB runtime.
+
+## Twelfth-Wave Offline-First Productization Slices
+
+The twelfth wave realigns the production path around offline-first desktop
+authoring. Local `.chemd.md` documents are the source of truth. PostgreSQL is a
+sync/enrichment layer and must not gate basic authoring.
+
+1. `desktop-ide-offline-workspace-reliability`
+   - Owns `apps/desktop/src-tauri/src/workspace*`.
+   - Adds content hash and modified time to workspace reads/writes.
+   - Adds optional `baseHash` conflict detection and atomic same-directory
+     write/replace behavior.
+
+2. `desktop-ide-language-service-core`
+   - Owns `packages/language-service/**`.
+   - Adds worker request/response contracts, stale compile handling, and a
+     Monaco-friendly aggregate model.
+
+3. `desktop-ide-local-status-contract`
+   - Owns `apps/desktop/src/desktop-local-store.ts`,
+     `apps/desktop/src/desktop-local-store.test.ts`, and local-store related
+     command types.
+   - Adds local authoring status derivation for saved/compiled/snapshot/sync
+     state without treating DB absence as a product failure.
+
+4. `desktop-ide-offline-core-smoke`
+   - Owns `scripts/desktop-runtime-smoke.mjs`,
+     `scripts/desktop-offline-core-smoke.mjs`, focused tests, and offline docs.
+   - Adds a P0 Offline Core smoke that explicitly separates database persistence
+     SKIP from local offline PASS.
+
+## Twelfth-Wave Execution Record
+
+- `desktop-ide-language-service-core` merged through
+  `246df83 feat(language-service)：增强语言服务核心契约`.
+  - Added `packages/language-service/src/worker.ts`.
+  - Added stale-safe compile response and structured error response.
+  - Extended Monaco adapter with an aggregate language-service model.
+
+- `desktop-ide-local-status-contract` merged through
+  `888159b feat(desktop)：补充离线本地状态契约`.
+  - Added `deriveLocalAuthoringStatus`.
+  - Added bounded/redacted local display errors, outbox counts, and retry
+    eligibility.
+
+- `desktop-ide-offline-core-smoke` merged through
+  `e06a546 feat(desktop)：添加离线核心 smoke`.
+  - Added `pnpm desktop:offline-core-smoke`.
+  - Updated integrated runtime smoke to return `offline-core-passed` when no
+    PostgreSQL runtime is available.
+
+- `desktop-ide-offline-workspace-reliability` merged through
+  `a84fccc fix(desktop)：强化 workspace 文件保存可靠性`.
+  - Added workspace content hash and modified timestamp metadata.
+  - Added optional `baseHash` conflict detection.
+  - Added atomic temp-file write and replace behavior.
+
+- Integration follow-up `13d1ccf fix(desktop)：同步 workspace 保存契约`.
+  - Synced TypeScript command contracts with Rust workspace read/write payloads.
+
+- Current validation:
+  - `pnpm --filter @chemd/language-service test` passed 11 tests.
+  - `pnpm exec vitest run apps/desktop/src/desktop-local-store.test.ts --config packages/compiler/vitest.config.ts --pool=threads`
+    passed 10 tests.
+  - `cargo test --manifest-path apps\desktop\src-tauri\Cargo.toml workspace`
+    passed 8 tests.
+  - `pnpm run test:scripts` passed 52 script tests.
+  - `pnpm --filter @chemd/desktop typecheck` passed.
+  - Desktop focused ESLint passed for changed TS/TSX files.
+  - `cargo check --manifest-path apps\desktop\src-tauri\Cargo.toml` passed.
+  - `pnpm desktop:offline-core-smoke` passed with Offline Core PASS.
+  - `pnpm --filter @chemd/desktop build` passed with existing lucide/chunk
+    warnings.
+  - `cargo test --manifest-path apps\desktop\src-tauri\Cargo.toml` passed 47
+    tests.
+  - `pnpm desktop:runtime-smoke` passed Offline Core and explicitly skipped
+    database persistence because no PostgreSQL binaries were available.
+  - `pnpm typecheck` passed all 21 workspaces.
+  - `pnpm test` passed Turbo tests, 52 script tests, and 52 Python tests.
+  - `git diff --check` passed.
+
+- Blocked verification:
+  - `pnpm --filter @chemd/desktop tauri:build` did not pass in this run.
+  - First attempt was blocked by a running
+    `apps/desktop/src-tauri/target/release/chemd-desktop.exe` process and
+    Windows `os error 5` while deleting the old exe.
+  - Second attempt with isolated `CARGO_TARGET_DIR=.tmp/tauri-build-target`
+    exceeded the tool timeout and was stopped.
+  - Treat this as an environment/process-lock blocker, not as a product pass.
