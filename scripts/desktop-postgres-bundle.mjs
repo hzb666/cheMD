@@ -1,6 +1,14 @@
 #!/usr/bin/env node
 
-import { cpSync, existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  writeFileSync
+} from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -16,9 +24,11 @@ export const POSTGRES_RESOURCE_BIN_PATH = path.join(
   "bin"
 );
 export const POSTGRES_RESOURCE_PATH = path.dirname(POSTGRES_RESOURCE_BIN_PATH);
+export const POSTGRES_BUNDLE_MANIFEST_FILE_NAME = "chemd-postgres-bundle-manifest.json";
 
 const REQUIRED_BINARIES = ["initdb", "psql"];
 const SERVER_BINARIES = ["postgres", "pg_ctl"];
+const REQUIRED_BINARY_LABELS = [...REQUIRED_BINARIES, "postgres or pg_ctl"];
 
 const safeTrim = (value) => (typeof value === "string" ? value.trim() : "");
 
@@ -122,6 +132,83 @@ const copyDirectoryContents = ({ sourceDir, targetDir }) => {
   }
 };
 
+const manifestPathForResourceDir = (targetResourceDir) =>
+  path.join(targetResourceDir, POSTGRES_BUNDLE_MANIFEST_FILE_NAME);
+
+const buildVerificationSummary = ({ manifest, serverBinaryName }) => {
+  const mode = manifest.binOnly ? "bin-only development staging" : "full distribution staging";
+  const proof = manifest.binOnly
+    ? "not a complete offline distribution proof"
+    : "complete offline distribution proof";
+  return [
+    `OK: ${mode} verified for ${manifest.platform};`,
+    `required binaries: ${manifest.requiredBinaries.join(", ")};`,
+    `server binary: ${serverBinaryName};`,
+    proof
+  ].join(" ");
+};
+
+export const buildPostgresBundleManifest = ({
+  source,
+  staged,
+  targetResourceDir,
+  targetBinDir,
+  platform,
+  stagedAt = new Date().toISOString()
+}) => {
+  const serverBinaryName =
+    SERVER_BINARIES.find((name) => Object.prototype.hasOwnProperty.call(staged.binaries, name)) ||
+    "unknown";
+  const manifest = {
+    schemaVersion: 1,
+    stagedAt,
+    platform,
+    mode: source.binOnly ? "bin-only-development" : "full-distribution",
+    binOnly: source.binOnly,
+    sourceRoot: source.sourceRootDir,
+    sourceBin: source.binDir,
+    targetResource: targetResourceDir,
+    targetBin: targetBinDir,
+    requiredBinaries: REQUIRED_BINARY_LABELS,
+    resolvedBinaries: staged.binaries,
+    verificationSummary: ""
+  };
+  manifest.verificationSummary = buildVerificationSummary({ manifest, serverBinaryName });
+  return manifest;
+};
+
+export const readPostgresBundleManifest = ({
+  targetResourceDir,
+  fileExists = existsSync,
+  readFile = readFileSync
+}) => {
+  const manifestPath = manifestPathForResourceDir(targetResourceDir);
+  if (!fileExists(manifestPath)) {
+    return { manifest: null, manifestPath };
+  }
+
+  const manifest = JSON.parse(readFile(manifestPath, "utf8"));
+  return { manifest, manifestPath };
+};
+
+const copyResolvedPostgresDistribution = ({
+  source,
+  targetResourceDir,
+  targetBinDir,
+  copyContents
+}) => {
+  if (source.binOnly) {
+    if (path.resolve(source.binDir) !== path.resolve(targetBinDir)) {
+      copyContents({ sourceDir: source.binDir, targetDir: targetBinDir });
+    }
+    return;
+  }
+
+  if (path.resolve(source.sourceRootDir) !== path.resolve(targetResourceDir)) {
+    copyContents({ sourceDir: source.sourceRootDir, targetDir: targetResourceDir });
+  }
+};
+
 export const stagePostgresBinaries = ({
   sourceDir,
   targetBinDir = path.join(REPO_ROOT, POSTGRES_RESOURCE_BIN_PATH),
@@ -129,53 +216,93 @@ export const stagePostgresBinaries = ({
   fileExists = existsSync,
   platform = process.platform,
   stat = statSync,
-  copyContents = copyDirectoryContents
+  copyContents = copyDirectoryContents,
+  writeFile = writeFileSync,
+  now = () => new Date(),
+  requireFullDistribution = false
 }) => {
   const source = resolvePostgresDistribution({ sourceDir, fileExists, platform });
+  if (requireFullDistribution && source.binOnly) {
+    throw new Error("Full PostgreSQL distribution proof is required, but source was bin-only.");
+  }
+
   if (!stat(source.binDir).isDirectory()) {
     throw new Error(`PostgreSQL source is not a directory: ${source.binDir}`);
   }
 
-  if (source.binOnly) {
-    if (path.resolve(source.binDir) !== path.resolve(targetBinDir)) {
-      copyContents({ sourceDir: source.binDir, targetDir: targetBinDir });
-    }
-  } else if (path.resolve(source.sourceRootDir) !== path.resolve(targetResourceDir)) {
-    copyContents({ sourceDir: source.sourceRootDir, targetDir: targetResourceDir });
-  }
+  copyResolvedPostgresDistribution({ source, targetResourceDir, targetBinDir, copyContents });
 
   const staged = inspectPostgresBinDir({ binDir: targetBinDir, fileExists, platform });
   if (!staged.ok) {
     throw new Error(`Staged PostgreSQL binaries are missing: ${staged.missing.join(", ")}.`);
   }
 
+  const manifest = buildPostgresBundleManifest({
+    source,
+    staged,
+    targetResourceDir,
+    targetBinDir,
+    platform,
+    stagedAt: now().toISOString()
+  });
+  const manifestPath = manifestPathForResourceDir(targetResourceDir);
+  writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+
   return {
     sourceRootDir: source.sourceRootDir,
     sourceBinDir: source.binDir,
     targetResourceDir,
     targetBinDir,
-    binaries: staged.binaries
+    binaries: staged.binaries,
+    binOnly: source.binOnly,
+    manifest,
+    manifestPath
   };
 };
 
 export const verifyStagedPostgresBinaries = ({
   targetBinDir = path.join(REPO_ROOT, POSTGRES_RESOURCE_BIN_PATH),
+  targetResourceDir = path.dirname(targetBinDir),
   fileExists = existsSync,
-  platform = process.platform
+  platform = process.platform,
+  requireFullDistribution = false,
+  readFile = readFileSync
 } = {}) => {
   const result = inspectPostgresBinDir({ binDir: targetBinDir, fileExists, platform });
   if (!result.ok) {
     throw new Error(`Staged PostgreSQL binaries are missing: ${result.missing.join(", ")}.`);
   }
-  return result;
+
+  const { manifest, manifestPath } = readPostgresBundleManifest({
+    targetResourceDir,
+    fileExists,
+    readFile
+  });
+  if (requireFullDistribution && (!manifest || manifest.binOnly)) {
+    throw new Error(
+      "Full PostgreSQL distribution proof is required, but the staged manifest is missing or bin-only."
+    );
+  }
+
+  const verificationSummary =
+    manifest?.verificationSummary ||
+    `OK: staged PostgreSQL binaries verified for ${platform}; manifest proof unavailable.`;
+  return {
+    ...result,
+    manifest,
+    manifestPath,
+    verificationSummary
+  };
 };
 
 export const parseDesktopPostgresBundleArgs = (argv) => {
-  const options = { source: "", verify: false, help: false };
+  const options = { source: "", verify: false, help: false, requireFullDistribution: false };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--verify") {
       options.verify = true;
+    } else if (arg === "--require-full") {
+      options.requireFullDistribution = true;
     } else if (arg === "--help" || arg === "-h") {
       options.help = true;
     } else if (arg === "--source") {
@@ -192,10 +319,11 @@ export const parseDesktopPostgresBundleArgs = (argv) => {
 
 const usage = () => [
   "Usage:",
-  "  node scripts/desktop-postgres-bundle.mjs --source <postgres-dist>",
-  "  node scripts/desktop-postgres-bundle.mjs --verify",
+  "  node scripts/desktop-postgres-bundle.mjs --source <postgres-dist> [--require-full]",
+  "  node scripts/desktop-postgres-bundle.mjs --verify [--require-full]",
   "",
   "Source may be a PostgreSQL distribution directory or, for local development only, its bin directory.",
+  "--require-full fails when the staged manifest is missing or bin-only.",
   "When --source is omitted, CHEMD_POSTGRES_DIST_DIR is used."
 ].join("\n");
 
@@ -212,15 +340,24 @@ export const runDesktopPostgresBundleCli = ({
     }
 
     if (options.verify) {
-      const result = verifyStagedPostgresBinaries();
+      const result = verifyStagedPostgresBinaries({
+        requireFullDistribution: options.requireFullDistribution
+      });
       logger.log(`PostgreSQL bundle resources verified: ${result.binDir}`);
+      logger.log(`Manifest: ${result.manifestPath}`);
+      logger.log(result.verificationSummary);
       return 0;
     }
 
     const sourceDir = options.source || env.CHEMD_POSTGRES_DIST_DIR;
-    const result = stagePostgresBinaries({ sourceDir });
+    const result = stagePostgresBinaries({
+      sourceDir,
+      requireFullDistribution: options.requireFullDistribution
+    });
     logger.log(`PostgreSQL bundle resources staged: ${result.targetBinDir}`);
     logger.log(`Source bin: ${result.sourceBinDir}`);
+    logger.log(`Manifest: ${result.manifestPath}`);
+    logger.log(result.manifest.verificationSummary);
     return 0;
   } catch (error) {
     logger.error(error instanceof Error ? error.message : String(error));
