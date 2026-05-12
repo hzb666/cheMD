@@ -621,16 +621,24 @@ PostgreSQL binaries to the repository.
   - Integration review added `92d29a8 fix(desktop)：传递 command smoke 运行环境`
     so runner subprocesses inherit the smoke env and managed PostgreSQL
     temporary connection data.
+  - Final integration added `cf1ff3a refactor(desktop)：降低 runtime smoke 复杂度`
+    to split the managed PostgreSQL smoke startup path and clear the script
+    ESLint complexity gate.
   - Integrated validation: focused runtime smoke tests passed 20 tests and
     `pnpm test:scripts` passed before merge.
 
 - Current integrated validation:
+  - Script ESLint passed for runtime smoke and bundle scripts.
   - `node --test scripts/desktop-runtime-smoke.test.mjs scripts/desktop-postgres-bundle.test.mjs`
     passed 31 tests.
   - `pnpm test:scripts` passed 47 script tests.
   - `pnpm desktop:runtime-smoke` passed the offline local path on this machine;
     database persistence remains an environment SKIP because no external DB or
     managed PostgreSQL binaries are available.
+  - `pnpm typecheck` passed all 21 workspaces.
+  - `pnpm test` passed Turbo tests, 47 script tests, and 52 Python tests.
+  - `pnpm --filter @chemd/desktop tauri:build` produced release exe, MSI, and
+    NSIS installer.
   - `git diff --check` passed.
 
 - Remaining production proof gap:

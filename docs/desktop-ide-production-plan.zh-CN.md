@@ -383,14 +383,21 @@ PostgreSQL 分发/staging provenance，以及 Tauri command-level smoke harness�
 - `79ee4b0`：规划第十一轮 runtime proof。
 - `0a21ce6`：合入 PostgreSQL 分发证明。
 - `74edabf`：合入 Tauri command smoke。
+- `cf1ff3a`：降低 runtime smoke 复杂度并清除脚本 lint 阻塞。
 
 已运行验证：
 
 - `node --test scripts/desktop-runtime-smoke.test.mjs scripts/desktop-postgres-bundle.test.mjs`：
   通过 31 个测试。
+- `pnpm exec eslint scripts/desktop-runtime-smoke.mjs scripts/desktop-runtime-smoke.test.mjs scripts/desktop-postgres-bundle.mjs scripts/desktop-postgres-bundle.test.mjs`：
+  通过。
 - `pnpm test:scripts`：通过 47 个脚本测试。
 - `pnpm desktop:runtime-smoke`：通过离线本地 snapshot/outbox 验证；
   数据库持久化仍因本机缺少 PostgreSQL runtime 被显式 SKIP。
+- `pnpm typecheck`：通过 21 个 workspace。
+- `pnpm test`：通过 Turbo 测试、47 个脚本测试与 52 个 Python 测试。
+- `pnpm --filter @chemd/desktop tauri:build`：通过，产出 release exe、
+  MSI 与 NSIS installer。
 - `git diff --check`：通过。
 
 仍需真实环境证明：
