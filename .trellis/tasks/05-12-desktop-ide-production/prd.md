@@ -316,3 +316,82 @@ the desktop host.
 - Local validation includes Rust tests/checks, desktop typecheck/build,
   script tests, `desktop:runtime-smoke`, root `pnpm typecheck`, root
   `pnpm test`, `tauri:build`, and `git diff --check`.
+
+## Eighth-Wave PostgreSQL Bundle Staging Slices
+
+The eighth wave keeps managed PostgreSQL optional instead of forcing a heavy
+database into every desktop install. The app can bundle PostgreSQL when a local
+or CI-provided distribution is staged, while the main package can still build
+without those binaries.
+
+1. `desktop-ide-postgres-bundle-staging`
+   - Owns `apps/desktop/src-tauri/tauri.conf.json`,
+     `apps/desktop/src-tauri/resources/postgres/**`,
+     `scripts/desktop-postgres-bundle.mjs`, focused script tests,
+     `package.json` script entries, and desktop docs.
+   - Adds a local/CI staging script that copies a full PostgreSQL distribution
+     into `resources/postgres` and verifies `bin/initdb`, `bin/psql`, and
+     `bin/postgres` or `bin/pg_ctl`.
+   - Tracks only placeholder docs and `.gitkeep`; staged binaries are ignored.
+
+## Eighth-Wave Acceptance Criteria
+
+- Tauri bundles `resources/postgres` when staged binaries are present.
+- The repo does not commit PostgreSQL binary files.
+- `desktop:postgres:verify` fails with an explicit environment reason when
+  binaries are not staged.
+- `desktop:runtime-smoke` continues to SKIP explicitly when neither external DB
+  nor staged managed binaries are available.
+
+## Ninth-Wave Offline Local-First Slices
+
+The ninth wave makes the desktop IDE useful when external PostgreSQL is
+offline, without making bundled PostgreSQL the default. The local store is a
+desktop cache/outbox, not a replacement for the shared PostgreSQL source of
+truth.
+
+1. `desktop-ide-local-store-runtime`
+   - Owns `apps/desktop/src-tauri/src/local_store*`,
+     `apps/desktop/src-tauri/src/lib.rs`, and focused Rust tests.
+   - Adds app-data local store commands for status, snapshot save, outbox
+     enqueue, pending list, mark synced, and clear failed entries.
+   - Uses durable local files with atomic writes and bounded JSON payloads.
+   - Stores only local cache/outbox records; it must not create desktop-specific
+     PostgreSQL tables or require a database driver.
+
+2. `desktop-ide-local-store-contract-builder`
+   - Owns `apps/desktop/src/desktop-contracts.ts`,
+     `apps/desktop/src/desktop-local-store.ts`, and focused TypeScript tests.
+   - Defines typed local snapshot and sync outbox payloads that reuse the
+     existing runtime Graph/RAG/Agent DTO shape.
+   - Builds deterministic idempotency keys so reconnect sync can upsert safely
+     to shared PostgreSQL later.
+
+3. `desktop-ide-offline-ui`
+   - Runs after the local-store contract is integrated.
+   - Owns `apps/desktop/src/App.tsx` and desktop CSS files.
+   - Adds clear offline/local-only state, pending sync count, save-local action,
+     and restore/read-local status near the existing Postgres panel.
+   - Must keep the UI aligned with the current light dense workbench style.
+
+4. `desktop-ide-offline-smoke-docs`
+   - Owns `scripts/desktop-runtime-smoke.mjs`,
+     `scripts/desktop-runtime-smoke.test.mjs`, and desktop docs.
+   - Extends smoke to prove the offline local path when no external DB or
+     managed binaries are available.
+   - Keeps external/managed DB smoke behavior unchanged and still distinguishes
+     environment SKIP from product failures.
+
+## Ninth-Wave Acceptance Criteria
+
+- With no external PostgreSQL and no staged managed binaries, the desktop can
+  still save the current editor Graph/RAG/Agent snapshot to a local outbox.
+- Local outbox records include stable `localId`, `idempotencyKey`, `createdAt`,
+  `syncStatus`, and a bounded runtime payload.
+- UI reports `Offline: local cache only` and pending sync count without
+  implying that shared PostgreSQL persistence succeeded.
+- Reconnect sync remains a later explicit phase; this wave only creates the
+  durable local queue and user-visible offline state.
+- Validation includes Rust tests/checks, desktop typecheck/build, focused
+  TypeScript/script tests, root `pnpm typecheck`, root `pnpm test`,
+  `tauri:build`, and `git diff --check`.
