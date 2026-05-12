@@ -197,3 +197,66 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 45: Desktop IDE 第十一轮 runtime proof 与分发证明
+
+**Date**: 2026-05-12
+**Task**: Desktop IDE 第十一轮 runtime proof 与分发证明
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+(Add summary)
+
+### Main Changes
+
+| Area | Result |
+|------|--------|
+| PostgreSQL distribution proof | Added staging manifest/provenance for bundled PostgreSQL resources, including source/target paths, platform, required binaries, bin-only vs full distribution mode, and verification summary. Added `--require-full` for production verification. |
+| Runtime distribution docs | Added `postgres-runtime-distribution.zh-CN.md` and updated managed/bundle docs to distinguish external DB, installer bundled managed PostgreSQL, and offline local outbox modes. |
+| Tauri command smoke | Added command-level smoke runner abstraction to `desktop:runtime-smoke`. Without `CHEMD_DESKTOP_TAURI_COMMAND_RUNNER`, the result is an explicit SKIP; with a runner, the command chain verifies managed setup, local snapshot save, outbox sync, and pending -> synced state. |
+| Integration review | Fixed command runner env propagation so managed PostgreSQL smoke connection variables are inherited by the runner subprocess. Refactored managed Postgres smoke startup to clear the script ESLint complexity gate. |
+| Worktree hygiene | Merged and removed `desktop-ide-postgres-dist` and `desktop-ide-tauri-command-smoke` worktrees/branches. The pre-existing `desktop-ide-tauri-tailwind` worktree was left untouched. |
+
+**Validation evidence**:
+- `pnpm exec eslint scripts/desktop-runtime-smoke.mjs scripts/desktop-runtime-smoke.test.mjs scripts/desktop-postgres-bundle.mjs scripts/desktop-postgres-bundle.test.mjs` passed.
+- `node --test scripts/desktop-runtime-smoke.test.mjs scripts/desktop-postgres-bundle.test.mjs` passed 31 tests.
+- `pnpm test:scripts` passed 47 script tests.
+- `pnpm desktop:runtime-smoke` passed offline local snapshot/outbox verification; database persistence was explicitly skipped because this machine lacks external DB env and managed PostgreSQL binaries.
+- `pnpm typecheck` passed all 21 workspaces.
+- `pnpm test` passed Turbo tests, 47 script tests, and 52 Python tests.
+- `pnpm --filter @chemd/desktop tauri:build` produced release exe, MSI, and NSIS bundles.
+- `git diff --check` passed after the final docs commit.
+
+**Remaining production gap**:
+- Real shared-schema DB proof still needs either `CHEMD_POSTGRES_DATABASE_URL` / `DATABASE_URL` or staged managed PostgreSQL binaries.
+- Real Tauri command-level proof still needs a configured `CHEMD_DESKTOP_TAURI_COMMAND_RUNNER` that can invoke the packaged desktop commands against that DB runtime.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `79ee4b0` | (see git log) |
+| `9d27ebe` | (see git log) |
+| `0a21ce6` | (see git log) |
+| `d8b10c1` | (see git log) |
+| `92d29a8` | (see git log) |
+| `74edabf` | (see git log) |
+| `2c62fab` | (see git log) |
+| `cf1ff3a` | (see git log) |
+| `10abb49` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
