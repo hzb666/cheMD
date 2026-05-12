@@ -1,133 +1,82 @@
-.desktop-topbar {
-  display: grid;
-  grid-template-columns: minmax(15rem, 22rem) minmax(8rem, 1fr) auto;
-  align-items: center;
-  gap: 1rem;
-  min-height: 3.25rem;
-  padding: 0 1rem;
-  border-bottom: 1px solid var(--border);
-  background: rgba(248, 250, 252, 0.92);
-}
+@layer components {
+  .desktop-topbar {
+    @apply grid min-h-[3.25rem] items-center gap-4 border-b border-border px-4;
+    grid-template-columns: minmax(15rem, 22rem) minmax(8rem, 1fr) auto;
+    background: color-mix(in oklch, var(--panel) 92%, transparent);
+  }
 
-.desktop-brand {
-  min-width: 0;
-  gap: 0.7rem;
-}
+  .desktop-brand {
+    @apply min-w-0 gap-[0.7rem];
+  }
 
-.desktop-logo-mark {
-  display: inline-flex;
-  width: 1.8rem;
-  height: 1.8rem;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid color-mix(in srgb, var(--primary) 26%, white);
-  border-radius: 7px;
-  background: var(--primary);
-  color: var(--primary-foreground);
-}
+  .desktop-logo-mark {
+    @apply inline-flex size-[1.8rem] items-center justify-center rounded-desktop bg-primary text-primary-foreground;
+    border: 1px solid color-mix(in oklch, var(--primary) 26%, var(--card));
+  }
 
-.desktop-brand-copy {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  line-height: 1.2;
-}
+  .desktop-brand-copy {
+    @apply flex min-w-0 flex-col leading-tight;
+  }
 
-.desktop-product-name {
-  overflow: hidden;
-  color: var(--foreground);
-  font-size: 0.9rem;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+  .desktop-product-name {
+    @apply overflow-hidden truncate text-[0.9rem] font-semibold text-foreground;
+  }
 
-.desktop-path-chip {
-  overflow: hidden;
-  width: 100%;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+  .desktop-path-chip {
+    @apply w-full overflow-hidden truncate;
+  }
 
-.desktop-path-input {
-  min-width: 12rem;
-  width: min(34rem, 38vw);
-  height: 1.9rem;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  padding: 0 0.55rem;
-  background: #fff;
-  color: var(--foreground);
-  font-family: var(--font-mono);
-  font-size: 0.74rem;
-  outline: 0;
-}
+  .desktop-path-input {
+    @apply h-[1.9rem] w-[min(34rem,38vw)] min-w-48 rounded-desktop border border-border bg-card px-[0.55rem] font-mono text-[0.74rem] text-foreground outline-0;
+  }
 
-.desktop-path-input:focus {
-  border-color: color-mix(in srgb, var(--primary) 42%, var(--border));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 12%, transparent);
-}
+  .desktop-path-input:focus {
+    border-color: color-mix(in oklch, var(--primary) 42%, var(--border));
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary) 12%, transparent);
+  }
 
-.desktop-runtime-badges {
-  min-width: 0;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.45rem;
-}
+  .desktop-runtime-badges {
+    @apply min-w-0 flex-wrap justify-end gap-[0.45rem];
+  }
 
-.desktop-status-badge {
-  display: inline-flex;
-  min-height: 1.65rem;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0 0.55rem;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.82);
-  color: var(--muted-foreground);
-  font-size: 0.72rem;
-  font-weight: 560;
-  white-space: nowrap;
-}
+  .desktop-status-badge {
+    @apply inline-flex min-h-[1.65rem] items-center gap-[0.4rem] whitespace-nowrap rounded-desktop border border-border px-[0.55rem] text-[0.72rem] font-medium text-muted-foreground;
+    background: color-mix(in oklch, var(--card) 82%, transparent);
+  }
 
-.desktop-status-badge,
-.desktop-button-primary {
-  flex: 0 0 auto;
-}
+  .desktop-status-badge,
+  .desktop-button-primary {
+    @apply flex-none;
+  }
 
-.desktop-status-dot {
-  width: 0.38rem;
-  height: 0.38rem;
-  border-radius: 999px;
-  background: currentColor;
-}
+  .desktop-status-dot {
+    @apply size-[0.38rem] rounded-full bg-current;
+  }
 
-.desktop-status-badge[data-state="success"] {
-  color: var(--success);
-}
+  .desktop-status-badge[data-state="success"] {
+    @apply text-success;
+  }
 
-.desktop-status-badge[data-state="warning"],
-.desktop-status-badge[data-state="pending"] {
-  color: var(--warning);
-}
+  .desktop-status-badge[data-state="warning"],
+  .desktop-status-badge[data-state="pending"] {
+    @apply text-warning;
+  }
 
-.desktop-status-badge[data-state="danger"] {
-  color: var(--danger);
+  .desktop-status-badge[data-state="danger"] {
+    @apply text-danger;
+  }
 }
 
 @media (max-width: 899px) {
   .desktop-topbar {
-    grid-template-columns: minmax(0, 1fr);
-    align-items: start;
-    gap: 0.55rem;
-    padding: 0.7rem;
+    @apply grid-cols-1 items-start gap-[0.55rem] p-[0.7rem];
   }
 
   .desktop-runtime-badges {
-    justify-content: flex-start;
+    @apply justify-start;
   }
 
   .desktop-path-input {
-    width: 100%;
+    @apply w-full;
   }
 }
