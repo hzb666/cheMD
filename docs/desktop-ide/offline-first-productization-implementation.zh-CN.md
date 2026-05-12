@@ -527,7 +527,15 @@ reconnect outbox sync: synced=1, pending=0, failed=0
 pnpm typecheck
 pnpm test
 pnpm --filter @chemd/desktop tauri:build
+pnpm desktop:diagnostics-bundle
 ```
+
+`desktop:diagnostics-bundle` 是支持闭环的离线诊断入口：它生成脱敏 JSON
+诊断包，记录平台、Node 版本、git commit、desktop package version、frontend
+dist、release exe/MSI/NSIS 产物摘要、已知 Tauri command 名称，以及 runtime
+smoke/preflight 的分类摘要。它不会启动 GUI、不会联网、不会读取 `.env` 文件、
+不会运行重型 runtime smoke，也不会输出完整 env、database URL、API key、
+token 或 password。
 
 ---
 
@@ -595,6 +603,9 @@ pnpm --filter @chemd/desktop tauri:build
 - 已生成 Windows MSI 与 NSIS 安装包。
 - `pnpm desktop:offline-release-smoke` 已在产物生成后通过 artifact preflight。
 - 第三轮补充 installer artifact preflight，自动检查 release exe、MSI、NSIS 非空产物与目标 exe 路径锁状态，但仍不等同于 clean-machine 安装后 smoke。
+- 第四轮追加 `pnpm desktop:diagnostics-bundle`，生成离线、脱敏 JSON
+  diagnostics bundle；当前只覆盖静态产物、命令清单与 preflight 分类，不替代
+  app/sidecar/sync/provider 的完整运行期日志包。
 - 还缺少“安装到干净用户环境后启动、打开 workspace、编辑保存、关闭重启恢复”的
   installer Offline Core smoke。
 
@@ -611,6 +622,9 @@ pnpm --filter @chemd/desktop tauri:build
 
 该脚本仍不等同于 clean-machine installer smoke；真实发布验收还需要在干净用户
 环境或隔离 VM 中安装后验证启动、打开 workspace、编辑保存、关闭重启恢复。
+
+diagnostics bundle 同样是支持分层判断工具，不是产品通过证明；若 dist、installer
+产物或环境探测缺失，应在 JSON 中标记 `SKIP` / `BLOCKED` 并继续生成诊断包。
 
 详细说明见 `docs/desktop-ide/release-offline-smoke.zh-CN.md`。
 
