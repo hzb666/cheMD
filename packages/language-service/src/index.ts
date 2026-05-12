@@ -1,4 +1,22 @@
 export {
+  getChemdCompletions
+} from "./completion";
+export {
+  getChemdCompletionContext
+} from "./completion-context";
+export type {
+  ChemdCompletionBlockKind,
+  ChemdCompletionContext,
+  ChemdCompletionItem,
+  ChemdCompletionItemKind,
+  ChemdCompletionList,
+  ChemdCompletionRequest,
+  ChemdCompletionTriggerKind,
+  ChemdEditorPosition,
+  ChemdWorkspaceSymbol,
+  ChemdWorkspaceSymbolIndex
+} from "./completion-types";
+export {
   compileChemdForEditor,
   compileChemdLanguageService,
   type ChemdLanguageServiceDependencies
