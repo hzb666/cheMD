@@ -61,3 +61,30 @@ The implementation loop must keep the desktop IDE usable while adding:
   - reaction clustering pure data builders and tests.
 - App integration, dependency edits, storage contract edits, and final release
   gates are serialized in the architect worktree.
+
+## First-Wave Integration Record
+
+- `desktop-ide-map-completion-ls` merged through
+  `feat(language-service)：合并 Chemd completion core`.
+  - Added Monaco-neutral `getChemdCompletions(request)`.
+  - Covered reaction/molecule snippets, Chemd block field suggestions, `kind:`
+    enum suggestions, and `stage:` enum suggestions.
+  - Main validation passed `pnpm --filter @chemd/language-service test` with
+    18 tests, `pnpm --filter @chemd/language-service typecheck`, and
+    `git diff --check`.
+
+- `desktop-ide-map-reaction-clusters` was integrated only by cherry-picking the
+  clean exporter-training adapter commit `4505d50`.
+  - Added `buildReactionClusterViewModel()` and
+    `findReactionClusterDetail()` to `@chemd/exporter-training`.
+  - The adapter produces cluster list/detail, members, similarity edges,
+    evidence summary, citation/source IDs, warnings, and empty-data summaries.
+  - Main validation passed `pnpm --filter @chemd/exporter-training test` with
+    23 tests, `pnpm --filter @chemd/exporter-training typecheck`, and
+    `git diff --check`.
+
+- `desktop-ide-map-workspace-index` was not merged.
+  - It repeatedly moved outside the approved write scope by creating a new
+    `packages/workspace-index` package.
+  - The agent was stopped; workspace indexing will be re-cut as a stricter
+    language-service-only slice.

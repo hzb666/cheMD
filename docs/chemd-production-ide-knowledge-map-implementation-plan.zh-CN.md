@@ -904,3 +904,10 @@ M1 language-service completion core
   - `pnpm --filter @chemd/exporter-training test`：通过，8 files / 23 tests。
   - `pnpm --filter @chemd/exporter-training typecheck`：通过。
   - `git diff --check`：通过；仅输出计划文档和 `packages/exporter-training/src/index.ts` 的 LF/CRLF 工作区提示。
+
+### 2026-05-13 workspace-index 子任务未合并
+
+- 原 `desktop-ide-map-workspace-index` 子任务未进入主线。
+- 原因：实现反复越过本轮边界，创建新的 `packages/workspace-index` package，而本轮要求只在
+  `@chemd/language-service` 内沉淀纯 helper。
+- 处理：停止该子代理，不合并该分支；下一轮重新切分为 language-service-only 工作包。
