@@ -419,3 +419,36 @@ truth.
 - Remaining ninth-wave work is split into `desktop-ide-offline-ui` and
   `desktop-ide-offline-smoke-docs` worktrees so UI changes do not conflict
   with script/docs verification work.
+
+- `desktop-ide-offline-smoke-docs` merged through
+  `931243e feat(desktop)：合入离线 local-store smoke`.
+  - `desktop:runtime-smoke` now distinguishes database persistence SKIP from
+    local offline success when no external DB or managed binaries are present.
+  - `docs/desktop-ide/offline-local-store.zh-CN.md` documents the three-layer
+    persistence model and the offline JSON outbox contract.
+
+- `desktop-ide-offline-ui` merged through
+  `ebcf493 feat(desktop)：合入离线本地快照控制面`.
+  - The desktop workbench now exposes an Offline Local Store panel beside the
+    existing PostgreSQL controls.
+  - `Save Local Snapshot` reuses the same Graph/RAG/Agent payload builder and
+    stores a pending local snapshot without implying PostgreSQL sync success.
+
+- Final ninth-wave validation:
+  - `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml` passed 39
+    tests after rerunning one transient sidecar exit-status assertion.
+  - `cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml` passed.
+  - `pnpm --filter @chemd/desktop typecheck` passed.
+  - Focused `desktop-local-store.test.ts` Vitest passed 6 tests.
+  - Desktop eslint passed with only existing CSS ignored warnings.
+  - `pnpm --filter @chemd/desktop build` passed with existing lucide and chunk
+    size warnings.
+  - `pnpm test:scripts` passed 37 script tests.
+  - `pnpm desktop:runtime-smoke` passed the offline local path on this machine:
+    database persistence was skipped because PostgreSQL binaries were missing,
+    then local snapshot/outbox verification completed with `pending=1`.
+  - `pnpm typecheck` passed all 21 workspaces.
+  - `pnpm test` passed Turbo tests, script tests, and 52 Python tests.
+  - `pnpm --filter @chemd/desktop tauri:build` produced the release executable,
+    MSI bundle, and NSIS installer.
+  - `git diff --check` passed.
