@@ -408,3 +408,73 @@ PostgreSQL 分发/staging provenance，以及 Tauri command-level smoke harness�
 - 当前没有配置真实 `CHEMD_DESKTOP_TAURI_COMMAND_RUNNER`，所以
   command-level smoke harness 已有可注入测试与 SKIP 分类，但尚未完成真实
   app/driver proof。
+
+### 2026-05-12 第十二轮：外部 PostgreSQL JDBC runtime proof 与缺口对齐
+
+目标：用真实远端 PostgreSQL/pgvector 环境补齐第十一轮的 script-level
+shared schema 写入证明，并把距离生产 Desktop IDE 的剩余缺口按优先级重新
+对齐。该轮仍不提交数据库凭据，也不把开发验证账号视为生产配置。
+
+已完成/已验证：
+
+- Tauri/Rust runtime 与 Node smoke 脚本均支持 JDBC 风格 PostgreSQL URL，
+  并在连接前归一化为标准 PostgreSQL URL。
+- 远端 PostgreSQL 目标 `103.24.219.156:5632/postgres` 网络端口可达，
+  `desktop:runtime-smoke` 在外部 DB 路径完成 shared schema 初始化、pgvector
+  检查、runtime Graph/RAG/Agent/Patch 持久化与读回验证。
+- script-level reconnect sync 已证明 local outbox payload 可以写入 shared
+  PostgreSQL schema，并把本地 outbox entry 从 `pending` 标记为 `synced`。
+- 相关 JDBC URL 归一化、脚本 smoke 与 reconnect sync 测试已补齐。
+
+验证结果：
+
+- `Test-NetConnection 103.24.219.156 -Port 5632`：`TcpTestSucceeded: True`。
+- `node scripts\desktop-runtime-smoke.mjs`，环境变量使用
+  `CHEMD_POSTGRES_DATABASE_URL=jdbc:postgresql://103.24.219.156:5632/postgres?user=<redacted>&password=<redacted>`、
+  `CHEMD_POSTGRES_SSL=false`、`CHEMD_POSTGRES_CONNECTION_TIMEOUT_MS=10000`：
+  通过。输出包含 `Chemd desktop runtime smoke passed.`、
+  `rag chunks: 3`、`runtime graph: rev-desktop-reconnect-runtime-smoke::graph`、
+  `reconnect outbox sync: synced=1, pending=0, failed=0`。
+- runtime verification 读回计数均为 1：
+  `experiments`、`revisions`、`ragChunks`、`graphSnapshots`、`graphNodes`、
+  `graphEdges`、`citations`、`agentRuns`、`agentToolCalls`、
+  `patchProposals`。
+- `cargo test --manifest-path apps\desktop\src-tauri\Cargo.toml postgres_tests::jdbc_postgres_urls_are_normalized_before_runtime_use`：
+  通过。
+- `pnpm run test:scripts`：通过。
+
+仍未完成/未验证：
+
+- Tauri command-level proof 仍缺少真实 `CHEMD_DESKTOP_TAURI_COMMAND_RUNNER`，
+  因此本轮通过的是脚本级 runtime proof，不是完整桌面 app command proof。
+- 当前远端 DB 不支持 SSL；本轮以 `CHEMD_POSTGRES_SSL=false` 完成验证。这可
+  作为开发/内网验证路径，但生产需要 TLS、VPN/内网隔离或等价安全边界。
+- 当前验证账号属于开发验证配置，不满足 least privilege、凭据轮换、桌面
+  secret storage 与审计要求。
+- installer bundled managed PostgreSQL 仍未 staged 完整分发包，也未完成
+  release installer 层面的离线 managed DB proof。
+- Desktop UI 仍使用 textarea editor；Monaco、真实 language-service adapter、
+  hover/completion/quick fix preview 尚未落地。
+- workspace 批量 ingest、connection profile UI、Graph/RAG/Agent 产品面板、
+  Ketcher/RDKit/OCR 端到端桌面工作流仍未达到生产 IDE 验收。
+
+阶段完成度快照：
+
+| 阶段 | 当前判断 | 主要依据 |
+| --- | --- | --- |
+| Phase 0 架构冻结 | 接近完成 | 关键边界文档已存在，但 production MVP cut line 仍需决策 |
+| Phase 1 Desktop shell/workspace | 部分完成 | Tauri shell、workspace、installer 基础存在，release smoke 仍不足 |
+| Phase 2 Monaco/Language Service | 未完成 | 设计文档已定义，当前实现仍是 textarea |
+| Phase 3 Preview/Ketcher/sidecar | 部分完成 | sidecar/preview 有基础，Ketcher/RDKit/OCR 生产链路仍待验证 |
+| Phase 4 PostgreSQL 持久化 | 部分完成且外部 DB 已脚本验证 | shared schema/runtime smoke 通过，Tauri command 与安全未完成 |
+| Phase 5 Reaction Graph | 原型/持久化层部分完成 | graph records 可写入，产品面板与 evidence 交互未完成 |
+| Phase 6 RAG 搜索 | 原型/持久化层部分完成 | chunks/citations 可写入，embedding/search/backfill 未完成 |
+| Phase 7 Agent 编排 | 原型/审计层部分完成 | agent records/patch proposal 可写入，真实 tool orchestration 未完成 |
+| Phase 8 发布质量 | 未完成 | installer 可构建的历史证明存在，但 signing/updater/release smoke 未完成 |
+
+讨论入口：
+
+- 详细缺口清单见
+  [`desktop-ide/production-gap-review.zh-CN.md`](./desktop-ide/production-gap-review.zh-CN.md)。
+- 完全产品化实施路线见
+  [`desktop-ide/offline-first-productization-implementation.zh-CN.md`](./desktop-ide/offline-first-productization-implementation.zh-CN.md)。
