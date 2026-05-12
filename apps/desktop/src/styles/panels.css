@@ -623,7 +623,8 @@
   color: var(--danger);
 }
 
-.desktop-local-snapshot-status {
+.desktop-local-snapshot-status,
+.desktop-local-sync-status {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
@@ -633,23 +634,58 @@
   background: #fbfcfe;
 }
 
-.desktop-local-snapshot-status[data-state="pending"] {
+.desktop-local-snapshot-status[data-state="pending"],
+.desktop-local-sync-status[data-state="pending"] {
   border-color: color-mix(in srgb, var(--primary) 24%, var(--border));
   background: #f7fbff;
 }
 
-.desktop-local-snapshot-status[data-state="success"] {
+.desktop-local-snapshot-status[data-state="success"],
+.desktop-local-sync-status[data-state="success"] {
   border-color: color-mix(in srgb, var(--success) 24%, var(--border));
   background: #f6fff8;
 }
 
-.desktop-local-snapshot-status[data-state="failure"] {
+.desktop-local-snapshot-status[data-state="failure"],
+.desktop-local-sync-status[data-state="failure"] {
   border-color: color-mix(in srgb, var(--danger) 24%, var(--border));
   background: #fff7ed;
 }
 
-.desktop-local-snapshot-status[data-state="failure"] .desktop-persist-status-row p {
+.desktop-local-snapshot-status[data-state="failure"] .desktop-persist-status-row p,
+.desktop-local-sync-status[data-state="failure"] .desktop-persist-status-row p {
   color: var(--danger);
+}
+
+.desktop-local-sync-errors {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.desktop-local-sync-errors li {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr);
+  gap: 0.45rem;
+  align-items: start;
+  color: var(--danger);
+  font-size: 0.68rem;
+}
+
+.desktop-local-sync-errors code,
+.desktop-local-sync-errors span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-local-sync-errors code {
+  color: var(--foreground);
+  font-family: var(--font-mono);
 }
 
 .desktop-local-store-fields {
