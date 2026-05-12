@@ -395,3 +395,27 @@ truth.
 - Validation includes Rust tests/checks, desktop typecheck/build, focused
   TypeScript/script tests, root `pnpm typecheck`, root `pnpm test`,
   `tauri:build`, and `git diff --check`.
+
+## Ninth-Wave Execution Record
+
+- `desktop-ide-local-store-runtime` merged through
+  `024a746 feat(desktop)：合入离线本地快照运行时`.
+  - Runtime commands now cover local store status, save snapshot, list outbox,
+    mark synced, and clear failed entries.
+  - The runtime writes bounded JSON files under app data with atomic temp-file
+    replacement and no database dependency.
+  - Integrated validation: `cargo test` passed 39 tests and `cargo check`
+    passed.
+
+- `desktop-ide-local-store-contract-builder` merged through
+  `02b7733 feat(desktop)：合入本地快照契约构建器`.
+  - TypeScript command contracts now match the Rust local-store command names
+    and reuse `PersistRuntimeGraphRagPayload`.
+  - `buildLocalRuntimeSnapshotInput` generates deterministic `localId` and
+    `idempotencyKey` values with a browser-compatible stable hash.
+  - Integrated validation: desktop typecheck passed, focused Vitest passed 6
+    tests, eslint passed, and `git diff --check` passed.
+
+- Remaining ninth-wave work is split into `desktop-ide-offline-ui` and
+  `desktop-ide-offline-smoke-docs` worktrees so UI changes do not conflict
+  with script/docs verification work.
