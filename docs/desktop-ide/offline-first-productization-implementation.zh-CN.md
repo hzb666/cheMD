@@ -403,6 +403,23 @@ DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outb
     desktop build、`git diff --check` 通过。
   - Focused ESLint 仍有 `LocalStorePanel` 复杂度与函数长度两项错误；按用户要求暂不
     阻塞产品化主线，归入最终 M11 UI 组件化与复杂度治理。
+- Release readiness：
+  - `feat(desktop)：合并发布就绪聚合脚本` 新增 `pnpm desktop:release-readiness`。
+  - 聚合 desktop runtime preconditions、offline release preflight 和 diagnostics
+    bundle builder，输出 console/JSON 摘要。
+  - clean-machine installer smoke 与真实网络检查固定记录为 `skip/not-run`，不伪装为
+    通过。
+  - 主分支验证：release-readiness 定向测试 6/6、`pnpm run test:scripts` 72/72、
+    scripts ESLint、`pnpm desktop:release-readiness --json`、`git diff --check` 通过。
+- Tauri diagnostics export：
+  - `feat(desktop)：合并 Tauri 诊断包导出命令` 新增 `export_diagnostics_bundle`
+    命令契约。
+  - 命令写入离线、脱敏 JSON 到系统临时目录，返回输出路径与摘要；不启动 GUI 外部
+    流程、不联网、不读取 `.env`、不要求 sidecar/PostgreSQL。
+  - `fix(desktop)：同步诊断包命令清单` 将 `export_diagnostics_bundle` 同步进 Node
+    diagnostics bundle command list。
+  - 主分支验证：Rust diagnostics bundle 测试 3/3、desktop typecheck、contract/scripts
+    ESLint、diagnostics bundle 测试 7/7、`pnpm desktop:diagnostics-bundle` 通过。
 
 当前暂缓债务：
 
@@ -558,6 +575,7 @@ pnpm typecheck
 pnpm test
 pnpm --filter @chemd/desktop tauri:build
 pnpm desktop:diagnostics-bundle
+pnpm desktop:release-readiness --json
 ```
 
 `desktop:diagnostics-bundle` 是支持闭环的离线诊断入口：它生成脱敏 JSON

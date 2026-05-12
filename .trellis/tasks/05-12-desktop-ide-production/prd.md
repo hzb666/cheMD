@@ -962,6 +962,32 @@ proof surface without changing the local-document source of truth.
     per user direction this is recorded as M11 UI componentization/complexity
     debt and no longer blocks current productization flow.
 
+- `desktop-ide-release-readiness` merged through
+  `feat(desktop)：合并发布就绪聚合脚本`.
+  - Added `pnpm desktop:release-readiness` with console, `--json`, and
+    `--output` modes.
+  - The report aggregates runtime preconditions, offline release preflight, and
+    diagnostics bundle builder results.
+  - Clean-machine installer smoke and real network checks are explicitly
+    `skip/not-run`, so offline readiness cannot be mistaken for full production
+    acceptance.
+  - Main branch validation passed: release-readiness tests 6/6,
+    `pnpm run test:scripts` 72/72, scripts ESLint,
+    `pnpm desktop:release-readiness --json`, and `git diff --check`.
+
+- `desktop-ide-tauri-diagnostics-export` merged through
+  `feat(desktop)：合并 Tauri 诊断包导出命令`.
+  - Added the Tauri command contract `export_diagnostics_bundle`.
+  - The command writes a redacted offline JSON bundle to a temp directory and
+    returns the output path plus summary counts.
+  - It does not start GUI helpers, open network connections, read `.env`, or
+    require sidecar/PostgreSQL runtime availability.
+  - Follow-up `fix(desktop)：同步诊断包命令清单` keeps the Node diagnostics
+    bundle command list aligned with the Rust command list.
+  - Main branch validation passed: Rust diagnostics bundle tests 3/3,
+    desktop typecheck, contract/scripts ESLint, diagnostics bundle tests 7/7,
+    `pnpm desktop:diagnostics-bundle`, and `git diff --check`.
+
 ## User Offline-First Docs Branch Record
 
 - Branch/worktree:
