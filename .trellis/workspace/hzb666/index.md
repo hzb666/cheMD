@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 53
+- **Total Sessions**: 54
 - **Last Active**: 2026-05-13
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~649 | Active |
+| `journal-2.md` | ~686 | Active |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 54 | 2026-05-13 | Desktop IDE release support hardening | `3ebfdee`, `04c1730`, `d637534`, `41b6aa6` | `desktop-ide` |
 | 53 | 2026-05-13 | Desktop IDE workspace ingest UI merge | `49b1558`, `db72a45`, `771e0f9` | `desktop-ide` |
 | 52 | 2026-05-13 | Desktop IDE offline support docs and diagnostics context | `7c7d2e0`, `8a3a99f`, `475da69`, `04f8202`, `8f77831` | `desktop-ide` |
 | 51 | 2026-05-13 | Desktop IDE fourth wave diagnostics hardening | `8a4cd28`, `137a936`, `2921c3c`, `c3f84fb`, `c1cf09b` | `desktop-ide` |

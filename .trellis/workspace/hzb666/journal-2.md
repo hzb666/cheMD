@@ -647,3 +647,40 @@ Merged workspace ingest UI into the desktop Local Store panel. Main validation p
 ### Next Steps
 
 - None - task complete
+
+
+## Session 54: Desktop IDE release support hardening
+
+**Date**: 2026-05-13
+**Task**: Desktop IDE release support hardening
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Merged offline release readiness aggregation and the Tauri export_diagnostics_bundle command. Main validation covered release-readiness tests 6/6, script tests 72/72, Rust diagnostics bundle tests 3/3, desktop typecheck, eslint checks, diagnostics bundle generation, release readiness JSON, and diff check. Clean-machine installer and real network checks remain explicit skip/not-run.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3ebfdee` | (see git log) |
+| `04c1730` | (see git log) |
+| `d637534` | (see git log) |
+| `41b6aa6` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
