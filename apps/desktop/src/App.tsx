@@ -1,16 +1,18 @@
 import { invoke } from "@tauri-apps/api/core";
-import { Activity, AlertTriangle, Bot, CheckCircle2, ChevronRight, CircleDot, Database, FileCode2, Files, FlaskConical, GitGraph, Lightbulb, PanelBottom, PlayCircle, RefreshCw, ScrollText, Search, Settings, ShieldCheck, Sparkles, Square, UploadCloud, Wrench, XCircle } from "lucide-react";
+import { Activity, AlertTriangle, Bot, CheckCircle2, ChevronRight, CircleDot, Database, FileCode2, Files, FlaskConical, GitGraph, HardDrive, Lightbulb, PanelBottom, PlayCircle, RefreshCw, ScrollText, Search, Settings, ShieldCheck, Sparkles, Square, UploadCloud, Wrench, XCircle } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
 import { appendToolCall, applyPatchDecision, approvePatchDecision, attachEvidence, createAgentRun, createToolResult, getAuditTimeline, proposePatch, rejectPatchDecision, transitionAgentRunStatus, type AgentAuditEvent, type AgentEvidence, type AgentRun, type AgentToolCall, type PatchDecision, type PatchProposal } from "@chemd/agent-tools";
 import { buildEditorGraphRagRecords, compileChemdForEditor, type ChemdEditorDiagnostic, type ChemdLanguageCompileOutput, type ChemdOutlineItem, type ChemdQuickFixProposal, type ChemdTextEdit } from "@chemd/language-service";
 
-import { shellFiles, shellPostgresStatus, shellSidecarStatus, shellWorkspace, type DesktopCommandError, type DesktopCommandMap, type ManagedPostgresStatus, type PostgresStatus, type RuntimeState, type SidecarStatus, type WorkspaceFileEntry, type WorkspaceHandle } from "./desktop-contracts";
+import { shellFiles, shellPostgresStatus, shellSidecarStatus, shellWorkspace, type DesktopCommandError, type DesktopCommandMap, type LocalStoreStatus, type ManagedPostgresStatus, type PostgresStatus, type RuntimeState, type SidecarStatus, type WorkspaceFileEntry, type WorkspaceHandle } from "./desktop-contracts";
+import { buildLocalRuntimeSnapshotInput } from "./desktop-local-store";
 import { buildPersistRuntimeGraphRagCommandInput } from "./desktop-runtime-persistence";
 
 type WorkspaceState = "empty" | "opening" | "open" | "error"; type DocumentMode = "sample" | "workspace";
 type SidecarOperation = "start" | "stop" | "refresh" | "logs";
 type ManagedPostgresOperation = "init" | "start" | "stop" | "migrate" | "refresh";
+type LocalStoreOperation = "refresh" | "save";
 type AgentMessageTone = "info" | "warning" | "success" | "danger";
 type AgentMessage = { tone: AgentMessageTone; text: string };
 type QuickFixCandidate = { diagnostic: ChemdEditorDiagnostic; quickFix: ChemdQuickFixProposal };
@@ -36,6 +38,29 @@ type PersistControllerInput = PersistBuildInput & {
   mode: DocumentMode;
   postgresStatus: PostgresStatus;
 };
+type LocalStoreControllerInput = PersistBuildInput & {
+  mode: DocumentMode;
+};
+type AgentPatchControllerInput = {
+  agentRun: AgentRun | null;
+  setAgentRun: (run: AgentRun | null) => void;
+  setAgentMessage: (message: AgentMessage | null) => void;
+  mode: DocumentMode;
+  file: WorkspaceFileEntry;
+  workspace: WorkspaceHandle;
+  source: string;
+  onSourceChange: (nextSource: string) => void;
+};
+type LocalSnapshotSummary = {
+  localId: string;
+  idempotencyKey: string;
+  pendingCount: number;
+};
+type LocalSnapshotState = {
+  state: PersistOperationState;
+  message: string;
+  summary: LocalSnapshotSummary | null;
+};
 type PostgresField = [string, string];
 type DesktopWorkbenchProps = {
   workspace: WorkspaceHandle;
@@ -43,6 +68,7 @@ type DesktopWorkbenchProps = {
   sidecarController: ReturnType<typeof useSidecarController>;
   postgresController: ReturnType<typeof usePostgresController>;
   persistController: ReturnType<typeof usePersistRuntimeController>;
+  localStoreController: ReturnType<typeof useLocalStoreController>;
   output: ChemdLanguageCompileOutput;
   compileError?: string;
   files: WorkspaceFileEntry[];
@@ -61,6 +87,49 @@ type DesktopWorkbenchProps = {
   onOpenWorkspace: () => void;
   onSelectFile: (file: WorkspaceFileEntry) => void;
   onSourceChange: (nextSource: string) => void;
+  onProposeQuickFix: (candidate: QuickFixCandidate) => void;
+  onApprovePatch: () => void;
+  onApplyPatch: () => void;
+  onRejectPatch: () => void;
+};
+type InsightPaneProps = {
+  outline: ChemdOutlineItem[];
+  diagnostics: ChemdEditorDiagnostic[];
+  mode: DocumentMode;
+  sidecarStatus: SidecarStatus;
+  sidecarLogTail: string[];
+  sidecarOperation: SidecarOperation | null;
+  sidecarMessage: string | null;
+  sidecarError: string | null;
+  postgresStatus: PostgresStatus;
+  managedPostgresStatus: ManagedPostgresStatus;
+  postgresLoading: boolean;
+  managedPostgresOperation: ManagedPostgresOperation | null;
+  postgresError: string | null;
+  managedPostgresError: string | null;
+  managedPostgresMessage: string | null;
+  persistState: PersistState;
+  persistDisabledReason: string | null;
+  localStoreStatus: LocalStoreStatus;
+  localStoreOperation: LocalStoreOperation | null;
+  localSnapshotState: LocalSnapshotState;
+  localStoreDisabledReason: string | null;
+  localStoreError: string | null;
+  agentRun: AgentRun | null;
+  agentMessage: AgentMessage | null;
+  onStartSidecar: () => void;
+  onStopSidecar: () => void;
+  onRefreshSidecar: () => void;
+  onLoadSidecarLogs: () => void;
+  onRefreshPostgres: () => void;
+  onInitManagedPostgres: () => void;
+  onStartManagedPostgres: () => void;
+  onStopManagedPostgres: () => void;
+  onMigrateManagedPostgres: () => void;
+  onRefreshManagedPostgres: () => void;
+  onPersistGraph: () => void;
+  onRefreshLocalStore: () => void;
+  onSaveLocalSnapshot: () => void;
   onProposeQuickFix: (candidate: QuickFixCandidate) => void;
   onApprovePatch: () => void;
   onApplyPatch: () => void;
@@ -92,6 +161,17 @@ const initialManagedPostgresStatus: ManagedPostgresStatus = {
   pid: null,
   startedAt: null,
   migrationState: "not_initialized"
+};
+const initialLocalStoreStatus: LocalStoreStatus = {
+  state: "placeholder",
+  label: "Local Store unchecked",
+  detail: "Refresh the offline JSON outbox status before saving local snapshots.",
+  available: false,
+  storagePath: null,
+  outboxPendingCount: 0,
+  outboxFailedCount: 0,
+  lastSavedAt: null,
+  lastSyncedAt: null
 };
 const agentStatusLabel: Record<AgentRun["status"], string> = {
   created: "Created",
@@ -261,6 +341,15 @@ const getManagedPostgresFields = (status: ManagedPostgresStatus): PostgresField[
   ["Detail", status.detail]
 ];
 
+const getLocalStoreFields = (status: LocalStoreStatus): PostgresField[] => [
+  ["Available", formatPostgresValue(status.available)],
+  ["Pending", formatPostgresValue(status.outboxPendingCount)],
+  ["Failed", formatPostgresValue(status.outboxFailedCount)],
+  ["Last saved", formatLocalTimestamp(status.lastSavedAt)],
+  ["Last synced", formatLocalTimestamp(status.lastSyncedAt)],
+  ["Storage path", formatPostgresValue(status.storagePath)]
+];
+
 const getManagedPostgresControlState = (
   status: ManagedPostgresStatus,
   loading: boolean,
@@ -316,12 +405,24 @@ const initialPersistState: PersistState = {
   message: "Graph/RAG payload is ready for a configured Postgres runtime.",
   summary: null
 };
+const initialLocalSnapshotState: LocalSnapshotState = {
+  state: "idle",
+  message: "Local Store is an offline cache/outbox. It does not mean Postgres sync has succeeded.",
+  summary: null
+};
 
 const getPersistErrorMessage = (error: unknown): string => {
   const commandError = error as Partial<DesktopCommandError> | undefined;
   const message = commandError?.message ?? (error instanceof Error ? error.message : String(error));
   const firstLine = message.split(/\r?\n/, 1)[0].trim();
   return redactSensitiveRuntimeText(firstLine || "Persist graph failed");
+};
+
+const getLocalStoreErrorMessage = (error: unknown): string => {
+  const commandError = error as Partial<DesktopCommandError> | undefined;
+  const message = commandError?.message ?? (error instanceof Error ? error.message : String(error));
+  const firstLine = message.split(/\r?\n/, 1)[0].trim();
+  return redactSensitiveRuntimeText(firstLine || "Local Store command failed");
 };
 
 const summarizeGraphSnapshotId = (graphSnapshotId: string): string =>
@@ -331,6 +432,15 @@ const summarizeGraphSnapshotId = (graphSnapshotId: string): string =>
 
 const formatPersistCounts = (counts: PersistSummary["counts"]): string =>
   `${counts.snapshots} snapshot / ${counts.nodes} nodes / ${counts.edges} edges / ${counts.citations} citations / ${counts.agentRuns} agent runs / ${counts.agentToolCalls} tools / ${counts.patchProposals} patches`;
+
+const summarizeLocalId = (value: string): string =>
+  value.length <= 34 ? value : `${value.slice(0, 14)}...${value.slice(-14)}`;
+
+const formatLocalTimestamp = (value: string | null): string => {
+  if (!value) return "never";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+};
 
 const getPersistDisabledReason = ({
   mode,
@@ -350,6 +460,21 @@ const getPersistDisabledReason = ({
   if (postgresStatus.vectorInstalled !== true) return "Install pgvector before persisting Graph/RAG records.";
   if (postgresStatus.schemaReady !== true) return "Run PostgreSQL migrations before persisting Graph/RAG records.";
   if (compileStatus === "failed") return "Resolve the compile failure before persisting Graph/RAG records.";
+  return null;
+};
+
+const getLocalSnapshotDisabledReason = ({
+  mode,
+  file,
+  compileStatus
+}: {
+  mode: DocumentMode;
+  file: WorkspaceFileEntry;
+  compileStatus: ChemdLanguageCompileOutput["status"];
+}): string | null => {
+  if (mode !== "workspace") return "Open a local workspace file before saving an offline snapshot.";
+  if (file.kind !== "file") return "Select a file before saving an offline snapshot.";
+  if (compileStatus === "failed") return "Resolve the compile failure before saving an offline snapshot.";
   return null;
 };
 
@@ -725,6 +850,32 @@ const PostgresControlButton = ({
   );
 };
 
+const LocalStoreButton = ({
+  label,
+  loadingLabel,
+  icon: Icon,
+  operation,
+  activeOperation,
+  disabled,
+  onClick
+}: {
+  label: string;
+  loadingLabel: string;
+  icon: typeof PlayCircle;
+  operation: LocalStoreOperation;
+  activeOperation: LocalStoreOperation | null;
+  disabled: boolean;
+  onClick: () => void;
+}) => {
+  const loading = activeOperation === operation;
+  return (
+    <button type="button" className="desktop-button" disabled={disabled} aria-busy={loading} onClick={onClick}>
+      <Icon size={14} />
+      <span>{loading ? loadingLabel : label}</span>
+    </button>
+  );
+};
+
 const SidecarControlPanel = ({
   status,
   logTail,
@@ -942,6 +1093,86 @@ const PostgresStatusPanel = ({
           onRefresh={onRefreshManaged}
         />
       </div>
+    </section>
+  );
+};
+
+const LocalStorePanel = ({
+  status,
+  operation,
+  snapshotState,
+  disabledReason,
+  errorMessage,
+  onRefresh,
+  onSave
+}: {
+  status: LocalStoreStatus;
+  operation: LocalStoreOperation | null;
+  snapshotState: LocalSnapshotState;
+  disabledReason: string | null;
+  errorMessage: string | null;
+  onRefresh: () => void;
+  onSave: () => void;
+}) => {
+  const busy = operation !== null;
+  const saveDisabled = busy || disabledReason !== null || !status.available;
+  const unavailableMessage = status.available
+    ? null
+    : "Local Store is unavailable. Refresh status before relying on the offline outbox.";
+
+  return (
+    <section className="desktop-local-store-panel" aria-label="Offline Local Store">
+      <div className="desktop-local-store-heading">
+        <div className="desktop-agent-subhead"><HardDrive size={14} /><span>Offline Local Store</span></div>
+        <StatusBadge label={status.label} state={status.state} detail={status.detail} />
+      </div>
+      <p className="desktop-local-store-copy">
+        Local Store writes the current Graph/RAG/Agent snapshot to a local JSON cache/outbox. External or Managed Postgres remains the sync target after reconnect.
+      </p>
+      <div className="desktop-local-store-actions">
+        <LocalStoreButton
+          label="Refresh Local"
+          loadingLabel="Refreshing"
+          icon={RefreshCw}
+          operation="refresh"
+          activeOperation={operation}
+          disabled={busy}
+          onClick={onRefresh}
+        />
+        <LocalStoreButton
+          label="Save Local Snapshot"
+          loadingLabel="Saving"
+          icon={HardDrive}
+          operation="save"
+          activeOperation={operation}
+          disabled={saveDisabled}
+          onClick={onSave}
+        />
+      </div>
+      {unavailableMessage ? <p className="desktop-local-store-message" data-tone="warning">{unavailableMessage}</p> : null}
+      {disabledReason ? <p className="desktop-local-store-message" data-tone="warning">{disabledReason}</p> : null}
+      {errorMessage ? <p className="desktop-local-store-message" data-tone="danger" role="alert">{errorMessage}</p> : null}
+      <div className="desktop-local-snapshot-status" data-state={snapshotState.state} aria-live="polite">
+        <div className="desktop-persist-status-row">
+          <span>{snapshotState.state}</span>
+          <p>{snapshotState.message}</p>
+        </div>
+        {snapshotState.summary ? (
+          <dl className="desktop-persist-summary">
+            <div><dt>Local id</dt><dd title={snapshotState.summary.localId}>{summarizeLocalId(snapshotState.summary.localId)}</dd></div>
+            <div><dt>Pending</dt><dd>{snapshotState.summary.pendingCount}</dd></div>
+            <div><dt>Idempotency</dt><dd title={snapshotState.summary.idempotencyKey}>{summarizeLocalId(snapshotState.summary.idempotencyKey)}</dd></div>
+          </dl>
+        ) : null}
+      </div>
+      <dl className="desktop-local-store-fields">
+        {getLocalStoreFields(status).map(([label, value]) => (
+          <div key={label} className={label === "Storage path" ? "desktop-local-store-field-wide" : undefined}>
+            <dt>{label}</dt>
+            <dd title={value}>{value}</dd>
+          </div>
+        ))}
+      </dl>
     </section>
   );
 };
@@ -1214,6 +1445,11 @@ const InsightPane = ({
   managedPostgresMessage,
   persistState,
   persistDisabledReason,
+  localStoreStatus,
+  localStoreOperation,
+  localSnapshotState,
+  localStoreDisabledReason,
+  localStoreError,
   agentRun,
   agentMessage,
   onStartSidecar,
@@ -1227,46 +1463,13 @@ const InsightPane = ({
   onMigrateManagedPostgres,
   onRefreshManagedPostgres,
   onPersistGraph,
+  onRefreshLocalStore,
+  onSaveLocalSnapshot,
   onProposeQuickFix,
   onApprovePatch,
   onApplyPatch,
   onRejectPatch
-}: {
-  outline: ChemdOutlineItem[];
-  diagnostics: ChemdEditorDiagnostic[];
-  mode: DocumentMode;
-  sidecarStatus: SidecarStatus;
-  sidecarLogTail: string[];
-  sidecarOperation: SidecarOperation | null;
-  sidecarMessage: string | null;
-  sidecarError: string | null;
-  postgresStatus: PostgresStatus;
-  managedPostgresStatus: ManagedPostgresStatus;
-  postgresLoading: boolean;
-  managedPostgresOperation: ManagedPostgresOperation | null;
-  postgresError: string | null;
-  managedPostgresError: string | null;
-  managedPostgresMessage: string | null;
-  persistState: PersistState;
-  persistDisabledReason: string | null;
-  agentRun: AgentRun | null;
-  agentMessage: AgentMessage | null;
-  onStartSidecar: () => void;
-  onStopSidecar: () => void;
-  onRefreshSidecar: () => void;
-  onLoadSidecarLogs: () => void;
-  onRefreshPostgres: () => void;
-  onInitManagedPostgres: () => void;
-  onStartManagedPostgres: () => void;
-  onStopManagedPostgres: () => void;
-  onMigrateManagedPostgres: () => void;
-  onRefreshManagedPostgres: () => void;
-  onPersistGraph: () => void;
-  onProposeQuickFix: (candidate: QuickFixCandidate) => void;
-  onApprovePatch: () => void;
-  onApplyPatch: () => void;
-  onRejectPatch: () => void;
-}) => {
+}: InsightPaneProps) => {
   const quickFixes = getQuickFixCandidates(diagnostics);
   const activeProposal = getLatestPatchProposal(agentRun);
   const approvedDecision = findPatchDecision(agentRun, activeProposal?.patchProposalId, "approved");
@@ -1305,6 +1508,15 @@ const InsightPane = ({
         onMigrateManaged={onMigrateManagedPostgres}
         onRefreshManaged={onRefreshManagedPostgres}
         onPersistGraph={onPersistGraph}
+      />
+      <LocalStorePanel
+        status={localStoreStatus}
+        operation={localStoreOperation}
+        snapshotState={localSnapshotState}
+        disabledReason={localStoreDisabledReason}
+        errorMessage={localStoreError}
+        onRefresh={onRefreshLocalStore}
+        onSave={onSaveLocalSnapshot}
       />
       <div className="desktop-agent-panel">
         <AgentRunHeader agentRun={agentRun} agentMessage={agentMessage} />
@@ -1587,12 +1799,162 @@ const usePersistRuntimeController = ({
   };
 };
 
+const useLocalStoreController = ({
+  mode,
+  file,
+  source,
+  workspace,
+  compileOutput,
+  agentRun
+}: LocalStoreControllerInput) => {
+  const [status, setStatus] = useState<LocalStoreStatus>(initialLocalStoreStatus);
+  const [snapshotState, setSnapshotState] = useState<LocalSnapshotState>(initialLocalSnapshotState);
+  const [operation, setOperation] = useState<LocalStoreOperation | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const operationRef = useRef<LocalStoreOperation | null>(null);
+  const disabledReason = getLocalSnapshotDisabledReason({
+    mode,
+    file,
+    compileStatus: compileOutput.status
+  });
+
+  const readStatus = async (): Promise<LocalStoreStatus | null> => {
+    try {
+      const nextStatus = await invokeDesktop("read_local_store_status", undefined);
+      setStatus(nextStatus);
+      setError(null);
+      return nextStatus;
+    } catch (nextError: unknown) {
+      setStatus(initialLocalStoreStatus);
+      setError(getLocalStoreErrorMessage(nextError));
+      return null;
+    }
+  };
+
+  const refresh = async () => {
+    if (operationRef.current) return;
+    operationRef.current = "refresh";
+    setOperation("refresh");
+    try {
+      await readStatus();
+    } finally {
+      operationRef.current = null;
+      setOperation(null);
+    }
+  };
+
+  const saveSnapshot = async () => {
+    if (operationRef.current) return;
+    if (disabledReason !== null || compileOutput.status === "failed") {
+      setSnapshotState({ state: "failure", message: disabledReason ?? "Compile failed.", summary: null });
+      return;
+    }
+    operationRef.current = "save";
+    setOperation("save");
+    setSnapshotState({ state: "pending", message: "Saving Graph/RAG/Agent snapshot to the local JSON outbox.", summary: null });
+    try {
+      const persistInput = buildPersistCommandInput({ source, workspace, file, compileOutput, agentRun });
+      const localInput = buildLocalRuntimeSnapshotInput(persistInput.payload);
+      const result = await invokeDesktop("save_local_runtime_snapshot", localInput);
+      setSnapshotState({
+        state: "success",
+        message: "Saved local snapshot. It is pending Postgres sync until a target reconnects.",
+        summary: {
+          localId: result.localId,
+          idempotencyKey: result.idempotencyKey,
+          pendingCount: result.outboxPendingCount
+        }
+      });
+      await readStatus();
+    } catch (nextError: unknown) {
+      setSnapshotState({ state: "failure", message: getLocalStoreErrorMessage(nextError), summary: null });
+    } finally {
+      operationRef.current = null;
+      setOperation(null);
+    }
+  };
+
+  useEffect(() => {
+    setSnapshotState(initialLocalSnapshotState);
+  }, [mode, file.id]);
+
+  useEffect(() => {
+    void refresh();
+  }, []);
+
+  return {
+    status,
+    snapshotState,
+    operation,
+    disabledReason,
+    error,
+    reset: () => setSnapshotState(initialLocalSnapshotState),
+    refresh: () => void refresh(),
+    saveSnapshot: () => void saveSnapshot()
+  };
+};
+
+const useAgentPatchController = ({
+  agentRun,
+  setAgentRun,
+  setAgentMessage,
+  mode,
+  file,
+  workspace,
+  source,
+  onSourceChange
+}: AgentPatchControllerInput) => {
+  useEffect(() => {
+    setAgentRun(null);
+    setAgentMessage(null);
+  }, [file.id, mode, setAgentMessage, setAgentRun]);
+
+  const proposeQuickFix = (candidate: QuickFixCandidate) => {
+    if (mode !== "workspace" || file.kind !== "file") {
+      setAgentMessage({
+        tone: "warning",
+        text: "Open a local workspace file before creating an Agent patch proposal."
+      });
+      return;
+    }
+
+    const result = createAgentProposalRun(candidate, file, workspace.workspaceId);
+    setAgentRun(result.run);
+    setAgentMessage(result.message);
+  };
+
+  const approvePatch = () => {
+    const result = agentRun ? approveAgentRunPatch(agentRun) : null;
+    if (!result) return;
+    setAgentRun(result.run);
+    setAgentMessage(result.message);
+  };
+
+  const applyPatch = () => {
+    const operation = agentRun ? applyAgentRunPatch(agentRun, source) : null;
+    if (!operation) return;
+    if (operation.nextSource !== undefined) onSourceChange(operation.nextSource);
+    setAgentRun(operation.result.run);
+    setAgentMessage(operation.result.message);
+  };
+
+  const rejectPatch = () => {
+    const result = agentRun ? rejectAgentRunPatch(agentRun) : null;
+    if (!result) return;
+    setAgentRun(result.run);
+    setAgentMessage(result.message);
+  };
+
+  return { proposeQuickFix, approvePatch, applyPatch, rejectPatch };
+};
+
 const DesktopWorkbench = ({
   workspace,
   workspaceState,
   sidecarController,
   postgresController,
   persistController,
+  localStoreController,
   output,
   compileError,
   files,
@@ -1631,6 +1993,11 @@ const DesktopWorkbench = ({
           postgresStatus={postgresController.status} managedPostgresStatus={postgresController.managedStatus} postgresLoading={postgresController.loading} managedPostgresOperation={postgresController.managedOperation} postgresError={postgresController.error} managedPostgresError={postgresController.managedError} managedPostgresMessage={postgresController.managedMessage}
           persistState={persistController.state}
           persistDisabledReason={persistController.disabledReason}
+          localStoreStatus={localStoreController.status}
+          localStoreOperation={localStoreController.operation}
+          localSnapshotState={localStoreController.snapshotState}
+          localStoreDisabledReason={localStoreController.disabledReason}
+          localStoreError={localStoreController.error}
           agentRun={agentRun}
           agentMessage={agentMessage}
           onStartSidecar={sidecarController.start} onStopSidecar={sidecarController.stop} onRefreshSidecar={sidecarController.refresh} onLoadSidecarLogs={sidecarController.loadLogs}
@@ -1641,6 +2008,8 @@ const DesktopWorkbench = ({
           onMigrateManagedPostgres={postgresController.migrateManaged}
           onRefreshManagedPostgres={postgresController.refreshManaged}
           onPersistGraph={persistController.persist}
+          onRefreshLocalStore={localStoreController.refresh}
+          onSaveLocalSnapshot={localStoreController.saveSnapshot}
           onProposeQuickFix={onProposeQuickFix}
           onApprovePatch={onApprovePatch}
           onApplyPatch={onApplyPatch}
@@ -1685,11 +2054,14 @@ export const App = () => {
     compileOutput: output,
     agentRun
   });
-
-  useEffect(() => {
-    setAgentRun(null);
-    setAgentMessage(null);
-  }, [mode, selectedFileId]);
+  const localStoreController = useLocalStoreController({
+    mode,
+    file: selectedFile,
+    source,
+    workspace,
+    compileOutput: output,
+    agentRun
+  });
 
   const openWorkspace = async () => {
     setWorkspaceState("opening");
@@ -1760,56 +2132,32 @@ export const App = () => {
   const updateEditorSource = (nextSource: string) => {
     setSource(nextSource);
     persistController.reset();
+    localStoreController.reset();
   };
 
-  const startAgentProposal = (candidate: QuickFixCandidate) => {
-    if (mode !== "workspace" || selectedFile.kind !== "file") {
-      setAgentMessage({
-        tone: "warning",
-        text: "Open a local workspace file before creating an Agent patch proposal."
-      });
-      return;
-    }
-
-    const result = createAgentProposalRun(candidate, selectedFile, workspace.workspaceId);
-    setAgentRun(result.run);
-    setAgentMessage(result.message);
-  };
-
-  const approveAgentPatch = () => {
-    const result = agentRun ? approveAgentRunPatch(agentRun) : null;
-    if (!result) return;
-    setAgentRun(result.run);
-    setAgentMessage(result.message);
-  };
-
-  const applyAgentPatch = () => {
-    const operation = agentRun ? applyAgentRunPatch(agentRun, source) : null;
-    if (!operation) return;
-    if (operation.nextSource !== undefined) updateEditorSource(operation.nextSource);
-    setAgentRun(operation.result.run);
-    setAgentMessage(operation.result.message);
-  };
-
-  const rejectAgentPatch = () => {
-    const result = agentRun ? rejectAgentRunPatch(agentRun) : null;
-    if (!result) return;
-    setAgentRun(result.run);
-    setAgentMessage(result.message);
-  };
+  const agentPatchController = useAgentPatchController({
+    agentRun,
+    setAgentRun,
+    setAgentMessage,
+    mode,
+    file: selectedFile,
+    workspace,
+    source,
+    onSourceChange: updateEditorSource
+  });
 
   return (
     <DesktopWorkbench
       workspace={workspace} workspaceState={workspaceState}
-      sidecarController={sidecarController} postgresController={postgresController} persistController={persistController}
+      sidecarController={sidecarController} postgresController={postgresController} persistController={persistController} localStoreController={localStoreController}
       output={output} compileError={compileError}
       files={files} selectedFile={selectedFile} selectedFileId={selectedFileId}
       mode={mode} message={message} source={source} savedSource={savedSource}
       rootPath={rootPath} canSave={canSave} agentRun={agentRun} agentMessage={agentMessage}
       onRootPathChange={setRootPath} onSourceChange={updateEditorSource}
       onSave={() => void saveWorkspaceFile()} onOpenWorkspace={() => void openWorkspace()}
-      onSelectFile={(file) => void selectFile(file)} onProposeQuickFix={startAgentProposal}
-      onApprovePatch={approveAgentPatch} onApplyPatch={applyAgentPatch} onRejectPatch={rejectAgentPatch}
+      onSelectFile={(file) => void selectFile(file)} onProposeQuickFix={agentPatchController.proposeQuickFix}
+      onApprovePatch={agentPatchController.approvePatch} onApplyPatch={agentPatchController.applyPatch} onRejectPatch={agentPatchController.rejectPatch}
     />
   );
 };
