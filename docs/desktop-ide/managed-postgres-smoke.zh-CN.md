@@ -11,6 +11,11 @@
 PostgreSQL binaries 启动本地托管实例，然后执行现有 PostgreSQL
 smoke、共享 schema 初始化、runtime Graph/RAG/Agent 持久化与读回验证。
 
+如果外部 DB 与 managed PostgreSQL binaries 都不可用，smoke 不会把数据库
+路径伪装成成功；它会保留 `SKIP database persistence` 分类，并继续执行
+offline local-store contract smoke，验证本地 snapshot/outbox JSON 可生成。
+详细说明见 [`offline-local-store.zh-CN.md`](./offline-local-store.zh-CN.md)。
+
 ## 开发配置
 
 开发机可通过 `CHEMD_MANAGED_POSTGRES_BIN_DIR` 指向 PostgreSQL 的 `bin`
@@ -46,5 +51,7 @@ DB 时会查找对应的打包资源候选路径；Tauri runtime 侧也按 `reso
 ## SKIP 条件
 
 如果没有外部 DB env，也没有可用的 managed PostgreSQL binaries，smoke 会输出
-明确 `SKIP`。这是环境缺口，不代表 runtime persistence 通过；它只说明当前机器
-既没有外部 PostgreSQL，也没有可启动的桌面内置 PostgreSQL。
+明确 `SKIP database persistence`。这是数据库环境缺口，不代表 shared schema
+runtime persistence 通过；它只说明当前机器既没有外部 PostgreSQL，也没有可启动
+的桌面内置 PostgreSQL。随后输出的 local offline smoke 只证明本地 JSON
+snapshot/outbox contract 可执行，不能替代数据库持久化验收。

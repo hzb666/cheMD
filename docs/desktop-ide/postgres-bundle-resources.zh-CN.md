@@ -56,5 +56,8 @@ CI 不应把 staged binaries 提交回仓库。它们只属于当前构建工作
 
 没有 staged binaries 时，`tauri build` 仍可完成资源目录打包，但安装产物不会携带
 可启动的 managed PostgreSQL。此时 `pnpm desktop:runtime-smoke` 在没有外部
-`CHEMD_POSTGRES_DATABASE_URL` / `DATABASE_URL` 的机器上应报告明确 `SKIP`：
-这是环境缺口，不代表 runtime persistence 已通过。
+`CHEMD_POSTGRES_DATABASE_URL` / `DATABASE_URL` 的机器上应报告明确
+`SKIP database persistence`，并继续执行 offline local-store smoke，验证本地
+`runtime-snapshot.json` 与 `outbox.json` 可生成。这个结果只覆盖本地 JSON
+outbox contract；shared Graph/RAG schema 的数据库写入仍需要外部或 managed
+PostgreSQL runtime。

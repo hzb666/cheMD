@@ -6,6 +6,7 @@ import {
   checkDesktopRuntimePreconditions,
   discoverManagedPostgresBinaries,
   getPostgresDatabaseUrl,
+  runDesktopOfflineLocalStoreSmoke,
   runDesktopRuntimePersistenceSmoke,
   runDesktopRuntimeSmoke,
   runDesktopRuntimeSmokeCli,
@@ -129,16 +130,45 @@ test("runDesktopRuntimeSmoke skips without external env or managed binaries", as
         reason: "Set CHEMD_MANAGED_POSTGRES_BIN_DIR or bundle PostgreSQL binaries"
       };
     },
+    offlineLocalStoreSmoke: async () => {
+      calls.push("offline-local-store");
+      return {
+        status: "offline-local-passed",
+        storeRoot: "D:\\offline\\local-store",
+        snapshotPath: "D:\\offline\\local-store\\runtime-snapshot.json",
+        outboxPath: "D:\\offline\\local-store\\outbox.json",
+        localId: "local-runtime-snapshot:test",
+        idempotencyKey: "local-runtime-snapshot:fnv1a:test",
+        graphSnapshotId: "graph-offline",
+        experimentId: "exp-offline",
+        outboxPendingCount: 1
+      };
+    },
     logger
   });
 
-  assert.deepEqual(calls, ["env-loader", "desktop-check", "managed-postgres"]);
+  assert.deepEqual(calls, ["env-loader", "desktop-check", "managed-postgres", "offline-local-store"]);
   assert.deepEqual(result, {
-    status: "skipped",
-    reason: "missing-postgres-runtime",
-    detail: "Set CHEMD_MANAGED_POSTGRES_BIN_DIR or bundle PostgreSQL binaries"
+    status: "offline-local-passed",
+    database: {
+      status: "skipped",
+      reason: "missing-postgres-runtime",
+      detail: "Set CHEMD_MANAGED_POSTGRES_BIN_DIR or bundle PostgreSQL binaries"
+    },
+    offline: {
+      status: "offline-local-passed",
+      storeRoot: "D:\\offline\\local-store",
+      snapshotPath: "D:\\offline\\local-store\\runtime-snapshot.json",
+      outboxPath: "D:\\offline\\local-store\\outbox.json",
+      localId: "local-runtime-snapshot:test",
+      idempotencyKey: "local-runtime-snapshot:fnv1a:test",
+      graphSnapshotId: "graph-offline",
+      experimentId: "exp-offline",
+      outboxPendingCount: 1
+    }
   });
-  assert.match(logger.lines.join("\n"), /SKIP desktop runtime smoke/u);
+  assert.match(logger.lines.join("\n"), /SKIP database persistence/u);
+  assert.match(logger.lines.join("\n"), /Chemd desktop local offline smoke passed/u);
 });
 
 test("buildMinimalDesktopRuntimePersistencePayload mirrors Tauri command payload shape", () => {
@@ -165,6 +195,54 @@ test("buildMinimalDesktopRuntimePersistencePayload mirrors Tauri command payload
   assert.equal(payload.agentToolCalls.length, 1);
   assert.equal(payload.patchProposals.length, 1);
   assert.equal(typeof payload.metadata.sourceText, "string");
+  assert.equal(payload.metadata.workspaceId, "desktop-runtime-smoke-workspace");
+});
+
+test("runDesktopOfflineLocalStoreSmoke writes local snapshot and pending outbox", async () => {
+  const files = new Map();
+  const madeDirs = [];
+
+  const result = await runDesktopOfflineLocalStoreSmoke({
+    rootDir: "D:\\repo",
+    env: {
+      CHEMD_DESKTOP_OFFLINE_SMOKE_DIR: "offline-smoke"
+    },
+    fileExists: (filePath) => files.has(filePath),
+    readTextFile: (filePath) => files.get(filePath),
+    writeTextFile: (filePath, content) => {
+      files.set(filePath, content);
+    },
+    makeDir: (dirPath) => {
+      madeDirs.push(dirPath);
+    },
+    localStoreModules: async () => ({
+      buildLocalRuntimeSnapshotInput: (payload) => ({
+        localId: "local-runtime-snapshot:offline",
+        idempotencyKey: "local-runtime-snapshot:fnv1a:offline",
+        payload,
+        metadata: {
+          localStoreKind: "runtime_graph_rag_snapshot",
+          graphSnapshotId: payload.graphSnapshot.graphSnapshotId
+        },
+        createdAt: payload.createdAt
+      })
+    })
+  });
+
+  assert.equal(result.status, "offline-local-passed");
+  assert.equal(result.storeRoot, "D:\\repo\\offline-smoke");
+  assert.equal(result.outboxPendingCount, 1);
+  assert.equal(result.graphSnapshotId, "rev-desktop-offline-runtime-smoke::graph");
+  assert.deepEqual(madeDirs, ["D:\\repo\\offline-smoke", "D:\\repo\\offline-smoke"]);
+
+  const snapshot = JSON.parse(files.get("D:\\repo\\offline-smoke\\runtime-snapshot.json"));
+  const outbox = JSON.parse(files.get("D:\\repo\\offline-smoke\\outbox.json"));
+  assert.equal(snapshot.localId, "local-runtime-snapshot:offline");
+  assert.equal(snapshot.payload.graphSnapshot.graphSnapshotId, "rev-desktop-offline-runtime-smoke::graph");
+  assert.equal(outbox.entries.length, 1);
+  assert.equal(outbox.entries[0].syncStatus, "pending");
+  assert.equal(outbox.entries[0].failureCount, 0);
+  assert.equal(outbox.entries[0].syncedAt, null);
 });
 
 test("runDesktopRuntimeSmoke redacts env while running smoke in order", async () => {
@@ -192,6 +270,9 @@ test("runDesktopRuntimeSmoke redacts env while running smoke in order", async ()
     managedPostgres: async () => {
       managedFallbackCalled = true;
       throw new Error("external DB must take priority");
+    },
+    offlineLocalStoreSmoke: async () => {
+      throw new Error("offline local store must not run when external DB is configured");
     },
     postgresSmoke: async () => {
       calls.push("postgres-smoke");
@@ -260,6 +341,9 @@ test("runDesktopRuntimeSmoke starts managed fallback and cleans it after success
     withClient: async ({ env, operation }) => {
       calls.push(`with-client:${env.CHEMD_POSTGRES_DATABASE_URL.includes("managed-secret")}`);
       return operation({ query: async () => ({ rows: [] }) });
+    },
+    offlineLocalStoreSmoke: async () => {
+      throw new Error("offline local store must not run when managed DB starts");
     },
     postgresSmoke: async () => {
       calls.push("postgres-smoke");
