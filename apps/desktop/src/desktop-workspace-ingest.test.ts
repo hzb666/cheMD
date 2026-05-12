@@ -1,9 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import type { PersistRuntimeGraphRagPayload, WorkspaceIngestQueueItem } from "./desktop-contracts";
+import type {
+  PersistRuntimeGraphRagPayload,
+  WorkspaceFileEntry,
+  WorkspaceIngestQueueItem
+} from "./desktop-contracts";
 import {
   buildWorkspaceIngestQueueItem,
-  deriveWorkspaceIngestQueueSummary
+  deriveWorkspaceIngestQueueSummary,
+  runWorkspaceIngest
 } from "./desktop-workspace-ingest";
 
 const createdAt = "2026-05-13T09:00:00.000Z";
@@ -161,5 +166,131 @@ describe("desktop workspace ingest queue builder", () => {
     expect(summary.errors[0].errorSummary).toContain("token=[redacted]");
     expect(summary.errors[0].errorSummary).not.toContain("secret@localhost");
     expect(summary.errors[0].errorSummary.length).toBeLessThanOrEqual(80);
+  });
+});
+
+const fileEntry = (path: string, kind: WorkspaceFileEntry["kind"] = "file"): WorkspaceFileEntry => ({
+  id: path,
+  name: path.split("/").pop() ?? path,
+  path,
+  kind
+});
+
+describe("desktop workspace ingest runner", () => {
+  it("processes .chemd.md files, skips plain markdown, and excludes other entries", async () => {
+    const readPaths: string[] = [];
+    const compileSources: string[] = [];
+    const result = await runWorkspaceIngest({
+      workspaceId: "workspace-alpha",
+      files: [
+        fileEntry("experiments/a.chemd.md"),
+        fileEntry("notes/readme.md"),
+        fileEntry("assets/table.csv"),
+        fileEntry("experiments", "directory")
+      ],
+      readFile: (file) => {
+        readPaths.push(file.path);
+        return { content: `source:${file.path}`, modifiedAtMs: 1778653200000 };
+      },
+      compile: (source) => {
+        compileSources.push(source);
+        return { status: "ok", source };
+      },
+      createdAt
+    });
+
+    expect(readPaths).toEqual(["experiments/a.chemd.md"]);
+    expect(compileSources).toEqual(["source:experiments/a.chemd.md"]);
+    expect(result.items.map((item) => [item.documentPath, item.status])).toEqual([
+      ["experiments/a.chemd.md", "pending"],
+      ["notes/readme.md", "skipped"]
+    ]);
+    expect(result.items[1].metadata.skipReason).toBe("non_chemd_markdown");
+    expect(result.summary).toMatchObject({ pendingCount: 1, skippedCount: 1, totalCount: 2 });
+  });
+
+  it("keeps ingest running when one file fails and redacts bounded failure summaries", async () => {
+    const files = [fileEntry("experiments/fail.chemd.md"), fileEntry("experiments/pass.chemd.md")];
+    const firstRun = await runWorkspaceIngest({
+      workspaceId: "workspace-alpha",
+      files,
+      readFile: (file) => `source:${file.path}`,
+      compile: (source) => {
+        if (source.includes("fail")) {
+          throw new Error(
+            "DATABASE_URL=postgres://user:secret@localhost:5432/chemd token=abc failed with a very long workspace ingest compile message"
+          );
+        }
+        return { status: "ok", source };
+      },
+      createdAt
+    });
+    const secondRun = await runWorkspaceIngest({
+      workspaceId: "workspace-alpha",
+      files: [files[0]],
+      readFile: (file) => `source:${file.path}`,
+      compile: () => {
+        throw new Error("token=retry failed");
+      },
+      existingItems: firstRun.items,
+      createdAt
+    });
+    const failed = firstRun.items.find((item) => item.status === "failed");
+
+    expect(firstRun.summary).toMatchObject({ pendingCount: 1, failedCount: 1, totalCount: 2 });
+    expect(failed?.errorSummary).toContain("DATABASE_URL=[redacted]");
+    expect(failed?.errorSummary).toContain("token=[redacted]");
+    expect(failed?.errorSummary).not.toContain("secret@localhost");
+    expect(failed?.errorSummary?.length).toBeLessThanOrEqual(160);
+    expect(secondRun.items[0].failureCount).toBe(2);
+  });
+
+  it("keeps source hashes and idempotency keys stable until file content changes", async () => {
+    const file = fileEntry("experiments/stable.chemd.md");
+    const runWithSource = (source: string) => runWorkspaceIngest({
+      workspaceId: "workspace-alpha",
+      files: [file],
+      readFile: () => source,
+      compile: () => ({ status: "ok", graphSnapshot: { graphSnapshotId: "stable-snapshot" } }),
+      createdAt
+    });
+
+    const first = (await runWithSource("same source")).items[0];
+    const second = (await runWithSource("same source")).items[0];
+    const changed = (await runWithSource("changed source")).items[0];
+
+    expect(second.documentHash).toBe(first.documentHash);
+    expect(second.metadata.sourceHash).toBe(first.documentHash);
+    expect(second.revisionHash).toBe(first.revisionHash);
+    expect(second.queueId).toBe(first.queueId);
+    expect(second.idempotencyKey).toBe(first.idempotencyKey);
+    expect(changed.documentHash).not.toBe(first.documentHash);
+    expect(changed.revisionHash).not.toBe(first.revisionHash);
+    expect(changed.idempotencyKey).not.toBe(first.idempotencyKey);
+  });
+
+  it("reuses an unchanged synced item without compiling it again", async () => {
+    const file = fileEntry("experiments/synced.chemd.md");
+    const initial = await runWorkspaceIngest({
+      workspaceId: "workspace-alpha",
+      files: [file],
+      readFile: () => "synced source",
+      compile: () => ({ status: "ok" }),
+      createdAt
+    });
+    const synced: WorkspaceIngestQueueItem = { ...initial.items[0], status: "synced" };
+    const compile = vi.fn(() => ({ status: "ok" }));
+    const resumed = await runWorkspaceIngest({
+      workspaceId: "workspace-alpha",
+      files: [file],
+      readFile: () => "synced source",
+      compile,
+      existingItems: [synced],
+      createdAt
+    });
+
+    expect(compile).not.toHaveBeenCalled();
+    expect(resumed.items[0]).toEqual(synced);
+    expect(resumed.summary).toMatchObject({ syncedCount: 1, pendingCount: 0 });
   });
 });
