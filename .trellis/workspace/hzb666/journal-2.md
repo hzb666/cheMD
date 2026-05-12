@@ -723,3 +723,39 @@ Merged the map production plan, language-service completion core, and exporter-t
 ### Next Steps
 
 - None - task complete
+
+
+## Session 56: Desktop IDE workspace symbol index core
+
+**Date**: 2026-05-13
+**Task**: Desktop IDE workspace symbol index core
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Re-cut and merged workspace symbol indexing as a language-service-only helper after rejecting the earlier new-package attempt. Main validation passed language-service tests 22/22, language-service typecheck, and diff check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8dc7ffe` | (see git log) |
+| `5b3d885` | (see git log) |
+| `565a6de` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

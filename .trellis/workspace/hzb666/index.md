@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 55
+- **Total Sessions**: 56
 - **Last Active**: 2026-05-13
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~725 | Active |
+| `journal-2.md` | ~761 | Active |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 56 | 2026-05-13 | Desktop IDE workspace symbol index core | `8dc7ffe`, `5b3d885`, `565a6de` | `desktop-ide` |
 | 55 | 2026-05-13 | Desktop IDE map first wave core packages | `8131982`, `a5bfa29`, `39f199a`, `4505d50`, `661445f`, `6e0f39a` | `desktop-ide` |
 | 54 | 2026-05-13 | Desktop IDE release support hardening | `3ebfdee`, `04c1730`, `d637534`, `41b6aa6` | `desktop-ide` |
 | 53 | 2026-05-13 | Desktop IDE workspace ingest UI merge | `49b1558`, `db72a45`, `771e0f9` | `desktop-ide` |
