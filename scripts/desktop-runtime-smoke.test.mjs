@@ -7,6 +7,7 @@ import {
   discoverManagedPostgresBinaries,
   getPostgresDatabaseUrl,
   runDesktopOfflineLocalStoreSmoke,
+  runDesktopReconnectOutboxSyncSmoke,
   runDesktopRuntimePersistenceSmoke,
   runDesktopRuntimeSmoke,
   runDesktopRuntimeSmokeCli,
@@ -245,6 +246,98 @@ test("runDesktopOfflineLocalStoreSmoke writes local snapshot and pending outbox"
   assert.equal(outbox.entries[0].syncedAt, null);
 });
 
+test("runDesktopReconnectOutboxSyncSmoke syncs local outbox payload to shared schema", async () => {
+  const files = new Map();
+  const calls = [];
+
+  const result = await runDesktopReconnectOutboxSyncSmoke({
+    client: { query: async () => ({ rows: [] }) },
+    rootDir: "D:\\repo",
+    env: { CHEMD_DESKTOP_OFFLINE_SMOKE_DIR: "offline-smoke" },
+    fileExists: (filePath) => files.has(filePath),
+    readTextFile: (filePath) => files.get(filePath),
+    writeTextFile: (filePath, content) => {
+      files.set(filePath, content);
+    },
+    makeDir: () => {},
+    now: () => "2026-05-12T00:00:01.000Z",
+    localStoreModules: async () => ({
+      buildLocalRuntimeSnapshotInput: (payload) => ({
+        localId: "local-runtime-snapshot:reconnect",
+        idempotencyKey: "local-runtime-snapshot:fnv1a:reconnect",
+        payload,
+        metadata: {
+          localStoreKind: "runtime_graph_rag_snapshot",
+          graphSnapshotId: payload.graphSnapshot.graphSnapshotId
+        },
+        createdAt: payload.createdAt
+      })
+    }),
+    persistenceSmoke: async ({ payloadBuilder }) => {
+      const payload = payloadBuilder();
+      calls.push(payload.graphSnapshot.graphSnapshotId);
+      return {
+        experimentId: payload.graphSnapshot.experimentId,
+        revisionId: payload.graphSnapshot.sourceRevisionIds[0],
+        graphSnapshotId: payload.graphSnapshot.graphSnapshotId,
+        counts: { graphSnapshots: 1, graphNodes: 2, graphEdges: 1 }
+      };
+    }
+  });
+
+  assert.equal(result.status, "script-level-reconnect-sync-passed");
+  assert.equal(result.sync.syncedCount, 1);
+  assert.equal(result.sync.outboxPendingCount, 0);
+  assert.equal(result.sync.syncedAt, "2026-05-12T00:00:01.000Z");
+  assert.deepEqual(calls, ["rev-desktop-reconnect-runtime-smoke::graph"]);
+
+  const outbox = JSON.parse(files.get("D:\\repo\\offline-smoke\\outbox.json"));
+  assert.equal(outbox.entries[0].syncStatus, "synced");
+  assert.equal(outbox.entries[0].failureCount, 0);
+  assert.equal(outbox.entries[0].lastError, null);
+  assert.equal(outbox.entries[0].payload.graphSnapshot.graphSnapshotId, "rev-desktop-reconnect-runtime-smoke::graph");
+});
+
+test("runDesktopReconnectOutboxSyncSmoke keeps payload and marks failure", async () => {
+  const files = new Map();
+
+  await assert.rejects(
+    () =>
+      runDesktopReconnectOutboxSyncSmoke({
+        client: { query: async () => ({ rows: [] }) },
+        rootDir: "D:\\repo",
+        env: { CHEMD_DESKTOP_OFFLINE_SMOKE_DIR: "offline-smoke" },
+        fileExists: (filePath) => files.has(filePath),
+        readTextFile: (filePath) => files.get(filePath),
+        writeTextFile: (filePath, content) => {
+          files.set(filePath, content);
+        },
+        makeDir: () => {},
+        now: () => "2026-05-12T00:00:02.000Z",
+        localStoreModules: async () => ({
+          buildLocalRuntimeSnapshotInput: (payload) => ({
+            localId: "local-runtime-snapshot:failed",
+            idempotencyKey: "local-runtime-snapshot:fnv1a:failed",
+            payload,
+            metadata: { localStoreKind: "runtime_graph_rag_snapshot" },
+            createdAt: payload.createdAt
+          })
+        }),
+        persistenceSmoke: async () => {
+          throw new Error("database unavailable");
+        }
+      }),
+    /database unavailable/u
+  );
+
+  const outbox = JSON.parse(files.get("D:\\repo\\offline-smoke\\outbox.json"));
+  assert.equal(outbox.entries[0].syncStatus, "failed");
+  assert.equal(outbox.entries[0].failureCount, 1);
+  assert.equal(outbox.entries[0].lastError, "database unavailable");
+  assert.equal(outbox.entries[0].syncedAt, null);
+  assert.equal(outbox.entries[0].payload.graphSnapshot.graphSnapshotId, "rev-desktop-reconnect-runtime-smoke::graph");
+});
+
 test("runDesktopRuntimeSmoke redacts env while running smoke in order", async () => {
   const calls = [];
   const logger = createLogger();
@@ -284,6 +377,24 @@ test("runDesktopRuntimeSmoke redacts env while running smoke in order", async ()
         firstChunkId: "chunk-1"
       };
     },
+    reconnectSyncSmoke: async ({ persistenceSmoke }) => {
+      calls.push("reconnect-sync-smoke");
+      const persistence = await persistenceSmoke({
+        client: { query: async () => ({ rows: [] }) }
+      });
+      return {
+        status: "script-level-reconnect-sync-passed",
+        sync: {
+          syncedCount: 1,
+          failedCount: 0,
+          skippedCount: 0,
+          outboxPendingCount: 0,
+          outboxFailedCount: 0,
+          syncedAt: "2026-05-12T00:00:00.000Z"
+        },
+        persistence
+      };
+    },
     persistenceSmoke: async () => {
       calls.push("persistence-smoke");
       return {
@@ -302,14 +413,19 @@ test("runDesktopRuntimeSmoke redacts env while running smoke in order", async ()
     "desktop-check",
     "with-client",
     "postgres-smoke",
+    "reconnect-sync-smoke",
     "persistence-smoke"
   ]);
   assert.equal(result.status, "passed");
+  assert.equal(result.result.reconnectSync.status, "script-level-reconnect-sync-passed");
+  assert.equal(result.result.reconnectSync.sync.syncedCount, 1);
   const output = logger.lines.join("\n");
   assert.doesNotMatch(output, /super-secret/u);
   assert.doesNotMatch(output, /postgres:\/\/chemd/u);
   assert.match(output, /host=localhost/u);
   assert.match(output, /runtime graph: graph-runtime/u);
+  assert.match(output, /reconnect outbox sync: synced=1, pending=0, failed=0/u);
+  assert.match(output, /Tauri command runtime proof is not covered/u);
 });
 
 test("runDesktopRuntimeSmoke starts managed fallback and cleans it after success", async () => {
@@ -355,6 +471,22 @@ test("runDesktopRuntimeSmoke starts managed fallback and cleans it after success
         firstChunkId: "chunk-1"
       };
     },
+    reconnectSyncSmoke: async ({ persistenceSmoke }) => {
+      calls.push("reconnect-sync-smoke");
+      const persistence = await persistenceSmoke({
+        client: { query: async () => ({ rows: [] }) }
+      });
+      return {
+        sync: {
+          syncedCount: 1,
+          failedCount: 0,
+          skippedCount: 0,
+          outboxPendingCount: 0,
+          outboxFailedCount: 0
+        },
+        persistence
+      };
+    },
     persistenceSmoke: async () => {
       calls.push("persistence-smoke");
       return {
@@ -374,6 +506,7 @@ test("runDesktopRuntimeSmoke starts managed fallback and cleans it after success
     "managed-postgres",
     "with-client:true",
     "postgres-smoke",
+    "reconnect-sync-smoke",
     "persistence-smoke",
     "managed-cleanup"
   ]);

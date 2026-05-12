@@ -10,6 +10,9 @@
 当这两个变量都不存在时，smoke 会尝试使用桌面 IDE 自带的
 PostgreSQL binaries 启动本地托管实例，然后执行现有 PostgreSQL
 smoke、共享 schema 初始化、runtime Graph/RAG/Agent 持久化与读回验证。
+数据库可用路径还会执行 script-level reconnect sync smoke：先生成本地
+pending outbox snapshot，再将同一 payload 写入 shared PostgreSQL schema，
+最后把本地 entry 标记为已同步。
 
 如果外部 DB 与 managed PostgreSQL binaries 都不可用，smoke 不会把数据库
 路径伪装成成功；它会保留 `SKIP database persistence` 分类，并继续执行
@@ -55,3 +58,17 @@ DB 时会查找对应的打包资源候选路径；Tauri runtime 侧也按 `reso
 runtime persistence 通过；它只说明当前机器既没有外部 PostgreSQL，也没有可启动
 的桌面内置 PostgreSQL。随后输出的 local offline smoke 只证明本地 JSON
 snapshot/outbox contract 可执行，不能替代数据库持久化验收。
+
+## Reconnect sync 输出
+
+DB 可用时，`pnpm desktop:runtime-smoke` 的关键输出包括：
+
+- `runtime graph: ...`
+- `runtime verification: ...`
+- `reconnect outbox sync: synced=1, pending=0, failed=0`
+- `reconnect proof: script-level local outbox -> shared PostgreSQL smoke; Tauri command runtime proof is not covered.`
+
+这里的 reconnect proof 只覆盖脚本级 contract：local offline snapshot/outbox
+payload 能写入 shared PostgreSQL schema，并能把本地 entry 标为 `synced`。
+它不等同于 Tauri `sync_local_outbox_to_postgres` command 在真实桌面 runtime
+中的端到端证明。
