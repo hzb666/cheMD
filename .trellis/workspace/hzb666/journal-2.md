@@ -129,3 +129,71 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 44: Desktop IDE 第十轮 outbox 重连同步
+
+**Date**: 2026-05-12
+**Task**: Desktop IDE 第十轮 outbox 重连同步
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+(Add summary)
+
+### Main Changes
+
+| Area | Result |
+|------|--------|
+| Runtime sync | Added and merged `sync_local_outbox_to_postgres`, reusing the shared `persist_runtime_graph_rag` PostgreSQL path for pending local outbox entries. Successful entries are marked `synced`; failed entries keep their payload, increment failure count, and store a bounded error. |
+| Contract | Added typed local outbox sync result/target/entry contracts and the `localStoreCommandNames.syncOutbox` command name. |
+| Desktop UI | Added `Sync Pending` to the Offline Local Store panel with readiness gates for Postgres config/status, pgvector, schema, and pending outbox count. The panel now reports synced/failed/skipped counts and target metadata without claiming DB success when unavailable. |
+| Smoke/docs | Extended runtime smoke with script-level local outbox -> shared PostgreSQL sync coverage and documented that this is not the same as Tauri command runtime proof. Updated the production plan with merge and validation evidence. |
+| Verification | Ran Rust tests/check, desktop typecheck/build/eslint, focused Vitest, script tests, runtime smoke, root typecheck, root test, Tauri build, and `git diff --check`. |
+
+**Validation evidence**:
+- `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml` passed 43 Rust tests.
+- `cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml` passed.
+- `pnpm --filter @chemd/desktop typecheck` passed.
+- `pnpm exec vitest run apps/desktop/src/desktop-local-store.test.ts --config packages/compiler/vitest.config.ts --pool=threads` passed 7 tests.
+- `pnpm --filter @chemd/desktop exec eslint src/App.tsx src/desktop-contracts.ts src/desktop-local-store.ts src/desktop-local-store.test.ts src/styles/base.css src/styles/panels.css` passed with only existing CSS ignored warnings.
+- `pnpm --filter @chemd/desktop build` passed with existing lucide/use-client and chunk-size warnings.
+- `pnpm test:scripts` passed 39 script tests.
+- `pnpm desktop:runtime-smoke` passed local offline snapshot/outbox verification; database persistence was explicitly skipped because this machine lacks `initdb`, `psql`, `postgres`, or `pg_ctl` and has no external DB env.
+- `pnpm typecheck` passed all 21 workspaces.
+- `pnpm test` passed Turbo tests, 39 script tests, and 52 Python tests.
+- `pnpm --filter @chemd/desktop tauri:build` produced release exe, MSI, and NSIS bundles.
+- `git diff --check` passed.
+
+**Remaining production gap**:
+- Real Tauri command-level reconnect proof against a live PostgreSQL runtime is still environment-blocked on this machine. The next slice should supply a distributable/managed PostgreSQL runtime or a controlled external PostgreSQL profile, then run a desktop runtime proof for `sync_local_outbox_to_postgres`.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1e2327a` | (see git log) |
+| `c395003` | (see git log) |
+| `9bdddf7` | (see git log) |
+| `a923a67` | (see git log) |
+| `6c9d684` | (see git log) |
+| `66a918e` | (see git log) |
+| `e1741a1` | (see git log) |
+| `3812138` | (see git log) |
+| `d6cf24e` | (see git log) |
+| `3059a57` | (see git log) |
+| `c3e0045` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
