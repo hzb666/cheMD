@@ -9,7 +9,8 @@ export const localStoreCommandNames = {
   saveSnapshot: "save_local_runtime_snapshot",
   listOutbox: "list_local_outbox",
   markSynced: "mark_local_outbox_synced",
-  clearFailures: "clear_local_outbox_failures"
+  clearFailures: "clear_local_outbox_failures",
+  syncOutbox: "sync_local_outbox_to_postgres"
 } as const;
 
 const HASH_PREFIX = "fnv1a";
