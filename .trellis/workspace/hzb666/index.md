@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 49
+- **Total Sessions**: 50
 - **Last Active**: 2026-05-13
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~496 | Active |
+| `journal-2.md` | ~537 | Active |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 50 | 2026-05-13 | Desktop IDE offline-first third wave | `05d2f72`, `21c0999`, `b6a5a80`, `fabddb9`, `9369aef`, `d2198f0`, `0973d1e`, `2e2fdf6` | `desktop-ide` |
 | 49 | 2026-05-13 | Desktop IDE offline-first second wave | `326b124`, `bf56ea7`, `8ddd7fa`, `ac8c792`, `e237e9b`, `3cbefc8`, `5af8541` | `desktop-ide` |
 | 48 | 2026-05-13 | Desktop IDE sidebar tabs and dock preview | `cc6da87`, `13d1ccf` | `desktop-ide` |
 | 47 | 2026-05-13 | Desktop IDE dock panels and rail routing | `02207f2`, `076859f` | `desktop-ide` |

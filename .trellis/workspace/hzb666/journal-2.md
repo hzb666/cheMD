@@ -494,3 +494,44 @@ Merged workspace conflict UI, workspace ingest queue contract, release Offline C
 ### Next Steps
 
 - None - task complete
+
+
+## Session 50: Desktop IDE offline-first third wave
+
+**Date**: 2026-05-13
+**Task**: Desktop IDE offline-first third wave
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Merged Monaco desktop editor, workspace ingest runner, installer artifact smoke, final visual/componentization plan additions, regenerated Tauri release artifacts, and verified focused tests, script tests, desktop build, offline smokes, root typecheck/test, and tauri build.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `05d2f72` | (see git log) |
+| `21c0999` | (see git log) |
+| `b6a5a80` | (see git log) |
+| `fabddb9` | (see git log) |
+| `9369aef` | (see git log) |
+| `d2198f0` | (see git log) |
+| `0973d1e` | (see git log) |
+| `2e2fdf6` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
