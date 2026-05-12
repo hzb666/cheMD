@@ -48,8 +48,11 @@ DB 时会查找对应的打包资源候选路径；Tauri runtime 侧也按 `reso
 `CHEMD_POSTGRES_DIST_DIR=<postgres-dist> pnpm desktop:postgres:bundle` 将本机
 或 CI 提供的 PostgreSQL 分发包 staged 到
 `apps/desktop/src-tauri/resources/postgres/bin`，再运行
-`pnpm desktop:postgres:verify`。详细流程见
-[`postgres-bundle-resources.zh-CN.md`](./postgres-bundle-resources.zh-CN.md)。
+`pnpm desktop:postgres:verify`。生产 installer 应追加 `--require-full`，确保
+manifest 证明来源是完整分发根目录而不是本地开发 bin-only。详细流程见
+[`postgres-bundle-resources.zh-CN.md`](./postgres-bundle-resources.zh-CN.md)，
+三类 runtime 路径见
+[`postgres-runtime-distribution.zh-CN.md`](./postgres-runtime-distribution.zh-CN.md)。
 
 ## SKIP 条件
 
@@ -57,7 +60,8 @@ DB 时会查找对应的打包资源候选路径；Tauri runtime 侧也按 `reso
 明确 `SKIP database persistence`。这是数据库环境缺口，不代表 shared schema
 runtime persistence 通过；它只说明当前机器既没有外部 PostgreSQL，也没有可启动
 的桌面内置 PostgreSQL。随后输出的 local offline smoke 只证明本地 JSON
-snapshot/outbox contract 可执行，不能替代数据库持久化验收。
+snapshot/outbox contract 可执行。local outbox 是缓存/队列，不是知识主库，不能
+替代 shared PostgreSQL 持久化验收。
 
 ## Reconnect sync 输出
 
