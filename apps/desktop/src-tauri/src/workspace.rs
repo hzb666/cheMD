@@ -50,6 +50,8 @@ pub struct WorkspaceFileContent {
     pub(crate) path: String,
     pub(crate) content: String,
     pub(crate) bytes: usize,
+    pub(crate) content_hash: String,
+    pub(crate) modified_at_ms: Option<u64>,
     pub(crate) chemd_kind: Option<String>,
 }
 
@@ -58,6 +60,8 @@ pub struct WorkspaceFileContent {
 pub struct WorkspaceWriteResult {
     pub(crate) path: String,
     pub(crate) bytes: usize,
+    pub(crate) content_hash: String,
+    pub(crate) modified_at_ms: Option<u64>,
     pub(crate) chemd_kind: Option<String>,
 }
 
@@ -103,10 +107,11 @@ pub fn write_workspace_file(
     root_path: Option<String>,
     path: String,
     content: String,
+    base_hash: Option<String>,
     registry: tauri::State<'_, WorkspaceRegistry>,
 ) -> Result<WorkspaceWriteResult, DesktopCommandError> {
     let (_, root) = resolve_workspace(workspace_id, root_path, &registry)?;
-    write_workspace_file_impl(&root, &path, &content)
+    write_workspace_file_impl(&root, &path, &content, base_hash.as_deref())
 }
 
 impl WorkspaceRegistry {
