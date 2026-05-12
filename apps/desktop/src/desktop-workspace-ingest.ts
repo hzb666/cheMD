@@ -37,11 +37,19 @@ export interface DeriveWorkspaceIngestQueueSummaryOptions {
 type MaybePromise<T> = T | Promise<T>;
 type WorkspaceIngestFileContent = string | Pick<WorkspaceFileContent, "content" | "modifiedAtMs">;
 
-export interface RunWorkspaceIngestInput { workspaceId: string; files: readonly WorkspaceFileEntry[];
+export interface RunWorkspaceIngestInput {
+  workspaceId: string;
+  files: readonly WorkspaceFileEntry[];
   readFile: (file: WorkspaceFileEntry) => MaybePromise<WorkspaceIngestFileContent>;
   compile: (source: string) => MaybePromise<unknown>;
-  existingItems?: readonly WorkspaceIngestQueueItem[]; createdAt?: string; }
-export interface RunWorkspaceIngestResult { items: WorkspaceIngestQueueItem[]; summary: WorkspaceIngestQueueSummary; }
+  existingItems?: readonly WorkspaceIngestQueueItem[];
+  createdAt?: string;
+}
+
+export interface RunWorkspaceIngestResult {
+  items: WorkspaceIngestQueueItem[];
+  summary: WorkspaceIngestQueueSummary;
+}
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -220,11 +228,21 @@ export const deriveWorkspaceIngestQueueSummary = (
 };
 
 const buildDocumentMetadata = (
-  workspaceId: string, file: WorkspaceFileEntry, source: string, modifiedAtMs?: number | null
+  workspaceId: string,
+  file: WorkspaceFileEntry,
+  source: string,
+  modifiedAtMs?: number | null
 ): WorkspaceIngestDocumentMetadata => {
   const documentHash = stableHash({ kind: "workspace-source", source });
   const revisionHash = stableHash({ workspaceId, documentPath: file.path, documentHash });
-  return { workspaceId, documentId: file.id, documentPath: file.path, documentHash, revisionHash, modifiedAtMs };
+  return {
+    workspaceId,
+    documentId: file.id,
+    documentPath: file.path,
+    documentHash,
+    revisionHash,
+    modifiedAtMs
+  };
 };
 
 const findExistingItem = (
@@ -236,11 +254,20 @@ const findExistingItem = (
     && item.documentHash === document.documentHash
   );
 
-const buildSkippedMarkdownItem = (input: RunWorkspaceIngestInput, file: WorkspaceFileEntry): WorkspaceIngestQueueItem => {
+const buildSkippedMarkdownItem = (
+  input: RunWorkspaceIngestInput,
+  file: WorkspaceFileEntry
+): WorkspaceIngestQueueItem => {
   const documentHash = stableHash({ kind: "non-chemd-markdown", path: file.path });
   const revisionHash = stableHash({ workspaceId: input.workspaceId, documentPath: file.path, documentHash });
   return buildWorkspaceIngestQueueItem({
-    document: { workspaceId: input.workspaceId, documentId: file.id, documentPath: file.path, documentHash, revisionHash },
+    document: {
+      workspaceId: input.workspaceId,
+      documentId: file.id,
+      documentPath: file.path,
+      documentHash,
+      revisionHash
+    },
     status: "skipped",
     metadata: { skipReason: "non_chemd_markdown" },
     createdAt: input.createdAt,
@@ -250,8 +277,13 @@ const buildSkippedMarkdownItem = (input: RunWorkspaceIngestInput, file: Workspac
 
 const getErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
+
 const buildFailedItem = (
-  input: RunWorkspaceIngestInput, file: WorkspaceFileEntry, source: string, error: unknown, modifiedAtMs?: number | null
+  input: RunWorkspaceIngestInput,
+  file: WorkspaceFileEntry,
+  source: string,
+  error: unknown,
+  modifiedAtMs?: number | null
 ): WorkspaceIngestQueueItem => {
   const document = buildDocumentMetadata(input.workspaceId, file, source, modifiedAtMs);
   const previous = findExistingItem(input, document);
@@ -288,13 +320,18 @@ const processChemdFile = async (
   }
 };
 
-export const runWorkspaceIngest = async (input: RunWorkspaceIngestInput): Promise<RunWorkspaceIngestResult> => {
+export const runWorkspaceIngest = async (
+  input: RunWorkspaceIngestInput
+): Promise<RunWorkspaceIngestResult> => {
   const workspaceId = requireText(input.workspaceId, "workspaceId");
   const normalizedInput = { ...input, workspaceId };
   const items: WorkspaceIngestQueueItem[] = [];
   for (const file of normalizedInput.files) {
-    if (isChemdMarkdown(file)) items.push(await processChemdFile(normalizedInput, file));
-    else if (isPlainMarkdown(file)) items.push(buildSkippedMarkdownItem(normalizedInput, file));
+    if (isChemdMarkdown(file)) {
+      items.push(await processChemdFile(normalizedInput, file));
+    } else if (isPlainMarkdown(file)) {
+      items.push(buildSkippedMarkdownItem(normalizedInput, file));
+    }
   }
   return { items, summary: deriveWorkspaceIngestQueueSummary(items) };
 };

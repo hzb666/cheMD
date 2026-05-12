@@ -290,13 +290,71 @@ DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outb
 - `pnpm desktop:runtime-smoke`：通过 Offline Core 路径；database persistence 因本机
   缺少 PostgreSQL binaries 被明确标记为 `SKIP`。
 
-当前剩余 P0/P1 缺口：
+第二轮后剩余 P0/P1 缺口：
 
 - Monaco 仍未替换 textarea；language-service core 已具备，但 UI 还不是生产 IDE
   编辑器体验。
 - 安装包已生成，但尚未执行干净安装后的人工/自动 Offline Core smoke。
 - workspace ingest 目前是本地队列契约，还未接入 UI 扫描、取消、重试与 outbox
   幂等同步执行。
+- PostgreSQL 真实同步仍需要外部 DB env 或 managed PostgreSQL binaries；无 DB 只证明
+  Offline Core PASS，不证明 shared schema 持久化。
+
+### 2026-05-13 第三轮执行记录：Monaco、ingest runner 与 installer artifact smoke
+
+已合并范围：
+
+- Monaco 编辑器：
+  - `textarea` 已替换为 `@monaco-editor/react` + `monaco-editor`。
+  - 新增 Chemd language id、基础 tokenization、浅色主题、Monaco worker 配置。
+  - Monaco markers 由 `@chemd/language-service` 的 Monaco DTO 派生，不重新实现
+    compiler。
+  - `Ctrl/Cmd+S` 继续走现有 workspace save，Problems panel 与 preview 数据源保持不变。
+- Workspace ingest runner：
+  - 新增纯 TypeScript runner，通过依赖注入组合文件列表、读取和 compile。
+  - 单文件失败不会中断整个 ingest；错误摘要继续脱敏和截断。
+  - `.chemd.md` 生成 pending queue item，普通 `.md` 生成 skipped item，其他条目排除。
+  - 相同文件内容保持 hash/idempotency key 稳定，内容变化生成新 revision/key。
+- Installer artifact smoke：
+  - `desktop:offline-release-smoke` 升级为 artifact preflight。
+  - 新增 `desktop:installer-offline-smoke` 别名。
+  - 自动检查 release exe、MSI、NSIS 非空产物与目标 release exe 路径锁状态。
+  - 明确该脚本不安装应用，也不证明 clean-machine Offline Core。
+
+已验证：
+
+- `pnpm install --frozen-lockfile`：通过。
+- `pnpm exec vitest run apps/desktop/src/desktop-workspace-ingest.test.ts apps/desktop/src/desktop-local-store.test.ts --config packages/compiler/vitest.config.ts --pool=threads`：
+  通过 19 个测试。
+- `pnpm run test:scripts`：通过 59 个脚本测试。
+- `pnpm --filter @chemd/desktop typecheck`：通过。
+- `pnpm --filter @chemd/desktop exec eslint src/App.tsx src/MonacoChemdEditor.tsx src/styles/panels.css src/desktop-workspace-ingest.ts src/desktop-workspace-ingest.test.ts`：
+  通过；`panels.css` 仍有既有 ignore warning。
+- `pnpm --filter @chemd/desktop build`：通过，生成 `editor.worker`；保留既有
+  lucide `use client` warning，Monaco 引入后主 bundle 超过 500 kB。
+- `pnpm desktop:offline-core-smoke`：通过，输出 Offline Core PASS。
+- `pnpm desktop:offline-release-smoke`：通过 artifact preflight PASS。
+- `pnpm desktop:installer-offline-smoke`：通过 artifact preflight PASS。
+- `pnpm desktop:runtime-smoke`：通过 Offline Core 路径；database persistence 因本机
+  缺少 PostgreSQL binaries 被明确标记为 `SKIP`。
+- `cargo test --manifest-path apps\desktop\src-tauri\Cargo.toml workspace`：
+  通过 8 个 workspace 测试。
+- `pnpm typecheck`：通过 21 个 workspace。
+- `pnpm test`：通过 Turbo tests、59 个脚本测试与 52 个 Python 测试。
+- `pnpm --filter @chemd/desktop tauri:build`：通过，生成包含 Monaco 前端产物的 release
+  exe、MSI 与 NSIS：
+  - release exe：33,360,325 bytes
+  - MSI：8,454,144 bytes
+  - NSIS：5,748,832 bytes
+- `git diff --check`：通过，仅有 CRLF 工作区提示。
+
+当前剩余 P0/P1/P4 缺口：
+
+- P0 离线基础编辑链路已具备 Monaco、保存冲突、snapshot/outbox 与 Offline Core smoke；
+  仍缺真实桌面运行截图/手测证据。
+- workspace ingest 已有纯 runner，但还未接入 UI 扫描、取消、重试与 outbox 幂等同步执行。
+- installer artifact preflight 已通过，但 clean-machine 安装后启动、打开 workspace、
+  编辑保存、关闭重启恢复仍未执行。
 - PostgreSQL 真实同步仍需要外部 DB env 或 managed PostgreSQL binaries；无 DB 只证明
   Offline Core PASS，不证明 shared schema 持久化。
 
@@ -455,7 +513,7 @@ pnpm --filter @chemd/desktop tauri:build
 - [x] 无 DB、无网络、无 sidecar 时，桌面 app 的 Offline Core smoke 可通过。
 - [x] 可打开 workspace、编辑 `.chemd.md`、保存，且保存冲突有 reload/keep local
   决策面板。
-- [ ] Monaco diagnostics、preview 与 Problems panel 可离线使用。
+- [x] Monaco diagnostics、preview 与 Problems panel 可离线使用。
 - [x] 本地 snapshot/outbox 可生成，pending sync 状态可见。
 - [x] PostgreSQL 不可用只降级知识同步，不阻塞编辑。
 
@@ -473,6 +531,7 @@ pnpm --filter @chemd/desktop tauri:build
 
 - [ ] workspace ingest 可本地运行并生成 outbox。
 - [x] outbox/ingest 契约支持 pending、synced、failed、skipped 与 retry eligibility。
+- [x] workspace ingest runner 可通过依赖注入本地运行并生成可恢复队列。
 - [ ] 本地队列幂等，不重复生成知识记录。
 - [x] 文件变更和 base revision 冲突有显式处理。
 
@@ -502,21 +561,24 @@ pnpm --filter @chemd/desktop tauri:build
 
 - `pnpm --filter @chemd/desktop tauri:build` 已在 `desktop-ide` 工作树通过。
 - 已生成 Windows MSI 与 NSIS 安装包。
-- `pnpm desktop:offline-release-smoke` 已在产物生成后通过 preflight。
+- `pnpm desktop:offline-release-smoke` 已在产物生成后通过 artifact preflight。
 - 第三轮补充 installer artifact preflight，自动检查 release exe、MSI、NSIS 非空产物与目标 exe 路径锁状态，但仍不等同于 clean-machine 安装后 smoke。
 - 还缺少“安装到干净用户环境后启动、打开 workspace、编辑保存、关闭重启恢复”的
   installer Offline Core smoke。
 
 当前 release smoke 前置分类：
 
-- `PASS`：`apps/desktop` scripts、`dist/index.html` 与 release exe 锁检查均满足，
-  可以继续运行 `pnpm --filter @chemd/desktop tauri:build`。
-- `SKIP`：缺少 dist 或无法可靠检查进程占用；这是环境/前置产物不足，不代表产品
-  失败或通过。
+- `PASS`：`apps/desktop` scripts、`dist/index.html`、release exe 锁检查、release
+  exe、MSI 与 NSIS 产物检查均满足；这只代表 artifact preflight 通过。
+- `SKIP`：缺少 dist、release exe、MSI/NSIS installer，或无法可靠检查进程占用；
+  这是环境/前置产物不足，不代表产品失败或通过。
 - `BLOCKED`：目标
   `apps/desktop/src-tauri/target/release/chemd-desktop.exe` 正由同路径进程运行，
-  或必要 desktop script 缺失；用户需关闭输出中的 PID，或改用隔离
-  `CARGO_TARGET_DIR` 重试。
+  必要 desktop script 缺失，或产物大小为 `0`；用户需关闭输出中的 PID、修复空产物，
+  或改用隔离 `CARGO_TARGET_DIR` 重试。
+
+该脚本仍不等同于 clean-machine installer smoke；真实发布验收还需要在干净用户
+环境或隔离 VM 中安装后验证启动、打开 workspace、编辑保存、关闭重启恢复。
 
 详细说明见 `docs/desktop-ide/release-offline-smoke.zh-CN.md`。
 

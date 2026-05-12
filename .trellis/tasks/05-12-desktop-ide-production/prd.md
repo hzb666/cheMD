@@ -811,3 +811,87 @@ truth.
     cancel loop.
   - Real PostgreSQL sync proof still needs either external DB env or staged
     managed PostgreSQL binaries.
+
+## Fourteenth-Wave Offline-First Productization Slices
+
+The fourteenth wave closes the remaining P0 editor gap and advances the P1/P4
+proof surface without changing the local-document source of truth.
+
+1. `desktop-ide-monaco-editor`
+   - Owns the desktop editor entrypoint and Monaco-only dependencies.
+   - Replaces the textarea with `@monaco-editor/react` and `monaco-editor`.
+   - Keeps diagnostics, markers, Problems, and preview derived from
+     `@chemd/language-service`, not a parallel compiler.
+
+2. `desktop-ide-workspace-ingest-runner`
+   - Owns the pure TypeScript workspace ingest runner.
+   - Uses dependency injection for file reads and compile calls.
+   - Keeps one-file failures isolated and produces recoverable queue summaries.
+
+3. `desktop-ide-installer-offline-smoke`
+   - Owns installer artifact preflight scripts and release docs.
+   - Checks release exe, MSI, NSIS, and target release exe lock status.
+   - Does not launch the GUI, kill processes, or claim clean-machine smoke.
+
+## Fourteenth-Wave Execution Record
+
+- `desktop-ide-workspace-ingest-runner` merged through
+  `fabddb9 feat(desktop)：合并 workspace ingest runner`.
+  - Added `runWorkspaceIngest` with injected `readFile` and `compile`.
+  - `.chemd.md` entries produce pending queue items; plain markdown is skipped;
+    other entries are excluded.
+  - Failures are redacted, bounded, and counted without stopping the rest of the
+    run.
+
+- `desktop-ide-installer-offline-smoke` merged through
+  `9369aef feat(desktop)：合并 installer 离线 smoke`.
+  - `desktop:offline-release-smoke` now performs artifact preflight.
+  - Added `desktop:installer-offline-smoke` as an explicit alias.
+  - Checks release exe, MSI, NSIS non-empty artifacts and exact-path release exe
+    locks.
+
+- `desktop-ide-monaco-editor` merged through
+  `d2198f0 feat(desktop)：合并 Monaco 编辑器`.
+  - Added Monaco dependencies and `MonacoChemdEditor`.
+  - Replaced the desktop textarea with Monaco while preserving `Ctrl/Cmd+S`,
+    existing save flow, compiler diagnostics, preview, and Problems panel.
+  - Integrated the Monaco worker in the Vite/Tauri desktop build without root
+    config changes.
+
+- Integration follow-up:
+  - Cleaned the workspace ingest runner types and long lines.
+  - Updated release smoke docs to distinguish artifact preflight from
+    clean-machine installer smoke.
+  - The implementation plan now includes final M10 visual style refactor and
+    M11 UI componentization/big-file split as post-core-productization work.
+
+- Current integrated validation:
+  - `pnpm install --frozen-lockfile` passed.
+  - Focused desktop local-store/ingest Vitest passed 19 tests.
+  - `pnpm run test:scripts` passed 59 script tests.
+  - `pnpm --filter @chemd/desktop typecheck` passed.
+  - Desktop focused ESLint passed for changed TS/TSX files; CSS remains ignored
+    by existing lint config.
+  - `pnpm --filter @chemd/desktop build` passed and emitted
+    `editor.worker`; Monaco increased the main bundle size warning.
+  - `pnpm desktop:offline-core-smoke` passed with Offline Core PASS.
+  - `pnpm desktop:offline-release-smoke` passed artifact preflight PASS.
+  - `pnpm desktop:installer-offline-smoke` passed artifact preflight PASS.
+  - `pnpm desktop:runtime-smoke` passed Offline Core and explicitly skipped
+    database persistence because PostgreSQL binaries were unavailable.
+  - `cargo test --manifest-path apps\desktop\src-tauri\Cargo.toml workspace`
+    passed 8 workspace tests.
+  - `pnpm typecheck` passed all 21 workspaces.
+  - `pnpm test` passed Turbo tests, 59 script tests, and 52 Python tests.
+  - `pnpm --filter @chemd/desktop tauri:build` passed and produced a release
+    exe plus MSI/NSIS installers containing the Monaco frontend artifact.
+  - `git diff --check` passed with only CRLF worktree warnings.
+
+- Remaining production gaps:
+  - Clean-machine installer Offline Core smoke has not been run.
+  - Workspace ingest still needs the UI scan/retry/cancel loop and local outbox
+    execution wiring.
+  - Real PostgreSQL sync proof still needs either external DB env or staged
+    managed PostgreSQL binaries.
+  - Monaco is integrated, but bundle splitting/performance tuning is still a
+    release optimization item.
