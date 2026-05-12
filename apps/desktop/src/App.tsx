@@ -79,6 +79,12 @@ type PostgresField = [string, string];
 type ActivityTool = "files" | "search" | "graph" | "agent" | "settings";
 type LayoutPanel = "sidebar" | "insight" | "bottom";
 type InsightDockPanelId = "outline" | "rag" | "graph" | "runtime" | "postgres" | "storage" | "agent" | "settings";
+type SidebarPrimaryTab = "files" | "outline" | "problems";
+type SidebarSecondaryTab = "workspace" | "summary";
+type DockDragPreview = {
+  source: InsightDockPanelId;
+  target: InsightDockPanelId;
+};
 type DesktopLayoutState = {
   sidebarWidth: number;
   insightWidth: number;
@@ -188,6 +194,12 @@ const layoutBounds: Record<LayoutPanel, { defaultValue: number; min: number; max
   sidebar: { defaultValue: 272, min: 208, max: 420, step: 16 },
   insight: { defaultValue: 376, min: 320, max: 640, step: 16 },
   bottom: { defaultValue: 176, min: 104, max: 420, step: 16 }
+};
+type SidebarTabItem<T extends string> = {
+  id: T;
+  label: string;
+  icon: typeof Files;
+  badge?: string;
 };
 
 const initialDesktopLayout: DesktopLayoutState = {
@@ -1632,29 +1644,112 @@ const Sidebar = ({
   selectedFileId,
   mode,
   message,
+  outline,
+  diagnostics,
+  compileStatus,
   onSelectFile
 }: {
   files: WorkspaceFileEntry[];
   selectedFileId: string;
   mode: DocumentMode;
   message: string;
+  outline: ChemdOutlineItem[];
+  diagnostics: ChemdEditorDiagnostic[];
+  compileStatus: "ok" | "failed";
   onSelectFile: (file: WorkspaceFileEntry) => void;
-}) => (
-  <aside className="desktop-sidebar">
-    <PanelHeader eyebrow="Workspace" title="Files" meta={mode === "sample" ? "Sample" : "Local"} />
-    <div className="desktop-sidebar-note" data-mode={mode}><Sparkles size={14} /><span>{message}</span></div>
-    <ul className="desktop-file-tree" aria-label="Workspace files">
-      {files.map((file) => (
-        <li key={file.id}>
-          <button type="button" className="desktop-file-row" data-kind={file.kind} data-selected={file.id === selectedFileId} onClick={() => onSelectFile(file)}>
-            <span className="desktop-file-icon" aria-hidden="true">{file.kind === "directory" ? <Files size={14} /> : <FileCode2 size={14} />}</span>
-            <span className="desktop-file-name">{file.name}</span><span className="desktop-file-kind">{file.chemdKind ?? file.kind}</span>
+}) => {
+  const [primaryTab, setPrimaryTab] = useState<SidebarPrimaryTab>("files");
+  const [secondaryTab, setSecondaryTab] = useState<SidebarSecondaryTab>("workspace");
+  const selectedFile = files.find((file) => file.id === selectedFileId);
+  const stats = getDiagnosticStats(diagnostics);
+  const primaryTabs: SidebarTabItem<SidebarPrimaryTab>[] = [
+    { id: "files", label: "Files", icon: Files, badge: `${files.length}` },
+    { id: "outline", label: "Outline", icon: ScrollText, badge: `${outline.length}` },
+    { id: "problems", label: "Problems", icon: AlertTriangle, badge: `${diagnostics.length}` }
+  ];
+  const secondaryTabs: SidebarTabItem<SidebarSecondaryTab>[] = [
+    { id: "workspace", label: "Workspace", icon: Sparkles },
+    { id: "summary", label: "Summary", icon: Activity }
+  ];
+
+  return (
+    <aside className="desktop-sidebar">
+      <section className="desktop-sidebar-window" data-window="primary" aria-label="Sidebar primary window">
+        <SidebarTabs items={primaryTabs} active={primaryTab} onSelect={setPrimaryTab} />
+        <div className="desktop-sidebar-window-body">
+          {primaryTab === "files" ? (
+            <ul className="desktop-file-tree" aria-label="Workspace files">
+              {files.map((file) => (
+                <li key={file.id}>
+                  <button type="button" className="desktop-file-row" data-kind={file.kind} data-selected={file.id === selectedFileId} onClick={() => onSelectFile(file)}>
+                    <span className="desktop-file-icon" aria-hidden="true">{file.kind === "directory" ? <Files size={14} /> : <FileCode2 size={14} />}</span>
+                    <span className="desktop-file-name">{file.name}</span><span className="desktop-file-kind">{file.chemdKind ?? file.kind}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {primaryTab === "outline" ? (
+            outline.length > 0 ? <OutlineTree items={outline} /> : <p className="desktop-empty-copy">No outline from language service.</p>
+          ) : null}
+          {primaryTab === "problems" ? (
+            <div className="desktop-sidebar-problem-list" role={diagnostics.length > 0 ? "list" : undefined}>
+              {diagnostics.length > 0 ? diagnostics.map((diagnostic) => (
+                <div key={`${diagnostic.code}-${diagnostic.range.startLine}-${diagnostic.message}`} className="desktop-sidebar-problem-row" data-severity={diagnostic.severity} role="listitem">
+                  <span>{diagnostic.severity}</span>
+                  <strong>{diagnostic.code}</strong>
+                  <p>{diagnostic.message}</p>
+                  <code>L{diagnostic.range.startLine}:C{diagnostic.range.startColumn}</code>
+                </div>
+              )) : <p className="desktop-empty-copy">Language service reports no diagnostics.</p>}
+            </div>
+          ) : null}
+        </div>
+      </section>
+      <section className="desktop-sidebar-window" data-window="secondary" aria-label="Sidebar secondary window">
+        <SidebarTabs items={secondaryTabs} active={secondaryTab} onSelect={setSecondaryTab} />
+        <div className="desktop-sidebar-window-body">
+          {secondaryTab === "workspace" ? (
+            <div className="desktop-sidebar-note" data-mode={mode}><Sparkles size={14} /><span>{message}</span></div>
+          ) : null}
+          {secondaryTab === "summary" ? (
+            <dl className="desktop-sidebar-summary">
+              <div><dt>Mode</dt><dd>{mode}</dd></div>
+              <div><dt>Selected</dt><dd>{selectedFile?.name ?? "none"}</dd></div>
+              <div><dt>Compile</dt><dd>{compileStatus}</dd></div>
+              <div><dt>Problems</dt><dd>{stats.errors}E / {stats.warnings}W / {stats.infos}I</dd></div>
+            </dl>
+          ) : null}
+        </div>
+      </section>
+    </aside>
+  );
+};
+
+function SidebarTabs<T extends string>({
+  items,
+  active,
+  onSelect
+}: {
+  items: SidebarTabItem<T>[];
+  active: T;
+  onSelect: (id: T) => void;
+}) {
+  return (
+    <div className="desktop-sidebar-tabs" role="tablist">
+      {items.map((item) => {
+        const Icon = item.icon;
+        return (
+          <button key={item.id} type="button" role="tab" aria-selected={item.id === active} data-active={item.id === active} onClick={() => onSelect(item.id)}>
+            <Icon size={13} />
+            <span>{item.label}</span>
+            {item.badge ? <code>{item.badge}</code> : null}
           </button>
-        </li>
-      ))}
-    </ul>
-  </aside>
-);
+        );
+      })}
+    </div>
+  );
+}
 
 const EditorPane = ({
   fileName,
@@ -1693,6 +1788,12 @@ const getQuickFixCandidates = (diagnostics: ChemdEditorDiagnostic[]): QuickFixCa
   diagnostics.flatMap((diagnostic) =>
     diagnostic.quickFixes.map((quickFix) => ({ diagnostic, quickFix }))
   );
+
+const getDiagnosticStats = (diagnostics: ChemdEditorDiagnostic[]) => ({
+  errors: diagnostics.filter((item) => item.severity === "error").length,
+  warnings: diagnostics.filter((item) => item.severity === "warning").length,
+  infos: diagnostics.filter((item) => item.severity === "info").length
+});
 
 const AgentRunHeader = ({
   agentRun,
@@ -1926,6 +2027,7 @@ const SettingsDockPanel = ({
 
 const useInsightDockController = (activeTool: ActivityTool) => {
   const [dockLayout, setDockLayout] = useState<InsightDockLayout>(initialInsightDockLayout);
+  const [dragPreview, setDragPreview] = useState<DockDragPreview | null>(null);
   const activeDockPanel = activityDockPanel[activeTool];
 
   useEffect(() => {
@@ -1990,13 +2092,30 @@ const useInsightDockController = (activeTool: ActivityTool) => {
     event.preventDefault();
     const startX = event.clientX;
     const startY = event.clientY;
+    let latestTarget: InsightDockPanelId | null = null;
     document.body.dataset.desktopDockDrag = panel;
+
+    const updatePreview = (clientX: number, clientY: number) => {
+      const moved = Math.abs(clientX - startX) + Math.abs(clientY - startY);
+      const targetElement = document.elementFromPoint(clientX, clientY);
+      const targetPanel = targetElement?.closest("[data-dock-panel]")?.getAttribute("data-dock-panel") as InsightDockPanelId | null;
+      const nextTarget = moved >= 8 && targetPanel && targetPanel !== panel && insightDockMeta[targetPanel]
+        ? targetPanel
+        : null;
+      latestTarget = nextTarget;
+      setDragPreview(nextTarget ? { source: panel, target: nextTarget } : null);
+    };
+
+    const onMove = (moveEvent: PointerEvent) => {
+      updatePreview(moveEvent.clientX, moveEvent.clientY);
+    };
 
     const onEnd = (endEvent: PointerEvent) => {
       delete document.body.dataset.desktopDockDrag;
+      window.removeEventListener("pointermove", onMove);
       const moved = Math.abs(endEvent.clientX - startX) + Math.abs(endEvent.clientY - startY);
-      const targetElement = document.elementFromPoint(endEvent.clientX, endEvent.clientY);
-      const targetPanel = targetElement?.closest("[data-dock-panel]")?.getAttribute("data-dock-panel") as InsightDockPanelId | null;
+      const targetPanel = latestTarget;
+      setDragPreview(null);
       if (moved < 8 || !targetPanel || !insightDockMeta[targetPanel]) return;
       setDockLayout((current) => ({
         ...current,
@@ -2005,11 +2124,13 @@ const useInsightDockController = (activeTool: ActivityTool) => {
       }));
     };
 
+    window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onEnd, { once: true });
   };
 
   return {
     dockLayout,
+    dragPreview,
     visiblePanels,
     minimizedPanels,
     activatePanel,
@@ -2118,23 +2239,52 @@ const InsightDockFrame = ({
   );
 };
 
+const InsightDockPreview = ({
+  panel,
+  layout
+}: {
+  panel: InsightDockPanelId;
+  layout: InsightDockLayout;
+}) => {
+  const meta = insightDockMeta[panel];
+  const Icon = meta.icon;
+  return (
+    <div
+      className="desktop-dock-preview"
+      aria-hidden="true"
+      style={{ "--desktop-dock-panel-height": `${layout.sizes[panel]}px` } as CSSProperties}
+    >
+      <GripVertical size={13} />
+      <Icon size={14} />
+      <span>{meta.label}</span>
+    </div>
+  );
+};
+
 const InsightPane = (props: InsightPaneProps) => {
   const dock = useInsightDockController(props.activeTool);
+  const orderedPanels = dock.dragPreview
+    ? moveDockPanel(dock.visiblePanels, dock.dragPreview.source, dock.dragPreview.target)
+    : dock.visiblePanels;
   return (
     <aside className="desktop-pane desktop-insight-pane" aria-label="Docked tools">
       <InsightDockTabs panels={dock.minimizedPanels} onActivate={dock.activatePanel} />
       <div className="desktop-dock-stack">
-        {dock.visiblePanels.map((panel) => (
-          <InsightDockFrame
-            key={panel}
-            panel={panel}
-            layout={dock.dockLayout}
-            props={props}
-            onActivate={dock.activatePanel}
-            onMinimize={dock.minimizePanel}
-            onResize={dock.beginDockResize}
-            onPointerDragStart={dock.beginDockDrag}
-          />
+        {orderedPanels.map((panel) => (
+          dock.dragPreview?.source === panel
+            ? <InsightDockPreview key={`preview-${panel}`} panel={panel} layout={dock.dockLayout} />
+            : (
+              <InsightDockFrame
+                key={panel}
+                panel={panel}
+                layout={dock.dockLayout}
+                props={props}
+                onActivate={dock.activatePanel}
+                onMinimize={dock.minimizePanel}
+                onResize={dock.beginDockResize}
+                onPointerDragStart={dock.beginDockDrag}
+              />
+            )
         ))}
       </div>
     </aside>
@@ -2142,11 +2292,7 @@ const InsightPane = (props: InsightPaneProps) => {
 };
 
 const BottomPanel = ({ diagnostics, compileStatus, errorMessage }: { diagnostics: ChemdEditorDiagnostic[]; compileStatus: "ok" | "failed"; errorMessage?: string }) => {
-  const stats = {
-    errors: diagnostics.filter((item) => item.severity === "error").length,
-    warnings: diagnostics.filter((item) => item.severity === "warning").length,
-    infos: diagnostics.filter((item) => item.severity === "info").length
-  };
+  const stats = getDiagnosticStats(diagnostics);
   return (
     <section className="desktop-bottom-panel" aria-label="Diagnostics pane">
       <div className="desktop-bottom-tabs">
@@ -2646,7 +2792,18 @@ const DesktopWorkbench = ({
       <TopBar workspace={workspace} workspaceState={workspaceState} sidecarStatus={sidecarController.status} postgresStatus={postgresController.status} diagnosticCount={output.diagnostics.length} dirty={source !== savedSource} rootPath={rootPath} canSave={canSave} onRootPathChange={onRootPathChange} onSave={onSave} onOpenWorkspace={onOpenWorkspace} />
       <div className="desktop-workbench" style={layoutController.style} data-sidebar-collapsed={layout.sidebarCollapsed}>
         <ActivityRail activeTool={activeTool} onSelectTool={selectTool} />
-        {layout.sidebarCollapsed ? null : <Sidebar files={files} selectedFileId={selectedFileId} mode={mode} message={message} onSelectFile={onSelectFile} />}
+        {layout.sidebarCollapsed ? null : (
+          <Sidebar
+            files={files}
+            selectedFileId={selectedFileId}
+            mode={mode}
+            message={message}
+            outline={output.outline}
+            diagnostics={output.diagnostics}
+            compileStatus={output.status}
+            onSelectFile={onSelectFile}
+          />
+        )}
         <ResizeHandle
           panel="sidebar"
           collapsed={layout.sidebarCollapsed}
@@ -2727,6 +2884,7 @@ export const App = () => {
   const [selectedFileId, setSelectedFileId] = useState(shellFiles[0].id);
   const [source, setSource] = useState(initialSource);
   const [savedSource, setSavedSource] = useState(initialSource);
+  const [savedContentHash, setSavedContentHash] = useState<string | null>(null);
   const [mode, setMode] = useState<DocumentMode>("sample");
   const [rootPath, setRootPath] = useState("");
   const [message, setMessage] = useState("No workspace is open. Editing bundled sample content.");
@@ -2776,11 +2934,13 @@ export const App = () => {
         })
         : undefined;
       const nextSource = nextContent?.content ?? getSampleSource(firstFile);
+      const nextContentHash = nextContent?.contentHash ?? null;
       setWorkspace(nextWorkspace);
       setFiles(usableFiles);
       setSelectedFileId(firstFile.id);
       setSource(nextSource);
       setSavedSource(nextSource);
+      setSavedContentHash(nextContentHash);
       setRootPath(nextWorkspace.rootPath);
       setMode("workspace");
       setMessage(`Opened ${usableFiles.length} visible Markdown entries from the local workspace.`);
@@ -2807,6 +2967,7 @@ export const App = () => {
       setSelectedFileId(file.id);
       setSource(nextSource);
       setSavedSource(nextSource);
+      setSavedContentHash(nextContent?.contentHash ?? null);
       setMessage(mode === "sample" ? "Sample document selected from bundled fallback." : `Read ${file.path} from the local workspace.`);
     } catch (error: unknown) {
       setMessage(`Workspace read failed: ${getDisplayableError(error)}.`);
@@ -2819,9 +2980,11 @@ export const App = () => {
       const result = await invokeDesktop("write_workspace_file", {
         workspaceId: workspace.workspaceId,
         path: selectedFile.path,
-        content: source
+        content: source,
+        baseHash: savedContentHash ?? undefined
       });
       setSavedSource(source);
+      setSavedContentHash(result.contentHash);
       setMessage(`Saved ${result.path} (${result.bytes} bytes).`);
     } catch (error: unknown) {
       setMessage(`Workspace save failed: ${getDisplayableError(error)}.`);

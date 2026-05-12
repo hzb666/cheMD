@@ -45,6 +45,40 @@
 @layer base {
   * {
     @apply box-border;
+    scrollbar-color: color-mix(in oklch, var(--foreground) 18%, transparent) transparent;
+    scrollbar-width: thin;
+  }
+
+  *:hover {
+    scrollbar-color: color-mix(in oklch, var(--foreground) 32%, transparent) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 0.38rem;
+    height: 0.38rem;
+  }
+
+  *:hover::-webkit-scrollbar {
+    width: 0.62rem;
+    height: 0.62rem;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    min-height: 2rem;
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: color-mix(in oklch, var(--foreground) 18%, transparent);
+    background-clip: content-box;
+  }
+
+  *:hover::-webkit-scrollbar-thumb {
+    border-width: 1px;
+    background: color-mix(in oklch, var(--foreground) 32%, transparent);
+    background-clip: content-box;
   }
 
   html,
@@ -123,10 +157,13 @@
   .desktop-diagnostic-row,
   .desktop-diagnostic-summary,
   .desktop-dock-header,
+  .desktop-dock-preview,
   .desktop-dock-tabs,
+  .desktop-sidebar-tabs,
   .desktop-tool-search,
   .desktop-tool-result-row,
-  .desktop-graph-node-row {
+  .desktop-graph-node-row,
+  .desktop-sidebar-problem-row {
     @apply flex items-center;
   }
 
