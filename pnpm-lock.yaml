@@ -291,6 +291,12 @@ importers:
         specifier: ^2.8.3
         version: 2.8.3
 
+  packages/reaction-map:
+    dependencies:
+      '@chemd/exporter-training':
+        specifier: workspace:*
+        version: link:../exporter-training
+
   packages/render-profile:
     dependencies:
       '@chemd/core':
@@ -354,6 +360,12 @@ importers:
         specifier: workspace:*
         version: link:../runtime-lab
 
+  packages/semantic-rendering:
+    dependencies:
+      '@chemd/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/step-ontology:
     dependencies:
       '@chemd/core':
@@ -393,6 +405,12 @@ importers:
       '@chemd/step-ontology':
         specifier: workspace:*
         version: link:../step-ontology
+
+  packages/workspace-index:
+    dependencies:
+      '@chemd/language-service':
+        specifier: workspace:*
+        version: link:../language-service
 
 packages:
 

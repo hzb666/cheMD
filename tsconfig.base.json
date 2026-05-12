@@ -32,6 +32,9 @@
       "@chemd/exporter-training": ["packages/exporter-training/src/index.ts"],
       "@chemd/storage-postgres": ["packages/storage-postgres/src/index.ts"],
       "@chemd/language-service": ["packages/language-service/src/index.ts"],
+      "@chemd/workspace-index": ["packages/workspace-index/src/index.ts"],
+      "@chemd/semantic-rendering": ["packages/semantic-rendering/src/index.ts"],
+      "@chemd/reaction-map": ["packages/reaction-map/src/index.ts"],
       "@chemd/agent-tools": ["packages/agent-tools/src/index.ts"]
     }
   }
