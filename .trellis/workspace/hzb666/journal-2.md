@@ -302,3 +302,58 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 47: Desktop IDE dock panels and rail routing
+
+**Date**: 2026-05-13
+**Task**: Desktop IDE dock panels and rail routing
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Added dockable desktop panels, fixed rail routing, verified desktop build/smoke/Tauri release.
+
+### Main Changes
+
+Completed the desktop IDE dock interaction pass.
+
+Changes:
+- Added Photoshop-like right-side dock panels for Outline, RAG Search, Reaction Graph, runtime, Postgres, Local Store, Agent Runs, and Settings.
+- Replaced fixed-height sidebar stack behavior with per-panel dock heights, drag splitters, minimize-to-tab controls, and pointer-based panel reordering.
+- Routed activity rail clicks to concrete panel content so menu actions restore and focus the matching panel instead of only changing icon state.
+- Preserved existing web-like desktop styling while adding compact tool panels for RAG, graph, and settings.
+- Refreshed release build artifact at apps/desktop/src-tauri/target/release/chemd-desktop.exe plus MSI/NSIS bundles.
+
+Verification:
+- pnpm --filter @chemd/desktop exec eslint src/App.tsx vite.config.ts: pass.
+- pnpm --filter @chemd/desktop typecheck: pass.
+- git diff --check -- apps/desktop/src/App.tsx apps/desktop/src/styles/base.css apps/desktop/src/styles/panels.css: pass.
+- pnpm --filter @chemd/desktop build: pass, with existing lucide use-client and chunk-size warnings.
+- pnpm dlx @playwright/test test apps/desktop/.smoke-dock.spec.cjs --config apps/desktop/.playwright-dock.config.cjs --reporter=line: pass. Temporary smoke spec/config were removed after validation.
+- pnpm --filter @chemd/desktop tauri:build: pass, produced release exe and installer bundles.
+
+Notes:
+- Commit 02207f2 contains the desktop UI implementation.
+- Commit 076859f contains the previously dirty desktop offline-first docs now present on desktop-ide.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `02207f2` | (see git log) |
+| `076859f` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

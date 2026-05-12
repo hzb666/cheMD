@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 46
-- **Last Active**: 2026-05-12
+- **Total Sessions**: 47
+- **Last Active**: 2026-05-13
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~304 | Active |
+| `journal-2.md` | ~359 | Active |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 47 | 2026-05-13 | Desktop IDE dock panels and rail routing | `02207f2`, `076859f` | `desktop-ide` |
 | 46 | 2026-05-12 | Desktop IDE panel layout controls and Tailwind merge | `988d43c`, `2bd3139` | `desktop-ide` |
 | 45 | 2026-05-12 | Desktop IDE 第十一轮 runtime proof 与分发证明 | `79ee4b0`, `9d27ebe`, `0a21ce6`, `d8b10c1`, `92d29a8`, `74edabf`, `2c62fab`, `cf1ff3a`, `10abb49` | `desktop-ide` |
 | 44 | 2026-05-12 | Desktop IDE 第十轮 outbox 重连同步 | `1e2327a`, `c395003`, `9bdddf7`, `a923a67`, `6c9d684`, `66a918e`, `e1741a1`, `3812138`, `d6cf24e`, `3059a57`, `c3e0045` | `desktop-ide` |
