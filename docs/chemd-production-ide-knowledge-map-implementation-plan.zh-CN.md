@@ -41,7 +41,7 @@
 | --- | --- | --- | --- | --- |
 | `desktop-ide-map-completion-ls` | `D:\Code\chemd-wt-map-completion-ls` | Monaco-neutral completion/snippet language-service core | `packages/language-service/**` | 已合并：`89b784f` |
 | `desktop-ide-map-workspace-index` | `D:\Code\chemd-wt-map-workspace-index` | workspace symbol/reference index data layer | `packages/workspace-index/**` | 原工作树 Git 元数据丢失，未合并 |
-| `desktop-ide-map-workspace-index-v2` | `D:\Code\chemd-wt-map-workspace-index` | workspace symbol/reference index data layer | `packages/workspace-index/**` | 重建并执行中 |
+| `desktop-ide-map-workspace-index-v2` | `D:\Code\chemd-wt-map-workspace-index` | workspace symbol/reference index data layer | `packages/workspace-index/**` | 已合并：`acd4ded` |
 | `desktop-ide-map-reaction-clusters` | `D:\Code\chemd-wt-map-reaction-clusters` | reaction cluster/map-ready data layer | `packages/reaction-map/**` | 已合并：`aceac9d` |
 | `desktop-ide-map-semantic-rendering` | `D:\Code\chemd-wt-map-semantic-rendering` | semantic render DTO/tree data layer | `packages/semantic-rendering/**` | 已合并：`1b4bebe` |
 
@@ -54,6 +54,16 @@
 - [x] `pnpm --filter @chemd/semantic-rendering typecheck`
 - [x] `pnpm --filter @chemd/reaction-map test`
 - [x] `pnpm --filter @chemd/reaction-map typecheck`
+- [x] `pnpm --filter @chemd/workspace-index test`
+- [x] `pnpm --filter @chemd/workspace-index typecheck`
+- [x] `pnpm exec eslint packages/workspace-index/src packages/workspace-index/tests --ext .ts`
+
+第一轮已完成的包级能力：
+
+- [x] `@chemd/language-service` completion/snippet/value/reference DTO core。
+- [x] `@chemd/workspace-index` 跨文档 symbol/reference index。
+- [x] `@chemd/semantic-rendering` 语义渲染 DTO/tree。
+- [x] `@chemd/reaction-map` 反应 cluster/map-ready layout 数据层。
 
 串行保留给主架构工作树：
 
