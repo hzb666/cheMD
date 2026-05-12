@@ -37,12 +37,23 @@
 
 第一轮并行任务：
 
-| 分支 | 工作树 | 目标 | 写入边界 |
-| --- | --- | --- | --- |
-| `desktop-ide-map-completion-ls` | `D:\Code\chemd-wt-map-completion-ls` | Monaco-neutral completion/snippet language-service core | `packages/language-service/**` |
-| `desktop-ide-map-workspace-index` | `D:\Code\chemd-wt-map-workspace-index` | workspace symbol/reference index data layer | `packages/workspace-index/**` |
-| `desktop-ide-map-reaction-clusters` | `D:\Code\chemd-wt-map-reaction-clusters` | reaction cluster/map-ready data layer | `packages/reaction-map/**` |
-| `desktop-ide-map-semantic-rendering` | `D:\Code\chemd-wt-map-semantic-rendering` | semantic render DTO/tree data layer | `packages/semantic-rendering/**` |
+| 分支 | 工作树 | 目标 | 写入边界 | 状态 |
+| --- | --- | --- | --- | --- |
+| `desktop-ide-map-completion-ls` | `D:\Code\chemd-wt-map-completion-ls` | Monaco-neutral completion/snippet language-service core | `packages/language-service/**` | 已合并：`89b784f` |
+| `desktop-ide-map-workspace-index` | `D:\Code\chemd-wt-map-workspace-index` | workspace symbol/reference index data layer | `packages/workspace-index/**` | 原工作树 Git 元数据丢失，未合并 |
+| `desktop-ide-map-workspace-index-v2` | `D:\Code\chemd-wt-map-workspace-index` | workspace symbol/reference index data layer | `packages/workspace-index/**` | 重建并执行中 |
+| `desktop-ide-map-reaction-clusters` | `D:\Code\chemd-wt-map-reaction-clusters` | reaction cluster/map-ready data layer | `packages/reaction-map/**` | 已合并：`aceac9d` |
+| `desktop-ide-map-semantic-rendering` | `D:\Code\chemd-wt-map-semantic-rendering` | semantic render DTO/tree data layer | `packages/semantic-rendering/**` | 已合并：`1b4bebe` |
+
+已验证：
+
+- [x] `pnpm --filter @chemd/language-service test`
+- [x] `pnpm --filter @chemd/language-service typecheck`
+- [x] `pnpm exec eslint packages/language-service/src/completion-context.ts packages/language-service/src/completion-fields.ts packages/language-service/src/completion-snippets.ts packages/language-service/src/completion-types.ts packages/language-service/src/completion-values.ts packages/language-service/src/completion.ts packages/language-service/tests/completion.test.ts --ext .ts`
+- [x] `pnpm --filter @chemd/semantic-rendering test`
+- [x] `pnpm --filter @chemd/semantic-rendering typecheck`
+- [x] `pnpm --filter @chemd/reaction-map test`
+- [x] `pnpm --filter @chemd/reaction-map typecheck`
 
 串行保留给主架构工作树：
 
