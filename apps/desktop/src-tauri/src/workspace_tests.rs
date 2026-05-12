@@ -1,5 +1,5 @@
 use crate::{
-    workspace_file_io::{read_workspace_file_impl, write_workspace_file_impl},
+    workspace_file_io::{content_hash, read_workspace_file_impl, write_workspace_file_impl},
     workspace_io::{canonical_workspace_root, list_workspace_files_impl, workspace_handle},
 };
 use std::{
@@ -75,7 +75,7 @@ fn rejects_parent_path_traversal_for_read_and_write() {
 
     let read_error = read_workspace_file_impl(&root, "../outside.md")
         .expect_err("parent traversal should not read");
-    let write_error = write_workspace_file_impl(&root, "../outside.md", "unsafe")
+    let write_error = write_workspace_file_impl(&root, "../outside.md", "unsafe", None)
         .expect_err("parent traversal should not write");
 
     assert_eq!(read_error.code, "workspace_path_outside_root");
@@ -120,15 +120,71 @@ fn read_and_write_round_trip_inside_workspace() {
     let workspace = TestWorkspace::new("round-trip");
     let root = workspace.canonical_root();
 
-    let write = write_workspace_file_impl(&root, "nested/result.chemd.md", "content")
+    let write = write_workspace_file_impl(&root, "nested/result.chemd.md", "content", None)
         .expect("write should succeed");
     let read =
         read_workspace_file_impl(&root, "nested/result.chemd.md").expect("read should succeed");
 
     assert_eq!(write.path, "nested/result.chemd.md");
     assert_eq!(write.bytes, "content".len());
+    assert_eq!(write.content_hash, content_hash(b"content"));
+    assert!(write.modified_at_ms.is_some());
     assert_eq!(read.content, "content");
+    assert_eq!(read.content_hash, write.content_hash);
+    assert!(read.modified_at_ms.is_some());
     assert_eq!(read.chemd_kind.as_deref(), Some("document"));
+}
+
+#[test]
+fn write_accepts_matching_base_hash() {
+    let workspace = TestWorkspace::new("base-match");
+    workspace.write("doc.chemd.md", "old");
+    let root = workspace.canonical_root();
+    let base_hash = content_hash(b"old");
+
+    let write = write_workspace_file_impl(&root, "doc.chemd.md", "new", Some(&base_hash))
+        .expect("matching base hash should save");
+    let read = read_workspace_file_impl(&root, "doc.chemd.md").expect("read should succeed");
+
+    assert_eq!(write.content_hash, content_hash(b"new"));
+    assert_eq!(read.content, "new");
+    assert_eq!(read.content_hash, write.content_hash);
+}
+
+#[test]
+fn write_rejects_external_modification_conflict() {
+    let workspace = TestWorkspace::new("base-conflict");
+    workspace.write("doc.chemd.md", "old");
+    let root = workspace.canonical_root();
+    let base_hash = content_hash(b"old");
+    workspace.write("doc.chemd.md", "external");
+
+    let error = write_workspace_file_impl(&root, "doc.chemd.md", "local", Some(&base_hash))
+        .expect_err("stale base hash should fail");
+    let read = read_workspace_file_impl(&root, "doc.chemd.md").expect("read should succeed");
+
+    assert_eq!(error.code, "workspace_file_conflict");
+    assert!(error
+        .detail
+        .as_deref()
+        .unwrap_or_default()
+        .contains(&base_hash));
+    assert_eq!(read.content, "external");
+}
+
+#[test]
+fn write_rejects_deleted_file_with_base_hash() {
+    let workspace = TestWorkspace::new("base-deleted");
+    workspace.write("doc.chemd.md", "old");
+    let root = workspace.canonical_root();
+    let base_hash = content_hash(b"old");
+    fs::remove_file(workspace.root.join("doc.chemd.md")).expect("file should be removed");
+
+    let error = write_workspace_file_impl(&root, "doc.chemd.md", "local", Some(&base_hash))
+        .expect_err("deleted base file should fail");
+
+    assert_eq!(error.code, "workspace_file_conflict");
+    assert!(!workspace.root.join("doc.chemd.md").exists());
 }
 
 fn path_str(path: &Path) -> &str {
