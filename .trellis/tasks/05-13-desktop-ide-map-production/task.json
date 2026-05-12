@@ -1,0 +1,53 @@
+{
+  "id": "desktop-ide-map-production",
+  "name": "desktop-ide-map-production",
+  "title": "Desktop IDE map production implementation",
+  "description": "Production implementation loop for Monaco completion, workspace references, semantic rendering, reaction clustering and map visualization.",
+  "status": "planning",
+  "dev_type": "fullstack",
+  "scope": null,
+  "package": "web",
+  "priority": "P0",
+  "creator": "hzb666",
+  "assignee": "hzb666",
+  "createdAt": "2026-05-13",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "desktop-ide-map",
+  "worktree_path": null,
+  "current_phase": 0,
+  "next_action": [
+    {
+      "phase": 1,
+      "action": "brainstorm"
+    },
+    {
+      "phase": 2,
+      "action": "research"
+    },
+    {
+      "phase": 3,
+      "action": "implement"
+    },
+    {
+      "phase": 4,
+      "action": "check"
+    },
+    {
+      "phase": 5,
+      "action": "update-spec"
+    },
+    {
+      "phase": 6,
+      "action": "record-session"
+    }
+  ],
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

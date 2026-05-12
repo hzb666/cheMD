@@ -1,0 +1,6 @@
+{"file": ".trellis/workflow.md", "reason": "Finish work checklist and quality gate process"}
+{"file": ".trellis/spec/web/frontend/index.md", "reason": "Frontend code quality check spec"}
+{"file": ".trellis\\spec\\guides\\cross-layer-thinking-guide.md", "reason": "Review cross-layer data flow and boundary contracts"}
+{"file": ".trellis\\spec\\guides\\code-reuse-thinking-guide.md", "reason": "Detect duplicated business logic during review"}
+{"file": ".trellis\\spec\\storage-postgres\\backend\\storage-contract.md", "reason": "Review storage contract and runtime boundary changes"}
+{"file": ".trellis\\spec\\web\\frontend\\quality-guidelines.md", "reason": "Review frontend tests, lint, and typecheck gates"}
