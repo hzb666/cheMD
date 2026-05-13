@@ -478,6 +478,15 @@ DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outb
   - 当前验证：job builder/controller Vitest 12/12、desktop typecheck、focused ESLint
     （新文件通过，`App.tsx` 复杂度/函数长度继续非阻塞）、`git diff --check` 通过；
     真实模型/网络/DB 未执行，按环境增强路径记录为 `SKIP`。
+- Reaction intelligence 硬化：
+  - `fix(desktop)：合并 reaction intelligence worker 超时` 为本地 worker command 增加
+    bounded timeout，默认 120s，超时只终止自己启动的直接 child，并以结构化
+    `reaction_intelligence_worker_timeout` 返回。
+  - `fix(desktop)：合并知识图谱来源跳转` 将 knowledge map source-ref/evidence action
+    接到 Monaco editor，当前文件内可 selection/reveal/focus；跨文件 source ref 当前阶段
+    明确提示并 no-op。
+  - 当前验证：Rust worker timeout tests 10/10、Monaco/source jump 与 knowledge-map
+    Vitest 18/18、desktop typecheck 通过；`App.tsx` 复杂度/函数长度仍进入 M11。
 
 当前暂缓债务：
 
@@ -702,6 +711,8 @@ env、database URL、API key、token 或 password。诊断包说明见
 ### P3：Graph/RAG/Agent 产品化
 
 - [ ] Graph panel 可解释 edge evidence 并跳源码。
+- [x] Graph panel 可从 source-ref/evidence action 跳到当前 Monaco editor range；跨文件
+  source ref 明确 no-op，不误开文件。
 - [x] Reaction intelligence artifact 的 computed/semantic basis、provider 状态与 layout
   来源可在 knowledge map/cluster inspector 中解释。
 - [x] Knowledge map 支持 edge basis filter，并可与 cluster filter 组合过滤节点。

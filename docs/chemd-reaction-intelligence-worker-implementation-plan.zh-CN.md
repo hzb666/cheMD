@@ -555,7 +555,7 @@ hybrid_score =
 
 - [x] 没有模型依赖时 worker CLI 输出 `SKIP` / fallback artifact，不阻塞 IDE 编辑链路。
 - [x] 有 artifact 时 cluster/map 展示 computed basis。
-- [ ] source-ref 和 reaction detail 跳转保持可用。
+- [x] source-ref 和 reaction detail 跳转保持可用。
 
 状态记录（Worker H / `reaction-intel-pipeline-cli` + 主控集成）：
 
@@ -596,6 +596,17 @@ hybrid_score =
   可生成合法 job。
 - 当前仍未做长时间 worker 的取消/超时 UI、后台队列持久化、以及 artifact shared
   schema/PostgreSQL sync；这些进入后续产品化硬化阶段。
+
+状态记录（Desktop worker timeout / source jump 硬化）：
+
+- `run_reaction_intelligence_worker` 增加 `timeoutMs` 可选输入，默认 120s，并对过小/过大
+  值做 clamp；执行改为 bounded child wait，超时后只 kill 自己启动的直接 child，并返回
+  `reaction_intelligence_worker_timeout`，保留可获得的 stdout/stderr tail。
+- Knowledge map 的 source-ref/evidence action 已接到 Monaco editor：当前文件匹配时
+  设置 selection、reveal range 并 focus editor；跨文件 source ref 只提示当前阶段不自动
+  打开其它文件，避免跳错文件。
+- 当前未做真实模型长挂 smoke，也未做后台任务取消按钮或持久队列；这些归后续 release
+  hardening / background job 产品化阶段。
 
 ---
 
