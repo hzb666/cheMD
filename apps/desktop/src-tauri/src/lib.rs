@@ -16,6 +16,7 @@ mod postgres_runtime_graph_cleanup;
 mod postgres_runtime_persist;
 mod postgres_runtime_sql;
 mod postgres_runtime_types;
+mod reaction_intelligence_worker;
 mod sidecar;
 mod sidecar_command;
 mod sidecar_log;
@@ -32,6 +33,8 @@ mod local_store_sync_tests;
 mod local_store_tests;
 #[cfg(test)]
 mod postgres_tests;
+#[cfg(test)]
+mod reaction_intelligence_worker_tests;
 #[cfg(test)]
 mod sidecar_tests;
 #[cfg(test)]
@@ -56,6 +59,8 @@ use managed_postgres::{
 use postgres::read_postgres_status;
 #[cfg(not(test))]
 use postgres_runtime_persist::persist_runtime_graph_rag;
+#[cfg(not(test))]
+use reaction_intelligence_worker::run_reaction_intelligence_worker;
 #[cfg(not(test))]
 use sidecar::{
     read_sidecar_logs, read_sidecar_status, start_sidecar, stop_sidecar, SidecarManager,
@@ -97,6 +102,7 @@ pub fn run() {
             clear_local_outbox_failures,
             sync_local_outbox_to_postgres,
             persist_runtime_graph_rag,
+            run_reaction_intelligence_worker,
             export_diagnostics_bundle
         ])
         .run(tauri::generate_context!())

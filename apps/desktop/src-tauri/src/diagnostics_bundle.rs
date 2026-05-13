@@ -12,7 +12,7 @@ const SCHEMA_VERSION: u8 = 1;
 const DEFAULT_OUTPUT_DIR: &str = "chemd-desktop-diagnostics-bundle";
 const SKIP: &str = "SKIP";
 
-const KNOWN_TAURI_COMMANDS: [&str; 24] = [
+const KNOWN_TAURI_COMMANDS: [&str; 25] = [
     "open_workspace",
     "list_workspace_files",
     "read_workspace_file",
@@ -36,6 +36,7 @@ const KNOWN_TAURI_COMMANDS: [&str; 24] = [
     "clear_local_outbox_failures",
     "sync_local_outbox_to_postgres",
     "persist_runtime_graph_rag",
+    "run_reaction_intelligence_worker",
     "export_diagnostics_bundle",
 ];
 
