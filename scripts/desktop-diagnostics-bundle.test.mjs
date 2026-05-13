@@ -74,6 +74,7 @@ test("known desktop commands include reaction intelligence, sync, and RAG surfac
     [
       "read_embedding_provider_status",
       "create_embedding_vector",
+      "create_embedding_vectors",
       "query_postgres_rag",
       "backfill_postgres_rag_embeddings",
       "run_reaction_intelligence_worker",
@@ -88,6 +89,7 @@ test("known desktop commands include reaction intelligence, sync, and RAG surfac
     [
       "read_embedding_provider_status",
       "create_embedding_vector",
+      "create_embedding_vectors",
       "query_postgres_rag",
       "backfill_postgres_rag_embeddings",
       "run_reaction_intelligence_worker",

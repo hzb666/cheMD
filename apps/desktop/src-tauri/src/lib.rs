@@ -59,7 +59,7 @@ mod workspace_tests;
 #[cfg(not(test))]
 use diagnostics_bundle::export_diagnostics_bundle;
 #[cfg(not(test))]
-use embedding_provider_client::create_embedding_vector;
+use embedding_provider_client::{create_embedding_vector, create_embedding_vectors};
 #[cfg(not(test))]
 use embedding_provider_status::read_embedding_provider_status;
 #[cfg(not(test))]
@@ -119,6 +119,7 @@ pub fn run() {
             read_postgres_status,
             read_embedding_provider_status,
             create_embedding_vector,
+            create_embedding_vectors,
             list_postgres_profiles,
             save_postgres_profile,
             activate_postgres_profile,

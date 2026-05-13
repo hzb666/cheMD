@@ -15,7 +15,7 @@ fn export_diagnostics_bundle_writes_parseable_json() {
     let parsed: Value = serde_json::from_str(&json).expect("bundle is valid JSON");
 
     assert_eq!(parsed["schemaVersion"], 1);
-    assert_eq!(parsed["summary"]["commandCount"], 33);
+    assert_eq!(parsed["summary"]["commandCount"], 34);
     assert_eq!(parsed["summary"]["boundarySkipCount"], 8);
     assert_eq!(parsed["summary"]["supportCommandCount"], 7);
     assert_eq!(parsed["runtimeBoundaries"][0]["status"], "SKIP");
@@ -27,6 +27,7 @@ fn export_diagnostics_bundle_writes_parseable_json() {
     assert!(json.contains("list_postgres_profiles"));
     assert!(json.contains("read_embedding_provider_status"));
     assert!(json.contains("create_embedding_vector"));
+    assert!(json.contains("create_embedding_vectors"));
     assert!(json.contains("query_postgres_rag"));
     assert!(json.contains("backfill_postgres_rag_embeddings"));
 
