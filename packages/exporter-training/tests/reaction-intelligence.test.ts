@@ -228,4 +228,63 @@ describe("reaction intelligence graph index merge", () => {
       "rdkit_provider_unavailable"
     ]));
   });
+
+  it("merges DRFP features and similarity edges into the reaction intelligence layer", () => {
+    const index = buildIndex();
+    const artifact: ReactionIntelligenceArtifact = {
+      schema_version: "chemd-reaction-intelligence-artifact/v0.1",
+      artifact_id: "artifact-drfp",
+      job_id: "job-drfp",
+      provider_statuses: [
+        {
+          provider: "drfp",
+          status: "OK",
+          warnings: []
+        }
+      ],
+      computed_features: [
+        {
+          feature_id: "ri-feature::rxn-a::drfp",
+          reaction_entity_id: rxnA,
+          provider: "drfp",
+          feature_kind: "drfp_reaction_fingerprint",
+          status: "AVAILABLE",
+          source: "computed_artifact",
+          fingerprint_ref: "drfp::rxn-a::abc",
+          warnings: [],
+          metadata: { on_bits: [1, 8, 13], dimension: 2048 }
+        }
+      ],
+      computed_similarity_edges: [
+        {
+          edge_id: "reaction-similarity::drfp",
+          from_reaction_entity_id: rxnA,
+          to_reaction_entity_id: rxnB,
+          basis: ["hybrid_computed", "drfp_tanimoto"],
+          score: 0.82,
+          source: "computed_artifact",
+          contributions: [
+            {
+              basis: "drfp_tanimoto",
+              provider: "drfp",
+              score: 0.82,
+              weight: 0.3,
+              warnings: []
+            }
+          ],
+          warnings: []
+        }
+      ],
+      warnings: []
+    };
+    const merged = mergeReactionIntelligenceArtifactIntoGraphIndex(index, artifact);
+
+    expect(merged.reaction_intelligence.provider_statuses[0]?.provider).toBe("drfp");
+    expect(merged.reaction_intelligence.computed_features[0]?.feature_kind).toBe(
+      "drfp_reaction_fingerprint"
+    );
+    expect(merged.reaction_intelligence.computed_similarity_edges[0]?.basis).toContain(
+      "drfp_tanimoto"
+    );
+  });
 });
