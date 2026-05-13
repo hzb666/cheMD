@@ -6,7 +6,9 @@ use crate::{
     },
     managed_postgres_migrations::managed_migration_sql,
     managed_postgres_process::{pid_file_owns_data_dir, write_pid_file, ManagedPostgresPidFile},
-    postgres::{schema_ready_from_rows, status_without_config, CORE_SCHEMA_TABLES},
+    postgres::{
+        migration_readiness, schema_ready_from_rows, status_without_config, CORE_SCHEMA_TABLES,
+    },
     postgres_config::{
         load_postgres_config_from_managed_root, normalize_postgres_database_url, parse_env_file,
         redact_postgres_url, select_postgres_config, EnvSource,
@@ -122,6 +124,9 @@ fn missing_config_returns_placeholder_without_connection_attempt() {
     assert!(!status.configured);
     assert_eq!(status.vector_installed, None);
     assert_eq!(status.schema_ready, None);
+    assert_eq!(status.migration_state, "unknown");
+    assert!(status.migration_reason.contains("Offline Core"));
+    assert_eq!(status.core_tables_found, None);
 }
 
 #[test]
@@ -139,6 +144,31 @@ fn schema_row_mapping_requires_all_core_graph_rag_tables() {
         .collect::<Vec<_>>();
 
     assert!(!schema_ready_from_rows(&missing_one));
+}
+
+#[test]
+fn migration_readiness_mapping_preserves_unknown_pending_failed_ready() {
+    let unknown = migration_readiness(None, None, None, true, "connection unavailable");
+    assert_eq!(unknown.0, "unknown");
+    assert!(unknown.1.contains("could not be inspected"));
+
+    let pending = migration_readiness(Some(false), Some(false), Some(0), true, "");
+    assert_eq!(pending.0, "pending");
+    assert!(pending.1.contains("Install pgvector"));
+
+    let partial = migration_readiness(Some(true), Some(false), Some(3), true, "");
+    assert_eq!(partial.0, "failed");
+    assert!(partial.1.contains("3/11"));
+
+    let ready = migration_readiness(
+        Some(true),
+        Some(true),
+        Some(CORE_SCHEMA_TABLES.len()),
+        true,
+        "",
+    );
+    assert_eq!(ready.0, "ready");
+    assert!(ready.1.contains("pgvector installed"));
 }
 
 #[test]

@@ -21,6 +21,12 @@ import {
   type PostgresProfileOperation,
   type PostgresProfileRow
 } from "./desktop-postgres-profiles";
+import {
+  buildExternalPostgresReadiness,
+  buildManagedPostgresReadiness,
+  formatPostgresDisplayValue,
+  type PostgresReadinessItem
+} from "./desktop-postgres-status";
 import { buildDesktopReactionIntelligenceJob, type DesktopReactionIntelligenceJobBuildResult } from "./desktop-reaction-intelligence-job";
 import {
   createDesktopReactionIntelligenceJobController,
@@ -545,11 +551,7 @@ const getPostgresErrorMessage = (error: unknown): string => {
   return redactSensitiveRuntimeText(firstLine || "Postgres status unavailable");
 };
 
-const formatPostgresValue = (value: string | number | boolean | null): string => {
-  if (value === null) return "unknown";
-  if (typeof value === "boolean") return value ? "yes" : "no";
-  return String(value);
-};
+const formatPostgresValue = formatPostgresDisplayValue;
 
 const getPostgresBadgeDetail = (status: PostgresStatus): string => {
   if (!status.configured) return "Postgres is not configured";
@@ -1308,14 +1310,28 @@ const PostgresFieldGrid = ({ fields, wideLabels = ["Detail"] }: { fields: Postgr
   </dl>
 );
 
+const PostgresReadinessList = ({ items }: { items: PostgresReadinessItem[] }) => (
+  <div className="desktop-postgres-readiness" aria-label="Postgres migration readiness">
+    {items.map((item) => (
+      <div key={item.id} data-tone={item.tone}>
+        <span>{item.label}</span>
+        <strong>{item.value}</strong>
+        <small>{item.reason}</small>
+      </div>
+    ))}
+  </div>
+);
+
 const ExternalPostgresSection = ({ status }: { status: PostgresStatus }) => {
   const externalConfigured = getExternalConfigured(status);
+  const readiness = buildExternalPostgresReadiness(status);
   return (
     <div className="desktop-postgres-subpanel">
       <div className="desktop-postgres-subhead">
         <span>External Postgres</span>
         <small>{externalConfigured ? "priority target" : "not selected"}</small>
       </div>
+      <PostgresReadinessList items={readiness} />
       <PostgresFieldGrid fields={getExternalPostgresFields(status)} />
     </div>
   );
@@ -1323,6 +1339,7 @@ const ExternalPostgresSection = ({ status }: { status: PostgresStatus }) => {
 
 const ManagedPostgresSection = ({
   status,
+  runtimeStatus,
   loading,
   operation,
   errorMessage,
@@ -1334,6 +1351,7 @@ const ManagedPostgresSection = ({
   onRefresh
 }: {
   status: ManagedPostgresStatus;
+  runtimeStatus: PostgresStatus;
   loading: boolean;
   operation: ManagedPostgresOperation | null;
   errorMessage: string | null;
@@ -1346,6 +1364,7 @@ const ManagedPostgresSection = ({
 }) => {
   const unavailableMessage = getManagedPostgresUnavailableMessage(status);
   const controls = getManagedPostgresControlState(status, loading, operation);
+  const readiness = buildManagedPostgresReadiness(status, runtimeStatus);
 
   return (
     <div className="desktop-postgres-subpanel">
@@ -1363,6 +1382,7 @@ const ManagedPostgresSection = ({
       {unavailableMessage ? <p className="desktop-postgres-message" data-tone="warning">{unavailableMessage}</p> : null}
       {errorMessage ? <p className="desktop-postgres-message" data-tone="danger" role="alert">{errorMessage}</p> : null}
       {message ? <p className="desktop-postgres-message" data-tone="info">{message}</p> : null}
+      <PostgresReadinessList items={readiness} />
       <PostgresFieldGrid fields={getManagedPostgresFields(status)} wideLabels={["Data dir", "Detail"]} />
     </div>
   );
@@ -1577,6 +1597,7 @@ const PostgresStatusPanel = ({
         <ExternalPostgresSection status={status} />
         <ManagedPostgresSection
           status={managedStatus}
+          runtimeStatus={status}
           loading={loading}
           operation={managedOperation}
           errorMessage={managedErrorMessage}

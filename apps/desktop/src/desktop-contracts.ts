@@ -6,6 +6,7 @@ import type {
 } from "@chemd/reaction-map";
 
 export type RuntimeState = "ready" | "placeholder" | "degraded" | "offline";
+export type PostgresMigrationReadiness = "ready" | "pending" | "failed" | "unknown";
 
 export interface WorkspaceHandle {
   workspaceId: string;
@@ -48,6 +49,9 @@ export interface PostgresStatus {
   ssl: string;
   vectorInstalled: boolean | null;
   schemaReady: boolean | null;
+  migrationState: PostgresMigrationReadiness;
+  migrationReason: string;
+  coreTablesFound: number | null;
   timeoutMs: number;
   pool: string | null;
 }
@@ -676,6 +680,9 @@ export const shellPostgresStatus: PostgresStatus = {
   ssl: "not configured",
   vectorInstalled: null,
   schemaReady: null,
+  migrationState: "unknown",
+  migrationReason: "No Postgres target is configured; Offline Core remains available",
+  coreTablesFound: null,
   timeoutMs: 0,
   pool: null
 };

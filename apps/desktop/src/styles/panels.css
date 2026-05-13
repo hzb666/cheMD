@@ -872,6 +872,78 @@
     margin: 0;
   }
 
+  .desktop-postgres-readiness {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.35rem;
+  }
+
+  .desktop-postgres-readiness div {
+    display: flex;
+    min-width: 0;
+    min-height: 4.2rem;
+    flex-direction: column;
+    gap: 0.18rem;
+    padding: 0.42rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--card);
+  }
+
+  .desktop-postgres-readiness span {
+    overflow: hidden;
+    color: var(--muted-foreground);
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .desktop-postgres-readiness strong {
+    color: var(--foreground);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 750;
+  }
+
+  .desktop-postgres-readiness small {
+    display: -webkit-box;
+    overflow: hidden;
+    color: var(--muted-foreground);
+    font-size: 0.66rem;
+    line-height: 1.25;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .desktop-postgres-readiness div[data-tone="success"] {
+    border-color: color-mix(in oklch, var(--success) 28%, var(--border));
+    background: color-mix(in oklch, var(--success) 6%, var(--card));
+  }
+
+  .desktop-postgres-readiness div[data-tone="success"] strong {
+    color: var(--success);
+  }
+
+  .desktop-postgres-readiness div[data-tone="warning"] {
+    border-color: color-mix(in oklch, var(--warning) 30%, var(--border));
+    background: color-mix(in oklch, var(--warning) 7%, var(--card));
+  }
+
+  .desktop-postgres-readiness div[data-tone="warning"] strong {
+    color: var(--warning);
+  }
+
+  .desktop-postgres-readiness div[data-tone="danger"] {
+    border-color: color-mix(in oklch, var(--danger) 30%, var(--border));
+    background: color-mix(in oklch, var(--danger) 7%, var(--card));
+  }
+
+  .desktop-postgres-readiness div[data-tone="danger"] strong {
+    color: var(--danger);
+  }
+
   .desktop-postgres-fields div {
     min-width: 0;
     padding: 0.42rem 0.5rem;

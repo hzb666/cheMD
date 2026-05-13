@@ -21,6 +21,11 @@ pub(crate) const CORE_SCHEMA_TABLES: [&str; 11] = [
     "chemd_patch_proposals",
 ];
 
+pub(crate) const POSTGRES_MIGRATION_READY: &str = "ready";
+pub(crate) const POSTGRES_MIGRATION_PENDING: &str = "pending";
+pub(crate) const POSTGRES_MIGRATION_FAILED: &str = "failed";
+pub(crate) const POSTGRES_MIGRATION_UNKNOWN: &str = "unknown";
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PostgresStatus {
@@ -35,6 +40,9 @@ pub struct PostgresStatus {
     pub(crate) ssl: String,
     pub(crate) vector_installed: Option<bool>,
     pub(crate) schema_ready: Option<bool>,
+    pub(crate) migration_state: String,
+    pub(crate) migration_reason: String,
+    pub(crate) core_tables_found: Option<usize>,
     pub(crate) timeout_ms: u64,
     pub(crate) pool: Option<String>,
 }
@@ -56,6 +64,10 @@ pub async fn read_postgres_status() -> PostgresStatus {
             ssl: "unknown".into(),
             vector_installed: None,
             schema_ready: None,
+            migration_state: POSTGRES_MIGRATION_UNKNOWN.into(),
+            migration_reason:
+                "Postgres status task failed before migration readiness could be inspected".into(),
+            core_tables_found: None,
             timeout_ms: 0,
             pool: None,
         },
@@ -76,6 +88,7 @@ pub(crate) fn read_postgres_status_impl() -> PostgresStatus {
             &format!("Connection or read-only checks failed: {detail}"),
             None,
             None,
+            None,
         ),
     }
 }
@@ -93,6 +106,9 @@ pub(crate) fn status_without_config() -> PostgresStatus {
         ssl: "not configured".into(),
         vector_installed: None,
         schema_ready: None,
+        migration_state: POSTGRES_MIGRATION_UNKNOWN.into(),
+        migration_reason: "No Postgres target is configured; Offline Core remains available".into(),
+        core_tables_found: None,
         timeout_ms: 0,
         pool: None,
     }
@@ -107,6 +123,7 @@ pub(crate) fn schema_ready_from_rows(found_tables: &[String]) -> bool {
 struct ProbeResult {
     vector_installed: bool,
     schema_ready: bool,
+    core_tables_found: usize,
 }
 
 fn probe_database(config: &PostgresRuntimeConfig) -> Result<ProbeResult, String> {
@@ -128,6 +145,7 @@ fn probe_database(config: &PostgresRuntimeConfig) -> Result<ProbeResult, String>
     Ok(ProbeResult {
         vector_installed,
         schema_ready: schema_ready_from_rows(&found_tables),
+        core_tables_found: found_tables.len(),
     })
 }
 
@@ -171,6 +189,7 @@ fn status_from_probe(config: &PostgresRuntimeConfig, probe: ProbeResult) -> Post
             "Connected, but pgvector extension is missing",
             Some(false),
             Some(probe.schema_ready),
+            Some(probe.core_tables_found),
         );
     }
     if !probe.schema_ready {
@@ -181,6 +200,7 @@ fn status_from_probe(config: &PostgresRuntimeConfig, probe: ProbeResult) -> Post
             "Connected, but required Chemd Graph/RAG tables are missing",
             Some(true),
             Some(false),
+            Some(probe.core_tables_found),
         );
     }
     configured_status(
@@ -190,6 +210,7 @@ fn status_from_probe(config: &PostgresRuntimeConfig, probe: ProbeResult) -> Post
         "Connected and verified SELECT 1, pgvector, and Chemd Graph/RAG schema",
         Some(true),
         Some(true),
+        Some(probe.core_tables_found),
     )
 }
 
@@ -200,7 +221,15 @@ fn configured_status(
     detail: &str,
     vector_installed: Option<bool>,
     schema_ready: Option<bool>,
+    core_tables_found: Option<usize>,
 ) -> PostgresStatus {
+    let (migration_state, migration_reason) = migration_readiness(
+        vector_installed,
+        schema_ready,
+        core_tables_found,
+        true,
+        detail,
+    );
     PostgresStatus {
         state: state.into(),
         label: label.into(),
@@ -213,7 +242,66 @@ fn configured_status(
         ssl: config.ssl.clone(),
         vector_installed,
         schema_ready,
+        migration_state,
+        migration_reason,
+        core_tables_found,
         timeout_ms: config.timeout_ms,
         pool: config.pool.clone(),
     }
+}
+
+pub(crate) fn migration_readiness(
+    vector_installed: Option<bool>,
+    schema_ready: Option<bool>,
+    core_tables_found: Option<usize>,
+    configured: bool,
+    detail: &str,
+) -> (String, String) {
+    if !configured {
+        return (
+            POSTGRES_MIGRATION_UNKNOWN.into(),
+            "No Postgres target is configured; Offline Core remains available".into(),
+        );
+    }
+    let (Some(vector_installed), Some(schema_ready), Some(core_tables_found)) =
+        (vector_installed, schema_ready, core_tables_found)
+    else {
+        return (
+            POSTGRES_MIGRATION_UNKNOWN.into(),
+            format!("Runtime readiness could not be inspected: {detail}"),
+        );
+    };
+    if vector_installed && schema_ready {
+        return (
+            POSTGRES_MIGRATION_READY.into(),
+            format!(
+                "pgvector installed and all {expected} shared schema tables are present",
+                expected = CORE_SCHEMA_TABLES.len()
+            ),
+        );
+    }
+    if core_tables_found == 0 {
+        let reason = if vector_installed {
+            "Run PostgreSQL migrations to create the shared Chemd schema"
+        } else {
+            "Install pgvector and run PostgreSQL migrations for the shared Chemd schema"
+        };
+        return (POSTGRES_MIGRATION_PENDING.into(), reason.into());
+    }
+    if !vector_installed {
+        return (
+            POSTGRES_MIGRATION_FAILED.into(),
+            format!(
+                "pgvector is missing while {core_tables_found}/{expected} shared schema tables are present",
+                expected = CORE_SCHEMA_TABLES.len()
+            ),
+        );
+    }
+    (
+        POSTGRES_MIGRATION_FAILED.into(),
+        format!(
+            "Shared schema is incomplete: {core_tables_found}/{expected} core tables found",
+            expected = CORE_SCHEMA_TABLES.len()
+        ),
+    )
 }
