@@ -105,7 +105,9 @@
 - [x] `apps/desktop/src/monaco/chemd-navigation-provider.ts`：Monaco hover、go to definition、find references provider，复用 workspace symbol index。
 - [x] `apps/desktop/src/workspace-index/desktop-workspace-index.ts`：workspace symbol/reference index view-model 与 completion index adapter。
 - [x] `apps/desktop/src/workspace-index/use-desktop-workspace-index.ts`：workspace 打开后读取可见 Chemd 文档，当前编辑 buffer 覆盖缓存文档，形成 cross-document index。
+- [x] `apps/desktop/src/workspace-index/DesktopWorkspaceIndexPanel.tsx`：workspace symbol/reference 面板组件，`App.tsx` 不承载搜索业务逻辑。
 - [x] `apps/desktop/src/knowledge-map/desktop-knowledge-map.ts`：semantic render tree 与 reaction map fallback layout view-model。
+- [x] `apps/desktop/src/knowledge-map/DesktopKnowledgeMapPanel.tsx`：semantic summary、reaction map、cluster rows 面板组件，`App.tsx` 只传 view-model。
 - [x] 新增 desktop focused tests：Monaco provider、workspace index view-model、knowledge map view-model。
 - [x] `apps/desktop/src/App.tsx` 薄接线：completion 接入 workspace index，RAG dock 展示 symbol/reference rows，Reaction Graph dock 展示 reaction map 与 cluster summary。
 

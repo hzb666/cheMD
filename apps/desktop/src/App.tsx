@@ -9,8 +9,10 @@ import { shellFiles, shellPostgresStatus, shellSidecarStatus, shellWorkspace, ty
 import { buildLocalRuntimeSnapshotInput } from "./desktop-local-store";
 import { buildPersistRuntimeGraphRagCommandInput } from "./desktop-runtime-persistence";
 import { runWorkspaceIngest } from "./desktop-workspace-ingest";
+import { DesktopKnowledgeMapPanel } from "./knowledge-map/DesktopKnowledgeMapPanel";
 import { buildDesktopKnowledgeMapViewModel, type DesktopKnowledgeMapViewModel } from "./knowledge-map/desktop-knowledge-map";
 import { MonacoChemdEditor } from "./MonacoChemdEditor";
+import { DesktopWorkspaceIndexPanel } from "./workspace-index/DesktopWorkspaceIndexPanel";
 import type { DesktopWorkspaceIndexViewModel } from "./workspace-index/desktop-workspace-index";
 import { useDesktopWorkspaceIndexController } from "./workspace-index/use-desktop-workspace-index";
 
@@ -2083,100 +2085,6 @@ const AgentLedger = ({ agentRun }: { agentRun: AgentRun | null }) => (
   ) : null
 );
 
-const RagSearchPanel = ({
-  workspaceIndexViewModel
-}: {
-  workspaceIndexViewModel: DesktopWorkspaceIndexViewModel;
-}) => {
-  const [query, setQuery] = useState("");
-  const rows = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    const symbolRows = workspaceIndexViewModel.symbols.map((symbol) => ({
-      id: `symbol-${symbol.id}`,
-      kind: symbol.kind,
-      label: symbol.label,
-      detail: `${symbol.documentPath}:L${symbol.line}`
-    }));
-    const referenceRows = workspaceIndexViewModel.references.map((reference) => ({
-      id: `reference-${reference.id}`,
-      kind: reference.status,
-      label: reference.target,
-      detail: `${reference.field} L${reference.line}`
-    }));
-    const allRows = [...symbolRows, ...referenceRows];
-    if (!normalizedQuery) return allRows.slice(0, 8);
-    return allRows.filter((row) =>
-      `${row.kind} ${row.label} ${row.detail}`.toLowerCase().includes(normalizedQuery)
-    ).slice(0, 12);
-  }, [query, workspaceIndexViewModel.references, workspaceIndexViewModel.symbols]);
-
-  return (
-    <div className="desktop-tool-panel">
-      <div className="desktop-graph-summary">
-        {workspaceIndexViewModel.badges.slice(0, 3).map((badge) => (
-          <div key={badge.label} data-state={badge.tone}><span>{badge.label}</span><strong>{badge.value}</strong></div>
-        ))}
-      </div>
-      <label className="desktop-tool-search">
-        <Search size={14} />
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search symbols, diagnostics, graph text"
-          aria-label="RAG search query"
-        />
-      </label>
-      <p className="desktop-empty-copy">{workspaceIndexViewModel.message}</p>
-      <div className="desktop-tool-result-list" role="list">
-        {rows.length > 0 ? rows.map((row) => (
-          <div key={row.id} className="desktop-tool-result-row" role="listitem">
-            <span>{row.kind}</span>
-            <strong title={row.label}>{row.label}</strong>
-            <code>{row.detail}</code>
-          </div>
-        )) : <p className="desktop-empty-copy">No matches.</p>}
-      </div>
-    </div>
-  );
-};
-
-const ReactionGraphPanel = ({
-  knowledgeMapViewModel
-}: {
-  knowledgeMapViewModel: DesktopKnowledgeMapViewModel;
-}) => {
-  const graphNodes = knowledgeMapViewModel.reactionMap.nodes.slice(0, 10);
-  return (
-    <div className="desktop-tool-panel">
-      <div className="desktop-graph-summary">
-        <div><span>State</span><strong>{knowledgeMapViewModel.state}</strong></div>
-        <div><span>Reactions</span><strong>{knowledgeMapViewModel.reactionSummary.reactionCount}</strong></div>
-        <div><span>Clusters</span><strong>{knowledgeMapViewModel.reactionSummary.clusterCount}</strong></div>
-      </div>
-      <p className="desktop-empty-copy">{knowledgeMapViewModel.reactionSummary.message}</p>
-      <div className="desktop-graph-node-list" role="list">
-        {graphNodes.length > 0 ? graphNodes.map((node) => (
-          <div key={node.reaction_entity_id} className="desktop-graph-node-row" role="listitem">
-            <GitGraph size={13} />
-            <span>{node.cluster_id ? "clustered" : "reaction"}</span>
-            <strong title={node.reaction_entity_id}>{node.reaction_entity_id}</strong>
-            <code>{Math.round(node.x)},{Math.round(node.y)}</code>
-          </div>
-        )) : <p className="desktop-empty-copy">{knowledgeMapViewModel.message}</p>}
-      </div>
-      <div className="desktop-tool-result-list" role="list" aria-label="Reaction clusters">
-        {knowledgeMapViewModel.clusters.slice(0, 6).map((cluster) => (
-          <div key={cluster.id} className="desktop-tool-result-row" role="listitem">
-            <span>{cluster.basis}</span>
-            <strong title={cluster.label}>{cluster.label}</strong>
-            <code>{cluster.memberCount}</code>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
 const SettingsDockPanel = ({
   mode,
   sidecarStatus,
@@ -2350,8 +2258,8 @@ const InsightDockContent = ({
   const appliedDecision = findPatchDecision(props.agentRun, activeProposal?.patchProposalId, "applied");
   const contentByPanel: Record<InsightDockPanelId, ReactNode> = {
     outline: <div className="desktop-insight-section">{props.outline.length > 0 ? <OutlineTree items={props.outline} /> : <p className="desktop-empty-copy">No outline from language service.</p>}</div>,
-    rag: <RagSearchPanel workspaceIndexViewModel={props.workspaceIndexViewModel} />,
-    graph: <ReactionGraphPanel knowledgeMapViewModel={props.knowledgeMapViewModel} />,
+    rag: <DesktopWorkspaceIndexPanel viewModel={props.workspaceIndexViewModel} />,
+    graph: <DesktopKnowledgeMapPanel viewModel={props.knowledgeMapViewModel} />,
     runtime: <SidecarControlPanel status={props.sidecarStatus} logTail={props.sidecarLogTail} operation={props.sidecarOperation} message={props.sidecarMessage} errorMessage={props.sidecarError} onStart={props.onStartSidecar} onStop={props.onStopSidecar} onRefresh={props.onRefreshSidecar} onLoadLogs={props.onLoadSidecarLogs} />,
     postgres: <PostgresStatusPanel status={props.postgresStatus} managedStatus={props.managedPostgresStatus} loading={props.postgresLoading} managedOperation={props.managedPostgresOperation} errorMessage={props.postgresError} managedErrorMessage={props.managedPostgresError} managedMessage={props.managedPostgresMessage} persistState={props.persistState} persistDisabledReason={props.persistDisabledReason} onRefresh={props.onRefreshPostgres} onInitManaged={props.onInitManagedPostgres} onStartManaged={props.onStartManagedPostgres} onStopManaged={props.onStopManagedPostgres} onMigrateManaged={props.onMigrateManagedPostgres} onRefreshManaged={props.onRefreshManagedPostgres} onPersistGraph={props.onPersistGraph} />,
     storage: <LocalStorePanel status={props.localStoreStatus} operation={props.localStoreOperation} snapshotState={props.localSnapshotState} syncState={props.localSyncState} workspaceIngestState={props.workspaceIngestState} disabledReason={props.localStoreDisabledReason} syncDisabledReason={props.localStoreSyncDisabledReason} workspaceIngestDisabledReason={props.workspaceIngestDisabledReason} errorMessage={props.localStoreError} onRefresh={props.onRefreshLocalStore} onSave={props.onSaveLocalSnapshot} onSync={props.onSyncLocalOutbox} onRunWorkspaceIngest={props.onRunWorkspaceIngest} />,
