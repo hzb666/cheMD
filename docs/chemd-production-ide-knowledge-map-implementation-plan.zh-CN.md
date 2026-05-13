@@ -1072,3 +1072,32 @@ M1 language-service completion core
   - `pnpm --filter @chemd/language-service test`：通过，5 files / 37 tests。
   - `pnpm --filter @chemd/language-service typecheck`：通过。
   - `git diff --check`：通过；仅输出 LF/CRLF 工作区提示。
+
+### 2026-05-13 desktop-ide-monaco-hover-definition
+
+- 范围：把已合并的 `@chemd/language-service` hover/definition core 接入
+  desktop Monaco editor provider；不改变 UI 布局，不修改 `App.tsx`、
+  root 配置、package/lockfile、Tauri/Rust、数据库或 shared packages。
+- 产物：新增 `apps/desktop/src/monaco-chemd-navigation.ts`，负责
+  hover/definition provider 单例注册、当前 model URI 到 `compileOutput`
+  的缓存、Monaco hover/definition range/location 映射；`MonacoChemdEditor.tsx`
+  只负责注册调用与 update/cleanup 生命周期。
+- 行为：hover 在当前文档 symbol、diagnostic、`@symbolId`/裸 symbol id
+  引用位置返回紧凑 Markdown；definition 对当前文档引用返回 Monaco
+  Location，缺少 compile output、无 token 或找不到 target 时返回空结果。
+- 降级：provider 内部捕获异常，返回 `null` 或空数组，不阻断编辑。
+- 验证：待本分支执行
+  `pnpm --filter @chemd/desktop typecheck`、
+  `pnpm --filter @chemd/desktop exec eslint src/MonacoChemdEditor.tsx src/monaco-chemd-navigation.ts src/monaco-chemd-navigation.test.ts`、
+  `pnpm --filter @chemd/desktop build` 和 `git diff --check` 后更新最终结果。
+
+### 2026-05-13 desktop-ide-monaco-hover-definition 验证结果
+
+- `pnpm --filter @chemd/desktop typecheck`：通过。
+- `pnpm --filter @chemd/desktop exec eslint src/MonacoChemdEditor.tsx src/monaco-chemd-navigation.ts src/monaco-chemd-navigation.test.ts`：
+  通过。
+- `pnpm --filter @chemd/desktop build`：通过；Vite 输出 lucide
+  `use client` directive ignored warning 和 chunk size warning。
+- `pnpm exec vitest run apps/desktop/src/monaco-chemd-navigation.test.ts`：
+  通过，1 file / 2 tests；Vitest 输出 workspace file deprecation warning。
+- `git diff --check`：通过；仅输出 LF/CRLF 工作区提示。
