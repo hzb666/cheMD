@@ -1125,3 +1125,25 @@ M1 language-service completion core
   - `pnpm --filter @chemd/desktop build`：通过；Vite 输出 lucide
     `use client` directive ignored warning 和 chunk size warning。
   - `git diff --check`：通过；仅输出 LF/CRLF 工作区提示。
+
+### 2026-05-13 desktop-ide-workspace-symbol-helper
+
+- 范围：新增 desktop workspace symbol index helper；不接入 UI，不修改
+  `App.tsx`、Monaco editor、shared packages、root 配置、Tauri/Rust 或
+  持久化层。
+- 产物：新增 `buildDesktopWorkspaceSymbolIndex(input)`，消费 workspace
+  handle、文件列表、注入式 `readFile` 与可选 `compile`/URI 构造函数，
+  输出 `ChemdWorkspaceSymbolIndex` 与 desktop summary。
+- 行为：仅扫描 `.chemd.md` 和 `chemdKind: "document"` 的 Markdown；
+  普通 Markdown、目录和不支持文件计入 skipped；单文件 read/compile
+  失败不阻断其他文件，并在 summary.errors 中记录阶段和错误信息。
+- 复用：默认通过 `compileChemdForEditor()` 生成单文档 compile output，
+  再交给 `buildChemdWorkspaceSymbolIndex()` 聚合，避免重复实现
+  parser/compiler/symbol 逻辑。
+- 验证：
+  - `pnpm --filter @chemd/desktop exec vitest run src/desktop-workspace-symbol-index.test.ts`：
+    通过，1 file / 6 tests。
+  - `pnpm --filter @chemd/desktop typecheck`：通过。
+  - `pnpm --filter @chemd/desktop exec eslint src/desktop-workspace-symbol-index.ts src/desktop-workspace-symbol-index.test.ts`：
+    通过。
+  - `git diff --check`：通过；仅输出 LF/CRLF 工作区提示。
