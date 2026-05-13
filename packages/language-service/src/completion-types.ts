@@ -23,7 +23,17 @@ export interface ChemdCompletionRequest {
 export type ChemdCompletionItemKind =
   | "snippet"
   | "field"
-  | "value";
+  | "value"
+  | "reference";
+
+export interface ChemdReferenceCompletionData {
+  type: "reference";
+  symbolId: string;
+  symbolKind: string;
+}
+
+export type ChemdCompletionItemData =
+  | ChemdReferenceCompletionData;
 
 export interface ChemdCompletionItem {
   id: string;
@@ -35,6 +45,7 @@ export interface ChemdCompletionItem {
   documentation?: string;
   sortText?: string;
   filterText?: string;
+  data?: ChemdCompletionItemData;
   range: ChemdSourceRange;
 }
 

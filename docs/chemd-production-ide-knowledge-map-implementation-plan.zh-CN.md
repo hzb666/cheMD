@@ -956,3 +956,18 @@ M1 language-service completion core
     `use client` bundle warnings。
   - `pnpm --filter @chemd/desktop exec eslint src/MonacoChemdEditor.tsx src/monaco-chemd-completion.ts`：通过。
   - `git diff --check`：通过；仅输出 LF/CRLF 工作区提示。
+
+### 2026-05-13 desktop-ide-current-reference-completion
+
+- 范围：完成 M2.1 当前文档 reference completion core，只修改
+  `@chemd/language-service` completion 层和本计划文档，不接入
+  `apps/desktop`、Monaco provider、workspace index 或 cross-document references。
+- 产物：新增 `getChemdReferenceCompletions(request, context)`，从传入的
+  `compileOutput.symbols` 生成 `reference` completion item；`insertText`
+  使用 `@symbolId`，并携带 `reference` data。
+- 触发：仅在显式 `@` token 或 `reactants`/`products`/`prev` 引用值位置提示；
+  普通 prose 不刷 reference suggestions；缺少 `compileOutput` 时返回空列表。
+- 验证：
+  - `pnpm --filter @chemd/language-service test`：通过，3 files / 26 tests。
+  - `pnpm --filter @chemd/language-service typecheck`：通过。
+  - `git diff --check`：通过；仅输出 LF/CRLF 工作区提示。
