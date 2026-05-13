@@ -1416,3 +1416,37 @@ Merged edge basis filtering and local artifact controller worktrees; added react
 ### Next Steps
 
 - None - task complete
+
+
+## Session 75: Desktop ingest runner and diagnostics provider coverage
+
+**Date**: 2026-05-13
+**Task**: Desktop ingest runner and diagnostics provider coverage
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+(Add summary)
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5a5e813` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
