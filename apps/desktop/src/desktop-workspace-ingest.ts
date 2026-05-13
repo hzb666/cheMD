@@ -43,6 +43,7 @@ export interface RunWorkspaceIngestInput {
   readFile: (file: WorkspaceFileEntry) => MaybePromise<WorkspaceIngestFileContent>;
   compile: (source: string, file: WorkspaceFileEntry) => MaybePromise<unknown>;
   existingItems?: readonly WorkspaceIngestQueueItem[];
+  maxRetryFailures?: number;
   createdAt?: string;
 }
 
@@ -252,7 +253,15 @@ const findExistingItem = (
     item.workspaceId === input.workspaceId
     && item.documentPath === document.documentPath
     && item.documentHash === document.documentHash
+    && item.revisionHash === document.revisionHash
   );
+
+const canReuseExistingItem = (item: WorkspaceIngestQueueItem): boolean =>
+  item.status === "pending" || item.status === "running" || item.status === "synced";
+
+const reachedRetryLimit = (input: RunWorkspaceIngestInput, item: WorkspaceIngestQueueItem): boolean =>
+  item.status === "failed"
+  && item.failureCount >= (input.maxRetryFailures ?? DEFAULT_MAX_RETRY_FAILURES);
 
 const buildSkippedMarkdownItem = (
   input: RunWorkspaceIngestInput,
@@ -307,7 +316,9 @@ const processChemdFile = async (
     const source = toSourceText(content);
     const document = buildDocumentMetadata(input.workspaceId, file, source, toModifiedAtMs(content));
     const existing = findExistingItem(input, document);
-    if (existing?.status === "synced") return existing;
+    if (existing && (canReuseExistingItem(existing) || reachedRetryLimit(input, existing))) {
+      return existing;
+    }
     return buildWorkspaceIngestQueueItem({
       document,
       compileOutput: await input.compile(source, file),
@@ -333,5 +344,10 @@ export const runWorkspaceIngest = async (
       items.push(buildSkippedMarkdownItem(normalizedInput, file));
     }
   }
-  return { items, summary: deriveWorkspaceIngestQueueSummary(items) };
+  return {
+    items,
+    summary: deriveWorkspaceIngestQueueSummary(items, {
+      maxRetryFailures: normalizedInput.maxRetryFailures
+    })
+  };
 };

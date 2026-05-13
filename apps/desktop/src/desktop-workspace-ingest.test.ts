@@ -269,6 +269,31 @@ describe("desktop workspace ingest runner", () => {
     expect(changed.idempotencyKey).not.toBe(first.idempotencyKey);
   });
 
+  it("reuses an unchanged pending item without creating another pending revision", async () => {
+    const file = fileEntry("experiments/pending.chemd.md");
+    const initial = await runWorkspaceIngest({
+      workspaceId: "workspace-alpha",
+      files: [file],
+      readFile: () => "pending source",
+      compile: () => ({ status: "ok", graphSnapshot: { graphSnapshotId: "pending-snapshot" } }),
+      createdAt
+    });
+    const pending = initial.items[0];
+    const compile = vi.fn(() => ({ status: "ok" }));
+    const resumed = await runWorkspaceIngest({
+      workspaceId: "workspace-alpha",
+      files: [file],
+      readFile: () => "pending source",
+      compile,
+      existingItems: [pending],
+      createdAt
+    });
+
+    expect(compile).not.toHaveBeenCalled();
+    expect(resumed.items).toEqual([pending]);
+    expect(resumed.summary).toMatchObject({ pendingCount: 1, totalCount: 1 });
+  });
+
   it("reuses an unchanged synced item without compiling it again", async () => {
     const file = fileEntry("experiments/synced.chemd.md");
     const initial = await runWorkspaceIngest({
@@ -292,5 +317,65 @@ describe("desktop workspace ingest runner", () => {
     expect(compile).not.toHaveBeenCalled();
     expect(resumed.items[0]).toEqual(synced);
     expect(resumed.summary).toMatchObject({ syncedCount: 1, pendingCount: 0 });
+  });
+
+  it("creates a new revision for changed content without overwriting existing items", async () => {
+    const file = fileEntry("experiments/changed.chemd.md");
+    const initial = await runWorkspaceIngest({
+      workspaceId: "workspace-alpha",
+      files: [file],
+      readFile: () => "old source",
+      compile: () => ({ status: "ok", graphSnapshot: { graphSnapshotId: "old-snapshot" } }),
+      createdAt
+    });
+    const oldPending = initial.items[0];
+    const changed = await runWorkspaceIngest({
+      workspaceId: "workspace-alpha",
+      files: [file],
+      readFile: () => "new source",
+      compile: () => ({ status: "ok", graphSnapshot: { graphSnapshotId: "new-snapshot" } }),
+      existingItems: [oldPending],
+      createdAt
+    });
+    const newPending = changed.items[0];
+
+    expect(newPending.status).toBe("pending");
+    expect(newPending.documentHash).not.toBe(oldPending.documentHash);
+    expect(newPending.revisionHash).not.toBe(oldPending.revisionHash);
+    expect(newPending.queueId).not.toBe(oldPending.queueId);
+    expect(oldPending.status).toBe("pending");
+  });
+
+  it("keeps failed items over the retry limit failed instead of making them pending", async () => {
+    const file = fileEntry("experiments/exhausted.chemd.md");
+    const failedRun = await runWorkspaceIngest({
+      workspaceId: "workspace-alpha",
+      files: [file],
+      readFile: () => "exhausted source",
+      compile: () => {
+        throw new Error("compile failed");
+      },
+      createdAt
+    });
+    const exhausted: WorkspaceIngestQueueItem = {
+      ...failedRun.items[0],
+      failureCount: 3,
+      errorSummary: "compile failed three times"
+    };
+    const compile = vi.fn(() => ({ status: "ok" }));
+    const resumed = await runWorkspaceIngest({
+      workspaceId: "workspace-alpha",
+      files: [file],
+      readFile: () => "exhausted source",
+      compile,
+      existingItems: [exhausted],
+      maxRetryFailures: 3,
+      createdAt
+    });
+
+    expect(compile).not.toHaveBeenCalled();
+    expect(resumed.items).toEqual([exhausted]);
+    expect(resumed.summary).toMatchObject({ failedCount: 1, retryableCount: 0 });
+    expect(resumed.summary.errors[0]).toMatchObject({ failureCount: 3, retryable: false });
   });
 });

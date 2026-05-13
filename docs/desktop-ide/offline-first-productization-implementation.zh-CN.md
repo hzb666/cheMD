@@ -463,7 +463,9 @@ DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outb
 - 文档 hash、source range、compile result hash 和 outbox payload 一一对应。
 
 状态：已补纯 TypeScript workspace ingest runner，并已在桌面 Local Store 面板接入
-workspace 扫描入口；当前先生成内存 ingest queue 与摘要，后续仍需接入本地 outbox
+workspace 扫描入口；runner 现在会复用同一 document hash / revision 的 existing
+pending、running、synced item，文件内容变化会生成新 revision，不覆盖旧 item；failed item
+超过 retry 阈值后保持 failed，不会自动变回 pending。后续仍需接入本地 outbox
 幂等执行、取消/重试和大 workspace 后台调度。
 
 验收：
@@ -636,7 +638,8 @@ env、database URL、API key、token 或 password。诊断包说明见
 - [ ] workspace ingest 可本地运行并生成 outbox。
 - [x] outbox/ingest 契约支持 pending、synced、failed、skipped 与 retry eligibility。
 - [x] workspace ingest runner 可通过依赖注入本地运行并生成可恢复队列。
-- [ ] 本地队列幂等，不重复生成知识记录。
+- [x] 本地队列幂等基础：同一 document hash / revision 复用 existing queue item，
+  文件变化生成新 revision，失败超过阈值后不自动重试；实际知识记录幂等写入仍归 P2/M5。
 - [x] 文件变更和 base revision 冲突有显式处理。
 
 ### P2：PostgreSQL 同步生产可用
