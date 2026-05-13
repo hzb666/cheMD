@@ -1518,3 +1518,37 @@ Merged edge basis filtering and local artifact controller worktrees; added react
 ### Next Steps
 
 - None - task complete
+
+
+## Session 78: Desktop Postgres profile secret storage backend
+
+**Date**: 2026-05-13
+**Task**: Desktop Postgres profile secret storage backend
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Added Desktop Postgres profile commands backed by OS keyring secret storage, wired active profile env source into runtime config, synchronized diagnostics command lists, updated productization docs, and verified cargo/pnpm checks.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `654a4a1` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
