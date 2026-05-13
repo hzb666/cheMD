@@ -987,3 +987,19 @@ M1 language-service completion core
   - `pnpm --filter @chemd/renderer-json test`：通过，2 files / 9 tests。
   - `pnpm --filter @chemd/renderer-json typecheck`：通过。
   - `git diff --check`：通过。
+
+### 2026-05-13 desktop-ide-renderable-html-shell
+
+- 范围：完成 M5.2 的 `@chemd/renderer-html` renderable node HTML shell；
+  不接入 desktop UI，不修改 App 入口、schema、root 配置或 lockfile。
+- 产物：新增 `renderRenderableHtml(tree, options?)`，从
+  `ChemdRenderableNodeTreeV1` 输出稳定 HTML 片段，保留
+  `data-chemd-node-id`、`data-chemd-node-kind`、
+  `data-chemd-render-state` 与 source refs JSON 属性。
+- 策略：heavy/lazy hydration 节点只输出可降级 placeholder shell 与 hydration
+  key，不渲染 molecule/reaction 结构或泄露 payload；markdown/text、layout、
+  template 与 semantic children 递归输出，文本和属性统一 escape。
+- 验证：
+  - `pnpm --filter @chemd/renderer-html test`：通过，2 files / 9 tests。
+  - `pnpm --filter @chemd/renderer-html typecheck`：通过。
+  - `git diff --check`：通过。
