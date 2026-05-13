@@ -1,5 +1,7 @@
 import type { ChemdTrainingGraphIndexV1, TrainingGraphIndexEdgeV1, TrainingInferenceConfidenceV1, TrainingReactionClusterBasisV1, TrainingReactionClusterV1, TrainingReactionGraphFeatureV1, TrainingReactionSimilarityBasisV1, TrainingReactionSimilarityEdgeV1 } from "@chemd/exporter-training";
 
+export * from "./intelligence-contracts";
+
 export type ReactionMapInputEdgeKind = "semantic" | "fingerprint" | "rxnfp" | "reaction_center" | "hybrid";
 export type ReactionMapLayoutEngine = "deterministic_fallback" | "tmap" | "worker";
 export type ReactionMapConfidence = TrainingInferenceConfidenceV1;

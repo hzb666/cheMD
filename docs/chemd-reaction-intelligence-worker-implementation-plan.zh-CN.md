@@ -382,17 +382,23 @@ hybrid_score =
 
 任务：
 
-- [ ] 在 `packages/reaction-map` 或新包 `packages/reaction-intelligence-contracts` 定义 TS contract。
-- [ ] 在 `services/chem-cluster-service/chem_cluster_service/intelligence/contracts.py` 定义 Python dataclass/TypedDict。
-- [ ] 写 fixture：2 个 esterification、2 个 Suzuki、1 个无效 reaction。
-- [ ] 写 schema round-trip 测试，确保 TS/Python 字段一致。
-- [ ] 文档更新：本文件与生产实施计划互链。
+- [x] 在 `packages/reaction-map` 定义 TS contract，不新增 workspace package。
+- [x] 在 `services/chem-cluster-service/chem_cluster_service/intelligence/contracts.py` 定义 Python TypedDict 与轻量 validation helper。
+- [x] 写 fixture：2 个 esterification、2 个 Suzuki、1 个无效 reaction。
+- [x] 写 schema round-trip 测试，覆盖 job input、artifact、provider status、computed feature、computed edge 字段。
+- [x] 文档更新：本文件记录 Phase 0 Worker B 合同冻结状态；后续生产实施计划互链由集成切片统一补齐。
 
 验收：
 
-- [ ] Python contract tests 通过。
-- [ ] TS contract tests 通过。
-- [ ] fixture 能从现有 `ChemdTrainingGraphIndexV1` 生成 job input。
+- [x] Python contract tests 通过。
+- [x] TS contract tests 通过。
+- [x] fixture 能从现有 `ChemdTrainingGraphIndexV1` 生成 job input。
+
+状态记录（Worker B / `reaction-intel-contracts`）：
+
+- 固定 `chemd-reaction-intelligence-job/v0.1` 与 `chemd-reaction-intelligence-artifact/v0.1` JSON contract。
+- 仅提供 TS/Python 类型、fixture builder、required-field validation 与 round-trip 测试。
+- 不接入 RDKit、RXNMapper、RXNFP、TMAP，也不新增 package、根 alias 或依赖。
 
 ### Phase 1：RDKit / fingerprint baseline
 

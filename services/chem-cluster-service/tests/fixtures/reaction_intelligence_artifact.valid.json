@@ -1,0 +1,76 @@
+{
+  "schema_version": "chemd-reaction-intelligence-artifact/v0.1",
+  "artifact_id": "reaction-intelligence-artifact::fixture",
+  "job_id": "reaction-intelligence-job::fixture",
+  "graph_index_id": "graph-index::fixture",
+  "generated_at": "2026-05-13T00:00:00.000Z",
+  "providers": [
+    {
+      "provider_id": "provider::rdkit-fingerprint",
+      "kind": "rdkit_fingerprint",
+      "status": "SKIP",
+      "package_name": "rdkit",
+      "warnings": ["dependency_not_installed"]
+    },
+    {
+      "provider_id": "provider::rxnmapper",
+      "kind": "rxnmapper",
+      "status": "SKIP",
+      "package_name": "rxnmapper",
+      "warnings": ["dependency_not_installed"]
+    },
+    {
+      "provider_id": "provider::hybrid-graph",
+      "kind": "hybrid_graph",
+      "status": "PASS",
+      "warnings": []
+    }
+  ],
+  "reaction_features": [
+    {
+      "reaction_entity_id": "rxn-ester-1",
+      "source_hash": "sha256:ester-1",
+      "canonical_rxn_smiles": "CC(=O)O.CCO>>CC(=O)OCC",
+      "fingerprint_refs": [
+        {
+          "feature_ref_id": "feature-ref::ester-1::rdkit",
+          "provider": "rdkit",
+          "kind": "bit_vector",
+          "dimension": 2048,
+          "storage": "sidecar_file",
+          "hash": "sha256:fp-ester-1"
+        }
+      ],
+      "atom_mapping": {
+        "provider": "rxnmapper",
+        "mapped_rxn": "[CH3:1][C:2](=[O:3])[OH:4].[CH3:5][CH2:6][OH:7]>>[CH3:1][C:2](=[O:3])[O:7][CH2:6][CH3:5]",
+        "confidence": 0.91,
+        "mapping_hash": "sha256:mapping-ester-1",
+        "warnings": []
+      },
+      "reaction_center": {
+        "provider": "rxnmapper_derived",
+        "center_signature": "C-O-ester-formation",
+        "changed_bonds": ["C2-O7"],
+        "changed_atoms": ["C2", "O7"],
+        "confidence": "medium",
+        "warnings": []
+      },
+      "warnings": []
+    }
+  ],
+  "similarity_edges": [
+    {
+      "edge_id": "computed-edge::ester-1::ester-2",
+      "from_reaction_entity_id": "rxn-ester-1",
+      "to_reaction_entity_id": "rxn-ester-2",
+      "score": 0.82,
+      "confidence": "medium",
+      "basis": ["rdkit_fingerprint_tanimoto", "hybrid_consensus"],
+      "provider_ids": ["provider::rdkit-fingerprint", "provider::hybrid-graph"],
+      "source_hashes": ["sha256:ester-1", "sha256:ester-2"],
+      "warnings": []
+    }
+  ],
+  "warnings": []
+}
