@@ -111,7 +111,34 @@ export const requirePostgresDatabaseUrl = (env) => {
         + "root .env.local, or apps/web/.env.local"
     );
   }
-  return value;
+  return normalizePostgresDatabaseUrl(value);
+};
+
+export const normalizePostgresDatabaseUrl = (value) => {
+  const trimmed = value.trim();
+  if (!trimmed.toLowerCase().startsWith("jdbc:")) {
+    return trimmed;
+  }
+  const url = new URL(trimmed.slice("jdbc:".length));
+  const user = url.searchParams.get("user");
+  const password = url.searchParams.get("password");
+  if (!url.username && user) {
+    url.username = user;
+    url.searchParams.delete("user");
+  }
+  if (!url.password && password) {
+    url.password = password;
+    url.searchParams.delete("password");
+  }
+  return url.toString();
+};
+
+const normalizePostgresRuntimeEnv = (env) => {
+  const databaseUrl = requirePostgresDatabaseUrl(env);
+  if (env.CHEMD_POSTGRES_DATABASE_URL?.trim()) {
+    return { ...env, CHEMD_POSTGRES_DATABASE_URL: databaseUrl };
+  }
+  return { ...env, DATABASE_URL: databaseUrl };
 };
 
 export const loadRuntimeModules = async () => {
@@ -134,9 +161,9 @@ export const withPostgresRuntimeClient = async ({
   operation,
   runtimeModules = loadRuntimeModules
 }) => {
-  requirePostgresDatabaseUrl(env);
+  const runtimeEnv = normalizePostgresRuntimeEnv(env);
   const { createPostgresRuntimeClient } = await runtimeModules();
-  const client = createPostgresRuntimeClient({ env });
+  const client = createPostgresRuntimeClient({ env: runtimeEnv });
   try {
     return await operation(client);
   } finally {

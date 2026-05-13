@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   loadPostgresEnv,
+  normalizePostgresDatabaseUrl,
   parseEnvContent,
   requirePostgresDatabaseUrl,
   runPostgresMigration,
@@ -88,6 +89,20 @@ test("requirePostgresDatabaseUrl fails with a clear message", () => {
   assert.throws(
     () => requirePostgresDatabaseUrl({}),
     /CHEMD_POSTGRES_DATABASE_URL or DATABASE_URL is required/u
+  );
+});
+
+test("PostgreSQL env accepts JDBC URLs for runtime clients", () => {
+  assert.equal(
+    normalizePostgresDatabaseUrl(" jdbc:postgresql://103.24.219.156:5632/postgres "),
+    "postgresql://103.24.219.156:5632/postgres"
+  );
+  assert.equal(
+    requirePostgresDatabaseUrl({
+      CHEMD_POSTGRES_DATABASE_URL:
+        "jdbc:postgresql://103.24.219.156:5632/postgres?user=chemd&password=secret&sslmode=require"
+    }),
+    "postgresql://chemd:secret@103.24.219.156:5632/postgres?sslmode=require"
   );
 });
 

@@ -1429,3 +1429,570 @@ Added inferred training graph index, reaction semantic clustering, CLI graph exp
 ### Next Steps
 
 - None - task complete
+
+
+## Session 35: Integrate desktop IDE production slice
+
+**Date**: 2026-05-12
+**Task**: Integrate desktop IDE production slice
+**Package**: desktop-ide
+**Branch**: `desktop-ide`
+
+### Summary
+
+Integrated the first production desktop IDE slice with Tauri shell, language service, generic Postgres graph/RAG contracts, agent tool guards, docs, and full validation.
+
+### Main Changes
+
+### Main Changes
+
+| Area | Summary |
+|------|---------|
+| Desktop shell | Added `apps/desktop` Vite/React/Tauri v2 skeleton with workspace file commands and a web-aligned IDE shell. |
+| Language service | Added `@chemd/language-service` around `compileChemd` for editor diagnostics, outline, symbols, quick fixes, and Monaco adapters. |
+| Storage/Postgres | Extended `@chemd/storage-postgres` with generic reaction graph, RAG citation, agent run, tool call, and patch proposal contracts. It reuses existing `chemd_experiments`, `chemd_experiment_revisions`, and `chemd_rag_chunks`; no desktop-only parallel schema is introduced. |
+| Agent tools | Added `@chemd/agent-tools` contracts for agent runs, tool calls, evidence, patch proposals, and guarded patch apply decisions requiring approvals, base hash match, and cited evidence. |
+| Docs/Trellis | Added production architecture docs under `docs/desktop-ide-*.zh-CN.md`, README links, and the parallel task packet under `.trellis/tasks/05-12-desktop-ide-production`. |
+
+### Parallel Integration
+
+- Integrated `desktop-ide-agent-tools` as `a0b379d`.
+- Integrated `desktop-ide-language-service` as `1a4bedd`.
+- Integrated corrected `desktop-ide-postgres-graph-rag` as `0ecd1b7`.
+- Integrated `desktop-ide-shell` as `9b1eb48`.
+- Added workspace dependency wiring as `5281d56`.
+- Recorded Trellis task setup as `f09995a`.
+
+### Verification
+
+- [OK] `pnpm --filter @chemd/agent-tools test`
+- [OK] `pnpm --filter @chemd/language-service test`
+- [OK] `pnpm --filter @chemd/storage-postgres test`
+- [OK] `pnpm --filter @chemd/agent-tools typecheck`
+- [OK] `pnpm --filter @chemd/language-service typecheck`
+- [OK] `pnpm --filter @chemd/storage-postgres typecheck`
+- [OK] `pnpm --filter @chemd/desktop typecheck`
+- [OK] `pnpm --filter @chemd/desktop build`
+- [OK] `cargo check` in `apps/desktop/src-tauri`
+- [OK] `pnpm typecheck`
+- [OK] `pnpm run test:py` after `poetry install` restored the service venv dependencies
+- [OK] `pnpm test`
+- [OK] `git diff --check`
+
+### Notes
+
+- `pnpm install` kept existing peer warnings for `ketcher-react` against React 19 and ignored build-script approval warnings for `core-js`, `esbuild`, and `sharp`.
+- `pnpm --filter @chemd/desktop build` emitted the existing Vite warning that `lucide-react` module-level `use client` directives are ignored during bundling.
+- The first broad `pnpm test` run failed only because the freshly created Poetry virtualenv lacked Flask; `poetry install` installed locked Python dependencies and the rerun passed.
+
+### Status
+
+[OK] Integrated on `desktop-ide` and ready for review.
+
+### Next Steps
+
+- Continue from this slice by wiring real desktop workspace persistence and live Postgres-backed graph/RAG queries behind the documented contracts.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `59702a4` | (see git log) |
+| `a0b379d` | (see git log) |
+| `1a4bedd` | (see git log) |
+| `0ecd1b7` | (see git log) |
+| `9b1eb48` | (see git log) |
+| `5281d56` | (see git log) |
+| `f09995a` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 36: Integrate desktop IDE productionization wave
+
+**Date**: 2026-05-12
+**Task**: Integrate desktop IDE productionization wave
+**Package**: desktop-ide
+**Branch**: `desktop-ide`
+
+### Summary
+
+Integrated the second desktop IDE productionization wave with real local workspace IO, language-service workbench, graph/RAG repository builders, agent orchestration, and Tauri Windows bundles.
+
+### Main Changes
+
+| Area | Summary |
+|------|---------|
+| Desktop workspace IO | Replaced placeholder Tauri workspace commands with local directory open, bounded Markdown listing, safe file read, and safe file write. Path traversal is rejected and reads are capped. |
+| Desktop workbench | Upgraded the React shell into a usable local IDE workbench with workspace path input, real file read/save, editor buffer dirty state, diagnostics, outline, quick fixes, and web-aligned light workbench styling. |
+| Graph/RAG repository | Added generic `@chemd/storage-postgres` query builders for graph snapshots, graph detail, RAG citations, agent runs, tool calls, patch proposals, and pending patch lists. These reuse `chemd_experiments`, `chemd_experiment_revisions`, and `chemd_rag_chunks`; no desktop-only tables were introduced. |
+| Agent orchestration | Added deterministic local agent run state machine, audit timeline, patch approval/reject/apply decisions, terminal-state guards, approval id matching, duplicate-apply rejection, base hash checks, and citation evidence gates. |
+| Packaging | Added Tauri bundle icon configuration so Windows MSI and NSIS installers build successfully. |
+
+### Parallel Integration
+
+- Integrated `desktop-ide-postgres-graph-repository` as `3b4127d` after checking for desktop-only table names and parameterized SQL.
+- Integrated `desktop-ide-workbench-ui` as `74b3126` after adding the shared `@chemd/language-service` dependency in `c9690d4`.
+- Integrated `desktop-ide-agent-orchestration` as `296551b` after returning it once to require approved decisions before patch apply.
+- Integrated `desktop-ide-workspace-io` as `adf3c41` and added frontend read/write wiring during integration.
+- Fixed Tauri bundle icon config as `59bb8c1` after `tauri:build` exposed the missing icon declaration.
+
+### Verification
+
+- [OK] `pnpm --filter @chemd/storage-postgres test`
+- [OK] `pnpm --filter @chemd/storage-postgres typecheck`
+- [OK] `pnpm --filter @chemd/agent-tools test`
+- [OK] `pnpm --filter @chemd/agent-tools typecheck`
+- [OK] `pnpm --filter @chemd/desktop typecheck`
+- [OK] `pnpm --filter @chemd/desktop build`
+- [OK] `cargo test` in `apps/desktop/src-tauri`
+- [OK] `cargo check` in `apps/desktop/src-tauri`
+- [OK] `pnpm typecheck`
+- [OK] `pnpm test`
+- [OK] `pnpm --filter @chemd/desktop tauri:build`
+- [OK] `git diff --check`
+
+### Packaging Evidence
+
+`tauri:build` produced:
+
+- `apps/desktop/src-tauri/target/release/bundle/msi/Chemd Desktop IDE_0.1.0_x64_en-US.msi`
+- `apps/desktop/src-tauri/target/release/bundle/nsis/Chemd Desktop IDE_0.1.0_x64-setup.exe`
+
+### Notes
+
+- The first `tauri:build` attempt timed out during the long first release compile; a second incremental run exposed a missing `.ico` bundle declaration. After adding `bundle.icon`, the final `tauri:build` passed.
+- Vite still emits non-failing warnings for lucide-react module-level `use client` directives and a desktop bundle chunk over 500 kB.
+- The desktop app now has a real local workspace edit loop. Live Postgres connection UI and real LLM/sidecar orchestration remain next implementation layers on top of the contracts added here.
+
+### Status
+
+[OK] Second productionization wave integrated on `desktop-ide` and ready for review.
+
+### Next Steps
+
+- Wire the desktop agent pane to `@chemd/agent-tools` orchestration state and approved patch proposals.
+- Add a desktop runtime bridge for live Postgres graph/RAG queries using the repository query builders.
+- Add chem-service sidecar lifecycle management beyond the current status boundary.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9a2bfe0` | (see git log) |
+| `c9690d4` | (see git log) |
+| `3b4127d` | (see git log) |
+| `74b3126` | (see git log) |
+| `296551b` | (see git log) |
+| `adf3c41` | (see git log) |
+| `59bb8c1` | (see git log) |
+
+### Testing
+
+- [OK] See Verification section above.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Continue with live Postgres graph/RAG runtime and sidecar-backed agent execution.
+
+
+## Session 37: Desktop IDE third-wave runtime integration
+
+**Date**: 2026-05-12
+**Task**: Desktop IDE third-wave runtime integration
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Integrated third-wave desktop IDE runtime slices across PostgreSQL Graph/RAG executor, Agent patch pane, language Graph/RAG DTOs, and chem-service sidecar lifecycle.
+
+### Main Changes
+
+## Main Changes
+
+| Area | Summary |
+|------|---------|
+| Third-wave planning | Extended `.trellis/tasks/05-12-desktop-ide-production/prd.md` with production runtime slices for sidecar lifecycle, Agent patch orchestration, language-service Graph/RAG DTOs, and PostgreSQL executor queries. |
+| Postgres Graph/RAG executor | Added `@chemd/storage-postgres` executor helpers and row mappers for graph snapshots, graph detail, RAG citation lookups, agent runs, tool calls, pending patches, and patch apply reads. This reuses the existing PostgreSQL schema and does not add desktop-specific tables. |
+| Desktop Agent pane | Wired the desktop workbench to `@chemd/agent-tools` for local quick-fix proposals, patch approval/apply/reject decisions, source-hash checks, audit timeline, and explicit user-controlled application. |
+| Language-service Graph/RAG DTOs | Added pure editor DTO builders for graph snapshots, nodes, edges, and RAG citation candidates with source ranges, while keeping database IO in the storage layer. |
+| chem-service sidecar | Added Tauri commands for `start_sidecar`, `stop_sidecar`, `read_sidecar_status`, and `read_sidecar_logs`, managing only the app-owned child process with log tail capture and safe Command+args invocation. |
+
+## Parallel Integration
+
+- Dispatched four gpt-5.5-high subagents in separate branches/worktrees.
+- Integrated `desktop-ide-postgres-graph-executor` as `6a93b32` after checking SQL boundaries and desktop-only table names.
+- Integrated `desktop-ide-agent-pane` as `b7587b9` after desktop lint/typecheck/build and source-hash compatibility review.
+- Integrated `desktop-ide-language-graph-records` as `69ad65e` after confirming no storage dependency and passing language-service tests/typecheck.
+- Integrated `desktop-ide-sidecar-runtime` as `12f0925` after Rust lifecycle/security review, cargo tests, cargo check, and desktop typecheck.
+
+## Verification
+
+- [OK] `pnpm exec eslint apps/desktop/src/App.tsx`
+- [OK] `pnpm --filter @chemd/desktop typecheck`
+- [OK] `pnpm --filter @chemd/desktop build`
+- [OK] `pnpm --filter @chemd/storage-postgres test`
+- [OK] `pnpm --filter @chemd/storage-postgres typecheck`
+- [OK] `pnpm --filter @chemd/language-service test`
+- [OK] `pnpm --filter @chemd/language-service typecheck`
+- [OK] `cargo test` in `apps/desktop/src-tauri`
+- [OK] `cargo check` in `apps/desktop/src-tauri`
+- [OK] `pnpm typecheck`
+- [OK] `pnpm test`
+- [OK] `pnpm --filter @chemd/desktop tauri:build`
+- [OK] `git diff --check`
+
+## Packaging Evidence
+
+`tauri:build` produced:
+
+- `apps/desktop/src-tauri/target/release/bundle/msi/Chemd Desktop IDE_0.1.0_x64_en-US.msi`
+- `apps/desktop/src-tauri/target/release/bundle/nsis/Chemd Desktop IDE_0.1.0_x64-setup.exe`
+
+## Notes
+
+- Vite still emits non-failing warnings for lucide-react module-level `use client` directives and a desktop bundle chunk above 500 kB.
+- Sidecar readiness currently means the chem-service process has spawned; HTTP `/healthz` readiness probing remains the next production hardening layer.
+- The desktop app now has production-oriented local workspace editing, Agent patch approvals, PostgreSQL Graph/RAG query contracts, language-service DTO generation, app-owned chem-service lifecycle management, and reproducible Windows packaging.
+
+## Status
+
+[OK] Third productionization wave integrated on `desktop-ide` and ready for review.
+
+## Next Steps
+
+- Add live Postgres connection configuration in the desktop runtime instead of relying only on repository helpers.
+- Add sidecar health probing and end-to-end smoke against a real chem-service instance.
+- Persist Agent runs and patch decisions through the PostgreSQL executor from the desktop runtime bridge.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e40ff30` | (see git log) |
+| `6a93b32` | (see git log) |
+| `b7587b9` | (see git log) |
+| `69ad65e` | (see git log) |
+| `12f0925` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 38: Desktop IDE fourth-wave runtime hardening
+
+**Date**: 2026-05-12
+**Task**: Desktop IDE fourth-wave runtime hardening
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Integrated sidecar runtime controls, PostgreSQL runtime adapters, and healthz-backed sidecar readiness for the desktop IDE.
+
+### Main Changes
+
+## Main Changes
+
+| Area | Summary |
+|------|---------|
+| Fourth-wave planning | Added fourth-wave hardening scope to the desktop IDE PRD for sidecar health, runtime controls, and PostgreSQL runtime adapters. |
+| Sidecar runtime controls | Added compact IDE controls for Start, Stop, Refresh, and Load logs, with a single-operation guard, disabled/loading states, clear user-facing errors, pid/startedAt/detail display, and log tail rendering. |
+| PostgreSQL runtime adapters | Added dependency-free adapter helpers that map editor Graph/RAG DTOs, RAG citation candidates, Agent runs, tool calls, and patch proposals into existing `@chemd/storage-postgres` executor record inputs without desktop-specific tables. |
+| Sidecar health readiness | Promoted sidecar `ready` from process-spawned to `/healthz`-probed readiness, with bounded retry, timeout, degraded status on failure, pid/log preservation, and tests for success, closed port, timeout, ready, and degraded paths. |
+| Integration correction | Corrected the sidecar default health URL to `http://127.0.0.1:18081/healthz`, matching the actual `chem-service` default `CHEM_SERVICE_PORT`. |
+
+## Parallel Integration
+
+- Dispatched three gpt-5.5-high subagents in separate worktrees.
+- Integrated `desktop-ide-runtime-controls` as `9ddbc5d` after UI/concurrency review, desktop lint/typecheck/build, and a timestamp-display compatibility fix.
+- Integrated `desktop-ide-postgres-runtime-adapters` as `1bed7da` after checking dependency isolation, no `desktop_*`/`chemd_desktop_*` tables, storage tests, and typecheck.
+- Integrated `desktop-ide-sidecar-health` as `5e43588` after Rust lifecycle review, cargo test/check, and fixing the default health port to 18081 during integration.
+
+## Verification
+
+- [OK] `pnpm exec eslint apps/desktop/src/App.tsx`
+- [OK] `pnpm --filter @chemd/desktop typecheck`
+- [OK] `pnpm --filter @chemd/desktop build`
+- [OK] `pnpm --filter @chemd/storage-postgres test`
+- [OK] `pnpm --filter @chemd/storage-postgres typecheck`
+- [OK] `cargo test` in `apps/desktop/src-tauri`
+- [OK] `cargo check` in `apps/desktop/src-tauri`
+- [OK] `pnpm typecheck`
+- [OK] `pnpm test`
+- [OK] `pnpm --filter @chemd/desktop tauri:build`
+- [OK] `git diff --check`
+
+## Packaging Evidence
+
+`tauri:build` produced:
+
+- `apps/desktop/src-tauri/target/release/bundle/msi/Chemd Desktop IDE_0.1.0_x64_en-US.msi`
+- `apps/desktop/src-tauri/target/release/bundle/nsis/Chemd Desktop IDE_0.1.0_x64-setup.exe`
+
+## Notes
+
+- Vite still emits non-failing warnings for lucide-react module-level `use client` directives and a desktop bundle chunk above 500 kB.
+- The sidecar health probe currently supports plain HTTP URLs and the default localhost service path; HTTPS/IPv6 URL parsing is not implemented.
+- The desktop app still needs a runtime bridge that actually connects configured PostgreSQL credentials from the desktop environment to the new storage adapters and executor helpers.
+
+## Status
+
+[OK] Fourth production hardening wave integrated on `desktop-ide` and ready for review.
+
+## Next Steps
+
+- Add a desktop runtime bridge for local PostgreSQL connection configuration and smokeable read/write operations.
+- Persist Agent run and patch decisions from the desktop pane through the runtime adapters and executor.
+- Add an end-to-end Tauri smoke that starts the sidecar, observes `/healthz`, and exercises one API call against the app-owned service.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `03138f0` | (see git log) |
+| `9ddbc5d` | (see git log) |
+| `1bed7da` | (see git log) |
+| `5e43588` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 39: Desktop IDE fifth wave Postgres runtime bridge
+
+**Date**: 2026-05-12
+**Task**: Desktop IDE fifth wave Postgres runtime bridge
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Postgres bridge, runtime persistence, status UI, and runtime smoke merged into desktop-ide with full local validation.
+
+### Main Changes
+
+## Completed
+- Planned the fifth desktop IDE runtime bridge wave in the PRD.
+- Merged Postgres runtime persistence into `@chemd/storage-postgres` without adding desktop-specific tables.
+- Merged the Tauri Postgres bridge with redacted config discovery, readiness checks, pgvector check, and core Graph/RAG/agent schema table checks.
+- Merged the desktop Postgres status panel while preserving the existing light workbench UI style.
+- Merged `desktop:runtime-smoke` for CI-safe runtime verification that skips cleanly without secrets and runs the existing PostgreSQL smoke path when env is configured.
+- Reviewed and closed all fifth-wave child agents, removed safely merged branches, and cleaned merged worktrees.
+
+## Verification
+- `pnpm --filter @chemd/desktop typecheck` passed.
+- `pnpm --filter @chemd/desktop build` passed with existing Vite warnings for lucide `use client` and chunk size.
+- `pnpm test:scripts` passed, 23 tests.
+- `pnpm desktop:runtime-smoke` passed as SKIP because no `CHEMD_POSTGRES_DATABASE_URL` or `DATABASE_URL` was configured.
+- `pnpm typecheck` passed, 21 packages.
+- `pnpm test` passed, including Turbo tests, script tests, and 52 Python tests.
+- `cargo test` passed, 22 Rust tests.
+- `cargo check` passed.
+- `pnpm --filter @chemd/desktop exec eslint src/App.tsx` passed.
+- `pnpm exec eslint scripts/desktop-runtime-smoke.mjs scripts/desktop-runtime-smoke.test.mjs` passed.
+- `pnpm --filter @chemd/desktop tauri:build` passed and produced release exe, MSI, and NSIS installer.
+- Post-session environment probe found no Docker command, no local PostgreSQL
+  CLI/service, and no listener on `127.0.0.1:5432`, so real DB smoke remains
+  environment-blocked rather than passed.
+- `git diff --check` passed; it emitted only a Git LF/CRLF warning on Cargo.toml.
+
+## Remaining Risk
+- Real PostgreSQL write/read runtime proof was not executed in this environment because no database URL was configured; the new smoke script reports this as SKIP, not pass.
+- The desktop app can report Postgres readiness, but the editor UI still needs an end-user command that persists the current Graph/RAG/agent snapshot through the desktop runtime path.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `cee2092` | (see git log) |
+| `5d72cf3` | (see git log) |
+| `35f28ac` | (see git log) |
+| `e4f2586` | (see git log) |
+| `6dce6ba` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 40: Desktop IDE sixth wave persistence loop
+
+**Date**: 2026-05-12
+**Task**: Desktop IDE sixth wave persistence loop
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Desktop Graph/RAG/Agent persistence loop, UI entry, Rust bridge, and runtime smoke merged with full local validation.
+
+### Main Changes
+
+## Completed
+- Planned the sixth desktop persistence loop in the PRD.
+- Merged a desktop runtime persistence payload builder that converts editor Graph/RAG records and optional Agent state into JSON-safe `persist_runtime_graph_rag` payloads with deterministic IDs.
+- Merged the Tauri/Rust `persist_runtime_graph_rag` command and integrated fixes for first-save core row creation: `chemd_experiments`, `chemd_experiment_revisions`, and citation `chemd_rag_chunks` are upserted before Graph/RAG/Agent rows.
+- Merged runtime smoke coverage for the desktop persistence data path. With DB env configured, it writes and reads back core experiment/revision, graph snapshot/nodes/edges, citation chunk/citation, Agent run/tool call, and patch proposal records.
+- Merged the desktop UI `Persist graph` action into the existing Postgres runtime panel. It builds payloads from the current editor source and Agent state, requires Postgres ready + pgvector + schema ready, and shows safe counts plus a graph snapshot summary.
+- Reviewed and closed all sixth-wave child agents, removed safely merged worktrees and branches.
+
+## Verification
+- `pnpm exec vitest run apps/desktop/src/desktop-runtime-persistence.test.ts --config packages/compiler/vitest.config.ts --pool=threads` passed, 5 tests.
+- `pnpm test:scripts` passed, 25 tests.
+- `pnpm desktop:runtime-smoke` passed as SKIP because no `CHEMD_POSTGRES_DATABASE_URL` or `DATABASE_URL` was configured.
+- `pnpm --filter @chemd/desktop typecheck` passed.
+- `pnpm --filter @chemd/desktop build` passed with existing Vite warnings for lucide `use client` and chunk size.
+- `cargo test` in `apps/desktop/src-tauri` passed, 24 tests.
+- `cargo check` in `apps/desktop/src-tauri` passed.
+- `pnpm typecheck` passed, 21 packages.
+- `pnpm test` passed, including Turbo tests, script tests, and 52 Python tests.
+- `pnpm --filter @chemd/desktop exec eslint src/App.tsx src/desktop-contracts.ts src/desktop-runtime-persistence.ts src/desktop-runtime-persistence.test.ts` passed.
+- `pnpm exec eslint scripts/desktop-runtime-smoke.mjs scripts/desktop-runtime-smoke.test.mjs` passed.
+- `git diff --check` passed.
+- `pnpm --filter @chemd/desktop tauri:build` passed and produced release exe, MSI, and NSIS installer.
+
+## Remaining Risk
+- Real PostgreSQL write/read was not executed in this machine because no database URL was configured; the smoke script reports this as SKIP, not pass.
+- The desktop app now has a production-oriented local persistence path, but real runtime proof still requires a configured PostgreSQL instance and user click/smoke execution against that instance.
+- Vite still emits non-failing warnings for lucide module-level `use client` directives and a desktop bundle chunk above 500 kB.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `97eaa18` | (see git log) |
+| `b5bd1cf` | (see git log) |
+| `bbba708` | (see git log) |
+| `24e1016` | (see git log) |
+| `6d45e69` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 41: Desktop IDE seventh wave managed Postgres runtime
+
+**Date**: 2026-05-12
+**Task**: Desktop IDE seventh wave managed Postgres runtime
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+(Add summary)
+
+### Main Changes
+
+| Area | Result |
+|------|--------|
+| Managed Postgres runtime | Added Tauri commands for status, initialize, start, stop, migrate, app-data config, binary discovery, PID ownership, redaction, shared-schema migration verification, and external-env priority. |
+| UI control surface | Added External / Managed Postgres panels in the desktop workbench with init/start/stop/migrate/refresh controls, active-target messaging, loading/error states, and redacted status rendering. |
+| Smoke and docs | Extended desktop runtime smoke to prefer external DB, fallback to managed binaries, clean owned processes, and SKIP with exact reason when binaries are absent. Added managed smoke packaging notes under docs/desktop-ide. |
+| Parallel workflow | Runtime branch, smoke branch, and UI branch were reviewed, merged into desktop-ide, and safe worktrees/branches were cleaned. |
+
+**Commits**:
+- `a8b91c7` chore(desktop)：规划第七轮托管 Postgres
+- `5212348` feat(desktop)：新增托管 Postgres 运行时
+- `1d13c54` feat(desktop)：合入托管 Postgres 运行时
+- `76dd784` feat(desktop)：补充托管 Postgres smoke
+- `074f513` feat(desktop)：合入托管 Postgres smoke
+- `fe1c121` feat(desktop)：增加托管 Postgres 控制面
+- `c3a1e46` feat(desktop)：合入托管 Postgres 控制面
+
+**Validation**:
+- `pnpm test:scripts` passed: 29 script tests.
+- `pnpm desktop:runtime-smoke` exited 0 with explicit SKIP: PostgreSQL binaries are missing `initdb`, `psql`, and `postgres` or `pg_ctl`.
+- `pnpm --filter @chemd/desktop typecheck` passed.
+- `pnpm --filter @chemd/desktop exec eslint src/App.tsx src/desktop-contracts.ts src/styles/base.css src/styles/panels.css` exited 0; CSS files are ignored by ESLint with 2 warnings, no errors.
+- `pnpm --filter @chemd/desktop build` passed; existing lucide `use client` and chunk-size warnings remain.
+- `cargo test` passed: 32 Rust tests.
+- `cargo check` passed.
+- `git diff --check` passed.
+- `pnpm typecheck` passed: 21 workspaces.
+- `pnpm test` passed: Turbo tests, 29 script tests, and 52 Python unittest tests.
+- `pnpm --filter @chemd/desktop tauri:build` passed and produced exe, MSI, and NSIS bundles.
+
+**Remaining Gap**:
+- Current machine/repo has no bundled PostgreSQL binaries, so the managed path is implemented and test-covered but real managed DB smoke is environment-blocked. Next phase should add a packaging/binary acquisition strategy so the app actually ships PostgreSQL binaries instead of relying on `CHEMD_MANAGED_POSTGRES_BIN_DIR`.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a8b91c7` | (see git log) |
+| `5212348` | (see git log) |
+| `1d13c54` | (see git log) |
+| `76dd784` | (see git log) |
+| `074f513` | (see git log) |
+| `fe1c121` | (see git log) |
+| `c3a1e46` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

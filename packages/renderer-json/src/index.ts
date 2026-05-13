@@ -9,6 +9,8 @@ import {
   type StructuredNode
 } from "@chemd/core";
 
+export * from "./renderable-node";
+
 interface SerializedNodeEntry {
   type: string;
   value: unknown;

@@ -1,0 +1,17 @@
+{
+  "name": "@chemd/workspace-index",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@chemd/language-service": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --pool=threads",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}
