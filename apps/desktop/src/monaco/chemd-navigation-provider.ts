@@ -1,6 +1,11 @@
 import type { Monaco } from "@monaco-editor/react";
 import type { editor, languages, Position } from "monaco-editor";
-import type { ChemdLanguageCompileOutput } from "@chemd/language-service";
+import type {
+  ChemdEditorDiagnostic,
+  ChemdLanguageCompileOutput,
+  ChemdOutlineItem,
+  ChemdSourceRange
+} from "@chemd/language-service";
 import {
   findReferences,
   findSymbolDefinitions,
@@ -14,6 +19,24 @@ type MonacoDisposable = { dispose: () => void };
 type NavigationProviderOptions = {
   getCompileOutput: () => ChemdLanguageCompileOutput | undefined;
   getWorkspaceIndex: () => WorkspaceSymbolIndex | null | undefined;
+};
+
+type TemplateParamSpecLike = {
+  name: string;
+  raw?: string;
+  type?: {
+    kind: string;
+    targetKind?: string;
+    quantityClass?: string;
+  };
+};
+
+type TemplateNodeLike = {
+  type: "template";
+  name: string;
+  params?: string[];
+  paramSpecs?: TemplateParamSpecLike[];
+  description?: string;
 };
 
 let activeNavigationRegistration: {
@@ -54,7 +77,7 @@ const toMonacoRange = (
   );
 
 const toHoverRange = (
-  range: WorkspaceSymbol["range"] | WorkspaceReference["range"]
+  range: ChemdSourceRange
 ): languages.Hover["range"] => ({
   startLineNumber: range.startLine,
   startColumn: range.startColumn,
@@ -91,7 +114,7 @@ const getMatchingSymbols = (
 };
 
 const containsPosition = (
-  range: WorkspaceReference["range"],
+  range: ChemdSourceRange,
   position: Position
 ): boolean =>
   position.lineNumber >= range.startLine
@@ -119,6 +142,75 @@ const getReferenceAtPosition = (
   ) ?? null;
 };
 
+const getDiagnosticsForModel = (
+  output: ChemdLanguageCompileOutput | undefined,
+  index: WorkspaceSymbolIndex | null | undefined,
+  model: editor.ITextModel
+): ChemdEditorDiagnostic[] => {
+  const modelUri = model.uri.toString();
+  const outputDiagnostics = output && (!output.documentUri || output.documentUri === modelUri)
+    ? output.diagnostics
+    : [];
+  const indexDiagnostics = index?.diagnostics
+    .filter((item) => item.documentUri === modelUri)
+    .map((item) => item.diagnostic) ?? [];
+  return [...outputDiagnostics, ...indexDiagnostics];
+};
+
+const getDiagnosticAtPosition = (
+  diagnostics: readonly ChemdEditorDiagnostic[],
+  position: Position
+): ChemdEditorDiagnostic | null =>
+  diagnostics.find((diagnostic) => containsPosition(diagnostic.range, position)) ?? null;
+
+const isTemplateNode = (value: unknown): value is TemplateNodeLike =>
+  typeof value === "object"
+  && value !== null
+  && "type" in value
+  && (value as { type?: unknown }).type === "template"
+  && "name" in value
+  && typeof (value as { name?: unknown }).name === "string";
+
+const getTemplateNameHoverRange = (
+  model: editor.ITextModel,
+  position: Position
+): ChemdSourceRange | null => {
+  const line = model.getLineContent(position.lineNumber);
+  const match = line.match(/^:::template\s+(\S+)/u);
+  if (!match?.[1]) return null;
+  const startColumn = line.indexOf(match[1]) + 1;
+  const endColumn = startColumn + match[1].length;
+  const range = {
+    startLine: position.lineNumber,
+    startColumn,
+    endLine: position.lineNumber,
+    endColumn
+  };
+  return containsPosition(range, position) ? range : null;
+};
+
+const getTemplateAtPosition = (
+  output: ChemdLanguageCompileOutput | undefined,
+  model: editor.ITextModel,
+  position: Position
+): { node: TemplateNodeLike; outline: ChemdOutlineItem; range: ChemdSourceRange } | null => {
+  if (output?.status !== "ok") return null;
+  const headerRange = getTemplateNameHoverRange(model, position);
+  if (!headerRange) return null;
+  const line = model.getLineContent(position.lineNumber);
+  const targetName = line.slice(headerRange.startColumn - 1, headerRange.endColumn - 1);
+  if (!targetName) return null;
+  const outline = output.outline.find((item) =>
+    item.kind === "template"
+    && item.id === targetName
+    && containsPosition(item.range, position)
+  );
+  const node = (output.result.document.children as readonly unknown[]).find((item): item is TemplateNodeLike =>
+    isTemplateNode(item) && item.name === targetName
+  );
+  return outline && node ? { node, outline, range: headerRange } : null;
+};
+
 export const getChemdHoverMarkdown = (
   symbol: WorkspaceSymbol
 ): string => [
@@ -139,12 +231,65 @@ export const getChemdReferenceHoverMarkdown = (
   `document: \`${reference.documentPath ?? reference.documentUri}\``
 ].join("\n");
 
+export const getChemdDiagnosticHoverMarkdown = (
+  diagnostic: ChemdEditorDiagnostic
+): string => [
+  `**${diagnostic.code}**`,
+  "",
+  diagnostic.message,
+  "",
+  `severity: \`${diagnostic.severity}\``,
+  `quick fixes: \`${diagnostic.quickFixes.length}\``
+].join("\n");
+
+const formatParamSpec = (param: TemplateParamSpecLike): string =>
+  param.raw ?? (
+    param.type?.kind === "ref" && param.type.targetKind
+      ? `${param.name}: ref<${param.type.targetKind}>`
+      : param.type?.kind === "quantity" && param.type.quantityClass
+        ? `${param.name}: quantity<${param.type.quantityClass}>`
+        : `${param.name}: ${param.type?.kind ?? "string"}`
+  );
+
+export const getChemdTemplateHoverMarkdown = (
+  template: TemplateNodeLike
+): string => {
+  const params = template.paramSpecs && template.paramSpecs.length > 0
+    ? template.paramSpecs.map(formatParamSpec)
+    : template.params ?? [];
+  return [
+    `**${template.name}**`,
+    "",
+    "kind: `template`",
+    `params: ${params.length > 0 ? params.map((param) => `\`${param}\``).join(", ") : "`none`"}`,
+    ...(template.description ? ["", template.description] : [])
+  ].join("\n");
+};
+
 const provideHover = (
   model: editor.ITextModel,
   position: Position,
   options: NavigationProviderOptions
 ): languages.ProviderResult<languages.Hover> => {
   const index = options.getWorkspaceIndex();
+  const output = options.getCompileOutput();
+  const diagnostic = getDiagnosticAtPosition(
+    getDiagnosticsForModel(output, index, model),
+    position
+  );
+  if (diagnostic) {
+    return {
+      contents: [{ value: getChemdDiagnosticHoverMarkdown(diagnostic) }],
+      range: toHoverRange(diagnostic.range)
+    };
+  }
+  const template = getTemplateAtPosition(output, model, position);
+  if (template) {
+    return {
+      contents: [{ value: getChemdTemplateHoverMarkdown(template.node) }],
+      range: toHoverRange(template.range)
+    };
+  }
   const symbol = getMatchingSymbols(index, model, position)[0];
   if (!symbol) {
     const reference = getReferenceAtPosition(index, model, position);
