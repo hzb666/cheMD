@@ -7,6 +7,7 @@ import { buildLocalReactionIntelligenceArtifactInput } from "./desktop-local-sto
 import {
   buildListLocalReactionIntelligenceArtifactsInput,
   readLatestLocalReactionIntelligenceArtifact,
+  reactionIntelligenceArtifactHasReactionOverlap,
   selectLatestLocalReactionIntelligenceArtifactEntry
 } from "./desktop-reaction-intelligence-artifact-controller";
 
@@ -106,5 +107,14 @@ describe("desktop reaction intelligence artifact controller", () => {
     expect(result.state).toBe("ready");
     expect(result.artifact).toBe(latest.artifact);
     expect(result.entry).toBe(latest);
+  });
+
+  it("detects whether a stored artifact belongs to the current reaction ids", () => {
+    const latest = entry("artifact-latest", "2026-05-13T09:00:00.000Z");
+
+    expect(reactionIntelligenceArtifactHasReactionOverlap(latest.artifact, ["rxn-a"])).toBe(true);
+    expect(reactionIntelligenceArtifactHasReactionOverlap(latest.artifact, ["rxn-c"])).toBe(false);
+    expect(reactionIntelligenceArtifactHasReactionOverlap(null, ["rxn-a"])).toBe(false);
+    expect(reactionIntelligenceArtifactHasReactionOverlap(latest.artifact, [])).toBe(false);
   });
 });

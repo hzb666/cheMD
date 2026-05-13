@@ -65,6 +65,23 @@ export const buildListLocalReactionIntelligenceArtifactsInput = (
   limit: 1
 });
 
+export const reactionIntelligenceArtifactHasReactionOverlap = (
+  artifact: ChemdReactionIntelligenceArtifactV1 | null,
+  reactionIds: readonly string[]
+): boolean => {
+  if (!artifact) return false;
+  const expectedIds = new Set(reactionIds.filter((id) => id.trim().length > 0));
+  if (expectedIds.size === 0) return false;
+  const artifactIds = new Set([
+    ...artifact.reaction_features.map((feature) => feature.reaction_entity_id),
+    ...artifact.similarity_edges.flatMap((edge) => [
+      edge.from_reaction_entity_id,
+      edge.to_reaction_entity_id
+    ])
+  ]);
+  return [...expectedIds].some((id) => artifactIds.has(id));
+};
+
 export const readLatestLocalReactionIntelligenceArtifact = async ({
   listArtifacts,
   graphIndexId

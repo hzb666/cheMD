@@ -10,6 +10,7 @@ import { buildLocalRuntimeSnapshotInput } from "./desktop-local-store";
 import {
   initialLocalReactionIntelligenceArtifactState,
   readLatestLocalReactionIntelligenceArtifact,
+  reactionIntelligenceArtifactHasReactionOverlap,
   type LocalReactionIntelligenceArtifactState
 } from "./desktop-reaction-intelligence-artifact-controller";
 import { buildPersistRuntimeGraphRagCommandInput } from "./desktop-runtime-persistence";
@@ -3382,6 +3383,13 @@ export const App = () => {
     documentUri: workspaceController.selectedFile.path,
     options: { strictChemdKind: true, procedureMode: "auto" }
   }), [workspaceController.selectedFile.path, workspaceController.source]);
+  const outputReactionIds = useMemo(() =>
+    output.status === "ok"
+      ? output.symbols
+        .filter((symbol) => symbol.kind === "reaction")
+        .map((symbol) => symbol.id)
+      : [],
+  [output]);
   const semanticPreview = useMemo(
     () => buildDesktopSemanticPreview(output),
     [output]
@@ -3415,11 +3423,17 @@ export const App = () => {
     compileOutput: output,
     agentRun
   });
+  const localReactionIntelligenceArtifact = useMemo(() => {
+    const artifact = localStoreController.reactionIntelligenceArtifactState.artifact;
+    return reactionIntelligenceArtifactHasReactionOverlap(artifact, outputReactionIds)
+      ? artifact
+      : null;
+  }, [localStoreController.reactionIntelligenceArtifactState.artifact, outputReactionIds]);
   const knowledgeMapViewModel = useMemo(() =>
     buildDesktopKnowledgeMapViewModel(output, {
-      reactionIntelligenceArtifact: localStoreController.reactionIntelligenceArtifactState.artifact
+      reactionIntelligenceArtifact: localReactionIntelligenceArtifact
     }),
-  [localStoreController.reactionIntelligenceArtifactState.artifact, output]);
+  [localReactionIntelligenceArtifact, output]);
   const workspaceIngestController = useWorkspaceIngestController({
     mode: workspaceController.mode,
     workspaceState: workspaceController.workspaceState,
