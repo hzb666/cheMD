@@ -68,6 +68,39 @@ const outputWithReaction = (): ChemdLanguageCompileSuccess => ({
   } as unknown) as ChemdLanguageCompileSuccess["result"]
 });
 
+const outputWithManyReactions = (count: number): ChemdLanguageCompileSuccess => {
+  const symbols = Array.from({ length: count }, (_, index) => ({
+    id: `rxn-${index + 1}`,
+    label: `rxn-${index + 1}`,
+    kind: "reaction",
+    range: { startLine: index + 1, startColumn: 1, endLine: index + 1, endColumn: 8 },
+    sourceNodeType: "reaction"
+  }));
+
+  return {
+    ...outputWithReaction(),
+    symbols,
+    result: ({
+      document: {
+        type: "document",
+        meta: {
+          id: "large-map-doc",
+          title: "Large knowledge map",
+          date: "2026-05-13"
+        },
+        children: symbols.map((symbol) => ({
+          type: "reaction",
+          id: symbol.id,
+          reactants: [`mol-${symbol.id}`],
+          products: [`product-${symbol.id}`]
+        })),
+        diagnostics: []
+      },
+      diagnostics: []
+    } as unknown) as ChemdLanguageCompileSuccess["result"]
+  };
+};
+
 describe("desktop knowledge map view model", () => {
   it("builds semantic summaries from successful compile output", () => {
     const viewModel = buildDesktopKnowledgeMapViewModel(outputWithReaction());
@@ -93,6 +126,16 @@ describe("desktop knowledge map view model", () => {
       reaction_entity_id: "rxn-a",
       x: 0,
       y: 0
+    });
+  });
+
+  it("builds a 1k reaction layout fixture without requiring TMAP", () => {
+    const viewModel = buildDesktopKnowledgeMapViewModel(outputWithManyReactions(1000));
+
+    expect(viewModel.reactionMap.nodes).toHaveLength(1000);
+    expect(viewModel.reactionSummary).toMatchObject({
+      reactionCount: 1000,
+      layoutEngine: "deterministic_fallback"
     });
   });
 

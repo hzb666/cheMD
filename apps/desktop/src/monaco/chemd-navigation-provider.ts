@@ -53,6 +53,15 @@ const toMonacoRange = (
     range.endColumn
   );
 
+const toHoverRange = (
+  range: WorkspaceSymbol["range"] | WorkspaceReference["range"]
+): languages.Hover["range"] => ({
+  startLineNumber: range.startLine,
+  startColumn: range.startColumn,
+  endLineNumber: range.endLine,
+  endColumn: range.endColumn
+});
+
 const symbolToLocation = (
   monaco: Monaco,
   symbol: WorkspaceSymbol
@@ -81,6 +90,35 @@ const getMatchingSymbols = (
   return findSymbolDefinitions(index, { localId: target });
 };
 
+const containsPosition = (
+  range: WorkspaceReference["range"],
+  position: Position
+): boolean =>
+  position.lineNumber >= range.startLine
+  && position.lineNumber <= range.endLine
+  && (
+    position.lineNumber !== range.startLine
+    || position.column >= range.startColumn
+  )
+  && (
+    position.lineNumber !== range.endLine
+    || position.column <= range.endColumn
+  );
+
+const getReferenceAtPosition = (
+  index: WorkspaceSymbolIndex | null | undefined,
+  model: editor.ITextModel,
+  position: Position
+): WorkspaceReference | null => {
+  if (!index) {
+    return null;
+  }
+  const modelUri = model.uri.toString();
+  return index.references.find((reference) =>
+    reference.documentUri === modelUri && containsPosition(reference.range, position)
+  ) ?? null;
+};
+
 export const getChemdHoverMarkdown = (
   symbol: WorkspaceSymbol
 ): string => [
@@ -91,13 +129,31 @@ export const getChemdHoverMarkdown = (
   `line: \`${symbol.range.startLine}\``
 ].join("\n");
 
+export const getChemdReferenceHoverMarkdown = (
+  reference: WorkspaceReference
+): string => [
+  `**${reference.targetText}**`,
+  "",
+  `status: \`${reference.status}\``,
+  `field: \`${reference.field}\``,
+  `document: \`${reference.documentPath ?? reference.documentUri}\``
+].join("\n");
+
 const provideHover = (
   model: editor.ITextModel,
   position: Position,
   options: NavigationProviderOptions
 ): languages.ProviderResult<languages.Hover> => {
-  const symbol = getMatchingSymbols(options.getWorkspaceIndex(), model, position)[0];
+  const index = options.getWorkspaceIndex();
+  const symbol = getMatchingSymbols(index, model, position)[0];
   if (!symbol) {
+    const reference = getReferenceAtPosition(index, model, position);
+    if (reference?.status === "unresolved") {
+      return {
+        contents: [{ value: getChemdReferenceHoverMarkdown(reference) }],
+        range: toHoverRange(reference.range)
+      };
+    }
     return null;
   }
   return {

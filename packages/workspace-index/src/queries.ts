@@ -67,6 +67,20 @@ export const listWorkspaceSymbols = (
   }));
 };
 
+export const markStaleWorkspaceSymbols = (
+  index: WorkspaceSymbolIndex,
+  staleSymbolIds: Iterable<string>
+): WorkspaceSymbolIndex => {
+  const staleIds = new Set(staleSymbolIds);
+  return {
+    ...index,
+    symbols: index.symbols.map((symbol) => ({
+      ...symbol,
+      stale: staleIds.has(symbol.symbolId)
+    }))
+  };
+};
+
 export const summarizeWorkspaceIndex = (
   index: WorkspaceSymbolIndex
 ): WorkspaceIndexSummary => ({

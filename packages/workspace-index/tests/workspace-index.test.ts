@@ -10,6 +10,7 @@ import {
   findReferences,
   findSymbolDefinitions,
   listWorkspaceSymbols,
+  markStaleWorkspaceSymbols,
   summarizeWorkspaceIndex,
   type WorkspaceDocumentInput,
   type WorkspaceIndexCompileFn
@@ -209,5 +210,15 @@ describe("buildWorkspaceSymbolIndex", () => {
       resolvedReferenceCount: 2,
       unresolvedReferenceCount: 0
     });
+  });
+
+  it("marks stale symbols without mutating the source index", () => {
+    const index = buildWorkspaceSymbolIndex(workspaceDocuments);
+    const staleId = index.symbols[0].symbolId;
+    const nextIndex = markStaleWorkspaceSymbols(index, [staleId]);
+
+    expect(index.symbols[0].stale).toBeUndefined();
+    expect(nextIndex.symbols.find((symbol) => symbol.symbolId === staleId)?.stale).toBe(true);
+    expect(nextIndex.symbols.filter((symbol) => symbol.stale)).toHaveLength(1);
   });
 });

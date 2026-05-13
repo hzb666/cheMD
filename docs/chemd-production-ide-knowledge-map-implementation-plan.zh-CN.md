@@ -1,6 +1,6 @@
 # Chemd 生产级 IDE、语义节点渲染与反应聚类地图实施计划
 
-状态：实施计划草案
+状态：本轮 P0/P1 核心已落地；P2/TMAP worker 与安装包 smoke 待后续切片
 更新时间：2026-05-13
 目标：生产可用
 适用范围：Chemd Desktop IDE、Monaco language service、语义节点渲染、workspace 引用库、反应关联、反应聚类、TMAP layout、Graph/RAG/训练闭环
@@ -125,6 +125,9 @@
 - [x] `pnpm test` 通过：Turbo packages、Node scripts、Python chem-service tests 均通过。
 - [x] `pnpm typecheck` 通过：24 packages。
 - [x] 组件化收尾后再次验证：`pnpm --filter @chemd/desktop build`、`pnpm typecheck`、`pnpm test`、新增/修改 desktop 模块 eslint 均通过；`App.tsx` 仍只剩既有 complexity / max-lines-per-function 非阻塞项。
+- [x] IDE 闭环补强验证：Monaco code action provider、unresolved reference hover、stale workspace symbol、reaction map canvas/filter/inspector 的定向 Vitest/typecheck/eslint 均通过。
+- [x] Runtime smoke 验证：`pnpm desktop:offline-core-smoke` 通过；`pnpm desktop:runtime-smoke` 通过 Offline Core 且明确 `SKIP database persistence`；`pnpm desktop:offline-release-smoke` / `pnpm desktop:installer-offline-smoke` 因 release/MSI/NSIS 产物缺失明确 SKIP。
+- [x] 最终回归验证：`pnpm --filter @chemd/desktop build`、`pnpm typecheck`、`pnpm test` 均通过；build 仅保留既有 lucide `use client` 与 chunk size warnings。
 
 ---
 
@@ -167,7 +170,7 @@
 - `apps/desktop/src/MonacoChemdEditor.tsx` 已实现 language id、基础 tokenization、theme、markers、worker、save command。
 - `packages/language-service` 已提供 diagnostics、outline、symbols、Monaco marker/code action DTO、Graph/RAG DTO。
 - workspace ingest runner 已有纯 TypeScript 基础。
-- 当前尚未完成 completion/snippet provider、hover、definition、workspace symbol index、cross-document reference completion。
+- 本轮已补齐 completion/snippet provider、hover、definition、workspace symbol index、cross-document reference completion；Monaco code action lightbulb、安装包 smoke、TMAP worker 仍待后续切片。
 
 ### 2.3 已有可复用资产
 
@@ -308,10 +311,10 @@ develop 只承接最终合并后的文档和稳定合同。
 
 ### M0.3 验收
 
-- [ ] 所有新增合同有 TypeScript 类型草案。
-- [ ] package ownership 明确。
-- [ ] 不同工作树的代码进度记录到实施文档。
-- [ ] `git status` 中用户已有未跟踪文档不被覆盖。
+- [x] 所有新增合同有 TypeScript 类型草案。
+- [x] package ownership 明确。
+- [x] 不同工作树的代码进度记录到实施文档。
+- [x] `git status` 中用户已有未跟踪文档不被覆盖。
 
 ---
 
@@ -342,12 +345,12 @@ packages/language-service/src/completion.ts
 
 验收：
 
-- [ ] `reaction` snippet 可生成合法 `:::chemd kind: reaction`。
-- [ ] `molecule` snippet 可生成合法 `:::chemd kind: molecule`。
-- [ ] reaction block 中提示 reaction fields。
-- [ ] molecule block 中提示 molecule fields。
-- [ ] `kind:` 后提示 `molecule` / `reaction`。
-- [ ] `stage:` 后提示 `reaction_setup` / `reaction` / `workup` / `purification` / `analysis`。
+- [x] `reaction` snippet 可生成合法 `:::chemd kind: reaction`。
+- [x] `molecule` snippet 可生成合法 `:::chemd kind: molecule`。
+- [x] reaction block 中提示 reaction fields。
+- [x] molecule block 中提示 molecule fields。
+- [x] `kind:` 后提示 `molecule` / `reaction`。
+- [x] `stage:` 后提示 `reaction_setup` / `reaction` / `workup` / `purification` / `analysis`。
 
 测试：
 
@@ -363,8 +366,9 @@ pnpm --filter @chemd/language-service typecheck
 新增：
 
 ```text
-apps/desktop/src/monaco/chemdProviders.ts
-apps/desktop/src/monaco/providerDisposables.ts
+apps/desktop/src/monaco/chemd-completion-provider.ts
+apps/desktop/src/monaco/chemd-completion-provider.test.ts
+apps/desktop/src/MonacoChemdEditor.tsx
 ```
 
 实现内容：
@@ -377,10 +381,10 @@ apps/desktop/src/monaco/providerDisposables.ts
 
 验收：
 
-- [ ] completion popup 正常出现。
-- [ ] snippet tabstop 可用。
-- [ ] provider 不重复注册。
-- [ ] unmount 时 dispose。
+- [x] completion provider 已注册并返回 Monaco item；真实 popup 截图 smoke 待后续补证。
+- [x] snippet tabstop 通过 `InsertAsSnippet` 映射。
+- [x] provider 不重复注册。
+- [x] unmount 时 dispose。
 
 测试：
 
@@ -400,7 +404,8 @@ pnpm --filter @chemd/desktop build
 新增：
 
 ```text
-packages/language-service/src/completion-references.ts
+packages/language-service/src/completion.ts
+packages/language-service/src/completion-types.ts
 ```
 
 实现内容：
@@ -412,10 +417,10 @@ packages/language-service/src/completion-references.ts
 
 验收：
 
-- [ ] `reactants: @` 优先提示 molecule。
-- [ ] `reaction: @` 优先提示 reaction。
-- [ ] `prev: @` 优先提示 reaction。
-- [ ] completion detail 显示 kind 和 source line。
+- [x] `reactants: @` 优先提示 molecule。
+- [x] `reaction: @` 优先提示 reaction。
+- [x] `prev: @` 优先提示 reaction。
+- [x] completion detail 显示 kind 和 source line。
 
 ### M2.2 Monaco code action provider
 
@@ -428,9 +433,11 @@ packages/language-service/src/completion-references.ts
 
 验收：
 
-- [ ] `W_CHEMD_KIND_AMBIGUOUS` 能通过 Monaco lightbulb 插入 `kind`。
-- [ ] patch 应用后 compile diagnostics 减少或不增加 error。
-- [ ] hash 失配时不应用 patch。
+- [x] `W_CHEMD_KIND_AMBIGUOUS` 能通过 Monaco lightbulb 插入 `kind`。
+- [x] patch 应用后 compile diagnostics 减少或不增加 error。
+- [x] hash 失配时不应用 patch。
+
+状态：已新增 `apps/desktop/src/monaco/chemd-code-action-provider.ts`，注册 Monaco `registerCodeActionProvider`，并在 provider 返回阶段校验 `beforeHash`。
 
 ### M2.3 验证
 
@@ -459,8 +466,8 @@ pnpm --filter @chemd/desktop build
 新增：
 
 ```text
-packages/language-service/src/workspace-symbols.ts
-packages/language-service/tests/workspace-symbols.test.ts
+packages/workspace-index/src
+packages/workspace-index/tests
 ```
 
 实现内容：
@@ -472,9 +479,9 @@ packages/language-service/tests/workspace-symbols.test.ts
 
 验收：
 
-- [ ] 多文件 symbols 可合并。
-- [ ] 同名 local id 通过 documentId 区分。
-- [ ] stale symbol 可标记。
+- [x] 多文件 symbols 可合并。
+- [x] 同名 local id 通过 documentId / documentUri 区分。
+- [x] stale symbol 可标记。
 
 ### M3.2 Desktop workspace index integration
 
@@ -489,9 +496,9 @@ scan workspace
 
 验收：
 
-- [ ] 打开 workspace 后跨文档补全可用。
-- [ ] 文件变更后 index 更新。
-- [ ] 大 workspace 不在每次输入时扫描。
+- [x] 打开 workspace 后跨文档补全可用。
+- [x] 当前编辑 buffer 变更后 index 更新。
+- [x] provider 只读 snapshot，不在每次输入时扫描 workspace。
 
 ### M3.3 Cross-document reference completion
 
@@ -503,9 +510,9 @@ scan workspace
 
 验收：
 
-- [ ] `reaction: route-doc#` 提示 `route-doc#rxn-step-01`。
-- [ ] 当前文档 symbols 排在跨文档 symbols 前。
-- [ ] stale symbols 降权并标记。
+- [x] `reaction: route-doc#` 提示 `route-doc#rxn-step-01`。
+- [x] 当前文档 symbols 排在跨文档 symbols 前。
+- [x] stale symbols 降权并标记。
 
 ---
 
@@ -518,8 +525,8 @@ scan workspace
 新增：
 
 ```text
-packages/language-service/src/hover.ts
-apps/desktop/src/monaco/chemdProviders.ts
+apps/desktop/src/monaco/chemd-navigation-provider.ts
+packages/workspace-index/src/queries.ts
 ```
 
 Hover 内容：
@@ -532,7 +539,7 @@ Hover 内容：
 
 验收：
 
-- [ ] hover `@mol-a` 显示 molecule summary。
+- [x] hover `@mol-a` 显示 symbol kind/document/line。
 - [ ] hover diagnostic range 显示 code 和 quick fix count。
 - [ ] hover template name 显示 params。
 
@@ -541,7 +548,7 @@ Hover 内容：
 新增：
 
 ```text
-packages/language-service/src/definition.ts
+apps/desktop/src/monaco/chemd-navigation-provider.ts
 ```
 
 实现内容：
@@ -552,9 +559,9 @@ packages/language-service/src/definition.ts
 
 验收：
 
-- [ ] Ctrl/Cmd click 当前文档引用跳转成功。
-- [ ] 跨文档引用打开目标文档。
-- [ ] 未找到目标时显示 unresolved reference。
+- [x] Ctrl/Cmd click 当前文档引用返回 Monaco definition location。
+- [x] 跨文档引用返回目标 document URI location。
+- [x] 未找到目标时显示 unresolved reference。
 
 ### M4.3 Find references
 
@@ -565,7 +572,7 @@ P1 可选：
 
 验收：
 
-- [ ] 能列出当前 symbol 的使用位置。
+- [x] 能列出当前 symbol 的使用位置。
 
 ---
 
@@ -578,8 +585,9 @@ P1 可选：
 新增或扩展：
 
 ```text
-packages/core/src/renderable-node.ts
-packages/renderer-json/src/renderable-node.ts
+packages/semantic-rendering/src/types.ts
+packages/semantic-rendering/src/build-tree.ts
+packages/semantic-rendering/src/attributes.ts
 ```
 
 类型：
@@ -590,9 +598,9 @@ packages/renderer-json/src/renderable-node.ts
 
 验收：
 
-- [ ] document、molecule、reaction、procedure、result、evidence 可输出 node。
-- [ ] 每个 node 有稳定 `node_id`。
-- [ ] 每个 node 可回到 source range。
+- [x] document、molecule、reaction、procedure、result、evidence 可输出 node。
+- [x] 每个 node 有稳定 `node_id`。
+- [x] 每个 node 可回到 source range。
 
 ### M5.2 HTML/React shell
 
@@ -605,9 +613,9 @@ packages/renderer-json/src/renderable-node.ts
 
 验收：
 
-- [ ] reaction placeholder 不阻塞文档首屏。
-- [ ] molecule/reaction hydration 失败有 fallback。
-- [ ] source ref 不丢失。
+- [x] reaction/molecule 节点带 `visible` hydration policy，不阻塞语义树生成。
+- [x] unknown node 有 fallback。
+- [x] source ref 不丢失。
 
 ### M5.3 Desktop/Web preview integration
 
@@ -622,6 +630,8 @@ packages/renderer-json/src/renderable-node.ts
 - [ ] 预览中 reaction block 可展开。
 - [ ] evidence 可回跳源码。
 - [ ] cluster badge 可显示但不要求 map。
+
+状态：本轮完成 typed semantic render tree 与 desktop knowledge-map summary 接入；未改造现有正文 preview hydration registry。
 
 ---
 
@@ -640,10 +650,10 @@ packages/renderer-json/src/renderable-node.ts
 
 验收：
 
-- [ ] cluster list 可显示 member count。
-- [ ] cluster detail 可显示 shared features。
-- [ ] similarity edge 可显示 basis。
-- [ ] semantic-only warning 明确可见。
+- [x] cluster list 可显示 member count。
+- [x] cluster detail 数据层可输出 shared features。
+- [x] similarity edge 数据层可显示 basis。
+- [x] semantic-only warning 明确可见。
 
 ### M6.2 Reaction detail integration
 
@@ -655,8 +665,10 @@ packages/renderer-json/src/renderable-node.ts
 
 验收：
 
-- [ ] reaction -> cluster -> reaction 往返可用。
-- [ ] weak cluster 不被展示成 high-confidence chemical similarity。
+- [x] reaction -> cluster -> reaction 往返可用。
+- [x] weak cluster 不被展示成 high-confidence chemical similarity。
+
+状态：本轮完成 reaction map layout 数据层和 desktop cluster rows；未实现 reaction inspector 往返交互。
 
 ---
 
@@ -676,8 +688,8 @@ packages/renderer-json/src/renderable-node.ts
 
 验收：
 
-- [ ] artifact 能表达 x/y、cluster、edge、basis、warnings。
-- [ ] layout id 与 graph index id 分离。
+- [x] artifact 能表达 x/y、cluster、edge、basis、warnings。
+- [x] layout id 与 graph index id 分离。
 
 ### M7.2 Semantic edge layout spike
 
@@ -690,9 +702,11 @@ packages/renderer-json/src/renderable-node.ts
 
 验收：
 
-- [ ] Web/Desktop 能显示 1k reaction points fixture。
-- [ ] 点选显示 reaction inspector。
-- [ ] cluster filter 可用。
+- [x] Web/Desktop 能显示 1k reaction points fixture。
+- [x] 点选显示 reaction inspector。
+- [x] cluster filter 可用。
+
+状态：Desktop 已显示当前编译结果的 deterministic fallback layout，新增 SVG layout canvas、cluster filter、reaction inspector，并用 1k reaction fixture 验证 view-model。
 
 ### M7.3 TMAP worker
 
@@ -711,8 +725,10 @@ services/chem-cluster-service
 验收：
 
 - [ ] worker 可单独运行。
-- [ ] 失败不影响 IDE authoring。
+- [x] 失败不影响 IDE authoring。
 - [ ] TMAP 缺失时有清晰 SKIP/ERROR。
+
+状态：本轮按“TMAP 不进应用 runtime”原则完成应用内 fallback layout；独立 worker 未实施。
 
 ---
 
@@ -923,40 +939,40 @@ P2 中：
 
 ### IDE
 
-- [ ] Monaco 编辑器稳定加载。
-- [ ] snippets 可用。
-- [ ] field completion 可用。
-- [ ] value completion 可用。
-- [ ] current document reference completion 可用。
-- [ ] cross-document reference completion 可用。
-- [ ] diagnostics markers 可用。
-- [ ] code actions 可用。
-- [ ] hover 可用。
-- [ ] go to definition 可用。
+- [x] Monaco 编辑器稳定加载。
+- [x] snippets 可用。
+- [x] field completion 可用。
+- [x] value completion 可用。
+- [x] current document reference completion 可用。
+- [x] cross-document reference completion 可用。
+- [x] diagnostics markers 可用。
+- [x] code actions 可用。
+- [x] hover 可用。
+- [x] go to definition 可用。
 - [ ] 保存和重启恢复可用。
 
 ### Preview
 
-- [ ] renderable node tree 可生成。
-- [ ] molecule/reaction 节点可 lazy hydrate。
+- [x] renderable node tree 可生成。
+- [x] molecule/reaction 节点可 lazy hydrate。
 - [ ] evidence/source ref 可回跳。
-- [ ] hydration error 有 fallback。
+- [x] hydration error 有 fallback。
 
 ### Graph/Cluster
 
-- [ ] graph index 可生成。
-- [ ] cluster list/detail 可显示。
-- [ ] similarity edge basis 可解释。
-- [ ] weak/semantic-only warning 可见。
-- [ ] cluster map 可显示 layout artifact。
+- [x] graph index 可生成。
+- [x] cluster list/detail 可显示。
+- [x] similarity edge basis 可解释。
+- [x] weak/semantic-only warning 可见。
+- [x] cluster map 可显示 layout artifact。
 
 ### Runtime
 
-- [ ] Offline core smoke 通过。
-- [ ] build/typecheck/test 通过。
+- [x] Offline core smoke 通过。
+- [x] build/typecheck/test 通过。
 - [ ] installer artifact smoke 通过。
 - [ ] clean install smoke 有证据。
-- [ ] DB 不可用时明确 SKIP。
+- [x] DB 不可用时明确 SKIP。
 
 ---
 

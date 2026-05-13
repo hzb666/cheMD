@@ -3,6 +3,7 @@ export {
   findReferences,
   findSymbolDefinitions,
   listWorkspaceSymbols,
+  markStaleWorkspaceSymbols,
   summarizeWorkspaceIndex,
   type WorkspaceSymbolQuery,
   type WorkspaceSymbolTarget

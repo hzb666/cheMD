@@ -170,7 +170,7 @@ const toCompletionSymbol = (symbol: WorkspaceSymbol): ChemdWorkspaceSymbol => ({
   label: symbol.label,
   range: symbol.range,
   sourceHash: symbol.sourceHash,
-  stale: symbol.duplicateLocalId,
+  stale: Boolean(symbol.stale || symbol.duplicateLocalId),
   summary: symbol.documentPath
 });
 

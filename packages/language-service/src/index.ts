@@ -56,3 +56,6 @@ export {
   type MonacoMarkerSeverity,
   type MonacoRangeLike
 } from "./monaco-adapter";
+export {
+  createSourceHash
+} from "./ranges";

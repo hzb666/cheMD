@@ -5,6 +5,7 @@ import type { WorkspaceSymbolIndex } from "@chemd/workspace-index";
 
 import {
   getChemdHoverMarkdown,
+  getChemdReferenceHoverMarkdown,
   registerChemdNavigationProviders
 } from "./chemd-navigation-provider";
 
@@ -54,6 +55,7 @@ const fakeIndex: WorkspaceSymbolIndex = {
 };
 
 const fakeModel = (source: string): editor.ITextModel => ({
+  uri: { toString: () => "chemd-workspace://workspace/route-a.chemd.md" },
   getWordAtPosition: () => ({ word: "rxn-a" }),
   getLineContent: () => source
 } as unknown as editor.ITextModel);
@@ -67,6 +69,18 @@ describe("chemd Monaco navigation providers", () => {
   it("builds hover markdown from workspace symbols", () => {
     expect(getChemdHoverMarkdown(fakeIndex.symbols[0])).toContain("**rxn-a**");
     expect(getChemdHoverMarkdown(fakeIndex.symbols[0])).toContain("kind: `reaction`");
+  });
+
+  it("builds hover markdown for unresolved references", () => {
+    const markdown = getChemdReferenceHoverMarkdown({
+      ...fakeIndex.references[0],
+      status: "unresolved",
+      targetText: "missing-rxn",
+      targetSymbolIds: []
+    });
+
+    expect(markdown).toContain("**missing-rxn**");
+    expect(markdown).toContain("status: `unresolved`");
   });
 
   it("registers hover, definition, and reference providers from workspace index", async () => {

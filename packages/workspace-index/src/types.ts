@@ -40,6 +40,7 @@ export interface WorkspaceSymbol {
   range: ChemdSourceRange;
   sourceHash: string;
   duplicateLocalId: boolean;
+  stale?: boolean;
 }
 
 export type WorkspaceReferenceStatus = "resolved" | "unresolved" | "ambiguous";

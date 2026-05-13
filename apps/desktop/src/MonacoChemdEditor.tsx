@@ -6,6 +6,7 @@ import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 
 import { toMonacoLanguageServiceModel, type ChemdLanguageCompileOutput, type ChemdWorkspaceSymbolIndex, type MonacoMarkerLike } from "@chemd/language-service";
 import type { WorkspaceSymbolIndex } from "@chemd/workspace-index";
+import { registerChemdCodeActionProvider } from "./monaco/chemd-code-action-provider";
 import { registerChemdCompletionProvider } from "./monaco/chemd-completion-provider";
 import { registerChemdNavigationProviders } from "./monaco/chemd-navigation-provider";
 
@@ -189,6 +190,9 @@ export const MonacoChemdEditor = ({
       getCompileOutput: () => compileOutputRef.current,
       getWorkspaceIndex: () => workspaceIndexRef.current
     });
+    const codeActionProvider = registerChemdCodeActionProvider(monaco, CHEMD_LANGUAGE_ID, {
+      getCompileOutput: () => compileOutputRef.current
+    });
     const navigationProviders = registerChemdNavigationProviders(monaco, CHEMD_LANGUAGE_ID, {
       getCompileOutput: () => compileOutputRef.current,
       getWorkspaceIndex: () => workspaceSymbolIndexRef.current
@@ -199,6 +203,7 @@ export const MonacoChemdEditor = ({
     syncMarkers();
     editorInstance.onDidDispose(() => {
       completionProvider.dispose();
+      codeActionProvider.dispose();
       navigationProviders.dispose();
     });
   }, [syncMarkers]);
