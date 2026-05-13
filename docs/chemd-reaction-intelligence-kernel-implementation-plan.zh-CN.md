@@ -10,8 +10,9 @@ Trellis task：`.trellis/tasks/05-13-reaction-intelligence-core`
 本阶段把 Chemd 的反应关联与聚类从“语义占位”推进到可生产使用的反应智能内核：
 
 - 支持独立的本地 worker/sidecar 计算反应特征，不把重依赖强塞进 Web/IDE 入口。
+- 接入 DRFP 作为默认 deterministic reaction fingerprint provider，生产聚类不依赖神经网络。
 - 接入可选 RDKit reaction fingerprint、RXNMapper atom mapping/reaction center、RXNFP embedding。
-- 生成 hybrid similarity graph：semantic + fingerprint + RXNFP + atom mapping/reaction center。
+- 生成 hybrid similarity graph：semantic + DRFP/RDKit fingerprint + RXNFP + atom mapping/reaction center。
 - 可选输出 TMAP 兼容布局数据，但应用内默认展示普通 map/graph；TMAP 作为大规模反应空间投影，不作为基础节点渲染机制。
 - 保持现有 `@chemd/exporter-training` 的 source truth 约束：没有真实向量或 mapping 时必须显式 SKIP/warning，不能伪造 fingerprint。
 
@@ -46,6 +47,17 @@ Trellis task：`.trellis/tasks/05-13-reaction-intelligence-core`
 - 作为 optional layout provider：输入 similarity edge list，输出 node positions + layout diagnostics。
 - 应用内没有必要强制显示 TMAP；小规模文档/引用图继续用普通节点图，只有成百上千反应、需要“反应空间地图”时再启用。
 - tmap 的 C++/OpenMP/OGDF/COIN 安装风险不得阻塞 Chemd 基础功能。
+
+### 2.4 DRFP
+
+代码库：`reymond-group/drfp`。核心能力是从 reaction SMILES 的反应物/产物差异生成 deterministic reaction fingerprint。它不是神经网络，不需要训练，适合作为 Chemd 反应聚类的默认生产底座。
+
+落地原则：
+
+- 作为 optional provider lazy import；当前 `chem-service` Python 3.14 主环境不强制安装 DRFP。
+- 有 DRFP 时优先使用 `drfp_tanimoto`，无 DRFP 时回退 `rdkit_tanimoto`。
+- DRFP 与 RDKit 属于同一 fingerprint family，hybrid scoring 不得双算同类权重。
+- 输出 deterministic clusters，并保留每条边的 contribution 和 warnings。
 
 ## 3. 架构边界
 
@@ -166,3 +178,4 @@ Write scope：
 - 2026-05-13：合入 RXNFP provider、hybrid similarity 和 pipeline，semantic-only 边不标记为 computed chemistry。
 - 2026-05-13：合入 TMAP optional layout CLI；应用内默认不强制显示 TMAP，CLI 输出统一 artifact schema。
 - 2026-05-13：主分支整合 provider key、status、artifact 字段命名，统一到 `chemd-reaction-intelligence-artifact/v0.1`。
+- 2026-05-13：新增 DRFP hybrid reaction clustering 实施计划；DRFP 作为默认 deterministic fingerprint provider，RXNFP 保持 optional semantic embedding provider。

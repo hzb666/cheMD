@@ -8,10 +8,11 @@ Chemd 的反应关联与聚类目前主要依赖语义图、reaction family、pr
 
 1. Define a stable reaction intelligence contract across TypeScript graph index and Python chem-service worker.
 2. Add optional local providers for RDKit fingerprint, RXNMapper atom mapping/reaction center, RXNFP embeddings, and TMAP layout.
-3. Build hybrid similarity edges with explicit basis and warnings.
-4. Keep all heavy dependencies optional and lazily loaded.
-5. Never claim computed chemistry when a provider is unavailable or skipped.
-6. Keep implementation componentized; no business logic in app entrypoints or service main files.
+3. Add DRFP as the default deterministic reaction fingerprint provider for production clustering.
+4. Build hybrid similarity edges and deterministic clusters with explicit basis and warnings.
+5. Keep all heavy dependencies optional and lazily loaded.
+6. Never claim computed chemistry when a provider is unavailable or skipped.
+7. Keep implementation componentized; no business logic in app entrypoints or service main files.
 
 ## Non-goals
 
@@ -22,10 +23,10 @@ Chemd 的反应关联与聚类目前主要依赖语义图、reaction family、pr
 
 ## Acceptance Criteria
 
-- TypeScript tests cover artifact merge and warning behavior.
-- Python tests cover provider availability, fake provider execution, hybrid scoring, and TMAP skip/layout behavior.
+- TypeScript tests cover artifact merge, DRFP contract, and warning behavior.
+- Python tests cover provider availability, fake provider execution, DRFP fallback, hybrid scoring, deterministic clustering, and TMAP skip/layout behavior.
 - `services/chem-service` can run the worker/CLI against a JSON job.
-- Docs explain provider policy, graph semantics, and TMAP display decision.
+- Docs explain provider policy, graph semantics, DRFP worker policy, clustering thresholds, and TMAP display decision.
 - Relevant package/service validation commands are run and recorded.
 
 ## Parallel Ownership
