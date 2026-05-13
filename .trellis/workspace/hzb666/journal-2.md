@@ -1280,3 +1280,37 @@ Merged cluster computed evidence and knowledge-map artifact summary worktrees; a
 ### Next Steps
 
 - None - task complete
+
+
+## Session 71: Desktop local intelligence artifact read and filtering
+
+**Date**: 2026-05-13
+**Task**: Desktop local intelligence artifact read and filtering
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Merged edge basis filtering and local artifact controller worktrees; added reaction overlap guard to prevent stale artifact injection; updated productization docs and passed full typecheck/test/build/Rust validation.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5b55c3f` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
