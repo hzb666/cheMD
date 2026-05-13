@@ -1,0 +1,53 @@
+{
+  "id": "desktop-ide-map-remaining-production",
+  "name": "desktop-ide-map-remaining-production",
+  "title": "Desktop IDE map remaining production closure",
+  "description": "",
+  "status": "planning",
+  "dev_type": "fullstack",
+  "scope": "apps/desktop,packages/workspace-index,packages/language-service,packages/semantic-rendering,packages/reaction-map,services/chem-cluster-service,docs",
+  "package": "web",
+  "priority": "P2",
+  "creator": "hzb666",
+  "assignee": "hzb666",
+  "createdAt": "2026-05-13",
+  "completedAt": null,
+  "branch": "desktop-ide-map",
+  "base_branch": "desktop-ide-map",
+  "worktree_path": null,
+  "current_phase": 0,
+  "next_action": [
+    {
+      "phase": 1,
+      "action": "brainstorm"
+    },
+    {
+      "phase": 2,
+      "action": "research"
+    },
+    {
+      "phase": 3,
+      "action": "implement"
+    },
+    {
+      "phase": 4,
+      "action": "check"
+    },
+    {
+      "phase": 5,
+      "action": "update-spec"
+    },
+    {
+      "phase": 6,
+      "action": "record-session"
+    }
+  ],
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
