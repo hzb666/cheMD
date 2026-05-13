@@ -487,6 +487,21 @@ DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outb
     明确提示并 no-op。
   - 当前验证：Rust worker timeout tests 10/10、Monaco/source jump 与 knowledge-map
     Vitest 18/18、desktop typecheck 通过；`App.tsx` 复杂度/函数长度仍进入 M11。
+- 本轮 P1/P2 纯逻辑闭环：
+  - `feat(desktop)：合并 workspace ingest outbox 桥接` 新增
+    `buildWorkspaceIngestOutboxInputs`，把带 `runtimePayload` 的 pending / retryable
+    failed ingest item 幂等转换为 Local Store snapshot outbox input；skipped、synced、
+    running、缺 payload、超过 retry 阈值的失败项都有结构化原因和脱敏摘要。
+  - `feat(postgres)：合并 reaction artifact shared schema adapter` 新增
+    `buildReactionIntelligenceRuntimeGraphRagInput`，把 reaction intelligence artifact
+    similarity edge 映射为 shared schema runtime graph edge，保留 artifact/job/provider、
+    basis、source hash、warnings 与 computed feature evidence。
+  - 主控审查后追加 `fix(postgres)：对齐 reaction artifact 类型合同`，让 adapter 直接
+    引用 `@chemd/reaction-map` 的 artifact 类型与 schema 常量，避免跨包合同漂移。
+  - 当前验证：workspace ingest/local store Vitest 28/28、storage-postgres Vitest
+    33/33、focused ESLint、`pnpm typecheck`、`pnpm test`、desktop build 与
+    `git diff --check` 均通过；真实 DB 写入仍复用既有 runtime smoke，artifact
+    command/UI 同步留到后续 M5/M6 集成。
 
 当前暂缓债务：
 
@@ -510,8 +525,9 @@ DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outb
 状态：已补纯 TypeScript workspace ingest runner，并已在桌面 Local Store 面板接入
 workspace 扫描入口；runner 现在会复用同一 document hash / revision 的 existing
 pending、running、synced item，文件内容变化会生成新 revision，不覆盖旧 item；failed item
-超过 retry 阈值后保持 failed，不会自动变回 pending。后续仍需接入本地 outbox
-幂等执行、取消/重试和大 workspace 后台调度。
+超过 retry 阈值后保持 failed，不会自动变回 pending。当前已补 ingest queue 到
+Local Store snapshot outbox input 的纯函数桥接；后续仍需接入 UI/Tauri 执行、
+取消/重试和大 workspace 后台调度。
 
 验收：
 
@@ -680,7 +696,8 @@ env、database URL、API key、token 或 password。诊断包说明见
 
 ### P1：本地知识队列生产可用
 
-- [ ] workspace ingest 可本地运行并生成 outbox。
+- [x] workspace ingest 可本地运行并生成 outbox-ready snapshot input；UI/Tauri 执行
+  仍归后续 M4/M5 集成。
 - [x] outbox/ingest 契约支持 pending、synced、failed、skipped 与 retry eligibility。
 - [x] workspace ingest runner 可通过依赖注入本地运行并生成可恢复队列。
 - [x] 本地队列幂等基础：同一 document hash / revision 复用 existing queue item，
@@ -700,6 +717,8 @@ env、database URL、API key、token 或 password。诊断包说明见
 - [ ] migration、pgvector、schema version 状态可见。
 - [ ] 外部 DB 与 managed DB 使用同一 shared schema。
 - [ ] sync 成功、失败、冲突都有 UI 和日志。
+- [x] Reaction intelligence artifact 可映射为 shared schema runtime graph edge
+  input；实际 artifact sync command/UI 仍待接入。
 
 当前验证状态：
 

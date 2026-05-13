@@ -608,6 +608,18 @@ hybrid_score =
 - 当前未做真实模型长挂 smoke，也未做后台任务取消按钮或持久队列；这些归后续 release
   hardening / background job 产品化阶段。
 
+状态记录（Shared schema adapter / workspace outbox bridge）：
+
+- `@chemd/storage-postgres` 新增 reaction intelligence runtime adapter，可把 artifact
+  similarity edge 转为 shared schema runtime graph edge，保留 basis、provider、source
+  hash、artifact/job id、warnings 与 computed feature evidence；adapter 直接引用
+  `@chemd/reaction-map` 的 artifact 类型和 schema 常量，避免复制合同。
+- Desktop workspace ingest 新增 outbox bridge，可把带 `runtimePayload` 的 pending /
+  retryable failed queue item 幂等转为 Local Store snapshot input；skipped、synced、
+  running、缺 payload、retry exhausted 都有结构化原因。
+- 当前仍未把 reaction intelligence artifact sync 接到 Tauri command/UI，也未跑真实
+  artifact PostgreSQL 写入；这一步进入后续 M5/M6 集成。
+
 ---
 
 ## 8. 验证矩阵
@@ -705,5 +717,7 @@ pnpm desktop:runtime-smoke
 
 - [ ] worker 环境可随 installer 分发或按需下载。
 - [ ] artifact 可同步到 PostgreSQL shared schema。
+  - 已完成纯 adapter：artifact similarity edge 可转 shared schema runtime graph edge；
+    Tauri command/UI 和真实 DB artifact smoke 尚未接入。
 - [ ] clean-machine smoke 覆盖“无模型依赖”和“有本地 worker 依赖”两种路径。
 - [ ] 人工审查 cluster/edge 可写回 training memory。
