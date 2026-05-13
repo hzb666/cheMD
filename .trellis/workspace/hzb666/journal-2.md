@@ -795,3 +795,41 @@ Merged the desktop Monaco completion provider using the language-service complet
 ### Next Steps
 
 - None - task complete
+
+
+## Session 58: Desktop IDE reference completion and renderable nodes
+
+**Date**: 2026-05-13
+**Task**: Desktop IDE reference completion and renderable nodes
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Merged current-document reference completions into @chemd/language-service and renderable semantic node DTOs into @chemd/renderer-json. Validation passed: language-service test 26/26, language-service typecheck, renderer-json test 9/9, renderer-json typecheck, git diff --check. Recorded both integrations in the desktop production implementation plan and Trellis task PRD.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f91b041` | (see git log) |
+| `2f3f5cc` | (see git log) |
+| `cc7caca` | (see git log) |
+| `c6de158` | (see git log) |
+| `22bafcb` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

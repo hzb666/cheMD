@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 57
+- **Total Sessions**: 58
 - **Last Active**: 2026-05-13
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~797 | Active |
+| `journal-2.md` | ~835 | Active |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 58 | 2026-05-13 | Desktop IDE reference completion and renderable nodes | `f91b041`, `2f3f5cc`, `cc7caca`, `c6de158`, `22bafcb` | `desktop-ide` |
 | 57 | 2026-05-13 | Desktop IDE Monaco completion provider | `62cb61b`, `7480d36`, `81e4de7` | `desktop-ide` |
 | 56 | 2026-05-13 | Desktop IDE workspace symbol index core | `8dc7ffe`, `5b3d885`, `565a6de` | `desktop-ide` |
 | 55 | 2026-05-13 | Desktop IDE map first wave core packages | `8131982`, `a5bfa29`, `39f199a`, `4505d50`, `661445f`, `6e0f39a` | `desktop-ide` |
