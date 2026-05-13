@@ -712,3 +712,37 @@ Merged workspace ingest UI into the desktop Local Store panel. Main validation p
 ### Next Steps
 
 - None - task complete
+
+
+## Session 55: Desktop IDE map interaction closure
+
+**Date**: 2026-05-13
+**Task**: Desktop IDE map interaction closure
+**Package**: web
+**Branch**: `desktop-ide-map`
+
+### Summary
+
+补齐 desktop-ide-map 的 IDE 与地图交互闭环：新增 Monaco code action provider 并用 beforeHash 阻止 stale patch；workspace-index 增加 stale symbol 标记并传入 completion；导航 hover 显示 unresolved reference；知识地图面板新增 SVG reaction layout canvas、cluster filter、reaction inspector，并以 1k reaction fixture 覆盖 fallback layout。验证已运行定向 Vitest/eslint、pnpm --filter @chemd/desktop build、pnpm typecheck、pnpm test、desktop offline core/runtime/release/installer smoke；installer/release 因缺少 release/MSI/NSIS 产物明确 SKIP。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `33a3835` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
