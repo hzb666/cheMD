@@ -16,10 +16,14 @@ fn export_diagnostics_bundle_writes_parseable_json() {
 
     assert_eq!(parsed["schemaVersion"], 1);
     assert_eq!(parsed["summary"]["commandCount"], 25);
-    assert_eq!(parsed["summary"]["boundarySkipCount"], 5);
+    assert_eq!(parsed["summary"]["boundarySkipCount"], 8);
+    assert_eq!(parsed["summary"]["supportCommandCount"], 7);
     assert_eq!(parsed["runtimeBoundaries"][0]["status"], "SKIP");
     assert!(json.contains("export_diagnostics_bundle"));
     assert!(json.contains("run_reaction_intelligence_worker"));
+    assert!(json.contains("save_local_reaction_intelligence_artifact"));
+    assert!(json.contains("list_local_reaction_intelligence_artifacts"));
+    assert!(json.contains("sync_local_outbox_to_postgres"));
 
     let _ = fs::remove_dir_all(dir);
 }
@@ -53,7 +57,22 @@ fn export_diagnostics_bundle_marks_non_running_boundaries_as_skip() {
         .map(|item| item["status"].as_str().unwrap_or_default())
         .collect::<Vec<_>>();
 
-    assert_eq!(statuses, vec!["SKIP", "SKIP", "SKIP", "SKIP", "SKIP"]);
+    assert_eq!(
+        statuses,
+        vec!["SKIP", "SKIP", "SKIP", "SKIP", "SKIP", "SKIP", "SKIP", "SKIP"]
+    );
+
+    let boundary_names = parsed["runtimeBoundaries"]
+        .as_array()
+        .expect("runtime boundaries are an array")
+        .iter()
+        .map(|item| item["name"].as_str().unwrap_or_default())
+        .collect::<Vec<_>>();
+
+    assert!(boundary_names.contains(&"provider"));
+    assert!(boundary_names.contains(&"model"));
+    assert!(boundary_names.contains(&"artifact"));
+    assert!(boundary_names.contains(&"sync"));
 
     let _ = fs::remove_dir_all(dir);
 }

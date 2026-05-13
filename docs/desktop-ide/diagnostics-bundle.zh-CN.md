@@ -30,7 +30,10 @@
   - 可选离线 smoke 目录信号。
   - `runtime-snapshot.json` 与 `outbox.json` 的小文件摘要。
   - 支持人员可运行的相关命令清单。
-  - sidecar、logs、sync、provider、Tauri command smoke 的未运行 `SKIP` 边界。
+  - reaction intelligence worker、local artifact store、outbox sync 的已知命令面。
+  - provider、model、artifact、sync 的 `PASS` / `SKIP` / `BLOCKED` 分类工具。
+  - sidecar、logs、sync、provider、model、artifact、Tauri command smoke 的未运行
+    `SKIP` 边界。
 
 ## 离线 smoke 目录摘要
 
@@ -65,10 +68,20 @@ pnpm desktop:offline-release-smoke
 其中 diagnostics bundle 是最低成本入口；后续 smoke 命令才会根据自身边界执行
 更重的本地验证。
 
+Reaction intelligence 相关入口以静态 command surface 形式记录：
+
+- `run_reaction_intelligence_worker`
+- `save_local_reaction_intelligence_artifact`
+- `list_local_reaction_intelligence_artifacts`
+- `sync_local_outbox_to_postgres`
+
+诊断包不会调用 worker、provider 或 model，不会枚举本地 artifact payload，也不会执行
+outbox sync。真实 provider/model/DB 不可用时按 `SKIP` 解释，不影响诊断包生成。
+
 ## Tauri command 边界
 
 桌面端同时暴露 `export_diagnostics_bundle` Tauri command，作为产品内支持闭环的
 最小离线导出能力。该 command 与脚本版保持相同安全边界：只写入系统临时目录中的
 脱敏 JSON，不启动 GUI 外部进程、不联网、不读取 `.env`，也不要求 sidecar 或
-PostgreSQL 可用。sidecar、任意日志目录、数据库检查、provider 与 Tauri command
-smoke 均在 bundle 内标记为 `SKIP`。
+PostgreSQL 可用。sidecar、任意日志目录、数据库检查、provider、model、artifact、
+sync 与 Tauri command smoke 均在 bundle 内标记为 `SKIP`。

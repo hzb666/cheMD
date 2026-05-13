@@ -39,12 +39,62 @@ export const KNOWN_DESKTOP_COMMAND_NAMES = [
   "migrate_managed_postgres",
   "read_local_store_status",
   "save_local_runtime_snapshot",
+  "save_local_reaction_intelligence_artifact",
+  "list_local_reaction_intelligence_artifacts",
   "list_local_outbox",
   "mark_local_outbox_synced",
   "clear_local_outbox_failures",
   "sync_local_outbox_to_postgres",
   "persist_runtime_graph_rag",
+  "run_reaction_intelligence_worker",
   "export_diagnostics_bundle"
+];
+
+const CLASSIFICATION_STATUS_VALUES = ["PASS", "SKIP", "BLOCKED"];
+
+const REACTION_INTELLIGENCE_SUPPORT_COMMANDS = [
+  {
+    name: "reaction intelligence worker",
+    command: "run_reaction_intelligence_worker",
+    boundary: "known Tauri command only; diagnostics bundle does not invoke worker providers, models, or child processes"
+  },
+  {
+    name: "local reaction intelligence artifact store",
+    command: "save_local_reaction_intelligence_artifact / list_local_reaction_intelligence_artifacts",
+    boundary: "known local artifact commands only; diagnostics bundle does not read artifact payload content"
+  },
+  {
+    name: "local outbox sync",
+    command: "sync_local_outbox_to_postgres",
+    boundary: "known sync command only; diagnostics bundle does not open database connections or run outbox sync"
+  }
+];
+
+const PROVIDER_ARTIFACT_SYNC_CONTEXTS = [
+  {
+    name: "provider",
+    status: "SKIP",
+    reason: "network providers are not contacted",
+    boundary: "classification only; provider names may appear in static command context but no provider env values are read"
+  },
+  {
+    name: "model",
+    status: "SKIP",
+    reason: "model execution is not run",
+    boundary: "classification only; no local or remote model process is started"
+  },
+  {
+    name: "artifact",
+    status: "SKIP",
+    reason: "local reaction intelligence artifacts are not enumerated",
+    boundary: "classification only; no large artifact body is read"
+  },
+  {
+    name: "sync",
+    status: "SKIP",
+    reason: "database and outbox sync are not executed",
+    boundary: "classification only; no database URL is loaded and no network connection is opened"
+  }
 ];
 
 const readJsonFile = ({ rootDir, relativePath, readTextFile }) =>
@@ -203,6 +253,30 @@ const summarizeReleasePreflight = async ({ rootDir, releasePreflight }) => {
   }
 };
 
+const appendMissingByName = (entries, additions) => {
+  const names = new Set(entries.map((entry) => entry.name));
+  return [
+    ...entries,
+    ...additions.filter((entry) => !names.has(entry.name))
+  ];
+};
+
+const buildAugmentedSupportContext = (options) => {
+  const supportContext = buildDesktopSupportContext(options);
+  return {
+    ...supportContext,
+    supportCommands: [
+      ...(supportContext.supportCommands ?? []),
+      ...REACTION_INTELLIGENCE_SUPPORT_COMMANDS
+    ],
+    classificationTool: {
+      statusValues: CLASSIFICATION_STATUS_VALUES,
+      contexts: PROVIDER_ARTIFACT_SYNC_CONTEXTS
+    },
+    notRun: appendMissingByName(supportContext.notRun ?? [], PROVIDER_ARTIFACT_SYNC_CONTEXTS)
+  };
+};
+
 export const buildDesktopDiagnosticsBundle = async ({
   rootDir = REPO_ROOT,
   env = process.env,
@@ -258,7 +332,7 @@ export const buildDesktopDiagnosticsBundle = async ({
       boundary: "Selected process env names only; values are redacted and no .env files are loaded.",
       signals: summarizeEnvSignals(env)
     },
-    supportContext: buildDesktopSupportContext({
+    supportContext: buildAugmentedSupportContext({
       rootDir,
       env,
       runtimePreflight,
