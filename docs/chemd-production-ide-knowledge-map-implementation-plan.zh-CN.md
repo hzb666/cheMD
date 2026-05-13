@@ -1173,3 +1173,24 @@ M1 language-service completion core
 - `pnpm --filter @chemd/desktop exec eslint src/monaco-chemd-completion.ts src/monaco-chemd-completion.test.ts`：
   通过。
 - `git diff --check`：通过；仅输出 LF/CRLF 工作区提示。
+
+### 2026-05-13 desktop-ide-semantic-preview-helper
+
+- 范围：新增 desktop semantic preview helper；不接入 React UI，不修改
+  `App.tsx`、Monaco editor、shared packages、root 配置、package/lockfile、
+  Tauri/Rust、数据库或 CI。
+- 产物：新增 `buildDesktopSemanticPreview(input)`，消费
+  `ChemdLanguageCompileOutput`，输出稳定 DTO：`state`、`reason`、
+  `html`、`tree`、`message`、`diagnostics`、`compiledAt` 与
+  `documentUri`。
+- 行为：compile ok 且存在 `result.document` 时，通过现有
+  `buildRenderableNodeTree()` 与 `renderRenderableHtml()` 生成 typed
+  semantic preview tree/html；compile failed 或缺少 document 时返回
+  fallback DTO，不抛出。
+- 验证：
+  - `pnpm --filter @chemd/desktop exec vitest run src/desktop-semantic-preview.test.ts`：
+    通过，1 file / 4 tests。
+  - `pnpm --filter @chemd/desktop typecheck`：通过。
+  - `pnpm --filter @chemd/desktop exec eslint src/desktop-semantic-preview.ts src/desktop-semantic-preview.test.ts`：
+    通过。
+  - `git diff --check`：通过；仅输出 LF/CRLF 工作区提示。
