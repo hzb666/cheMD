@@ -1658,3 +1658,39 @@ Merged the first M6 Postgres RAG productization slice: citation-gated query_post
 ### Next Steps
 
 - None - task complete
+
+
+## Session 82: Desktop RAG embedding backfill and query view adapter
+
+**Date**: 2026-05-14
+**Task**: Desktop RAG embedding backfill and query view adapter
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Merged the second M6 RAG slice: backfill_postgres_rag_embeddings writes validated embeddings to shared pgvector schema, query result adapter prepares connected RAG rows for UI, docs updated, and full desktop/workspace validation passed.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `facb1e4` | (see git log) |
+| `c2dd2e6` | (see git log) |
+| `c2d8c4f` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
