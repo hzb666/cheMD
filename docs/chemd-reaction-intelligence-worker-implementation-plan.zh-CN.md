@@ -432,19 +432,27 @@ hybrid_score =
 
 任务：
 
-- [ ] 新增 `rxnmapper_provider.py`。
-- [ ] 用 `BatchedMapper(batch_size=N)` 处理输入。
-- [ ] 默认 detailed 输出，保存 `mapped_rxn`、confidence、mapping hash。
-- [ ] 低 confidence / 空结果转 warning。
-- [ ] 从 mapped reaction 中提取 changed atoms / changed bonds / center signature。
-- [ ] 生成 `same_reaction_center` / `compatible_reaction_center` edges。
+- [x] 新增 `rxnmapper_provider.py`。
+- [x] 用 `BatchedMapper(batch_size=N)` 处理输入，并保留可注入 adapter 测试路径。
+- [x] 默认 detailed 输出，保存 `mapped_rxn`、confidence、mapping hash。
+- [x] 低 confidence / 空结果转 warning。
+- [x] 从 mapped reaction 中提取 changed atoms / changed bonds / center signature。
+- [x] 生成 `same_reaction_center` / `compatible_reaction_center` edges。
 
 验收：
 
-- [ ] `rxnmapper` 缺失时 provider `SKIP`。
-- [ ] 单条 mapping 失败不影响 batch。
-- [ ] mapped_rxn 和 confidence 可回写 artifact。
-- [ ] reaction center edge 不会在低 confidence 时标成 high。
+- [x] `rxnmapper` 缺失时 provider `SKIP`。
+- [x] 单条 mapping 失败不影响 batch。
+- [x] mapped_rxn 和 confidence 可回写 artifact。
+- [x] reaction center edge 不会在低 confidence 时标成 high。
+
+状态记录（Worker D / `reaction-intel-rxnmapper-center`）：
+
+- 新增 `rxnmapper_provider.py`，真实 RXNMapper 依赖仅在 provider run 时加载；缺失时 provider 返回 `SKIP`。
+- PASS 路径通过可注入 fake adapter 测试，不要求本机安装 RXNMapper。
+- atom mapping 记录 `mapped_rxn`、confidence、`mapping_hash` 与 per-reaction warnings。
+- `reaction_center.py` 从 atom-mapped reaction 提取 `center_signature`、changed atoms 与 changed bonds；无法可靠提取时返回 low confidence warning。
+- provider result 返回 reaction-center computed edges，basis 为 `same_reaction_center` 或 `compatible_reaction_center`，低 confidence 不会提升为 high。
 
 ### Phase 3：RXNFP embedding
 
