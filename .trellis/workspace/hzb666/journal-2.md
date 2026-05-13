@@ -986,3 +986,43 @@ Merged Monaco workspace reference completion support and a desktop semantic prev
 ### Next Steps
 
 - None - task complete
+
+
+## Session 63: Desktop IDE preview and workspace index UI
+
+**Date**: 2026-05-13
+**Task**: Desktop IDE preview and workspace index UI
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Connected desktop semantic preview and workspace symbol index to the React IDE shell, updated Monaco completion cache wiring, documented verification and the deferred complexity gate.
+
+### Main Changes
+
+- 接入 `MonacoChemdEditor` 的 workspace symbol index prop，并同步到 Monaco completion provider cache。
+- 在 `App.tsx` 新增 workspace symbol index controller：当前文件使用内存 source，其他 workspace Chemd 文档通过只读 Tauri command 读取。
+- 新增 `Semantic Preview` dock panel，展示 semantic HTML/fallback DTO 与 workspace index 摘要。
+- 同步更新生产 IDE 知识地图实施计划与离线优先产品化实施文档。
+- 验证通过：desktop workspace-symbol/semantic-preview/Monaco completion 定向测试 11/11、desktop typecheck、desktop build、root `pnpm test`、root `pnpm typecheck`、`git diff --check`。
+- Focused ESLint 仅剩 `LocalStorePanel` 既有函数长度/复杂度门禁，按用户要求记录到 M11 复杂度治理，不阻塞当前功能主线。
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `13c2cfc` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
