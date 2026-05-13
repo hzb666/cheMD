@@ -19,6 +19,7 @@
 - [Chemd 节点渲染与反应聚类总 PRD](./chemd-rendering-and-reaction-clustering-master-prd.zh-CN.md)
 - [Chemd 语义节点渲染 PRD](./chemd-semantic-node-rendering-prd.zh-CN.md)
 - [Chemd 反应聚类与 TMAP 地图 PRD](./chemd-reaction-clustering-tmap-prd.zh-CN.md)
+- [Chemd Reaction Intelligence Worker 实施计划](./chemd-reaction-intelligence-worker-implementation-plan.zh-CN.md)
 - 外部工作树证据：`D:\Code\chemd-wt-desktop-ide-docs\docs\desktop-ide\offline-first-productization-implementation.zh-CN.md`
 
 ---

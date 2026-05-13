@@ -1,0 +1,611 @@
+# Chemd Reaction Intelligence Worker 实施计划
+
+状态：设计完成，待实施
+更新时间：2026-05-13
+目标：在不污染 Desktop IDE、`chem-service` 和前端 bundle 的前提下，引入 RXNMapper、RXNFP、fingerprint 与 TMAP，形成可解释的 hybrid reaction similarity graph。
+
+---
+
+## 1. 结论
+
+Chemd 应采用 **应用发布体系内的本地独立 worker/sidecar**，默认不走外部 API。
+
+```text
+Chemd Desktop / CLI
+  -> 导出 reaction graph index
+  -> 调用本地 services/chem-cluster-service
+      -> RDKit fingerprint provider
+      -> RXNMapper provider
+      -> RXNFP provider
+      -> hybrid similarity builder
+      -> TMAP layout provider
+  -> 写回 intelligence artifacts
+  -> Desktop 只读取 artifact 展示
+```
+
+关键原则：
+
+- 本地优先：用户实验反应默认不上传外部服务。
+- 独立环境：模型依赖不进入 `apps/desktop`、`apps/web`、`services/chem-service`。
+- 可降级：任一 provider 缺失或失败时输出 `SKIP` / `ERROR` / `fallback`，不阻塞 IDE authoring。
+- 可追溯：每条 embedding、mapping、reaction-center、similarity edge 都记录 source hash、provider、model version、参数和 warnings。
+- 先稳后强：先做 RDKit/fingerprint baseline，再接 RXNMapper/RXNFP，最后合成 hybrid graph。
+
+---
+
+## 2. 开源代码库研究结论
+
+本计划基于以下开源仓库当前 HEAD 与本地浅克隆/官方 raw 文档研究：
+
+| 仓库 | HEAD | 与 Chemd 的关系 | 结论 |
+| --- | --- | --- | --- |
+| `rxn4chemistry/rxnmapper` | `a01ecdcd5ac944850e9691739c1df858e005fd39` | atom mapping / reaction center | 可作为本地 worker provider；模型随 package data 分发，`BatchedMapper` 已有批处理和错误隔离。 |
+| `rxn4chemistry/rxnfp` | `6fd48f4927c2178555cc5d71dbfb225fb178f43c` | reaction embedding / nearest neighbor | 可作为独立 embedding provider；依赖较旧，不能并入 `chem-service`。 |
+| `reymond-group/tmap` | `edd29345a16c992a79ad2e2e469da8d38cc448ca` | layout generator | 适合离线 layout；`LayoutFromEdgeList(vertex_count, edges, config, create_mst)` 正好匹配 Chemd 已有 edge list。 |
+
+### 2.1 RXNMapper
+
+代码入口：
+
+- `rxnmapper.RXNMapper`
+- `rxnmapper.BatchedMapper`
+- `RXNMapper.get_attention_guided_atom_maps(rxns, detailed_output=...)`
+- `BatchedMapper.map_reactions_with_info(reaction_smiles, detailed=...)`
+
+依赖和模型：
+
+- `python_requires >= 3.6`
+- `torch >= 1.5.0`
+- `transformers >= 4.0.0,<5.0.0`
+- optional `rdkit`
+- 默认模型路径在 package data：`models/transformers/albert_heads_8_uspto_all_1310k`
+
+输出能力：
+
+```json
+{
+  "mapped_rxn": "... atom-mapped reaction SMILES ...",
+  "confidence": 0.9565,
+  "pxr_mapping_vector": "... detailed mode only ...",
+  "pxr_confidences": "... detailed mode only ...",
+  "mapping_tuples": "... detailed mode only ..."
+}
+```
+
+对 Chemd 的设计影响：
+
+- 用 `BatchedMapper` 作为默认 provider，而不是直接循环 `RXNMapper`。
+- 默认 `detailed=true`，以便提取 reaction center。
+- 输入必须是标准 reaction SMILES；Chemd 需要在 worker 前建立 `reaction_entity_id -> canonical_rxn_smiles` 合同。
+- 单条失败不能中断批次；空结果或异常要转成 per-reaction warning。
+
+### 2.2 RXNFP
+
+代码入口：
+
+- `rxnfp.transformer_fingerprints.RXNBERTFingerprintGenerator`
+- `rxnfp.transformer_fingerprints.get_default_model_and_tokenizer`
+- `rxnfp.transformer_fingerprints.generate_fingerprints`
+- `RXNBERTFingerprintGenerator.convert_batch(rxns)`
+
+依赖和风险：
+
+- README 推荐 `conda create -n rxnfp python=3.6`
+- 推荐 `rdkit=2020.03.3`
+- package requirements 包含 `transformers>=4.5.0`、`torch>=1.6`、`scipy==1.4.1`、`scikit-learn==0.23.1`、`faerun==0.3.20`
+- Minhash 版本直接 `import tmap as tm`
+
+输出能力：
+
+- `RXNBERTFingerprintGenerator.convert()` 返回 BERT `[CLS]` float embedding。
+- `convert_batch()` 返回批量 embedding。
+- `RXNBERTMinhashFingerprintGenerator` 能转 MinHash，但会直接依赖 `tmap`。
+
+对 Chemd 的设计影响：
+
+- 第一阶段只接 float embedding，不把 RXNFP MinHash 作为必选路径。
+- RXNFP provider 单独环境运行，不和 RDKit/OCR/render service 混装。
+- 需要缓存：`reaction_hash + rxnfp_model_id + normalization_version -> embedding_ref`。
+- 需要记录 embedding dimension、model name、device、batch size。
+
+### 2.3 TMAP
+
+代码/API 入口：
+
+- Python 包名实际是 `tmap-viz`，import 名是 `tmap`。
+- README 建议通过 conda 安装：`conda install -c tmap tmap`。
+- 官方示例常用 `tm.LSHForest` + `tm.layout_from_lsh_forest`。
+- C++/Python 文档提供 `LayoutFromEdgeList(vertex_count, edges, config, create_mst)`，输入 edge list 形如 `(from, to, weight)`，返回 `x`、`y`、`s`、`t` 和 `GraphProperties`。
+
+构建/运行风险：
+
+- CMake + C++17 + pybind11。
+- 依赖 OGDF/COIN/OpenMP。
+- Windows 支持依赖 WSL/工具链边界，不能作为 Desktop authoring 前置依赖。
+
+对 Chemd 的设计影响：
+
+- TMAP 只做离线 layout worker，不进前端 bundle。
+- Chemd 已有 `ReactionMapWorkerLayoutInput`，可以稳定转成 vertex index + weighted edge list。
+- 当 `tmap` 不可导入时保持现有 `SKIP` / `ERROR` / fallback 行为。
+- TMAP 不负责 cluster label，只负责坐标和 MST/layout edges。
+
+---
+
+## 3. 与当前 Chemd 基线的关系
+
+当前已存在：
+
+- `packages/exporter-training`：`ChemdTrainingGraphIndexV1`、reaction features、semantic similarity edges。
+- `packages/reaction-map`：`ReactionMapLayout`、`ReactionMapWorkerLayoutInput`、edge kind 已预留 `"semantic" | "fingerprint" | "rxnfp" | "reaction_center" | "hybrid"`。
+- `services/chem-cluster-service`：deterministic fallback layout worker、输入归一化、缺 TMAP 分类。
+- Desktop knowledge map：可显示 cluster、edge basis、warnings、source-ref。
+
+当前缺口：
+
+- 没有 computed reaction fingerprint artifact。
+- 没有 RXNFP embedding artifact。
+- 没有 RXNMapper atom mapping artifact。
+- 没有 reaction center feature extractor。
+- 没有 hybrid similarity graph builder。
+- TMAP worker 还没有真正调用 `LayoutFromEdgeList`。
+
+---
+
+## 4. 目标合同
+
+### 4.1 Reaction Intelligence Job Input
+
+新增 JSON contract：
+
+```ts
+interface ChemdReactionIntelligenceJobInputV1 {
+  schema_version: "chemd-reaction-intelligence-job/v0.1";
+  job_id: string;
+  graph_index_id: string;
+  source_compile_run_ids: string[];
+  reactions: Array<{
+    reaction_entity_id: string;
+    document_id: string;
+    source_range?: unknown;
+    canonical_rxn_smiles: string;
+    participant_signature: string;
+    reaction_family?: string;
+    procedure_signature?: string;
+    condition_signature?: string;
+    source_hash: string;
+  }>;
+  requested_providers: Array<
+    "rdkit_fingerprint" | "rxnmapper" | "rxnfp" | "hybrid_graph" | "tmap_layout"
+  >;
+  provider_policy: {
+    missing_dependency: "skip" | "error" | "fallback";
+    per_reaction_failure: "warn" | "error";
+    allow_network: false;
+  };
+}
+```
+
+### 4.2 Reaction Intelligence Artifact
+
+新增 JSON contract：
+
+```ts
+interface ChemdReactionIntelligenceArtifactV1 {
+  schema_version: "chemd-reaction-intelligence-artifact/v0.1";
+  artifact_id: string;
+  job_id: string;
+  graph_index_id: string;
+  generated_at: string;
+  providers: Array<{
+    provider_id: string;
+    kind: "rdkit_fingerprint" | "rxnmapper" | "rxnfp" | "hybrid_graph" | "tmap_layout";
+    status: "PASS" | "SKIP" | "ERROR";
+    package_name?: string;
+    package_version?: string;
+    model_id?: string;
+    model_hash?: string;
+    warnings: string[];
+  }>;
+  reaction_features: ChemdComputedReactionFeatureV1[];
+  similarity_edges: ChemdComputedReactionSimilarityEdgeV1[];
+  layout?: ChemdReactionClusterLayoutV1;
+  warnings: string[];
+}
+```
+
+### 4.3 Computed Reaction Feature
+
+```ts
+interface ChemdComputedReactionFeatureV1 {
+  reaction_entity_id: string;
+  source_hash: string;
+  canonical_rxn_smiles: string;
+  fingerprint_refs: Array<{
+    feature_ref_id: string;
+    provider: "rdkit" | "rxnfp";
+    kind: "bit_vector" | "float_embedding" | "minhash";
+    dimension: number;
+    storage: "inline" | "sidecar_file" | "postgres_vector";
+    hash: string;
+  }>;
+  atom_mapping?: {
+    provider: "rxnmapper";
+    mapped_rxn: string;
+    confidence: number;
+    mapping_hash: string;
+    warnings: string[];
+  };
+  reaction_center?: {
+    provider: "rxnmapper_derived";
+    center_signature: string;
+    changed_bonds: string[];
+    changed_atoms: string[];
+    confidence: "high" | "medium" | "low";
+    warnings: string[];
+  };
+  warnings: string[];
+}
+```
+
+---
+
+## 5. Worker 架构
+
+### 5.1 包结构
+
+扩展现有服务，不新增第二个 Python service：
+
+```text
+services/chem-cluster-service/
+  chem_cluster_service/
+    cli.py
+    layout.py
+    intelligence/
+      __init__.py
+      contracts.py
+      io.py
+      providers/
+        rdkit_fingerprint.py
+        rxnmapper_provider.py
+        rxnfp_provider.py
+        tmap_layout.py
+      reaction_center.py
+      similarity.py
+      pipeline.py
+      classify.py
+  tests/
+    test_intelligence_contracts.py
+    test_rdkit_fingerprint_provider.py
+    test_rxnmapper_provider.py
+    test_rxnfp_provider.py
+    test_reaction_center.py
+    test_hybrid_similarity.py
+    test_tmap_layout_provider.py
+```
+
+### 5.2 CLI
+
+现有 layout CLI 保留，新增 intelligence CLI：
+
+```bash
+cd services/chem-cluster-service
+python -m chem_cluster_service.intelligence.cli \
+  --input job.json \
+  --output artifact.json \
+  --providers rdkit_fingerprint,rxnmapper,rxnfp,hybrid_graph,tmap_layout \
+  --missing-dependency skip \
+  --pretty
+```
+
+返回码约定：
+
+| 场景 | exit code | artifact |
+| --- | --- | --- |
+| 所有请求 provider 完成 | 0 | `PASS` |
+| 可选 provider 缺失，策略为 `skip` | 0 | provider `SKIP` |
+| provider 失败但 per-reaction 可降级 | 0 | reaction warnings |
+| 必选 provider 缺失，策略为 `error` | 2 | provider `ERROR` |
+| 输入 contract 无效 | 1 | validation error envelope |
+
+### 5.3 Provider 边界
+
+Provider 必须实现统一接口：
+
+```python
+class ReactionIntelligenceProvider(Protocol):
+    provider_id: str
+    kind: str
+
+    def inspect(self) -> ProviderInspection:
+        ...
+
+    def run(self, reactions: list[ReactionInput]) -> ProviderResult:
+        ...
+```
+
+`inspect()` 只检查依赖和版本，不加载大模型；`run()` 才加载模型。
+
+---
+
+## 6. Similarity 策略
+
+### 6.1 Edge basis
+
+新增 computed basis：
+
+```ts
+type ChemdComputedSimilarityBasisV1 =
+  | "rdkit_fingerprint_tanimoto"
+  | "rxnfp_cosine"
+  | "same_reaction_center"
+  | "compatible_reaction_center"
+  | "semantic_family_support"
+  | "semantic_procedure_support"
+  | "hybrid_consensus";
+```
+
+### 6.2 Score 合成
+
+第一版采用可解释线性权重，不引入训练模型：
+
+```text
+hybrid_score =
+  0.30 * semantic_score
+  + 0.25 * rdkit_fingerprint_score
+  + 0.25 * rxnfp_cosine_score
+  + 0.20 * reaction_center_score
+```
+
+降级规则：
+
+- 缺某一项时按可用权重重新归一化。
+- 只有 semantic 时，edge 继续带 `semantic_similarity_without_computed_fingerprint`。
+- RXNMapper confidence 低于阈值时，reaction center edge 不能作为 high confidence。
+- RXNFP embedding 维度不一致时，该 batch `ERROR`，不生成 RXNFP edge。
+
+### 6.3 Confidence
+
+| 条件 | confidence |
+| --- | --- |
+| hybrid_score >= 0.85 且至少两个 computed provider 支撑 | `high` |
+| hybrid_score >= 0.65 且至少一个 computed provider 支撑 | `medium` |
+| 只有 semantic 或 warnings 非空 | `low` |
+
+---
+
+## 7. 实施阶段
+
+### Phase 0：合同和基线测试
+
+目标：先冻结 JSON contract，不接真实模型。
+
+任务：
+
+- [ ] 在 `packages/reaction-map` 或新包 `packages/reaction-intelligence-contracts` 定义 TS contract。
+- [ ] 在 `services/chem-cluster-service/chem_cluster_service/intelligence/contracts.py` 定义 Python dataclass/TypedDict。
+- [ ] 写 fixture：2 个 esterification、2 个 Suzuki、1 个无效 reaction。
+- [ ] 写 schema round-trip 测试，确保 TS/Python 字段一致。
+- [ ] 文档更新：本文件与生产实施计划互链。
+
+验收：
+
+- [ ] Python contract tests 通过。
+- [ ] TS contract tests 通过。
+- [ ] fixture 能从现有 `ChemdTrainingGraphIndexV1` 生成 job input。
+
+### Phase 1：RDKit / fingerprint baseline
+
+目标：先得到低风险 computed chemistry feature。
+
+任务：
+
+- [ ] 独立 provider 检测 RDKit 可用性。
+- [ ] 从 `canonical_rxn_smiles` 生成 reactant/product fingerprints 或 reaction delta fingerprint。
+- [ ] 输出 `feature_ref_id`、dimension、hash、warnings。
+- [ ] 计算 Tanimoto edges。
+- [ ] 把 edge basis 写成 `rdkit_fingerprint_tanimoto`。
+
+验收：
+
+- [ ] RDKit 缺失时 provider `SKIP`，IDE 不受影响。
+- [ ] 指纹相同/相似反应生成 computed edge。
+- [ ] 无效 SMILES 只产生 per-reaction warning。
+
+### Phase 2：RXNMapper atom mapping
+
+目标：生成 atom mapping 和 reaction center。
+
+任务：
+
+- [ ] 新增 `rxnmapper_provider.py`。
+- [ ] 用 `BatchedMapper(batch_size=N)` 处理输入。
+- [ ] 默认 detailed 输出，保存 `mapped_rxn`、confidence、mapping hash。
+- [ ] 低 confidence / 空结果转 warning。
+- [ ] 从 mapped reaction 中提取 changed atoms / changed bonds / center signature。
+- [ ] 生成 `same_reaction_center` / `compatible_reaction_center` edges。
+
+验收：
+
+- [ ] `rxnmapper` 缺失时 provider `SKIP`。
+- [ ] 单条 mapping 失败不影响 batch。
+- [ ] mapped_rxn 和 confidence 可回写 artifact。
+- [ ] reaction center edge 不会在低 confidence 时标成 high。
+
+### Phase 3：RXNFP embedding
+
+目标：生成 reaction embedding 和 nearest-neighbor edges。
+
+任务：
+
+- [ ] 新增 `rxnfp_provider.py`。
+- [ ] 独立加载 `get_default_model_and_tokenizer()`。
+- [ ] 用 `RXNBERTFingerprintGenerator.convert_batch()` 生成 float embedding。
+- [ ] 输出 sidecar `.npy` 或 JSONL refs，避免把大向量内联到主 artifact。
+- [ ] 计算 cosine similarity top-k。
+- [ ] 生成 `rxnfp_cosine` edges。
+
+验收：
+
+- [ ] RXNFP 依赖缺失时 provider `SKIP`。
+- [ ] embedding 记录 model id、dimension、hash。
+- [ ] top-k edge 可稳定复现。
+- [ ] embedding 缓存命中时不重复加载模型。
+
+### Phase 4：Hybrid similarity graph
+
+目标：合并 semantic、fingerprint、RXNFP、reaction center。
+
+任务：
+
+- [ ] 读取现有 `reaction_similarity_edges` 作为 semantic base。
+- [ ] 读取 computed provider edges。
+- [ ] 按 pair 合并 basis、score、warnings、evidence。
+- [ ] 应用 hybrid score 和 confidence 规则。
+- [ ] 输出 `ChemdComputedReactionSimilarityEdgeV1`。
+- [ ] 更新 `@chemd/reaction-map` 让 computed edge 进入 layout。
+
+验收：
+
+- [ ] semantic-only edge 仍带 warning。
+- [ ] computed 支撑 edge 可升为 medium/high。
+- [ ] UI 能区分 semantic、fingerprint、rxnfp、reaction_center、hybrid。
+
+### Phase 5：TMAP LayoutFromEdgeList
+
+目标：替换 worker 中“tmap 可用但仍 fallback”的占位实现。
+
+任务：
+
+- [ ] 在 `tmap_layout.py` 中导入 `tmap`。
+- [ ] 建立 `reaction_entity_id <-> vertex_index` 映射。
+- [ ] 生成 `(from_index, to_index, weight)` edge list。
+- [ ] 调用 `LayoutConfiguration()`。
+- [ ] 调用 `layout_from_edge_list` 或对应 Python binding。
+- [ ] 输出 positions 和 MST edges。
+- [ ] 保留当前 deterministic fallback。
+
+验收：
+
+- [ ] `--engine tmap` 在有 tmap 环境时输出 `layout_engine: "tmap"`。
+- [ ] tmap 缺失时 `SKIP` / `ERROR` / fallback 行为保持。
+- [ ] layout artifact 保留 input edge kind、basis、warnings。
+
+### Phase 6：Desktop / CLI 集成
+
+目标：IDE 只消费 artifact，不直接跑模型。
+
+任务：
+
+- [ ] CLI 增加 `chemd reaction-intelligence run` 或 desktop command wrapper。
+- [ ] Desktop 增加“Run intelligence job”入口，默认后台任务。
+- [ ] 显示 provider 状态：PASS / SKIP / ERROR。
+- [ ] Knowledge map 增加 edge basis filter。
+- [ ] Cluster inspector 展示 computed evidence。
+- [ ] Artifact 存入 workspace local store；DB 可用时再同步。
+
+验收：
+
+- [ ] 没有模型依赖时 IDE 仍可编辑、保存、预览。
+- [ ] 有 artifact 时 cluster/map 展示 computed basis。
+- [ ] source-ref 和 reaction detail 跳转保持可用。
+
+---
+
+## 8. 验证矩阵
+
+### Python
+
+```bash
+python -m unittest discover services/chem-cluster-service/tests
+python -m compileall services\chem-cluster-service\chem_cluster_service services\chem-cluster-service\tests
+```
+
+可选环境：
+
+```bash
+python -m chem_cluster_service.intelligence.cli --input fixtures/job.json --output artifacts/intelligence.json --providers rdkit_fingerprint --missing-dependency skip
+python -m chem_cluster_service.intelligence.cli --input fixtures/job.json --output artifacts/intelligence.json --providers rxnmapper --missing-dependency skip
+python -m chem_cluster_service.intelligence.cli --input fixtures/job.json --output artifacts/intelligence.json --providers rxnfp --missing-dependency skip
+python -m chem_cluster_service.cli --input artifacts/layout-input.json --output artifacts/layout.json --engine tmap --missing-tmap skip
+```
+
+### TypeScript
+
+```bash
+pnpm --filter @chemd/reaction-map test
+pnpm --filter @chemd/reaction-map typecheck
+pnpm --filter @chemd/exporter-training test
+pnpm --filter @chemd/exporter-training typecheck
+pnpm --filter @chemd/desktop typecheck
+```
+
+### Full regression
+
+```bash
+pnpm typecheck
+pnpm test
+pnpm --filter @chemd/desktop build
+```
+
+### Smoke
+
+```bash
+pnpm desktop:offline-core-smoke
+pnpm desktop:runtime-smoke
+```
+
+---
+
+## 9. 风险与决策
+
+| 风险 | 影响 | 决策 |
+| --- | --- | --- |
+| RXNFP 依赖老旧 | 安装失败、污染环境 | 独立 conda/venv worker，默认可 SKIP |
+| RXNMapper 模型较大 | 启动慢、包体积增加 | 模型只在 provider run 时加载，artifact 缓存 |
+| TMAP Windows 工具链复杂 | clean install 不稳定 | 默认 fallback，TMAP 作为可选 provider |
+| 用户私有反应外泄 | 合规风险 | 默认禁用 external API，`allow_network: false` |
+| semantic edge 被误解为化学相似 | 产品误导 | UI 强制显示 basis/warnings |
+| hybrid score 不可解释 | 研究结果不可审计 | 第一版用固定权重并记录每项 score |
+| mapping 低置信污染 center | 错误聚类 | confidence 阈值和 review_required warning |
+
+---
+
+## 10. 并行实施建议
+
+可以拆成 4 个不冲突 worktree：
+
+| 分支 | 写入范围 | 目标 |
+| --- | --- | --- |
+| `reaction-intel-contracts` | `packages/reaction-map/**`、`services/chem-cluster-service/chem_cluster_service/intelligence/contracts.py`、docs | 合同和 fixture |
+| `reaction-intel-rdkit-mapper` | `services/chem-cluster-service/chem_cluster_service/intelligence/providers/rdkit_fingerprint.py`、`rxnmapper_provider.py`、tests | RDKit + RXNMapper |
+| `reaction-intel-rxnfp` | `services/chem-cluster-service/chem_cluster_service/intelligence/providers/rxnfp_provider.py`、tests | RXNFP embedding |
+| `reaction-intel-hybrid-tmap` | `services/chem-cluster-service/chem_cluster_service/intelligence/similarity.py`、`tmap_layout.py`、`packages/reaction-map/**` | hybrid graph + TMAP layout |
+
+串行保留：
+
+- 根依赖、lockfile、环境模板。
+- Desktop command/UI 接入。
+- release smoke 和 clean-machine 验收。
+
+---
+
+## 11. 完成定义
+
+第一阶段生产可接受：
+
+- [ ] 无 RXNFP/RXNMapper/TMAP 环境时，所有 provider 明确 `SKIP`，IDE 不受影响。
+- [ ] 有 RDKit 时可生成 computed fingerprint edge。
+- [ ] 有 RXNMapper 时可生成 atom mapping 与 reaction center。
+- [ ] 有 RXNFP 时可生成 embedding 与 cosine edge。
+- [ ] 有 TMAP 时可从 edge list 生成 layout artifact。
+- [ ] hybrid edge 明确记录 semantic/fingerprint/rxnfp/reaction_center basis。
+- [ ] Desktop 能显示 provider 状态、computed edge basis、warnings。
+- [ ] `pnpm typecheck`、`pnpm test`、Python worker tests 通过。
+
+第二阶段生产增强：
+
+- [ ] worker 环境可随 installer 分发或按需下载。
+- [ ] artifact 可同步到 PostgreSQL shared schema。
+- [ ] clean-machine smoke 覆盖“无模型依赖”和“有本地 worker 依赖”两种路径。
+- [ ] 人工审查 cluster/edge 可写回 training memory。
