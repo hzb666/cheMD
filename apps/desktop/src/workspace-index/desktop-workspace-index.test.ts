@@ -205,8 +205,22 @@ describe("desktop workspace index view model", () => {
       chunkId: expect.any(String),
       documentPath: "experiments/rag-gate.chemd.md",
       documentUri: expect.stringContaining("chemd-workspace://"),
+      text: expect.any(String),
       locator: expect.stringContaining("L")
     });
+  });
+
+  it("keeps full RAG chunk text separate from truncated display labels", () => {
+    const longText = "A".repeat(120);
+    const results = buildDesktopWorkspaceRagResultsFromCitationCandidates({
+      documentPath: "experiments/long.chemd.md",
+      documentUri: "chemd-workspace://workspace/long.chemd.md",
+      candidates: [citationCandidate()],
+      chunkTextById: new Map([["chunk-1", longText]])
+    });
+
+    expect(results[0].text).toBe(longText);
+    expect(results[0].label.length).toBeLessThan(longText.length);
   });
 
   it("keeps empty RAG candidates behind the citation gate", () => {

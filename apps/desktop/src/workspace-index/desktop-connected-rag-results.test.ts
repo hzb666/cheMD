@@ -40,6 +40,7 @@ const localResult = (
   sourceRange: range(3),
   documentPath: "experiments/local.chemd.md",
   documentUri: "chemd-workspace://workspace/experiments/local.chemd.md",
+  text: "Local evidence about reaction yield.",
   label: "Local evidence about reaction yield.",
   detail: "experiments/local.chemd.md citation-local-1 L3",
   locator: "citation-local-1 L3",

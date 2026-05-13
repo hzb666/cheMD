@@ -21,6 +21,7 @@ export interface DesktopWorkspaceRagResult {
   sourceRange: EditorGraphRagSourceRange;
   documentPath: string;
   documentUri: string;
+  text: string;
   label: string;
   detail: string;
   locator: string;
@@ -67,7 +68,10 @@ export const buildDesktopWorkspaceRagResultsFromCitationCandidates = ({
     if (!isUsableCitationCandidate(candidate)) {
       return [];
     }
-    const text = chunkTextById.get(candidate.chunkId) ?? candidate.chunkId;
+    const text = (chunkTextById.get(candidate.chunkId) ?? candidate.chunkId)
+      .replace(/\s+/g, " ")
+      .trim()
+      || candidate.chunkId;
     const locator = `${candidate.citationId} ${rangeLocator(candidate.sourceRange)}`;
     return [{
       id: `rag-${candidate.citationId}`,
@@ -77,7 +81,8 @@ export const buildDesktopWorkspaceRagResultsFromCitationCandidates = ({
       sourceRange: candidate.sourceRange,
       documentPath,
       documentUri,
-      label: truncate(text.replace(/\s+/g, " ").trim() || candidate.chunkId, 96),
+      text,
+      label: truncate(text, 96),
       detail: `${documentPath} ${locator}`,
       locator
     }];

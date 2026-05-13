@@ -148,6 +148,9 @@ const toConnectedResult = (
   const distance = finiteNumber(row.distance);
   const documentPath = fallbackDocumentPath(row);
   const documentUri = fallbackDocumentUri(row, documentPath);
+  const text = (row.text ?? row.label ?? row.chunkId ?? "Connected RAG result")
+    .replace(/\s+/g, " ")
+    .trim();
   const locator = `${citationId} ${rangeLocator(sourceRange)}`;
   const detail = row.detail?.trim() || `${documentPath} ${locator}`;
 
@@ -162,6 +165,7 @@ const toConnectedResult = (
       sourceRange,
       documentPath,
       documentUri,
+      text: text || chunkId,
       label: labelForRow(row),
       detail,
       locator,
