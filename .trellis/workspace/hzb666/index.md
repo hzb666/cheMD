@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 59
+- **Total Sessions**: 60
 - **Last Active**: 2026-05-13
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~874 | Active |
+| `journal-2.md` | ~912 | Active |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 60 | 2026-05-13 | Desktop IDE navigation providers and workspace reference completions | `28d0d2d`, `c265e71`, `e162f38`, `4d2b983`, `552e77f` | `desktop-ide` |
 | 59 | 2026-05-13 | Desktop IDE hover definition and renderable HTML shell | `f0d2744`, `72c4e04`, `7a7cea5`, `df186dc`, `5685ca2`, `09e86fd` | `desktop-ide` |
 | 58 | 2026-05-13 | Desktop IDE reference completion and renderable nodes | `f91b041`, `2f3f5cc`, `cc7caca`, `c6de158`, `22bafcb` | `desktop-ide` |
 | 57 | 2026-05-13 | Desktop IDE Monaco completion provider | `62cb61b`, `7480d36`, `81e4de7` | `desktop-ide` |

@@ -872,3 +872,41 @@ Merged Monaco-neutral hover/definition core into @chemd/language-service and ren
 ### Next Steps
 
 - None - task complete
+
+
+## Session 60: Desktop IDE navigation providers and workspace reference completions
+
+**Date**: 2026-05-13
+**Task**: Desktop IDE navigation providers and workspace reference completions
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Merged workspace reference completion core into @chemd/language-service and desktop Monaco hover/definition providers into @chemd/desktop. Validation passed: language-service test 37/37, language-service typecheck, desktop typecheck, focused desktop ESLint, Monaco navigation provider test 2/2, desktop build, conflict marker scan, and git diff --check. Ran pnpm install --frozen-lockfile after the earlier renderer-html dependency addition to refresh local workspace symlinks; no lockfile change.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `28d0d2d` | (see git log) |
+| `c265e71` | (see git log) |
+| `e162f38` | (see git log) |
+| `4d2b983` | (see git log) |
+| `552e77f` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
