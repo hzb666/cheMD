@@ -1409,6 +1409,59 @@
     font-size: 0.74rem;
   }
 
+  .desktop-rag-connected-status {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.22rem 0.45rem;
+    padding: 0.48rem 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--panel);
+  }
+
+  .desktop-rag-connected-status span {
+    color: var(--accent-foreground);
+    font-size: 0.62rem;
+    font-weight: 720;
+    text-transform: uppercase;
+  }
+
+  .desktop-rag-connected-status strong {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--foreground);
+    font-size: 0.72rem;
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .desktop-rag-connected-status code {
+    color: var(--muted-foreground);
+    font-family: var(--font-mono);
+    font-size: 0.64rem;
+  }
+
+  .desktop-rag-connected-status small {
+    grid-column: 1 / -1;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--muted-foreground);
+    font-size: 0.68rem;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .desktop-rag-connected-status[data-state="degraded"] {
+    border-color: color-mix(in oklch, var(--warning) 30%, var(--border));
+    background: color-mix(in oklch, var(--warning) 7%, var(--card));
+  }
+
+  .desktop-rag-connected-status[data-disabled="true"] {
+    opacity: 0.82;
+  }
+
   .desktop-reaction-map-canvas {
     width: 100%;
     min-height: 12rem;
@@ -1498,6 +1551,29 @@
     font-size: 0.7rem;
   }
 
+  .desktop-tool-result-row {
+    align-items: flex-start;
+    min-height: 2.35rem;
+    padding: 0.38rem 0.45rem;
+  }
+
+  .desktop-tool-result-row[data-kind="connected"] {
+    border-color: color-mix(in oklch, var(--primary) 28%, var(--border));
+    background: color-mix(in oklch, var(--primary) 6%, var(--panel));
+  }
+
+  .desktop-tool-result-row[data-kind="local"] {
+    border-color: color-mix(in oklch, var(--success) 24%, var(--border));
+  }
+
+  .desktop-tool-result-main {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.12rem;
+  }
+
   .desktop-tool-result-row span,
   .desktop-graph-node-row span {
     flex: 0 0 auto;
@@ -1518,12 +1594,36 @@
     white-space: nowrap;
   }
 
+  .desktop-tool-result-main small {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--muted-foreground);
+    font-family: var(--font-mono);
+    font-size: 0.63rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .desktop-tool-result-row code,
   .desktop-graph-node-row code {
     flex: 0 0 auto;
     color: var(--muted-foreground);
     font-family: var(--font-mono);
     font-size: 0.66rem;
+  }
+
+  .desktop-tool-result-metric {
+    max-width: 8.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .desktop-tool-result-detail {
+    max-width: 10rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .desktop-renderable-node-list {
