@@ -6,7 +6,10 @@ import {
   type ChemdLanguageCompileOutput
 } from "@chemd/language-service";
 
-import { buildDesktopKnowledgeMapViewModel } from "./desktop-knowledge-map";
+import {
+  buildDesktopKnowledgeMapViewModel,
+  createKnowledgeMapSourceJumpIntent
+} from "./desktop-knowledge-map";
 
 const compile = (source: string): ChemdLanguageCompileOutput =>
   compileChemdForEditor({
@@ -59,8 +62,26 @@ const outputWithReaction = (): ChemdLanguageCompileSuccess => ({
         date: "2026-05-13"
       },
       children: [
-        { type: "molecule", id: "mol-a", name: "A", smiles: "CCO" },
-        { type: "reaction", id: "rxn-a", reactants: ["mol-a"], products: ["mol-b"] }
+        {
+          type: "molecule",
+          id: "mol-a",
+          name: "A",
+          smiles: "CCO",
+          sourceSpan: { start: 42, end: 80, startLine: 7, endLine: 10 }
+        },
+        {
+          type: "reaction",
+          id: "rxn-a",
+          reactants: ["mol-a"],
+          products: ["mol-b"],
+          sourceSpan: { start: 100, end: 180, startLine: 12, endLine: 16 }
+        },
+        {
+          type: "observation",
+          id: "obs-a",
+          text: "Reaction evidence",
+          sourceSpan: { start: 181, end: 220, startLine: 18, endLine: 19 }
+        }
       ],
       diagnostics: []
     },
@@ -92,7 +113,13 @@ const outputWithManyReactions = (count: number): ChemdLanguageCompileSuccess => 
           type: "reaction",
           id: symbol.id,
           reactants: [`mol-${symbol.id}`],
-          products: [`product-${symbol.id}`]
+          products: [`product-${symbol.id}`],
+          sourceSpan: {
+            start: symbol.range.startLine * 10,
+            end: symbol.range.endLine * 10,
+            startLine: symbol.range.startLine,
+            endLine: symbol.range.endLine
+          }
         })),
         diagnostics: []
       },
@@ -126,6 +153,63 @@ describe("desktop knowledge map view model", () => {
       reaction_entity_id: "rxn-a",
       x: 0,
       y: 0
+    });
+  });
+
+  it("exposes expandable reaction renderable data with source refs", () => {
+    const viewModel = buildDesktopKnowledgeMapViewModel(outputWithReaction());
+
+    expect(viewModel.reactionRenderables).toHaveLength(1);
+    expect(viewModel.reactionRenderables[0]).toMatchObject({
+      semanticId: "rxn-a",
+      component: "ReactionBlock",
+      hydration: "visible",
+      sourceRef: {
+        label: "map.chemd.md L12-L16",
+        startLine: 12,
+        endLine: 16
+      }
+    });
+  });
+
+  it("builds source jump intents for renderable and evidence source refs", () => {
+    const viewModel = buildDesktopKnowledgeMapViewModel(outputWithReaction());
+    const reaction = viewModel.reactionRenderables[0];
+    const evidence = viewModel.evidenceSourceRefs[0];
+
+    expect(reaction.sourceRef?.intent).toEqual({
+      kind: "chemd-source-jump",
+      nodeId: "reaction::rxn-a",
+      semanticId: "rxn-a",
+      sourceKind: "chemd",
+      sourceUri: "experiments/map.chemd.md",
+      range: {
+        startLine: 12,
+        endLine: 16,
+        startOffset: 100,
+        endOffset: 180
+      }
+    });
+    expect(evidence.sourceRef.intent?.range).toMatchObject({
+      startLine: 18,
+      endLine: 19
+    });
+  });
+
+  it("returns null source jump intent when a source ref has no line", () => {
+    expect(createKnowledgeMapSourceJumpIntent("node-a", "rxn-a", {
+      source_kind: "chemd",
+      source_uri: "experiments/map.chemd.md"
+    })).toBeNull();
+  });
+
+  it("adds cluster badge data to reaction renderable rows", () => {
+    const viewModel = buildDesktopKnowledgeMapViewModel(outputWithReaction());
+
+    expect(viewModel.reactionRenderables[0].clusterBadge).toMatchObject({
+      basis: "reaction_signature",
+      confidence: "high",
+      memberCount: 1
     });
   });
 
