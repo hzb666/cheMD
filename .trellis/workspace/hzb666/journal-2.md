@@ -759,3 +759,39 @@ Re-cut and merged workspace symbol indexing as a language-service-only helper af
 ### Next Steps
 
 - None - task complete
+
+
+## Session 57: Desktop IDE Monaco completion provider
+
+**Date**: 2026-05-13
+**Task**: Desktop IDE Monaco completion provider
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Merged the desktop Monaco completion provider using the language-service completion core. Provider logic was split into monaco-chemd-completion.ts so MonacoChemdEditor remains under the file-size boundary. Main validation passed desktop typecheck, focused ESLint, desktop build, and diff check; real interactive UI smoke remains pending.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `62cb61b` | (see git log) |
+| `7480d36` | (see git log) |
+| `81e4de7` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
