@@ -124,6 +124,7 @@
 - [x] `poetry run python -m unittest discover tests` 通过：52 tests。
 - [x] `pnpm test` 通过：Turbo packages、Node scripts、Python chem-service tests 均通过。
 - [x] `pnpm typecheck` 通过：24 packages。
+- [x] 组件化收尾后再次验证：`pnpm --filter @chemd/desktop build`、`pnpm typecheck`、`pnpm test`、新增/修改 desktop 模块 eslint 均通过；`App.tsx` 仍只剩既有 complexity / max-lines-per-function 非阻塞项。
 
 ---
 
