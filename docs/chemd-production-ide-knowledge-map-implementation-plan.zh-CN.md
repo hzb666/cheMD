@@ -1020,3 +1020,20 @@ M1 language-service completion core
   - `pnpm --filter @chemd/renderer-json test`：通过，2 files / 9 tests。
   - `pnpm --filter @chemd/renderer-json typecheck`：通过。
   - `git diff --check`：通过。
+
+### 2026-05-13 desktop-ide-hover-definition-core
+
+- 范围：实现 `@chemd/language-service` hover/definition Monaco-neutral core；
+  不接入 `apps/desktop`、Monaco provider、renderer、root 配置或持久化层。
+- 产物：新增 `getChemdHover(request, context)` 与
+  `getChemdDefinition(request, context)`，消费当前文档 `compileOutput` 的
+  symbols/diagnostics/source position，输出稳定 DTO。
+- 行为：hover 覆盖 symbol metadata、source line、diagnostic at position、
+  reference target；definition 支持 `@symbolId` 和裸 symbol id token 跳转到
+  当前文档 definition。
+- 降级：缺少 `compileOutput`、无当前位置 token、找不到 target symbol 时返回
+  `null` 或空数组，不抛出。
+- 验证：
+  - `pnpm --filter @chemd/language-service test`：通过，4 files / 33 tests。
+  - `pnpm --filter @chemd/language-service typecheck`：通过。
+  - `git diff --check`：通过；仅输出 LF/CRLF 工作区提示。

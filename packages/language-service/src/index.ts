@@ -5,6 +5,26 @@ export {
   getChemdReferenceCompletions
 } from "./completion-references";
 export {
+  getChemdDefinition
+} from "./definition";
+export type {
+  ChemdDefinitionContext,
+  ChemdDefinitionLocation,
+  ChemdDefinitionRequest,
+  ChemdDefinitionTarget
+} from "./definition";
+export {
+  getChemdHover
+} from "./hover";
+export type {
+  ChemdHoverContext,
+  ChemdHoverDiagnostic,
+  ChemdHoverReferenceTarget,
+  ChemdHoverRequest,
+  ChemdHoverResult,
+  ChemdHoverSymbol
+} from "./hover";
+export {
   getChemdCompletionContext
 } from "./completion-context";
 export type {
