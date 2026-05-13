@@ -1621,3 +1621,40 @@ Merged the Desktop Postgres migration readiness slice, added visible pgvector/sc
 ### Next Steps
 
 - None - task complete
+
+
+## Session 81: Desktop Postgres RAG query command foundation
+
+**Date**: 2026-05-14
+**Task**: Desktop Postgres RAG query command foundation
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Merged the first M6 Postgres RAG productization slice: citation-gated query_postgres_rag Tauri command, connected result normalization, optional runtime smoke SKIP classification, docs updates, and full desktop/workspace validation.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7d50795` | (see git log) |
+| `7582e50` | (see git log) |
+| `85b1e39` | (see git log) |
+| `bb84e1c` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

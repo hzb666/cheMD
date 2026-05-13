@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 80
+- **Total Sessions**: 81
 - **Last Active**: 2026-05-14
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~1623 | Active |
+| `journal-2.md` | ~1660 | Active |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 81 | 2026-05-14 | Desktop Postgres RAG query command foundation | `7d50795`, `7582e50`, `85b1e39`, `bb84e1c` | `desktop-ide` |
 | 80 | 2026-05-14 | Desktop Postgres migration readiness visibility | `2484194`, `9613ffb` | `desktop-ide` |
 | 79 | 2026-05-13 | Desktop Postgres profile UI and command smoke | `c026b4b` | `desktop-ide` |
 | 78 | 2026-05-13 | Desktop Postgres profile secret storage backend | `654a4a1` | `desktop-ide` |
