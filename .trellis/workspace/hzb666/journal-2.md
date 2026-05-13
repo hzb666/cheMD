@@ -1174,3 +1174,39 @@ Merged offline-safe Reaction Intelligence RDKit fingerprint and RXNMapper reacti
 ### Next Steps
 
 - None - task complete
+
+
+## Session 68: Reaction Intelligence RXNFP and hybrid similarity baselines
+
+**Date**: 2026-05-13
+**Task**: Reaction Intelligence RXNFP and hybrid similarity baselines
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Merged RXNFP embedding and hybrid similarity baselines. RXNFP provider supports dependency SKIP, injected-adapter tests, sidecar embedding refs, cosine top-k edges, and dimension-mismatch ERROR without edges. Hybrid similarity combines semantic and computed provider edges with fixed weighted scoring, preserves semantic-only warnings, and keeps warnings from high confidence. Updated implementation plan for Phase 3 and Phase 4 status. Validation passed targeted RXNFP/hybrid tests, chem-cluster-service tests, compileall, reaction-map test/typecheck, desktop build, full pnpm typecheck, full pnpm test, and git diff --check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ab6d74d` | (see git log) |
+| `5d1cc71` | (see git log) |
+| `fd4a715` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
