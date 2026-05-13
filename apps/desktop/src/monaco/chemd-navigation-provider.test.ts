@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { Monaco } from "@monaco-editor/react";
 import type { editor, languages, Position } from "monaco-editor";
+import { compileChemdForEditor } from "@chemd/language-service";
 import type { WorkspaceSymbolIndex } from "@chemd/workspace-index";
 
 import {
+  getChemdDiagnosticHoverMarkdown,
   getChemdHoverMarkdown,
   getChemdReferenceHoverMarkdown,
+  getChemdTemplateHoverMarkdown,
   registerChemdNavigationProviders
 } from "./chemd-navigation-provider";
 
@@ -57,7 +60,7 @@ const fakeIndex: WorkspaceSymbolIndex = {
 const fakeModel = (source: string): editor.ITextModel => ({
   uri: { toString: () => "chemd-workspace://workspace/route-a.chemd.md" },
   getWordAtPosition: () => ({ word: "rxn-a" }),
-  getLineContent: () => source
+  getLineContent: (lineNumber: number) => source.split("\n")[lineNumber - 1] ?? source
 } as unknown as editor.ITextModel);
 
 const fakePosition: Position = {
@@ -81,6 +84,42 @@ describe("chemd Monaco navigation providers", () => {
 
     expect(markdown).toContain("**missing-rxn**");
     expect(markdown).toContain("status: `unresolved`");
+  });
+
+  it("builds diagnostic hover markdown with quick fix count", () => {
+    const output = compileChemdForEditor({
+      source: [
+        ":::chemd #mol-open",
+        "smiles: CCO",
+        ":::"
+      ].join("\n")
+    });
+    const diagnostic = output.diagnostics.find((item) =>
+      item.quickFixes.length > 0
+    );
+
+    expect(diagnostic).toBeDefined();
+    const markdown = getChemdDiagnosticHoverMarkdown(diagnostic!);
+
+    expect(markdown).toContain(`**${diagnostic?.code}**`);
+    expect(markdown).toContain(diagnostic?.message);
+    expect(markdown).toContain(`quick fixes: \`${diagnostic?.quickFixes.length}\``);
+  });
+
+  it("builds template hover markdown with params", () => {
+    const markdown = getChemdTemplateHoverMarkdown({
+      type: "template",
+      name: "charge_pair",
+      params: ["reagent_a", "amount"],
+      paramSpecs: [
+        { name: "reagent_a", raw: "reagent_a: ref<molecule>" },
+        { name: "amount", raw: "amount: quantity<amount>" }
+      ]
+    });
+
+    expect(markdown).toContain("**charge_pair**");
+    expect(markdown).toContain("`reagent_a: ref<molecule>`");
+    expect(markdown).toContain("`amount: quantity<amount>`");
   });
 
   it("registers hover, definition, and reference providers from workspace index", async () => {
@@ -139,5 +178,88 @@ describe("chemd Monaco navigation providers", () => {
     expect(references).toHaveLength(2);
     disposable.dispose();
     expect(disposals).toEqual(["hover", "definition", "reference"]);
+  });
+
+  it("returns diagnostic hover over a diagnostic range", async () => {
+    const hoverProviders: languages.HoverProvider[] = [];
+    const monaco = {
+      languages: {
+        registerHoverProvider: (_languageId: string, provider: languages.HoverProvider) => {
+          hoverProviders.push(provider);
+          return { dispose: () => undefined };
+        },
+        registerDefinitionProvider: () => ({ dispose: () => undefined }),
+        registerReferenceProvider: () => ({ dispose: () => undefined })
+      }
+    } as unknown as Monaco;
+    const source = [
+      ":::chemd #mol-open",
+      "smiles: CCO",
+      ":::"
+    ].join("\n");
+    const output = compileChemdForEditor({ source });
+    const diagnostic = output.diagnostics.find((item) =>
+      item.quickFixes.length > 0
+    );
+
+    expect(diagnostic).toBeDefined();
+    const disposable = registerChemdNavigationProviders(monaco, "chemd", {
+      getCompileOutput: () => output,
+      getWorkspaceIndex: () => fakeIndex
+    });
+    const hover = await hoverProviders[0].provideHover(
+      fakeModel(source),
+      {
+        lineNumber: diagnostic!.range.startLine,
+        column: diagnostic!.range.startColumn
+      } as Position,
+      {} as never
+    );
+
+    expect(hover?.contents[0].value).toContain(diagnostic?.code);
+    expect(hover?.contents[0].value).toContain(`quick fixes: \`${diagnostic?.quickFixes.length}\``);
+    disposable.dispose();
+  });
+
+  it("returns template params hover over a template name", async () => {
+    const hoverProviders: languages.HoverProvider[] = [];
+    const monaco = {
+      languages: {
+        registerHoverProvider: (_languageId: string, provider: languages.HoverProvider) => {
+          hoverProviders.push(provider);
+          return { dispose: () => undefined };
+        },
+        registerDefinitionProvider: () => ({ dispose: () => undefined }),
+        registerReferenceProvider: () => ({ dispose: () => undefined })
+      }
+    } as unknown as Monaco;
+    const source = [
+      "---",
+      "id: template-doc",
+      "title: Template Doc",
+      "---",
+      "",
+      ":::template charge_pair",
+      "params: reagent_a: ref<molecule> | amount: quantity<amount>",
+      "description: Charge pair template",
+      ":::"
+    ].join("\n");
+    const output = compileChemdForEditor({ source });
+    const disposable = registerChemdNavigationProviders(monaco, "chemd", {
+      getCompileOutput: () => output,
+      getWorkspaceIndex: () => fakeIndex
+    });
+    const templateLine = 6;
+    const hover = await hoverProviders[0].provideHover(
+      fakeModel(source),
+      { lineNumber: templateLine, column: 16 } as Position,
+      {} as never
+    );
+
+    expect(output.status).toBe("ok");
+    expect(hover?.contents[0].value).toContain("**charge_pair**");
+    expect(hover?.contents[0].value).toContain("`reagent_a: ref<molecule>`");
+    expect(hover?.contents[0].value).toContain("`amount: quantity<amount>`");
+    disposable.dispose();
   });
 });
