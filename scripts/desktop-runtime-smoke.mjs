@@ -35,6 +35,8 @@ const RUNTIME_CREATED_AT = "2026-05-12T00:00:00.000Z";
 const RUNTIME_SOURCE = "---\nid: exp-desktop-runtime-smoke\ntitle: Desktop runtime smoke\ndate: 2026-05-12\n---\n\n:::chemd #rxn-runtime-smoke\nkind: reaction\nreactants: aldehyde\nproducts: alcohol\nyield: 72%\n:::\n";
 const TAURI_COMMAND_RUNNER_ENV = "CHEMD_DESKTOP_TAURI_COMMAND_RUNNER";
 const TAURI_COMMAND_RUNNER_ARGS_ENV = "CHEMD_DESKTOP_TAURI_COMMAND_RUNNER_ARGS";
+const RAG_QUERY_EMBEDDING_ENV = "CHEMD_DESKTOP_RAG_QUERY_EMBEDDING_JSON";
+const RAG_QUERY_TEXT_ENV = "CHEMD_DESKTOP_RAG_QUERY_TEXT";
 const POSTGRES_PROFILE_SMOKE_ID_PREFIX = "desktop-runtime-smoke-profile";
 const POSTGRES_PROFILE_SMOKE_PASSWORD = "desktop-runtime-smoke-profile-password";
 
@@ -985,8 +987,11 @@ const redactPostgresUrlPassword = (value) =>
   );
 
 const redactCommandDiagnosticValue = (value, key = "") => {
+  if (/embedding|vector/iu.test(key)) {
+    return "[REDACTED]";
+  }
   if (typeof value === "string") {
-    if (/password/iu.test(key)) {
+    if (/password|secret|token|api[_-]?key/iu.test(key)) {
       return "[REDACTED]";
     }
     return redactPostgresUrlPassword(value)
@@ -1026,6 +1031,120 @@ const invokeSmokeCommand = async ({ commandRunner, command, input, commands }) =
   } catch (error) {
     throw new Error(`Tauri command ${command} failed: ${commandErrorMessage(error)}`);
   }
+};
+
+const skippedRagQueryCommandSmoke = ({ reason, detail, blockers = [reason] }) => ({
+  status: "skipped",
+  classification: "SKIP",
+  reason,
+  blockers,
+  detail
+});
+
+const parseRagQueryEmbedding = (env) => {
+  const raw = safeTrim(env[RAG_QUERY_EMBEDDING_ENV]);
+  if (!raw) {
+    return {
+      ok: false,
+      reason: "missing-rag-query-embedding",
+      detail: `Set ${RAG_QUERY_EMBEDDING_ENV} to a JSON number array to run RAG query command smoke`
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (
+      !Array.isArray(parsed) ||
+      parsed.length === 0 ||
+      parsed.some((value) => typeof value !== "number" || !Number.isFinite(value))
+    ) {
+      return {
+        ok: false,
+        reason: "invalid-rag-query-embedding",
+        detail: `${RAG_QUERY_EMBEDDING_ENV} must be a non-empty JSON number array`
+      };
+    }
+    return { ok: true, embedding: parsed };
+  } catch {
+    return {
+      ok: false,
+      reason: "invalid-rag-query-embedding",
+      detail: `${RAG_QUERY_EMBEDDING_ENV} must be valid JSON`
+    };
+  }
+};
+
+const hasPostgresRuntimeForRagQuery = ({ env, postgresMode }) =>
+  postgresMode === "managed" || Boolean(getPostgresDatabaseUrl(env));
+
+const buildRagQuerySmokeInput = ({ env, embedding }) => ({
+  input: {
+    query: safeTrim(env[RAG_QUERY_TEXT_ENV]) || "desktop runtime smoke",
+    embedding,
+    embeddingModel: "desktop-runtime-smoke",
+    limit: 3
+  }
+});
+
+const summarizeRagQueryCommandResult = (result) => {
+  const rows = Array.isArray(result)
+    ? result
+    : Array.isArray(result?.results)
+      ? result.results
+    : Array.isArray(result?.rows)
+      ? result.rows
+      : Array.isArray(result?.matches)
+        ? result.matches
+        : [];
+  return { rowCount: rows.length };
+};
+
+export const runDesktopRagQueryCommandSmoke = async ({
+  env = process.env,
+  postgresMode = getPostgresDatabaseUrl(env) ? "external" : "",
+  commandRunner = createDesktopTauriCommandRunner({ env }),
+  commands = []
+} = {}) => {
+  const embedding = parseRagQueryEmbedding(env);
+  const checks = [
+    {
+      missing: !hasPostgresRuntimeForRagQuery({ env, postgresMode }),
+      reason: "missing-postgres-runtime",
+      detail: "RAG query command smoke requires an external or managed PostgreSQL runtime"
+    },
+    {
+      missing: !commandRunner,
+      reason: "unsupported-tauri-command-runner",
+      detail: `Set ${TAURI_COMMAND_RUNNER_ENV} or inject commandRunner to run query_postgres_rag`
+    },
+    {
+      missing: !embedding.ok,
+      reason: embedding.reason,
+      detail: embedding.detail
+    }
+  ].filter((check) => check.missing);
+
+  if (checks.length > 0) {
+    return skippedRagQueryCommandSmoke({
+      reason: checks[0].reason,
+      blockers: checks.map((check) => check.reason),
+      detail: checks.map((check) => check.detail).join("; ")
+    });
+  }
+
+  const result = await invokeSmokeCommand({
+    commandRunner,
+    command: "query_postgres_rag",
+    input: buildRagQuerySmokeInput({ env, embedding: embedding.embedding }),
+    commands
+  });
+  return {
+    status: "rag-query-command-passed",
+    classification: "PASS",
+    detail: "Tauri command smoke invoked query_postgres_rag with a configured runtime and embedding vector",
+    commands,
+    resultSummary: summarizeRagQueryCommandResult(result)
+  };
 };
 
 const requireOutboxEntry = ({ entries, localId, idempotencyKey, syncStatus, phase }) => {
@@ -1405,6 +1524,7 @@ const logDesktopChecks = (logger, checks) => {
 
 const runOfflineDesktopRuntimeSmoke = async ({ rootDir, env, managed, offlineLocalStoreSmoke, logger }) => {
   logger.log(`SKIP database persistence: ${managed.reason}.`);
+  logger.log(`SKIP RAG query command smoke: ${managed.reason}.`);
   const offline = await offlineLocalStoreSmoke({ rootDir, env });
   logDesktopOfflineCoreSuccess({ logger, offline });
   return {
@@ -1414,6 +1534,10 @@ const runOfflineDesktopRuntimeSmoke = async ({ rootDir, env, managed, offlineLoc
       reason: "missing-postgres-runtime",
       detail: managed.reason
     },
+    ragQueryCommand: skippedRagQueryCommandSmoke({
+      reason: "missing-postgres-runtime",
+      detail: managed.reason
+    }),
     offline
   };
 };
@@ -1460,7 +1584,8 @@ const runConnectedDesktopRuntimeSmoke = async ({
   postgresSmoke,
   reconnectSyncSmoke,
   persistenceSmoke,
-  tauriCommandSmoke
+  tauriCommandSmoke,
+  ragQueryCommandSmoke
 }) =>
   withClient({
     env: smokeEnv,
@@ -1477,7 +1602,12 @@ const runConnectedDesktopRuntimeSmoke = async ({
         env: smokeEnv,
         postgresMode
       });
-      return { postgres, reconnectSync, persistence: reconnectSync.persistence, tauriCommand };
+      const ragQueryCommand = await ragQueryCommandSmoke({
+        rootDir,
+        env: smokeEnv,
+        postgresMode
+      });
+      return { postgres, reconnectSync, persistence: reconnectSync.persistence, tauriCommand, ragQueryCommand };
     }
   });
 
@@ -1494,9 +1624,14 @@ const logDesktopRuntimeSuccess = (logger, result) => {
   logger.log("reconnect proof: script-level local outbox -> shared PostgreSQL smoke.");
   if (result.tauriCommand.status === "skipped") {
     logger.log(`SKIP Tauri command smoke: ${result.tauriCommand.detail}`);
+  } else {
+    logger.log(`Tauri command smoke passed: graph=${result.tauriCommand.graphSnapshotId}, local=${result.tauriCommand.localId}, synced=${result.tauriCommand.sync.syncedCount}`);
+  }
+  if (result.ragQueryCommand.status === "skipped") {
+    logger.log(`SKIP RAG query command smoke: ${result.ragQueryCommand.detail}`);
     return;
   }
-  logger.log(`Tauri command smoke passed: graph=${result.tauriCommand.graphSnapshotId}, local=${result.tauriCommand.localId}, synced=${result.tauriCommand.sync.syncedCount}`);
+  logger.log(`RAG query command smoke passed: rows=${result.ragQueryCommand.resultSummary.rowCount}`);
 };
 
 const createDesktopRuntimeSmokeOptions = (options) => ({
@@ -1508,6 +1643,7 @@ const createDesktopRuntimeSmokeOptions = (options) => ({
   persistenceSmoke: runDesktopRuntimePersistenceSmoke,
   reconnectSyncSmoke: runDesktopReconnectOutboxSyncSmoke,
   tauriCommandSmoke: runDesktopTauriCommandSmoke,
+  ragQueryCommandSmoke: runDesktopRagQueryCommandSmoke,
   managedPostgres: startManagedPostgresSmokeRuntime,
   offlineLocalStoreSmoke: runDesktopOfflineLocalStoreSmoke,
   logger: console,
@@ -1524,6 +1660,7 @@ export const runDesktopRuntimeSmoke = async (options = {}) => {
     persistenceSmoke,
     reconnectSyncSmoke,
     tauriCommandSmoke,
+    ragQueryCommandSmoke,
     managedPostgres,
     offlineLocalStoreSmoke,
     logger
@@ -1559,7 +1696,8 @@ export const runDesktopRuntimeSmoke = async (options = {}) => {
       postgresSmoke,
       reconnectSyncSmoke,
       persistenceSmoke,
-      tauriCommandSmoke
+      tauriCommandSmoke,
+      ragQueryCommandSmoke
     });
 
     logDesktopRuntimeSuccess(logger, result);

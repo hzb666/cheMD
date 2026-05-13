@@ -9,6 +9,7 @@ import {
   discoverManagedPostgresBinaries,
   getPostgresDatabaseUrl,
   runDesktopOfflineLocalStoreSmoke,
+  runDesktopRagQueryCommandSmoke,
   runDesktopReconnectOutboxSyncSmoke,
   runDesktopRuntimePersistenceSmoke,
   runDesktopRuntimeSmoke,
@@ -469,6 +470,13 @@ test("runDesktopRuntimeSmoke skips without external env or managed binaries", as
       reason: "missing-postgres-runtime",
       detail: "Set CHEMD_MANAGED_POSTGRES_BIN_DIR or bundle PostgreSQL binaries"
     },
+    ragQueryCommand: {
+      status: "skipped",
+      classification: "SKIP",
+      reason: "missing-postgres-runtime",
+      blockers: ["missing-postgres-runtime"],
+      detail: "Set CHEMD_MANAGED_POSTGRES_BIN_DIR or bundle PostgreSQL binaries"
+    },
     offline: {
       status: "offline-local-passed",
       storeRoot: "D:\\offline\\local-store",
@@ -482,6 +490,7 @@ test("runDesktopRuntimeSmoke skips without external env or managed binaries", as
     }
   });
   assert.match(logger.lines.join("\n"), /SKIP database persistence/u);
+  assert.match(logger.lines.join("\n"), /SKIP RAG query command smoke/u);
   assert.match(logger.lines.join("\n"), /Chemd desktop offline core smoke passed/u);
 });
 
@@ -662,6 +671,92 @@ test("runDesktopTauriCommandSmoke skips when no command runner is configured", a
   assert.equal(result.status, "skipped");
   assert.equal(result.reason, "unsupported-tauri-command-runner");
   assert.match(result.detail, /CHEMD_DESKTOP_TAURI_COMMAND_RUNNER/u);
+});
+
+test("runDesktopRagQueryCommandSmoke classifies missing environment as SKIP", async () => {
+  const result = await runDesktopRagQueryCommandSmoke({
+    env: {},
+    commandRunner: undefined
+  });
+
+  assert.equal(result.status, "skipped");
+  assert.equal(result.classification, "SKIP");
+  assert.equal(result.reason, "missing-postgres-runtime");
+  assert.deepEqual(result.blockers, [
+    "missing-postgres-runtime",
+    "unsupported-tauri-command-runner",
+    "missing-rag-query-embedding"
+  ]);
+  assert.match(result.detail, /PostgreSQL runtime/u);
+  assert.match(result.detail, /CHEMD_DESKTOP_TAURI_COMMAND_RUNNER/u);
+  assert.match(result.detail, /CHEMD_DESKTOP_RAG_QUERY_EMBEDDING_JSON/u);
+});
+
+test("runDesktopRagQueryCommandSmoke invokes query_postgres_rag with minimal payload", async () => {
+  const calls = [];
+
+  const result = await runDesktopRagQueryCommandSmoke({
+    env: {
+      CHEMD_POSTGRES_DATABASE_URL: "postgres://chemd:super-secret@localhost:5432/chemd",
+      CHEMD_DESKTOP_RAG_QUERY_TEXT:
+        "Find reduction notes near postgres://chemd:super-secret@localhost:5432/chemd",
+      CHEMD_DESKTOP_RAG_QUERY_EMBEDDING_JSON: "[0.1,0.2,0.3]"
+    },
+    commandRunner: async ({ command, input }) => {
+      calls.push({ command, input });
+      return { matches: [{ chunkId: "chunk-1", score: 0.9 }] };
+    }
+  });
+
+  assert.equal(result.status, "rag-query-command-passed");
+  assert.equal(result.classification, "PASS");
+  assert.deepEqual(result.commands, ["query_postgres_rag"]);
+  assert.deepEqual(calls, [
+    {
+      command: "query_postgres_rag",
+      input: {
+        input: {
+          query: "Find reduction notes near postgres://chemd:super-secret@localhost:5432/chemd",
+          embedding: [0.1, 0.2, 0.3],
+          embeddingModel: "desktop-runtime-smoke",
+          limit: 3
+        }
+      }
+    }
+  ]);
+  assert.equal(result.resultSummary.rowCount, 1);
+  assert.doesNotMatch(JSON.stringify(result), /super-secret/u);
+  assert.doesNotMatch(JSON.stringify(result), /0\.1/u);
+});
+
+test("runDesktopRagQueryCommandSmoke redacts query and embedding from command failures", async () => {
+  await assert.rejects(
+    () =>
+      runDesktopRagQueryCommandSmoke({
+        env: {
+          CHEMD_POSTGRES_DATABASE_URL: "postgres://chemd:super-secret@localhost:5432/chemd",
+          CHEMD_DESKTOP_RAG_QUERY_TEXT:
+            "Find password=secret-token near postgres://chemd:super-secret@localhost:5432/chemd",
+          CHEMD_DESKTOP_RAG_QUERY_EMBEDDING_JSON: "[0.123,0.456]"
+        },
+        commandRunner: async ({ input }) => {
+          throw {
+            message: "query failed",
+            input,
+            databaseUrl: "postgres://chemd:super-secret@localhost:5432/chemd"
+          };
+        }
+      }),
+    (error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      assert.match(message, /Tauri command query_postgres_rag failed/u);
+      assert.doesNotMatch(message, /super-secret/u);
+      assert.doesNotMatch(message, /secret-token/u);
+      assert.doesNotMatch(message, /0\.123/u);
+      assert.match(message, /\[REDACTED\]/u);
+      return true;
+    }
+  );
 });
 
 test("createDesktopTauriCommandRunner passes smoke env to the runner process", async () => {
