@@ -730,13 +730,162 @@ test("runDesktopTauriCommandSmoke fails with the command name and original error
   assert.deepEqual(calls, ["initialize_managed_postgres", "start_managed_postgres"]);
 });
 
+test("runDesktopTauriCommandSmoke redacts profile save failures", async () => {
+  await assert.rejects(
+    () =>
+      runDesktopTauriCommandSmoke({
+        postgresMode: "external",
+        now: () => 12345,
+        commandRunner: async ({ command, input }) => {
+          if (command === "list_postgres_profiles") {
+            return { activeProfileId: null, profiles: [] };
+          }
+          if (command === "save_postgres_profile") {
+            throw {
+              message: "profile save failed",
+              input,
+              databaseUrl: "postgres://chemd:super-secret@localhost:5432/chemd"
+            };
+          }
+          throw new Error(`unexpected command ${command}`);
+        }
+      }),
+    (error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      assert.match(message, /Tauri command save_postgres_profile failed/u);
+      assert.doesNotMatch(message, /desktop-runtime-smoke-profile-password/u);
+      assert.doesNotMatch(message, /super-secret/u);
+      assert.match(message, /\[REDACTED\]/u);
+      return true;
+    }
+  );
+});
+
+test("runDesktopTauriCommandSmoke restores active profile before surfacing delete failures", async () => {
+  const calls = [];
+  const smokeProfileId = `desktop-runtime-smoke-profile-${process.pid}-12345`;
+  const existingProfile = {
+    profileId: "existing-profile",
+    label: "Existing Profile",
+    host: "db.example.test",
+    port: 5432,
+    database: "chemd",
+    user: "chemd",
+    sslmode: "require",
+    timeoutMs: 5000,
+    pool: null,
+    passwordSaved: true,
+    active: true,
+    createdAt: "2026-05-12T00:00:00.000Z",
+    updatedAt: "2026-05-12T00:00:00.000Z"
+  };
+  let profileState = { activeProfileId: "existing-profile", profiles: [existingProfile] };
+
+  await assert.rejects(
+    () =>
+      runDesktopTauriCommandSmoke({
+        postgresMode: "external",
+        now: () => 12345,
+        commandRunner: async ({ command, input }) => {
+          calls.push({ command, input });
+          if (command === "list_postgres_profiles") {
+            return profileState;
+          }
+          if (command === "save_postgres_profile") {
+            profileState = {
+              activeProfileId: "existing-profile",
+              profiles: [
+                existingProfile,
+                {
+                  profileId: input.input.profileId,
+                  label: input.input.label,
+                  host: input.input.host,
+                  port: input.input.port,
+                  database: input.input.database,
+                  user: input.input.user,
+                  sslmode: input.input.sslmode,
+                  timeoutMs: input.input.timeoutMs,
+                  pool: input.input.pool,
+                  passwordSaved: true,
+                  active: false,
+                  createdAt: "2026-05-12T00:00:00.000Z",
+                  updatedAt: "2026-05-12T00:00:00.000Z"
+                }
+              ]
+            };
+            return profileState;
+          }
+          if (command === "activate_postgres_profile") {
+            profileState = {
+              activeProfileId: input.profileId,
+              profiles: profileState.profiles.map((profile) => ({
+                ...profile,
+                active: profile.profileId === input.profileId
+              }))
+            };
+            return profileState;
+          }
+          if (command === "delete_postgres_profile") {
+            throw {
+              message: "delete failed",
+              password: "desktop-runtime-smoke-profile-password",
+              databaseUrl: "postgres://chemd:super-secret@localhost:5432/chemd"
+            };
+          }
+          throw new Error(`unexpected command ${command}`);
+        }
+      }),
+    (error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      assert.match(message, /Tauri command delete_postgres_profile failed/u);
+      assert.doesNotMatch(message, /desktop-runtime-smoke-profile-password/u);
+      assert.doesNotMatch(message, /super-secret/u);
+      assert.match(message, /\[REDACTED\]/u);
+      return true;
+    }
+  );
+
+  assert.deepEqual(
+    calls.map((call) => call.command),
+    [
+      "list_postgres_profiles",
+      "save_postgres_profile",
+      "activate_postgres_profile",
+      "delete_postgres_profile",
+      "activate_postgres_profile"
+    ]
+  );
+  assert.deepEqual(
+    calls.filter((call) => call.command === "activate_postgres_profile").map((call) => call.input),
+    [{ profileId: smokeProfileId }, { profileId: "existing-profile" }]
+  );
+});
+
 test("runDesktopTauriCommandSmoke validates managed command order and pending to synced outbox", async () => {
   const calls = [];
   let saved;
+  const smokeProfileId = `desktop-runtime-smoke-profile-${process.pid}-12345`;
+  const existingProfile = {
+    profileId: "existing-profile",
+    label: "Existing Profile",
+    host: "db.example.test",
+    port: 5432,
+    database: "chemd",
+    user: "chemd",
+    sslmode: "require",
+    timeoutMs: 5000,
+    pool: null,
+    passwordSaved: true,
+    active: true,
+    createdAt: "2026-05-12T00:00:00.000Z",
+    updatedAt: "2026-05-12T00:00:00.000Z"
+  };
+  let profileState = { activeProfileId: "existing-profile", profiles: [existingProfile] };
 
   const result = await runDesktopTauriCommandSmoke({
     postgresMode: "managed",
     revisionId: "rev-tauri-command-smoke",
+    now: () => 12345,
     localStoreModules: async () => ({
       buildLocalRuntimeSnapshotInput: (payload) => ({
         localId: `local:${payload.graphSnapshot.graphSnapshotId}`,
@@ -751,6 +900,54 @@ test("runDesktopTauriCommandSmoke validates managed command order and pending to
     }),
     commandRunner: async ({ command, input }) => {
       calls.push({ command, input });
+      if (command === "list_postgres_profiles") {
+        return profileState;
+      }
+      if (command === "save_postgres_profile") {
+        assert.equal(input.input.profileId, smokeProfileId);
+        assert.equal(input.input.password, "desktop-runtime-smoke-profile-password");
+        assert.equal(input.input.setActive, false);
+        profileState = {
+          activeProfileId: "existing-profile",
+          profiles: [
+            existingProfile,
+            {
+              profileId: input.input.profileId,
+              label: input.input.label,
+              host: input.input.host,
+              port: input.input.port,
+              database: input.input.database,
+              user: input.input.user,
+              sslmode: input.input.sslmode,
+              timeoutMs: input.input.timeoutMs,
+              pool: input.input.pool,
+              passwordSaved: true,
+              active: false,
+              createdAt: "2026-05-12T00:00:00.000Z",
+              updatedAt: "2026-05-12T00:00:00.000Z"
+            }
+          ]
+        };
+        return profileState;
+      }
+      if (command === "activate_postgres_profile") {
+        profileState = {
+          activeProfileId: input.profileId,
+          profiles: profileState.profiles.map((profile) => ({
+            ...profile,
+            active: profile.profileId === input.profileId
+          }))
+        };
+        return profileState;
+      }
+      if (command === "delete_postgres_profile") {
+        assert.deepEqual(input, { profileId: smokeProfileId });
+        profileState = {
+          activeProfileId: null,
+          profiles: profileState.profiles.filter((profile) => profile.profileId !== input.profileId)
+        };
+        return profileState;
+      }
       if (command === "read_postgres_status") {
         return { state: "ready", configured: true, schemaReady: true };
       }
@@ -788,6 +985,11 @@ test("runDesktopTauriCommandSmoke validates managed command order and pending to
 
   assert.equal(result.status, "tauri-command-passed");
   assert.equal(result.graphSnapshotId, "rev-tauri-command-smoke::graph");
+  assert.equal(result.postgresProfile.profileId, smokeProfileId);
+  assert.equal(result.postgresProfile.savedPasswordFlag, true);
+  assert.equal(result.postgresProfile.initial.activeProfileId, "existing-profile");
+  assert.equal(result.postgresProfile.deleted.profileCount, 1);
+  assert.equal(result.postgresProfile.restored.restoredProfileId, "existing-profile");
   assert.equal(result.sync.syncedCount, 1);
   assert.equal(result.pendingEntry.syncStatus, "pending");
   assert.equal(result.syncedEntry.syncStatus, "synced");
@@ -797,6 +999,11 @@ test("runDesktopTauriCommandSmoke validates managed command order and pending to
       "initialize_managed_postgres",
       "start_managed_postgres",
       "migrate_managed_postgres",
+      "list_postgres_profiles",
+      "save_postgres_profile",
+      "activate_postgres_profile",
+      "delete_postgres_profile",
+      "activate_postgres_profile",
       "read_postgres_status",
       "read_local_store_status",
       "save_local_runtime_snapshot",
@@ -809,6 +1016,11 @@ test("runDesktopTauriCommandSmoke validates managed command order and pending to
     calls.find((call) => call.command === "save_local_runtime_snapshot").input.payload.graphSnapshot.graphSnapshotId,
     "rev-tauri-command-smoke::graph"
   );
+  assert.deepEqual(
+    calls.filter((call) => call.command === "activate_postgres_profile").map((call) => call.input),
+    [{ profileId: smokeProfileId }, { profileId: "existing-profile" }]
+  );
+  assert.doesNotMatch(JSON.stringify(result), /desktop-runtime-smoke-profile-password/u);
 });
 
 test("runDesktopRuntimeSmoke redacts env while running smoke in order", async () => {
