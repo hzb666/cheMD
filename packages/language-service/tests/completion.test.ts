@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { getChemdCompletions } from "../src/index";
+import {
+  compileChemdForEditor,
+  getChemdCompletions
+} from "../src/index";
 
 const withCursor = (source: string): { source: string; cursorOffset: number } => {
   const cursorOffset = source.indexOf("|");
@@ -94,5 +97,112 @@ title: |
 
     expect(items.length).toBeGreaterThan(0);
     expect(items.every((item) => item.sortText?.startsWith("z-"))).toBe(true);
+  });
+
+  it("suggests current document symbol references from compile output", () => {
+    const source = `---
+id: exp-completion
+title: Completion
+---
+
+:::chemd #mol-main
+kind: molecule
+smiles: CCO
+:::
+
+:::chemd #rxn-main
+kind: reaction
+reactants: @mol-main
+products: @mol-main
+:::
+
+Related: @|
+`;
+    const { source: cleanSource, cursorOffset } = withCursor(source);
+    const compileOutput = compileChemdForEditor({ source: cleanSource });
+    const items = getChemdCompletions({
+      source: cleanSource,
+      cursorOffset,
+      compileOutput
+    }).items;
+
+    expect(items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "reference.chemd.mol-main",
+        label: "mol-main",
+        kind: "reference",
+        insertText: "@mol-main",
+        data: {
+          type: "reference",
+          symbolId: "mol-main",
+          symbolKind: "molecule"
+        }
+      })
+    ]));
+    expect(items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "reference.chemd.rxn-main",
+        label: "rxn-main",
+        kind: "reference",
+        insertText: "@rxn-main"
+      })
+    ]));
+  });
+
+  it("suggests references in reference value positions without an at token", () => {
+    const source = `:::chemd #mol-main
+kind: molecule
+smiles: CCO
+:::
+
+:::chemd #rxn-main
+kind: reaction
+reactants: |
+:::
+`;
+    const { source: cleanSource, cursorOffset } = withCursor(source);
+    const compileOutput = compileChemdForEditor({ source: cleanSource });
+    const items = getChemdCompletions({
+      source: cleanSource,
+      cursorOffset,
+      compileOutput
+    }).items;
+
+    expect(items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        label: "mol-main",
+        kind: "reference",
+        insertText: "@mol-main"
+      })
+    ]));
+    expect(items.map((item) => item.label)).not.toContain("rxn-main");
+  });
+
+  it("does not flood ordinary prose with reference suggestions", () => {
+    const source = `:::chemd #mol-main
+kind: molecule
+smiles: CCO
+:::
+
+This is prose|
+`;
+    const { source: cleanSource, cursorOffset } = withCursor(source);
+    const compileOutput = compileChemdForEditor({ source: cleanSource });
+    const items = getChemdCompletions({
+      source: cleanSource,
+      cursorOffset,
+      compileOutput
+    }).items;
+
+    expect(items.some((item) => item.kind === "reference")).toBe(false);
+  });
+
+  it("does not throw or suggest references without compile output", () => {
+    const items = getChemdCompletions(withCursor(`:::chemd #rxn-main
+kind: reaction
+reactants: @|
+:::`)).items;
+
+    expect(items.some((item) => item.kind === "reference")).toBe(false);
   });
 });

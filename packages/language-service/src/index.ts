@@ -2,16 +2,21 @@ export {
   getChemdCompletions
 } from "./completion";
 export {
+  getChemdReferenceCompletions
+} from "./completion-references";
+export {
   getChemdCompletionContext
 } from "./completion-context";
 export type {
   ChemdCompletionBlockKind,
   ChemdCompletionContext,
   ChemdCompletionItem,
+  ChemdCompletionItemData,
   ChemdCompletionItemKind,
   ChemdCompletionList,
   ChemdCompletionRequest,
   ChemdCompletionTriggerKind,
+  ChemdReferenceCompletionData,
   ChemdEditorPosition
 } from "./completion-types";
 export {
