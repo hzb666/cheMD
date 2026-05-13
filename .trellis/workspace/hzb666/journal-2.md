@@ -1102,3 +1102,39 @@ Merged desktop-ide-map into desktop-ide, preserving current semantic preview/wor
 ### Next Steps
 
 - None - task complete
+
+
+## Session 66: Desktop IDE ingest idempotency and reaction intelligence contracts
+
+**Date**: 2026-05-13
+**Task**: Desktop IDE ingest idempotency and reaction intelligence contracts
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Merged workspace ingest idempotency/retry foundation and Reaction Intelligence Phase 0 contracts. Architect review preserved old queue items when new revisions are generated. Validation passed targeted desktop ingest tests, reaction-map tests/typecheck, chem-cluster-service unittest/compileall, desktop build, full pnpm typecheck, full pnpm test, and git diff --check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `32daf70` | (see git log) |
+| `93e6579` | (see git log) |
+| `d690b55` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
