@@ -36,6 +36,12 @@ The implementation loop must keep the desktop IDE usable while adding:
   validation evidence.
 - Treat bundle size, network availability, or missing local service dependencies
   as engineering risks to mitigate, not as reasons to stop the workflow.
+- Keep final style refactor and UI componentization as the last productization
+  stage after offline/product functionality is complete.
+- For the final UI stage, use the user-provided desktop IDE screenshot as the
+  visual reference and
+  `D:\Code\LabStorageManager\docs\2026-03-24-lint_complexity_summary.md` as
+  the large-file/complexity governance reference.
 
 ## Acceptance Criteria
 
@@ -50,6 +56,8 @@ The implementation loop must keep the desktop IDE usable while adding:
       are unavailable.
 - [ ] Targeted package tests, type checks, and desktop build checks are run or
       explicitly classified with exact blockers.
+- [ ] Final style refactor and UI componentization are completed after the
+      functional path is production-ready.
 - [ ] Trellis session records and implementation documents reflect the actual
       merged code state.
 

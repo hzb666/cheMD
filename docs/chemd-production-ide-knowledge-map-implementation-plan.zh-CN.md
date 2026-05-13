@@ -668,6 +668,39 @@ UI 变更需要：
 
 ---
 
+## M9：最终样式重构与 UI 组件化
+
+目标：在功能闭环和生产验证完成后，统一桌面端视觉语言并治理大文件/复杂度，
+不阻塞前面的离线可用主路径。
+
+### M9.1 样式重构
+
+参考用户提供的桌面端截图：浅色、低噪声、类 macOS IDE 布局、左侧活动栏、
+文件树、顶部标签页、编辑区留白和轻量工具栏。
+
+要求：
+
+- 保留现有桌面 IDE 信息架构，不做营销页或 Web 化重排。
+- 统一浅色主题、间距、边框、hover/active 状态和面板密度。
+- 优先让文档本地优先、离线可用路径清晰可见。
+- 补齐 UI 变更截图证据，至少覆盖 desktop、窄屏和主要面板状态。
+
+### M9.2 UI 组件化与大文件拆分
+
+参考：`D:\Code\LabStorageManager\docs\2026-03-24-lint_complexity_summary.md`。
+
+要求：
+
+- 将 `apps/desktop/src/App.tsx` 中的 dock、sidebar、insight、runtime、
+  storage、agent、workspace ingest、preview/map 等区域拆成可复用组件。
+- 将 controller hook、view model builder、presentational component 分层，
+  避免业务逻辑继续堆在入口组件。
+- 将复杂度 lint 作为最终治理门禁处理；当前阶段仅记录，不阻塞功能推进。
+- 保持组件 API 小而稳定，避免一次性重写运行时持久化、Tauri command 或
+  storage contract。
+
+---
+
 ## 6. 任务拆分建议
 
 ### 子任务 A：language-service completion core
