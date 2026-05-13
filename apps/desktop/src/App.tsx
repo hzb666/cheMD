@@ -23,7 +23,7 @@ import {
 import { buildPersistRuntimeGraphRagCommandInput } from "./desktop-runtime-persistence";
 import { buildDesktopSemanticPreview, type DesktopSemanticPreview } from "./desktop-semantic-preview";
 import { buildDesktopWorkspaceSymbolIndex, type DesktopWorkspaceSymbolIndexSummary } from "./desktop-workspace-symbol-index";
-import { runWorkspaceIngest } from "./desktop-workspace-ingest";
+import { runWorkspaceIngestOutboxSave } from "./desktop-workspace-ingest-runner";
 import { DesktopKnowledgeMapPanel } from "./knowledge-map/DesktopKnowledgeMapPanel";
 import { buildDesktopKnowledgeMapViewModel, type DesktopKnowledgeMapViewModel, type DesktopSourceJumpIntent } from "./knowledge-map/desktop-knowledge-map";
 import { isSameChemdDesktopDocumentPath, MonacoChemdEditor, toChemdDesktopModelUri, type MonacoChemdEditorHandle } from "./MonacoChemdEditor";
@@ -120,6 +120,7 @@ type WorkspaceIngestControllerInput = {
   workspaceState: WorkspaceState;
   workspace: WorkspaceHandle;
   files: WorkspaceFileEntry[];
+  onAfterRun?: () => void;
 };
 type WorkspaceSymbolIndexControllerInput = WorkspaceIngestControllerInput & {
   selectedFile: WorkspaceFileEntry;
@@ -692,7 +693,7 @@ const initialLocalSyncState: LocalSyncState = {
 };
 const initialWorkspaceIngestState: WorkspaceIngestState = {
   state: "idle",
-  message: "Scan/Ingest reads workspace files and builds an in-memory queue only; it does not write DB or Local Store outbox entries.",
+  message: "Scan/Ingest reads workspace files and saves eligible Graph/RAG snapshots to the Local Store outbox.",
   items: [],
   summary: null
 };
@@ -2975,7 +2976,8 @@ const useWorkspaceIngestController = ({
   mode,
   workspaceState,
   workspace,
-  files
+  files,
+  onAfterRun
 }: WorkspaceIngestControllerInput) => {
   const [state, setState] = useState<WorkspaceIngestState>(initialWorkspaceIngestState);
   const runningRef = useRef(false);
@@ -2995,10 +2997,10 @@ const useWorkspaceIngestController = ({
     setState((current) => ({
       ...current,
       state: "pending",
-      message: "Scanning workspace files and compiling Chemd documents into an in-memory ingest queue."
+      message: "Scanning workspace files and saving eligible Chemd snapshots to the Local Store outbox."
     }));
     try {
-      const result = await runWorkspaceIngest({
+      const result = await runWorkspaceIngestOutboxSave({
         workspaceId: workspace.workspaceId,
         files,
         existingItems: state.items,
@@ -3013,15 +3015,28 @@ const useWorkspaceIngestController = ({
             options: { strictChemdKind: true, procedureMode: "auto" }
           });
           if (output.status === "failed") throw output.error;
-          return output;
+          return {
+            compileOutput: output,
+            runtimePayload: buildPersistCommandInput({
+              source,
+              workspace,
+              file,
+              compileOutput: output,
+              agentRun: null
+            }).payload
+          };
+        },
+        saveSnapshot: (input) => {
+          return invokeDesktop("save_local_runtime_snapshot", input);
         }
       });
       setState({
         state: "success",
-        message: `Workspace ingest scan finished: ${formatWorkspaceIngestCounts(result.summary)}. Queue items stay in memory only.`,
-        items: result.items,
-        summary: result.summary
+        message: `Workspace ingest scan finished: ${formatWorkspaceIngestCounts(result.ingest.summary)}. ${result.message}`,
+        items: result.ingest.items,
+        summary: result.ingest.summary
       });
+      onAfterRun?.();
     } catch (error: unknown) {
       setState((current) => ({
         ...current,
@@ -3585,7 +3600,8 @@ export const App = () => {
     mode: workspaceController.mode,
     workspaceState: workspaceController.workspaceState,
     workspace: workspaceController.workspace,
-    files: workspaceController.files
+    files: workspaceController.files,
+    onAfterRun: localStoreController.refresh
   });
   const workspaceSymbolIndexController = useWorkspaceSymbolIndexController({
     mode: workspaceController.mode,
