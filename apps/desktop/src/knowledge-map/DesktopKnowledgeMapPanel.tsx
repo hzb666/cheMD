@@ -6,6 +6,7 @@ import type {
   DesktopRenderableSourceRef,
   DesktopSourceJumpIntent
 } from "./desktop-knowledge-map";
+import { filterDesktopKnowledgeMapNodes } from "./desktop-knowledge-map";
 
 interface KnowledgeMapPanelProps {
   viewModel: DesktopKnowledgeMapViewModel;
@@ -17,13 +18,15 @@ export const DesktopKnowledgeMapPanel = ({
   onSourceJump
 }: KnowledgeMapPanelProps) => {
   const [selectedClusterId, setSelectedClusterId] = useState<string>("all");
+  const [selectedEdgeBasis, setSelectedEdgeBasis] = useState<string>("all");
   const [selectedReactionId, setSelectedReactionId] = useState<string | null>(null);
   const [expandedReactionIds, setExpandedReactionIds] = useState<string[]>([]);
   const graphNodes = useMemo(
-    () => viewModel.reactionMap.nodes.filter((node) =>
-      selectedClusterId === "all" || node.cluster_id === selectedClusterId
-    ),
-    [selectedClusterId, viewModel.reactionMap.nodes]
+    () => filterDesktopKnowledgeMapNodes(viewModel.reactionMap, {
+      clusterId: selectedClusterId,
+      edgeBasis: selectedEdgeBasis
+    }),
+    [selectedClusterId, selectedEdgeBasis, viewModel.reactionMap]
   );
   const selectedNode = graphNodes.find((node) =>
     node.reaction_entity_id === selectedReactionId
@@ -59,6 +62,24 @@ export const DesktopKnowledgeMapPanel = ({
           ))}
         </select>
       </label>
+      <label className="desktop-tool-search">
+        <Filter size={14} />
+        <select
+          value={selectedEdgeBasis}
+          aria-label="Filter reaction map by edge basis"
+          onChange={(event) => {
+            setSelectedEdgeBasis(event.target.value);
+            setSelectedReactionId(null);
+          }}
+        >
+          <option value="all">All basis</option>
+          {viewModel.edgeBasisOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label} ({option.edgeCount})
+            </option>
+          ))}
+        </select>
+      </label>
       <ReactionLayoutCanvas
         nodes={graphNodes}
         selectedReactionId={selectedNode?.reaction_entity_id}
@@ -81,7 +102,9 @@ export const DesktopKnowledgeMapPanel = ({
             <code>{Math.round(node.x)},{Math.round(node.y)}</code>
           </div>
         ))}
-        {graphNodes.length === 0 ? <p className="desktop-empty-copy">{viewModel.message}</p> : null}
+        {graphNodes.length === 0 ? (
+          <p className="desktop-empty-copy">No reactions match the current filters.</p>
+        ) : null}
       </div>
       <div className="desktop-graph-summary">
         <div><span>Semantic</span><strong>{viewModel.semanticSummary.nodeCount}</strong></div>
