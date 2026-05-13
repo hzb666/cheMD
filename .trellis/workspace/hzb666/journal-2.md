@@ -1762,3 +1762,37 @@ Merged connected RAG panel display and pure query controller worktrees into desk
 ### Next Steps
 
 - None - task complete
+
+
+## Session 85: Desktop embedding provider status and RAG query entry
+
+**Date**: 2026-05-14
+**Task**: Desktop embedding provider status and RAG query entry
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Merged the read-only embedding provider status command, synchronized diagnostics command lists, and added a query-only connected RAG entry in the desktop RAG panel. The UI reads provider readiness and exposes a Run affordance, but keeps connected RAG disabled until a real query embedding vector path exists; no provider calls, fake embeddings, or DB/query success claims are introduced. Validation passed: embedding provider Rust tests 5/5, diagnostics bundle Rust tests 3/3, diagnostics script tests 8/8, connected RAG Vitest 20/20, desktop build, root pnpm typecheck, root pnpm test, and git diff --check. Complexity-only focused ESLint debt remains deferred to M11.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9304ceb 9afdb03 b4c96ae` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
