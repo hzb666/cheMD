@@ -633,6 +633,18 @@ hybrid_score =
 - 当前仍未执行真实 provider/model/DB 写入；这些按环境增强路径记录为 `SKIP`，
   不阻塞离线优先主线。
 
+状态记录（Workspace ingest UI/Tauri local save）：
+
+- Desktop Local Store 面板的 Scan/Ingest 已从内存队列切换为
+  `runWorkspaceIngestOutboxSave`，每个可编译 workspace 文档复用 runtime payload
+  builder 构造 Graph/RAG snapshot，并通过 `save_local_runtime_snapshot` 写入本地
+  outbox。
+- UI 完成态现在显示 scan count 与 runner save 摘要，运行后刷新 Local Store 状态；
+  pending outbox count 可反映 workspace ingest 产生的本地同步队列。
+- 当前验证：desktop workspace ingest runner/local store Vitest 33/33、desktop
+  typecheck、`pnpm typecheck`、`pnpm test`、desktop build 与 `git diff --check`
+  均通过；focused ESLint 仍仅报 `App.tsx` 既有复杂度/函数长度 4 项，按 M11 处理。
+
 ---
 
 ## 8. 验证矩阵

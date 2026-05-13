@@ -515,6 +515,16 @@ DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outb
     desktop build、完整 Tauri `cargo test` 均通过；desktop build 仍有既有 lucide
     `use client` 与 chunk size warning。真实 DB、provider、模型运行未执行，继续按
     环境增强路径记录为 `SKIP`。
+- Workspace ingest UI/Tauri 保存接线：
+  - `feat(desktop)：合并 workspace ingest 本地保存接线` 将 Local Store 面板的
+    Scan/Ingest 从内存队列切换为 `runWorkspaceIngestOutboxSave`，每个可编译 workspace
+    文档会复用 runtime payload builder 构造 Graph/RAG snapshot，并通过
+    `save_local_runtime_snapshot` 写入本地 outbox。
+  - UI 文案现在显示 scan count 与 runner save 摘要；完成后刷新 Local Store 状态，
+    pending outbox count 可以反映 workspace ingest 产生的本地同步队列。
+  - 当前验证：workspace ingest runner/local store Vitest 33/33、desktop typecheck、
+    `pnpm typecheck`、`pnpm test`、desktop build 与 `git diff --check` 均通过；
+    focused ESLint 仍仅报 `App.tsx` 既有复杂度/函数长度 4 项，继续按 M11 处理。
 
 当前暂缓债务：
 
@@ -536,12 +546,13 @@ DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outb
 - 文档 hash、source range、compile result hash 和 outbox payload 一一对应。
 
 状态：已补纯 TypeScript workspace ingest runner，并已在桌面 Local Store 面板接入
-workspace 扫描入口；runner 现在会复用同一 document hash / revision 的 existing
+workspace 扫描和本地 outbox 保存入口；runner 现在会复用同一 document hash / revision 的 existing
 pending、running、synced item，文件内容变化会生成新 revision，不覆盖旧 item；failed item
 超过 retry 阈值后保持 failed，不会自动变回 pending。当前已补 ingest queue 到
 Local Store snapshot outbox input 的纯函数桥接，并新增注入式
-`runWorkspaceIngestOutboxSave` 保存 eligible / retryable outbox input；App UI/Tauri
-调用链、取消/重试和大 workspace 后台调度仍归后续集成。
+`runWorkspaceIngestOutboxSave` 保存 eligible / retryable outbox input；App 已通过
+`save_local_runtime_snapshot` 接入本地 JSON outbox。取消/重试和大 workspace 后台调度
+仍归后续集成。
 
 验收：
 
@@ -710,8 +721,8 @@ env、database URL、API key、token 或 password。诊断包说明见
 
 ### P1：本地知识队列生产可用
 
-- [x] workspace ingest 可本地运行并通过纯 runner 保存 outbox-ready snapshot input；
-  App UI/Tauri 接线仍归后续 M4/M5 集成。
+- [x] workspace ingest 可本地运行并通过 App UI/Tauri 调用链保存 outbox-ready
+  snapshot input。
 - [x] outbox/ingest 契约支持 pending、synced、failed、skipped 与 retry eligibility。
 - [x] workspace ingest runner 可通过依赖注入本地运行并生成可恢复队列。
 - [x] 本地队列幂等基础：同一 document hash / revision 复用 existing queue item，
