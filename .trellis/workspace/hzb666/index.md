@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 75
+- **Total Sessions**: 76
 - **Last Active**: 2026-05-13
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~1452 | Active |
+| `journal-2.md` | ~1486 | Active |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 76 | 2026-05-13 | Desktop workspace ingest local outbox save | `aba54df` | `desktop-ide` |
 | 75 | 2026-05-13 | Desktop ingest runner and diagnostics provider coverage | `5a5e813` | `desktop-ide` |
 | 74 | 2026-05-13 | Desktop ingest outbox and reaction artifact schema bridge | `35dc0e4` | `desktop-ide` |
 | 73 | 2026-05-13 | Desktop reaction intelligence hardening | `d6cf149` | `desktop-ide` |
