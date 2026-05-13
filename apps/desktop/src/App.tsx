@@ -7,6 +7,13 @@ import { buildEditorGraphRagRecords, compileChemdForEditor, type ChemdEditorDiag
 
 import { shellFiles, shellPostgresStatus, shellSidecarStatus, shellWorkspace, type DesktopCommandError, type DesktopCommandMap, type LocalStoreStatus, type ManagedPostgresStatus, type PostgresStatus, type RuntimeState, type SidecarStatus, type WorkspaceFileEntry, type WorkspaceHandle, type WorkspaceIngestQueueItem, type WorkspaceIngestQueueSummary } from "./desktop-contracts";
 import { buildLocalRuntimeSnapshotInput } from "./desktop-local-store";
+import { buildDesktopReactionIntelligenceJob, type DesktopReactionIntelligenceJobBuildResult } from "./desktop-reaction-intelligence-job";
+import {
+  createDesktopReactionIntelligenceJobController,
+  toDesktopReactionIntelligenceWorkerResult,
+  type DesktopReactionIntelligenceJobController,
+  type DesktopReactionIntelligenceJobState
+} from "./desktop-reaction-intelligence-job-controller";
 import {
   initialLocalReactionIntelligenceArtifactState,
   readLatestLocalReactionIntelligenceArtifact,
@@ -96,6 +103,12 @@ type LocalSyncState = {
   message: string;
   summary: LocalSyncSummary | null;
 };
+type ReactionIntelligenceJobControllerInput = {
+  mode: DocumentMode;
+  file: WorkspaceFileEntry;
+  jobBuild: DesktopReactionIntelligenceJobBuildResult;
+  onAfterRun: () => void;
+};
 type WorkspaceIngestState = {
   state: PersistOperationState;
   message: string;
@@ -149,6 +162,8 @@ type DesktopWorkbenchProps = {
   postgresController: ReturnType<typeof usePostgresController>;
   persistController: ReturnType<typeof usePersistRuntimeController>;
   localStoreController: ReturnType<typeof useLocalStoreController>;
+  reactionIntelligenceJobBuild: DesktopReactionIntelligenceJobBuildResult;
+  reactionIntelligenceJobController: ReturnType<typeof useReactionIntelligenceJobController>;
   workspaceIngestController: ReturnType<typeof useWorkspaceIngestController>;
   workspaceSymbolIndexController: ReturnType<typeof useWorkspaceSymbolIndexController>;
   semanticPreview: DesktopSemanticPreview;
@@ -205,6 +220,8 @@ type InsightPaneProps = {
   localStoreOperation: LocalStoreOperation | null;
   localSnapshotState: LocalSnapshotState;
   localSyncState: LocalSyncState;
+  reactionIntelligenceJobBuild: DesktopReactionIntelligenceJobBuildResult;
+  reactionIntelligenceJobState: DesktopReactionIntelligenceJobState;
   localStoreDisabledReason: string | null;
   localStoreSyncDisabledReason: string | null;
   localStoreError: string | null;
@@ -230,6 +247,7 @@ type InsightPaneProps = {
   onRefreshLocalStore: () => void;
   onSaveLocalSnapshot: () => void;
   onSyncLocalOutbox: () => void;
+  onRunReactionIntelligenceJob: () => void;
   onRunWorkspaceIngest: () => void;
   onProposeQuickFix: (candidate: QuickFixCandidate) => void;
   onApprovePatch: () => void;
@@ -238,7 +256,7 @@ type InsightPaneProps = {
 };
 
 const sampleSources: Record<string, string> = {
-  "suzuki-screen.chemd.md": "---\nid: exp-desktop-suzuki\ntitle: Suzuki coupling condition screen\ndate: 2026-05-12\n---\n\n:::chemd #mol-aryl-bromide\nsmiles: Cc1ccc(Br)cc1\n:::\n\n:::chemd #rxn-screen\nkind: reaction\nreactants: mol-aryl-bromide, phenylboronic-acid\nproducts: biaryl-product\nconditions:\n  catalyst: Pd(PPh3)4\n  base: K2CO3\n  solvent: dioxane/water\n:::\n\n:::result #screen-result\nstatus: pending\nyield: 78%\n:::\n",
+  "suzuki-screen.chemd.md": "---\nid: exp-desktop-suzuki\ntitle: Suzuki coupling condition screen\ndate: 2026-05-12\n---\n\n:::chemd #mol-aryl-bromide\nsmiles: Cc1ccc(Br)cc1\n:::\n\n:::chemd #mol-boronic-acid\nsmiles: OB(O)c1ccccc1\n:::\n\n:::chemd #mol-biaryl-product\nsmiles: Cc1ccc(-c2ccccc2)cc1\n:::\n\n:::chemd #rxn-screen\nkind: reaction\nreactants: @mol-aryl-bromide | @mol-boronic-acid\nproducts: @mol-biaryl-product\nconditions:\n  catalyst: Pd(PPh3)4\n  base: K2CO3\n  solvent: dioxane/water\n:::\n\n:::result #screen-result\nstatus: pending\nyield: 78%\n:::\n",
   "calibration.chemd.md": "---\nid: exp-desktop-calibration\ntitle: HPLC calibration record\ndate: 2026-05-12\n---\n\n:::sample #std-a\nname: caffeine standard\namount: 2.0 mg\n:::\n\n:::analysis #calibration\nmethod: HPLC-UV\ntarget: caffeine\nresult: linear fit accepted\n:::\n"
 };
 
@@ -1416,6 +1434,8 @@ const LocalStorePanel = ({
   operation,
   snapshotState,
   syncState,
+  reactionIntelligenceJobBuild,
+  reactionIntelligenceJobState,
   workspaceIngestState,
   disabledReason,
   syncDisabledReason,
@@ -1424,12 +1444,15 @@ const LocalStorePanel = ({
   onRefresh,
   onSave,
   onSync,
+  onRunReactionIntelligenceJob,
   onRunWorkspaceIngest
 }: {
   status: LocalStoreStatus;
   operation: LocalStoreOperation | null;
   snapshotState: LocalSnapshotState;
   syncState: LocalSyncState;
+  reactionIntelligenceJobBuild: DesktopReactionIntelligenceJobBuildResult;
+  reactionIntelligenceJobState: DesktopReactionIntelligenceJobState;
   workspaceIngestState: WorkspaceIngestState;
   disabledReason: string | null;
   syncDisabledReason: string | null;
@@ -1438,11 +1461,14 @@ const LocalStorePanel = ({
   onRefresh: () => void;
   onSave: () => void;
   onSync: () => void;
+  onRunReactionIntelligenceJob: () => void;
   onRunWorkspaceIngest: () => void;
 }) => {
   const busy = operation !== null;
   const saveDisabled = busy || disabledReason !== null || !status.available;
   const syncDisabled = busy || syncDisabledReason !== null;
+  const intelligenceBusy = reactionIntelligenceJobState.status === "running";
+  const intelligenceDisabled = intelligenceBusy || reactionIntelligenceJobBuild.state !== "ready" || !status.available;
   const ingestBusy = workspaceIngestState.state === "pending";
   const ingestDisabled = ingestBusy || workspaceIngestDisabledReason !== null;
   const unavailableMessage = status.available
@@ -1494,6 +1520,43 @@ const LocalStorePanel = ({
               </li>
             ))}
           </ul>
+        ) : null}
+      </div>
+      <div className="desktop-reaction-intelligence-status" data-state={reactionIntelligenceJobState.status} aria-live="polite">
+        <div className="desktop-workspace-ingest-header">
+          <div className="desktop-agent-subhead"><Sparkles size={14} /><span>Reaction Intelligence</span></div>
+          <button
+            type="button"
+            className="desktop-button-primary"
+            disabled={intelligenceDisabled}
+            aria-busy={intelligenceBusy}
+            onClick={onRunReactionIntelligenceJob}
+          >
+            {intelligenceBusy ? <RefreshCw size={14} /> : <Sparkles size={14} />}
+            <span>{intelligenceBusy ? "Running" : "Run intelligence job"}</span>
+          </button>
+        </div>
+        <p>{reactionIntelligenceJobBuild.message}</p>
+        <div className="desktop-persist-status-row">
+          <span>{reactionIntelligenceJobState.status}</span>
+          <p>{reactionIntelligenceJobState.message}</p>
+        </div>
+        {reactionIntelligenceJobState.artifactSummary ? (
+          <dl className="desktop-persist-summary">
+            <div><dt>Artifact</dt><dd title={reactionIntelligenceJobState.artifactSummary.artifactId}>{summarizeLocalId(reactionIntelligenceJobState.artifactSummary.artifactId)}</dd></div>
+            <div><dt>Edges</dt><dd>{reactionIntelligenceJobState.artifactSummary.similarityEdgeCount}</dd></div>
+            <div><dt>Features</dt><dd>{reactionIntelligenceJobState.artifactSummary.reactionFeatureCount}</dd></div>
+          </dl>
+        ) : null}
+        {reactionIntelligenceJobState.error ? (
+          <p className="desktop-local-store-message" data-tone="danger">{reactionIntelligenceJobState.error}</p>
+        ) : null}
+        {reactionIntelligenceJobState.logTail.length > 0 ? (
+          <div className="desktop-sidecar-log" aria-label="Reaction intelligence log tail">
+            {reactionIntelligenceJobState.logTail.slice(-4).map((line, index) => (
+              <code key={`${index}-${line}`}>{line}</code>
+            ))}
+          </div>
         ) : null}
       </div>
       <div className="desktop-local-store-actions">
@@ -2326,7 +2389,7 @@ const InsightDockContent = ({
     graph: <DesktopKnowledgeMapPanel viewModel={props.knowledgeMapViewModel} />,
     runtime: <SidecarControlPanel status={props.sidecarStatus} logTail={props.sidecarLogTail} operation={props.sidecarOperation} message={props.sidecarMessage} errorMessage={props.sidecarError} onStart={props.onStartSidecar} onStop={props.onStopSidecar} onRefresh={props.onRefreshSidecar} onLoadLogs={props.onLoadSidecarLogs} />,
     postgres: <PostgresStatusPanel status={props.postgresStatus} managedStatus={props.managedPostgresStatus} loading={props.postgresLoading} managedOperation={props.managedPostgresOperation} errorMessage={props.postgresError} managedErrorMessage={props.managedPostgresError} managedMessage={props.managedPostgresMessage} persistState={props.persistState} persistDisabledReason={props.persistDisabledReason} onRefresh={props.onRefreshPostgres} onInitManaged={props.onInitManagedPostgres} onStartManaged={props.onStartManagedPostgres} onStopManaged={props.onStopManagedPostgres} onMigrateManaged={props.onMigrateManagedPostgres} onRefreshManaged={props.onRefreshManagedPostgres} onPersistGraph={props.onPersistGraph} />,
-    storage: <LocalStorePanel status={props.localStoreStatus} operation={props.localStoreOperation} snapshotState={props.localSnapshotState} syncState={props.localSyncState} workspaceIngestState={props.workspaceIngestState} disabledReason={props.localStoreDisabledReason} syncDisabledReason={props.localStoreSyncDisabledReason} workspaceIngestDisabledReason={props.workspaceIngestDisabledReason} errorMessage={props.localStoreError} onRefresh={props.onRefreshLocalStore} onSave={props.onSaveLocalSnapshot} onSync={props.onSyncLocalOutbox} onRunWorkspaceIngest={props.onRunWorkspaceIngest} />,
+    storage: <LocalStorePanel status={props.localStoreStatus} operation={props.localStoreOperation} snapshotState={props.localSnapshotState} syncState={props.localSyncState} reactionIntelligenceJobBuild={props.reactionIntelligenceJobBuild} reactionIntelligenceJobState={props.reactionIntelligenceJobState} workspaceIngestState={props.workspaceIngestState} disabledReason={props.localStoreDisabledReason} syncDisabledReason={props.localStoreSyncDisabledReason} workspaceIngestDisabledReason={props.workspaceIngestDisabledReason} errorMessage={props.localStoreError} onRefresh={props.onRefreshLocalStore} onSave={props.onSaveLocalSnapshot} onSync={props.onSyncLocalOutbox} onRunReactionIntelligenceJob={props.onRunReactionIntelligenceJob} onRunWorkspaceIngest={props.onRunWorkspaceIngest} />,
     settings: <SettingsDockPanel mode={props.mode} sidecarStatus={props.sidecarStatus} postgresStatus={props.postgresStatus} localStoreStatus={props.localStoreStatus} />,
     agent: <div className="desktop-agent-panel"><AgentRunHeader agentRun={props.agentRun} agentMessage={props.agentMessage} /><AgentEmptyState mode={props.mode} hasQuickFixes={quickFixes.length > 0} /><AgentQuickFixList mode={props.mode} quickFixes={quickFixes} onProposeQuickFix={props.onProposeQuickFix} /><AgentPatchProposalCard proposal={activeProposal} canApprove={activeProposal !== undefined && approvedDecision === undefined && rejectedDecision === undefined && appliedDecision === undefined} canApply={activeProposal !== undefined && approvedDecision !== undefined && appliedDecision === undefined && rejectedDecision === undefined} canReject={activeProposal !== undefined && rejectedDecision === undefined && appliedDecision === undefined} onApprovePatch={props.onApprovePatch} onApplyPatch={props.onApplyPatch} onRejectPatch={props.onRejectPatch} /><AgentTimeline agentRun={props.agentRun} /><AgentLedger agentRun={props.agentRun} /></div>
   };
@@ -2848,6 +2911,60 @@ const useLocalStoreController = ({
   };
 };
 
+const useReactionIntelligenceJobController = ({
+  mode,
+  file,
+  jobBuild,
+  onAfterRun
+}: ReactionIntelligenceJobControllerInput) => {
+  const controllerRef = useRef<DesktopReactionIntelligenceJobController | null>(null);
+  if (controllerRef.current === null) {
+    controllerRef.current = createDesktopReactionIntelligenceJobController({
+      runWorker: async (input) => {
+        const result = await invokeDesktop("run_reaction_intelligence_worker", {
+          jobJson: input.job,
+          providers: input.job.requested_providers,
+          missingDependency: input.job.provider_policy.missing_dependency,
+          pretty: false
+        });
+        return toDesktopReactionIntelligenceWorkerResult(result);
+      },
+      saveArtifact: (input) => invokeDesktop("save_local_reaction_intelligence_artifact", input),
+      readLatestArtifact: (input) => readLatestLocalReactionIntelligenceArtifact({
+        listArtifacts: (listInput) => invokeDesktop("list_local_reaction_intelligence_artifacts", listInput),
+        graphIndexId: input.graphIndexId
+      }),
+      now: () => new Date().toISOString()
+    });
+  }
+
+  const [state, setState] = useState(() => controllerRef.current!.getState());
+
+  useEffect(() => {
+    const nextState = controllerRef.current?.reset();
+    if (nextState) setState(nextState);
+  }, [mode, file.id]);
+
+  const run = async () => {
+    const nextState = await controllerRef.current?.run({
+      job: jobBuild.job,
+      workspaceId: file.id,
+      sourceHash: jobBuild.job?.source_compile_run_ids[0] ?? null,
+      graphIndexId: jobBuild.job?.graph_index_id ?? null
+    });
+    if (!nextState || !controllerRef.current) return;
+    setState(controllerRef.current.getState());
+    if (nextState.status === "completed") {
+      onAfterRun();
+    }
+  };
+
+  return {
+    state,
+    run: () => void run()
+  };
+};
+
 const useWorkspaceIngestController = ({
   mode,
   workspaceState,
@@ -3060,6 +3177,8 @@ const DesktopWorkbench = ({
   postgresController,
   persistController,
   localStoreController,
+  reactionIntelligenceJobBuild,
+  reactionIntelligenceJobController,
   workspaceIngestController,
   workspaceSymbolIndexController,
   semanticPreview,
@@ -3170,6 +3289,8 @@ const DesktopWorkbench = ({
               localStoreOperation={localStoreController.operation}
               localSnapshotState={localStoreController.snapshotState}
               localSyncState={localStoreController.syncState}
+              reactionIntelligenceJobBuild={reactionIntelligenceJobBuild}
+              reactionIntelligenceJobState={reactionIntelligenceJobController.state}
               localStoreDisabledReason={localStoreController.disabledReason}
               localStoreSyncDisabledReason={localStoreController.syncDisabledReason}
               localStoreError={localStoreController.error}
@@ -3189,6 +3310,7 @@ const DesktopWorkbench = ({
               onRefreshLocalStore={localStoreController.refresh}
               onSaveLocalSnapshot={localStoreController.saveSnapshot}
               onSyncLocalOutbox={localStoreController.syncPending}
+              onRunReactionIntelligenceJob={reactionIntelligenceJobController.run}
               onRunWorkspaceIngest={workspaceIngestController.runIngest}
               onProposeQuickFix={onProposeQuickFix}
               onApprovePatch={onApprovePatch}
@@ -3423,6 +3545,19 @@ export const App = () => {
     compileOutput: output,
     agentRun
   });
+  const reactionIntelligenceJobBuild = useMemo(() =>
+    buildDesktopReactionIntelligenceJob({
+      compileOutput: output,
+      source: workspaceController.source,
+      documentUri: workspaceController.selectedFile.path
+    }),
+  [output, workspaceController.selectedFile.path, workspaceController.source]);
+  const reactionIntelligenceJobController = useReactionIntelligenceJobController({
+    mode: workspaceController.mode,
+    file: workspaceController.selectedFile,
+    jobBuild: reactionIntelligenceJobBuild,
+    onAfterRun: localStoreController.refresh
+  });
   const localReactionIntelligenceArtifact = useMemo(() => {
     const artifact = localStoreController.reactionIntelligenceArtifactState.artifact;
     return reactionIntelligenceArtifactHasReactionOverlap(artifact, outputReactionIds)
@@ -3469,7 +3604,7 @@ export const App = () => {
   return (
     <DesktopWorkbench
       workspace={workspaceController.workspace} workspaceState={workspaceController.workspaceState}
-      sidecarController={sidecarController} postgresController={postgresController} persistController={persistController} localStoreController={localStoreController} workspaceIngestController={workspaceIngestController} workspaceSymbolIndexController={workspaceSymbolIndexController}
+      sidecarController={sidecarController} postgresController={postgresController} persistController={persistController} localStoreController={localStoreController} reactionIntelligenceJobBuild={reactionIntelligenceJobBuild} reactionIntelligenceJobController={reactionIntelligenceJobController} workspaceIngestController={workspaceIngestController} workspaceSymbolIndexController={workspaceSymbolIndexController}
       semanticPreview={semanticPreview}
       workspaceIndexViewModel={workspaceIndexViewModel} knowledgeMapViewModel={knowledgeMapViewModel}
       output={output} compileError={compileError}

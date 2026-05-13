@@ -465,6 +465,19 @@ DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outb
   - 主分支验证：desktop local-store/artifact-controller/knowledge-map 定向 Vitest 31/31、
     desktop typecheck、focused ESLint（不含 `App.tsx`）、desktop build、`git diff --check`
     通过；`App.tsx` 既有复杂度/函数长度 3 项继续记录到 M11。
+- Reaction intelligence worker 本地运行入口：
+  - `feat(desktop)：合并 reaction intelligence worker 命令` 新增
+    `run_reaction_intelligence_worker` Tauri command，调用本地
+    `services/chem-cluster-service` CLI；service/Python/模型缺失返回结构化
+    `skipped`/`failed`，不阻塞离线编辑。
+  - `feat(desktop)：合并 reaction intelligence 任务控制器` 新增纯 TS 状态机，
+    覆盖 worker run、artifact save、latest artifact refresh 与错误路径。
+  - 主线补充 `buildDesktopReactionIntelligenceJob`，仅在 reaction participant 具备真实
+    SMILES/canonical SMILES 时构造 job；Local Store 面板新增 Run intelligence job
+    入口并显示运行、跳过、失败、保存摘要与日志 tail。
+  - 当前验证：job builder/controller Vitest 12/12、desktop typecheck、focused ESLint
+    （新文件通过，`App.tsx` 复杂度/函数长度继续非阻塞）、`git diff --check` 通过；
+    真实模型/网络/DB 未执行，按环境增强路径记录为 `SKIP`。
 
 当前暂缓债务：
 
@@ -668,6 +681,8 @@ env、database URL、API key、token 或 password。诊断包说明见
   inspector 消费；DB sync 仍归 P2 shared schema 阶段。
 - [x] App 可从本地 local store 读取最新 reaction intelligence artifact，并带 reaction id
   overlap guard 后注入当前 knowledge map。
+- [x] Desktop 可从本地编译语义生成合法 reaction intelligence job，并通过本地 worker
+  入口运行；缺少结构数据或模型依赖时可显式降级/跳过。
 
 ### P2：PostgreSQL 同步生产可用
 
@@ -690,6 +705,8 @@ env、database URL、API key、token 或 password。诊断包说明见
 - [x] Reaction intelligence artifact 的 computed/semantic basis、provider 状态与 layout
   来源可在 knowledge map/cluster inspector 中解释。
 - [x] Knowledge map 支持 edge basis filter，并可与 cluster filter 组合过滤节点。
+- [x] Reaction intelligence job builder 不伪造 RXN SMILES，只消费真实结构字段；失败或
+  缺依赖时保留本地日志 tail 和可显示状态。
 - [ ] RAG search 有 citation gate。
 - [ ] Agent run 可审计，patch 需用户确认。
 - [ ] 所有增强能力离线/失败时可降级。

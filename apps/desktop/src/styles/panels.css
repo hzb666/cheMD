@@ -870,7 +870,8 @@
     gap: 0.35rem;
   }
 
-  .desktop-workspace-ingest-status {
+  .desktop-workspace-ingest-status,
+  .desktop-reaction-intelligence-status {
     display: flex;
     flex-direction: column;
     gap: 0.45rem;
@@ -880,17 +881,21 @@
     background: var(--panel);
   }
 
-  .desktop-workspace-ingest-status[data-state="pending"] {
+  .desktop-workspace-ingest-status[data-state="pending"],
+  .desktop-reaction-intelligence-status[data-state="running"] {
     border-color: color-mix(in oklch, var(--primary) 24%, var(--border));
     background: color-mix(in oklch, var(--primary) 6%, var(--card));
   }
 
-  .desktop-workspace-ingest-status[data-state="success"] {
+  .desktop-workspace-ingest-status[data-state="success"],
+  .desktop-reaction-intelligence-status[data-state="completed"] {
     border-color: color-mix(in oklch, var(--success) 24%, var(--border));
     background: color-mix(in oklch, var(--success) 7%, var(--card));
   }
 
-  .desktop-workspace-ingest-status[data-state="failure"] {
+  .desktop-workspace-ingest-status[data-state="failure"],
+  .desktop-reaction-intelligence-status[data-state="failed"],
+  .desktop-reaction-intelligence-status[data-state="save_failed"] {
     border-color: color-mix(in oklch, var(--danger) 24%, var(--border));
     background: color-mix(in oklch, var(--danger) 7%, var(--card));
   }
@@ -909,7 +914,13 @@
     gap: 0.35rem;
   }
 
-  .desktop-workspace-ingest-status > p {
+  .desktop-reaction-intelligence-status[data-state="skipped"] {
+    border-color: color-mix(in oklch, var(--warning) 28%, var(--border));
+    background: color-mix(in oklch, var(--warning) 6%, var(--card));
+  }
+
+  .desktop-workspace-ingest-status > p,
+  .desktop-reaction-intelligence-status > p {
     margin: 0;
     color: var(--muted-foreground);
     font-size: 0.72rem;

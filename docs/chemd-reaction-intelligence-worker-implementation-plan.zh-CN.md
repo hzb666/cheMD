@@ -545,7 +545,7 @@ hybrid_score =
 任务：
 
 - [x] CLI 增加 `python -m chem_cluster_service.intelligence.cli` worker 入口。
-- [ ] Desktop 增加“Run intelligence job”入口，默认后台任务。
+- [x] Desktop 增加“Run intelligence job”入口，默认后台任务。
 - [x] 显示 provider 状态：PASS / SKIP / ERROR 摘要。
 - [x] Knowledge map 增加 edge basis filter。
 - [x] Cluster inspector 展示 computed evidence。
@@ -579,6 +579,23 @@ hybrid_score =
 - Desktop App 现在会通过 `list_local_reaction_intelligence_artifacts` 读取本地最新 artifact，并传入 knowledge map view model。
 - 为避免跨文档污染，App 注入前会校验 artifact reaction ids 与当前 compile output 的 reaction ids 有交集；不匹配时按无 artifact 降级。
 - `App.tsx` focused ESLint 仍有既有复杂度/函数长度 3 项，按当前策略记录到最终 UI 组件化/复杂度治理阶段，不阻塞本轮功能主线。
+
+状态记录（Desktop Run intelligence job 本地入口）：
+
+- 新增 `run_reaction_intelligence_worker` Tauri command，桌面端可一次性调用
+  `services/chem-cluster-service` 的 reaction intelligence CLI；找不到 service、Python
+  或缺少真实模型依赖时返回结构化 `skipped`/`failed` 与日志 tail，不阻断 IDE 编辑链路。
+- 新增纯 TS job controller，封装 run worker -> save artifact -> refresh latest artifact
+  状态机，并覆盖 worker failed/skipped、无 artifact、save failed、latest refresh failed
+  与并发 guard。
+- 新增 desktop job builder：只有 reaction 的 reactants/products 能解析到真实
+  `smiles`/`canonical_smiles` 时才构造 `canonical_rxn_smiles`；结构数据缺失时返回
+  `skipped`，不从 symbol label 伪造化学反应。
+- Local Store 面板新增 “Run intelligence job” 入口，成功后 artifact 写入本地
+  local store，并触发本地 artifact refresh；默认 Suzuki sample 已补齐 molecule SMILES，
+  可生成合法 job。
+- 当前仍未做长时间 worker 的取消/超时 UI、后台队列持久化、以及 artifact shared
+  schema/PostgreSQL sync；这些进入后续产品化硬化阶段。
 
 ---
 

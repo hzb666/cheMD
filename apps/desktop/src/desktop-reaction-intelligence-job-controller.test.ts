@@ -12,6 +12,7 @@ import type {
 import { buildLocalReactionIntelligenceArtifactInput } from "./desktop-local-store";
 import {
   createDesktopReactionIntelligenceJobController,
+  toDesktopReactionIntelligenceWorkerResult,
   type DesktopReactionIntelligenceJobControllerDeps,
   type DesktopReactionIntelligenceWorkerResult
 } from "./desktop-reaction-intelligence-job-controller";
@@ -274,5 +275,24 @@ describe("desktop reaction intelligence job controller", () => {
 
     expect(completed.status).toBe("completed");
     expect(controller.getState()).toBe(completed);
+  });
+
+  it("maps Tauri worker command output into controller worker results", () => {
+    const mapped = toDesktopReactionIntelligenceWorkerResult({
+      status: "completed",
+      message: "done",
+      reason: null,
+      detail: null,
+      artifactJson: artifact(),
+      exitCode: 0,
+      stdoutTail: ["stdout"],
+      stderrTail: ["stderr"]
+    });
+
+    expect(mapped).toMatchObject({
+      status: "completed",
+      artifact: expect.objectContaining({ artifact_id: "artifact-local-1" }),
+      logTail: ["stdout", "stderr"]
+    });
   });
 });

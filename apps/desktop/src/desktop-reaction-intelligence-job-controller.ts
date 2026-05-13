@@ -4,6 +4,7 @@ import type {
 } from "@chemd/reaction-map";
 
 import type {
+  DesktopCommandMap,
   LocalReactionIntelligenceArtifactInput,
   SaveLocalReactionIntelligenceArtifactResult
 } from "./desktop-contracts";
@@ -84,6 +85,34 @@ const logTail = (logs: readonly string[] | undefined): string[] =>
   (logs ?? []).slice(-MAX_LOG_TAIL).map((item) =>
     toSafeLocalDisplaySummary(item, 240) ?? ""
   ).filter((item) => item.length > 0);
+
+export const toDesktopReactionIntelligenceWorkerResult = (
+  result: DesktopCommandMap["run_reaction_intelligence_worker"]["output"]
+): DesktopReactionIntelligenceWorkerResult => {
+  const logs = [...result.stdoutTail, ...result.stderrTail];
+  if (result.status === "completed") {
+    return {
+      status: "completed",
+      artifact: result.artifactJson,
+      message: result.message,
+      logTail: logs
+    };
+  }
+  if (result.status === "skipped") {
+    return {
+      status: "skipped",
+      reason: result.reason ?? result.detail ?? undefined,
+      message: result.message,
+      logTail: logs
+    };
+  }
+  return {
+    status: "failed",
+    error: result.detail ?? result.reason ?? result.message,
+    message: result.message,
+    logTail: logs
+  };
+};
 
 const summarizeArtifact = (
   artifact: ChemdReactionIntelligenceArtifactV1
