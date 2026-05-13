@@ -266,6 +266,35 @@ export interface CreateEmbeddingVectorResult {
   dimension: number | null;
 }
 
+export interface CreateEmbeddingVectorsInputItem {
+  id: string;
+  text: string;
+}
+
+export interface CreateEmbeddingVectorsInput {
+  items: CreateEmbeddingVectorsInputItem[];
+  dryRun?: boolean;
+}
+
+export interface CreateEmbeddingVectorsItemSummary {
+  id: string;
+  state: EmbeddingProviderStatusState;
+  label: string;
+  detail: string;
+  embedding?: number[];
+  dimension?: number;
+}
+
+export interface CreateEmbeddingVectorsResult {
+  state: EmbeddingProviderStatusState;
+  label: string;
+  detail: string;
+  providerKind: EmbeddingProviderKind;
+  model: string | null;
+  dimension: number | null;
+  items: CreateEmbeddingVectorsItemSummary[];
+}
+
 export interface PostgresRagQueryRequest {
   query: string;
   embedding: number[];
@@ -649,6 +678,12 @@ export interface DesktopCommandMap {
     };
     output: CreateEmbeddingVectorResult;
   };
+  create_embedding_vectors: {
+    input: {
+      input: CreateEmbeddingVectorsInput;
+    };
+    output: CreateEmbeddingVectorsResult;
+  };
   list_postgres_profiles: {
     input: void;
     output: PostgresProfilesState;
@@ -826,7 +861,7 @@ export const shellDiagnosticsBundleResult: DiagnosticsBundleExportResult = {
   outputPath: "",
   summary: {
     generatedAt: "",
-    commandCount: 33,
+    commandCount: 34,
     boundarySkipCount: 5,
     supportCommandCount: 4
   }

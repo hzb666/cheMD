@@ -34,6 +34,7 @@ export const KNOWN_DESKTOP_COMMAND_NAMES = [
   "read_postgres_status",
   "read_embedding_provider_status",
   "create_embedding_vector",
+  "create_embedding_vectors",
   "list_postgres_profiles",
   "save_postgres_profile",
   "activate_postgres_profile",
