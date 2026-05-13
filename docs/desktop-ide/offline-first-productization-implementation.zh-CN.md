@@ -694,6 +694,13 @@ validation summary、维度一致性检查与 password 脱敏，不直接接远�
 UI 接线准备。当前仍未把 embedding provider 配置、backfill UI、connected query button
 接入 App/RAG panel。
 
+2026-05-14 第三批 M6 接入完成：Desktop RAG 面板已接入 connected RAG controller
+state，并支持展示 local/connected result source、score/distance、blocked summary 与
+disabled/degraded 状态。当前 App 侧不会伪造 embedding vector，也不会在无 provider
+时调用 `query_postgres_rag`；无 embedding provider 时 connected RAG 明确保持
+disabled，本地 citation-backed RAG、symbols 与 references 搜索继续可用。后续仍需补
+embedding provider 配置、query/backfill UI trigger 与真实 provider/runner proof。
+
 验收：
 
 - Graph/RAG 只消费 compiler/exporter output，不重新解析 source。
@@ -855,8 +862,9 @@ env、database URL、API key、token 或 password。诊断包说明见
 - [x] Reaction intelligence job builder 不伪造 RXN SMILES，只消费真实结构字段；失败或
   缺依赖时保留本地日志 tail 和可显示状态。
 - [x] RAG search 有 citation gate 基础：本地结果必须带 citation locator；connected
-  pgvector query command、embedding write command、result gate 与 query view adapter
-  已具备，UI 接入和真实 embedding provider 配置仍待补。
+  pgvector query command、embedding write command、result gate、query view adapter
+  与 RAG panel disabled/degraded 展示已具备；真实 embedding provider 配置、query
+  trigger 与 backfill UI 仍待补。
 - [ ] Agent run 可审计，patch 需用户确认。
 - [ ] 所有增强能力离线/失败时可降级。
 

@@ -733,6 +733,21 @@ hybrid_score =
   Vitest 8/8、desktop typecheck、focused ESLint 与 `git diff --check` 均通过；真实
   embedding provider 配置、backfill UI 和 connected query button 仍待后续接入。
 
+状态记录（Desktop connected RAG panel wiring）：
+
+- Desktop RAG 面板新增 connected RAG 展示状态，可区分 local/connected/symbol/
+  reference 行，并显示 connected result 的 score、distance、source detail 与
+  blocked summary。
+- 新增 connected RAG query controller 纯逻辑，统一判断 workspace mode、query、
+  Postgres readiness、pgvector/schema、embedding provider 和 runner availability；
+  无 provider、无 runner 或 DB 不 ready 时输出 disabled/degraded，不把环境缺失当成
+  Offline Core 产品失败。
+- App 已把 controller state 传入 RAG 面板；当前仍不伪造 embedding vector，也不在无
+  provider 时调用 `query_postgres_rag`。本地 citation-backed RAG 搜索继续可用。
+- 当前验证：connected RAG controller/view/result Vitest 20/20、desktop typecheck、
+  focused ESLint、desktop build 与 `git diff --check` 均通过；`App.tsx` focused ESLint
+  仍只有既有复杂度/函数长度门禁，按用户要求记录到最终 M11 复杂度治理。
+
 ---
 
 ## 8. 验证矩阵
