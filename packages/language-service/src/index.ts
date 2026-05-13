@@ -63,6 +63,15 @@ export {
   findChemdWorkspaceSymbolsByKind,
   findChemdWorkspaceSymbolsByName
 } from "./workspace-symbol-index";
+export {
+  getChemdWorkspaceReferenceCompletions
+} from "./workspace-reference-completion";
+export type {
+  ChemdWorkspaceReferenceCompletionData,
+  ChemdWorkspaceReferenceCompletionItem,
+  ChemdWorkspaceReferenceCompletionList,
+  ChemdWorkspaceReferenceCompletionRequest
+} from "./workspace-reference-completion";
 export type {
   ChemdWorkspaceDiagnosticsSummary,
   ChemdWorkspaceSymbol,

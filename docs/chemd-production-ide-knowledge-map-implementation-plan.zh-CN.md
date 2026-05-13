@@ -1053,3 +1053,22 @@ M1 language-service completion core
   - `pnpm --filter @chemd/renderer-html test`：通过，2 files / 9 tests。
   - `pnpm --filter @chemd/renderer-html typecheck`：通过。
   - `git diff --check`：通过。
+
+### 2026-05-13 desktop-ide-workspace-reference-completion
+
+- 范围：完成 `@chemd/language-service` 跨文档引用补全 core；不接入
+  `apps/desktop`、Monaco provider、renderer、root 配置、Tauri/Rust 或持久化层。
+- 产物：新增 `getChemdWorkspaceReferenceCompletions(request, context)`，
+  消费 `ChemdWorkspaceSymbolIndex`，输出 workspace-specific reference
+  completion DTO。
+- 触发：仅在显式 `@` token 或 `reactants`/`products`/`prev` 引用值位置提示；
+  普通 prose 裸文本不刷 suggestions。
+- 行为：补全项使用 `documentId#localId`，携带 `documentUri`、`documentId`、
+  `sourceHash` 与 `stale`；排除当前文档当前 symbol 自引用；
+  `reactants`/`products` 优先 molecule，`prev` 优先 reaction。
+- 降级：缺少 workspace index、空 index、failed document symbols 时返回空列表；
+  stale symbols 保留但在 detail/data 标记 stale。
+- 验证：
+  - `pnpm --filter @chemd/language-service test`：通过，5 files / 37 tests。
+  - `pnpm --filter @chemd/language-service typecheck`：通过。
+  - `git diff --check`：通过；仅输出 LF/CRLF 工作区提示。
