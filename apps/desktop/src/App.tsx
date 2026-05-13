@@ -1,12 +1,26 @@
 import { invoke } from "@tauri-apps/api/core";
 import { Activity, AlertTriangle, Bot, CheckCircle2, ChevronRight, CircleDot, Database, FileCode2, Files, FlaskConical, GitGraph, GripHorizontal, GripVertical, HardDrive, Lightbulb, PanelBottom, PanelBottomClose, PanelBottomOpen, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PlayCircle, RefreshCw, ScrollText, Search, Settings, ShieldCheck, Sparkles, Square, UploadCloud, Wrench, XCircle } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ChangeEvent as ReactChangeEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
 
 import { appendToolCall, applyPatchDecision, approvePatchDecision, attachEvidence, createAgentRun, createToolResult, getAuditTimeline, proposePatch, rejectPatchDecision, transitionAgentRunStatus, type AgentAuditEvent, type AgentEvidence, type AgentRun, type AgentToolCall, type PatchDecision, type PatchProposal } from "@chemd/agent-tools";
 import { buildEditorGraphRagRecords, compileChemdForEditor, type ChemdEditorDiagnostic, type ChemdLanguageCompileOutput, type ChemdOutlineItem, type ChemdQuickFixProposal, type ChemdTextEdit, type ChemdWorkspaceSymbolIndex } from "@chemd/language-service";
 
 import { shellFiles, shellPostgresStatus, shellSidecarStatus, shellWorkspace, type DesktopCommandError, type DesktopCommandMap, type LocalStoreStatus, type ManagedPostgresStatus, type PostgresStatus, type RuntimeState, type SidecarStatus, type WorkspaceFileEntry, type WorkspaceHandle, type WorkspaceIngestQueueItem, type WorkspaceIngestQueueSummary } from "./desktop-contracts";
 import { buildLocalRuntimeSnapshotInput } from "./desktop-local-store";
+import {
+  buildPostgresProfileRows,
+  buildPostgresProfileSaveInput,
+  clearPostgresProfilePassword,
+  createInitialPostgresProfileForm,
+  createPostgresProfileFormFromProfile,
+  initialPostgresProfilesState,
+  toPostgresProfileCommandError,
+  toPostgresProfileValidationError,
+  type PostgresProfileCommandError,
+  type PostgresProfileForm,
+  type PostgresProfileOperation,
+  type PostgresProfileRow
+} from "./desktop-postgres-profiles";
 import { buildDesktopReactionIntelligenceJob, type DesktopReactionIntelligenceJobBuildResult } from "./desktop-reaction-intelligence-job";
 import {
   createDesktopReactionIntelligenceJobController,
@@ -133,6 +147,21 @@ type WorkspaceSymbolIndexControllerState = {
   summary: DesktopWorkspaceSymbolIndexSummary | null;
 };
 type PostgresField = [string, string];
+type PostgresProfilePanelController = {
+  state: DesktopCommandMap["list_postgres_profiles"]["output"];
+  rows: PostgresProfileRow[];
+  form: PostgresProfileForm;
+  operation: PostgresProfileOperation | null;
+  error: PostgresProfileCommandError | null;
+  message: string | null;
+  onFormChange: (patch: Partial<PostgresProfileForm>) => void;
+  onResetForm: () => void;
+  onEditProfile: (profileId: string) => void;
+  onSaveProfile: () => void;
+  onActivateProfile: (profileId: string) => void;
+  onDeleteProfile: (profileId: string) => void;
+  onRefreshProfiles: () => void;
+};
 type ActivityTool = "files" | "search" | "graph" | "agent" | "settings";
 type LayoutPanel = "sidebar" | "insight" | "bottom";
 type InsightDockPanelId = "outline" | "preview" | "rag" | "graph" | "runtime" | "postgres" | "storage" | "agent" | "settings";
@@ -217,6 +246,7 @@ type InsightPaneProps = {
   postgresError: string | null;
   managedPostgresError: string | null;
   managedPostgresMessage: string | null;
+  postgresProfiles: PostgresProfilePanelController;
   persistState: PersistState;
   persistDisabledReason: string | null;
   localStoreStatus: LocalStoreStatus;
@@ -1338,6 +1368,132 @@ const ManagedPostgresSection = ({
   );
 };
 
+const PostgresProfileManagerSection = ({ profiles }: { profiles: PostgresProfilePanelController }) => {
+  const busy = profiles.operation !== null;
+  const updateField = (field: keyof PostgresProfileForm) => (
+    event: ReactChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const value = event.currentTarget.type === "checkbox"
+      ? (event.currentTarget as HTMLInputElement).checked
+      : event.currentTarget.value;
+    profiles.onFormChange({ [field]: value } as Partial<PostgresProfileForm>);
+  };
+
+  return (
+    <div className="desktop-postgres-subpanel desktop-postgres-profile-manager">
+      <div className="desktop-postgres-subhead">
+        <span>Connection profiles</span>
+        <small>{profiles.state.profiles.length} saved</small>
+      </div>
+      <div className="desktop-postgres-actions">
+        <button type="button" className="desktop-button" disabled={busy} onClick={profiles.onRefreshProfiles}>
+          <RefreshCw size={14} />
+          <span>{profiles.operation === "list" ? "Loading" : "List"}</span>
+        </button>
+        <button type="button" className="desktop-button" disabled={busy} onClick={profiles.onResetForm}>
+          <FileCode2 size={14} />
+          <span>New</span>
+        </button>
+        <button type="button" className="desktop-button-primary" disabled={busy} onClick={profiles.onSaveProfile}>
+          <ShieldCheck size={14} />
+          <span>{profiles.operation === "save" ? "Saving" : "Save"}</span>
+        </button>
+      </div>
+      {profiles.error ? (
+        <div className="desktop-postgres-command-error" role="alert">
+          <div>
+            <strong>{profiles.error.operation} failed</strong>
+            <code>{profiles.error.code}</code>
+          </div>
+          <p>{profiles.error.message}</p>
+          {profiles.error.detail ? <small>{profiles.error.detail}</small> : null}
+        </div>
+      ) : null}
+      {profiles.message ? <p className="desktop-postgres-message" data-tone="info">{profiles.message}</p> : null}
+      <div className="desktop-postgres-profile-form">
+        <label>
+          <span>Label</span>
+          <input value={profiles.form.label} onChange={updateField("label")} />
+        </label>
+        <label>
+          <span>Host</span>
+          <input value={profiles.form.host} onChange={updateField("host")} />
+        </label>
+        <label>
+          <span>Port</span>
+          <input inputMode="numeric" value={profiles.form.port} onChange={updateField("port")} />
+        </label>
+        <label>
+          <span>Database</span>
+          <input value={profiles.form.database} onChange={updateField("database")} />
+        </label>
+        <label>
+          <span>User</span>
+          <input value={profiles.form.user} onChange={updateField("user")} />
+        </label>
+        <label>
+          <span>Password</span>
+          <input type="password" value={profiles.form.password} autoComplete="new-password" onChange={updateField("password")} />
+        </label>
+        <label>
+          <span>SSL mode</span>
+          <select value={profiles.form.sslmode} onChange={updateField("sslmode")}>
+            <option value="require">require</option>
+            <option value="prefer">prefer</option>
+            <option value="disable">disable</option>
+            <option value="verify-ca">verify-ca</option>
+            <option value="verify-full">verify-full</option>
+          </select>
+        </label>
+        <label>
+          <span>Timeout</span>
+          <input inputMode="numeric" value={profiles.form.timeoutMs} onChange={updateField("timeoutMs")} />
+        </label>
+        <label>
+          <span>Pool</span>
+          <input value={profiles.form.pool} placeholder="default" onChange={updateField("pool")} />
+        </label>
+        <label className="desktop-postgres-profile-check">
+          <input type="checkbox" checked={profiles.form.setActive} onChange={updateField("setActive")} />
+          <span>Set active</span>
+        </label>
+      </div>
+      <div className="desktop-postgres-profile-list" aria-label="Saved Postgres profiles">
+        {profiles.rows.length > 0 ? profiles.rows.map((profile) => (
+          <div key={profile.profileId} className="desktop-postgres-profile-row" data-active={profile.active}>
+            <div className="desktop-postgres-profile-main">
+              <strong>{profile.label}</strong>
+              <span>{profile.target} / {profile.userDatabase}</span>
+            </div>
+            <div className="desktop-postgres-profile-badges">
+              <span data-tone={profile.active ? "success" : "muted"}>{profile.active ? "active" : "inactive"}</span>
+              <span data-tone={profile.passwordSaved ? "success" : "warning"}>
+                {profile.passwordSaved ? "passwordSaved" : "no password"}
+              </span>
+              <span>{profile.sslmode}</span>
+              <span>{profile.timeout}</span>
+            </div>
+            <div className="desktop-postgres-profile-actions">
+              <button type="button" className="desktop-button" disabled={busy} onClick={() => profiles.onEditProfile(profile.profileId)}>
+                <Settings size={13} />
+                <span>Edit</span>
+              </button>
+              <button type="button" className="desktop-button" disabled={busy || profile.active} onClick={() => profiles.onActivateProfile(profile.profileId)}>
+                <CheckCircle2 size={13} />
+                <span>Activate</span>
+              </button>
+              <button type="button" className="desktop-button" disabled={busy} onClick={() => profiles.onDeleteProfile(profile.profileId)}>
+                <XCircle size={13} />
+                <span>Delete</span>
+              </button>
+            </div>
+          </div>
+        )) : <p className="desktop-empty-copy">No Postgres profiles saved. Offline Core authoring remains available.</p>}
+      </div>
+    </div>
+  );
+};
+
 const PostgresStatusPanel = ({
   status,
   managedStatus,
@@ -1346,6 +1502,7 @@ const PostgresStatusPanel = ({
   errorMessage,
   managedErrorMessage,
   managedMessage,
+  profiles,
   persistState,
   persistDisabledReason,
   onRefresh,
@@ -1363,6 +1520,7 @@ const PostgresStatusPanel = ({
   errorMessage: string | null;
   managedErrorMessage: string | null;
   managedMessage: string | null;
+  profiles: PostgresProfilePanelController;
   persistState: PersistState;
   persistDisabledReason: string | null;
   onRefresh: () => void;
@@ -1415,6 +1573,7 @@ const PostgresStatusPanel = ({
         ) : null}
       </div>
       <div className="desktop-postgres-split">
+        <PostgresProfileManagerSection profiles={profiles} />
         <ExternalPostgresSection status={status} />
         <ManagedPostgresSection
           status={managedStatus}
@@ -2395,7 +2554,7 @@ const InsightDockContent = ({
     rag: <DesktopWorkspaceIndexPanel viewModel={props.workspaceIndexViewModel} />,
     graph: <DesktopKnowledgeMapPanel viewModel={props.knowledgeMapViewModel} onSourceJump={props.onKnowledgeMapSourceJump} />,
     runtime: <SidecarControlPanel status={props.sidecarStatus} logTail={props.sidecarLogTail} operation={props.sidecarOperation} message={props.sidecarMessage} errorMessage={props.sidecarError} onStart={props.onStartSidecar} onStop={props.onStopSidecar} onRefresh={props.onRefreshSidecar} onLoadLogs={props.onLoadSidecarLogs} />,
-    postgres: <PostgresStatusPanel status={props.postgresStatus} managedStatus={props.managedPostgresStatus} loading={props.postgresLoading} managedOperation={props.managedPostgresOperation} errorMessage={props.postgresError} managedErrorMessage={props.managedPostgresError} managedMessage={props.managedPostgresMessage} persistState={props.persistState} persistDisabledReason={props.persistDisabledReason} onRefresh={props.onRefreshPostgres} onInitManaged={props.onInitManagedPostgres} onStartManaged={props.onStartManagedPostgres} onStopManaged={props.onStopManagedPostgres} onMigrateManaged={props.onMigrateManagedPostgres} onRefreshManaged={props.onRefreshManagedPostgres} onPersistGraph={props.onPersistGraph} />,
+    postgres: <PostgresStatusPanel status={props.postgresStatus} managedStatus={props.managedPostgresStatus} loading={props.postgresLoading} managedOperation={props.managedPostgresOperation} errorMessage={props.postgresError} managedErrorMessage={props.managedPostgresError} managedMessage={props.managedPostgresMessage} profiles={props.postgresProfiles} persistState={props.persistState} persistDisabledReason={props.persistDisabledReason} onRefresh={props.onRefreshPostgres} onInitManaged={props.onInitManagedPostgres} onStartManaged={props.onStartManagedPostgres} onStopManaged={props.onStopManagedPostgres} onMigrateManaged={props.onMigrateManagedPostgres} onRefreshManaged={props.onRefreshManagedPostgres} onPersistGraph={props.onPersistGraph} />,
     storage: <LocalStorePanel status={props.localStoreStatus} operation={props.localStoreOperation} snapshotState={props.localSnapshotState} syncState={props.localSyncState} reactionIntelligenceJobBuild={props.reactionIntelligenceJobBuild} reactionIntelligenceJobState={props.reactionIntelligenceJobState} workspaceIngestState={props.workspaceIngestState} disabledReason={props.localStoreDisabledReason} syncDisabledReason={props.localStoreSyncDisabledReason} workspaceIngestDisabledReason={props.workspaceIngestDisabledReason} errorMessage={props.localStoreError} onRefresh={props.onRefreshLocalStore} onSave={props.onSaveLocalSnapshot} onSync={props.onSyncLocalOutbox} onRunReactionIntelligenceJob={props.onRunReactionIntelligenceJob} onRunWorkspaceIngest={props.onRunWorkspaceIngest} />,
     settings: <SettingsDockPanel mode={props.mode} sidecarStatus={props.sidecarStatus} postgresStatus={props.postgresStatus} localStoreStatus={props.localStoreStatus} />,
     agent: <div className="desktop-agent-panel"><AgentRunHeader agentRun={props.agentRun} agentMessage={props.agentMessage} /><AgentEmptyState mode={props.mode} hasQuickFixes={quickFixes.length > 0} /><AgentQuickFixList mode={props.mode} quickFixes={quickFixes} onProposeQuickFix={props.onProposeQuickFix} /><AgentPatchProposalCard proposal={activeProposal} canApprove={activeProposal !== undefined && approvedDecision === undefined && rejectedDecision === undefined && appliedDecision === undefined} canApply={activeProposal !== undefined && approvedDecision !== undefined && appliedDecision === undefined && rejectedDecision === undefined} canReject={activeProposal !== undefined && rejectedDecision === undefined && appliedDecision === undefined} onApprovePatch={props.onApprovePatch} onApplyPatch={props.onApplyPatch} onRejectPatch={props.onRejectPatch} /><AgentTimeline agentRun={props.agentRun} /><AgentLedger agentRun={props.agentRun} /></div>
@@ -2611,6 +2770,146 @@ const useSidecarController = () => {
   };
 };
 
+const usePostgresProfileController = (
+  onRuntimeStatusChange: () => Promise<void>
+): { panel: PostgresProfilePanelController; readProfiles: () => Promise<DesktopCommandMap["list_postgres_profiles"]["output"] | null> } => {
+  const [profilesState, setProfilesState] = useState(initialPostgresProfilesState);
+  const [profileForm, setProfileForm] = useState(createInitialPostgresProfileForm);
+  const [profileOperation, setProfileOperation] = useState<PostgresProfileOperation | null>(null);
+  const [profileError, setProfileError] = useState<PostgresProfileCommandError | null>(null);
+  const [profileMessage, setProfileMessage] = useState<string | null>(null);
+  const profileOperationRef = useRef<PostgresProfileOperation | null>(null);
+
+  const readProfiles = async () => {
+    try {
+      const nextProfiles = await invokeDesktop("list_postgres_profiles", undefined);
+      setProfilesState(nextProfiles);
+      setProfileError(null);
+      return nextProfiles;
+    } catch (nextError: unknown) {
+      setProfileError(toPostgresProfileCommandError("list", nextError, "Postgres profiles unavailable"));
+      return null;
+    }
+  };
+
+  const refreshProfiles = async () => {
+    if (profileOperationRef.current) return;
+    profileOperationRef.current = "list";
+    setProfileOperation("list");
+    setProfileMessage(null);
+    try {
+      const nextProfiles = await readProfiles();
+      if (nextProfiles) {
+        setProfileMessage(`Loaded ${nextProfiles.profiles.length} Postgres profiles.`);
+      }
+    } finally {
+      profileOperationRef.current = null;
+      setProfileOperation(null);
+    }
+  };
+
+  const saveProfile = async () => {
+    if (profileOperationRef.current) return;
+    const saveInput = buildPostgresProfileSaveInput(profileForm);
+    if (!saveInput.ok) {
+      setProfileError(toPostgresProfileValidationError("save", saveInput.message));
+      setProfileMessage(null);
+      return;
+    }
+    profileOperationRef.current = "save";
+    setProfileOperation("save");
+    setProfileMessage(null);
+    try {
+      const nextProfiles = await invokeDesktop("save_postgres_profile", { input: saveInput.input });
+      setProfilesState(nextProfiles);
+      setProfileForm((current) => clearPostgresProfilePassword(current));
+      setProfileError(null);
+      setProfileMessage("Postgres profile saved. Password input was cleared.");
+      await onRuntimeStatusChange();
+    } catch (nextError: unknown) {
+      setProfileError(toPostgresProfileCommandError("save", nextError, "Postgres profile save failed"));
+    } finally {
+      profileOperationRef.current = null;
+      setProfileOperation(null);
+    }
+  };
+
+  const activateProfile = async (profileId: string) => {
+    if (profileOperationRef.current) return;
+    profileOperationRef.current = "activate";
+    setProfileOperation("activate");
+    setProfileMessage(null);
+    try {
+      const nextProfiles = await invokeDesktop("activate_postgres_profile", { profileId });
+      setProfilesState(nextProfiles);
+      setProfileError(null);
+      setProfileMessage("Postgres profile activated.");
+      await onRuntimeStatusChange();
+    } catch (nextError: unknown) {
+      setProfileError(toPostgresProfileCommandError("activate", nextError, "Postgres profile activation failed"));
+    } finally {
+      profileOperationRef.current = null;
+      setProfileOperation(null);
+    }
+  };
+
+  const deleteProfile = async (profileId: string) => {
+    if (profileOperationRef.current) return;
+    profileOperationRef.current = "delete";
+    setProfileOperation("delete");
+    setProfileMessage(null);
+    try {
+      const nextProfiles = await invokeDesktop("delete_postgres_profile", { profileId });
+      setProfilesState(nextProfiles);
+      setProfileForm((current) =>
+        current.profileId === profileId ? createInitialPostgresProfileForm() : current
+      );
+      setProfileError(null);
+      setProfileMessage("Postgres profile deleted. Active profile state was refreshed.");
+      await onRuntimeStatusChange();
+    } catch (nextError: unknown) {
+      setProfileError(toPostgresProfileCommandError("delete", nextError, "Postgres profile delete failed"));
+    } finally {
+      profileOperationRef.current = null;
+      setProfileOperation(null);
+    }
+  };
+
+  const editProfile = (profileId: string) => {
+    const profile = profilesState.profiles.find((item) => item.profileId === profileId);
+    if (!profile) return;
+    setProfileForm(createPostgresProfileFormFromProfile(profile));
+    setProfileError(null);
+    setProfileMessage("Editing saved profile metadata. Saved passwords are never displayed.");
+  };
+
+  return {
+    readProfiles,
+    panel: {
+      state: profilesState,
+      rows: buildPostgresProfileRows(profilesState),
+      form: profileForm,
+      operation: profileOperation,
+      error: profileError,
+      message: profileMessage,
+      onFormChange: (patch: Partial<PostgresProfileForm>) => setProfileForm((current) => ({
+        ...current,
+        ...patch
+      })),
+      onResetForm: () => {
+        setProfileForm(createInitialPostgresProfileForm());
+        setProfileError(null);
+        setProfileMessage("New Postgres profile form is ready. Password remains empty until entered.");
+      },
+      onEditProfile: editProfile,
+      onSaveProfile: () => void saveProfile(),
+      onActivateProfile: (profileId: string) => void activateProfile(profileId),
+      onDeleteProfile: (profileId: string) => void deleteProfile(profileId),
+      onRefreshProfiles: () => void refreshProfiles()
+    }
+  };
+};
+
 const usePostgresController = () => {
   const [status, setStatus] = useState<PostgresStatus>(shellPostgresStatus);
   const [managedStatus, setManagedStatus] = useState<ManagedPostgresStatus>(initialManagedPostgresStatus);
@@ -2644,6 +2943,8 @@ const usePostgresController = () => {
     }
   };
 
+  const profileController = usePostgresProfileController(readRuntimeStatus);
+
   const refresh = async () => {
     if (loadingRef.current || managedOperationRef.current) return;
     loadingRef.current = true;
@@ -2651,6 +2952,7 @@ const usePostgresController = () => {
     try {
       await readRuntimeStatus();
       await readManagedStatus();
+      await profileController.readProfiles();
     } finally {
       loadingRef.current = false;
       setLoading(false);
@@ -2707,6 +3009,7 @@ const usePostgresController = () => {
     error,
     managedError,
     managedMessage,
+    profiles: profileController.panel,
     refresh: () => void refresh(),
     initializeManaged: () => void runManagedCommand("init"),
     startManaged: () => void runManagedCommand("start"),
@@ -3306,7 +3609,7 @@ const DesktopWorkbench = ({
               knowledgeMapViewModel={knowledgeMapViewModel}
               mode={mode}
               sidecarStatus={sidecarController.status} sidecarLogTail={sidecarController.logTail} sidecarOperation={sidecarController.operation} sidecarMessage={sidecarController.message} sidecarError={sidecarController.error}
-              postgresStatus={postgresController.status} managedPostgresStatus={postgresController.managedStatus} postgresLoading={postgresController.loading} managedPostgresOperation={postgresController.managedOperation} postgresError={postgresController.error} managedPostgresError={postgresController.managedError} managedPostgresMessage={postgresController.managedMessage}
+              postgresStatus={postgresController.status} managedPostgresStatus={postgresController.managedStatus} postgresLoading={postgresController.loading} managedPostgresOperation={postgresController.managedOperation} postgresError={postgresController.error} managedPostgresError={postgresController.managedError} managedPostgresMessage={postgresController.managedMessage} postgresProfiles={postgresController.profiles}
               persistState={persistController.state}
               persistDisabledReason={persistController.disabledReason}
               localStoreStatus={localStoreController.status}
