@@ -690,6 +690,181 @@
     gap: 0.35rem;
   }
 
+  .desktop-postgres-profile-manager {
+    gap: 0.55rem;
+  }
+
+  .desktop-postgres-profile-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem;
+  }
+
+  .desktop-postgres-profile-form label {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.22rem;
+  }
+
+  .desktop-postgres-profile-form label span {
+    color: var(--muted-foreground);
+    font-size: 0.64rem;
+    font-weight: 650;
+    text-transform: uppercase;
+  }
+
+  .desktop-postgres-profile-form input,
+  .desktop-postgres-profile-form select {
+    min-width: 0;
+    height: 1.9rem;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 0 0.45rem;
+    background: var(--background);
+    color: var(--foreground);
+    font-size: 0.72rem;
+  }
+
+  .desktop-postgres-profile-check {
+    min-height: 1.9rem;
+    flex-direction: row !important;
+    align-items: center;
+    gap: 0.45rem !important;
+    padding-top: 0.85rem;
+  }
+
+  .desktop-postgres-profile-check input {
+    width: 0.95rem;
+    height: 0.95rem;
+  }
+
+  .desktop-postgres-profile-list {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .desktop-postgres-profile-row {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: 1fr;
+    gap: 0.42rem;
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--panel);
+  }
+
+  .desktop-postgres-profile-row[data-active="true"] {
+    border-color: color-mix(in oklch, var(--success) 30%, var(--border));
+    background: color-mix(in oklch, var(--success) 6%, var(--panel));
+  }
+
+  .desktop-postgres-profile-main {
+    min-width: 0;
+  }
+
+  .desktop-postgres-profile-main strong,
+  .desktop-postgres-profile-main span {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .desktop-postgres-profile-main strong {
+    color: var(--foreground);
+    font-size: 0.74rem;
+    font-weight: 700;
+  }
+
+  .desktop-postgres-profile-main span {
+    margin-top: 0.12rem;
+    color: var(--muted-foreground);
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+  }
+
+  .desktop-postgres-profile-badges,
+  .desktop-postgres-profile-actions {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+
+  .desktop-postgres-profile-badges span {
+    min-height: 1.35rem;
+    padding: 0.16rem 0.38rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--card);
+    color: var(--muted-foreground);
+    font-size: 0.64rem;
+    font-weight: 650;
+  }
+
+  .desktop-postgres-profile-badges span[data-tone="success"] {
+    border-color: color-mix(in oklch, var(--success) 32%, var(--border));
+    color: var(--success);
+  }
+
+  .desktop-postgres-profile-badges span[data-tone="warning"] {
+    border-color: color-mix(in oklch, var(--warning) 32%, var(--border));
+    color: var(--warning);
+  }
+
+  .desktop-postgres-profile-actions button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+  }
+
+  .desktop-postgres-command-error {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.22rem;
+    padding: 0.5rem;
+    border: 1px solid color-mix(in oklch, var(--danger) 30%, var(--border));
+    border-radius: 7px;
+    background: color-mix(in oklch, var(--danger) 7%, var(--card));
+  }
+
+  .desktop-postgres-command-error div {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .desktop-postgres-command-error strong {
+    color: var(--danger);
+    font-size: 0.72rem;
+    font-weight: 720;
+  }
+
+  .desktop-postgres-command-error code {
+    color: var(--muted-foreground);
+    font-family: var(--font-mono);
+    font-size: 0.64rem;
+  }
+
+  .desktop-postgres-command-error p,
+  .desktop-postgres-command-error small {
+    margin: 0;
+    color: var(--danger);
+    font-size: 0.7rem;
+    line-height: 1.35;
+  }
+
+  .desktop-postgres-command-error small {
+    color: var(--muted-foreground);
+  }
+
   .desktop-postgres-fields {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
