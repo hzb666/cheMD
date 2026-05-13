@@ -185,3 +185,23 @@ The implementation loop must keep the desktop IDE usable while adding:
     @chemd/desktop build`, and `git diff --check`.
   - `pnpm install --frozen-lockfile` was required once after the earlier
     renderer-html dependency addition to refresh local workspace symlinks.
+
+- `desktop-ide-monaco-code-actions` merged through
+  `feat(desktop)：合并 Monaco code actions`.
+  - Registered a desktop Monaco code action provider over existing
+    language-service quick-fix DTOs.
+  - Provider state follows the per-URI compile output cache pattern and maps
+    quick fixes to Monaco workspace edits with proposal metadata.
+  - Main validation passed `pnpm --filter @chemd/desktop typecheck`, focused
+    desktop ESLint, the Monaco code-action provider test, desktop build, and
+    `git diff --check`.
+
+- `desktop-ide-workspace-symbol-helper` merged through
+  `feat(desktop)：合并 workspace symbol index helper`.
+  - Added `buildDesktopWorkspaceSymbolIndex(input)` as a pure desktop helper
+    for building `ChemdWorkspaceSymbolIndex` from workspace file entries.
+  - The helper scans only Chemd markdown documents, records skipped/read/compile
+    failures, and delegates symbol extraction to `@chemd/language-service`.
+  - Main validation passed `pnpm --filter @chemd/desktop typecheck`, focused
+    desktop ESLint, the workspace symbol helper test, desktop build, and
+    `git diff --check`.
