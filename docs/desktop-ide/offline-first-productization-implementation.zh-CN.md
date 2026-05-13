@@ -403,6 +403,18 @@ DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outb
     desktop build、`git diff --check` 通过。
   - Focused ESLint 仍有 `LocalStorePanel` 复杂度与函数长度两项错误；按用户要求暂不
     阻塞产品化主线，归入最终 M11 UI 组件化与复杂度治理。
+- Workspace index 与 semantic preview UI：
+  - Monaco editor 现在接收本地 workspace symbol index，用于跨文档 reference
+    completion；无 index 或 index 异常时自动降级为 local completions。
+  - `App.tsx` 在本地 workspace 打开后构建 Chemd 文档 symbol index，当前编辑文件使用
+    内存 source，其他文件通过只读 `read_workspace_file` 读取。
+  - 右侧 dock 新增 `Semantic Preview` 面板，消费 renderer-json/html 生成的语义预览
+    DTO，并展示 preview 状态、编译时间与 workspace index 摘要。
+  - 主分支验证：workspace-symbol/semantic-preview/Monaco completion 定向测试 11/11、
+    desktop typecheck、desktop build、`pnpm test`、`pnpm typecheck` 和 `git diff --check`
+    通过。
+  - Focused ESLint 仍仅报 `LocalStorePanel` 既有复杂度/函数长度门禁；按当前策略记录到
+    M11 组件化与复杂度治理，不阻塞功能主线。
 - Release readiness：
   - `feat(desktop)：合并发布就绪聚合脚本` 新增 `pnpm desktop:release-readiness`。
   - 聚合 desktop runtime preconditions、offline release preflight 和 diagnostics

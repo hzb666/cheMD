@@ -1194,3 +1194,32 @@ M1 language-service completion core
   - `pnpm --filter @chemd/desktop exec eslint src/desktop-semantic-preview.ts src/desktop-semantic-preview.test.ts`：
     通过。
   - `git diff --check`：通过；仅输出 LF/CRLF 工作区提示。
+
+### 2026-05-13 desktop-ide-preview-and-workspace-index-ui
+
+- 范围：在 desktop React 入口串行接入 workspace symbol index 与 semantic preview；
+  不修改 shared packages、Tauri/Rust、数据库 schema、根配置或 package/lockfile。
+- 产物：
+  - `MonacoChemdEditor` 接收 workspace symbol index，并把 index 送入 completion
+    provider cache。
+  - `App.tsx` 新增 workspace symbol index controller，打开本地 workspace 后读取
+    Chemd 文档并使用 `chemd://desktop/...` model URI 建索引。
+  - 右侧 dock 新增 `Semantic Preview` 面板，消费 `buildDesktopSemanticPreview()`
+    的 HTML/fallback DTO，并显示 workspace index 摘要。
+- 行为：
+  - 当前编辑文件直接使用内存中的未保存 `source`，避免 completion index 落后于编辑器。
+  - 其他 workspace 文件通过只读 `read_workspace_file` 读取；单文件 read/compile
+    失败由 symbol index helper 记录，不中断整体索引。
+  - workspace index 不可用时 completion 自动降级为 local completions，不阻断写作。
+- 验证：
+  - `pnpm --filter @chemd/desktop exec vitest run src/desktop-workspace-symbol-index.test.ts src/desktop-semantic-preview.test.ts src/monaco-chemd-completion.test.ts`：
+    通过，3 files / 11 tests。
+  - `pnpm --filter @chemd/desktop typecheck`：通过。
+  - `pnpm --filter @chemd/desktop build`：通过；保留既有 lucide `use client`
+    与 chunk size warning。
+  - `pnpm --filter @chemd/desktop exec eslint src/App.tsx src/MonacoChemdEditor.tsx`：
+    仍报 `LocalStorePanel` 既有 `max-lines-per-function` 与 `complexity`，按当前
+    产品化策略记录到 M9/M11 复杂度治理，不阻塞本功能合并。
+  - `pnpm test`：通过 Turbo tests、72 个脚本测试与 52 个 Python 测试。
+  - `pnpm typecheck`：通过 21 个 workspace。
+  - `git diff --check`：通过；仅输出 LF/CRLF 工作区提示。

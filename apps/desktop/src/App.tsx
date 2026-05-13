@@ -3,13 +3,15 @@ import { Activity, AlertTriangle, Bot, CheckCircle2, ChevronRight, CircleDot, Da
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
 import { appendToolCall, applyPatchDecision, approvePatchDecision, attachEvidence, createAgentRun, createToolResult, getAuditTimeline, proposePatch, rejectPatchDecision, transitionAgentRunStatus, type AgentAuditEvent, type AgentEvidence, type AgentRun, type AgentToolCall, type PatchDecision, type PatchProposal } from "@chemd/agent-tools";
-import { buildEditorGraphRagRecords, compileChemdForEditor, type ChemdEditorDiagnostic, type ChemdLanguageCompileOutput, type ChemdOutlineItem, type ChemdQuickFixProposal, type ChemdTextEdit } from "@chemd/language-service";
+import { buildEditorGraphRagRecords, compileChemdForEditor, type ChemdEditorDiagnostic, type ChemdLanguageCompileOutput, type ChemdOutlineItem, type ChemdQuickFixProposal, type ChemdTextEdit, type ChemdWorkspaceSymbolIndex } from "@chemd/language-service";
 
 import { shellFiles, shellPostgresStatus, shellSidecarStatus, shellWorkspace, type DesktopCommandError, type DesktopCommandMap, type LocalStoreStatus, type ManagedPostgresStatus, type PostgresStatus, type RuntimeState, type SidecarStatus, type WorkspaceFileEntry, type WorkspaceHandle, type WorkspaceIngestQueueItem, type WorkspaceIngestQueueSummary } from "./desktop-contracts";
 import { buildLocalRuntimeSnapshotInput } from "./desktop-local-store";
 import { buildPersistRuntimeGraphRagCommandInput } from "./desktop-runtime-persistence";
+import { buildDesktopSemanticPreview, type DesktopSemanticPreview } from "./desktop-semantic-preview";
+import { buildDesktopWorkspaceSymbolIndex, type DesktopWorkspaceSymbolIndexSummary } from "./desktop-workspace-symbol-index";
 import { runWorkspaceIngest } from "./desktop-workspace-ingest";
-import { MonacoChemdEditor } from "./MonacoChemdEditor";
+import { MonacoChemdEditor, toChemdDesktopModelUri } from "./MonacoChemdEditor";
 
 type WorkspaceState = "empty" | "opening" | "open" | "error"; type DocumentMode = "sample" | "workspace";
 type SidecarOperation = "start" | "stop" | "refresh" | "logs";
@@ -95,10 +97,20 @@ type WorkspaceIngestControllerInput = {
   workspace: WorkspaceHandle;
   files: WorkspaceFileEntry[];
 };
+type WorkspaceSymbolIndexControllerInput = WorkspaceIngestControllerInput & {
+  selectedFile: WorkspaceFileEntry;
+  source: string;
+};
+type WorkspaceSymbolIndexControllerState = {
+  state: PersistOperationState;
+  message: string;
+  index: ChemdWorkspaceSymbolIndex | null;
+  summary: DesktopWorkspaceSymbolIndexSummary | null;
+};
 type PostgresField = [string, string];
 type ActivityTool = "files" | "search" | "graph" | "agent" | "settings";
 type LayoutPanel = "sidebar" | "insight" | "bottom";
-type InsightDockPanelId = "outline" | "rag" | "graph" | "runtime" | "postgres" | "storage" | "agent" | "settings";
+type InsightDockPanelId = "outline" | "preview" | "rag" | "graph" | "runtime" | "postgres" | "storage" | "agent" | "settings";
 type SidebarPrimaryTab = "files" | "outline" | "problems";
 type SidebarSecondaryTab = "workspace" | "summary";
 type DockDragPreview = {
@@ -127,6 +139,8 @@ type DesktopWorkbenchProps = {
   persistController: ReturnType<typeof usePersistRuntimeController>;
   localStoreController: ReturnType<typeof useLocalStoreController>;
   workspaceIngestController: ReturnType<typeof useWorkspaceIngestController>;
+  workspaceSymbolIndexController: ReturnType<typeof useWorkspaceSymbolIndexController>;
+  semanticPreview: DesktopSemanticPreview;
   output: ChemdLanguageCompileOutput;
   compileError?: string;
   files: WorkspaceFileEntry[];
@@ -181,6 +195,10 @@ type InsightPaneProps = {
   localStoreError: string | null;
   workspaceIngestState: WorkspaceIngestState;
   workspaceIngestDisabledReason: string | null;
+  workspaceSymbolIndexSummary: DesktopWorkspaceSymbolIndexSummary | null;
+  workspaceSymbolIndexState: PersistOperationState;
+  workspaceSymbolIndexMessage: string;
+  semanticPreview: DesktopSemanticPreview;
   agentRun: AgentRun | null;
   agentMessage: AgentMessage | null;
   onStartSidecar: () => void;
@@ -245,6 +263,7 @@ const insightDockPanels: {
   icon: typeof Files;
 }[] = [
   { id: "outline", label: "Outline", eyebrow: "Inspect", icon: Files },
+  { id: "preview", label: "Semantic Preview", eyebrow: "Preview", icon: FileCode2 },
   { id: "rag", label: "RAG Search", eyebrow: "Search", icon: Search },
   { id: "graph", label: "Reaction Graph", eyebrow: "Graph", icon: GitGraph },
   { id: "runtime", label: "chem-service", eyebrow: "Runtime", icon: HardDrive },
@@ -259,9 +278,10 @@ const insightDockMeta = Object.fromEntries(
 ) as Record<InsightDockPanelId, (typeof insightDockPanels)[number]>;
 
 const initialInsightDockLayout: InsightDockLayout = {
-  order: ["outline", "rag", "graph", "runtime", "postgres", "storage", "agent", "settings"],
+  order: ["outline", "preview", "rag", "graph", "runtime", "postgres", "storage", "agent", "settings"],
   sizes: {
     outline: 190,
+    preview: 320,
     rag: 220,
     graph: 220,
     runtime: 260,
@@ -641,6 +661,12 @@ const initialWorkspaceIngestState: WorkspaceIngestState = {
   state: "idle",
   message: "Scan/Ingest reads workspace files and builds an in-memory queue only; it does not write DB or Local Store outbox entries.",
   items: [],
+  summary: null
+};
+const initialWorkspaceSymbolIndexState: WorkspaceSymbolIndexControllerState = {
+  state: "idle",
+  message: "Open a local workspace to build cross-document reference suggestions.",
+  index: null,
   summary: null
 };
 
@@ -1860,6 +1886,7 @@ const EditorPane = ({
   mode,
   source,
   compileOutput,
+  workspaceSymbolIndex,
   lineCount,
   compiledAt,
   workspaceConflict,
@@ -1872,6 +1899,7 @@ const EditorPane = ({
   mode: DocumentMode;
   source: string;
   compileOutput: ChemdLanguageCompileOutput;
+  workspaceSymbolIndex: ChemdWorkspaceSymbolIndex | null;
   lineCount: number;
   compiledAt: string;
   workspaceConflict: WorkspaceConflictState | null;
@@ -1894,6 +1922,7 @@ const EditorPane = ({
       value={source}
       documentPath={compileOutput.documentUri ?? fileName}
       compileOutput={compileOutput}
+      workspaceSymbolIndex={workspaceSymbolIndex}
       onChange={onChange}
       onSave={onSave}
     />
@@ -2006,6 +2035,40 @@ const AgentQuickFixList = ({
         <span>{candidate.quickFix.title}</span>
       </button>
     )) : <span className="desktop-empty-copy">No quick fixes available.</span>}
+  </div>
+);
+
+const SemanticPreviewPanel = ({
+  preview,
+  workspaceSymbolIndexState,
+  workspaceSymbolIndexMessage,
+  workspaceSymbolIndexSummary
+}: {
+  preview: DesktopSemanticPreview;
+  workspaceSymbolIndexState: PersistOperationState;
+  workspaceSymbolIndexMessage: string;
+  workspaceSymbolIndexSummary: DesktopWorkspaceSymbolIndexSummary | null;
+}) => (
+  <div className="desktop-preview-surface">
+    <div className="desktop-document-preview" data-state={preview.state}>
+      <p className="desktop-preview-kicker">{preview.message}</p>
+      <dl>
+        <div><dt>Preview</dt><dd>{preview.state}</dd></div>
+        <div><dt>Compiled</dt><dd>{new Date(preview.compiledAt).toLocaleTimeString()}</dd></div>
+        <div><dt>Workspace index</dt><dd>{workspaceSymbolIndexState}</dd></div>
+        <div><dt>Documents</dt><dd>{workspaceSymbolIndexSummary?.indexedFiles ?? 0} indexed</dd></div>
+      </dl>
+      <p>{workspaceSymbolIndexMessage}</p>
+      {preview.state === "ready" ? (
+        <div
+          className="desktop-semantic-preview-html"
+          // HTML is produced by @chemd/renderer-html, which escapes source text.
+          dangerouslySetInnerHTML={{ __html: preview.html }}
+        />
+      ) : (
+        <p>{preview.reason ?? "preview_unavailable"}</p>
+      )}
+    </div>
   </div>
 );
 
@@ -2330,6 +2393,7 @@ const InsightDockContent = ({
   const appliedDecision = findPatchDecision(props.agentRun, activeProposal?.patchProposalId, "applied");
   const contentByPanel: Record<InsightDockPanelId, ReactNode> = {
     outline: <div className="desktop-insight-section">{props.outline.length > 0 ? <OutlineTree items={props.outline} /> : <p className="desktop-empty-copy">No outline from language service.</p>}</div>,
+    preview: <SemanticPreviewPanel preview={props.semanticPreview} workspaceSymbolIndexState={props.workspaceSymbolIndexState} workspaceSymbolIndexMessage={props.workspaceSymbolIndexMessage} workspaceSymbolIndexSummary={props.workspaceSymbolIndexSummary} />,
     rag: <RagSearchPanel outline={props.outline} diagnostics={props.diagnostics} />,
     graph: <ReactionGraphPanel outline={props.outline} diagnostics={props.diagnostics} compileStatus={props.diagnostics.some((item) => item.severity === "error") ? "failed" : "ok"} />,
     runtime: <SidecarControlPanel status={props.sidecarStatus} logTail={props.sidecarLogTail} operation={props.sidecarOperation} message={props.sidecarMessage} errorMessage={props.sidecarError} onStart={props.onStartSidecar} onStop={props.onStopSidecar} onRefresh={props.onRefreshSidecar} onLoadLogs={props.onLoadSidecarLogs} />,
@@ -2914,6 +2978,88 @@ const useWorkspaceIngestController = ({
   };
 };
 
+const formatWorkspaceSymbolIndexMessage = (
+  summary: DesktopWorkspaceSymbolIndexSummary
+): string =>
+  `Workspace symbols indexed: ${summary.indexedFiles} ready, ${summary.failedFiles} failed, ${summary.skippedFiles} skipped.`;
+
+const useWorkspaceSymbolIndexController = ({
+  mode,
+  workspaceState,
+  workspace,
+  files,
+  selectedFile,
+  source
+}: WorkspaceSymbolIndexControllerInput): WorkspaceSymbolIndexControllerState => {
+  const [state, setState] = useState<WorkspaceSymbolIndexControllerState>(
+    initialWorkspaceSymbolIndexState
+  );
+
+  useEffect(() => {
+    if (mode !== "workspace" || workspaceState !== "open") {
+      setState(initialWorkspaceSymbolIndexState);
+      return;
+    }
+
+    let cancelled = false;
+    setState((current) => ({
+      ...current,
+      state: "pending",
+      message: "Building workspace symbol index from local Chemd documents."
+    }));
+
+    void buildDesktopWorkspaceSymbolIndex({
+      workspace,
+      files,
+      createDocumentUri: (file) => toChemdDesktopModelUri(file.path),
+      readFile: async (file) => {
+        if (file.id === selectedFile.id || file.path === selectedFile.path) {
+          return source;
+        }
+
+        const content = await invokeDesktop("read_workspace_file", {
+          workspaceId: workspace.workspaceId,
+          path: file.path
+        });
+        return content.content;
+      }
+    }).then((result) => {
+      if (cancelled) return;
+      setState({
+        state: "success",
+        message: formatWorkspaceSymbolIndexMessage(result.summary),
+        index: result.index,
+        summary: result.summary
+      });
+    }).catch((error: unknown) => {
+      if (cancelled) return;
+      setState({
+        state: "failure",
+        message: getCommandErrorMessage(
+          error,
+          "Workspace symbol index failed before cross-document suggestions were built."
+        ),
+        index: null,
+        summary: null
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    files,
+    mode,
+    selectedFile.id,
+    selectedFile.path,
+    source,
+    workspace,
+    workspaceState
+  ]);
+
+  return state;
+};
+
 const useAgentPatchController = ({
   agentRun,
   setAgentRun,
@@ -2975,7 +3121,7 @@ const DesktopWorkbench = ({
   postgresController,
   persistController,
   localStoreController,
-  workspaceIngestController,
+  workspaceIngestController, workspaceSymbolIndexController, semanticPreview,
   output,
   compileError,
   files,
@@ -3046,7 +3192,7 @@ const DesktopWorkbench = ({
             fileName={selectedFile.name}
             mode={mode}
             source={source}
-            compileOutput={output}
+            compileOutput={output} workspaceSymbolIndex={workspaceSymbolIndexController.index}
             lineCount={source.split(/\r?\n/).length}
             compiledAt={output.compiledAt}
             workspaceConflict={workspaceConflict}
@@ -3083,6 +3229,7 @@ const DesktopWorkbench = ({
               localStoreError={localStoreController.error}
               workspaceIngestState={workspaceIngestController.state}
               workspaceIngestDisabledReason={workspaceIngestController.disabledReason}
+              workspaceSymbolIndexSummary={workspaceSymbolIndexController.summary} workspaceSymbolIndexState={workspaceSymbolIndexController.state} workspaceSymbolIndexMessage={workspaceSymbolIndexController.message} semanticPreview={semanticPreview}
               agentRun={agentRun}
               agentMessage={agentMessage}
               onStartSidecar={sidecarController.start} onStopSidecar={sidecarController.stop} onRefreshSidecar={sidecarController.refresh} onLoadSidecarLogs={sidecarController.loadLogs}
@@ -3281,6 +3428,10 @@ export const App = () => {
     documentUri: workspaceController.selectedFile.path,
     options: { strictChemdKind: true, procedureMode: "auto" }
   }), [workspaceController.selectedFile.path, workspaceController.source]);
+  const semanticPreview = useMemo(
+    () => buildDesktopSemanticPreview(output),
+    [output]
+  );
   const compileError = output.status === "failed" ? output.error.message : undefined;
   const persistController = usePersistRuntimeController({
     mode: workspaceController.mode,
@@ -3306,6 +3457,14 @@ export const App = () => {
     workspace: workspaceController.workspace,
     files: workspaceController.files
   });
+  const workspaceSymbolIndexController = useWorkspaceSymbolIndexController({
+    mode: workspaceController.mode,
+    workspaceState: workspaceController.workspaceState,
+    workspace: workspaceController.workspace,
+    files: workspaceController.files,
+    selectedFile: workspaceController.selectedFile,
+    source: workspaceController.source
+  });
 
   const updateEditorSource = (nextSource: string) => {
     workspaceController.setSource(nextSource);
@@ -3327,7 +3486,8 @@ export const App = () => {
   return (
     <DesktopWorkbench
       workspace={workspaceController.workspace} workspaceState={workspaceController.workspaceState}
-      sidecarController={sidecarController} postgresController={postgresController} persistController={persistController} localStoreController={localStoreController} workspaceIngestController={workspaceIngestController}
+      sidecarController={sidecarController} postgresController={postgresController} persistController={persistController} localStoreController={localStoreController} workspaceIngestController={workspaceIngestController} workspaceSymbolIndexController={workspaceSymbolIndexController}
+      semanticPreview={semanticPreview}
       output={output} compileError={compileError}
       files={workspaceController.files} selectedFile={workspaceController.selectedFile} selectedFileId={workspaceController.selectedFileId}
       mode={workspaceController.mode} message={workspaceController.message} source={workspaceController.source} savedSource={workspaceController.savedSource} workspaceConflict={workspaceController.workspaceConflict}

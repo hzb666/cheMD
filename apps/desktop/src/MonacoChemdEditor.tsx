@@ -7,6 +7,7 @@ import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import {
   toMonacoLanguageServiceModel,
   type ChemdLanguageCompileOutput,
+  type ChemdWorkspaceSymbolIndex,
   type MonacoMarkerLike
 } from "@chemd/language-service";
 import {
@@ -16,8 +17,10 @@ import {
 } from "./monaco-chemd-code-actions";
 import {
   cleanupChemdCompletionOutput,
+  cleanupChemdCompletionWorkspaceIndex,
   registerChemdCompletionProvider,
-  updateChemdCompletionOutput
+  updateChemdCompletionOutput,
+  updateChemdCompletionWorkspaceIndex
 } from "./monaco-chemd-completion";
 import {
   cleanupChemdNavigationOutput,
@@ -50,6 +53,7 @@ type MonacoChemdEditorProps = {
   value: string;
   documentPath: string;
   compileOutput: ChemdLanguageCompileOutput;
+  workspaceSymbolIndex?: ChemdWorkspaceSymbolIndex | null;
   onChange: (nextSource: string) => void;
   onSave: () => void;
 };
@@ -65,6 +69,8 @@ const toModelPath = (documentPath: string): string => {
 
   return `chemd://desktop/${encodedPath}`;
 };
+
+export const toChemdDesktopModelUri = toModelPath;
 
 const toEditorMarker = (marker: MonacoMarkerLike): editor.IMarkerData => ({
   startLineNumber: marker.startLineNumber,
@@ -165,6 +171,7 @@ export const MonacoChemdEditor = ({
   value,
   documentPath,
   compileOutput,
+  workspaceSymbolIndex,
   onChange,
   onSave
 }: MonacoChemdEditorProps) => {
@@ -187,6 +194,18 @@ export const MonacoChemdEditor = ({
       cleanupChemdNavigationOutput(modelPath, compileOutput);
     };
   }, [compileOutput, modelPath]);
+
+  useEffect(() => {
+    if (!workspaceSymbolIndex) {
+      cleanupChemdCompletionWorkspaceIndex(modelPath);
+      return;
+    }
+
+    updateChemdCompletionWorkspaceIndex(modelPath, workspaceSymbolIndex);
+    return () => {
+      cleanupChemdCompletionWorkspaceIndex(modelPath, workspaceSymbolIndex);
+    };
+  }, [modelPath, workspaceSymbolIndex]);
 
   useEffect(() => {
     onSaveRef.current = onSave;
