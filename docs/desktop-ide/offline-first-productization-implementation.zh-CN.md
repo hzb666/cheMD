@@ -758,11 +758,18 @@ failure/degraded 状态显示，不影响本地 RAG、symbols、references 搜�
 - Audit persistence：离线先写本地 outbox，在线同步到 PostgreSQL。
 - Safety gate：compile failed 时阻止 accepted revision。
 
+2026-05-13 第一批 M7 接入完成：Agent patch apply 现在在修改 editor buffer
+前先生成候选源码并运行 `compileChemdForEditor`；该验证会作为
+`compile_current_file` tool call 写入 Agent audit timeline。若候选源码 compile failed，
+Agent run 转为 `blocked`，记录 validation result 和 final summary，不修改 editor buffer；
+compile 通过后才写入 `applied` decision 并更新 buffer。该步骤仍是本地同步验证，不依赖
+网络、PostgreSQL 或真实外部 Agent provider。
+
 验收：
 
 - Agent 不能直接写 workspace 文件。
 - 用户确认前不会应用 patch。
-- patch apply 后必须重新 compile。
+- patch apply 前必须对候选源码重新 compile；失败时不得修改 editor buffer。
 - 每个 Agent run 可审计、可重放关键上下文。
 
 ### M8：`chem-service` 与结构工作流

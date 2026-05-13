@@ -1033,6 +1033,52 @@ const createProposalToolCall = ({
   })
 });
 
+const createCompileValidationToolCall = ({
+  runId,
+  toolCallId,
+  workspaceId,
+  file,
+  output,
+  at
+}: {
+  runId: string;
+  toolCallId: string;
+  workspaceId: string;
+  file: WorkspaceFileEntry;
+  output: ChemdLanguageCompileOutput;
+  at: string;
+}): AgentToolCall => {
+  const failed = output.status === "failed";
+  return {
+    toolCallId,
+    agentRunId: runId,
+    workspaceId,
+    toolName: "compile_current_file",
+    payload: {
+      filePath: file.path,
+      strictChemdKind: true,
+      procedureMode: "auto"
+    },
+    status: failed ? "failed" : "ok",
+    startedAt: at,
+    finishedAt: at,
+    result: createToolResult({
+      toolCallId,
+      status: failed ? "failed" : "ok",
+      payload: failed ? undefined : {
+        status: output.status,
+        diagnostics: output.diagnostics.length,
+        symbols: output.symbols.length
+      },
+      error: failed ? {
+        code: "compile_failed",
+        message: output.error.message
+      } : undefined,
+      evidence: []
+    })
+  };
+};
+
 const createAgentProposalRun = (
   candidate: QuickFixCandidate,
   file: WorkspaceFileEntry,
@@ -1125,18 +1171,65 @@ const approveAgentRunPatch = (run: AgentRun): AgentOperationResult | null => {
 
 const applyAgentRunPatch = (
   run: AgentRun,
-  source: string
+  source: string,
+  file: WorkspaceFileEntry
 ): { result: AgentOperationResult; nextSource?: string } | null => {
   const activeProposal = getLatestPatchProposal(run);
   const approvedDecision = findPatchDecision(run, activeProposal?.patchProposalId, "approved");
   if (!activeProposal || !approvedDecision) return null;
 
-  const appliedResult = applyPatchDecision(run, {
+  const now = new Date().toISOString();
+  const nextSource = applyTextEdits(source, activeProposal.edits);
+  const validationOutput = compileChemdForEditor({
+    source: nextSource,
+    documentUri: file.path,
+    options: { strictChemdKind: true, procedureMode: "auto" }
+  });
+  const validationToolCall = createCompileValidationToolCall({
+    runId: run.agentRunId,
+    toolCallId: createAgentId("tool"),
+    workspaceId: run.workspaceId,
+    file,
+    output: validationOutput,
+    at: now
+  });
+  const validationResult = appendToolCall(run, {
+    toolCall: validationToolCall,
+    at: now,
+    summary: validationOutput.status === "failed"
+      ? "Compile failed after patch preview; editor buffer was not changed."
+      : "Compile passed for the approved patch preview."
+  });
+  if (!validationResult.ok) {
+    return {
+      result: {
+        run: validationResult.run,
+        message: { tone: "danger", text: validationResult.error.message }
+      }
+    };
+  }
+  if (validationOutput.status === "failed") {
+    const blockedResult = transitionAgentRunStatus(validationResult.run, {
+      status: "blocked",
+      at: now,
+      summary: "Compile failed after patch preview.",
+      finalSummary: "Patch was not applied because the edited source failed to compile.",
+      validationResult: validationToolCall.result
+    });
+    return {
+      result: {
+        run: blockedResult.run,
+        message: { tone: "danger", text: "Patch was not applied because the edited source failed to compile." }
+      }
+    };
+  }
+
+  const appliedResult = applyPatchDecision(validationResult.run, {
     decisionId: createAgentId("decision"),
     patchProposalId: activeProposal.patchProposalId,
     userApprovalId: approvedDecision.userApprovalId,
     reason: "Applied approved patch to current editor buffer.",
-    decidedAt: new Date().toISOString(),
+    decidedAt: now,
     currentBeforeHash: createEditorSourceHash(source)
   });
   if (!appliedResult.ok) {
@@ -1150,16 +1243,17 @@ const applyAgentRunPatch = (
 
   const completedResult = transitionAgentRunStatus(appliedResult.run, {
     status: "completed",
-    at: new Date().toISOString(),
-    summary: "Applied approved patch to the editor buffer.",
-    finalSummary: "Patch applied locally. Save remains under the normal workspace save flow."
+    at: now,
+    summary: "Applied approved patch after compile validation.",
+    finalSummary: "Patch applied locally after compile validation. Save remains under the normal workspace save flow.",
+    validationResult: validationToolCall.result
   });
   return {
-    nextSource: applyTextEdits(source, activeProposal.edits),
+    nextSource,
     result: {
       run: completedResult.run,
       message: completedResult.ok
-        ? { tone: "success", text: "Patch applied to the editor buffer. Use Save to persist it." }
+        ? { tone: "success", text: "Patch compiled and was applied to the editor buffer. Use Save to persist it." }
         : { tone: "danger", text: completedResult.error.message }
     }
   };
@@ -3763,7 +3857,7 @@ const useAgentPatchController = ({
   };
 
   const applyPatch = () => {
-    const operation = agentRun ? applyAgentRunPatch(agentRun, source) : null;
+    const operation = agentRun ? applyAgentRunPatch(agentRun, source, file) : null;
     if (!operation) return;
     if (operation.nextSource !== undefined) onSourceChange(operation.nextSource);
     setAgentRun(operation.result.run);

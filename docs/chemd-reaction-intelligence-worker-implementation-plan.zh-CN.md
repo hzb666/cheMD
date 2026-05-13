@@ -786,6 +786,16 @@ hybrid_score =
   `App.tsx` max-lines/complexity 与 `DesktopWorkspaceIndexPanel` complexity，按用户要求
   记录到最终 M11 样式和组件化治理。
 
+状态记录（Desktop Agent patch compile gate）：
+
+- Agent patch apply 不再直接修改 editor buffer；App 会先对候选源码运行
+  `compileChemdForEditor`，并把结果作为 `compile_current_file` tool call 写入
+  Agent audit timeline。
+- 候选源码 compile failed 时，Agent run 转为 `blocked`，写入 validation result 和
+  final summary，不修改 editor buffer；compile 通过后才记录 applied decision 并更新
+  buffer。
+- 当前验证：Agent timeline/orchestration/safety Vitest 28/28、desktop typecheck 通过。
+
 ---
 
 ## 8. 验证矩阵
