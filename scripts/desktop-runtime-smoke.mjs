@@ -35,6 +35,8 @@ const RUNTIME_CREATED_AT = "2026-05-12T00:00:00.000Z";
 const RUNTIME_SOURCE = "---\nid: exp-desktop-runtime-smoke\ntitle: Desktop runtime smoke\ndate: 2026-05-12\n---\n\n:::chemd #rxn-runtime-smoke\nkind: reaction\nreactants: aldehyde\nproducts: alcohol\nyield: 72%\n:::\n";
 const TAURI_COMMAND_RUNNER_ENV = "CHEMD_DESKTOP_TAURI_COMMAND_RUNNER";
 const TAURI_COMMAND_RUNNER_ARGS_ENV = "CHEMD_DESKTOP_TAURI_COMMAND_RUNNER_ARGS";
+const POSTGRES_PROFILE_SMOKE_ID_PREFIX = "desktop-runtime-smoke-profile";
+const POSTGRES_PROFILE_SMOKE_PASSWORD = "desktop-runtime-smoke-profile-password";
 
 const safeTrim = (value) => (typeof value === "string" ? value.trim() : "");
 
@@ -834,14 +836,12 @@ const OFFLINE_CORE_SKIPPED_DATABASE_DETAIL =
   "Offline Core smoke runs with database and managed PostgreSQL env disabled";
 
 export const createOfflineCoreSmokeEnv = (env = process.env) => {
-  const {
-    CHEMD_POSTGRES_DATABASE_URL,
-    DATABASE_URL,
-    CHEMD_MANAGED_POSTGRES_BIN_DIR,
-    CHEMD_MANAGED_POSTGRES_RESOURCE_DIR,
-    CHEMD_MANAGED_POSTGRES_HOME,
-    ...offlineEnv
-  } = env;
+  const offlineEnv = { ...env };
+  delete offlineEnv.CHEMD_POSTGRES_DATABASE_URL;
+  delete offlineEnv.DATABASE_URL;
+  delete offlineEnv.CHEMD_MANAGED_POSTGRES_BIN_DIR;
+  delete offlineEnv.CHEMD_MANAGED_POSTGRES_RESOURCE_DIR;
+  delete offlineEnv.CHEMD_MANAGED_POSTGRES_HOME;
   return offlineEnv;
 };
 
@@ -978,14 +978,45 @@ export const runDesktopReconnectOutboxSyncSmoke = async ({
   }
 };
 
+const redactPostgresUrlPassword = (value) =>
+  value.replace(
+    /\b(postgres(?:ql)?:\/\/)([^:\s/@]+):([^@\s]+)@/giu,
+    (_match, scheme, user) => `${scheme}${user}:[REDACTED]@`
+  );
+
+const redactCommandDiagnosticValue = (value, key = "") => {
+  if (typeof value === "string") {
+    if (/password/iu.test(key)) {
+      return "[REDACTED]";
+    }
+    return redactPostgresUrlPassword(value)
+      .replaceAll(POSTGRES_PROFILE_SMOKE_PASSWORD, "[REDACTED]")
+      .replace(/((?:password|password_[a-z0-9_]*|[a-z0-9_]*_password)\s*[=:]\s*)[^\s,;}"']+/giu, "$1[REDACTED]");
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => redactCommandDiagnosticValue(item));
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([entryKey, entryValue]) => [
+        entryKey,
+        /password/iu.test(entryKey)
+          ? "[REDACTED]"
+          : redactCommandDiagnosticValue(entryValue, entryKey)
+      ])
+    );
+  }
+  return value;
+};
+
 const commandErrorMessage = (error) => {
   if (error instanceof Error) {
-    return error.message;
+    return redactCommandDiagnosticValue(error.message);
   }
   if (error && typeof error === "object") {
-    return JSON.stringify(error);
+    return JSON.stringify(redactCommandDiagnosticValue(error));
   }
-  return String(error);
+  return redactCommandDiagnosticValue(String(error));
 };
 
 const invokeSmokeCommand = async ({ commandRunner, command, input, commands }) => {
@@ -1026,6 +1057,207 @@ const requireSyncedOutboxResult = ({ sync, localId, idempotencyKey }) => {
   return entry;
 };
 
+const createPostgresProfileSmokeId = ({ pid = process.pid, now = Date.now } = {}) =>
+  `${POSTGRES_PROFILE_SMOKE_ID_PREFIX}-${pid}-${now()}`;
+
+const buildPostgresProfileSmokeInput = ({ profileId }) => ({
+  profileId,
+  label: "Desktop Runtime Smoke",
+  host: "127.0.0.1",
+  port: 5432,
+  database: "chemd_desktop",
+  user: "chemd_desktop",
+  password: POSTGRES_PROFILE_SMOKE_PASSWORD,
+  sslmode: "disable",
+  timeoutMs: 5000,
+  pool: "desktop-runtime-smoke",
+  setActive: false
+});
+
+const getPostgresProfile = ({ state, profileId, phase }) => {
+  if (!Array.isArray(state?.profiles)) {
+    throw new Error(`Tauri command smoke expected ${phase} Postgres profiles to be an array`);
+  }
+  return state.profiles.find((profile) => profile?.profileId === profileId);
+};
+
+const requirePostgresProfile = ({ state, profileId, phase }) => {
+  const profile = getPostgresProfile({ state, profileId, phase });
+  if (!profile) {
+    throw new Error(`Tauri command smoke did not find ${phase} Postgres profile ${profileId}`);
+  }
+  return profile;
+};
+
+const requireNoPostgresProfile = ({ state, profileId, phase }) => {
+  const profile = getPostgresProfile({ state, profileId, phase });
+  if (profile) {
+    throw new Error(`Tauri command smoke expected ${phase} Postgres profile ${profileId} to be deleted`);
+  }
+};
+
+const summarizePostgresProfileState = (state) => ({
+  activeProfileId: state?.activeProfileId ?? null,
+  profileCount: Array.isArray(state?.profiles) ? state.profiles.length : 0
+});
+
+const restoreInitialPostgresProfile = async ({
+  commandRunner,
+  commands,
+  state,
+  initialActiveProfileId,
+  temporaryProfileId
+}) => {
+  if (!initialActiveProfileId || initialActiveProfileId === temporaryProfileId) {
+    return undefined;
+  }
+  const profile = getPostgresProfile({
+    state,
+    profileId: initialActiveProfileId,
+    phase: "restore"
+  });
+  if (!profile) {
+    return undefined;
+  }
+
+  const restored = await invokeSmokeCommand({
+    commandRunner,
+    command: "activate_postgres_profile",
+    input: { profileId: initialActiveProfileId },
+    commands
+  });
+  if (restored?.activeProfileId !== initialActiveProfileId) {
+    throw new Error(
+      `Tauri command activate_postgres_profile failed: expected restored active profile ${initialActiveProfileId}, got ${restored?.activeProfileId ?? "none"}`
+    );
+  }
+  return {
+    restoredProfileId: initialActiveProfileId,
+    restored: summarizePostgresProfileState(restored)
+  };
+};
+
+const bestEffortDeletePostgresProfile = async ({ commandRunner, commands, profileId }) => {
+  try {
+    await invokeSmokeCommand({
+      commandRunner,
+      command: "delete_postgres_profile",
+      input: { profileId },
+      commands
+    });
+  } catch {
+    // Best-effort cleanup must not replace the original command failure.
+  }
+};
+
+const bestEffortRestoreInitialPostgresProfile = async ({
+  commandRunner,
+  commands,
+  state,
+  initialActiveProfileId,
+  temporaryProfileId
+}) => {
+  try {
+    await restoreInitialPostgresProfile({
+      commandRunner,
+      commands,
+      state,
+      initialActiveProfileId,
+      temporaryProfileId
+    });
+  } catch {
+    // Best-effort restore must not replace the original delete failure.
+  }
+};
+
+const runPostgresProfileCommandSmoke = async ({ commandRunner, commands, profileId }) => {
+  const profileInput = buildPostgresProfileSmokeInput({ profileId });
+  const initial = await invokeSmokeCommand({
+    commandRunner,
+    command: "list_postgres_profiles",
+    commands
+  });
+  const initialActiveProfileId = initial?.activeProfileId ?? null;
+  const saved = await invokeSmokeCommand({
+    commandRunner,
+    command: "save_postgres_profile",
+    input: { input: profileInput },
+    commands
+  });
+  const savedProfile = requirePostgresProfile({
+    state: saved,
+    profileId: profileInput.profileId,
+    phase: "saved"
+  });
+  let activated;
+  try {
+    activated = await invokeSmokeCommand({
+      commandRunner,
+      command: "activate_postgres_profile",
+      input: { profileId: profileInput.profileId },
+      commands
+    });
+    if (activated?.activeProfileId !== profileInput.profileId) {
+      throw new Error(
+        `Tauri command smoke expected active Postgres profile ${profileInput.profileId}, got ${activated?.activeProfileId ?? "none"}`
+      );
+    }
+    requirePostgresProfile({
+      state: activated,
+      profileId: profileInput.profileId,
+      phase: "activated"
+    });
+  } catch (error) {
+    await bestEffortDeletePostgresProfile({
+      commandRunner,
+      commands,
+      profileId: profileInput.profileId
+    });
+    throw error;
+  }
+
+  let deleted;
+  try {
+    deleted = await invokeSmokeCommand({
+      commandRunner,
+      command: "delete_postgres_profile",
+      input: { profileId: profileInput.profileId },
+      commands
+    });
+    requireNoPostgresProfile({
+      state: deleted,
+      profileId: profileInput.profileId,
+      phase: "deleted"
+    });
+  } catch (error) {
+    await bestEffortRestoreInitialPostgresProfile({
+      commandRunner,
+      commands,
+      state: activated,
+      initialActiveProfileId,
+      temporaryProfileId: profileInput.profileId
+    });
+    throw error;
+  }
+  const restored = await restoreInitialPostgresProfile({
+    commandRunner,
+    commands,
+    state: deleted,
+    initialActiveProfileId,
+    temporaryProfileId: profileInput.profileId
+  });
+
+  return {
+    profileId: profileInput.profileId,
+    savedPasswordFlag: savedProfile.passwordSaved === true,
+    initial: summarizePostgresProfileState(initial),
+    saved: summarizePostgresProfileState(saved),
+    activated: summarizePostgresProfileState(activated),
+    deleted: summarizePostgresProfileState(deleted),
+    restored
+  };
+};
+
 const saveCommandLocalSnapshot = async ({
   commandRunner,
   localStoreModules,
@@ -1055,7 +1287,9 @@ export const runDesktopTauriCommandSmoke = async ({
   commandRunner = createDesktopTauriCommandRunner({ env }),
   localStoreModules = loadDesktopLocalStoreModules,
   payloadBuilder = buildMinimalDesktopRuntimePersistencePayload,
-  revisionId = "rev-desktop-tauri-command-runtime-smoke"
+  revisionId = "rev-desktop-tauri-command-runtime-smoke",
+  now = Date.now,
+  postgresProfileId = createPostgresProfileSmokeId({ now })
 } = {}) => {
   if (!commandRunner) {
     return {
@@ -1072,6 +1306,11 @@ export const runDesktopTauriCommandSmoke = async ({
     await invokeSmokeCommand({ commandRunner, command: "migrate_managed_postgres", commands });
   }
 
+  const postgresProfile = await runPostgresProfileCommandSmoke({
+    commandRunner,
+    commands,
+    profileId: postgresProfileId
+  });
   const postgresStatus = await invokeSmokeCommand({ commandRunner, command: "read_postgres_status", commands });
   const localStoreStatus = await invokeSmokeCommand({ commandRunner, command: "read_local_store_status", commands });
   const { payload, saved } = await saveCommandLocalSnapshot({
@@ -1119,6 +1358,7 @@ export const runDesktopTauriCommandSmoke = async ({
     detail: "Tauri command smoke verified local outbox pending -> synced through desktop commands",
     postgresMode,
     commands,
+    postgresProfile,
     postgresStatus,
     localStoreStatus,
     graphSnapshotId: payload.graphSnapshot.graphSnapshotId,
