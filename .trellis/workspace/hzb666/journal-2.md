@@ -1586,3 +1586,38 @@ Merged parallel P2 slices for Desktop Postgres profile UI and Tauri command smok
 ### Next Steps
 
 - None - task complete
+
+
+## Session 80: Desktop Postgres migration readiness visibility
+
+**Date**: 2026-05-14
+**Task**: Desktop Postgres migration readiness visibility
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Merged the Desktop Postgres migration readiness slice, added visible pgvector/schema/migration state for external and managed Postgres, documented the M6 Graph/RAG next-step split, and verified focused Rust/desktop checks with App.tsx complexity debt deferred to M11.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2484194` | (see git log) |
+| `9613ffb` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
