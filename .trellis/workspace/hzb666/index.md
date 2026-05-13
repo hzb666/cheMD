@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 88
+- **Total Sessions**: 89
 - **Last Active**: 2026-05-14
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~1913 | Active |
+| `journal-2.md` | ~1956 | Active |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 89 | 2026-05-14 | Desktop Agent patch compile gate | `ea726ae` | `desktop-ide` |
 | 88 | 2026-05-14 | Desktop connected RAG backfill UI | `8970c4d` | `desktop-ide` |
 | 87 | 2026-05-14 | M6 RAG backfill embedding foundation | `6ba5d9a` | `desktop-ide` |
 | 86 | 2026-05-14 | M6 connected RAG embedding query | `aba6e4c` | `desktop-ide` |

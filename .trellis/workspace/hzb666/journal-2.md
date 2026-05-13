@@ -1911,3 +1911,46 @@ Validation:
 ### Next Steps
 
 - None - task complete
+
+
+## Session 89: Desktop Agent patch compile gate
+
+**Date**: 2026-05-14
+**Task**: Desktop Agent patch compile gate
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Agent patch apply now compiles candidate source first and blocks failed patches before editor changes.
+
+### Main Changes
+
+- Agent patch apply now validates candidate source with compileChemdForEditor before changing the editor buffer.
+- The validation is recorded as a compile_current_file tool call in the Agent audit timeline.
+- Compile failure transitions the run to blocked and does not apply text edits.
+- Updated M7 implementation documentation.
+
+Validation:
+- pnpm exec vitest run apps/desktop/src/desktop-agent-timeline-panel.test.ts packages/agent-tools/tests/orchestration.test.ts packages/agent-tools/tests/safety.test.ts --config packages/compiler/vitest.config.ts --pool=threads (28/28 passed)
+- pnpm --filter @chemd/desktop typecheck (passed)
+- git diff --check (passed; line-ending warnings only)
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ea726ae` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
