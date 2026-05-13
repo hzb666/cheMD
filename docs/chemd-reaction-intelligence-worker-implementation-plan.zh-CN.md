@@ -460,19 +460,28 @@ hybrid_score =
 
 任务：
 
-- [ ] 新增 `rxnfp_provider.py`。
-- [ ] 独立加载 `get_default_model_and_tokenizer()`。
-- [ ] 用 `RXNBERTFingerprintGenerator.convert_batch()` 生成 float embedding。
-- [ ] 输出 sidecar `.npy` 或 JSONL refs，避免把大向量内联到主 artifact。
-- [ ] 计算 cosine similarity top-k。
-- [ ] 生成 `rxnfp_cosine` edges。
+- [x] 新增 `rxnfp_provider.py`。
+- [x] 独立加载 `get_default_model_and_tokenizer()`。
+- [x] 用 `RXNBERTFingerprintGenerator.convert_batch()` 生成 float embedding。
+- [x] 输出 sidecar refs，避免把大向量内联到主 artifact；测试可使用小向量 inline。
+- [x] 计算 cosine similarity top-k。
+- [x] 生成 `rxnfp_cosine` edges。
 
 验收：
 
-- [ ] RXNFP 依赖缺失时 provider `SKIP`。
-- [ ] embedding 记录 model id、dimension、hash。
-- [ ] top-k edge 可稳定复现。
+- [x] RXNFP 依赖缺失时 provider `SKIP`。
+- [x] embedding 记录 model id、dimension、hash。
+- [x] top-k edge 可稳定复现。
 - [ ] embedding 缓存命中时不重复加载模型。
+
+状态记录（Worker E / `reaction-intel-rxnfp-baseline`）：
+
+- 新增 `rxnfp_provider.py`，真实 RXNFP adapter 只在 run 路径加载模型；缺失依赖时 provider 返回 `SKIP`。
+- PASS 路径通过可注入 fake adapter 测试，不要求本机安装 RXNFP。
+- embedding ref 默认使用 `sidecar_file`，记录 `model_id`、dimension、hash、device 与 batch size；测试中的小向量可 inline。
+- cosine top-k edge 使用 basis `rxnfp_cosine`。
+- embedding 维度不一致时 provider 标记 `ERROR`，不生成错误 edge。
+- 缓存持久化和模型复用策略仍留给 Phase 6 pipeline / artifact cache 统一处理。
 
 ### Phase 4：Hybrid similarity graph
 
@@ -480,18 +489,26 @@ hybrid_score =
 
 任务：
 
-- [ ] 读取现有 `reaction_similarity_edges` 作为 semantic base。
-- [ ] 读取 computed provider edges。
-- [ ] 按 pair 合并 basis、score、warnings、evidence。
-- [ ] 应用 hybrid score 和 confidence 规则。
-- [ ] 输出 `ChemdComputedReactionSimilarityEdgeV1`。
+- [x] 读取现有 `reaction_similarity_edges` 作为 semantic base。
+- [x] 读取 computed provider edges。
+- [x] 按 pair 合并 basis、score、warnings、provider_ids、source_hashes。
+- [x] 应用 hybrid score 和 confidence 规则。
+- [x] 输出 `ChemdComputedReactionSimilarityEdgeV1`。
 - [ ] 更新 `@chemd/reaction-map` 让 computed edge 进入 layout。
 
 验收：
 
-- [ ] semantic-only edge 仍带 warning。
-- [ ] computed 支撑 edge 可升为 medium/high。
+- [x] semantic-only edge 仍带 warning。
+- [x] computed 支撑 edge 可升为 medium/high。
 - [ ] UI 能区分 semantic、fingerprint、rxnfp、reaction_center、hybrid。
+
+状态记录（Worker F / `reaction-intel-hybrid-similarity`）：
+
+- 新增 `similarity.py`，接受 semantic graph edge 与 computed provider edge 两类输入。
+- 按 pair 稳定合并 basis、score、warnings、provider_ids、source_hashes。
+- 固定权重为 semantic 0.30、RDKit 0.25、RXNFP 0.25、reaction center 0.20，缺项时按可用权重重归一。
+- semantic-only edge 保留 `semantic_similarity_without_computed_fingerprint`，computed 支撑可提升为 medium/high；warnings 非空不标 high。
+- layout/UI 消费 computed hybrid edge 仍留给 Phase 6 桌面集成切片。
 
 ### Phase 5：TMAP LayoutFromEdgeList
 
