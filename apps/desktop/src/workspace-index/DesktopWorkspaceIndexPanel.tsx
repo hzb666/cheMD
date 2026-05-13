@@ -6,12 +6,14 @@ import {
   type DesktopConnectedRagBlockedSummary,
   type DesktopMergedRagResult
 } from "./desktop-connected-rag-results";
+import type { DesktopPostgresRagQueryControllerState } from "./desktop-postgres-rag-query-controller";
 import type { DesktopPostgresRagQueryView } from "./desktop-postgres-rag-query-view";
 import type { DesktopWorkspaceIndexViewModel } from "./desktop-workspace-index";
 
 interface WorkspaceIndexPanelProps {
   viewModel: DesktopWorkspaceIndexViewModel;
   connectedRagQueryView?: DesktopPostgresRagQueryView | null;
+  connectedRagQueryState?: DesktopPostgresRagQueryControllerState | null;
 }
 
 type SearchRowKind = "local" | "connected" | "symbol" | "reference";
@@ -43,6 +45,21 @@ const disconnectedSummary: ConnectedRagPanelSummary = {
   blockedCount: 0,
   disabled: true,
   degraded: false
+};
+
+const controllerSummary = (
+  state: DesktopPostgresRagQueryControllerState | null | undefined
+): ConnectedRagPanelSummary | null => {
+  if (!state) return null;
+  return {
+    state: state.state === "ready" ? "ready" : state.state === "degraded" ? "degraded" : "offline",
+    label: state.disabled ? "Connected RAG disabled" : "Connected RAG query",
+    detail: state.message,
+    message: state.message,
+    blockedCount: state.commandView?.summary.blockedCount ?? state.merged.blocked.count,
+    disabled: state.disabled,
+    degraded: state.degraded
+  };
 };
 
 const rowMatchesQuery = (row: SearchRow, normalizedQuery: string): boolean =>
@@ -91,14 +108,18 @@ const connectedSummaryCopy = (summary: ConnectedRagPanelSummary): string => {
 
 export const DesktopWorkspaceIndexPanel = ({
   viewModel,
-  connectedRagQueryView = null
+  connectedRagQueryView = null,
+  connectedRagQueryState = null
 }: WorkspaceIndexPanelProps) => {
   const [query, setQuery] = useState("");
+  const effectiveConnectedView = connectedRagQueryState?.commandView ?? connectedRagQueryView;
   const mergedRag = useMemo(() => mergeDesktopWorkspaceRagResults({
     localResults: viewModel.ragResults,
-    connectedRows: connectedRagQueryView?.connectedRows ?? []
-  }), [connectedRagQueryView?.connectedRows, viewModel.ragResults]);
-  const connectedSummary = connectedRagQueryView?.summary ?? disconnectedSummary;
+    connectedRows: effectiveConnectedView?.connectedRows ?? []
+  }), [effectiveConnectedView?.connectedRows, viewModel.ragResults]);
+  const connectedSummary = effectiveConnectedView?.summary
+    ?? controllerSummary(connectedRagQueryState)
+    ?? disconnectedSummary;
   const blockedSummary = summarizeBlockedRows(
     connectedSummary.blockedCount,
     mergedRag.blocked

@@ -48,6 +48,10 @@ import { DesktopKnowledgeMapPanel } from "./knowledge-map/DesktopKnowledgeMapPan
 import { buildDesktopKnowledgeMapViewModel, type DesktopKnowledgeMapViewModel, type DesktopSourceJumpIntent } from "./knowledge-map/desktop-knowledge-map";
 import { isSameChemdDesktopDocumentPath, MonacoChemdEditor, toChemdDesktopModelUri, type MonacoChemdEditorHandle } from "./MonacoChemdEditor";
 import { DesktopWorkspaceIndexPanel } from "./workspace-index/DesktopWorkspaceIndexPanel";
+import {
+  buildDesktopPostgresRagQueryControllerState,
+  type DesktopPostgresRagQueryControllerState
+} from "./workspace-index/desktop-postgres-rag-query-controller";
 import type { DesktopWorkspaceIndexViewModel } from "./workspace-index/desktop-workspace-index";
 import { useDesktopWorkspaceIndexController } from "./workspace-index/use-desktop-workspace-index";
 
@@ -204,6 +208,7 @@ type DesktopWorkbenchProps = {
   workspaceSymbolIndexController: ReturnType<typeof useWorkspaceSymbolIndexController>;
   semanticPreview: DesktopSemanticPreview;
   workspaceIndexViewModel: DesktopWorkspaceIndexViewModel;
+  workspaceRagQueryState: DesktopPostgresRagQueryControllerState;
   knowledgeMapViewModel: DesktopKnowledgeMapViewModel;
   output: ChemdLanguageCompileOutput;
   compileError?: string;
@@ -238,6 +243,7 @@ type InsightPaneProps = {
   outline: ChemdOutlineItem[];
   diagnostics: ChemdEditorDiagnostic[];
   workspaceIndexViewModel: DesktopWorkspaceIndexViewModel;
+  workspaceRagQueryState: DesktopPostgresRagQueryControllerState;
   knowledgeMapViewModel: DesktopKnowledgeMapViewModel;
   mode: DocumentMode;
   sidecarStatus: SidecarStatus;
@@ -2572,7 +2578,7 @@ const InsightDockContent = ({
   const contentByPanel: Record<InsightDockPanelId, ReactNode> = {
     outline: <div className="desktop-insight-section">{props.outline.length > 0 ? <OutlineTree items={props.outline} /> : <p className="desktop-empty-copy">No outline from language service.</p>}</div>,
     preview: <SemanticPreviewPanel preview={props.semanticPreview} workspaceSymbolIndexState={props.workspaceSymbolIndexState} workspaceSymbolIndexMessage={props.workspaceSymbolIndexMessage} workspaceSymbolIndexSummary={props.workspaceSymbolIndexSummary} />,
-    rag: <DesktopWorkspaceIndexPanel viewModel={props.workspaceIndexViewModel} />,
+    rag: <DesktopWorkspaceIndexPanel viewModel={props.workspaceIndexViewModel} connectedRagQueryState={props.workspaceRagQueryState} />,
     graph: <DesktopKnowledgeMapPanel viewModel={props.knowledgeMapViewModel} onSourceJump={props.onKnowledgeMapSourceJump} />,
     runtime: <SidecarControlPanel status={props.sidecarStatus} logTail={props.sidecarLogTail} operation={props.sidecarOperation} message={props.sidecarMessage} errorMessage={props.sidecarError} onStart={props.onStartSidecar} onStop={props.onStopSidecar} onRefresh={props.onRefreshSidecar} onLoadLogs={props.onLoadSidecarLogs} />,
     postgres: <PostgresStatusPanel status={props.postgresStatus} managedStatus={props.managedPostgresStatus} loading={props.postgresLoading} managedOperation={props.managedPostgresOperation} errorMessage={props.postgresError} managedErrorMessage={props.managedPostgresError} managedMessage={props.managedPostgresMessage} profiles={props.postgresProfiles} persistState={props.persistState} persistDisabledReason={props.persistDisabledReason} onRefresh={props.onRefreshPostgres} onInitManaged={props.onInitManagedPostgres} onStartManaged={props.onStartManagedPostgres} onStopManaged={props.onStopManagedPostgres} onMigrateManaged={props.onMigrateManagedPostgres} onRefreshManaged={props.onRefreshManagedPostgres} onPersistGraph={props.onPersistGraph} />,
@@ -3528,6 +3534,7 @@ const DesktopWorkbench = ({
   workspaceSymbolIndexController,
   semanticPreview,
   workspaceIndexViewModel,
+  workspaceRagQueryState,
   knowledgeMapViewModel,
   output,
   compileError,
@@ -3627,6 +3634,7 @@ const DesktopWorkbench = ({
               outline={output.outline}
               diagnostics={output.diagnostics}
               workspaceIndexViewModel={workspaceIndexViewModel}
+              workspaceRagQueryState={workspaceRagQueryState}
               knowledgeMapViewModel={knowledgeMapViewModel}
               mode={mode}
               sidecarStatus={sidecarController.status} sidecarLogTail={sidecarController.logTail} sidecarOperation={sidecarController.operation} sidecarMessage={sidecarController.message} sidecarError={sidecarController.error}
@@ -3877,6 +3885,26 @@ export const App = () => {
     readFile: readWorkspaceIndexFile
   });
   const workspaceIndexViewModel = workspaceIndexController.viewModel;
+  const workspaceRagQueryState = useMemo(() => buildDesktopPostgresRagQueryControllerState({
+    mode: workspaceController.mode,
+    query: "",
+    postgresStatus: postgresController.status,
+    embedding: {
+      providerAvailable: false,
+      vector: null,
+      model: null
+    },
+    runnerAvailable: true,
+    localResults: workspaceIndexViewModel.ragResults,
+    workspaceId: workspaceController.workspace.workspaceId,
+    documentId: workspaceController.selectedFile.path
+  }), [
+    postgresController.status,
+    workspaceController.mode,
+    workspaceController.selectedFile.path,
+    workspaceController.workspace.workspaceId,
+    workspaceIndexViewModel.ragResults
+  ]);
   const compileError = output.status === "failed" ? output.error.message : undefined;
   const persistController = usePersistRuntimeController({
     mode: workspaceController.mode,
@@ -3978,7 +4006,7 @@ export const App = () => {
       workspace={workspaceController.workspace} workspaceState={workspaceController.workspaceState}
       sidecarController={sidecarController} postgresController={postgresController} persistController={persistController} localStoreController={localStoreController} reactionIntelligenceJobBuild={reactionIntelligenceJobBuild} reactionIntelligenceJobController={reactionIntelligenceJobController} workspaceIngestController={workspaceIngestController} workspaceSymbolIndexController={workspaceSymbolIndexController}
       semanticPreview={semanticPreview}
-      workspaceIndexViewModel={workspaceIndexViewModel} knowledgeMapViewModel={knowledgeMapViewModel}
+      workspaceIndexViewModel={workspaceIndexViewModel} workspaceRagQueryState={workspaceRagQueryState} knowledgeMapViewModel={knowledgeMapViewModel}
       output={output} compileError={compileError}
       files={workspaceController.files} selectedFile={workspaceController.selectedFile} selectedFileId={workspaceController.selectedFileId}
       mode={workspaceController.mode} message={workspaceController.message} source={workspaceController.source} savedSource={workspaceController.savedSource} workspaceConflict={workspaceController.workspaceConflict}
