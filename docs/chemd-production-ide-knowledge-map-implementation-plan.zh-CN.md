@@ -71,6 +71,47 @@
 - `apps/desktop` 中 Monaco providers、workspace index、reaction map panel、semantic preview 的 UI 接入。
 - `.trellis` 记录、最终验证、合并和安全清理。
 
+### 2026-05-13：第二轮 Desktop 适配层并行切片
+
+已完成：
+
+- [x] 在主集成分支注册新增 workspace package alias：`@chemd/workspace-index`、`@chemd/semantic-rendering`、`@chemd/reaction-map`。
+- [x] 在 `apps/desktop` 接入新增包依赖并更新 lockfile：`74b09bb chore(desktop)：接入地图相关包依赖`。
+- [x] 验证 `pnpm --filter @chemd/desktop typecheck`。
+
+第二轮并行任务：
+
+| 分支 | 工作树 | 目标 | 写入边界 | 状态 |
+| --- | --- | --- | --- | --- |
+| `desktop-ide-map-monaco-provider` | `D:\Code\chemd-wt-map-monaco-provider` | Monaco completion/snippet provider 注册适配 | `apps/desktop/src/monaco/**`、`MonacoChemdEditor.tsx` | 子代理 usage limit 失败；工作树/分支已清理 |
+| `desktop-ide-map-workspace-controller` | `D:\Code\chemd-wt-map-workspace-controller` | workspace symbol index UI 控制/视图模型 | `apps/desktop/src/workspace-index/**` | 子代理 usage limit 失败；工作树/分支已清理 |
+| `desktop-ide-map-view-models` | `D:\Code\chemd-wt-map-view-models` | reaction map 与 semantic rendering 视图模型 | `apps/desktop/src/knowledge-map/**` | 子代理 usage limit 失败；工作树/分支已清理 |
+
+架构约束：
+
+- `apps/desktop/src/App.tsx` 是最终串联层，不交给并行子任务直接修改。
+- Monaco provider、workspace index、knowledge map 都先落成纯 helper / view-model，再由主集成分支做薄接线。
+- 子任务不得修改 `package.json`、lockfile、tsconfig、shared contracts、Tauri 命令或其他 packages；如发现需要 shared contract，停止并上报。
+
+调度结果：
+
+- 三个 `gpt-5.5-high` 子代理均因 usage limit 在启动阶段失败，未产生代码改动。
+- 主架构工作树按相同边界串行完成第二轮适配层，保留模块边界，未把业务规则塞入入口文件。
+
+主架构工作树已完成：
+
+- [x] `apps/desktop/src/monaco/chemd-completion-provider.ts`：Monaco completion DTO 映射、snippet rule、provider lifecycle/dispose。
+- [x] `apps/desktop/src/MonacoChemdEditor.tsx`：薄接入 completion provider，通过 ref 读取当前 compile output / workspace index。
+- [x] `apps/desktop/src/workspace-index/desktop-workspace-index.ts`：workspace symbol/reference index view-model 与 completion index adapter。
+- [x] `apps/desktop/src/knowledge-map/desktop-knowledge-map.ts`：semantic render tree 与 reaction map fallback layout view-model。
+- [x] 新增 desktop focused tests：Monaco provider、workspace index view-model、knowledge map view-model。
+
+已验证：
+
+- [x] `pnpm exec vitest run apps/desktop/src/monaco/chemd-completion-provider.test.ts apps/desktop/src/workspace-index/desktop-workspace-index.test.ts apps/desktop/src/knowledge-map/desktop-knowledge-map.test.ts`
+- [x] `pnpm --filter @chemd/desktop typecheck`
+- [x] `pnpm exec eslint apps/desktop/src/monaco apps/desktop/src/workspace-index apps/desktop/src/knowledge-map apps/desktop/src/MonacoChemdEditor.tsx --ext .ts,.tsx`
+
 ---
 
 ## 1. 总目标

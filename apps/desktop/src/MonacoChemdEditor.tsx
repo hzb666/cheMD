@@ -4,7 +4,8 @@ import type { editor } from "monaco-editor";
 import * as monacoRuntime from "monaco-editor/esm/vs/editor/editor.api.js";
 import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 
-import { toMonacoLanguageServiceModel, type ChemdLanguageCompileOutput, type MonacoMarkerLike } from "@chemd/language-service";
+import { toMonacoLanguageServiceModel, type ChemdLanguageCompileOutput, type ChemdWorkspaceSymbolIndex, type MonacoMarkerLike } from "@chemd/language-service";
+import { registerChemdCompletionProvider } from "./monaco/chemd-completion-provider";
 
 export const CHEMD_LANGUAGE_ID = "chemd";
 
@@ -31,6 +32,7 @@ type MonacoChemdEditorProps = {
   value: string;
   documentPath: string;
   compileOutput: ChemdLanguageCompileOutput;
+  workspaceIndex?: ChemdWorkspaceSymbolIndex;
   onChange: (nextSource: string) => void;
   onSave: () => void;
 };
@@ -130,12 +132,15 @@ export const MonacoChemdEditor = ({
   value,
   documentPath,
   compileOutput,
+  workspaceIndex,
   onChange,
   onSave
 }: MonacoChemdEditorProps) => {
   const editorRef = useRef<MonacoEditor | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
   const onSaveRef = useRef(onSave);
+  const compileOutputRef = useRef(compileOutput);
+  const workspaceIndexRef = useRef(workspaceIndex);
   const markers = useMemo(
     () => toMonacoLanguageServiceModel(compileOutput).markers.map(toEditorMarker),
     [compileOutput]
@@ -145,6 +150,11 @@ export const MonacoChemdEditor = ({
   useEffect(() => {
     onSaveRef.current = onSave;
   }, [onSave]);
+
+  useEffect(() => {
+    compileOutputRef.current = compileOutput;
+    workspaceIndexRef.current = workspaceIndex;
+  }, [compileOutput, workspaceIndex]);
 
   const syncMarkers = useCallback(() => {
     const editorInstance = editorRef.current;
@@ -169,10 +179,17 @@ export const MonacoChemdEditor = ({
   const handleMount = useCallback<OnMount>((editorInstance, monaco) => {
     editorRef.current = editorInstance;
     monacoRef.current = monaco;
+    const completionProvider = registerChemdCompletionProvider(monaco, CHEMD_LANGUAGE_ID, {
+      getCompileOutput: () => compileOutputRef.current,
+      getWorkspaceIndex: () => workspaceIndexRef.current
+    });
     editorInstance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
       onSaveRef.current();
     });
     syncMarkers();
+    editorInstance.onDidDispose(() => {
+      completionProvider.dispose();
+    });
   }, [syncMarkers]);
 
   const handleChange = useCallback<OnChange>((nextValue) => {
