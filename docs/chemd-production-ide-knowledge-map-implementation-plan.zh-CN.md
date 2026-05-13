@@ -834,6 +834,19 @@ P2 中：
 
 - [ ] graph index 可生成。
 - [ ] cluster list/detail 可显示。
+
+---
+
+## 2026-05-13 M5.1 分支状态：desktop-ide-renderable-node-core
+
+- 分支：`desktop-ide-renderable-node-core`
+- 工作树：`D:\Code\chemd-wt-renderable-node-core`
+- 范围：仅实现 `@chemd/renderer-json` 的 renderable semantic node DTO core；不接入 React/UI，不修改 compiler contract。
+- 新增：`buildRenderableNodeTree(document, options?)`、`ChemdRenderableNodeTreeV1`、`ChemdRenderableNodeV1`、`ChemdRenderDirectiveV1`、`ChemdSourceRefV1`。
+- DTO 策略：`col` 保留 columns layout 容器；`template` 保留 nested-body 容器并展开 body children；heavy node 使用 lazy hydration directive，缺少可渲染信息时降级 placeholder directive；markdown 使用 text directive。
+- 已验证：`pnpm --filter @chemd/renderer-json test` 通过，2 files / 9 tests passed。
+- 已验证：`pnpm --filter @chemd/renderer-json typecheck` 通过。
+- 已验证：`git diff --check` 通过。
 - [ ] similarity edge basis 可解释。
 - [ ] weak/semantic-only warning 可见。
 - [ ] cluster map 可显示 layout artifact。
