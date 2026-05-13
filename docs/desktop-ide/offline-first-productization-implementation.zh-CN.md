@@ -684,6 +684,16 @@ local + connected 结果去重和按 score / distance 排序；runtime smoke 增
 `SKIP`。当前仍未接入真实 embedding provider/backfill UI，也未把 connected query
 接进桌面 RAG 面板。
 
+2026-05-14 第二批 M6 接入完成：Desktop 新增
+`backfill_postgres_rag_embeddings` Tauri command contract 和 Rust write path，调用方传入
+已生成的 embedding vectors；Rust 只校验并 upsert shared schema 的
+`chemd_embedding_models` 与 `chemd_rag_chunk_embeddings`，支持 `dryRun`、逐项
+validation summary、维度一致性检查与 password 脱敏，不直接接远端 provider secret。
+同时新增 `desktop-postgres-rag-query-view` adapter，把 `query_postgres_rag` result
+转换为 connected RAG rows，并汇总 command/adapter blocked count，为后续 RAG panel
+UI 接线准备。当前仍未把 embedding provider 配置、backfill UI、connected query button
+接入 App/RAG panel。
+
 验收：
 
 - Graph/RAG 只消费 compiler/exporter output，不重新解析 source。
@@ -829,6 +839,8 @@ env、database URL、API key、token 或 password。诊断包说明见
 - Desktop RAG query command 已可复用 active Postgres config 查询 shared pgvector
   rows，并强制 citation-backed results；真实 runner/真实 embedding 仍按环境型
   `SKIP`。
+- Desktop RAG embedding backfill command 已可写入 shared pgvector schema；provider
+  配置和 UI 触发仍待后续接入。
 - Tauri command-level proof 尚未配置 runner，当前按环境型 `SKIP` 处理，不阻塞离线
   优先主线。
 
@@ -843,8 +855,8 @@ env、database URL、API key、token 或 password。诊断包说明见
 - [x] Reaction intelligence job builder 不伪造 RXN SMILES，只消费真实结构字段；失败或
   缺依赖时保留本地日志 tail 和可显示状态。
 - [x] RAG search 有 citation gate 基础：本地结果必须带 citation locator；connected
-  pgvector query command 与 result gate 已具备，UI 接入、真实 embedding provider 与
-  backfill 仍待补。
+  pgvector query command、embedding write command、result gate 与 query view adapter
+  已具备，UI 接入和真实 embedding provider 配置仍待补。
 - [ ] Agent run 可审计，patch 需用户确认。
 - [ ] 所有增强能力离线/失败时可降级。
 

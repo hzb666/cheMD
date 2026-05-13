@@ -717,6 +717,22 @@ hybrid_score =
   typecheck 和 focused ESLint 均通过；真实 embedding provider/backfill UI 与桌面
   RAG 面板接入仍待后续 M6 切片。
 
+状态记录（Desktop Postgres RAG embedding backfill / query view adapter）：
+
+- Desktop 新增 `backfill_postgres_rag_embeddings` Tauri command contract 与 Rust
+  write path；调用方传入已生成 embedding vectors，desktop 不在本阶段直接接 provider
+  secret 或远端模型。
+- Rust 仅写 shared schema 的 `chemd_embedding_models` 与
+  `chemd_rag_chunk_embeddings`，支持 `dryRun`、逐项 validation summary、维度一致性
+  检查、invalid item 失败汇总和 password 脱敏；不创建 desktop-only schema，不执行
+  migration。
+- Workspace index 层新增 `desktop-postgres-rag-query-view` adapter，把
+  `query_postgres_rag` command result 转成 connected RAG rows，并汇总 command
+  blocked count 与 adapter blocked reasons，为后续 RAG panel UI 接线准备。
+- 当前验证：`cargo test postgres_rag_backfill` 7/7、query view + connected result
+  Vitest 8/8、desktop typecheck、focused ESLint 与 `git diff --check` 均通过；真实
+  embedding provider 配置、backfill UI 和 connected query button 仍待后续接入。
+
 ---
 
 ## 8. 验证矩阵
