@@ -1,4 +1,9 @@
-import type { ChemdReactionIntelligenceArtifactV1 } from "@chemd/reaction-map";
+import type {
+  ChemdReactionIntelligenceArtifactV1,
+  ChemdReactionIntelligenceJobInputV1,
+  ChemdReactionIntelligenceMissingDependencyPolicyV1,
+  ChemdReactionIntelligenceProviderKindV1
+} from "@chemd/reaction-map";
 
 export type RuntimeState = "ready" | "placeholder" | "degraded" | "offline";
 
@@ -281,6 +286,26 @@ export interface LocalOutboxSyncResult extends LocalOutboxSyncSummary {
   target: LocalOutboxSyncTargetSummary;
 }
 
+export type ReactionIntelligenceWorkerStatus = "completed" | "skipped" | "failed";
+
+export interface ReactionIntelligenceWorkerInput {
+  jobJson: ChemdReactionIntelligenceJobInputV1;
+  providers?: ChemdReactionIntelligenceProviderKindV1[];
+  missingDependency?: ChemdReactionIntelligenceMissingDependencyPolicyV1;
+  pretty?: boolean;
+}
+
+export interface ReactionIntelligenceWorkerResult {
+  status: ReactionIntelligenceWorkerStatus;
+  message: string;
+  reason: string | null;
+  detail: string | null;
+  artifactJson: ChemdReactionIntelligenceArtifactV1 | null;
+  exitCode: number | null;
+  stdoutTail: string[];
+  stderrTail: string[];
+}
+
 export type LocalAuthoringCompileState = "compiled" | "failed" | "pending" | "skipped";
 export type LocalAuthoringStepState = "saved" | "compiled" | "pending" | "failed" | "skipped";
 export type LocalSyncDisplayState = "pending" | "synced" | "failed" | "skipped";
@@ -531,6 +556,10 @@ export interface DesktopCommandMap {
     input: void;
     output: LocalOutboxSyncResult;
   };
+  run_reaction_intelligence_worker: {
+    input: ReactionIntelligenceWorkerInput;
+    output: ReactionIntelligenceWorkerResult;
+  };
   export_diagnostics_bundle: {
     input: void;
     output: DiagnosticsBundleExportResult;
@@ -600,7 +629,7 @@ export const shellDiagnosticsBundleResult: DiagnosticsBundleExportResult = {
   outputPath: "",
   summary: {
     generatedAt: "",
-    commandCount: 24,
+    commandCount: 25,
     boundarySkipCount: 5,
     supportCommandCount: 4
   }

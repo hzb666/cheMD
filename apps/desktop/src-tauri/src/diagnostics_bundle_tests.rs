@@ -15,10 +15,11 @@ fn export_diagnostics_bundle_writes_parseable_json() {
     let parsed: Value = serde_json::from_str(&json).expect("bundle is valid JSON");
 
     assert_eq!(parsed["schemaVersion"], 1);
-    assert_eq!(parsed["summary"]["commandCount"], 24);
+    assert_eq!(parsed["summary"]["commandCount"], 25);
     assert_eq!(parsed["summary"]["boundarySkipCount"], 5);
     assert_eq!(parsed["runtimeBoundaries"][0]["status"], "SKIP");
     assert!(json.contains("export_diagnostics_bundle"));
+    assert!(json.contains("run_reaction_intelligence_worker"));
 
     let _ = fs::remove_dir_all(dir);
 }
