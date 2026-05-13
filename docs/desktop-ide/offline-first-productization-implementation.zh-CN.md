@@ -701,6 +701,15 @@ disabled/degraded 状态。当前 App 侧不会伪造 embedding vector，也不�
 disabled，本地 citation-backed RAG、symbols 与 references 搜索继续可用。后续仍需补
 embedding provider 配置、query/backfill UI trigger 与真实 provider/runner proof。
 
+2026-05-14 第四批 M6 接入完成：Desktop 新增只读
+`read_embedding_provider_status` Tauri command，用于检查
+`CHEMD_EMBEDDING_*` 运行时环境是否足够支撑 connected RAG；该 command 不联网、不访问
+数据库、不返回 API key 或完整 URL，只返回 host、model、dim、distance metric、timeout
+与脱敏 detail。RAG 面板新增 query 输入与 Run 入口，并读取 provider status 参与
+readiness；由于当前仍没有“query text -> embedding vector”的桌面 provider command，
+Run 在无 vector 时保持 disabled，不会伪造 embedding，也不会误报 pgvector 查询已成功。
+backfill UI 暂缓到真实 provider vector 生成路径完成后再接入。
+
 验收：
 
 - Graph/RAG 只消费 compiler/exporter output，不重新解析 source。
@@ -863,8 +872,9 @@ env、database URL、API key、token 或 password。诊断包说明见
   缺依赖时保留本地日志 tail 和可显示状态。
 - [x] RAG search 有 citation gate 基础：本地结果必须带 citation locator；connected
   pgvector query command、embedding write command、result gate、query view adapter
-  与 RAG panel disabled/degraded 展示已具备；真实 embedding provider 配置、query
-  trigger 与 backfill UI 仍待补。
+  与 RAG panel disabled/degraded 展示已具备；embedding provider status、query 输入
+  与 disabled Run 入口已接入。真实 query embedding vector 生成、可执行 query trigger
+  与 backfill UI 仍待补。
 - [ ] Agent run 可审计，patch 需用户确认。
 - [ ] 所有增强能力离线/失败时可降级。
 

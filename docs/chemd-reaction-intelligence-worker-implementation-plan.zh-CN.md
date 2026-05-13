@@ -748,6 +748,24 @@ hybrid_score =
   focused ESLint、desktop build 与 `git diff --check` 均通过；`App.tsx` focused ESLint
   仍只有既有复杂度/函数长度门禁，按用户要求记录到最终 M11 复杂度治理。
 
+状态记录（Desktop embedding provider status / query-only UI entry）：
+
+- Desktop 新增 `read_embedding_provider_status` Tauri command，只读
+  `CHEMD_EMBEDDING_*` 运行时环境，返回 provider kind、model、embedding dim、
+  distance metric、timeout、API key 是否配置与 base URL host；不联网、不访问 DB、
+  不返回 API key 或完整 URL。
+- Diagnostics bundle command 清单同步补齐 `read_embedding_provider_status`、
+  `query_postgres_rag` 与 `backfill_postgres_rag_embeddings`，支持诊断包解释
+  connected RAG 边界。
+- RAG 面板新增 query 输入与 Run 入口，App 读取 provider status 并传入 connected
+  RAG readiness；当前没有 query embedding vector 生成 command，因此 Run 在无 vector
+  时保持 disabled，不伪造 embedding，也不误报 pgvector 查询成功。
+- 当前验证：embedding provider Rust tests 5/5、diagnostics bundle Rust tests 3/3、
+  diagnostics script tests 8/8、connected RAG Vitest 20/20、desktop typecheck/build、
+  focused ESLint 与 `git diff --check` 均通过。复杂度类 focused ESLint 仍按 M11
+  记录：`DesktopWorkspaceIndexPanel` complexity 19/15，`App.tsx` 仍有既有
+  max-lines/complexity 门禁。
+
 ---
 
 ## 8. 验证矩阵
