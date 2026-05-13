@@ -37,14 +37,20 @@ const fieldRegistry: Record<Exclude<ChemdCompletionBlockKind, "unknown">, string
     "conversion",
     "selectivity",
     "caption"
-  ]
+  ],
+  result: ["status", "yield", "conversion", "selectivity", "reaction", "product", "notes"],
+  procedure: ["ref", "reaction", "evidence", "step"],
+  step: ["family", "stage", "purpose", "inputs", "outputs", "dependsOn", "evidence", "confidence"],
+  template: ["params", "bind", "description", "body"],
+  use: [],
+  condition_varies: ["reaction", "standard", "condition", "varies", "notes", "var1", "res1", "note1"]
 };
 
 export const getChemdFieldCompletions = (
   context: ChemdCompletionContext
 ): ChemdCompletionItem[] => {
   const block = context.block;
-  if (!context.isChemdBlock || !block || !context.isFieldKeyPosition) {
+  if (!block || !context.isFieldKeyPosition) {
     return [];
   }
 
@@ -68,7 +74,7 @@ export const getChemdFieldCompletions = (
 };
 
 const getFieldsForKind = (kind: ChemdCompletionBlockKind): string[] => {
-  if (kind === "molecule" || kind === "reaction") {
+  if (kind !== "unknown") {
     return fieldRegistry[kind];
   }
 

@@ -60,6 +60,57 @@ stage: |
     ]);
   });
 
+  it("suggests procedure step family values", () => {
+    expect(labelsFor(`:::procedure #proc-main
+step: hea|
+:::`)).toEqual(["heat"]);
+  });
+
+  it("filters current-document references by field context", () => {
+    const compileOutput = compileChemdForEditor({
+      source: `---
+id: exp-completion
+title: Completion
+date: 2026-05-13
+---
+
+:::chemd #mol-a
+kind: molecule
+smiles: CCO
+:::
+
+:::chemd #rxn-a
+kind: reaction
+reactants: @mol-a
+products: product-a
+:::
+`
+    });
+    const items = getChemdCompletions({
+      ...withCursor(`:::chemd #rxn-edit
+kind: reaction
+reactants: @|
+:::`),
+      documentUri: "file:///current.chemd",
+      compileOutput,
+      triggerKind: "trigger-character",
+      triggerCharacter: "@"
+    }).items;
+
+    expect(items.map((item) => item.label)).toContain("mol-a");
+    expect(items.map((item) => item.label)).not.toContain("rxn-a");
+    expect(items.find((item) => item.label === "mol-a")).toMatchObject({
+      kind: "reference",
+      insertText: "@mol-a",
+      range: {
+        startLine: 3,
+        startColumn: 12,
+        endLine: 3,
+        endColumn: 13
+      }
+    });
+  });
+
   it("suggests reaction block fields and omits existing fields", () => {
     const labels = labelsFor(`:::chemd #rxn-main
 kind: reaction

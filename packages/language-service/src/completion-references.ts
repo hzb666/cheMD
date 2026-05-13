@@ -7,6 +7,11 @@ import type { ChemdSourceRange, ChemdSymbol } from "./types";
 
 const referenceFields = new Set(["reactants", "products", "prev"]);
 const referenceTokenPattern = /@([A-Za-z0-9_-]*)$/;
+const preferredKindsByField: Record<string, string[]> = {
+  reactants: ["molecule"],
+  products: ["molecule"],
+  prev: ["reaction"]
+};
 
 export const getChemdReferenceCompletions = (
   request: ChemdCompletionRequest,
@@ -19,9 +24,23 @@ export const getChemdReferenceCompletions = (
   }
 
   const prefix = token.symbolPrefix.toLowerCase();
-  return getCurrentDocumentSymbols(symbols, context.block?.id)
+  return filterPreferredSymbols(getCurrentDocumentSymbols(symbols, context.block?.id), context)
     .filter((symbol) => symbol.id.toLowerCase().startsWith(prefix))
     .map((symbol, index) => createReferenceItem(symbol, token.range, index));
+};
+
+const filterPreferredSymbols = (
+  symbols: ChemdSymbol[],
+  context: ChemdCompletionContext
+): ChemdSymbol[] => {
+  const preferredKinds = context.fieldKey
+    ? preferredKindsByField[context.fieldKey] ?? []
+    : [];
+  const preferred = preferredKinds.length > 0
+    ? symbols.filter((symbol) => preferredKinds.includes(symbol.kind))
+    : [];
+
+  return preferred.length > 0 ? preferred : symbols;
 };
 
 const readReferenceToken = (

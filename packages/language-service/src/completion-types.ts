@@ -1,4 +1,8 @@
-import type { ChemdLanguageCompileOutput, ChemdSourceRange } from "./types";
+import type {
+  ChemdLanguageCompileOutput,
+  ChemdSourceRange
+} from "./types";
+import type { ChemdWorkspaceSymbolIndex } from "./workspace-symbol-types";
 
 export interface ChemdEditorPosition {
   line: number;
@@ -18,13 +22,16 @@ export interface ChemdCompletionRequest {
   triggerKind?: ChemdCompletionTriggerKind;
   triggerCharacter?: string;
   compileOutput?: ChemdLanguageCompileOutput;
+  workspaceIndex?: ChemdWorkspaceSymbolIndex;
 }
 
 export type ChemdCompletionItemKind =
   | "snippet"
   | "field"
   | "value"
-  | "reference";
+  | "reference"
+  | "template"
+  | "quick_fix";
 
 export interface ChemdReferenceCompletionData {
   type: "reference";
@@ -58,6 +65,12 @@ export interface ChemdCompletionList {
 export type ChemdCompletionBlockKind =
   | "molecule"
   | "reaction"
+  | "result"
+  | "procedure"
+  | "step"
+  | "template"
+  | "use"
+  | "condition_varies"
   | "unknown";
 
 export interface ChemdCompletionContext {
@@ -70,6 +83,9 @@ export interface ChemdCompletionContext {
   range: ChemdSourceRange;
   isFrontmatter: boolean;
   isChemdBlock: boolean;
+  isUseHeaderPosition: boolean;
+  isReferencePosition: boolean;
+  isStepFamilyPosition: boolean;
   isFieldKeyPosition: boolean;
   isFieldValuePosition: boolean;
   fieldKey?: string;

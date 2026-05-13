@@ -1,0 +1,279 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  compileChemdForEditor,
+  type ChemdLanguageCompileSuccess,
+  type ChemdLanguageCompileOutput
+} from "@chemd/language-service";
+
+import {
+  buildDesktopKnowledgeMapViewModel,
+  createKnowledgeMapSourceJumpIntent
+} from "./desktop-knowledge-map";
+
+const compile = (source: string): ChemdLanguageCompileOutput =>
+  compileChemdForEditor({
+    source,
+    documentUri: "experiments/map.chemd.md",
+    options: { strictChemdKind: true, procedureMode: "auto" }
+  });
+
+const outputWithReaction = (): ChemdLanguageCompileSuccess => ({
+  status: "ok",
+  documentUri: "experiments/map.chemd.md",
+  compiledAt: "2026-05-13T00:00:00.000Z",
+  diagnostics: [],
+  outline: [
+    {
+      id: "mol-a",
+      label: "mol-a",
+      kind: "molecule",
+      range: { startLine: 7, startColumn: 1, endLine: 10, endColumn: 4 }
+    },
+    {
+      id: "rxn-a",
+      label: "rxn-a",
+      kind: "reaction",
+      range: { startLine: 12, startColumn: 1, endLine: 16, endColumn: 4 }
+    }
+  ],
+  symbols: [
+    {
+      id: "mol-a",
+      label: "mol-a",
+      kind: "molecule",
+      range: { startLine: 7, startColumn: 1, endLine: 10, endColumn: 4 },
+      sourceNodeType: "molecule"
+    },
+    {
+      id: "rxn-a",
+      label: "rxn-a",
+      kind: "reaction",
+      range: { startLine: 12, startColumn: 1, endLine: 16, endColumn: 4 },
+      sourceNodeType: "reaction"
+    }
+  ],
+  result: ({
+    document: {
+      type: "document",
+      meta: {
+        id: "map-doc",
+        title: "Knowledge map",
+        date: "2026-05-13"
+      },
+      children: [
+        {
+          type: "molecule",
+          id: "mol-a",
+          name: "A",
+          smiles: "CCO",
+          sourceSpan: { start: 42, end: 80, startLine: 7, endLine: 10 }
+        },
+        {
+          type: "reaction",
+          id: "rxn-a",
+          reactants: ["mol-a"],
+          products: ["mol-b"],
+          sourceSpan: { start: 100, end: 180, startLine: 12, endLine: 16 }
+        },
+        {
+          type: "observation",
+          id: "obs-a",
+          text: "Reaction evidence",
+          sourceSpan: { start: 181, end: 220, startLine: 18, endLine: 19 }
+        }
+      ],
+      diagnostics: []
+    },
+    diagnostics: []
+  } as unknown) as ChemdLanguageCompileSuccess["result"]
+});
+
+const outputWithManyReactions = (count: number): ChemdLanguageCompileSuccess => {
+  const symbols = Array.from({ length: count }, (_, index) => ({
+    id: `rxn-${index + 1}`,
+    label: `rxn-${index + 1}`,
+    kind: "reaction",
+    range: { startLine: index + 1, startColumn: 1, endLine: index + 1, endColumn: 8 },
+    sourceNodeType: "reaction"
+  }));
+
+  return {
+    ...outputWithReaction(),
+    symbols,
+    result: ({
+      document: {
+        type: "document",
+        meta: {
+          id: "large-map-doc",
+          title: "Large knowledge map",
+          date: "2026-05-13"
+        },
+        children: symbols.map((symbol) => ({
+          type: "reaction",
+          id: symbol.id,
+          reactants: [`mol-${symbol.id}`],
+          products: [`product-${symbol.id}`],
+          sourceSpan: {
+            start: symbol.range.startLine * 10,
+            end: symbol.range.endLine * 10,
+            startLine: symbol.range.startLine,
+            endLine: symbol.range.endLine
+          }
+        })),
+        diagnostics: []
+      },
+      diagnostics: []
+    } as unknown) as ChemdLanguageCompileSuccess["result"]
+  };
+};
+
+describe("desktop knowledge map view model", () => {
+  it("builds semantic summaries from successful compile output", () => {
+    const viewModel = buildDesktopKnowledgeMapViewModel(outputWithReaction());
+
+    expect(viewModel.state).toBe("ready");
+    expect(viewModel.semanticTree?.document_id).toBe("map-doc");
+    expect(viewModel.semanticSummary.nodeCount).toBeGreaterThan(1);
+    expect(viewModel.semanticSummary.components).toEqual(expect.arrayContaining([
+      expect.objectContaining({ component: "MoleculeBlock" }),
+      expect.objectContaining({ component: "ReactionBlock" })
+    ]));
+  });
+
+  it("creates reaction map data with deterministic fallback layout", () => {
+    const viewModel = buildDesktopKnowledgeMapViewModel(outputWithReaction());
+
+    expect(viewModel.reactionSummary).toMatchObject({
+      reactionCount: 1,
+      layoutEngine: "deterministic_fallback"
+    });
+    expect(viewModel.reactionSummary.message).toContain("TMAP/worker");
+    expect(viewModel.reactionMap.nodes[0]).toMatchObject({
+      reaction_entity_id: "rxn-a",
+      x: 0,
+      y: 0
+    });
+  });
+
+  it("exposes expandable reaction renderable data with source refs", () => {
+    const viewModel = buildDesktopKnowledgeMapViewModel(outputWithReaction());
+
+    expect(viewModel.reactionRenderables).toHaveLength(1);
+    expect(viewModel.reactionRenderables[0]).toMatchObject({
+      semanticId: "rxn-a",
+      component: "ReactionBlock",
+      hydration: "visible",
+      sourceRef: {
+        label: "map.chemd.md L12-L16",
+        startLine: 12,
+        endLine: 16
+      }
+    });
+  });
+
+  it("builds source jump intents for renderable and evidence source refs", () => {
+    const viewModel = buildDesktopKnowledgeMapViewModel(outputWithReaction());
+    const reaction = viewModel.reactionRenderables[0];
+    const evidence = viewModel.evidenceSourceRefs[0];
+
+    expect(reaction.sourceRef?.intent).toEqual({
+      kind: "chemd-source-jump",
+      nodeId: "reaction::rxn-a",
+      semanticId: "rxn-a",
+      sourceKind: "chemd",
+      sourceUri: "experiments/map.chemd.md",
+      range: {
+        startLine: 12,
+        endLine: 16,
+        startOffset: 100,
+        endOffset: 180
+      }
+    });
+    expect(evidence.sourceRef.intent?.range).toMatchObject({
+      startLine: 18,
+      endLine: 19
+    });
+  });
+
+  it("returns null source jump intent when a source ref has no line", () => {
+    expect(createKnowledgeMapSourceJumpIntent("node-a", "rxn-a", {
+      source_kind: "chemd",
+      source_uri: "experiments/map.chemd.md"
+    })).toBeNull();
+  });
+
+  it("adds cluster badge data to reaction renderable rows", () => {
+    const viewModel = buildDesktopKnowledgeMapViewModel(outputWithReaction());
+
+    expect(viewModel.reactionRenderables[0].clusterBadge).toMatchObject({
+      basis: "reaction_signature",
+      confidence: "high",
+      memberCount: 1
+    });
+  });
+
+  it("builds a 1k reaction layout fixture without requiring TMAP", () => {
+    const viewModel = buildDesktopKnowledgeMapViewModel(outputWithManyReactions(1000));
+
+    expect(viewModel.reactionMap.nodes).toHaveLength(1000);
+    expect(viewModel.reactionSummary).toMatchObject({
+      reactionCount: 1000,
+      layoutEngine: "deterministic_fallback"
+    });
+  });
+
+  it("marks diagnostic output as degraded without losing semantic data", () => {
+    const output = outputWithReaction();
+    const viewModel = buildDesktopKnowledgeMapViewModel({
+      ...output,
+      diagnostics: [{
+        code: "W_TEST",
+        severity: "warning",
+        message: "review required",
+        range: {
+          startLine: 1,
+          startColumn: 1,
+          endLine: 1,
+          endColumn: 2
+        },
+        quickFixes: []
+      }]
+    });
+
+    expect(viewModel.state).toBe("degraded");
+    expect(viewModel.semanticSummary.nodeCount).toBeGreaterThan(1);
+  });
+
+  it("returns failed state when compile output failed", () => {
+    const failed = {
+      status: "failed",
+      documentUri: "experiments/bad.chemd.md",
+      compiledAt: "2026-05-13T00:00:00.000Z",
+      diagnostics: [],
+      outline: [],
+      symbols: [],
+      error: {
+        code: "LS_COMPILE_FAILED",
+        message: "failed"
+      }
+    } satisfies ChemdLanguageCompileOutput;
+    const viewModel = buildDesktopKnowledgeMapViewModel(failed);
+
+    expect(viewModel.state).toBe("failed");
+    expect(viewModel.semanticTree).toBeNull();
+    expect(viewModel.reactionSummary.reactionCount).toBe(0);
+  });
+
+  it("keeps empty documents explicit", () => {
+    const viewModel = buildDesktopKnowledgeMapViewModel(compile(`---
+id: empty-doc
+title: Empty
+date: 2026-05-13
+---
+`));
+
+    expect(viewModel.state).toBe("empty");
+    expect(viewModel.reactionSummary.reactionCount).toBe(0);
+  });
+});

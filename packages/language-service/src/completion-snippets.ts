@@ -29,12 +29,67 @@ const snippets: Array<Omit<ChemdCompletionItem, "range">> = [{
   insertTextFormat: "snippet",
   detail: "Chemd molecule block",
   sortText: "a-molecule"
+}, {
+  id: "snippet.result",
+  label: "result block",
+  kind: "snippet",
+  insertText: [
+    ":::result #res-${1:id}",
+    "reaction: ${2:@rxn-main}",
+    "status: ${3:pending}",
+    "notes: ${4:notes}",
+    ":::"
+  ].join("\n"),
+  insertTextFormat: "snippet",
+  detail: "Result evidence block",
+  sortText: "a-result"
+}, {
+  id: "snippet.procedure",
+  label: "procedure block",
+  kind: "snippet",
+  insertText: [
+    ":::procedure #proc-${1:id}",
+    "reaction: ${2:@rxn-main}",
+    "step: ${3:charge} | inputs=${4:@mol-a} | outputs=${5:@mol-b}",
+    ":::"
+  ].join("\n"),
+  insertTextFormat: "snippet",
+  detail: "Procedure block",
+  sortText: "a-procedure"
+}, {
+  id: "snippet.template",
+  label: "template block",
+  kind: "snippet",
+  insertText: [
+    ":::template ${1:name}",
+    "params: ${2:param:string}",
+    "description: ${3:description}",
+    "${4:body}",
+    ":::"
+  ].join("\n"),
+  insertTextFormat: "snippet",
+  detail: "Template block",
+  sortText: "a-template"
+}, {
+  id: "snippet.condition_varies",
+  label: "condition-varies block",
+  kind: "snippet",
+  insertText: [
+    ":::condition-varies #cv-${1:id}",
+    "reaction: ${2:@rxn-main}",
+    "condition: ${3:solvent=baseline | temperature=baseline}",
+    "var1: ${4:solvent=candidate}",
+    ":::"
+  ].join("\n"),
+  insertTextFormat: "snippet",
+  detail: "Condition variation block",
+  sortText: "a-condition-varies"
 }];
 
 export const getChemdSnippetCompletions = (
   context: ChemdCompletionContext
 ): ChemdCompletionItem[] => {
-  if (context.isFrontmatter || context.block) {
+  if (context.isFrontmatter || context.isFieldValuePosition || context.isReferencePosition) {
     return [];
   }
 

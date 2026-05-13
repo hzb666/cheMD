@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { Activity, AlertTriangle, Bot, CheckCircle2, ChevronRight, CircleDot, Database, FileCode2, Files, FlaskConical, GitGraph, GripHorizontal, GripVertical, HardDrive, Lightbulb, PanelBottom, PanelBottomClose, PanelBottomOpen, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PlayCircle, RefreshCw, ScrollText, Search, Settings, ShieldCheck, Sparkles, Square, UploadCloud, Wrench, XCircle } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
 import { appendToolCall, applyPatchDecision, approvePatchDecision, attachEvidence, createAgentRun, createToolResult, getAuditTimeline, proposePatch, rejectPatchDecision, transitionAgentRunStatus, type AgentAuditEvent, type AgentEvidence, type AgentRun, type AgentToolCall, type PatchDecision, type PatchProposal } from "@chemd/agent-tools";
 import { buildEditorGraphRagRecords, compileChemdForEditor, type ChemdEditorDiagnostic, type ChemdLanguageCompileOutput, type ChemdOutlineItem, type ChemdQuickFixProposal, type ChemdTextEdit, type ChemdWorkspaceSymbolIndex } from "@chemd/language-service";
@@ -11,7 +11,12 @@ import { buildPersistRuntimeGraphRagCommandInput } from "./desktop-runtime-persi
 import { buildDesktopSemanticPreview, type DesktopSemanticPreview } from "./desktop-semantic-preview";
 import { buildDesktopWorkspaceSymbolIndex, type DesktopWorkspaceSymbolIndexSummary } from "./desktop-workspace-symbol-index";
 import { runWorkspaceIngest } from "./desktop-workspace-ingest";
+import { DesktopKnowledgeMapPanel } from "./knowledge-map/DesktopKnowledgeMapPanel";
+import { buildDesktopKnowledgeMapViewModel, type DesktopKnowledgeMapViewModel } from "./knowledge-map/desktop-knowledge-map";
 import { MonacoChemdEditor, toChemdDesktopModelUri } from "./MonacoChemdEditor";
+import { DesktopWorkspaceIndexPanel } from "./workspace-index/DesktopWorkspaceIndexPanel";
+import type { DesktopWorkspaceIndexViewModel } from "./workspace-index/desktop-workspace-index";
+import { useDesktopWorkspaceIndexController } from "./workspace-index/use-desktop-workspace-index";
 
 type WorkspaceState = "empty" | "opening" | "open" | "error"; type DocumentMode = "sample" | "workspace";
 type SidecarOperation = "start" | "stop" | "refresh" | "logs";
@@ -141,6 +146,8 @@ type DesktopWorkbenchProps = {
   workspaceIngestController: ReturnType<typeof useWorkspaceIngestController>;
   workspaceSymbolIndexController: ReturnType<typeof useWorkspaceSymbolIndexController>;
   semanticPreview: DesktopSemanticPreview;
+  workspaceIndexViewModel: DesktopWorkspaceIndexViewModel;
+  knowledgeMapViewModel: DesktopKnowledgeMapViewModel;
   output: ChemdLanguageCompileOutput;
   compileError?: string;
   files: WorkspaceFileEntry[];
@@ -171,6 +178,8 @@ type InsightPaneProps = {
   activeTool: ActivityTool;
   outline: ChemdOutlineItem[];
   diagnostics: ChemdEditorDiagnostic[];
+  workspaceIndexViewModel: DesktopWorkspaceIndexViewModel;
+  knowledgeMapViewModel: DesktopKnowledgeMapViewModel;
   mode: DocumentMode;
   sidecarStatus: SidecarStatus;
   sidecarLogTail: string[];
@@ -375,9 +384,6 @@ const moveDockPanel = (
   nextOrder.splice(targetIndex, 0, source);
   return nextOrder;
 };
-
-const flattenOutlineItems = (items: ChemdOutlineItem[]): ChemdOutlineItem[] =>
-  items.flatMap((item) => [item, ...flattenOutlineItems(item.children ?? [])]);
 
 const statusToneByState: Record<RuntimeState, string> = { ready: "success", placeholder: "pending", degraded: "warning", offline: "danger" };
 const workspaceStateLabel: Record<WorkspaceState, string> = { empty: "Empty", opening: "Opening", open: "Open", error: "Fallback" };
@@ -2136,90 +2142,6 @@ const AgentLedger = ({ agentRun }: { agentRun: AgentRun | null }) => (
   ) : null
 );
 
-const RagSearchPanel = ({
-  outline,
-  diagnostics
-}: {
-  outline: ChemdOutlineItem[];
-  diagnostics: ChemdEditorDiagnostic[];
-}) => {
-  const [query, setQuery] = useState("");
-  const rows = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    const outlineRows = flattenOutlineItems(outline).map((item) => ({
-      id: `outline-${item.id}`,
-      kind: item.kind,
-      label: item.label,
-      detail: `L${item.range.startLine}`
-    }));
-    const diagnosticRows = diagnostics.map((diagnostic) => ({
-      id: `diagnostic-${diagnostic.code}-${diagnostic.range.startLine}-${diagnostic.range.startColumn}`,
-      kind: diagnostic.severity,
-      label: diagnostic.message,
-      detail: diagnostic.code
-    }));
-    const allRows = [...outlineRows, ...diagnosticRows];
-    if (!normalizedQuery) return allRows.slice(0, 8);
-    return allRows.filter((row) =>
-      `${row.kind} ${row.label} ${row.detail}`.toLowerCase().includes(normalizedQuery)
-    ).slice(0, 12);
-  }, [diagnostics, outline, query]);
-
-  return (
-    <div className="desktop-tool-panel">
-      <label className="desktop-tool-search">
-        <Search size={14} />
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search symbols, diagnostics, graph text"
-          aria-label="RAG search query"
-        />
-      </label>
-      <div className="desktop-tool-result-list" role="list">
-        {rows.length > 0 ? rows.map((row) => (
-          <div key={row.id} className="desktop-tool-result-row" role="listitem">
-            <span>{row.kind}</span>
-            <strong title={row.label}>{row.label}</strong>
-            <code>{row.detail}</code>
-          </div>
-        )) : <p className="desktop-empty-copy">No matches.</p>}
-      </div>
-    </div>
-  );
-};
-
-const ReactionGraphPanel = ({
-  outline,
-  diagnostics,
-  compileStatus
-}: {
-  outline: ChemdOutlineItem[];
-  diagnostics: ChemdEditorDiagnostic[];
-  compileStatus: "ok" | "failed";
-}) => {
-  const graphNodes = flattenOutlineItems(outline).slice(0, 10);
-  return (
-    <div className="desktop-tool-panel">
-      <div className="desktop-graph-summary">
-        <div><span>Compile</span><strong>{compileStatus}</strong></div>
-        <div><span>Nodes</span><strong>{graphNodes.length}</strong></div>
-        <div><span>Diagnostics</span><strong>{diagnostics.length}</strong></div>
-      </div>
-      <div className="desktop-graph-node-list" role="list">
-        {graphNodes.length > 0 ? graphNodes.map((node) => (
-          <div key={node.id} className="desktop-graph-node-row" role="listitem">
-            <GitGraph size={13} />
-            <span>{node.kind}</span>
-            <strong title={node.label}>{node.label}</strong>
-            <code>L{node.range.startLine}</code>
-          </div>
-        )) : <p className="desktop-empty-copy">No graph nodes.</p>}
-      </div>
-    </div>
-  );
-};
-
 const SettingsDockPanel = ({
   mode,
   sidecarStatus,
@@ -2394,8 +2316,8 @@ const InsightDockContent = ({
   const contentByPanel: Record<InsightDockPanelId, ReactNode> = {
     outline: <div className="desktop-insight-section">{props.outline.length > 0 ? <OutlineTree items={props.outline} /> : <p className="desktop-empty-copy">No outline from language service.</p>}</div>,
     preview: <SemanticPreviewPanel preview={props.semanticPreview} workspaceSymbolIndexState={props.workspaceSymbolIndexState} workspaceSymbolIndexMessage={props.workspaceSymbolIndexMessage} workspaceSymbolIndexSummary={props.workspaceSymbolIndexSummary} />,
-    rag: <RagSearchPanel outline={props.outline} diagnostics={props.diagnostics} />,
-    graph: <ReactionGraphPanel outline={props.outline} diagnostics={props.diagnostics} compileStatus={props.diagnostics.some((item) => item.severity === "error") ? "failed" : "ok"} />,
+    rag: <DesktopWorkspaceIndexPanel viewModel={props.workspaceIndexViewModel} />,
+    graph: <DesktopKnowledgeMapPanel viewModel={props.knowledgeMapViewModel} />,
     runtime: <SidecarControlPanel status={props.sidecarStatus} logTail={props.sidecarLogTail} operation={props.sidecarOperation} message={props.sidecarMessage} errorMessage={props.sidecarError} onStart={props.onStartSidecar} onStop={props.onStopSidecar} onRefresh={props.onRefreshSidecar} onLoadLogs={props.onLoadSidecarLogs} />,
     postgres: <PostgresStatusPanel status={props.postgresStatus} managedStatus={props.managedPostgresStatus} loading={props.postgresLoading} managedOperation={props.managedPostgresOperation} errorMessage={props.postgresError} managedErrorMessage={props.managedPostgresError} managedMessage={props.managedPostgresMessage} persistState={props.persistState} persistDisabledReason={props.persistDisabledReason} onRefresh={props.onRefreshPostgres} onInitManaged={props.onInitManagedPostgres} onStartManaged={props.onStartManagedPostgres} onStopManaged={props.onStopManagedPostgres} onMigrateManaged={props.onMigrateManagedPostgres} onRefreshManaged={props.onRefreshManagedPostgres} onPersistGraph={props.onPersistGraph} />,
     storage: <LocalStorePanel status={props.localStoreStatus} operation={props.localStoreOperation} snapshotState={props.localSnapshotState} syncState={props.localSyncState} workspaceIngestState={props.workspaceIngestState} disabledReason={props.localStoreDisabledReason} syncDisabledReason={props.localStoreSyncDisabledReason} workspaceIngestDisabledReason={props.workspaceIngestDisabledReason} errorMessage={props.localStoreError} onRefresh={props.onRefreshLocalStore} onSave={props.onSaveLocalSnapshot} onSync={props.onSyncLocalOutbox} onRunWorkspaceIngest={props.onRunWorkspaceIngest} />,
@@ -3121,7 +3043,11 @@ const DesktopWorkbench = ({
   postgresController,
   persistController,
   localStoreController,
-  workspaceIngestController, workspaceSymbolIndexController, semanticPreview,
+  workspaceIngestController,
+  workspaceSymbolIndexController,
+  semanticPreview,
+  workspaceIndexViewModel,
+  knowledgeMapViewModel,
   output,
   compileError,
   files,
@@ -3192,7 +3118,8 @@ const DesktopWorkbench = ({
             fileName={selectedFile.name}
             mode={mode}
             source={source}
-            compileOutput={output} workspaceSymbolIndex={workspaceSymbolIndexController.index}
+            compileOutput={output}
+            workspaceSymbolIndex={workspaceSymbolIndexController.index}
             lineCount={source.split(/\r?\n/).length}
             compiledAt={output.compiledAt}
             workspaceConflict={workspaceConflict}
@@ -3215,6 +3142,8 @@ const DesktopWorkbench = ({
               activeTool={activeTool}
               outline={output.outline}
               diagnostics={output.diagnostics}
+              workspaceIndexViewModel={workspaceIndexViewModel}
+              knowledgeMapViewModel={knowledgeMapViewModel}
               mode={mode}
               sidecarStatus={sidecarController.status} sidecarLogTail={sidecarController.logTail} sidecarOperation={sidecarController.operation} sidecarMessage={sidecarController.message} sidecarError={sidecarController.error}
               postgresStatus={postgresController.status} managedPostgresStatus={postgresController.managedStatus} postgresLoading={postgresController.loading} managedPostgresOperation={postgresController.managedOperation} postgresError={postgresController.error} managedPostgresError={postgresController.managedError} managedPostgresMessage={postgresController.managedMessage}
@@ -3423,6 +3352,15 @@ export const App = () => {
   const [agentMessage, setAgentMessage] = useState<AgentMessage | null>(null);
   const sidecarController = useSidecarController();
   const postgresController = usePostgresController();
+  const readWorkspaceIndexFile = useCallback((file: WorkspaceFileEntry) =>
+    invokeDesktop("read_workspace_file", {
+      workspaceId: workspaceController.workspace.workspaceId,
+      path: file.path
+    }).then((result) => ({
+      content: result.content,
+      modifiedAtMs: result.modifiedAtMs
+    })),
+  [workspaceController.workspace.workspaceId]);
   const output = useMemo(() => compileChemdForEditor({
     source: workspaceController.source,
     documentUri: workspaceController.selectedFile.path,
@@ -3432,6 +3370,19 @@ export const App = () => {
     () => buildDesktopSemanticPreview(output),
     [output]
   );
+  const workspaceIndexController = useDesktopWorkspaceIndexController({
+    mode: workspaceController.mode,
+    workspaceState: workspaceController.workspaceState,
+    workspace: workspaceController.workspace,
+    files: workspaceController.files,
+    selectedFile: workspaceController.selectedFile,
+    source: workspaceController.source,
+    readFile: readWorkspaceIndexFile
+  });
+  const workspaceIndexViewModel = workspaceIndexController.viewModel;
+  const knowledgeMapViewModel = useMemo(() =>
+    buildDesktopKnowledgeMapViewModel(output),
+  [output]);
   const compileError = output.status === "failed" ? output.error.message : undefined;
   const persistController = usePersistRuntimeController({
     mode: workspaceController.mode,
@@ -3488,6 +3439,7 @@ export const App = () => {
       workspace={workspaceController.workspace} workspaceState={workspaceController.workspaceState}
       sidecarController={sidecarController} postgresController={postgresController} persistController={persistController} localStoreController={localStoreController} workspaceIngestController={workspaceIngestController} workspaceSymbolIndexController={workspaceSymbolIndexController}
       semanticPreview={semanticPreview}
+      workspaceIndexViewModel={workspaceIndexViewModel} knowledgeMapViewModel={knowledgeMapViewModel}
       output={output} compileError={compileError}
       files={workspaceController.files} selectedFile={workspaceController.selectedFile} selectedFileId={workspaceController.selectedFileId}
       mode={workspaceController.mode} message={workspaceController.message} source={workspaceController.source} savedSource={workspaceController.savedSource} workspaceConflict={workspaceController.workspaceConflict}

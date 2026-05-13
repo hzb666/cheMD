@@ -33,7 +33,11 @@ export const getChemdCompletionContext = (
     range,
     isFrontmatter: isInsideFrontmatter(lines, position.line),
     isChemdBlock: block?.type === "chemd",
-    isFieldKeyPosition: Boolean(block) && !field.hasColon,
+    isUseHeaderPosition: /^\s*:::use\s+\S*$/.test(linePrefix),
+    isReferencePosition: tokenPrefix.startsWith("@") ||
+      (request.triggerCharacter === "@" && linePrefix.endsWith("@")),
+    isStepFamilyPosition: /^\s*step\s*:\s*[^|]*$/.test(linePrefix),
+    isFieldKeyPosition: Boolean(block) && !field.hasColon && !linePrefix.trim().startsWith(":::"),
     isFieldValuePosition: Boolean(block) && field.hasColon,
     fieldKey: field.key,
     fieldPrefix: field.hasColon ? "" : field.key ?? tokenPrefix,
@@ -98,7 +102,7 @@ const findOpenBlock = (
     }
     if (header) {
       open = {
-        type: header[1] ?? "",
+        type: normalizeBlockType(header[1] ?? ""),
         id: readBlockId(header[2]),
         startLine: index + 1,
         fields: new Map()
@@ -125,7 +129,7 @@ const inferBlockKind = (
   fields: Map<string, string>
 ): ChemdCompletionBlockKind => {
   if (blockType !== "chemd") {
-    return "unknown";
+    return isKnownBlockKind(blockType) ? blockType : "unknown";
   }
   const explicitKind = fields.get("kind");
   if (explicitKind === "molecule" || explicitKind === "reaction") {
@@ -140,6 +144,21 @@ const inferBlockKind = (
 
   return "unknown";
 };
+
+const normalizeBlockType = (type: string): string =>
+  type === "condition-varies" ? "condition_varies" : type;
+
+const isKnownBlockKind = (type: string): type is ChemdCompletionBlockKind =>
+  [
+    "molecule",
+    "reaction",
+    "result",
+    "procedure",
+    "step",
+    "template",
+    "use",
+    "condition_varies"
+  ].includes(type);
 
 const readFieldAtCursor = (linePrefix: string): { hasColon: boolean; key?: string } => {
   const colonIndex = linePrefix.indexOf(":");
@@ -156,7 +175,7 @@ const readBlockId = (headerArg: string | undefined): string | undefined => {
 };
 
 const readTokenPrefix = (linePrefix: string): string => {
-  const match = linePrefix.match(/[A-Za-z0-9_-]*$/);
+  const match = linePrefix.match(/[A-Za-z0-9_@#./:-]*$/);
   return match?.[0] ?? "";
 };
 

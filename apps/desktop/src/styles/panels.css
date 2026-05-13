@@ -1141,6 +1141,83 @@
     font-size: 0.74rem;
   }
 
+  .desktop-tool-search select {
+    min-width: 0;
+    flex: 1;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--foreground);
+    font-size: 0.74rem;
+  }
+
+  .desktop-reaction-map-canvas {
+    width: 100%;
+    min-height: 12rem;
+    flex: 0 0 auto;
+  }
+
+  .desktop-reaction-map-canvas rect {
+    fill: var(--panel);
+    stroke: var(--border);
+  }
+
+  .desktop-reaction-map-canvas g {
+    cursor: pointer;
+    outline: 0;
+  }
+
+  .desktop-reaction-map-canvas circle {
+    fill: var(--accent-foreground);
+    opacity: 0.78;
+    stroke: var(--card);
+    stroke-width: 1.2;
+  }
+
+  .desktop-reaction-map-canvas circle[data-selected="true"] {
+    fill: var(--foreground);
+    opacity: 1;
+    stroke: var(--accent-foreground);
+    stroke-width: 2;
+  }
+
+  .desktop-reaction-inspector {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0.35rem 0.5rem;
+    padding: 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--panel);
+    font-size: 0.7rem;
+  }
+
+  .desktop-reaction-inspector span {
+    color: var(--accent-foreground);
+    font-size: 0.64rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .desktop-reaction-inspector strong {
+    overflow: hidden;
+    color: var(--foreground);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .desktop-reaction-inspector code {
+    color: var(--muted-foreground);
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+  }
+
+  .desktop-reaction-inspector p {
+    grid-column: 1 / -1;
+    margin: 0;
+    color: var(--muted-foreground);
+  }
+
   .desktop-tool-result-list,
   .desktop-graph-node-list {
     display: flex;
@@ -1189,6 +1266,113 @@
     color: var(--muted-foreground);
     font-family: var(--font-mono);
     font-size: 0.66rem;
+  }
+
+  .desktop-renderable-node-list {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .desktop-renderable-node-row,
+  .desktop-renderable-evidence-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 0.4rem;
+    align-items: center;
+    min-width: 0;
+    padding: 0.42rem;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--panel);
+  }
+
+  .desktop-renderable-node-toggle,
+  .desktop-source-ref-button {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.35rem;
+    border: 0;
+    background: transparent;
+    color: var(--foreground);
+    font-size: 0.7rem;
+  }
+
+  .desktop-renderable-node-toggle {
+    justify-content: flex-start;
+    padding: 0;
+    text-align: left;
+  }
+
+  .desktop-renderable-node-toggle span {
+    flex: 0 0 auto;
+    color: var(--accent-foreground);
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .desktop-renderable-node-toggle strong,
+  .desktop-renderable-evidence-row strong {
+    min-width: 0;
+    overflow: hidden;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .desktop-renderable-node-detail {
+    display: flex;
+    grid-column: 1 / -1;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    padding-top: 0.25rem;
+    color: var(--muted-foreground);
+    font-size: 0.68rem;
+  }
+
+  .desktop-renderable-node-detail code,
+  .desktop-renderable-node-detail span,
+  .desktop-cluster-badge,
+  .desktop-source-ref-chip,
+  .desktop-source-ref-button {
+    max-width: 12rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .desktop-renderable-node-detail code,
+  .desktop-cluster-badge,
+  .desktop-source-ref-chip {
+    padding: 0.16rem 0.34rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--card);
+    color: var(--muted-foreground);
+    font-family: var(--font-mono);
+    font-size: 0.63rem;
+  }
+
+  .desktop-cluster-badge {
+    color: var(--accent-foreground);
+    font-family: inherit;
+    font-weight: 700;
+  }
+
+  .desktop-source-ref-button {
+    justify-content: flex-end;
+    padding: 0.12rem 0.25rem;
+    color: var(--accent-foreground);
+  }
+
+  .desktop-renderable-evidence-row > span {
+    color: var(--accent-foreground);
+    font-size: 0.64rem;
+    font-weight: 700;
+    text-transform: uppercase;
   }
 
   .desktop-graph-summary,
