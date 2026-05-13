@@ -1864,3 +1864,50 @@ Added create_embedding_vectors batch command foundation, preserved full workspac
 ### Next Steps
 
 - None - task complete
+
+
+## Session 88: Desktop connected RAG backfill UI
+
+**Date**: 2026-05-14
+**Task**: Desktop connected RAG backfill UI
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Connected RAG backfill UI now generates chunk embeddings and writes them to shared pgvector when runtime readiness is satisfied.
+
+### Main Changes
+
+- Connected RAG backfill UI is now wired in the desktop RAG panel.
+- Added pure backfill helper/test coverage for readiness, chunk dedupe, blank text skip, batch partial success, and skipped summary.
+- App now runs create_embedding_vectors before backfill_postgres_rag_embeddings and keeps offline/provider failures as UI state instead of blocking local search.
+- Updated desktop productization docs with M6 seventh batch status and remaining real-provider proof.
+
+Validation:
+- pnpm exec vitest run apps/desktop/src/workspace-index/desktop-postgres-rag-backfill-controller.test.ts apps/desktop/src/workspace-index/desktop-postgres-rag-query-controller.test.ts apps/desktop/src/workspace-index/desktop-workspace-index.test.ts --config packages/compiler/vitest.config.ts --pool=threads (26/26 passed)
+- pnpm --filter @chemd/desktop typecheck (passed)
+- pnpm --filter @chemd/desktop build (passed; known Vite lucide use-client and chunk-size warnings)
+- pnpm typecheck (24/24 tasks passed)
+- pnpm test (turbo tests, 78 script tests, 52 Python tests passed)
+- git diff --check (passed; line-ending warnings only)
+- pnpm exec eslint focused files still reports complexity/line-count gates in App.tsx and DesktopWorkspaceIndexPanel.tsx; deferred to M11 per user direction.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8970c4d` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
