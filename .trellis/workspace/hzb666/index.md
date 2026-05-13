@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 71
+- **Total Sessions**: 72
 - **Last Active**: 2026-05-13
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~1316 | Active |
+| `journal-2.md` | ~1350 | Active |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 72 | 2026-05-13 | Desktop reaction intelligence run entry | `7e2fc74` | `desktop-ide` |
 | 71 | 2026-05-13 | Desktop local intelligence artifact read and filtering | `5b55c3f` | `desktop-ide` |
 | 70 | 2026-05-13 | Desktop reaction intelligence artifact integration | `02860c8` | `desktop-ide` |
 | 69 | 2026-05-13 | Reaction Intelligence TMAP layout and worker pipeline CLI | `5265c1b`, `133f54d`, `07de424` | `desktop-ide` |
