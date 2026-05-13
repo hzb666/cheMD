@@ -19,6 +19,8 @@ class HybridSimilarityWeights:
     reaction_center: float = 0.10
 
     def weight_for(self, provider: str) -> float:
+        if provider == "rdkit_fingerprint":
+            return self.fingerprint
         return float(getattr(self, provider, 0.0))
 
 
@@ -81,7 +83,7 @@ def build_hybrid_similarity_edge(
     right_results: Mapping[str, ProviderResult] | None = None,
     semantic_score: float | None = None,
     weights: HybridSimilarityWeights | None = None,
-    expected_providers: Iterable[str] = ("fingerprint", "rxnfp", "reaction_center"),
+    expected_providers: Iterable[str] = ("rdkit_fingerprint", "rxnfp", "reaction_center"),
 ) -> HybridSimilarityEdge:
     active_weights = weights or HybridSimilarityWeights()
     left = left_results or {}
@@ -106,8 +108,8 @@ def build_hybrid_similarity_edge(
     for provider in expected_providers:
         contribution = _provider_contribution(
             provider=provider,
-            left=left.get(provider),
-            right=right.get(provider),
+            left=_provider_result(left, provider),
+            right=_provider_result(right, provider),
             weight=active_weights.weight_for(provider),
         )
         contributions.append(contribution)
@@ -166,9 +168,9 @@ def _provider_contribution(
             warnings=_result_warnings(left, right),
         )
 
-    if provider == "fingerprint":
+    if provider in {"fingerprint", "rdkit_fingerprint"}:
         score = tanimoto_like_score(left.get("fingerprint"), right.get("fingerprint"))
-        return _ok_contribution(provider, "fingerprint_tanimoto", score, weight)
+        return _ok_contribution("rdkit_fingerprint", "rdkit_tanimoto", score, weight)
     if provider == "rxnfp":
         left_vector = _read_embedding(left)
         right_vector = _read_embedding(right)
@@ -176,9 +178,20 @@ def _provider_contribution(
         return _ok_contribution(provider, "rxnfp_cosine", score, weight)
     if provider == "reaction_center":
         score = reaction_center_score(_read_center_signature(left), _read_center_signature(right))
-        return _ok_contribution(provider, "reaction_center_overlap", score, weight)
+        return _ok_contribution(provider, "atom_mapping_reaction_center", score, weight)
 
     return _skipped_contribution(provider, weight, f"{provider}_provider_not_supported")
+
+
+def _provider_result(
+    results: Mapping[str, ProviderResult],
+    provider: str,
+) -> ProviderResult | None:
+    if provider in results:
+        return results[provider]
+    if provider == "rdkit_fingerprint":
+        return results.get("fingerprint")
+    return None
 
 
 def _ok_contribution(

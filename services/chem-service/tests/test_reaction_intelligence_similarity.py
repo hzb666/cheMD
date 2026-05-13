@@ -108,14 +108,14 @@ class ReactionIntelligenceSimilarityTest(unittest.TestCase):
             edge["basis"],
             [
                 "semantic_similarity",
-                "fingerprint_tanimoto",
+                "rdkit_tanimoto",
                 "rxnfp_cosine",
-                "reaction_center_overlap",
+                "atom_mapping_reaction_center",
             ],
         )
         self.assertEqual(
             [contribution["provider"] for contribution in edge["contributions"]],
-            ["semantic", "fingerprint", "rxnfp", "reaction_center"],
+            ["semantic", "rdkit_fingerprint", "rxnfp", "reaction_center"],
         )
         self.assertEqual(edge["warnings"], [])
         self.assertGreater(edge["score"], 0.7)
@@ -158,26 +158,29 @@ class ReactionIntelligencePipelineTest(unittest.TestCase):
 
         self.assertEqual(artifact["schema_version"], "chemd-reaction-intelligence-artifact/v0.1")
         self.assertEqual(
-            artifact["providers"],
+            artifact["provider_statuses"],
             [
                 {
-                    "provider": "fingerprint",
-                    "status": "skipped",
-                    "warnings": ["fingerprint_provider_skipped"],
+                    "provider": "rdkit_fingerprint",
+                    "status": "SKIP",
+                    "reason_code": "provider_skipped",
+                    "warnings": ["rdkit_fingerprint_provider_skipped"],
                 },
                 {
                     "provider": "rxnfp",
-                    "status": "skipped",
+                    "status": "SKIP",
+                    "reason_code": "provider_skipped",
                     "warnings": ["rxnfp_provider_skipped"],
                 },
                 {
                     "provider": "reaction_center",
-                    "status": "skipped",
+                    "status": "SKIP",
+                    "reason_code": "provider_skipped",
                     "warnings": ["reaction_center_provider_skipped"],
                 },
             ],
         )
-        self.assertFalse(artifact["similarity_edges"][0]["computed_chemistry"])
+        self.assertFalse(artifact["computed_similarity_edges"][0]["computed_chemistry"])
         self.assertIn("semantic_only_similarity_not_computed_chemistry", artifact["warnings"])
 
     def test_pipeline_combines_provider_results_into_computed_edges(self) -> None:
@@ -194,15 +197,15 @@ class ReactionIntelligencePipelineTest(unittest.TestCase):
             ],
             provider_results={
                 "rxnfp": rxnfp_results,
-                "fingerprint": [
+                "rdkit_fingerprint": [
                     {
-                        "provider": "fingerprint",
+                        "provider": "rdkit_fingerprint",
                         "status": "ok",
                         "reaction_id": "rxn-1",
                         "fingerprint": [1, 0, 1],
                     },
                     {
-                        "provider": "fingerprint",
+                        "provider": "rdkit_fingerprint",
                         "status": "ok",
                         "reaction_id": "rxn-2",
                         "fingerprint": [1, 1, 0],
@@ -211,10 +214,12 @@ class ReactionIntelligencePipelineTest(unittest.TestCase):
             },
         )
 
-        self.assertTrue(artifact["similarity_edges"][0]["computed_chemistry"])
-        self.assertIn("fingerprint_tanimoto", artifact["similarity_edges"][0]["basis"])
-        self.assertIn("rxnfp_cosine", artifact["similarity_edges"][0]["basis"])
+        self.assertTrue(artifact["computed_similarity_edges"][0]["computed_chemistry"])
+        self.assertIn("rdkit_tanimoto", artifact["computed_similarity_edges"][0]["basis"])
+        self.assertIn("rxnfp_cosine", artifact["computed_similarity_edges"][0]["basis"])
         reaction_center = next(
-            provider for provider in artifact["providers"] if provider["provider"] == "reaction_center"
+            provider
+            for provider in artifact["provider_statuses"]
+            if provider["provider"] == "reaction_center"
         )
-        self.assertEqual(reaction_center["status"], "skipped")
+        self.assertEqual(reaction_center["status"], "SKIP")

@@ -4,10 +4,15 @@ from collections.abc import Iterable, Mapping
 from itertools import combinations
 from typing import Any, TypedDict
 
+from chem_service.reaction_intelligence.artifact_adapter import (
+    ProviderResultsByReaction,
+    artifact_similarity_edge,
+    computed_features_from_results,
+    normalize_provider_results,
+)
 from chem_service.reaction_intelligence.similarity import (
     HybridSimilarityEdge,
     HybridSimilarityWeights,
-    ProviderResult,
     build_hybrid_similarity_edge,
 )
 
@@ -22,22 +27,23 @@ class ReactionInput(TypedDict, total=False):
 
 class ReactionIntelligenceArtifact(TypedDict):
     schema_version: str
-    reactions: list[dict[str, Any]]
-    providers: list[dict[str, Any]]
-    similarity_edges: list[HybridSimilarityEdge]
+    artifact_id: str
+    job_id: str
+    provider_statuses: list[dict[str, Any]]
+    computed_features: list[dict[str, Any]]
+    computed_similarity_edges: list[HybridSimilarityEdge]
     warnings: list[str]
-
-
-ProviderResultsByReaction = dict[str, dict[str, ProviderResult]]
 
 
 def build_reaction_intelligence_artifact(
     *,
     reactions: Iterable[ReactionInput],
+    job_id: str = "reaction-intelligence-job",
+    artifact_id: str | None = None,
     provider_results: Any | None = None,
     semantic_edges: Iterable[Mapping[str, Any]] | None = None,
     weights: HybridSimilarityWeights | None = None,
-    expected_providers: Iterable[str] = ("fingerprint", "rxnfp", "reaction_center"),
+    expected_providers: Iterable[str] = ("rdkit_fingerprint", "rxnfp", "reaction_center"),
 ) -> ReactionIntelligenceArtifact:
     materialized = list(reactions)
     provider_names = list(expected_providers)
@@ -67,64 +73,13 @@ def build_reaction_intelligence_artifact(
 
     return {
         "schema_version": "chemd-reaction-intelligence-artifact/v0.1",
-        "reactions": [dict(reaction) for reaction in materialized],
-        "providers": provider_statuses,
-        "similarity_edges": edges,
+        "artifact_id": artifact_id or f"reaction-intelligence::{job_id}",
+        "job_id": job_id,
+        "provider_statuses": provider_statuses,
+        "computed_features": computed_features_from_results(results_by_reaction),
+        "computed_similarity_edges": [artifact_similarity_edge(edge) for edge in edges],
         "warnings": _unique_strings(artifact_warnings),
     }
-
-
-def normalize_provider_results(provider_results: Any | None) -> ProviderResultsByReaction:
-    if provider_results is None:
-        return {}
-
-    if isinstance(provider_results, list):
-        return _normalize_result_list(provider_results)
-
-    if not isinstance(provider_results, Mapping):
-        return {}
-
-    if all(isinstance(value, list) for value in provider_results.values()):
-        normalized: ProviderResultsByReaction = {}
-        for provider, results in provider_results.items():
-            if not isinstance(provider, str) or not isinstance(results, list):
-                continue
-            for result in results:
-                if isinstance(result, Mapping):
-                    _put_provider_result(normalized, provider, result)
-        return normalized
-
-    normalized = {}
-    for reaction_id, per_provider in provider_results.items():
-        if not isinstance(reaction_id, str) or not isinstance(per_provider, Mapping):
-            continue
-        normalized[reaction_id] = {}
-        for provider, result in per_provider.items():
-            if isinstance(provider, str) and isinstance(result, Mapping):
-                normalized[reaction_id][provider] = dict(result)
-    return normalized
-
-
-def _normalize_result_list(results: list[Any]) -> ProviderResultsByReaction:
-    normalized: ProviderResultsByReaction = {}
-    for result in results:
-        if not isinstance(result, Mapping):
-            continue
-        provider = result.get("provider")
-        if isinstance(provider, str):
-            _put_provider_result(normalized, provider, result)
-    return normalized
-
-
-def _put_provider_result(
-    normalized: ProviderResultsByReaction,
-    provider: str,
-    result: Mapping[str, Any],
-) -> None:
-    reaction_id = result.get("reaction_id") or result.get("id")
-    if not isinstance(reaction_id, str) or not reaction_id:
-        return
-    normalized.setdefault(reaction_id, {})[provider] = dict(result)
 
 
 def _build_provider_statuses(
@@ -142,7 +97,8 @@ def _build_provider_statuses(
             statuses.append(
                 {
                     "provider": provider,
-                    "status": "skipped",
+                    "status": "SKIP",
+                    "reason_code": "provider_skipped",
                     "warnings": [f"{provider}_provider_skipped"],
                 }
             )
@@ -157,7 +113,8 @@ def _build_provider_statuses(
         statuses.append(
             {
                 "provider": provider,
-                "status": "ok" if has_ok else "skipped",
+                "status": "OK" if has_ok else "SKIP",
+                "reason_code": None if has_ok else "provider_skipped",
                 "warnings": _unique_strings(warnings),
             }
         )

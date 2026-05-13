@@ -8,23 +8,25 @@ from typing import Any
 
 from chem_service.reaction_intelligence.providers.tmap_layout import build_tmap_layout
 
-ARTIFACT_SCHEMA_VERSION = "chemd.reaction-intelligence-artifact.v1"
+ARTIFACT_SCHEMA_VERSION = "chemd-reaction-intelligence-artifact/v0.1"
 
 
 def build_artifact(job: dict[str, Any]) -> dict[str, Any]:
     layout_result = build_tmap_layout(job)
-    providers = [layout_result["provider"]]
-    layouts = [layout_result["layout"]] if layout_result["layout"] is not None else []
+    layout = _artifact_layout(layout_result)
 
     return {
-        "schemaVersion": ARTIFACT_SCHEMA_VERSION,
-        "jobId": job.get("jobId"),
-        "providers": providers,
-        "layouts": layouts,
+        "schema_version": ARTIFACT_SCHEMA_VERSION,
+        "artifact_id": _artifact_id(job),
+        "job_id": _job_id(job),
+        "provider_statuses": [_provider_status(layout_result["provider"])],
+        "computed_features": [],
+        "computed_similarity_edges": [],
+        **({"layout": layout} if layout is not None else {}),
         "warnings": layout_result["warnings"],
         "diagnostics": {
             "reactionCount": _reaction_count(job, layout_result),
-            "layoutCount": len(layouts),
+            "layoutCount": 1 if layout is not None else 0,
         },
     }
 
@@ -83,17 +85,20 @@ def _write_artifact(artifact: dict[str, Any], output_path: Path | None) -> None:
 
 def _failure_artifact(message: str) -> dict[str, Any]:
     return {
-        "schemaVersion": ARTIFACT_SCHEMA_VERSION,
-        "jobId": None,
-        "providers": [
+        "schema_version": ARTIFACT_SCHEMA_VERSION,
+        "artifact_id": "reaction-intelligence::invalid-job",
+        "job_id": None,
+        "provider_statuses": [
             {
-                "name": "tmap",
-                "status": "failed",
-                "reason": "invalid_job",
+                "provider": "tmap_layout",
+                "status": "ERROR",
+                "reason_code": "invalid_job",
                 "message": message,
+                "warnings": [message],
             }
         ],
-        "layouts": [],
+        "computed_features": [],
+        "computed_similarity_edges": [],
         "warnings": [message],
         "diagnostics": {"reactionCount": 0, "layoutCount": 0},
     }
@@ -112,6 +117,53 @@ def _reaction_count(job: dict[str, Any], layout_result: dict[str, Any]) -> int:
     if isinstance(reactions, list):
         return len(reactions)
     return 0
+
+
+def _job_id(job: dict[str, Any]) -> str | None:
+    value = job.get("job_id") or job.get("jobId")
+    return value if isinstance(value, str) else None
+
+
+def _artifact_id(job: dict[str, Any]) -> str:
+    return f"reaction-intelligence::{_job_id(job) or 'anonymous-job'}"
+
+
+def _provider_status(provider: dict[str, Any]) -> dict[str, Any]:
+    status = provider.get("status")
+    return {
+        "provider": "tmap_layout",
+        "status": "OK" if status == "computed" else "SKIP",
+        "reason_code": provider.get("reason"),
+        "message": provider.get("message"),
+        "warnings": [provider["message"]] if isinstance(provider.get("message"), str) else [],
+    }
+
+
+def _artifact_layout(layout_result: dict[str, Any]) -> dict[str, Any] | None:
+    layout = layout_result.get("layout")
+    if not isinstance(layout, dict):
+        return None
+    positions = layout.get("positions")
+    if not isinstance(positions, list):
+        return None
+    return {
+        "layout_id": "reaction-layout::tmap",
+        "provider": "tmap_layout",
+        "status": "OK",
+        "coordinate_system": "tmap_2d",
+        "nodes": [
+            {
+                "reaction_entity_id": position["reactionId"],
+                "x": position["x"],
+                "y": position["y"],
+                "warnings": [],
+            }
+            for position in positions
+            if isinstance(position, dict)
+        ],
+        "warnings": layout_result.get("warnings", []),
+        "diagnostics": layout.get("diagnostics"),
+    }
 
 
 if __name__ == "__main__":

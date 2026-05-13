@@ -161,3 +161,8 @@ Write scope：
 
 - 2026-05-13：从当前 `HEAD` 创建 `reaction-intelligence-core` worktree。
 - 2026-05-13：建立 Trellis task 与本实施计划。
+- 2026-05-13：合入 TS graph sidecar contract，新增 `reaction_intelligence` graph layer 和 good/base/bad 测试。
+- 2026-05-13：合入 Python RDKit/RXNMapper provider foundation，外部依赖均 lazy import，缺失时显式 SKIP。
+- 2026-05-13：合入 RXNFP provider、hybrid similarity 和 pipeline，semantic-only 边不标记为 computed chemistry。
+- 2026-05-13：合入 TMAP optional layout CLI；应用内默认不强制显示 TMAP，CLI 输出统一 artifact schema。
+- 2026-05-13：主分支整合 provider key、status、artifact 字段命名，统一到 `chemd-reaction-intelligence-artifact/v0.1`。

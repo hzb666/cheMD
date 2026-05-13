@@ -132,10 +132,11 @@ class ReactionIntelligenceCliTest(unittest.TestCase):
             artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
 
         self.assertEqual(exit_code, 0)
-        self.assertEqual(artifact["schemaVersion"], cli.ARTIFACT_SCHEMA_VERSION)
-        self.assertEqual(artifact["jobId"], "job-1")
-        self.assertEqual(artifact["providers"][0]["status"], "skipped")
-        self.assertEqual(artifact["layouts"], [])
+        self.assertEqual(artifact["schema_version"], cli.ARTIFACT_SCHEMA_VERSION)
+        self.assertEqual(artifact["job_id"], "job-1")
+        self.assertEqual(artifact["provider_statuses"][0]["provider"], "tmap_layout")
+        self.assertEqual(artifact["provider_statuses"][0]["status"], "SKIP")
+        self.assertNotIn("layout", artifact)
         self.assertEqual(artifact["diagnostics"]["reactionCount"], 2)
 
     def test_cli_returns_parseable_failure_artifact_for_invalid_json(self) -> None:
@@ -149,8 +150,8 @@ class ReactionIntelligenceCliTest(unittest.TestCase):
             artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
 
         self.assertEqual(exit_code, 2)
-        self.assertEqual(artifact["providers"][0]["status"], "failed")
-        self.assertEqual(artifact["providers"][0]["reason"], "invalid_job")
+        self.assertEqual(artifact["provider_statuses"][0]["status"], "ERROR")
+        self.assertEqual(artifact["provider_statuses"][0]["reason_code"], "invalid_job")
 
 
 if __name__ == "__main__":

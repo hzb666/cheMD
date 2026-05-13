@@ -30,8 +30,8 @@ Reaction intelligence worker / CLI:
 - Reaction intelligence runs as a local worker/CLI path instead of a Flask route so heavy chemistry and layout dependencies do not leak into the web app startup path.
 - Run a JSON job from `services/chem-service` with:
   - `poetry run python -m chem_service.reaction_intelligence.cli path/to/job.json --output path/to/artifact.json`
-- The job can provide `reactionIds` plus `similarityEdges`, or `reactions` plus `edges`. Edges accept common endpoint keys such as `source`/`target`, `sourceReactionId`/`targetReactionId`, or `from`/`to`.
-- The CLI always writes parseable artifact JSON. Optional provider failures are reported under `providers[]` with `status: "skipped"` or `status: "failed"` instead of pretending that computed chemistry or layout exists.
+- The job can provide `job_id`/`jobId`, `reactionIds` plus `similarityEdges`, or `reactions` plus `edges`. Edges accept common endpoint keys such as `source`/`target`, `sourceReactionId`/`targetReactionId`, or `from`/`to`.
+- The CLI always writes parseable artifact JSON using `schema_version: "chemd-reaction-intelligence-artifact/v0.1"`. Optional provider failures are reported under `provider_statuses[]` with `status: "SKIP"` or `status: "ERROR"` instead of pretending that computed chemistry or layout exists.
 - TMAP is optional and lazily imported only when a multi-reaction layout has similarity edges. If `tmap` is not installed or its native extension cannot load, the artifact remains valid and reports `provider_unavailable`.
 - TMAP is intended for large reaction-space overview maps. The app does not need to display TMAP by default; ordinary document-scale reaction graphs should continue to use normal map/graph rendering unless the product flow explicitly asks for a large projected reaction space.
 

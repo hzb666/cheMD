@@ -8,9 +8,11 @@ type JsonValue = JsonScalar | JsonValue[] | { [key: string]: JsonValue };
 export type ReactionIntelligenceJsonObject = { [key: string]: JsonValue };
 
 export type ReactionIntelligenceProvider =
+  | "semantic"
   | "rdkit_fingerprint"
   | "rxnmapper"
   | "rxnfp"
+  | "reaction_center"
   | "tmap_layout";
 
 export type ReactionIntelligenceProviderState = "OK" | "SKIP" | "ERROR";
@@ -69,9 +71,12 @@ export interface ReactionIntelligenceComputedFeature {
 }
 
 export type ReactionIntelligenceComputedSimilarityBasis =
+  | "semantic_similarity"
   | "rdkit_tanimoto"
   | "rxnfp_cosine"
   | "atom_mapping_reaction_center"
+  | "reaction_center_overlap"
+  | "fingerprint_tanimoto"
   | "hybrid_computed";
 
 export interface ReactionIntelligenceSimilarityContribution {

@@ -8,7 +8,7 @@ from chem_service.reaction_intelligence.contracts import (
     ReactionIntelligenceJob,
 )
 
-REACTION_INTELLIGENCE_SCHEMA_VERSION = "chemd-reaction-intelligence/v0.1"
+REACTION_INTELLIGENCE_SCHEMA_VERSION = "chemd-reaction-intelligence-artifact/v0.1"
 
 
 class ReactionIntelligenceProvider(Protocol):

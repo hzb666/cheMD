@@ -35,7 +35,7 @@ def load_rdkit_reaction_toolkit() -> RdkitReactionToolkit | None:
 
 
 class RdkitReactionFingerprintProvider:
-    provider_key = "rdkit-fingerprint"
+    provider_key = "rdkit_fingerprint"
     fingerprint_kind = "rdkit-structural-reaction-fingerprint"
 
     def __init__(
