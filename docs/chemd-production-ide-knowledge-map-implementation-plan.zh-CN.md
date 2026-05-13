@@ -129,6 +129,30 @@
 - [x] Runtime smoke 验证：`pnpm desktop:offline-core-smoke` 通过；`pnpm desktop:runtime-smoke` 通过 Offline Core 且明确 `SKIP database persistence`；`pnpm desktop:offline-release-smoke` / `pnpm desktop:installer-offline-smoke` 因 release/MSI/NSIS 产物缺失明确 SKIP。
 - [x] 最终回归验证：`pnpm --filter @chemd/desktop build`、`pnpm typecheck`、`pnpm test` 均通过；build 仅保留既有 lucide `use client` 与 chunk size warnings。
 
+### 2026-05-13：第三轮剩余生产目标并行切片
+
+执行锚点：
+
+- 主集成分支：`desktop-ide-map`
+- 主集成工作树：`D:\Code\chemd-wt-desktop-ide-map`
+- 基线提交：`6b96420 chore(trellis)：创建地图剩余闭环任务`
+- Trellis 任务：`.trellis/tasks/05-13-desktop-ide-map-remaining-production`
+
+并行任务：
+
+| 分支 | 工作树 | 目标 | 写入边界 | 状态 |
+| --- | --- | --- | --- | --- |
+| `desktop-ide-map-hover-details` | `D:\Code\chemd-wt-map-hover-details` | Monaco diagnostic/template hover 细节 | `apps/desktop/src/monaco/**` | 进行中 |
+| `desktop-ide-map-preview-source-ref` | `D:\Code\chemd-wt-map-preview-source-ref` | reaction preview 展开、source-ref intent、cluster badge | `apps/desktop/src/knowledge-map/**`、`apps/desktop/src/styles/panels.css` | 进行中 |
+| `desktop-ide-map-tmap-worker` | `D:\Code\chemd-wt-map-tmap-worker` | 独立 TMAP worker 与 SKIP/ERROR 分类 | `services/chem-cluster-service/**` | 进行中 |
+
+串行保留给主架构工作树：
+
+- 共享实施文档状态更新。
+- root config / dependency / lockfile 变更审查。
+- 子任务合并、最终验证、Trellis record 和安全清理。
+- installer artifact / clean-machine smoke 的环境边界判断。
+
 ---
 
 ## 1. 总目标
