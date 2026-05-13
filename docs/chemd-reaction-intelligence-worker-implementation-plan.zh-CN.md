@@ -687,6 +687,19 @@ hybrid_score =
 - 当前仍未执行真实 Tauri command runner / GUI 手测；没有把真实网络、DB 或 runner
   作为本轮阻塞。
 
+状态记录（Postgres migration readiness visibility）：
+
+- Desktop Tauri Postgres status 已新增 `migrationState`、`migrationReason` 与
+  `coreTablesFound`，把 pgvector installed、core schema ready 和 migration state
+  拆成独立可见状态。
+- Desktop Postgres 面板已为 external / managed Postgres 共用 readiness item 展示；
+  未配置、无 runner、无真实 DB 时保持 `unknown` / degraded，不阻断 Offline Core。
+- 当前验证：`cargo test postgres` 22/22、desktop status Vitest 4/4、desktop
+  typecheck、status helper focused ESLint 与 desktop build 均通过；focused
+  `App.tsx` ESLint 仍仅剩既有 complexity/max-lines 4 项，继续按 M11 治理。
+- 当前仍未新增 schema version mismatch 检测；需要等 shared migration contract
+  明确版本来源后补齐。
+
 ---
 
 ## 8. 验证矩阵

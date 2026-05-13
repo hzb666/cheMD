@@ -562,6 +562,16 @@ DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outb
     `pnpm run test:scripts` 75/75、desktop typecheck、new-file/scripts focused ESLint、
     desktop build、`pnpm typecheck`、`pnpm test` 与 `git diff --check` 均通过；真实
     Tauri command runner 和真实 GUI 手测仍未执行。
+- Postgres migration / pgvector / schema readiness visibility：
+  - `feat(desktop)：合并 Postgres migration status` 扩展 Tauri Postgres status：
+    返回 `migrationState`、`migrationReason` 与 `coreTablesFound`，并把 pgvector、
+    core schema、migration state 拆成独立可见信号。
+  - 外部 PostgreSQL 与 managed PostgreSQL 共用同一 readiness 展示模型；无配置、
+    无 runner、无真实 DB 连接时保持 `unknown` / degraded 语义，不阻断 Offline Core。
+  - Rust 侧仅做 read-only 探针与状态归一化，不新增 desktop-only schema 或 migration。
+  - 当前验证：`cargo test postgres` 22/22、desktop status Vitest 4/4、desktop
+    typecheck、status helper focused ESLint 与 desktop build 均通过；focused
+    `App.tsx` ESLint 仍仅剩既有 complexity/max-lines 4 项，按 M11 处理。
 
 当前暂缓债务：
 
@@ -569,7 +579,8 @@ DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outb
   `LocalStorePanel` 超过 `max-lines-per-function` 与 complexity 限制。
 - Postgres profile UI 合并后，focused `App.tsx` ESLint 仍仅剩既有复杂度/函数长度
   4 项：`PostgresProfileManagerSection`/`LocalStorePanel`/`DesktopWorkbench`/`App`
-  所在区域行号随插入变化；继续进入 M11 组件化与复杂度治理，不阻塞功能主线。
+  所在区域行号随插入变化；Postgres readiness UI 合并后仍属同一类债务，继续进入
+  M11 组件化与复杂度治理，不阻塞功能主线。
 - 最终 M11 阶段需要拆出有职责的 `WorkspaceIngestPanel`/hook，不能只靠纯 props
   转发组件搬移复杂度。
 
@@ -657,7 +668,10 @@ reconnect outbox sync: synced=1, pending=0, failed=0
 状态：已在桌面 RAG 面板补 citation-backed 本地搜索基础，RAG result 必须带
 `citationId`、`revisionId`、`chunkId` 与 source range；当前只消费本地 compiler /
 language-service 生成的 citation candidates，尚未接入 embedding provider、pgvector
-查询和跨 workspace 排名。
+查询和跨 workspace 排名。2026-05-13 只读架构拆分结论：先串行落地 desktop RAG
+command contract + Rust runtime query，再并行接 citation-gated UI、embedding
+backfill task/status 与 runtime smoke extension；`desktop-contracts.ts`、shared
+schema/migration 与 `App.tsx` 接入点不得多人并行写。
 
 验收：
 
@@ -784,7 +798,8 @@ env、database URL、API key、token 或 password。诊断包说明见
 
 - [x] connection profile UI 可用；真实 Tauri runner/GUI 手测待补。
 - [x] 凭据后端使用系统 secret storage；profile UI 不展示或保存明文密码。
-- [ ] migration、pgvector、schema version 状态可见。
+- [x] migration、pgvector、schema readiness 状态可见；schema version mismatch
+  检测仍待 shared migration contract 明确后补。
 - [ ] 外部 DB 与 managed DB 使用同一 shared schema。
 - [ ] sync 成功、失败、冲突都有 UI 和日志。
 - [x] Reaction intelligence artifact 可映射为 shared schema runtime graph edge
@@ -798,6 +813,8 @@ env、database URL、API key、token 或 password。诊断包说明见
   keyring 保存 password；桌面 UI 已接入 list/save/activate/delete 表单与状态展示。
 - Tauri command smoke 已用 fake runner 覆盖 profile command 调用、临时 profile 清理、
   原 active profile 恢复和 password 脱敏；真实 runner 仍按环境型 `SKIP`。
+- Desktop Postgres status 已拆分展示 pgvector installed、core schema ready 与
+  migration state；外部 DB 与 managed DB 面板共用 readiness item 模型。
 - Tauri command-level proof 尚未配置 runner，当前按环境型 `SKIP` 处理，不阻塞离线
   优先主线。
 
