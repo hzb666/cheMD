@@ -12,6 +12,7 @@ mod managed_postgres_process;
 mod postgres;
 mod postgres_config;
 mod postgres_profiles;
+mod postgres_rag;
 mod postgres_runtime_core;
 mod postgres_runtime_graph_cleanup;
 mod postgres_runtime_persist;
@@ -34,6 +35,8 @@ mod local_store_sync_tests;
 mod local_store_tests;
 #[cfg(test)]
 mod postgres_profiles_tests;
+#[cfg(test)]
+mod postgres_rag_tests;
 #[cfg(test)]
 mod postgres_tests;
 #[cfg(test)]
@@ -65,6 +68,8 @@ use postgres_profiles::{
     activate_postgres_profile, delete_postgres_profile, list_postgres_profiles,
     save_postgres_profile,
 };
+#[cfg(not(test))]
+use postgres_rag::query_postgres_rag;
 #[cfg(not(test))]
 use postgres_runtime_persist::persist_runtime_graph_rag;
 #[cfg(not(test))]
@@ -114,6 +119,7 @@ pub fn run() {
             clear_local_outbox_failures,
             sync_local_outbox_to_postgres,
             persist_runtime_graph_rag,
+            query_postgres_rag,
             run_reaction_intelligence_worker,
             export_diagnostics_bundle
         ])

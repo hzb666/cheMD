@@ -234,6 +234,49 @@ export interface PersistRuntimeGraphRagResult {
   target: PostgresTargetSummary;
 }
 
+export type PostgresRagQueryState = "ready" | "degraded" | "offline";
+
+export interface PostgresRagQueryRequest {
+  query: string;
+  embedding: number[];
+  embeddingModel: string;
+  limit?: number;
+  workspaceId?: string;
+  documentId?: string;
+  revisionId?: string;
+}
+
+export interface PostgresRagQueryCitation {
+  locator: string;
+  sourceRange: RuntimeJsonObject;
+  citation: RuntimeJsonObject;
+  quality: RuntimeJsonObject;
+  sourceUri?: string;
+  entityId?: string;
+  blockId?: string;
+}
+
+export interface PostgresRagQueryResultItem {
+  chunkId: string;
+  revisionId: string;
+  experimentId: string;
+  chunkType: string;
+  sourceEntityIds: string[];
+  text: string;
+  metadata: RuntimeJsonObject;
+  distance: number;
+  citation: PostgresRagQueryCitation;
+}
+
+export interface PostgresRagQueryResult {
+  state: PostgresRagQueryState;
+  label: string;
+  detail: string;
+  results: PostgresRagQueryResultItem[];
+  blockedCount: number;
+  target: PostgresTargetSummary | null;
+}
+
 export type LocalOutboxSyncStatus = "pending" | "synced" | "failed";
 
 export interface LocalStoreStatus {
@@ -577,6 +620,12 @@ export interface DesktopCommandMap {
     };
     output: PersistRuntimeGraphRagResult;
   };
+  query_postgres_rag: {
+    input: {
+      input: PostgresRagQueryRequest;
+    };
+    output: PostgresRagQueryResult;
+  };
   read_local_store_status: {
     input: void;
     output: LocalStoreStatus;
@@ -694,7 +743,7 @@ export const shellDiagnosticsBundleResult: DiagnosticsBundleExportResult = {
   outputPath: "",
   summary: {
     generatedAt: "",
-    commandCount: 29,
+    commandCount: 30,
     boundarySkipCount: 5,
     supportCommandCount: 4
   }
