@@ -1552,3 +1552,37 @@ Added Desktop Postgres profile commands backed by OS keyring secret storage, wir
 ### Next Steps
 
 - None - task complete
+
+
+## Session 79: Desktop Postgres profile UI and command smoke
+
+**Date**: 2026-05-13
+**Task**: Desktop Postgres profile UI and command smoke
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Merged parallel P2 slices for Desktop Postgres profile UI and Tauri command smoke coverage, including password redaction, temporary profile cleanup, active profile restore, full pnpm validation, and productization docs updates.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c026b4b` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
