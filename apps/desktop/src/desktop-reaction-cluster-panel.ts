@@ -37,6 +37,8 @@ export interface DesktopReactionSimilarityEdge {
   to_reaction_entity_id: string;
   basis: string[];
   score: number;
+  confidence?: string;
+  provider_ids?: string[];
   warnings: string[];
 }
 
@@ -79,7 +81,11 @@ export interface DesktopReactionClusterPanelEdge {
   fromReactionEntityId: string;
   toReactionEntityId: string;
   basis: string[];
+  computedBasis: string[];
+  semanticBasis: string[];
   score: number;
+  confidence: string | null;
+  providerIds: string[];
   warnings: string[];
 }
 
@@ -92,6 +98,10 @@ export interface DesktopReactionClusterPanelDetail {
   edgeCount: number;
   sharedFeatures: string[];
   similarityEdgeBasis: string[];
+  computedSimilarityBasis: string[];
+  semanticSimilarityBasis: string[];
+  providerIds: string[];
+  edgeConfidences: string[];
   maxSimilarityScore: number | null;
   semanticOnly: boolean;
   weak: boolean;
@@ -130,6 +140,20 @@ const basisLabels: Record<string, string> = {
 
 const uniqueStrings = (values: readonly (string | undefined | null)[]): string[] =>
   Array.from(new Set(values.filter((value): value is string => Boolean(value)))).sort();
+
+const computedSimilarityBasis = new Set([
+  "rdkit_fingerprint_tanimoto",
+  "rxnfp_cosine",
+  "same_reaction_center",
+  "compatible_reaction_center",
+  "hybrid_consensus"
+]);
+
+const semanticSimilarityBasis = new Set([
+  "semantic_family_support",
+  "semantic_procedure_support",
+  "same_reaction_family"
+]);
 
 const isCompileOutput = (
   input: ChemdLanguageCompileOutput | DesktopReactionClusterGraphIndex | DesktopReactionClusterPanelInput
@@ -182,9 +206,21 @@ const hasSemanticOnlyEvidence = (
   basis: readonly string[],
   warnings: readonly string[]
 ): boolean =>
-  cluster.basis === "reaction_family"
-  || basis.includes("same_reaction_family")
-  || warnings.some((warning) => warning.includes("semantic") || warning.includes("fingerprint"));
+  !hasComputedSimilarityBasis(basis)
+  && (
+    cluster.basis === "reaction_family"
+    || basis.some((item) => semanticSimilarityBasis.has(item))
+    || warnings.some((warning) => warning.includes("semantic") || warning.includes("fingerprint"))
+  );
+
+const filterComputedBasis = (basis: readonly string[]): string[] =>
+  uniqueStrings(basis.filter((item) => computedSimilarityBasis.has(item)));
+
+const filterSemanticBasis = (basis: readonly string[]): string[] =>
+  uniqueStrings(basis.filter((item) => semanticSimilarityBasis.has(item)));
+
+const hasComputedSimilarityBasis = (basis: readonly string[]): boolean =>
+  basis.some((item) => computedSimilarityBasis.has(item));
 
 const hasWeakEvidence = (
   cluster: DesktopReactionCluster,
@@ -217,6 +253,10 @@ const buildDetail = (
 ): DesktopReactionClusterPanelDetail => {
   const edges = getClusterEdges(cluster, graphIndex.reaction_similarity_edges ?? []);
   const edgeBasis = uniqueStrings(edges.flatMap((edge) => edge.basis));
+  const computedBasis = filterComputedBasis(edgeBasis);
+  const semanticBasis = filterSemanticBasis(edgeBasis);
+  const providerIds = uniqueStrings(edges.flatMap((edge) => edge.provider_ids ?? []));
+  const edgeConfidences = uniqueStrings(edges.map((edge) => edge.confidence));
   const warnings = uniqueStrings([
     ...cluster.warnings,
     ...edges.flatMap((edge) => edge.warnings),
@@ -232,6 +272,10 @@ const buildDetail = (
     edgeCount: edges.length,
     sharedFeatures: cluster.shared_features.slice().sort(),
     similarityEdgeBasis: edgeBasis,
+    computedSimilarityBasis: computedBasis,
+    semanticSimilarityBasis: semanticBasis,
+    providerIds,
+    edgeConfidences,
     maxSimilarityScore: scores.length > 0 ? Math.max(...scores) : null,
     semanticOnly: hasSemanticOnlyEvidence(cluster, edgeBasis, warnings),
     weak: hasWeakEvidence(cluster, edges.length, warnings),
@@ -242,7 +286,11 @@ const buildDetail = (
       fromReactionEntityId: edge.from_reaction_entity_id,
       toReactionEntityId: edge.to_reaction_entity_id,
       basis: edge.basis.slice().sort(),
+      computedBasis: filterComputedBasis(edge.basis),
+      semanticBasis: filterSemanticBasis(edge.basis),
       score: edge.score,
+      confidence: edge.confidence ?? null,
+      providerIds: uniqueStrings(edge.provider_ids ?? []),
       warnings: edge.warnings.slice().sort()
     }))
   };
