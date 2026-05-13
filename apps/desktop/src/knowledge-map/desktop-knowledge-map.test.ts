@@ -5,6 +5,10 @@ import {
   type ChemdLanguageCompileSuccess,
   type ChemdLanguageCompileOutput
 } from "@chemd/language-service";
+import type {
+  ChemdReactionIntelligenceArtifactV1,
+  ReactionMapLayout
+} from "@chemd/reaction-map";
 
 import {
   buildDesktopKnowledgeMapViewModel,
@@ -128,6 +132,69 @@ const outputWithManyReactions = (count: number): ChemdLanguageCompileSuccess => 
   };
 };
 
+const reactionIntelligenceArtifact = (
+  layout?: ReactionMapLayout
+): ChemdReactionIntelligenceArtifactV1 => ({
+  schema_version: "chemd-reaction-intelligence-artifact/v0.1",
+  artifact_id: "artifact::reaction-intel::map-doc",
+  job_id: "job::reaction-intel::map-doc",
+  graph_index_id: "graph-index::map-doc",
+  generated_at: "2026-05-13T10:00:00.000Z",
+  providers: [
+    {
+      provider_id: "rdkit::fixture",
+      kind: "rdkit_fingerprint",
+      status: "PASS",
+      package_name: "rdkit",
+      package_version: "fixture",
+      warnings: []
+    },
+    {
+      provider_id: "rxnfp::fixture",
+      kind: "rxnfp",
+      status: "SKIP",
+      warnings: ["rxnfp_not_installed"]
+    },
+    {
+      provider_id: "tmap::fixture",
+      kind: "tmap_layout",
+      status: "ERROR",
+      warnings: ["tmap_layout_failed"]
+    }
+  ],
+  reaction_features: [
+    {
+      reaction_entity_id: "rxn-1",
+      source_hash: "hash-rxn-1",
+      canonical_rxn_smiles: "CCO.O>>CC=O",
+      fingerprint_refs: [{
+        feature_ref_id: "feature::rxn-1::rdkit",
+        provider: "rdkit",
+        kind: "bit_vector",
+        dimension: 2048,
+        storage: "inline",
+        hash: "feature-hash-rxn-1"
+      }],
+      warnings: []
+    }
+  ],
+  similarity_edges: [
+    {
+      edge_id: "edge::rxn-1::rxn-2",
+      from_reaction_entity_id: "rxn-1",
+      to_reaction_entity_id: "rxn-2",
+      score: 0.91,
+      confidence: "high",
+      basis: ["rdkit_fingerprint_tanimoto", "hybrid_consensus"],
+      provider_ids: ["rdkit::fixture"],
+      source_hashes: ["hash-rxn-1", "hash-rxn-2"],
+      warnings: ["computed_edge_reviewed"]
+    }
+  ],
+  layout,
+  warnings: ["artifact_warning_for_review"]
+});
+
 describe("desktop knowledge map view model", () => {
   it("builds semantic summaries from successful compile output", () => {
     const viewModel = buildDesktopKnowledgeMapViewModel(outputWithReaction());
@@ -154,6 +221,61 @@ describe("desktop knowledge map view model", () => {
       x: 0,
       y: 0
     });
+    expect(viewModel.reactionIntelligenceArtifact).toBeNull();
+  });
+
+  it("keeps no-artifact calls compatible with the deterministic fallback message", () => {
+    const viewModel = buildDesktopKnowledgeMapViewModel(outputWithReaction());
+
+    expect(viewModel.reactionIntelligenceArtifact).toBeNull();
+    expect(viewModel.reactionSummary.message).toContain("TMAP/worker");
+  });
+
+  it("summarizes reaction intelligence artifact providers, edges, basis, and warnings", () => {
+    const viewModel = buildDesktopKnowledgeMapViewModel(outputWithManyReactions(2), {
+      reactionIntelligenceArtifact: reactionIntelligenceArtifact()
+    });
+
+    expect(viewModel.reactionIntelligenceArtifact).toMatchObject({
+      artifactId: "artifact::reaction-intel::map-doc",
+      jobId: "job::reaction-intel::map-doc",
+      generatedAt: "2026-05-13T10:00:00.000Z",
+      providerStatusCounts: { PASS: 1, SKIP: 1, ERROR: 1 },
+      computedEdgeCount: 1,
+      computedBasis: ["hybrid_consensus", "rdkit_fingerprint_tanimoto"],
+      warnings: ["artifact_warning_for_review"],
+      layout: {
+        fromArtifact: false,
+        usesTmap: false,
+        engine: "deterministic_fallback"
+      }
+    });
+    expect(viewModel.reactionSummary.edgeCount).toBe(1);
+    expect(viewModel.reactionMap.edges[0]).toMatchObject({
+      from_reaction_entity_id: "rxn-1",
+      to_reaction_entity_id: "rxn-2",
+      basis: ["hybrid_consensus", "rdkit_fingerprint_tanimoto"]
+    });
+  });
+
+  it("uses artifact TMAP layout when the artifact carries a layout payload", () => {
+    const fallbackLayout = buildDesktopKnowledgeMapViewModel(outputWithManyReactions(2)).reactionMap;
+    const artifactLayout: ReactionMapLayout = {
+      ...fallbackLayout,
+      layout_engine: "tmap",
+      generated_at: "2026-05-13T10:00:00.000Z"
+    };
+    const viewModel = buildDesktopKnowledgeMapViewModel(outputWithManyReactions(2), {
+      reactionIntelligenceArtifact: reactionIntelligenceArtifact(artifactLayout)
+    });
+
+    expect(viewModel.reactionMap.layout_engine).toBe("tmap");
+    expect(viewModel.reactionIntelligenceArtifact?.layout).toEqual({
+      fromArtifact: true,
+      usesTmap: true,
+      engine: "tmap"
+    });
+    expect(viewModel.reactionSummary.message).toBe("Using external reaction map layout output.");
   });
 
   it("exposes expandable reaction renderable data with source refs", () => {

@@ -40,6 +40,7 @@ export const DesktopKnowledgeMapPanel = ({
         <div><span>Clusters</span><strong>{viewModel.reactionSummary.clusterCount}</strong></div>
       </div>
       <p className="desktop-empty-copy">{viewModel.reactionSummary.message}</p>
+      <ReactionIntelligenceArtifactSummary viewModel={viewModel} />
       <label className="desktop-tool-search">
         <Filter size={14} />
         <select
@@ -109,6 +110,54 @@ export const DesktopKnowledgeMapPanel = ({
         ))}
       </div>
     </div>
+  );
+};
+
+type ReactionIntelligenceArtifactSummaryProps = {
+  viewModel: DesktopKnowledgeMapViewModel;
+};
+
+const ReactionIntelligenceArtifactSummary = ({
+  viewModel
+}: ReactionIntelligenceArtifactSummaryProps) => {
+  const summary = viewModel.reactionIntelligenceArtifact;
+  if (!summary) {
+    return null;
+  }
+  return (
+    <>
+      <div className="desktop-graph-summary" aria-label="Reaction intelligence artifact summary">
+        <div><span>Artifact</span><strong title={summary.artifactId}>{summary.artifactId}</strong></div>
+        <div><span>Job</span><strong title={summary.jobId}>{summary.jobId}</strong></div>
+        <div><span>Generated</span><strong>{summary.generatedAt}</strong></div>
+      </div>
+      <div className="desktop-graph-summary">
+        <div><span>PASS</span><strong>{summary.providerStatusCounts.PASS}</strong></div>
+        <div><span>SKIP</span><strong>{summary.providerStatusCounts.SKIP}</strong></div>
+        <div><span>ERROR</span><strong>{summary.providerStatusCounts.ERROR}</strong></div>
+      </div>
+      <div className="desktop-tool-result-list" role="list" aria-label="Reaction intelligence computed basis">
+        <div className="desktop-tool-result-row" role="listitem">
+          <span>{summary.layout.fromArtifact ? "artifact layout" : "fallback layout"}</span>
+          <strong>{summary.layout.usesTmap ? "TMAP" : summary.layout.engine}</strong>
+          <code>{summary.computedEdgeCount} edges</code>
+        </div>
+        {summary.computedBasis.slice(0, 6).map((basis) => (
+          <div key={basis} className="desktop-tool-result-row" role="listitem">
+            <span>Basis</span>
+            <strong title={basis}>{basis}</strong>
+            <code>{summary.graphIndexId}</code>
+          </div>
+        ))}
+        {summary.warnings.slice(0, 4).map((warning) => (
+          <div key={warning} className="desktop-tool-result-row" role="listitem">
+            <span>Warning</span>
+            <strong title={warning}>{warning}</strong>
+            <code>artifact</code>
+          </div>
+        ))}
+      </div>
+    </>
   );
 };
 
