@@ -1,5 +1,7 @@
 import {
   buildReactionMapFromGraphIndex,
+  type ChemdComputedSimilarityBasisV1,
+  type ChemdReactionIntelligenceArtifactV1,
   type ReactionMapExplicitInput,
   type ReactionMapLayout
 } from "@chemd/reaction-map";
@@ -30,6 +32,28 @@ export interface DesktopReactionMapSummary {
   edgeCount: number;
   layoutEngine: ReactionMapLayout["layout_engine"];
   message: string;
+}
+
+export interface DesktopArtifactProviderStatusCounts {
+  PASS: number;
+  SKIP: number;
+  ERROR: number;
+}
+
+export interface DesktopReactionIntelligenceArtifactSummary {
+  artifactId: string;
+  jobId: string;
+  graphIndexId: string;
+  generatedAt: string;
+  providerStatusCounts: DesktopArtifactProviderStatusCounts;
+  computedEdgeCount: number;
+  computedBasis: ChemdComputedSimilarityBasisV1[];
+  warnings: string[];
+  layout: {
+    fromArtifact: boolean;
+    usesTmap: boolean;
+    engine: ReactionMapLayout["layout_engine"];
+  };
 }
 
 export interface DesktopReactionClusterRow {
@@ -104,9 +128,14 @@ export interface DesktopKnowledgeMapViewModel {
   semanticSummary: DesktopSemanticSummary;
   reactionMap: ReactionMapLayout;
   reactionSummary: DesktopReactionMapSummary;
+  reactionIntelligenceArtifact: DesktopReactionIntelligenceArtifactSummary | null;
   clusters: DesktopReactionClusterRow[];
   reactionRenderables: DesktopReactionRenderableRow[];
   evidenceSourceRefs: DesktopEvidenceSourceRow[];
+}
+
+export interface BuildDesktopKnowledgeMapViewModelOptions {
+  reactionIntelligenceArtifact?: ChemdReactionIntelligenceArtifactV1 | null;
 }
 
 const emptyReactionMap = (documentUri = "current"): ReactionMapLayout =>
@@ -180,7 +209,8 @@ const documentIdForOutput = (output: ChemdLanguageCompileOutput): string =>
   || "current";
 
 const buildReactionInput = (
-  output: ChemdLanguageCompileOutput
+  output: ChemdLanguageCompileOutput,
+  artifact?: ChemdReactionIntelligenceArtifactV1 | null
 ): ReactionMapExplicitInput => {
   if (output.status === "failed") {
     return {
@@ -196,7 +226,22 @@ const buildReactionInput = (
     reaction_features: output.symbols
       .filter(isReactionSymbol)
       .map((symbol) => reactionFeatureForSymbol(symbol, documentId)),
-    warnings: ["deterministic_fallback_layout_used"]
+    explicit_edges: artifact?.similarity_edges.map((edge) => ({
+      from_reaction_entity_id: edge.from_reaction_entity_id,
+      to_reaction_entity_id: edge.to_reaction_entity_id,
+      score: edge.score,
+      basis: edge.basis,
+      warnings: edge.warnings,
+      evidence: [{
+        evidence_id: edge.edge_id,
+        source: "explicit_edge",
+        basis: edge.basis,
+        warnings: edge.warnings
+      }]
+    })),
+    warnings: artifact
+      ? ["deterministic_fallback_layout_used", "reaction_intelligence_edges_applied"]
+      : ["deterministic_fallback_layout_used"]
   };
 };
 
@@ -228,6 +273,56 @@ const summarizeReactionMap = (
     ? "Using deterministic fallback layout; TMAP/worker output can replace positions later."
     : "Using external reaction map layout output."
 });
+
+const isReactionMapLayout = (value: unknown): value is ReactionMapLayout => {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const layout = value as Partial<ReactionMapLayout>;
+  return layout.schema_version === "chemd-reaction-cluster-layout/v0.1"
+    && Array.isArray(layout.nodes)
+    && Array.isArray(layout.edges)
+    && Array.isArray(layout.clusters)
+    && typeof layout.layout_engine === "string";
+};
+
+const providerStatusCounts = (
+  artifact: ChemdReactionIntelligenceArtifactV1
+): DesktopArtifactProviderStatusCounts =>
+  artifact.providers.reduce<DesktopArtifactProviderStatusCounts>((counts, provider) => ({
+    ...counts,
+    [provider.status]: counts[provider.status] + 1
+  }), { PASS: 0, SKIP: 0, ERROR: 0 });
+
+const computedBasisForArtifact = (
+  artifact: ChemdReactionIntelligenceArtifactV1
+): ChemdComputedSimilarityBasisV1[] =>
+  Array.from(new Set(artifact.similarity_edges.flatMap((edge) => edge.basis))).sort();
+
+const summarizeReactionIntelligenceArtifact = (
+  artifact: ChemdReactionIntelligenceArtifactV1 | null | undefined,
+  reactionMap: ReactionMapLayout,
+  layoutFromArtifact: boolean
+): DesktopReactionIntelligenceArtifactSummary | null => {
+  if (!artifact) {
+    return null;
+  }
+  return {
+    artifactId: artifact.artifact_id,
+    jobId: artifact.job_id,
+    graphIndexId: artifact.graph_index_id,
+    generatedAt: artifact.generated_at,
+    providerStatusCounts: providerStatusCounts(artifact),
+    computedEdgeCount: artifact.similarity_edges.length,
+    computedBasis: computedBasisForArtifact(artifact),
+    warnings: [...artifact.warnings],
+    layout: {
+      fromArtifact: layoutFromArtifact,
+      usesTmap: reactionMap.layout_engine === "tmap",
+      engine: reactionMap.layout_engine
+    }
+  };
+};
 
 const clusterRows = (
   reactionMap: ReactionMapLayout
@@ -362,8 +457,13 @@ const highestDiagnosticSeverity = (
 };
 
 export const buildDesktopKnowledgeMapViewModel = (
-  output: ChemdLanguageCompileOutput
+  output: ChemdLanguageCompileOutput,
+  options: BuildDesktopKnowledgeMapViewModelOptions = {}
 ): DesktopKnowledgeMapViewModel => {
+  const artifact = options.reactionIntelligenceArtifact;
+  const reactionMapFromArtifact = isReactionMapLayout(artifact?.layout)
+    ? artifact.layout
+    : null;
   const semanticTree = output.status === "ok"
     ? buildSemanticRenderTree({
       document: output.result.document,
@@ -371,13 +471,14 @@ export const buildDesktopKnowledgeMapViewModel = (
       sourceUri: output.documentUri
     })
     : null;
-  const reactionMap = output.status === "failed"
+  const reactionMap = reactionMapFromArtifact ?? (output.status === "failed"
     ? emptyReactionMap(output.documentUri)
-    : buildReactionMapFromGraphIndex(buildReactionInput(output), {
+    : buildReactionMapFromGraphIndex(buildReactionInput(output, artifact), {
       graph_index_id: `desktop-knowledge-map::${documentIdForOutput(output)}`,
       source_compile_run_ids: [output.compiledAt],
-      generated_at: output.compiledAt
-    });
+      generated_at: output.compiledAt,
+      input_edge_kind: artifact && artifact.similarity_edges.length > 0 ? "hybrid" : "semantic"
+    }));
   const state = buildState(output, reactionMap);
   const severity = highestDiagnosticSeverity(output.diagnostics);
 
@@ -390,6 +491,11 @@ export const buildDesktopKnowledgeMapViewModel = (
     semanticSummary: summarizeSemanticTree(semanticTree),
     reactionMap,
     reactionSummary: summarizeReactionMap(reactionMap),
+    reactionIntelligenceArtifact: summarizeReactionIntelligenceArtifact(
+      artifact,
+      reactionMap,
+      reactionMapFromArtifact !== null
+    ),
     clusters: clusterRows(reactionMap),
     reactionRenderables: reactionRenderableRows(semanticTree, reactionMap),
     evidenceSourceRefs: evidenceSourceRows(semanticTree)
