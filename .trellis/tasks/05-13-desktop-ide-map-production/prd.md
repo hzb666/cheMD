@@ -98,3 +98,13 @@ The implementation loop must keep the desktop IDE usable while adding:
   - Main validation passed `pnpm --filter @chemd/language-service test` with
     22 tests, `pnpm --filter @chemd/language-service typecheck`, and
     `git diff --check`.
+
+- `desktop-ide-monaco-completion-provider` merged through
+  `feat(desktop)：合并 Monaco Chemd 补全`.
+  - Registered the desktop Monaco completion provider against the
+    Monaco-neutral `getChemdCompletions()` core.
+  - Provider logic lives in `apps/desktop/src/monaco-chemd-completion.ts`; the
+    editor component stays under the file-size boundary.
+  - Main validation passed `pnpm --filter @chemd/desktop typecheck`, focused
+    desktop ESLint, `pnpm --filter @chemd/desktop build`, and
+    `git diff --check`.
