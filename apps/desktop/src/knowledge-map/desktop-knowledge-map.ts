@@ -34,6 +34,12 @@ export interface DesktopReactionMapSummary {
   message: string;
 }
 
+export interface DesktopEdgeBasisOption {
+  value: string;
+  label: string;
+  edgeCount: number;
+}
+
 export interface DesktopArtifactProviderStatusCounts {
   PASS: number;
   SKIP: number;
@@ -129,6 +135,7 @@ export interface DesktopKnowledgeMapViewModel {
   reactionMap: ReactionMapLayout;
   reactionSummary: DesktopReactionMapSummary;
   reactionIntelligenceArtifact: DesktopReactionIntelligenceArtifactSummary | null;
+  edgeBasisOptions: DesktopEdgeBasisOption[];
   clusters: DesktopReactionClusterRow[];
   reactionRenderables: DesktopReactionRenderableRow[];
   evidenceSourceRefs: DesktopEvidenceSourceRow[];
@@ -286,6 +293,11 @@ const isReactionMapLayout = (value: unknown): value is ReactionMapLayout => {
     && typeof layout.layout_engine === "string";
 };
 
+const uniqueSortedStrings = (values: readonly string[]): string[] =>
+  Array.from(new Set(values.filter(Boolean))).sort((left, right) =>
+    left.localeCompare(right, "en")
+  );
+
 const providerStatusCounts = (
   artifact: ChemdReactionIntelligenceArtifactV1
 ): DesktopArtifactProviderStatusCounts =>
@@ -297,7 +309,9 @@ const providerStatusCounts = (
 const computedBasisForArtifact = (
   artifact: ChemdReactionIntelligenceArtifactV1
 ): ChemdComputedSimilarityBasisV1[] =>
-  Array.from(new Set(artifact.similarity_edges.flatMap((edge) => edge.basis))).sort();
+  uniqueSortedStrings(
+    artifact.similarity_edges.flatMap((edge) => edge.basis)
+  ) as ChemdComputedSimilarityBasisV1[];
 
 const summarizeReactionIntelligenceArtifact = (
   artifact: ChemdReactionIntelligenceArtifactV1 | null | undefined,
@@ -335,6 +349,46 @@ const clusterRows = (
     confidence: cluster.confidence,
     reviewRequired: cluster.training_use.requires_human_review
   }));
+
+const buildEdgeBasisOptions = (
+  reactionMap: ReactionMapLayout,
+  artifactSummary: DesktopReactionIntelligenceArtifactSummary | null
+): DesktopEdgeBasisOption[] =>
+  uniqueSortedStrings([
+    ...reactionMap.edges.flatMap((edge) => edge.basis),
+    ...(artifactSummary?.computedBasis ?? [])
+  ]).map((basis) => ({
+    value: basis,
+    label: basis,
+    edgeCount: reactionMap.edges.filter((edge) => edge.basis.includes(basis)).length
+  }));
+
+export const filterDesktopKnowledgeMapNodes = (
+  reactionMap: ReactionMapLayout,
+  filters: {
+    clusterId?: string;
+    edgeBasis?: string;
+  }
+): ReactionMapLayout["nodes"] => {
+  const clusterId = filters.clusterId ?? "all";
+  const edgeBasis = filters.edgeBasis ?? "all";
+  const connectedReactionIds = edgeBasis === "all"
+    ? null
+    : new Set(reactionMap.edges
+      .filter((edge) => edge.basis.includes(edgeBasis))
+      .flatMap((edge) => [
+        edge.from_reaction_entity_id,
+        edge.to_reaction_entity_id
+      ]));
+
+  return reactionMap.nodes.filter((node) =>
+    (clusterId === "all" || node.cluster_id === clusterId)
+    && (
+      connectedReactionIds === null
+      || connectedReactionIds.has(node.reaction_entity_id)
+    )
+  );
+};
 
 export const createKnowledgeMapSourceJumpIntent = (
   nodeId: string,
@@ -481,6 +535,11 @@ export const buildDesktopKnowledgeMapViewModel = (
     }));
   const state = buildState(output, reactionMap);
   const severity = highestDiagnosticSeverity(output.diagnostics);
+  const reactionIntelligenceArtifact = summarizeReactionIntelligenceArtifact(
+    artifact,
+    reactionMap,
+    reactionMapFromArtifact !== null
+  );
 
   return {
     state,
@@ -491,11 +550,8 @@ export const buildDesktopKnowledgeMapViewModel = (
     semanticSummary: summarizeSemanticTree(semanticTree),
     reactionMap,
     reactionSummary: summarizeReactionMap(reactionMap),
-    reactionIntelligenceArtifact: summarizeReactionIntelligenceArtifact(
-      artifact,
-      reactionMap,
-      reactionMapFromArtifact !== null
-    ),
+    reactionIntelligenceArtifact,
+    edgeBasisOptions: buildEdgeBasisOptions(reactionMap, reactionIntelligenceArtifact),
     clusters: clusterRows(reactionMap),
     reactionRenderables: reactionRenderableRows(semanticTree, reactionMap),
     evidenceSourceRefs: evidenceSourceRows(semanticTree)

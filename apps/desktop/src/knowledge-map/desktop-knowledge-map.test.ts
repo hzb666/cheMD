@@ -12,7 +12,8 @@ import type {
 
 import {
   buildDesktopKnowledgeMapViewModel,
-  createKnowledgeMapSourceJumpIntent
+  createKnowledgeMapSourceJumpIntent,
+  filterDesktopKnowledgeMapNodes
 } from "./desktop-knowledge-map";
 
 const compile = (source: string): ChemdLanguageCompileOutput =>
@@ -228,6 +229,7 @@ describe("desktop knowledge map view model", () => {
     const viewModel = buildDesktopKnowledgeMapViewModel(outputWithReaction());
 
     expect(viewModel.reactionIntelligenceArtifact).toBeNull();
+    expect(viewModel.edgeBasisOptions).toEqual([]);
     expect(viewModel.reactionSummary.message).toContain("TMAP/worker");
   });
 
@@ -256,6 +258,34 @@ describe("desktop knowledge map view model", () => {
       to_reaction_entity_id: "rxn-2",
       basis: ["hybrid_consensus", "rdkit_fingerprint_tanimoto"]
     });
+    expect(viewModel.edgeBasisOptions).toEqual([
+      { value: "hybrid_consensus", label: "hybrid_consensus", edgeCount: 1 },
+      {
+        value: "rdkit_fingerprint_tanimoto",
+        label: "rdkit_fingerprint_tanimoto",
+        edgeCount: 1
+      }
+    ]);
+  });
+
+  it("filters graph nodes by edge basis and keeps cluster filtering composable", () => {
+    const viewModel = buildDesktopKnowledgeMapViewModel(outputWithManyReactions(3), {
+      reactionIntelligenceArtifact: reactionIntelligenceArtifact()
+    });
+    const rxnOneClusterId = viewModel.reactionMap.nodes.find((node) =>
+      node.reaction_entity_id === "rxn-1"
+    )?.cluster_id;
+
+    expect(filterDesktopKnowledgeMapNodes(viewModel.reactionMap, {
+      edgeBasis: "rdkit_fingerprint_tanimoto"
+    }).map((node) => node.reaction_entity_id)).toEqual(["rxn-1", "rxn-2"]);
+    expect(filterDesktopKnowledgeMapNodes(viewModel.reactionMap, {
+      clusterId: rxnOneClusterId,
+      edgeBasis: "rdkit_fingerprint_tanimoto"
+    }).map((node) => node.reaction_entity_id)).toEqual(["rxn-1"]);
+    expect(filterDesktopKnowledgeMapNodes(viewModel.reactionMap, {
+      edgeBasis: "rxnfp_cosine"
+    })).toEqual([]);
   });
 
   it("uses artifact TMAP layout when the artifact carries a layout payload", () => {
