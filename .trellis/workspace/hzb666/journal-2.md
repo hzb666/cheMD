@@ -833,3 +833,42 @@ Merged current-document reference completions into @chemd/language-service and r
 ### Next Steps
 
 - None - task complete
+
+
+## Session 59: Desktop IDE hover definition and renderable HTML shell
+
+**Date**: 2026-05-13
+**Task**: Desktop IDE hover definition and renderable HTML shell
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Merged Monaco-neutral hover/definition core into @chemd/language-service and renderable node HTML shell into @chemd/renderer-html. Architect integration resolved plan-doc conflicts and updated pnpm-lock.yaml for the renderer-json workspace dependency. Validation passed: language-service test 33/33, language-service typecheck, renderer-html test 9/9, renderer-html typecheck, conflict marker scan, and git diff --check. Final UI style refactor and componentization were appended as the last productization stage.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f0d2744` | (see git log) |
+| `72c4e04` | (see git log) |
+| `7a7cea5` | (see git log) |
+| `df186dc` | (see git log) |
+| `5685ca2` | (see git log) |
+| `09e86fd` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
