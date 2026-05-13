@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 83
+- **Total Sessions**: 84
 - **Last Active**: 2026-05-14
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~1730 | Active |
+| `journal-2.md` | ~1764 | Active |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 84 | 2026-05-14 | Desktop connected RAG panel wiring | `e6faa39` `6563e1c` `c14ce8a` `e61e4db` | `desktop-ide` |
 | 83 | 2026-05-14 | Desktop IDE progress checkpoint before ide-map merge | `45fe4c2` | `desktop-ide` |
 | 82 | 2026-05-14 | Desktop RAG embedding backfill and query view adapter | `facb1e4`, `c2dd2e6`, `c2d8c4f` | `desktop-ide` |
 | 81 | 2026-05-14 | Desktop Postgres RAG query command foundation | `7d50795`, `7582e50`, `85b1e39`, `bb84e1c` | `desktop-ide` |

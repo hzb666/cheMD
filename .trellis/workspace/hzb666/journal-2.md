@@ -1728,3 +1728,37 @@ Verified desktop-ide is clean at 45fe4c2 after the RAG backfill/query-view batch
 ### Next Steps
 
 - None - task complete
+
+
+## Session 84: Desktop connected RAG panel wiring
+
+**Date**: 2026-05-14
+**Task**: Desktop connected RAG panel wiring
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Merged connected RAG panel display and pure query controller worktrees into desktop-ide, then wired controller state into the desktop RAG panel. The panel now distinguishes local and connected RAG rows, shows score/distance and blocked summaries, and degrades safely when embedding provider/query trigger is unavailable. Updated implementation docs. Validation passed: focused RAG Vitest 20/20, @chemd/desktop typecheck/build, root pnpm typecheck, root pnpm test, and git diff --check. App.tsx focused ESLint still reports only existing complexity/max-lines debt deferred to M11.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e6faa39 6563e1c c14ce8a e61e4db` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
