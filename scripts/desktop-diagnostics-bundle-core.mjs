@@ -32,6 +32,7 @@ export const KNOWN_DESKTOP_COMMAND_NAMES = [
   "read_sidecar_status",
   "read_sidecar_logs",
   "read_postgres_status",
+  "read_embedding_provider_status",
   "list_postgres_profiles",
   "save_postgres_profile",
   "activate_postgres_profile",
@@ -50,6 +51,8 @@ export const KNOWN_DESKTOP_COMMAND_NAMES = [
   "clear_local_outbox_failures",
   "sync_local_outbox_to_postgres",
   "persist_runtime_graph_rag",
+  "query_postgres_rag",
+  "backfill_postgres_rag_embeddings",
   "run_reaction_intelligence_worker",
   "export_diagnostics_bundle"
 ];

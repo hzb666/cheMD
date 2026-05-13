@@ -69,9 +69,12 @@ test("redactDiagnosticsValue redacts secrets and database URLs", () => {
   );
 });
 
-test("known desktop commands include reaction intelligence, sync, and Postgres profile surfaces", () => {
+test("known desktop commands include reaction intelligence, sync, and RAG surfaces", () => {
   assert.deepEqual(
     [
+      "read_embedding_provider_status",
+      "query_postgres_rag",
+      "backfill_postgres_rag_embeddings",
       "run_reaction_intelligence_worker",
       "save_local_reaction_intelligence_artifact",
       "list_local_reaction_intelligence_artifacts",
@@ -82,6 +85,9 @@ test("known desktop commands include reaction intelligence, sync, and Postgres p
       "delete_postgres_profile"
     ].filter((command) => KNOWN_DESKTOP_COMMAND_NAMES.includes(command)),
     [
+      "read_embedding_provider_status",
+      "query_postgres_rag",
+      "backfill_postgres_rag_embeddings",
       "run_reaction_intelligence_worker",
       "save_local_reaction_intelligence_artifact",
       "list_local_reaction_intelligence_artifacts",

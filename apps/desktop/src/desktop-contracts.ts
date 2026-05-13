@@ -236,6 +236,21 @@ export interface PersistRuntimeGraphRagResult {
 
 export type PostgresRagQueryState = "ready" | "degraded" | "offline";
 export type PgvectorDistanceMetric = "cosine" | "l2" | "inner_product";
+export type EmbeddingProviderStatusState = "ready" | "degraded" | "offline";
+export type EmbeddingProviderKind = "http_env";
+
+export interface EmbeddingProviderStatus {
+  state: EmbeddingProviderStatusState;
+  configured: boolean;
+  providerKind: EmbeddingProviderKind;
+  model: string | null;
+  embeddingDim: number | null;
+  distanceMetric: PgvectorDistanceMetric | null;
+  baseUrlHost: string | null;
+  timeoutMs: number | null;
+  apiKeyConfigured: boolean;
+  detail: string;
+}
 
 export interface PostgresRagQueryRequest {
   query: string;
@@ -610,6 +625,10 @@ export interface DesktopCommandMap {
     input: void;
     output: PostgresStatus;
   };
+  read_embedding_provider_status: {
+    input: void;
+    output: EmbeddingProviderStatus;
+  };
   list_postgres_profiles: {
     input: void;
     output: PostgresProfilesState;
@@ -787,7 +806,7 @@ export const shellDiagnosticsBundleResult: DiagnosticsBundleExportResult = {
   outputPath: "",
   summary: {
     generatedAt: "",
-    commandCount: 31,
+    commandCount: 32,
     boundarySkipCount: 5,
     supportCommandCount: 4
   }
