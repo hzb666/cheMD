@@ -1864,6 +1864,7 @@ const EditorPane = ({
   source,
   compileOutput,
   workspaceIndex,
+  workspaceSymbolIndex,
   lineCount,
   compiledAt,
   workspaceConflict,
@@ -1877,6 +1878,7 @@ const EditorPane = ({
   source: string;
   compileOutput: ChemdLanguageCompileOutput;
   workspaceIndex?: DesktopWorkspaceIndexViewModel["completionIndex"];
+  workspaceSymbolIndex?: DesktopWorkspaceIndexViewModel["index"];
   lineCount: number;
   compiledAt: string;
   workspaceConflict: WorkspaceConflictState | null;
@@ -1900,6 +1902,7 @@ const EditorPane = ({
       documentPath={compileOutput.documentUri ?? fileName}
       compileOutput={compileOutput}
       workspaceIndex={workspaceIndex}
+      workspaceSymbolIndex={workspaceSymbolIndex}
       onChange={onChange}
       onSave={onSave}
     />
@@ -3066,6 +3069,7 @@ const DesktopWorkbench = ({
             source={source}
             compileOutput={output}
             workspaceIndex={workspaceIndexViewModel.completionIndex}
+            workspaceSymbolIndex={workspaceIndexViewModel.index}
             lineCount={source.split(/\r?\n/).length}
             compiledAt={output.compiledAt}
             workspaceConflict={workspaceConflict}
