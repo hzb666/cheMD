@@ -5,7 +5,9 @@ import {
 } from "@chemd/reaction-map";
 import {
   buildSemanticRenderTree,
-  type ChemdSemanticRenderTreeV1
+  type ChemdRenderableNodeV1,
+  type ChemdSemanticRenderTreeV1,
+  type ChemdSourceRefV1
 } from "@chemd/semantic-rendering";
 import type {
   ChemdEditorDiagnostic,
@@ -39,6 +41,62 @@ export interface DesktopReactionClusterRow {
   reviewRequired: boolean;
 }
 
+export interface DesktopSourceJumpIntent {
+  kind: "chemd-source-jump";
+  nodeId: string;
+  semanticId?: string;
+  sourceKind: ChemdSourceRefV1["source_kind"];
+  sourceUri?: string;
+  range: {
+    startLine: number;
+    endLine: number;
+    startOffset?: number;
+    endOffset?: number;
+  };
+}
+
+export interface DesktopRenderableSourceRef {
+  label: string;
+  sourceKind: ChemdSourceRefV1["source_kind"];
+  sourceUri?: string;
+  startLine?: number;
+  endLine?: number;
+  intent: DesktopSourceJumpIntent | null;
+}
+
+export interface DesktopReactionClusterBadge {
+  clusterId: string;
+  label: string;
+  basis: string;
+  confidence: string;
+  memberCount: number;
+  reviewRequired: boolean;
+}
+
+export interface DesktopRenderableChildRow {
+  nodeId: string;
+  nodeType: string;
+  label: string;
+  sourceRef: DesktopRenderableSourceRef | null;
+}
+
+export interface DesktopReactionRenderableRow {
+  nodeId: string;
+  semanticId: string;
+  component: string;
+  hydration: string;
+  title: string;
+  sourceRef: DesktopRenderableSourceRef | null;
+  clusterBadge: DesktopReactionClusterBadge | null;
+  children: DesktopRenderableChildRow[];
+}
+
+export interface DesktopEvidenceSourceRow {
+  nodeId: string;
+  label: string;
+  sourceRef: DesktopRenderableSourceRef;
+}
+
 export interface DesktopKnowledgeMapViewModel {
   state: DesktopKnowledgeMapState;
   message: string;
@@ -47,6 +105,8 @@ export interface DesktopKnowledgeMapViewModel {
   reactionMap: ReactionMapLayout;
   reactionSummary: DesktopReactionMapSummary;
   clusters: DesktopReactionClusterRow[];
+  reactionRenderables: DesktopReactionRenderableRow[];
+  evidenceSourceRefs: DesktopEvidenceSourceRow[];
 }
 
 const emptyReactionMap = (documentUri = "current"): ReactionMapLayout =>
@@ -181,6 +241,111 @@ const clusterRows = (
     reviewRequired: cluster.training_use.requires_human_review
   }));
 
+export const createKnowledgeMapSourceJumpIntent = (
+  nodeId: string,
+  semanticId: string | undefined,
+  sourceRef: ChemdSourceRefV1 | undefined
+): DesktopSourceJumpIntent | null => {
+  if (!sourceRef || sourceRef.start_line === undefined) {
+    return null;
+  }
+  return {
+    kind: "chemd-source-jump",
+    nodeId,
+    semanticId,
+    sourceKind: sourceRef.source_kind,
+    sourceUri: sourceRef.source_uri,
+    range: {
+      startLine: sourceRef.start_line,
+      endLine: sourceRef.end_line ?? sourceRef.start_line,
+      startOffset: sourceRef.start_offset,
+      endOffset: sourceRef.end_offset
+    }
+  };
+};
+
+const sourceRefLabel = (sourceRef: ChemdSourceRefV1): string => {
+  const location = sourceRef.start_line === undefined
+    ? "source"
+    : `L${sourceRef.start_line}${sourceRef.end_line ? `-L${sourceRef.end_line}` : ""}`;
+  const uri = sourceRef.source_uri?.split(/[\\/]/u).pop();
+  return uri ? `${uri} ${location}` : location;
+};
+
+const toDesktopSourceRef = (
+  node: ChemdRenderableNodeV1
+): DesktopRenderableSourceRef | null => {
+  if (!node.source_ref) {
+    return null;
+  }
+  return {
+    label: sourceRefLabel(node.source_ref),
+    sourceKind: node.source_ref.source_kind,
+    sourceUri: node.source_ref.source_uri,
+    startLine: node.source_ref.start_line,
+    endLine: node.source_ref.end_line,
+    intent: createKnowledgeMapSourceJumpIntent(node.node_id, node.semantic_id, node.source_ref)
+  };
+};
+
+const clusterBadgeForReaction = (
+  reactionId: string,
+  reactionMap: ReactionMapLayout
+): DesktopReactionClusterBadge | null => {
+  const mapNode = reactionMap.nodes.find((node) => node.reaction_entity_id === reactionId);
+  const cluster = reactionMap.clusters.find((item) => item.cluster_id === mapNode?.cluster_id);
+  if (!cluster) {
+    return null;
+  }
+  return {
+    clusterId: cluster.cluster_id,
+    label: cluster.label,
+    basis: cluster.basis,
+    confidence: cluster.confidence,
+    memberCount: cluster.member_count,
+    reviewRequired: cluster.training_use.requires_human_review
+  };
+};
+
+const childRow = (node: ChemdRenderableNodeV1): DesktopRenderableChildRow => ({
+  nodeId: node.node_id,
+  nodeType: node.node_type,
+  label: node.semantic_id ?? node.original_id ?? node.node_type,
+  sourceRef: toDesktopSourceRef(node)
+});
+
+const reactionRenderableRows = (
+  tree: ChemdSemanticRenderTreeV1 | null,
+  reactionMap: ReactionMapLayout
+): DesktopReactionRenderableRow[] =>
+  (tree?.nodes ?? [])
+    .filter((node) => node.node_type === "ChemdReactionNode" && node.semantic_id)
+    .map((node) => ({
+      nodeId: node.node_id,
+      semanticId: node.semantic_id ?? node.node_id,
+      component: node.render.component,
+      hydration: node.render.hydrate,
+      title: node.semantic_id ?? node.original_id ?? node.node_id,
+      sourceRef: toDesktopSourceRef(node),
+      clusterBadge: clusterBadgeForReaction(node.semantic_id ?? node.node_id, reactionMap),
+      children: node.children.map(childRow)
+    }));
+
+const evidenceSourceRows = (
+  tree: ChemdSemanticRenderTreeV1 | null
+): DesktopEvidenceSourceRow[] =>
+  (tree?.nodes ?? [])
+    .filter((node) => node.node_type === "ChemdEvidenceNode")
+    .map((node) => ({ node, sourceRef: toDesktopSourceRef(node) }))
+    .filter((row): row is { node: ChemdRenderableNodeV1; sourceRef: DesktopRenderableSourceRef } =>
+      row.sourceRef !== null
+    )
+    .map(({ node, sourceRef }) => ({
+      nodeId: node.node_id,
+      label: node.semantic_id ?? node.original_id ?? "evidence",
+      sourceRef
+    }));
+
 const highestDiagnosticSeverity = (
   diagnostics: readonly ChemdEditorDiagnostic[]
 ): ChemdEditorDiagnostic["severity"] | null => {
@@ -225,6 +390,8 @@ export const buildDesktopKnowledgeMapViewModel = (
     semanticSummary: summarizeSemanticTree(semanticTree),
     reactionMap,
     reactionSummary: summarizeReactionMap(reactionMap),
-    clusters: clusterRows(reactionMap)
+    clusters: clusterRows(reactionMap),
+    reactionRenderables: reactionRenderableRows(semanticTree, reactionMap),
+    evidenceSourceRefs: evidenceSourceRows(semanticTree)
   };
 };

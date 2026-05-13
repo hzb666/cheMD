@@ -1,17 +1,24 @@
 import { useMemo, useState } from "react";
-import { Filter, GitGraph } from "lucide-react";
+import { ChevronDown, ChevronRight, Filter, GitGraph, LocateFixed } from "lucide-react";
 
-import type { DesktopKnowledgeMapViewModel } from "./desktop-knowledge-map";
+import type {
+  DesktopKnowledgeMapViewModel,
+  DesktopRenderableSourceRef,
+  DesktopSourceJumpIntent
+} from "./desktop-knowledge-map";
 
 interface KnowledgeMapPanelProps {
   viewModel: DesktopKnowledgeMapViewModel;
+  onSourceJump?: (intent: DesktopSourceJumpIntent) => void;
 }
 
 export const DesktopKnowledgeMapPanel = ({
-  viewModel
+  viewModel,
+  onSourceJump
 }: KnowledgeMapPanelProps) => {
   const [selectedClusterId, setSelectedClusterId] = useState<string>("all");
   const [selectedReactionId, setSelectedReactionId] = useState<string | null>(null);
+  const [expandedReactionIds, setExpandedReactionIds] = useState<string[]>([]);
   const graphNodes = useMemo(
     () => viewModel.reactionMap.nodes.filter((node) =>
       selectedClusterId === "all" || node.cluster_id === selectedClusterId
@@ -80,6 +87,18 @@ export const DesktopKnowledgeMapPanel = ({
         <div><span>Hydrate</span><strong>{viewModel.semanticSummary.heavyNodeCount}</strong></div>
         <div><span>Warnings</span><strong>{viewModel.semanticSummary.warningCount}</strong></div>
       </div>
+      <ReactionRenderableList
+        viewModel={viewModel}
+        expandedReactionIds={expandedReactionIds}
+        onToggle={(nodeId) => {
+          setExpandedReactionIds((current) =>
+            current.includes(nodeId)
+              ? current.filter((item) => item !== nodeId)
+              : [...current, nodeId]
+          );
+        }}
+        onSourceJump={onSourceJump}
+      />
       <div className="desktop-tool-result-list" role="list" aria-label="Reaction clusters">
         {viewModel.clusters.slice(0, 6).map((cluster) => (
           <div key={cluster.id} className="desktop-tool-result-row" role="listitem">
@@ -90,6 +109,91 @@ export const DesktopKnowledgeMapPanel = ({
         ))}
       </div>
     </div>
+  );
+};
+
+type ReactionRenderableListProps = {
+  viewModel: DesktopKnowledgeMapViewModel;
+  expandedReactionIds: readonly string[];
+  onToggle: (nodeId: string) => void;
+  onSourceJump?: (intent: DesktopSourceJumpIntent) => void;
+};
+
+const ReactionRenderableList = ({
+  viewModel,
+  expandedReactionIds,
+  onToggle,
+  onSourceJump
+}: ReactionRenderableListProps) => (
+  <div className="desktop-renderable-node-list" role="list" aria-label="Reaction renderable nodes">
+    {viewModel.reactionRenderables.slice(0, 12).map((node) => {
+      const expanded = expandedReactionIds.includes(node.nodeId);
+      return (
+        <div key={node.nodeId} className="desktop-renderable-node-row" role="listitem">
+          <button
+            type="button"
+            className="desktop-renderable-node-toggle"
+            aria-expanded={expanded}
+            onClick={() => onToggle(node.nodeId)}
+          >
+            {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            <span>{node.component}</span>
+            <strong title={node.title}>{node.title}</strong>
+          </button>
+          {node.clusterBadge ? (
+            <span className="desktop-cluster-badge" title={node.clusterBadge.label}>
+              {node.clusterBadge.basis} / {node.clusterBadge.confidence}
+            </span>
+          ) : null}
+          <SourceRefAction sourceRef={node.sourceRef} onSourceJump={onSourceJump} />
+          {expanded ? (
+            <div className="desktop-renderable-node-detail">
+              <code>{node.hydration}</code>
+              {node.children.length > 0 ? node.children.map((child) => (
+                <span key={child.nodeId} title={child.nodeType}>
+                  {child.label}
+                </span>
+              )) : <span>No child renderables</span>}
+            </div>
+          ) : null}
+        </div>
+      );
+    })}
+    {viewModel.evidenceSourceRefs.slice(0, 6).map((evidence) => (
+      <div key={evidence.nodeId} className="desktop-renderable-evidence-row" role="listitem">
+        <span>Evidence</span>
+        <strong title={evidence.label}>{evidence.label}</strong>
+        <SourceRefAction sourceRef={evidence.sourceRef} onSourceJump={onSourceJump} />
+      </div>
+    ))}
+  </div>
+);
+
+type SourceRefActionProps = {
+  sourceRef: DesktopRenderableSourceRef | null;
+  onSourceJump?: (intent: DesktopSourceJumpIntent) => void;
+};
+
+const SourceRefAction = ({
+  sourceRef,
+  onSourceJump
+}: SourceRefActionProps) => {
+  if (!sourceRef) {
+    return <span className="desktop-source-ref-chip">No source</span>;
+  }
+  if (!sourceRef.intent || !onSourceJump) {
+    return <span className="desktop-source-ref-chip">{sourceRef.label}</span>;
+  }
+  const intent = sourceRef.intent;
+  return (
+    <button
+      type="button"
+      className="desktop-source-ref-button"
+      onClick={() => onSourceJump(intent)}
+    >
+      <LocateFixed size={13} />
+      <span>{sourceRef.label}</span>
+    </button>
   );
 };
 
