@@ -645,6 +645,18 @@ hybrid_score =
   typecheck、`pnpm typecheck`、`pnpm test`、desktop build 与 `git diff --check`
   均通过；focused ESLint 仍仅报 `App.tsx` 既有复杂度/函数长度 4 项，按 M11 处理。
 
+状态记录（RAG citation gate foundation）：
+
+- Desktop workspace index view model 新增 citation-backed RAG results 与 `ragGate`
+  状态；RAG 面板会展示带 citation locator 的本地 RAG 行，同时保留 symbols /
+  references 搜索。
+- RAG result 只消费 `buildEditorGraphRagRecords` 生成的 citation candidates；缺少
+  `citationId`、`revisionId`、`chunkId` 或 source range 的候选不会进入结果。
+- 当前验证：workspace-index Vitest 7/7、focused ESLint、desktop typecheck、
+  `pnpm typecheck`、`pnpm test`、desktop build 与 `git diff --check` 均通过。
+- 当前仍未接入 embedding provider、pgvector 查询或真实跨 workspace 排名；这些进入
+  后续 M6/M5 增强。
+
 ---
 
 ## 8. 验证矩阵

@@ -525,6 +525,15 @@ DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outb
   - 当前验证：workspace ingest runner/local store Vitest 33/33、desktop typecheck、
     `pnpm typecheck`、`pnpm test`、desktop build 与 `git diff --check` 均通过；
     focused ESLint 仍仅报 `App.tsx` 既有复杂度/函数长度 4 项，继续按 M11 处理。
+- RAG citation gate 基础：
+  - `feat(desktop)：合并 RAG citation gate 结果` 在 workspace index view model 中
+    增加 citation-backed RAG results 与 `ragGate` 状态；RAG 面板现在先展示带
+    citation locator 的本地 RAG 行，再保留 symbols/references 搜索。
+  - RAG result 只来自 `buildEditorGraphRagRecords` 产出的 citation candidates；
+    缺少 `citationId`、`revisionId`、`chunkId` 或 source range 的候选不会进入结果。
+  - 当前验证：workspace-index Vitest 7/7、focused ESLint、desktop typecheck、
+    `pnpm typecheck`、`pnpm test`、desktop build 与 `git diff --check` 均通过；
+    这仍是本地 citation gate 基础，不包含 embedding/provider/DB 查询。
 
 当前暂缓债务：
 
@@ -613,6 +622,11 @@ reconnect outbox sync: synced=1, pending=0, failed=0
 - RAG search：自然语言查询、reaction-aware filter、citation gate。
 - embedding pipeline：provider 配置、backfill、失败重试、任务状态。
 - 无 citation 的 RAG 结果不得进入 Agent context。
+
+状态：已在桌面 RAG 面板补 citation-backed 本地搜索基础，RAG result 必须带
+`citationId`、`revisionId`、`chunkId` 与 source range；当前只消费本地 compiler /
+language-service 生成的 citation candidates，尚未接入 embedding provider、pgvector
+查询和跨 workspace 排名。
 
 验收：
 
@@ -762,7 +776,8 @@ env、database URL、API key、token 或 password。诊断包说明见
 - [x] Knowledge map 支持 edge basis filter，并可与 cluster filter 组合过滤节点。
 - [x] Reaction intelligence job builder 不伪造 RXN SMILES，只消费真实结构字段；失败或
   缺依赖时保留本地日志 tail 和可显示状态。
-- [ ] RAG search 有 citation gate。
+- [x] RAG search 有 citation gate 基础：本地结果必须带 citation locator；embedding /
+  pgvector 查询仍待接入。
 - [ ] Agent run 可审计，patch 需用户确认。
 - [ ] 所有增强能力离线/失败时可降级。
 
