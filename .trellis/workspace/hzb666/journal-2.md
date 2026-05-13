@@ -1796,3 +1796,37 @@ Merged the read-only embedding provider status command, synchronized diagnostics
 ### Next Steps
 
 - None - task complete
+
+
+## Session 86: M6 connected RAG embedding query
+
+**Date**: 2026-05-14
+**Task**: M6 connected RAG embedding query
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Merged create_embedding_vector command and wired connected RAG Run to generate a real query embedding before calling query_postgres_rag. Updated M6 productization docs. Verification: Rust embedding provider tests 9/9, diagnostics bundle Rust tests 3/3, connected RAG Vitest 21/21, desktop typecheck/build, full pnpm typecheck, full pnpm test, diagnostics script tests, git diff --check. Focused ESLint still reports App/DesktopWorkspaceIndexPanel complexity only; deferred to M11.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `aba6e4c` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
