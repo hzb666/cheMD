@@ -7,6 +7,11 @@ import { buildEditorGraphRagRecords, compileChemdForEditor, type ChemdEditorDiag
 
 import { shellFiles, shellPostgresStatus, shellSidecarStatus, shellWorkspace, type DesktopCommandError, type DesktopCommandMap, type LocalStoreStatus, type ManagedPostgresStatus, type PostgresStatus, type RuntimeState, type SidecarStatus, type WorkspaceFileEntry, type WorkspaceHandle, type WorkspaceIngestQueueItem, type WorkspaceIngestQueueSummary } from "./desktop-contracts";
 import { buildLocalRuntimeSnapshotInput } from "./desktop-local-store";
+import {
+  initialLocalReactionIntelligenceArtifactState,
+  readLatestLocalReactionIntelligenceArtifact,
+  type LocalReactionIntelligenceArtifactState
+} from "./desktop-reaction-intelligence-artifact-controller";
 import { buildPersistRuntimeGraphRagCommandInput } from "./desktop-runtime-persistence";
 import { buildDesktopSemanticPreview, type DesktopSemanticPreview } from "./desktop-semantic-preview";
 import { buildDesktopWorkspaceSymbolIndex, type DesktopWorkspaceSymbolIndexSummary } from "./desktop-workspace-symbol-index";
@@ -2701,6 +2706,8 @@ const useLocalStoreController = ({
   const [status, setStatus] = useState<LocalStoreStatus>(initialLocalStoreStatus);
   const [snapshotState, setSnapshotState] = useState<LocalSnapshotState>(initialLocalSnapshotState);
   const [syncState, setSyncState] = useState<LocalSyncState>(initialLocalSyncState);
+  const [reactionIntelligenceArtifactState, setReactionIntelligenceArtifactState] =
+    useState<LocalReactionIntelligenceArtifactState>(initialLocalReactionIntelligenceArtifactState);
   const [operation, setOperation] = useState<LocalStoreOperation | null>(null);
   const [error, setError] = useState<string | null>(null);
   const operationRef = useRef<LocalStoreOperation | null>(null);
@@ -2727,12 +2734,20 @@ const useLocalStoreController = ({
     }
   };
 
+  const readReactionIntelligenceArtifact = async (): Promise<LocalReactionIntelligenceArtifactState> => {
+    const nextState = await readLatestLocalReactionIntelligenceArtifact({
+      listArtifacts: (input) => invokeDesktop("list_local_reaction_intelligence_artifacts", input)
+    });
+    setReactionIntelligenceArtifactState(nextState);
+    return nextState;
+  };
+
   const refresh = async () => {
     if (operationRef.current) return;
     operationRef.current = "refresh";
     setOperation("refresh");
     try {
-      await readStatus();
+      await Promise.all([readStatus(), readReactionIntelligenceArtifact()]);
     } finally {
       operationRef.current = null;
       setOperation(null);
@@ -2761,7 +2776,7 @@ const useLocalStoreController = ({
           pendingCount: result.outboxPendingCount
         }
       });
-      await readStatus();
+      await Promise.all([readStatus(), readReactionIntelligenceArtifact()]);
     } catch (nextError: unknown) {
       setSnapshotState({ state: "failure", message: getLocalStoreErrorMessage(nextError), summary: null });
     } finally {
@@ -2795,7 +2810,7 @@ const useLocalStoreController = ({
           failedEntries
         }
       });
-      await readStatus();
+      await Promise.all([readStatus(), readReactionIntelligenceArtifact()]);
     } catch (nextError: unknown) {
       setSyncState({ state: "failure", message: getLocalStoreErrorMessage(nextError), summary: null });
     } finally {
@@ -2817,10 +2832,11 @@ const useLocalStoreController = ({
     status,
     snapshotState,
     syncState,
+    reactionIntelligenceArtifactState,
     operation,
     disabledReason,
     syncDisabledReason,
-    error,
+    error: error ?? reactionIntelligenceArtifactState.error,
     reset: () => {
       setSnapshotState(initialLocalSnapshotState);
       setSyncState(initialLocalSyncState);
@@ -3380,9 +3396,6 @@ export const App = () => {
     readFile: readWorkspaceIndexFile
   });
   const workspaceIndexViewModel = workspaceIndexController.viewModel;
-  const knowledgeMapViewModel = useMemo(() =>
-    buildDesktopKnowledgeMapViewModel(output),
-  [output]);
   const compileError = output.status === "failed" ? output.error.message : undefined;
   const persistController = usePersistRuntimeController({
     mode: workspaceController.mode,
@@ -3402,6 +3415,11 @@ export const App = () => {
     compileOutput: output,
     agentRun
   });
+  const knowledgeMapViewModel = useMemo(() =>
+    buildDesktopKnowledgeMapViewModel(output, {
+      reactionIntelligenceArtifact: localStoreController.reactionIntelligenceArtifactState.artifact
+    }),
+  [localStoreController.reactionIntelligenceArtifactState.artifact, output]);
   const workspaceIngestController = useWorkspaceIngestController({
     mode: workspaceController.mode,
     workspaceState: workspaceController.workspaceState,
