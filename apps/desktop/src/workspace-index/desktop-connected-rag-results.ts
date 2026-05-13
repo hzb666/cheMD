@@ -18,6 +18,7 @@ export interface DesktopConnectedRagRow {
   sourceRange?: EditorGraphRagSourceRange | null;
   documentPath?: string | null;
   documentUri?: string | null;
+  sourceUri?: string | null;
   text?: string | null;
   label?: string | null;
   detail?: string | null;
