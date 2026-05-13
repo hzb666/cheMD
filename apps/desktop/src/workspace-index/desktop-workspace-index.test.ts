@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type {
   ChemdLanguageCompileSuccess,
-  ChemdSourceRange
+  ChemdSourceRange,
+  EditorGraphRagCitationCandidate
 } from "@chemd/language-service";
 import type { WorkspaceIndexCompileFn } from "@chemd/workspace-index";
 
 import type { WorkspaceFileEntry } from "../desktop-contracts";
+import { buildDesktopWorkspaceRagResultsFromCitationCandidates } from "./desktop-rag-citation-gate";
 import {
   buildDesktopWorkspaceIndexViewModel,
   getWorkspaceReferenceRowsForSymbol
@@ -38,6 +40,51 @@ const compile: WorkspaceIndexCompileFn = (input): ChemdLanguageCompileSuccess =>
     : [{ id: "rxn-a", label: "rxn-a", kind: "reaction", range: range(6) }]
 });
 
+const citationSource = `---
+id: exp-rag-gate
+title: RAG gate
+date: 2026-05-13
+---
+
+:::chemd #mol-a
+kind: molecule
+smiles: CCO
+:::
+
+:::chemd #rxn-a
+kind: reaction
+reactants: mol-a
+products: product-a
+:::
+
+:::result #res-a
+reaction: rxn-a
+status: success
+yield: 72%
+:::
+`;
+
+const citationCandidate = (
+  overrides: Partial<EditorGraphRagCitationCandidate> = {}
+): EditorGraphRagCitationCandidate => ({
+  citationId: "citation-1",
+  revisionId: "revision-1",
+  chunkId: "chunk-1",
+  experimentId: "experiment-1",
+  documentUri: "chemd-workspace://workspace/route.chemd.md",
+  sourceRange: range(12),
+  citation: {
+    experimentId: "experiment-1",
+    revisionId: "revision-1",
+    chunkId: "chunk-1",
+    documentUri: "chemd-workspace://workspace/route.chemd.md",
+    sourceRange: range(12)
+  },
+  quality: {},
+  createdAt: "2026-05-13T00:00:00.000Z",
+  ...overrides
+});
+
 describe("desktop workspace index view model", () => {
   it("returns an empty state when no loaded Chemd source is available", () => {
     const viewModel = buildDesktopWorkspaceIndexViewModel({
@@ -50,7 +97,10 @@ describe("desktop workspace index view model", () => {
       index: null,
       completionIndex: undefined
     });
-    expect(viewModel.badges).toEqual([{ label: "Docs", value: "0", tone: "neutral" }]);
+    expect(viewModel.badges).toEqual([
+      { label: "Docs", value: "0", tone: "neutral" },
+      { label: "RAG", value: "0", tone: "warning" }
+    ]);
   });
 
   it("indexes the current document without reading from the file system", () => {
@@ -132,5 +182,64 @@ describe("desktop workspace index view model", () => {
         target: "missing-product"
       })
     ]);
+  });
+
+  it("generates searchable RAG results only when citations are usable", () => {
+    const viewModel = buildDesktopWorkspaceIndexViewModel({
+      workspaceId: "workspace-rag",
+      files: [file("experiments/rag-gate.chemd.md")],
+      currentDocument: {
+        path: "experiments/rag-gate.chemd.md",
+        source: citationSource
+      }
+    });
+
+    expect(viewModel.ragGate).toMatchObject({
+      state: "ready",
+      message: expect.stringContaining("citation-backed only")
+    });
+    expect(viewModel.ragResults.length).toBeGreaterThan(0);
+    expect(viewModel.ragResults[0]).toMatchObject({
+      citationId: expect.any(String),
+      revisionId: expect.any(String),
+      chunkId: expect.any(String),
+      documentPath: "experiments/rag-gate.chemd.md",
+      documentUri: expect.stringContaining("chemd-workspace://"),
+      locator: expect.stringContaining("L")
+    });
+  });
+
+  it("keeps empty RAG candidates behind the citation gate", () => {
+    const results = buildDesktopWorkspaceRagResultsFromCitationCandidates({
+      documentPath: "experiments/empty.chemd.md",
+      documentUri: "chemd-workspace://workspace/empty.chemd.md",
+      candidates: [],
+      chunkTextById: new Map()
+    });
+    const viewModel = buildDesktopWorkspaceIndexViewModel({
+      workspaceId: "workspace-rag",
+      files: [file("README.md")]
+    });
+
+    expect(results).toEqual([]);
+    expect(viewModel.ragGate).toMatchObject({
+      state: "empty",
+      message: expect.stringContaining("citation-backed only")
+    });
+  });
+
+  it("filters candidate content when citation fields are missing", () => {
+    const results = buildDesktopWorkspaceRagResultsFromCitationCandidates({
+      documentPath: "experiments/route.chemd.md",
+      documentUri: "chemd-workspace://workspace/route.chemd.md",
+      candidates: [
+        citationCandidate({ citationId: "" }),
+        citationCandidate({ chunkId: "" }),
+        citationCandidate({ sourceRange: {} })
+      ],
+      chunkTextById: new Map([["chunk-1", "uncited content"]])
+    });
+
+    expect(results).toEqual([]);
   });
 });
