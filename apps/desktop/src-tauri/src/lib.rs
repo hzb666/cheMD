@@ -11,6 +11,7 @@ mod managed_postgres_migrations;
 mod managed_postgres_process;
 mod postgres;
 mod postgres_config;
+mod postgres_profiles;
 mod postgres_runtime_core;
 mod postgres_runtime_graph_cleanup;
 mod postgres_runtime_persist;
@@ -31,6 +32,8 @@ mod diagnostics_bundle_tests;
 mod local_store_sync_tests;
 #[cfg(test)]
 mod local_store_tests;
+#[cfg(test)]
+mod postgres_profiles_tests;
 #[cfg(test)]
 mod postgres_tests;
 #[cfg(test)]
@@ -57,6 +60,11 @@ use managed_postgres::{
 };
 #[cfg(not(test))]
 use postgres::read_postgres_status;
+#[cfg(not(test))]
+use postgres_profiles::{
+    activate_postgres_profile, delete_postgres_profile, list_postgres_profiles,
+    save_postgres_profile,
+};
 #[cfg(not(test))]
 use postgres_runtime_persist::persist_runtime_graph_rag;
 #[cfg(not(test))]
@@ -88,6 +96,10 @@ pub fn run() {
             read_sidecar_status,
             read_sidecar_logs,
             read_postgres_status,
+            list_postgres_profiles,
+            save_postgres_profile,
+            activate_postgres_profile,
+            delete_postgres_profile,
             read_managed_postgres_status,
             initialize_managed_postgres,
             start_managed_postgres,

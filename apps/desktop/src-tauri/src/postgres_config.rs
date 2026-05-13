@@ -3,6 +3,7 @@
 use crate::managed_postgres_config::{
     managed_config_candidate_roots, managed_env_source, ManagedPostgresPaths,
 };
+use crate::postgres_profiles::{postgres_profile_candidate_roots, postgres_profile_env_source};
 use std::{collections::BTreeMap, env, fs, path::Path};
 use url::Url;
 
@@ -158,7 +159,11 @@ pub(crate) fn normalize_postgres_database_url(value: &str) -> String {
 }
 
 fn config_sources(repo_root: Option<&Path>) -> Vec<EnvSource> {
-    let mut sources = vec![process_source()];
+    let mut sources = postgres_profile_candidate_roots()
+        .into_iter()
+        .filter_map(|root| postgres_profile_env_source(&root))
+        .collect::<Vec<_>>();
+    sources.push(process_source());
     if let Some(repo_root) = repo_root {
         sources.extend(
             [

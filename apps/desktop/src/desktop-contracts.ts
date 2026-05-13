@@ -57,6 +57,41 @@ export interface PostgresTargetSummary {
   ssl: string; timeoutMs: number; pool: string | null;
 }
 
+export interface SavePostgresProfileInput {
+  profileId?: string;
+  label: string;
+  host: string;
+  port: number;
+  database: string;
+  user: string;
+  password?: string;
+  sslmode?: string;
+  timeoutMs?: number;
+  pool?: string;
+  setActive?: boolean;
+}
+
+export interface PostgresProfileSummary {
+  profileId: string;
+  label: string;
+  host: string;
+  port: number;
+  database: string;
+  user: string;
+  sslmode: string;
+  timeoutMs: number;
+  pool: string | null;
+  passwordSaved: boolean;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PostgresProfilesState {
+  activeProfileId: string | null;
+  profiles: PostgresProfileSummary[];
+}
+
 export type ManagedPostgresMigrationState = "not_initialized" | "pending" | "applied" | "failed";
 
 export interface ManagedPostgresStatus {
@@ -490,6 +525,28 @@ export interface DesktopCommandMap {
     input: void;
     output: PostgresStatus;
   };
+  list_postgres_profiles: {
+    input: void;
+    output: PostgresProfilesState;
+  };
+  save_postgres_profile: {
+    input: {
+      input: SavePostgresProfileInput;
+    };
+    output: PostgresProfilesState;
+  };
+  activate_postgres_profile: {
+    input: {
+      profileId: string;
+    };
+    output: PostgresProfilesState;
+  };
+  delete_postgres_profile: {
+    input: {
+      profileId: string;
+    };
+    output: PostgresProfilesState;
+  };
   read_managed_postgres_status: {
     input: void;
     output: ManagedPostgresStatus;
@@ -630,7 +687,7 @@ export const shellDiagnosticsBundleResult: DiagnosticsBundleExportResult = {
   outputPath: "",
   summary: {
     generatedAt: "",
-    commandCount: 25,
+    commandCount: 29,
     boundarySkipCount: 5,
     supportCommandCount: 4
   }
