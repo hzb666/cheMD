@@ -534,6 +534,20 @@ DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outb
   - 当前验证：workspace-index Vitest 7/7、focused ESLint、desktop typecheck、
     `pnpm typecheck`、`pnpm test`、desktop build 与 `git diff --check` 均通过；
     这仍是本地 citation gate 基础，不包含 embedding/provider/DB 查询。
+- Postgres connection profile / secret storage 后端：
+  - 新增 `list_postgres_profiles`、`save_postgres_profile`、
+    `activate_postgres_profile`、`delete_postgres_profile` Tauri command 契约。
+  - profile metadata 写入 app data 下的 `postgres-profiles/profiles.json`；password
+    只写入系统 keyring，不写入普通 JSON 配置、diagnostics bundle 或日志。
+  - runtime Postgres config 会优先读取 active profile 并生成
+    `CHEMD_POSTGRES_DATABASE_URL` / timeout / pool env source；无 active profile 或
+    secret 不可读时自然回落到 process env、repo env、managed PostgreSQL。
+  - diagnostics bundle 的已知 command 清单同步加入 profile commands，仍只做离线
+    脱敏支持包，不读取 password 或连接真实 DB。
+  - 当前验证：Rust profile tests 5/5、Rust diagnostics tests 3/3、完整
+    `cargo test` 65/65、`cargo check`、diagnostics Node tests 8/8、contract/scripts
+    ESLint、desktop typecheck、`pnpm typecheck`、`pnpm test`、desktop build 与
+    `git diff --check` 均通过；真实 DB/network/Tauri runner 未作为本轮门禁。
 
 当前暂缓债务：
 
@@ -752,7 +766,7 @@ env、database URL、API key、token 或 password。诊断包说明见
 ### P2：PostgreSQL 同步生产可用
 
 - [ ] connection profile UI 可用。
-- [ ] 凭据使用系统 secret storage。
+- [x] 凭据后端使用系统 secret storage；profile UI 接线待完成。
 - [ ] migration、pgvector、schema version 状态可见。
 - [ ] 外部 DB 与 managed DB 使用同一 shared schema。
 - [ ] sync 成功、失败、冲突都有 UI 和日志。
@@ -763,6 +777,8 @@ env、database URL、API key、token 或 password。诊断包说明见
 
 - 外部 PostgreSQL script-level runtime smoke 已通过，包含 shared schema 写入与本地
   outbox reconnect sync。
+- Desktop profile command 后端已可保存/激活/删除 connection profile，并通过 OS
+  keyring 保存 password；当前缺口是桌面 UI 表单和真实 command-runner 手测证据。
 - Tauri command-level proof 尚未配置 runner，当前按环境型 `SKIP` 处理，不阻塞离线
   优先主线。
 

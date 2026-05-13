@@ -657,6 +657,21 @@ hybrid_score =
 - 当前仍未接入 embedding provider、pgvector 查询或真实跨 workspace 排名；这些进入
   后续 M6/M5 增强。
 
+状态记录（Postgres profile secret storage backend）：
+
+- Desktop Tauri 新增 Postgres connection profile 后端命令：
+  `list_postgres_profiles`、`save_postgres_profile`、`activate_postgres_profile`、
+  `delete_postgres_profile`。
+- Profile metadata 写入 app data 下的 `postgres-profiles/profiles.json`；password
+  只通过 OS keyring 保存，普通 JSON、diagnostics bundle 和日志不保存明文密码。
+- Runtime Postgres config 会优先读取 active profile 生成连接 env source；profile
+  不存在或 secret 不可读时回落到 process env、repo env、managed PostgreSQL。
+- 当前验证：Rust profile tests 5/5、完整 Tauri `cargo test` 65/65、
+  diagnostics Node tests 8/8、contract/scripts ESLint、desktop typecheck、
+  `pnpm typecheck`、`pnpm test`、desktop build 与 `git diff --check` 均通过。
+- 当前仍未接 profile UI 表单，也未用 Tauri command runner 做真实桌面命令调用；这些
+  进入后续 P2/M5 UI 与 runtime proof。
+
 ---
 
 ## 8. 验证矩阵
