@@ -442,6 +442,19 @@ DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outb
     diagnostics bundle command list。
   - 主分支验证：Rust diagnostics bundle 测试 3/3、desktop typecheck、contract/scripts
     ESLint、diagnostics bundle 测试 7/7、`pnpm desktop:diagnostics-bundle` 通过。
+- Reaction intelligence artifact 本地消费：
+  - `feat(desktop)：保存 reaction intelligence 本地 artifact` 新增独立 local-store
+    artifact 文件与 Tauri 命令，不把 worker artifact 混入 runtime snapshot/outbox。
+  - `feat(desktop)：合并 cluster computed evidence` 让 cluster detail/edge DTO 区分
+    computed basis、semantic basis、provider ids 与 confidence；computed/hybrid edge 不再
+    因 fallback warning 被误标为 semantic-only。
+  - `feat(desktop)：合并 knowledge artifact 摘要` 让 knowledge map view model 可选消费
+    reaction intelligence artifact，并在面板展示 artifact/job、provider PASS/SKIP/ERROR、
+    computed edge count、basis、warnings 与 TMAP/fallback layout 来源。
+  - 主分支验证：desktop local-store/cluster/knowledge-map 定向 Vitest 30/30、
+    Rust local_store 12/12、desktop typecheck、focused ESLint、desktop build、
+    `git diff --check` 通过；desktop build 仍只有既有 lucide `use client` 与 chunk size
+    warning。
 
 当前暂缓债务：
 
@@ -641,6 +654,8 @@ env、database URL、API key、token 或 password。诊断包说明见
 - [x] 本地队列幂等基础：同一 document hash / revision 复用 existing queue item，
   文件变化生成新 revision，失败超过阈值后不自动重试；实际知识记录幂等写入仍归 P2/M5。
 - [x] 文件变更和 base revision 冲突有显式处理。
+- [x] Reaction intelligence artifact 可离线写入本地 local store，并可被知识图谱/cluster
+  inspector 消费；DB sync 仍归 P2 shared schema 阶段。
 
 ### P2：PostgreSQL 同步生产可用
 
@@ -660,6 +675,8 @@ env、database URL、API key、token 或 password。诊断包说明见
 ### P3：Graph/RAG/Agent 产品化
 
 - [ ] Graph panel 可解释 edge evidence 并跳源码。
+- [x] Reaction intelligence artifact 的 computed/semantic basis、provider 状态与 layout
+  来源可在 knowledge map/cluster inspector 中解释。
 - [ ] RAG search 有 citation gate。
 - [ ] Agent run 可审计，patch 需用户确认。
 - [ ] 所有增强能力离线/失败时可降级。

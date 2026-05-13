@@ -546,15 +546,15 @@ hybrid_score =
 
 - [x] CLI 增加 `python -m chem_cluster_service.intelligence.cli` worker 入口。
 - [ ] Desktop 增加“Run intelligence job”入口，默认后台任务。
-- [ ] 显示 provider 状态：PASS / SKIP / ERROR。
+- [x] 显示 provider 状态：PASS / SKIP / ERROR 摘要。
 - [ ] Knowledge map 增加 edge basis filter。
-- [ ] Cluster inspector 展示 computed evidence。
-- [ ] Artifact 存入 workspace local store；DB 可用时再同步。
+- [x] Cluster inspector 展示 computed evidence。
+- [x] Artifact 存入 workspace local store；DB 可用时再同步仍留给 shared schema 阶段。
 
 验收：
 
 - [x] 没有模型依赖时 worker CLI 输出 `SKIP` / fallback artifact，不阻塞 IDE 编辑链路。
-- [ ] 有 artifact 时 cluster/map 展示 computed basis。
+- [x] 有 artifact 时 cluster/map 展示 computed basis。
 - [ ] source-ref 和 reaction detail 跳转保持可用。
 
 状态记录（Worker H / `reaction-intel-pipeline-cli` + 主控集成）：
@@ -563,7 +563,15 @@ hybrid_score =
 - pipeline 已接入 RDKit、RXNMapper、RXNFP、hybrid graph 与 TMAP layout provider。
 - provider dependency policy 支持 `skip` / `error` / `fallback`；invalid job input exit 1，missing dependency error exit 2，skip/fallback exit 0。
 - fixture CLI smoke 已验证：无真实 RDKit/RXNMapper/RXNFP/TMAP 依赖时，5 个 provider 均可分类，artifact contract validation 通过，并在 fallback 策略下写出 layout。
-- Desktop 后台任务入口、artifact local-store 持久化、provider 状态 UI、edge basis filter 仍留给下一轮桌面集成切片。
+- Desktop 后台任务入口和 edge basis filter 仍留给下一轮桌面集成切片。
+
+状态记录（Desktop artifact / UI 消费集成）：
+
+- 新增 `save_local_reaction_intelligence_artifact` 与 `list_local_reaction_intelligence_artifacts` Tauri 命令契约，artifact 以独立 JSON local-store 文件保存，不进入 runtime outbox。
+- 新增 `buildLocalReactionIntelligenceArtifactInput`，使用 graph index / artifact id / job id 生成稳定 local id 与 idempotency key。
+- Knowledge map view model 保持 `buildDesktopKnowledgeMapViewModel(output)` 兼容，并可选消费 reaction intelligence artifact，展示 provider PASS/SKIP/ERROR、computed edge count、basis、warnings 与 TMAP layout 来源。
+- Cluster inspector 已区分 computed basis 与 semantic basis，包含 hybrid/computed edge 时不再被 warning 中的 `fingerprint` 字样误标为 semantic-only。
+- 本轮不启动真实模型、不联网、不接 PostgreSQL artifact sync；真实 worker 后台任务入口和 shared schema 同步仍是后续产品化项。
 
 ---
 
