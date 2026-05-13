@@ -6,10 +6,12 @@ import type {
   WorkspaceIngestQueueItem
 } from "./desktop-contracts";
 import {
+  buildWorkspaceIngestOutboxInputs,
   buildWorkspaceIngestQueueItem,
   deriveWorkspaceIngestQueueSummary,
   runWorkspaceIngest
 } from "./desktop-workspace-ingest";
+import { buildLocalRuntimeSnapshotInput } from "./desktop-local-store";
 
 const createdAt = "2026-05-13T09:00:00.000Z";
 
@@ -166,6 +168,124 @@ describe("desktop workspace ingest queue builder", () => {
     expect(summary.errors[0].errorSummary).toContain("token=[redacted]");
     expect(summary.errors[0].errorSummary).not.toContain("secret@localhost");
     expect(summary.errors[0].errorSummary.length).toBeLessThanOrEqual(80);
+  });
+});
+
+describe("desktop workspace ingest outbox bridge", () => {
+  it("builds idempotent local runtime snapshot inputs from pending payload items", () => {
+    const item = buildItem("pending");
+    const first = buildWorkspaceIngestOutboxInputs([item]);
+    const second = buildWorkspaceIngestOutboxInputs([item]);
+    const expected = buildLocalRuntimeSnapshotInput(item.runtimePayload!);
+
+    expect(second.inputs).toEqual(first.inputs);
+    expect(first.inputs).toEqual([expected]);
+    expect(first.summary).toMatchObject({
+      eligibleCount: 1,
+      retryableCount: 0,
+      skippedCount: 0,
+      blockedCount: 0,
+      outboxCount: 1,
+      totalCount: 1
+    });
+    expect(first.summary.items[0]).toMatchObject({
+      disposition: "eligible",
+      reason: "pending_runtime_payload",
+      localId: expected.localId,
+      idempotencyKey: expected.idempotencyKey
+    });
+  });
+
+  it("filters non-sync-ready statuses, missing payloads, and exhausted failures", () => {
+    const pending = buildItem("pending");
+    const retryable = buildItem("failed", {
+      failureCount: 2,
+      errorSummary: "temporary failure"
+    });
+    const skipped = buildItem("skipped");
+    const synced = buildItem("synced");
+    const running = buildItem("running");
+    const missingPayload = buildItem("pending", { runtimePayload: undefined });
+    const exhausted = buildItem("failed", {
+      failureCount: 3,
+      errorSummary: "permanent failure"
+    });
+    const result = buildWorkspaceIngestOutboxInputs([
+      pending,
+      retryable,
+      skipped,
+      synced,
+      running,
+      missingPayload,
+      exhausted
+    ], { maxRetryFailures: 3 });
+
+    expect(result.inputs.map((input) => input.payload.graphSnapshot.graphSnapshotId)).toEqual([
+      pending.runtimePayload?.graphSnapshot.graphSnapshotId,
+      retryable.runtimePayload?.graphSnapshot.graphSnapshotId
+    ]);
+    expect(result.summary).toMatchObject({
+      eligibleCount: 1,
+      retryableCount: 1,
+      skippedCount: 3,
+      blockedCount: 2,
+      outboxCount: 2,
+      totalCount: 7
+    });
+    expect(result.summary.items.map((item) => item.reason)).toEqual([
+      "pending_runtime_payload",
+      "failed_retryable_runtime_payload",
+      "status_skipped",
+      "already_synced",
+      "currently_running",
+      "missing_runtime_payload",
+      "retry_limit_reached"
+    ]);
+  });
+
+  it("honors the failed retry threshold before generating outbox inputs", () => {
+    const retryable = buildItem("failed", { failureCount: 2 });
+    const exhausted = buildItem("failed", { failureCount: 3 });
+
+    expect(buildWorkspaceIngestOutboxInputs([retryable], { maxRetryFailures: 3 }))
+      .toMatchObject({
+        inputs: [expect.any(Object)],
+        summary: { retryableCount: 1, blockedCount: 0 }
+      });
+    expect(buildWorkspaceIngestOutboxInputs([exhausted], { maxRetryFailures: 3 }))
+      .toMatchObject({
+        inputs: [],
+        summary: { retryableCount: 0, blockedCount: 1 }
+      });
+  });
+
+  it("does not generate outbox input when a queue item has no runtime payload", () => {
+    const pendingWithoutPayload = buildItem("pending", { runtimePayload: undefined });
+    const result = buildWorkspaceIngestOutboxInputs([pendingWithoutPayload]);
+
+    expect(result.inputs).toEqual([]);
+    expect(result.summary.items[0]).toMatchObject({
+      disposition: "blocked",
+      reason: "missing_runtime_payload",
+      localId: null,
+      idempotencyKey: null
+    });
+  });
+
+  it("redacts sensitive failed item summaries in outbox bridge reports", () => {
+    const failed = buildItem("failed", {
+      failureCount: 3,
+      errorSummary: "DATABASE_URL=postgres://user:secret@localhost:5432/chemd token=abc failed"
+    });
+    const result = buildWorkspaceIngestOutboxInputs([failed], {
+      maxRetryFailures: 3,
+      maxErrorLength: 100
+    });
+
+    expect(result.inputs).toEqual([]);
+    expect(result.summary.items[0].errorSummary).toContain("DATABASE_URL=[redacted]");
+    expect(result.summary.items[0].errorSummary).toContain("token=[redacted]");
+    expect(result.summary.items[0].errorSummary).not.toContain("secret@localhost");
   });
 });
 
