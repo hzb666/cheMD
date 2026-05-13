@@ -1694,3 +1694,37 @@ Merged the second M6 RAG slice: backfill_postgres_rag_embeddings writes validate
 ### Next Steps
 
 - None - task complete
+
+
+## Session 83: Desktop IDE progress checkpoint before ide-map merge
+
+**Date**: 2026-05-14
+**Task**: Desktop IDE progress checkpoint before ide-map merge
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Verified desktop-ide is clean at 45fe4c2 after the RAG backfill/query-view batch. Attempted to locate ide-map before merge; git fetch origin --prune succeeded, but no local or remote ide-map ref exists, so merge is blocked by missing branch reference and workflow continues with offline-first productization work.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `45fe4c2` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
