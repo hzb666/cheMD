@@ -10,6 +10,7 @@ from chem_service.reaction_intelligence.artifact_adapter import (
     computed_features_from_results,
     normalize_provider_results,
 )
+from chem_service.reaction_intelligence.clustering import assign_similarity_clusters
 from chem_service.reaction_intelligence.similarity import (
     HybridSimilarityEdge,
     HybridSimilarityWeights,
@@ -32,6 +33,7 @@ class ReactionIntelligenceArtifact(TypedDict):
     provider_statuses: list[dict[str, Any]]
     computed_features: list[dict[str, Any]]
     computed_similarity_edges: list[HybridSimilarityEdge]
+    clusters: list[dict[str, Any]]
     warnings: list[str]
 
 
@@ -43,7 +45,9 @@ def build_reaction_intelligence_artifact(
     provider_results: Any | None = None,
     semantic_edges: Iterable[Mapping[str, Any]] | None = None,
     weights: HybridSimilarityWeights | None = None,
-    expected_providers: Iterable[str] = ("rdkit_fingerprint", "rxnfp", "reaction_center"),
+    expected_providers: Iterable[str] = ("drfp", "rdkit_fingerprint", "rxnfp", "reaction_center"),
+    cluster_threshold: float = 0.72,
+    min_cluster_size: int = 2,
 ) -> ReactionIntelligenceArtifact:
     materialized = list(reactions)
     provider_names = list(expected_providers)
@@ -71,13 +75,22 @@ def build_reaction_intelligence_artifact(
     for edge in edges:
         artifact_warnings.extend(edge["warnings"])
 
+    computed_edges = [artifact_similarity_edge(edge) for edge in edges]
+    clusters = assign_similarity_clusters(
+        reaction_ids=[_read_reaction_id(reaction) for reaction in materialized],
+        edges=computed_edges,
+        threshold=cluster_threshold,
+        min_cluster_size=min_cluster_size,
+    )
+
     return {
         "schema_version": "chemd-reaction-intelligence-artifact/v0.1",
         "artifact_id": artifact_id or f"reaction-intelligence::{job_id}",
         "job_id": job_id,
         "provider_statuses": provider_statuses,
         "computed_features": computed_features_from_results(results_by_reaction),
-        "computed_similarity_edges": [artifact_similarity_edge(edge) for edge in edges],
+        "computed_similarity_edges": computed_edges,
+        "clusters": clusters,
         "warnings": _unique_strings(artifact_warnings),
     }
 

@@ -115,10 +115,43 @@ class ReactionIntelligenceSimilarityTest(unittest.TestCase):
         )
         self.assertEqual(
             [contribution["provider"] for contribution in edge["contributions"]],
-            ["semantic", "rdkit_fingerprint", "rxnfp", "reaction_center"],
+            ["semantic", "drfp", "rdkit_fingerprint", "rxnfp", "reaction_center"],
         )
-        self.assertEqual(edge["warnings"], [])
+        self.assertEqual(edge["warnings"], ["drfp_provider_skipped"])
         self.assertGreater(edge["score"], 0.7)
+
+    def test_hybrid_similarity_prefers_drfp_fingerprint_family(self) -> None:
+        edge = build_hybrid_similarity_edge(
+            left_reaction_id="rxn-1",
+            right_reaction_id="rxn-2",
+            left_results={
+                "drfp": {"status": "ok", "fingerprint": [1, 3, 5]},
+                "rdkit_fingerprint": {"status": "ok", "fingerprint": [1]},
+            },
+            right_results={
+                "drfp": {"status": "ok", "fingerprint": [1, 5, 8]},
+                "rdkit_fingerprint": {"status": "ok", "fingerprint": [1]},
+            },
+            expected_providers=("drfp", "rdkit_fingerprint"),
+        )
+
+        ok = [item for item in edge["contributions"] if item["status"] == "ok"]
+        self.assertEqual(ok[0]["provider"], "drfp")
+        self.assertEqual(ok[0]["basis"], "drfp_tanimoto")
+        self.assertIn("drfp_tanimoto", edge["basis"])
+        self.assertNotIn("rdkit_tanimoto", edge["basis"])
+
+    def test_hybrid_similarity_falls_back_to_rdkit_when_drfp_missing(self) -> None:
+        edge = build_hybrid_similarity_edge(
+            left_reaction_id="rxn-1",
+            right_reaction_id="rxn-2",
+            left_results={"rdkit_fingerprint": {"status": "ok", "fingerprint": [1, 2]}},
+            right_results={"rdkit_fingerprint": {"status": "ok", "fingerprint": [2, 3]}},
+            expected_providers=("drfp", "rdkit_fingerprint"),
+        )
+
+        self.assertIn("rdkit_tanimoto", edge["basis"])
+        self.assertIn("drfp_provider_skipped", edge["warnings"])
 
     def test_semantic_only_similarity_is_not_marked_computed_chemistry(self) -> None:
         edge = build_hybrid_similarity_edge(
@@ -134,7 +167,7 @@ class ReactionIntelligenceSimilarityTest(unittest.TestCase):
         self.assertIn("semantic_only_similarity_not_computed_chemistry", edge["warnings"])
         self.assertEqual(
             [contribution["status"] for contribution in edge["contributions"]],
-            ["ok", "skipped", "skipped", "skipped"],
+            ["ok", "skipped", "skipped", "skipped", "skipped"],
         )
 
 
@@ -160,6 +193,12 @@ class ReactionIntelligencePipelineTest(unittest.TestCase):
         self.assertEqual(
             artifact["provider_statuses"],
             [
+                {
+                    "provider": "drfp",
+                    "status": "SKIP",
+                    "reason_code": "provider_skipped",
+                    "warnings": ["drfp_provider_skipped"],
+                },
                 {
                     "provider": "rdkit_fingerprint",
                     "status": "SKIP",
@@ -196,6 +235,20 @@ class ReactionIntelligencePipelineTest(unittest.TestCase):
                 {"reaction_id": "rxn-2"},
             ],
             provider_results={
+                "drfp": [
+                    {
+                        "provider": "drfp",
+                        "status": "ok",
+                        "reaction_id": "rxn-1",
+                        "fingerprint": [1, 3, 5],
+                    },
+                    {
+                        "provider": "drfp",
+                        "status": "ok",
+                        "reaction_id": "rxn-2",
+                        "fingerprint": [1, 5, 8],
+                    },
+                ],
                 "rxnfp": rxnfp_results,
                 "rdkit_fingerprint": [
                     {
@@ -215,7 +268,8 @@ class ReactionIntelligencePipelineTest(unittest.TestCase):
         )
 
         self.assertTrue(artifact["computed_similarity_edges"][0]["computed_chemistry"])
-        self.assertIn("rdkit_tanimoto", artifact["computed_similarity_edges"][0]["basis"])
+        self.assertIn("drfp_tanimoto", artifact["computed_similarity_edges"][0]["basis"])
+        self.assertNotIn("rdkit_tanimoto", artifact["computed_similarity_edges"][0]["basis"])
         self.assertIn("rxnfp_cosine", artifact["computed_similarity_edges"][0]["basis"])
         reaction_center = next(
             provider

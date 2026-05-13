@@ -3,6 +3,7 @@ import type {
   MergeReactionIntelligenceOptions,
   MergedReactionIntelligenceLayer,
   ReactionIntelligenceArtifact,
+  ReactionIntelligenceCluster,
   ReactionIntelligenceComputedFeature,
   ReactionIntelligenceComputedSimilarityEdge,
   ReactionIntelligenceLayout
@@ -121,6 +122,25 @@ const normalizeLayout = (
   };
 };
 
+const normalizeClusters = (
+  artifact: ReactionIntelligenceArtifact,
+  reactionIds: ReadonlySet<string>
+): ReactionIntelligenceCluster[] | undefined => {
+  if (!artifact.clusters) return undefined;
+  return artifact.clusters
+    .filter((cluster) =>
+      cluster.reaction_entity_ids.length > 0
+      && cluster.reaction_entity_ids.every((reactionId) => reactionIds.has(reactionId))
+      && reactionIds.has(cluster.representative_reaction_entity_id)
+    )
+    .map((cluster) => ({
+      ...cluster,
+      reaction_entity_ids: [...cluster.reaction_entity_ids],
+      basis_summary: [...cluster.basis_summary],
+      warnings: [...cluster.warnings]
+    }));
+};
+
 const skippedProviderWarnings = (artifact: ReactionIntelligenceArtifact): string[] =>
   artifact.provider_statuses.flatMap((status) => [
     ...status.warnings,
@@ -153,6 +173,7 @@ const buildLayer = (
   const computedFeatures = normalizeFeatures(artifact, reactionIds, options);
   const computedEdges = normalizeEdges(artifact, reactionIds);
   const layout = normalizeLayout(artifact, reactionIds);
+  const clusters = normalizeClusters(artifact, reactionIds);
   return {
     schema_version: "chemd-reaction-intelligence-graph-layer/v0.1",
     source_artifact_id: artifact.artifact_id,
@@ -163,6 +184,7 @@ const buildLayer = (
     })),
     computed_features: computedFeatures,
     computed_similarity_edges: computedEdges,
+    ...(clusters ? { clusters } : {}),
     ...(layout ? { layout } : {}),
     warnings: uniqueStrings([
       ...artifact.warnings,

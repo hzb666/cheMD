@@ -129,6 +129,8 @@ def _normalize_provider_result(provider: str, result: Mapping[str, Any]) -> Prov
     status = normalized.get("status")
     if isinstance(status, str):
         normalized["status"] = status.lower()
+    if provider == "drfp" and "fingerprint" not in normalized:
+        _copy_on_bits_as_fingerprint(normalized)
     if provider == "rdkit_fingerprint" and "fingerprint" not in normalized:
         _copy_on_bits_as_fingerprint(normalized)
     if provider == "reaction_center" and "signature" not in normalized:
@@ -155,6 +157,8 @@ def _feature_from_result(
     provider: str,
     result: ProviderResult,
 ) -> dict[str, Any] | None:
+    if provider == "drfp":
+        return _drfp_feature(reaction_id, result)
     if provider == "rdkit_fingerprint":
         return _rdkit_feature(reaction_id, result)
     if provider == "rxnfp":
@@ -172,6 +176,18 @@ def _base_feature(reaction_id: str, provider: str, feature_kind: str) -> dict[st
         "feature_kind": feature_kind,
         "status": "AVAILABLE",
         "source": "computed_artifact",
+    }
+
+
+def _drfp_feature(reaction_id: str, result: ProviderResult) -> dict[str, Any]:
+    return {
+        **_base_feature(reaction_id, "drfp", "drfp_reaction_fingerprint"),
+        "fingerprint_ref": result.get("fingerprint_ref"),
+        "warnings": result.get("warnings", []),
+        "metadata": {
+            "on_bits": result.get("fingerprint", []),
+            "dimension": result.get("dimension"),
+        },
     }
 
 

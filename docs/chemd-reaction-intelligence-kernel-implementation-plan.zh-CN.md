@@ -179,3 +179,4 @@ Write scope：
 - 2026-05-13：合入 TMAP optional layout CLI；应用内默认不强制显示 TMAP，CLI 输出统一 artifact schema。
 - 2026-05-13：主分支整合 provider key、status、artifact 字段命名，统一到 `chemd-reaction-intelligence-artifact/v0.1`。
 - 2026-05-13：新增 DRFP hybrid reaction clustering 实施计划；DRFP 作为默认 deterministic fingerprint provider，RXNFP 保持 optional semantic embedding provider。
+- 2026-05-13：合入 DRFP contract、DRFP provider、deterministic clustering module，并完成主分支 adapter/similarity/pipeline/CLI 串行整合。

@@ -6,12 +6,24 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from chem_service.reaction_intelligence.pipeline import build_reaction_intelligence_artifact
+from chem_service.reaction_intelligence.provider_pipeline import (
+    cluster_threshold,
+    compute_provider_results,
+    job_reactions,
+    layout_requested,
+    min_cluster_size,
+    requested_providers,
+    semantic_edges,
+)
 from chem_service.reaction_intelligence.providers.tmap_layout import build_tmap_layout
 
 ARTIFACT_SCHEMA_VERSION = "chemd-reaction-intelligence-artifact/v0.1"
 
 
 def build_artifact(job: dict[str, Any]) -> dict[str, Any]:
+    if job_reactions(job):
+        return _build_pipeline_artifact(job)
     layout_result = build_tmap_layout(job)
     layout = _artifact_layout(layout_result)
 
@@ -28,6 +40,56 @@ def build_artifact(job: dict[str, Any]) -> dict[str, Any]:
             "reactionCount": _reaction_count(job, layout_result),
             "layoutCount": 1 if layout is not None else 0,
         },
+    }
+
+
+def _build_pipeline_artifact(job: dict[str, Any]) -> dict[str, Any]:
+    artifact = build_reaction_intelligence_artifact(
+        reactions=job_reactions(job),
+        job_id=_job_id(job) or "reaction-intelligence-job",
+        provider_results=compute_provider_results(job),
+        semantic_edges=semantic_edges(job),
+        expected_providers=requested_providers(job),
+        cluster_threshold=cluster_threshold(job),
+        min_cluster_size=min_cluster_size(job),
+    )
+    if not layout_requested(job):
+        return artifact
+    return _artifact_with_layout(artifact)
+
+
+def _artifact_with_layout(artifact: dict[str, Any]) -> dict[str, Any]:
+    layout_result = build_tmap_layout(_layout_job(artifact))
+    layout = _artifact_layout(layout_result)
+    return {
+        **artifact,
+        "provider_statuses": [
+            *artifact["provider_statuses"],
+            _provider_status(layout_result["provider"]),
+        ],
+        **({"layout": layout} if layout is not None else {}),
+        "warnings": [*artifact["warnings"], *layout_result.get("warnings", [])],
+    }
+
+
+def _layout_job(artifact: dict[str, Any]) -> dict[str, Any]:
+    reaction_ids = [
+        feature["reaction_entity_id"]
+        for feature in artifact.get("computed_features", [])
+        if isinstance(feature, dict) and isinstance(feature.get("reaction_entity_id"), str)
+    ]
+    return {
+        "jobId": artifact.get("job_id"),
+        "reactionIds": sorted(set(reaction_ids)),
+        "similarityEdges": [
+            {
+                "source": edge["from_reaction_entity_id"],
+                "target": edge["to_reaction_entity_id"],
+                "score": edge["score"],
+            }
+            for edge in artifact.get("computed_similarity_edges", [])
+            if isinstance(edge, dict)
+        ],
     }
 
 

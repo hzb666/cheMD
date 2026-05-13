@@ -85,7 +85,7 @@ export type ReactionIntelligenceComputedSimilarityBasis =
 export interface ReactionIntelligenceSimilarityContribution {
   basis: ReactionIntelligenceComputedSimilarityBasis;
   provider: ReactionIntelligenceProvider;
-  score: number;
+  score: number | null;
   weight: number;
   warnings: string[];
 }
@@ -119,6 +119,16 @@ export interface ReactionIntelligenceLayout {
   diagnostics?: ReactionIntelligenceJsonObject;
 }
 
+export interface ReactionIntelligenceCluster {
+  cluster_id: string;
+  reaction_entity_ids: string[];
+  representative_reaction_entity_id: string;
+  mean_score: number;
+  basis_summary: ReactionIntelligenceComputedSimilarityBasis[];
+  warnings: string[];
+  metadata?: ReactionIntelligenceJsonObject;
+}
+
 export interface ReactionIntelligenceArtifact {
   schema_version: "chemd-reaction-intelligence-artifact/v0.1";
   artifact_id: string;
@@ -128,6 +138,7 @@ export interface ReactionIntelligenceArtifact {
   provider_statuses: ReactionIntelligenceProviderStatus[];
   computed_features: ReactionIntelligenceComputedFeature[];
   computed_similarity_edges: ReactionIntelligenceComputedSimilarityEdge[];
+  clusters?: ReactionIntelligenceCluster[];
   layout?: ReactionIntelligenceLayout;
   warnings: string[];
 }
@@ -139,6 +150,7 @@ export interface MergedReactionIntelligenceLayer {
   provider_statuses: ReactionIntelligenceProviderStatus[];
   computed_features: ReactionIntelligenceComputedFeature[];
   computed_similarity_edges: ReactionIntelligenceComputedSimilarityEdge[];
+  clusters?: ReactionIntelligenceCluster[];
   layout?: ReactionIntelligenceLayout;
   warnings: string[];
 }

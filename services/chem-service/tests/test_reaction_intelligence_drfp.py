@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import unittest
 
+from chem_service.reaction_intelligence.artifact_adapter import (
+    computed_features_from_results,
+    normalize_provider_results,
+)
 from chem_service.reaction_intelligence.providers.drfp_fingerprint import (
     DrfpFingerprintProvider,
     DrfpProviderUnavailable,
@@ -125,6 +129,42 @@ class ReactionIntelligenceDrfpProviderTest(unittest.TestCase):
 
         self.assertEqual(results[0]["status"], "ok")
         self.assertEqual(results[0]["provider"], "drfp")
+
+    def test_drfp_result_becomes_computed_feature(self) -> None:
+        features = computed_features_from_results(
+            normalize_provider_results(
+                {
+                    "drfp": [
+                        {
+                            "provider": "drfp",
+                            "status": "ok",
+                            "reaction_id": "rxn-1",
+                            "fingerprint": [1, 3, 4],
+                            "fingerprint_ref": "drfp::rxn-1::abc",
+                            "dimension": 2048,
+                            "warnings": [],
+                        }
+                    ]
+                }
+            )
+        )
+
+        self.assertEqual(
+            features,
+            [
+                {
+                    "feature_id": "ri-feature::rxn-1::drfp",
+                    "reaction_entity_id": "rxn-1",
+                    "provider": "drfp",
+                    "feature_kind": "drfp_reaction_fingerprint",
+                    "status": "AVAILABLE",
+                    "source": "computed_artifact",
+                    "fingerprint_ref": "drfp::rxn-1::abc",
+                    "warnings": [],
+                    "metadata": {"on_bits": [1, 3, 4], "dimension": 2048},
+                }
+            ],
+        )
 
 
 if __name__ == "__main__":

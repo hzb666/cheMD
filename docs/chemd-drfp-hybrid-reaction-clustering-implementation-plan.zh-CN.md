@@ -1464,7 +1464,13 @@ python -m chem_service.reaction_intelligence.cli examples/reaction-intelligence/
 
 ---
 
-## 10. 完成定义
+## 10. 进度记录
+
+- 2026-05-13：建立 DRFP hybrid reaction clustering 实施计划并提交到 `reaction-intelligence-core`。
+- 2026-05-13：子代理并行完成 TS contract、DRFP provider、deterministic clustering module。
+- 2026-05-13：架构会话合并子分支，并串行整合 artifact adapter、hybrid similarity、pipeline cluster 输出和 CLI provider pipeline。
+
+## 11. 完成定义
 
 本计划完成时，Chemd 应具备：
 

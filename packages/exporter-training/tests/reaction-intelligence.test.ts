@@ -275,6 +275,17 @@ describe("reaction intelligence graph index merge", () => {
           warnings: []
         }
       ],
+      clusters: [
+        {
+          cluster_id: "cluster-drfp",
+          reaction_entity_ids: [rxnA, rxnB],
+          representative_reaction_entity_id: rxnA,
+          mean_score: 0.82,
+          basis_summary: ["hybrid_computed", "drfp_tanimoto"],
+          warnings: [],
+          metadata: { threshold: 0.72 }
+        }
+      ],
       warnings: []
     };
     const merged = mergeReactionIntelligenceArtifactIntoGraphIndex(index, artifact);
@@ -286,5 +297,10 @@ describe("reaction intelligence graph index merge", () => {
     expect(merged.reaction_intelligence.computed_similarity_edges[0]?.basis).toContain(
       "drfp_tanimoto"
     );
+    expect(merged.reaction_intelligence.clusters?.[0]).toMatchObject({
+      cluster_id: "cluster-drfp",
+      reaction_entity_ids: [rxnA, rxnB],
+      representative_reaction_entity_id: rxnA
+    });
   });
 });
