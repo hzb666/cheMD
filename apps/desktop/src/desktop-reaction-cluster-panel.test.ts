@@ -37,14 +37,17 @@ const cluster = (
 
 const edge = (
   fromReactionEntityId: string,
-  toReactionEntityId: string
+  toReactionEntityId: string,
+  overrides: Partial<DesktopReactionSimilarityEdge> = {}
 ): DesktopReactionSimilarityEdge => ({
-  edge_id: "edge-family",
+  edge_id: overrides.edge_id ?? "edge-family",
   from_reaction_entity_id: fromReactionEntityId,
   to_reaction_entity_id: toReactionEntityId,
-  basis: ["same_reaction_family"],
-  score: 0.55,
-  warnings: ["semantic_similarity_without_computed_fingerprint"]
+  basis: overrides.basis ?? ["same_reaction_family"],
+  score: overrides.score ?? 0.55,
+  confidence: overrides.confidence,
+  provider_ids: overrides.provider_ids,
+  warnings: overrides.warnings ?? ["semantic_similarity_without_computed_fingerprint"]
 });
 
 const graphIndex = (
@@ -155,5 +158,65 @@ describe("buildDesktopReactionClusterPanel", () => {
     ]);
     expect(panel.warnings).toContain("computed_reaction_fingerprints_not_available");
     expect(panel.warnings).toContain("semantic_similarity_without_computed_fingerprint");
+  });
+
+  it("keeps hybrid computed edge evidence out of semantic-only fallback", () => {
+    const first = feature("rxn::doc-a::rxn-a", "doc-a", "acid+alcohol=>ester");
+    const second = feature("rxn::doc-a::rxn-b", "doc-a", "acid-b+alcohol=>ester-b");
+    const panel = buildDesktopReactionClusterPanel(graphIndex(
+      [first, second],
+      [cluster([first.reaction_entity_id, second.reaction_entity_id])],
+      [
+        edge(first.reaction_entity_id, second.reaction_entity_id, {
+          basis: ["rdkit_fingerprint_tanimoto", "semantic_family_support", "hybrid_consensus"],
+          confidence: "high",
+          provider_ids: ["rdkit-local", "hybrid-consensus"],
+          score: 0.88,
+          warnings: ["semantic_similarity_without_computed_fingerprint"]
+        })
+      ]
+    ));
+
+    expect(panel.selectedDetail?.semanticOnly).toBe(false);
+    expect(panel.selectedDetail?.computedSimilarityBasis).toEqual([
+      "hybrid_consensus",
+      "rdkit_fingerprint_tanimoto"
+    ]);
+    expect(panel.selectedDetail?.semanticSimilarityBasis).toEqual(["semantic_family_support"]);
+    expect(panel.selectedDetail?.providerIds).toEqual(["hybrid-consensus", "rdkit-local"]);
+    expect(panel.selectedDetail?.edgeConfidences).toEqual(["high"]);
+    expect(panel.selectedDetail?.edges[0]).toMatchObject({
+      computedBasis: ["hybrid_consensus", "rdkit_fingerprint_tanimoto"],
+      semanticBasis: ["semantic_family_support"],
+      confidence: "high",
+      providerIds: ["hybrid-consensus", "rdkit-local"]
+    });
+  });
+
+  it("keeps pure semantic warning fallback marked for review", () => {
+    const first = feature("rxn::doc-a::rxn-a", "doc-a", "acid+alcohol=>ester");
+    const second = feature("rxn::doc-a::rxn-b", "doc-a", "acid-b+alcohol=>ester-b");
+    const panel = buildDesktopReactionClusterPanel(graphIndex(
+      [first, second],
+      [cluster([first.reaction_entity_id, second.reaction_entity_id])],
+      [
+        edge(first.reaction_entity_id, second.reaction_entity_id, {
+          basis: ["semantic_family_support", "semantic_procedure_support"],
+          confidence: "medium",
+          provider_ids: ["semantic-fallback"],
+          warnings: ["semantic_similarity_without_computed_fingerprint"]
+        })
+      ]
+    ));
+
+    expect(panel.selectedDetail?.semanticOnly).toBe(true);
+    expect(panel.selectedDetail?.weak).toBe(true);
+    expect(panel.selectedDetail?.computedSimilarityBasis).toEqual([]);
+    expect(panel.selectedDetail?.semanticSimilarityBasis).toEqual([
+      "semantic_family_support",
+      "semantic_procedure_support"
+    ]);
+    expect(panel.selectedDetail?.providerIds).toEqual(["semantic-fallback"]);
+    expect(panel.selectedDetail?.edges[0].confidence).toBe("medium");
   });
 });
