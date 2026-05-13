@@ -1068,3 +1068,37 @@ Merged reaction cluster and Agent timeline panel DTO model slices into desktop-i
 ### Next Steps
 
 - None - task complete
+
+
+## Session 65: Desktop IDE ide-map branch integration
+
+**Date**: 2026-05-13
+**Task**: Desktop IDE ide-map branch integration
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Merged desktop-ide-map into desktop-ide, preserving current semantic preview/workspace symbol index path while adding workspace-index, knowledge map panels, reaction-map, semantic-rendering, and chem-cluster-service. Validation passed pnpm install --frozen-lockfile, targeted Vitest suites, desktop build, Python cluster worker unittest/compileall, full pnpm typecheck, full pnpm test, and git diff --check. Focused ESLint still reports non-blocking App.tsx complexity/length per deferred complexity governance.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0af78bc` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
