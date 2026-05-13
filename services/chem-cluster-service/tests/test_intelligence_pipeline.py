@@ -93,7 +93,9 @@ class ReactionIntelligencePipelineTests(unittest.TestCase):
 
         self.assertEqual(result.exit_code, 0)
         self.assertEqual(result.payload["providers"][0]["status"], "SKIP")
-        self.assertIn("fallback_policy_treated_as_skip", result.payload["providers"][0]["warnings"])
+        self.assertEqual(result.payload["layout"]["layout_engine"], "deterministic-fallback")
+        self.assertIn("dependency_not_installed", result.payload["providers"][0]["warnings"])
+        self.assertIn("deterministic_fallback_layout_used", result.payload["layout"]["warnings"])
 
 
 def job_for(providers: list[str], *, missing_dependency: str = "skip") -> dict[str, Any]:

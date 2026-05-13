@@ -516,19 +516,27 @@ hybrid_score =
 
 任务：
 
-- [ ] 在 `tmap_layout.py` 中导入 `tmap`。
-- [ ] 建立 `reaction_entity_id <-> vertex_index` 映射。
-- [ ] 生成 `(from_index, to_index, weight)` edge list。
+- [x] 在 `tmap_layout.py` 中导入 `tmap`。
+- [x] 建立 `reaction_entity_id <-> vertex_index` 映射。
+- [x] 生成 `(from_index, to_index, weight)` edge list。
 - [ ] 调用 `LayoutConfiguration()`。
-- [ ] 调用 `layout_from_edge_list` 或对应 Python binding。
-- [ ] 输出 positions 和 MST edges。
-- [ ] 保留当前 deterministic fallback。
+- [x] 调用 `layout_from_edge_list` 或对应 Python binding。
+- [x] 输出 positions 和 MST edges。
+- [x] 保留当前 deterministic fallback。
 
 验收：
 
 - [ ] `--engine tmap` 在有 tmap 环境时输出 `layout_engine: "tmap"`。
-- [ ] tmap 缺失时 `SKIP` / `ERROR` / fallback 行为保持。
-- [ ] layout artifact 保留 input edge kind、basis、warnings。
+- [x] tmap 缺失时 `SKIP` / `ERROR` / fallback 行为保持。
+- [x] layout artifact 保留 input edge kind、basis、warnings。
+
+状态记录（Worker G / `reaction-intel-tmap-layout`）：
+
+- 新增 `providers/tmap_layout.py`，真实 TMAP 依赖通过 adapter 隔离；缺失时 provider 返回 `SKIP`。
+- provider 支持 `skip` / `error` / `fallback` 策略，fallback 生成 deterministic layout。
+- adapter 路径接收 vertex count 与 weighted edge list，输出 positions、MST edges 与 warnings。
+- layout artifact 保留 vertex index 映射、edge basis 与 edge warnings。
+- 真实 TMAP Windows 环境和 `LayoutConfiguration()` 参数调优仍需在有 TMAP 运行时的机器上验收。
 
 ### Phase 6：Desktop / CLI 集成
 
@@ -536,7 +544,7 @@ hybrid_score =
 
 任务：
 
-- [ ] CLI 增加 `chemd reaction-intelligence run` 或 desktop command wrapper。
+- [x] CLI 增加 `python -m chem_cluster_service.intelligence.cli` worker 入口。
 - [ ] Desktop 增加“Run intelligence job”入口，默认后台任务。
 - [ ] 显示 provider 状态：PASS / SKIP / ERROR。
 - [ ] Knowledge map 增加 edge basis filter。
@@ -545,9 +553,17 @@ hybrid_score =
 
 验收：
 
-- [ ] 没有模型依赖时 IDE 仍可编辑、保存、预览。
+- [x] 没有模型依赖时 worker CLI 输出 `SKIP` / fallback artifact，不阻塞 IDE 编辑链路。
 - [ ] 有 artifact 时 cluster/map 展示 computed basis。
 - [ ] source-ref 和 reaction detail 跳转保持可用。
+
+状态记录（Worker H / `reaction-intel-pipeline-cli` + 主控集成）：
+
+- 新增 `intelligence/io.py`、`pipeline.py`、`cli.py`，支持读取 job、验证 contract、执行 provider、写出 artifact。
+- pipeline 已接入 RDKit、RXNMapper、RXNFP、hybrid graph 与 TMAP layout provider。
+- provider dependency policy 支持 `skip` / `error` / `fallback`；invalid job input exit 1，missing dependency error exit 2，skip/fallback exit 0。
+- fixture CLI smoke 已验证：无真实 RDKit/RXNMapper/RXNFP/TMAP 依赖时，5 个 provider 均可分类，artifact contract validation 通过，并在 fallback 策略下写出 layout。
+- Desktop 后台任务入口、artifact local-store 持久化、provider 状态 UI、edge basis filter 仍留给下一轮桌面集成切片。
 
 ---
 

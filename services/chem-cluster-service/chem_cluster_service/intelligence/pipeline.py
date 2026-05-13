@@ -18,6 +18,7 @@ from chem_cluster_service.intelligence.io import ClassifiedEnvelope, validation_
 from chem_cluster_service.intelligence.providers.rdkit_fingerprint import run_rdkit_fingerprint_provider
 from chem_cluster_service.intelligence.providers.rxnfp_provider import run_rxnfp_provider
 from chem_cluster_service.intelligence.providers.rxnmapper_provider import RXNMapperProvider
+from chem_cluster_service.intelligence.providers.tmap_layout import run_tmap_layout_provider
 from chem_cluster_service.intelligence.similarity import HYBRID_PROVIDER_ID, build_hybrid_similarity_edges
 
 
@@ -38,6 +39,7 @@ class _ProviderOutput:
     reaction_features: list[dict[str, Any]]
     similarity_edges: list[dict[str, Any]]
     warnings: list[str]
+    layout: dict[str, Any] | None = None
 
 
 def run_reaction_intelligence_pipeline(
@@ -67,7 +69,7 @@ def run_reaction_intelligence_pipeline(
             provider_reports.append(provider_outputs[-1].provider)
             continue
         if provider_kind == "tmap_layout":
-            output = _classify_unimplemented_provider(provider_kind, job["provider_policy"]["missing_dependency"])
+            output = _run_tmap_layout_provider(job, provider_outputs)
         else:
             output = _run_baseline_provider(provider_kind, job["reactions"], factory)
             output = _apply_missing_dependency_policy(output, job["provider_policy"]["missing_dependency"])
@@ -89,6 +91,9 @@ def run_reaction_intelligence_pipeline(
         "similarity_edges": _collect_similarity_edges(provider_outputs),
         "warnings": _dedupe_strings(artifact_warnings),
     }
+    layout = _first_layout(provider_outputs)
+    if layout is not None:
+        artifact["layout"] = layout
     return PipelineRunResult(exit_code=exit_code, payload=artifact)
 
 
@@ -133,16 +138,35 @@ def _run_hybrid_graph_provider(
     )
 
 
-def _classify_unimplemented_provider(provider_kind: ProviderKind, policy: str) -> _ProviderOutput:
-    report = _provider_report(provider_kind, "SKIP", ["provider_not_implemented"])
-    warnings = list(report["warnings"])
-    if policy == "error":
-        report["status"] = "ERROR"
-        warnings.append("missing_dependency_policy_error")
-    elif policy == "fallback":
-        warnings.append("fallback_policy_treated_as_skip")
-    report["warnings"] = _dedupe_strings(warnings)
-    return _ProviderOutput(report, [], [], list(report["warnings"]))
+def _run_tmap_layout_provider(
+    job: Mapping[str, Any],
+    provider_outputs: list[_ProviderOutput],
+) -> _ProviderOutput:
+    reaction_ids = [
+        item["reaction_entity_id"]
+        for item in job.get("reactions", [])
+        if isinstance(item, Mapping) and isinstance(item.get("reaction_entity_id"), str)
+    ]
+    edges = _object_list(job.get("reaction_similarity_edges")) + _collect_similarity_edges(provider_outputs)
+    result = run_tmap_layout_provider(
+        reaction_ids,
+        edges,  # type: ignore[arg-type]
+        missing_dependency=job["provider_policy"]["missing_dependency"],
+    )
+    return _ProviderOutput(
+        provider=dict(result.provider),
+        reaction_features=[],
+        similarity_edges=[],
+        warnings=list(result.warnings),
+        layout=dict(result.layout) if isinstance(result.layout, Mapping) else None,
+    )
+
+
+def _first_layout(provider_outputs: list[_ProviderOutput]) -> dict[str, Any] | None:
+    for output in provider_outputs:
+        if output.layout is not None:
+            return output.layout
+    return None
 
 
 def _apply_missing_dependency_policy(output: _ProviderOutput, policy: str) -> _ProviderOutput:
