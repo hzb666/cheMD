@@ -6,3 +6,5 @@ export * from "./task-projections";
 export * from "./campaign-projections";
 export * from "./graph-index";
 export * from "./graph-index-types";
+export * from "./reaction-intelligence";
+export * from "./reaction-intelligence-types";
