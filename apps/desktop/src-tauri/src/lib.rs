@@ -1,4 +1,5 @@
 mod diagnostics_bundle;
+mod embedding_provider_status;
 mod local_store;
 mod local_store_io;
 mod local_store_status;
@@ -55,6 +56,8 @@ mod workspace_tests;
 #[cfg(not(test))]
 use diagnostics_bundle::export_diagnostics_bundle;
 #[cfg(not(test))]
+use embedding_provider_status::read_embedding_provider_status;
+#[cfg(not(test))]
 use local_store::{
     clear_local_outbox_failures, list_local_outbox, list_local_reaction_intelligence_artifacts,
     mark_local_outbox_synced, read_local_store_status, save_local_reaction_intelligence_artifact,
@@ -109,6 +112,7 @@ pub fn run() {
             read_sidecar_status,
             read_sidecar_logs,
             read_postgres_status,
+            read_embedding_provider_status,
             list_postgres_profiles,
             save_postgres_profile,
             activate_postgres_profile,
