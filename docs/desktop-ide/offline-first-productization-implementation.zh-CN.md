@@ -765,12 +765,22 @@ Agent run 转为 `blocked`，记录 validation result 和 final summary，不修
 compile 通过后才写入 `applied` decision 并更新 buffer。该步骤仍是本地同步验证，不依赖
 网络、PostgreSQL 或真实外部 Agent provider。
 
+2026-05-13 第二批 M7 接入完成：合并子代理 `desktop-agent-panel-ui` 与
+`desktop-agent-tool-contracts`。Desktop 新增可复用 `DesktopAgentPanel`，消费
+`buildDesktopAgentTimelinePanel` 输出，集中展示 summary、tool calls、patch gate、
+warnings、timeline rows 和 approve/apply/reject 入口；旧 App 内联 Agent 面板已替换。
+同时新增 desktop agent tool contract helper，锁定 `compile_current_file`、`query_rag`、
+`inspect_reaction_graph`、`semantic_diff`、`propose_repair`、`apply_approved_patch`
+的展示文案、输入/输出摘要、workspace/current file/explicit approval requirement 与
+offline/connected availability；timeline tool row 现在优先使用该 contract 摘要策略。
+
 验收：
 
 - Agent 不能直接写 workspace 文件。
 - 用户确认前不会应用 patch。
 - patch apply 前必须对候选源码重新 compile；失败时不得修改 editor buffer。
-- 每个 Agent run 可审计、可重放关键上下文。
+- 每个 Agent run 可审计、可重放关键上下文；tool row 使用稳定 contract 摘要，避免
+  泄露完整 source 或大 payload。
 
 ### M8：`chem-service` 与结构工作流
 

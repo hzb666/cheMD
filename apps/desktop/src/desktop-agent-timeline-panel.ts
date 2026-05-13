@@ -6,6 +6,12 @@ import {
 } from "@chemd/agent-tools";
 
 import {
+  DESKTOP_AGENT_TOOL_NAMES,
+  summarizeDesktopAgentToolInput,
+  summarizeDesktopAgentToolOutput,
+  type DesktopOrchestratedToolName
+} from "./agent-tools";
+import {
   buildEvidenceWarningCodes,
   calculateDurationMs,
   countCitations,
@@ -47,6 +53,7 @@ export type {
 } from "./desktop-agent-timeline-panel-types";
 
 const DEFAULT_MAX_SUMMARY_LENGTH = 96;
+const desktopAgentToolNames = new Set<string>(DESKTOP_AGENT_TOOL_NAMES);
 
 export const buildDesktopAgentTimelinePanel = (
   run: AgentRun | null,
@@ -149,13 +156,46 @@ const buildToolCallRow = (
     startedAt: toolCall.startedAt,
     finishedAt: toolCall.finishedAt,
     durationMs: calculateDurationMs(toolCall.startedAt, toolCall.finishedAt),
-    inputSummary: summarizeValue(toolCall.payload, maxLength),
-    outputSummary: summarizeToolResult(result, maxLength),
+    inputSummary: summarizeAgentToolInput(toolCall, maxLength),
+    outputSummary: summarizeAgentToolOutput(toolCall, maxLength),
     evidenceCount: evidence.length,
     citationCount: countCitations(evidence),
     error,
     warnings: buildEvidenceWarningCodes(evidence)
   };
+};
+
+const isDesktopOrchestratedToolName = (
+  toolName: AgentToolCall["toolName"]
+): toolName is DesktopOrchestratedToolName => desktopAgentToolNames.has(toolName);
+
+const summarizeAgentToolInput = (
+  toolCall: AgentToolCall,
+  maxLength: number
+): string => {
+  if (!isDesktopOrchestratedToolName(toolCall.toolName)) {
+    return summarizeValue(toolCall.payload, maxLength);
+  }
+  const contractSummary = summarizeDesktopAgentToolInput(toolCall.toolName, toolCall.payload);
+  return contractSummary === "No summary fields."
+    ? summarizeValue(toolCall.payload, maxLength)
+    : contractSummary;
+};
+
+const summarizeAgentToolOutput = (
+  toolCall: AgentToolCall,
+  maxLength: number
+): string => {
+  if (!isDesktopOrchestratedToolName(toolCall.toolName)) {
+    return summarizeToolResult(toolCall.result, maxLength);
+  }
+  if (toolCall.result?.error !== undefined) {
+    return summarizeToolResult(toolCall.result, maxLength);
+  }
+  const contractSummary = summarizeDesktopAgentToolOutput(toolCall.toolName, toolCall.result?.payload);
+  return contractSummary === "No summary fields."
+    ? summarizeToolResult(toolCall.result, maxLength)
+    : contractSummary;
 };
 
 const buildWarnings = (

@@ -15,6 +15,7 @@ export type DesktopAgentPatchAction = (patch: DesktopAgentPatchRow) => void;
 
 export interface DesktopAgentPanelProps {
   panel: DesktopAgentTimelinePanel;
+  quickFixControls?: ReactNode;
   onApprovePatch?: DesktopAgentPatchAction;
   onApplyPatch?: DesktopAgentPatchAction;
   onRejectPatch?: DesktopAgentPatchAction;
@@ -22,6 +23,7 @@ export interface DesktopAgentPanelProps {
 
 export const DesktopAgentPanel = ({
   panel,
+  quickFixControls,
   onApprovePatch,
   onApplyPatch,
   onRejectPatch
@@ -29,6 +31,7 @@ export const DesktopAgentPanel = ({
   <div className="desktop-agent-panel">
     <AgentPanelHeader panel={panel} />
     <AgentSummary panel={panel} />
+    {quickFixControls}
     <AgentToolCalls rows={panel.toolCallRows} />
     <AgentPatchGate panel={panel} />
     <AgentPatchRows

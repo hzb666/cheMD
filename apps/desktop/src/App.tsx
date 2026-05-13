@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Activity, AlertTriangle, Bot, CheckCircle2, ChevronRight, CircleDot, Database, FileCode2, Files, FlaskConical, GitGraph, GripHorizontal, GripVertical, HardDrive, Lightbulb, PanelBottom, PanelBottomClose, PanelBottomOpen, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PlayCircle, RefreshCw, ScrollText, Search, Settings, ShieldCheck, Sparkles, Square, UploadCloud, Wrench, XCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ChangeEvent as ReactChangeEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
 
-import { appendToolCall, applyPatchDecision, approvePatchDecision, attachEvidence, createAgentRun, createToolResult, getAuditTimeline, proposePatch, rejectPatchDecision, transitionAgentRunStatus, type AgentAuditEvent, type AgentEvidence, type AgentRun, type AgentToolCall, type PatchDecision, type PatchProposal } from "@chemd/agent-tools";
+import { appendToolCall, applyPatchDecision, approvePatchDecision, attachEvidence, createAgentRun, createToolResult, proposePatch, rejectPatchDecision, transitionAgentRunStatus, type AgentEvidence, type AgentRun, type AgentToolCall, type PatchDecision, type PatchProposal } from "@chemd/agent-tools";
 import { buildEditorGraphRagRecords, compileChemdForEditor, type ChemdEditorDiagnostic, type ChemdLanguageCompileOutput, type ChemdOutlineItem, type ChemdQuickFixProposal, type ChemdTextEdit, type ChemdWorkspaceSymbolIndex } from "@chemd/language-service";
 
 import { shellFiles, shellPostgresStatus, shellSidecarStatus, shellWorkspace, type CreateEmbeddingVectorResult, type DesktopCommandError, type DesktopCommandMap, type EmbeddingProviderStatus, type LocalStoreStatus, type ManagedPostgresStatus, type PostgresRagQueryResult, type PostgresStatus, type RuntimeState, type SidecarStatus, type WorkspaceFileEntry, type WorkspaceHandle, type WorkspaceIngestQueueItem, type WorkspaceIngestQueueSummary } from "./desktop-contracts";
@@ -28,6 +28,8 @@ import {
   type PostgresReadinessItem
 } from "./desktop-postgres-status";
 import { buildDesktopReactionIntelligenceJob, type DesktopReactionIntelligenceJobBuildResult } from "./desktop-reaction-intelligence-job";
+import { DesktopAgentPanel } from "./agent-panel";
+import { buildDesktopAgentTimelinePanel } from "./desktop-agent-timeline-panel";
 import {
   createDesktopReactionIntelligenceJobController,
   toDesktopReactionIntelligenceWorkerResult,
@@ -236,6 +238,7 @@ type DesktopWorkbenchProps = {
   canSave: boolean;
   agentRun: AgentRun | null;
   agentMessage: AgentMessage | null;
+  agentCurrentBeforeHash: string;
   editorRef: RefObject<MonacoChemdEditorHandle | null>;
   onRootPathChange: (value: string) => void;
   onSave: () => void;
@@ -298,6 +301,7 @@ type InsightPaneProps = {
   semanticPreview: DesktopSemanticPreview;
   agentRun: AgentRun | null;
   agentMessage: AgentMessage | null;
+  agentCurrentBeforeHash: string;
   onStartSidecar: () => void;
   onStopSidecar: () => void;
   onRefreshSidecar: () => void;
@@ -520,29 +524,6 @@ const initialEmbeddingProviderStatus: EmbeddingProviderStatus = {
   apiKeyConfigured: false,
   detail: "Embedding provider status has not been refreshed."
 };
-const agentStatusLabel: Record<AgentRun["status"], string> = {
-  created: "Created",
-  running: "Running",
-  waiting_for_approval: "Awaiting approval",
-  applying_patch: "Applying patch",
-  validating: "Validating",
-  completed: "Completed",
-  failed: "Failed",
-  blocked: "Blocked",
-  canceled: "Canceled"
-};
-const auditEventLabel: Record<AgentAuditEvent["type"], string> = {
-  run_created: "Run",
-  status_transitioned: "Status",
-  tool_call_appended: "Tool",
-  evidence_attached: "Evidence",
-  patch_proposed: "Patch",
-  patch_approved: "Approve",
-  patch_rejected: "Reject",
-  patch_applied: "Apply",
-  decision_blocked: "Blocked"
-};
-
 const invokeDesktop = async <Command extends keyof DesktopCommandMap>(
   command: Command,
   input: DesktopCommandMap[Command]["input"]
@@ -926,9 +907,6 @@ const buildPersistCommandInput = ({
   });
   return input as unknown as DesktopCommandMap["persist_runtime_graph_rag"]["input"];
 };
-
-const formatRange = (range: ChemdTextEdit["range"]): string =>
-  `L${range.startLine}:C${range.startColumn}-L${range.endLine}:C${range.endColumn}`;
 
 const formatSidecarStartedAt = (startedAt: string | null): string => {
   if (!startedAt) {
@@ -2376,25 +2354,6 @@ const getDiagnosticStats = (diagnostics: ChemdEditorDiagnostic[]) => ({
   infos: diagnostics.filter((item) => item.severity === "info").length
 });
 
-const AgentRunHeader = ({
-  agentRun,
-  agentMessage
-}: {
-  agentRun: AgentRun | null;
-  agentMessage: AgentMessage | null;
-}) => (
-  <>
-    <div className="desktop-agent-heading">
-      <Bot size={15} />
-      <span>Agent run</span>
-      <span className="desktop-agent-status" data-status={agentRun?.status ?? "created"}>
-        {agentRun ? agentStatusLabel[agentRun.status] : "Idle"}
-      </span>
-    </div>
-    {agentMessage ? <p className="desktop-agent-message" data-tone={agentMessage.tone}>{agentMessage.text}</p> : null}
-  </>
-);
-
 const AgentEmptyState = ({
   mode,
   hasQuickFixes
@@ -2467,70 +2426,6 @@ const SemanticPreviewPanel = ({
       )}
     </div>
   </div>
-);
-
-const AgentPatchProposalCard = ({
-  proposal,
-  canApprove,
-  canApply,
-  canReject,
-  onApprovePatch,
-  onApplyPatch,
-  onRejectPatch
-}: {
-  proposal?: PatchProposal;
-  canApprove: boolean;
-  canApply: boolean;
-  canReject: boolean;
-  onApprovePatch: () => void;
-  onApplyPatch: () => void;
-  onRejectPatch: () => void;
-}) => (
-  proposal ? (
-    <div className="desktop-agent-proposal">
-      <div className="desktop-agent-subhead"><Wrench size={14} /><span>{proposal.title}</span></div>
-      <p>{proposal.rationale}</p>
-      <ul className="desktop-agent-edit-list">
-        {proposal.edits.map((edit, index) => (
-          <li key={`${proposal.patchProposalId}-${index}`}>
-            <span>{formatRange(edit.range)}</span>
-            <code>{edit.replacement.split(/\r?\n/, 1)[0] || "empty replacement"}</code>
-          </li>
-        ))}
-      </ul>
-      <div className="desktop-agent-action-row">
-        <button type="button" className="desktop-button" disabled={!canApprove} onClick={onApprovePatch}><ShieldCheck size={14} />Approve</button>
-        <button type="button" className="desktop-button-primary" disabled={!canApply} onClick={onApplyPatch}><PlayCircle size={14} />Apply</button>
-        <button type="button" className="desktop-button" disabled={!canReject} onClick={onRejectPatch}><XCircle size={14} />Reject</button>
-      </div>
-    </div>
-  ) : null
-);
-
-const AgentTimeline = ({ agentRun }: { agentRun: AgentRun | null }) => {
-  const timeline = agentRun ? getAuditTimeline(agentRun) : [];
-  return (
-    <div className="desktop-agent-timeline">
-      <div className="desktop-agent-subhead"><Activity size={14} /><span>Timeline</span></div>
-      {timeline.length > 0 ? timeline.map((event) => (
-        <div key={event.eventId} className="desktop-agent-timeline-row" data-type={event.type}>
-          <span>{auditEventLabel[event.type]}</span>
-          <p>{event.summary}</p>
-          <time dateTime={event.at}>{event.at ? new Date(event.at).toLocaleTimeString() : "now"}</time>
-        </div>
-      )) : <p className="desktop-empty-copy">No agent run has started.</p>}
-    </div>
-  );
-};
-
-const AgentLedger = ({ agentRun }: { agentRun: AgentRun | null }) => (
-  agentRun ? (
-    <div className="desktop-agent-ledger">
-      <span>{agentRun.toolCalls.length} tools</span>
-      <span>{agentRun.evidence.length} evidence</span>
-      <span>{agentRun.patchDecisions.length} decisions</span>
-    </div>
-  ) : null
 );
 
 const SettingsDockPanel = ({
@@ -2700,10 +2595,24 @@ const InsightDockContent = ({
   props: InsightPaneProps;
 }) => {
   const quickFixes = getQuickFixCandidates(props.diagnostics);
-  const activeProposal = getLatestPatchProposal(props.agentRun);
-  const approvedDecision = findPatchDecision(props.agentRun, activeProposal?.patchProposalId, "approved");
-  const rejectedDecision = findPatchDecision(props.agentRun, activeProposal?.patchProposalId, "rejected");
-  const appliedDecision = findPatchDecision(props.agentRun, activeProposal?.patchProposalId, "applied");
+  const agentPanel = buildDesktopAgentTimelinePanel(props.agentRun, {
+    currentBeforeHash: props.agentCurrentBeforeHash
+  });
+  const quickFixControls = (
+    <>
+      {props.agentMessage ? (
+        <p className="desktop-agent-message" data-tone={props.agentMessage.tone}>
+          {props.agentMessage.text}
+        </p>
+      ) : null}
+      <AgentEmptyState mode={props.mode} hasQuickFixes={quickFixes.length > 0} />
+      <AgentQuickFixList
+        mode={props.mode}
+        quickFixes={quickFixes}
+        onProposeQuickFix={props.onProposeQuickFix}
+      />
+    </>
+  );
   const contentByPanel: Record<InsightDockPanelId, ReactNode> = {
     outline: <div className="desktop-insight-section">{props.outline.length > 0 ? <OutlineTree items={props.outline} /> : <p className="desktop-empty-copy">No outline from language service.</p>}</div>,
     preview: <SemanticPreviewPanel preview={props.semanticPreview} workspaceSymbolIndexState={props.workspaceSymbolIndexState} workspaceSymbolIndexMessage={props.workspaceSymbolIndexMessage} workspaceSymbolIndexSummary={props.workspaceSymbolIndexSummary} />,
@@ -2713,7 +2622,7 @@ const InsightDockContent = ({
     postgres: <PostgresStatusPanel status={props.postgresStatus} managedStatus={props.managedPostgresStatus} loading={props.postgresLoading} managedOperation={props.managedPostgresOperation} errorMessage={props.postgresError} managedErrorMessage={props.managedPostgresError} managedMessage={props.managedPostgresMessage} profiles={props.postgresProfiles} persistState={props.persistState} persistDisabledReason={props.persistDisabledReason} onRefresh={props.onRefreshPostgres} onInitManaged={props.onInitManagedPostgres} onStartManaged={props.onStartManagedPostgres} onStopManaged={props.onStopManagedPostgres} onMigrateManaged={props.onMigrateManagedPostgres} onRefreshManaged={props.onRefreshManagedPostgres} onPersistGraph={props.onPersistGraph} />,
     storage: <LocalStorePanel status={props.localStoreStatus} operation={props.localStoreOperation} snapshotState={props.localSnapshotState} syncState={props.localSyncState} reactionIntelligenceJobBuild={props.reactionIntelligenceJobBuild} reactionIntelligenceJobState={props.reactionIntelligenceJobState} workspaceIngestState={props.workspaceIngestState} disabledReason={props.localStoreDisabledReason} syncDisabledReason={props.localStoreSyncDisabledReason} workspaceIngestDisabledReason={props.workspaceIngestDisabledReason} errorMessage={props.localStoreError} onRefresh={props.onRefreshLocalStore} onSave={props.onSaveLocalSnapshot} onSync={props.onSyncLocalOutbox} onRunReactionIntelligenceJob={props.onRunReactionIntelligenceJob} onRunWorkspaceIngest={props.onRunWorkspaceIngest} />,
     settings: <SettingsDockPanel mode={props.mode} sidecarStatus={props.sidecarStatus} postgresStatus={props.postgresStatus} localStoreStatus={props.localStoreStatus} />,
-    agent: <div className="desktop-agent-panel"><AgentRunHeader agentRun={props.agentRun} agentMessage={props.agentMessage} /><AgentEmptyState mode={props.mode} hasQuickFixes={quickFixes.length > 0} /><AgentQuickFixList mode={props.mode} quickFixes={quickFixes} onProposeQuickFix={props.onProposeQuickFix} /><AgentPatchProposalCard proposal={activeProposal} canApprove={activeProposal !== undefined && approvedDecision === undefined && rejectedDecision === undefined && appliedDecision === undefined} canApply={activeProposal !== undefined && approvedDecision !== undefined && appliedDecision === undefined && rejectedDecision === undefined} canReject={activeProposal !== undefined && rejectedDecision === undefined && appliedDecision === undefined} onApprovePatch={props.onApprovePatch} onApplyPatch={props.onApplyPatch} onRejectPatch={props.onRejectPatch} /><AgentTimeline agentRun={props.agentRun} /><AgentLedger agentRun={props.agentRun} /></div>
+    agent: <DesktopAgentPanel panel={agentPanel} quickFixControls={quickFixControls} onApprovePatch={() => props.onApprovePatch()} onApplyPatch={() => props.onApplyPatch()} onRejectPatch={() => props.onRejectPatch()} />
   };
   return contentByPanel[panel];
 };
@@ -3908,6 +3817,7 @@ const DesktopWorkbench = ({
   canSave,
   agentRun,
   agentMessage,
+  agentCurrentBeforeHash,
   editorRef,
   onRootPathChange,
   onSave,
@@ -4021,6 +3931,7 @@ const DesktopWorkbench = ({
               workspaceSymbolIndexSummary={workspaceSymbolIndexController.summary} workspaceSymbolIndexState={workspaceSymbolIndexController.state} workspaceSymbolIndexMessage={workspaceSymbolIndexController.message} semanticPreview={semanticPreview}
               agentRun={agentRun}
               agentMessage={agentMessage}
+              agentCurrentBeforeHash={agentCurrentBeforeHash}
               onStartSidecar={sidecarController.start} onStopSidecar={sidecarController.stop} onRefreshSidecar={sidecarController.refresh} onLoadSidecarLogs={sidecarController.loadLogs}
               onRefreshPostgres={postgresController.refresh}
               onInitManagedPostgres={postgresController.initializeManaged}
@@ -4370,6 +4281,7 @@ export const App = () => {
       files={workspaceController.files} selectedFile={workspaceController.selectedFile} selectedFileId={workspaceController.selectedFileId}
       mode={workspaceController.mode} message={workspaceController.message} source={workspaceController.source} savedSource={workspaceController.savedSource} workspaceConflict={workspaceController.workspaceConflict}
       rootPath={workspaceController.rootPath} canSave={workspaceController.canSave} agentRun={agentRun} agentMessage={agentMessage}
+      agentCurrentBeforeHash={createEditorSourceHash(workspaceController.source)}
       editorRef={editorRef}
       onRootPathChange={workspaceController.setRootPath} onSourceChange={updateEditorSource}
       onSave={() => void workspaceController.saveWorkspaceFile()} onOpenWorkspace={() => void workspaceController.openWorkspace()}

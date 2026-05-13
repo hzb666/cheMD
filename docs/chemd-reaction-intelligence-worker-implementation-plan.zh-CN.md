@@ -796,6 +796,21 @@ hybrid_score =
   buffer。
 - 当前验证：Agent timeline/orchestration/safety Vitest 28/28、desktop typecheck 通过。
 
+状态记录（Desktop Agent panel and tool contracts）：
+
+- 已合并子代理分支 `desktop-agent-panel-ui`：
+  新增 `apps/desktop/src/agent-panel/DesktopAgentPanel.tsx` 和 server-render 测试，
+  以复用组件展示 summary、tool calls、patch gate、warnings、timeline rows 和
+  approve/apply/reject 入口。
+- 已合并子代理分支 `desktop-agent-tool-contracts`：
+  新增 `apps/desktop/src/agent-tools/*`，锁定 M7 六类桌面 Agent tool 的展示 contract、
+  输入/输出摘要策略、workspace/current file/explicit approval requirement 与
+  offline/connected availability。
+- App 已替换旧内联 Agent 面板为 `DesktopAgentPanel`；timeline tool row 已接入
+  desktop tool contract 摘要策略，缺少特定字段时回退原 generic summary。
+- 当前验证：Agent panel/tool-contract/timeline Vitest 18/18、desktop typecheck 通过；
+  focused ESLint 仅剩既有 `App.tsx` max-lines/complexity，按 M11 统一治理。
+
 ---
 
 ## 8. 验证矩阵
