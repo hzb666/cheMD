@@ -10,6 +10,11 @@ import {
   type MonacoMarkerLike
 } from "@chemd/language-service";
 import {
+  cleanupChemdCodeActionOutput,
+  registerChemdCodeActionProvider,
+  updateChemdCodeActionOutput
+} from "./monaco-chemd-code-actions";
+import {
   cleanupChemdCompletionOutput,
   registerChemdCompletionProvider,
   updateChemdCompletionOutput
@@ -151,6 +156,7 @@ const registerChemdLanguage = (monaco: Monaco): void => {
   configureChemdLanguage(monaco);
   configureChemdTokens(monaco);
   defineChemdTheme(monaco);
+  registerChemdCodeActionProvider(monaco, CHEMD_LANGUAGE_ID);
   registerChemdCompletionProvider(monaco, CHEMD_LANGUAGE_ID);
   registerChemdNavigationProviders(monaco, CHEMD_LANGUAGE_ID);
 };
@@ -172,9 +178,11 @@ export const MonacoChemdEditor = ({
   const modelPath = useMemo(() => toModelPath(documentPath), [documentPath]);
 
   useEffect(() => {
+    updateChemdCodeActionOutput(modelPath, compileOutput);
     updateChemdCompletionOutput(modelPath, compileOutput);
     updateChemdNavigationOutput(modelPath, compileOutput);
     return () => {
+      cleanupChemdCodeActionOutput(modelPath, compileOutput);
       cleanupChemdCompletionOutput(modelPath, compileOutput);
       cleanupChemdNavigationOutput(modelPath, compileOutput);
     };
