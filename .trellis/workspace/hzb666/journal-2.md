@@ -1830,3 +1830,37 @@ Merged create_embedding_vector command and wired connected RAG Run to generate a
 ### Next Steps
 
 - None - task complete
+
+
+## Session 87: M6 RAG backfill embedding foundation
+
+**Date**: 2026-05-14
+**Task**: M6 RAG backfill embedding foundation
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Added create_embedding_vectors batch command foundation, preserved full workspace RAG chunk text separately from display labels, split batch Rust helpers under the 300-line guideline, and updated M6 implementation docs. Verification: cargo embedding provider 14/14, diagnostics bundle Rust 3/3, workspace index/RAG Vitest 25/25, focused eslint, diagnostics script 8/8, desktop build, pnpm typecheck, pnpm test, git diff --check. Real provider/network proof remains environment-gated.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6ba5d9a` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

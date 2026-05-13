@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 86
+- **Total Sessions**: 87
 - **Last Active**: 2026-05-14
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~1832 | Active |
+| `journal-2.md` | ~1866 | Active |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 87 | 2026-05-14 | M6 RAG backfill embedding foundation | `6ba5d9a` | `desktop-ide` |
 | 86 | 2026-05-14 | M6 connected RAG embedding query | `aba6e4c` | `desktop-ide` |
 | 85 | 2026-05-14 | Desktop embedding provider status and RAG query entry | `9304ceb` `9afdb03` `b4c96ae` | `desktop-ide` |
 | 84 | 2026-05-14 | Desktop connected RAG panel wiring | `e6faa39` `6563e1c` `c14ce8a` `e61e4db` | `desktop-ide` |
