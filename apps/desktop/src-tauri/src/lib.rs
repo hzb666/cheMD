@@ -1,4 +1,5 @@
 mod diagnostics_bundle;
+mod embedding_provider_client;
 mod embedding_provider_status;
 mod local_store;
 mod local_store_io;
@@ -35,6 +36,8 @@ mod workspace_path;
 #[cfg(test)]
 mod diagnostics_bundle_tests;
 #[cfg(test)]
+mod embedding_provider_client_tests;
+#[cfg(test)]
 mod local_store_sync_tests;
 #[cfg(test)]
 mod local_store_tests;
@@ -55,6 +58,8 @@ mod workspace_tests;
 
 #[cfg(not(test))]
 use diagnostics_bundle::export_diagnostics_bundle;
+#[cfg(not(test))]
+use embedding_provider_client::create_embedding_vector;
 #[cfg(not(test))]
 use embedding_provider_status::read_embedding_provider_status;
 #[cfg(not(test))]
@@ -113,6 +118,7 @@ pub fn run() {
             read_sidecar_logs,
             read_postgres_status,
             read_embedding_provider_status,
+            create_embedding_vector,
             list_postgres_profiles,
             save_postgres_profile,
             activate_postgres_profile,

@@ -252,6 +252,20 @@ export interface EmbeddingProviderStatus {
   detail: string;
 }
 
+export interface CreateEmbeddingVectorInput {
+  text: string;
+}
+
+export interface CreateEmbeddingVectorResult {
+  state: EmbeddingProviderStatusState;
+  label: string;
+  detail: string;
+  providerKind: EmbeddingProviderKind;
+  model: string | null;
+  embedding: number[];
+  dimension: number | null;
+}
+
 export interface PostgresRagQueryRequest {
   query: string;
   embedding: number[];
@@ -629,6 +643,12 @@ export interface DesktopCommandMap {
     input: void;
     output: EmbeddingProviderStatus;
   };
+  create_embedding_vector: {
+    input: {
+      input: CreateEmbeddingVectorInput;
+    };
+    output: CreateEmbeddingVectorResult;
+  };
   list_postgres_profiles: {
     input: void;
     output: PostgresProfilesState;
@@ -806,7 +826,7 @@ export const shellDiagnosticsBundleResult: DiagnosticsBundleExportResult = {
   outputPath: "",
   summary: {
     generatedAt: "",
-    commandCount: 32,
+    commandCount: 33,
     boundarySkipCount: 5,
     supportCommandCount: 4
   }

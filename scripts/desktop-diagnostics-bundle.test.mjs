@@ -73,6 +73,7 @@ test("known desktop commands include reaction intelligence, sync, and RAG surfac
   assert.deepEqual(
     [
       "read_embedding_provider_status",
+      "create_embedding_vector",
       "query_postgres_rag",
       "backfill_postgres_rag_embeddings",
       "run_reaction_intelligence_worker",
@@ -86,6 +87,7 @@ test("known desktop commands include reaction intelligence, sync, and RAG surfac
     ].filter((command) => KNOWN_DESKTOP_COMMAND_NAMES.includes(command)),
     [
       "read_embedding_provider_status",
+      "create_embedding_vector",
       "query_postgres_rag",
       "backfill_postgres_rag_embeddings",
       "run_reaction_intelligence_worker",

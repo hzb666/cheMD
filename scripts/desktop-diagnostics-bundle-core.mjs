@@ -33,6 +33,7 @@ export const KNOWN_DESKTOP_COMMAND_NAMES = [
   "read_sidecar_logs",
   "read_postgres_status",
   "read_embedding_provider_status",
+  "create_embedding_vector",
   "list_postgres_profiles",
   "save_postgres_profile",
   "activate_postgres_profile",
