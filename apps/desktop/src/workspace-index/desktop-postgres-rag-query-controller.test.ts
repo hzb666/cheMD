@@ -176,6 +176,24 @@ describe("desktop Postgres RAG query controller", () => {
     });
   });
 
+  it("can be ready to run before a query embedding vector exists", () => {
+    const state = buildDesktopPostgresRagQueryControllerState(baseInput({
+      embedding: {
+        providerAvailable: true,
+        vector: null,
+        model: "text-embedding-3-small"
+      }
+    }));
+
+    expect(state).toMatchObject({
+      state: "ready",
+      disabled: false,
+      degraded: false
+    });
+    expect(state.request).toBeNull();
+    expect(state.message).toBe("Connected RAG query is ready.");
+  });
+
   it("merges ready connected command results with local citation-backed results", () => {
     const state = buildDesktopPostgresRagQueryControllerState({
       ...baseInput(),

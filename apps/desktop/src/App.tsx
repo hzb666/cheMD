@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { appendToolCall, applyPatchDecision, approvePatchDecision, attachEvidence, createAgentRun, createToolResult, getAuditTimeline, proposePatch, rejectPatchDecision, transitionAgentRunStatus, type AgentAuditEvent, type AgentEvidence, type AgentRun, type AgentToolCall, type PatchDecision, type PatchProposal } from "@chemd/agent-tools";
 import { buildEditorGraphRagRecords, compileChemdForEditor, type ChemdEditorDiagnostic, type ChemdLanguageCompileOutput, type ChemdOutlineItem, type ChemdQuickFixProposal, type ChemdTextEdit, type ChemdWorkspaceSymbolIndex } from "@chemd/language-service";
 
-import { shellFiles, shellPostgresStatus, shellSidecarStatus, shellWorkspace, type DesktopCommandError, type DesktopCommandMap, type EmbeddingProviderStatus, type LocalStoreStatus, type ManagedPostgresStatus, type PostgresRagQueryResult, type PostgresStatus, type RuntimeState, type SidecarStatus, type WorkspaceFileEntry, type WorkspaceHandle, type WorkspaceIngestQueueItem, type WorkspaceIngestQueueSummary } from "./desktop-contracts";
+import { shellFiles, shellPostgresStatus, shellSidecarStatus, shellWorkspace, type CreateEmbeddingVectorResult, type DesktopCommandError, type DesktopCommandMap, type EmbeddingProviderStatus, type LocalStoreStatus, type ManagedPostgresStatus, type PostgresRagQueryResult, type PostgresStatus, type RuntimeState, type SidecarStatus, type WorkspaceFileEntry, type WorkspaceHandle, type WorkspaceIngestQueueItem, type WorkspaceIngestQueueSummary } from "./desktop-contracts";
 import { buildLocalRuntimeSnapshotInput } from "./desktop-local-store";
 import {
   buildPostgresProfileRows,
@@ -3117,16 +3117,24 @@ const useConnectedRagQueryController = ({
 }) => {
   const [query, setQueryValue] = useState("");
   const [operation, setOperation] = useState<RagQueryOperationState>("idle");
-  const [message, setMessage] = useState("Connected RAG needs a configured embedding vector before it can query Postgres.");
+  const [message, setMessage] = useState("Connected RAG needs a configured embedding provider before it can query Postgres.");
   const [commandResult, setCommandResult] = useState<PostgresRagQueryResult | null>(null);
+  const [embeddingResult, setEmbeddingResult] = useState<{
+    query: string;
+    result: CreateEmbeddingVectorResult;
+  } | null>(null);
+  const normalizedQuery = query.trim();
+  const activeEmbeddingResult = embeddingResult?.query === normalizedQuery
+    ? embeddingResult.result
+    : null;
   const queryState = useMemo(() => buildDesktopPostgresRagQueryControllerState({
     mode,
     query,
     postgresStatus,
     embedding: {
       providerAvailable: embeddingStatus.state === "ready",
-      vector: null,
-      model: embeddingStatus.model,
+      vector: activeEmbeddingResult?.state === "ready" ? activeEmbeddingResult.embedding : null,
+      model: activeEmbeddingResult?.model ?? embeddingStatus.model,
       distanceMetric: embeddingStatus.distanceMetric ?? undefined
     },
     runnerAvailable: true,
@@ -3135,12 +3143,13 @@ const useConnectedRagQueryController = ({
     workspaceId: workspace.workspaceId,
     documentId: file.path,
     limit: 8
-  }), [commandResult, embeddingStatus, file.path, localResults, mode, postgresStatus, query, workspace.workspaceId]);
+  }), [activeEmbeddingResult, commandResult, embeddingStatus, file.path, localResults, mode, postgresStatus, query, workspace.workspaceId]);
 
   useEffect(() => {
     setCommandResult(null);
-    setOperation(query.trim() ? "idle" : "disabled");
-    setMessage(query.trim()
+    setEmbeddingResult(null);
+    setOperation(normalizedQuery ? "idle" : "disabled");
+    setMessage(normalizedQuery
       ? queryState.message
       : "Enter a query to search connected RAG when an embedding vector is available.");
   }, [embeddingStatus, file.id, mode, postgresStatus, query, workspace.workspaceId]);
@@ -3151,18 +3160,51 @@ const useConnectedRagQueryController = ({
 
   const run = async () => {
     if (operation === "pending") return;
-    if (!queryState.request) {
+    if (queryState.readiness.disabled) {
       setOperation("disabled");
       setMessage(queryState.message);
       return;
     }
+    const queryText = queryState.query;
     setOperation("pending");
-    setMessage("Querying connected Postgres RAG.");
+    setMessage("Creating query embedding vector.");
     try {
-      const result = await invokeDesktop("query_postgres_rag", { input: queryState.request });
+      const embedding = await invokeDesktop("create_embedding_vector", {
+        input: { text: queryText }
+      });
+      setEmbeddingResult({ query: queryText, result: embedding });
+      if (embedding.state !== "ready" || embedding.embedding.length === 0 || !embedding.model) {
+        setOperation("failure");
+        setMessage(embedding.detail || "Embedding provider did not return a usable vector.");
+        return;
+      }
+      const readyState = buildDesktopPostgresRagQueryControllerState({
+        mode,
+        query: queryText,
+        postgresStatus,
+        embedding: {
+          providerAvailable: true,
+          vector: embedding.embedding,
+          model: embedding.model,
+          distanceMetric: embeddingStatus.distanceMetric ?? undefined
+        },
+        runnerAvailable: true,
+        localResults,
+        commandResult: null,
+        workspaceId: workspace.workspaceId,
+        documentId: file.path,
+        limit: 8
+      });
+      if (!readyState.request) {
+        setOperation("failure");
+        setMessage(readyState.message);
+        return;
+      }
+      setMessage("Querying connected Postgres RAG.");
+      const result = await invokeDesktop("query_postgres_rag", { input: readyState.request });
       setCommandResult(result);
       setOperation(result.state === "ready" ? "success" : "failure");
-      setMessage(result.detail || queryState.message);
+      setMessage(result.detail || readyState.message);
     } catch (error: unknown) {
       setOperation("failure");
       setMessage(getCommandErrorMessage(error, "Connected RAG query failed"));

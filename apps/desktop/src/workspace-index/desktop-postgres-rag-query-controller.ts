@@ -85,7 +85,7 @@ export const desktopPostgresRagQueryDisabledReasonMessages: Record<
   postgres_not_ready: "Postgres is not ready; local citation-backed results remain available.",
   pgvector_not_ready: "pgvector is not ready for connected RAG.",
   schema_not_ready: "The shared Graph/RAG schema is not ready.",
-  embedding_unavailable: "An embedding provider and vector are required for connected RAG.",
+  embedding_unavailable: "An embedding provider is required for connected RAG.",
   runner_unavailable: "The connected RAG runner is unavailable in this runtime."
 };
 
@@ -105,9 +105,12 @@ const normalizedQuery = (query: string): string => query.trim();
 const nonBlank = (value: string | null | undefined): value is string =>
   value !== undefined && value !== null && value.trim().length > 0;
 
-const hasUsableEmbedding = (embedding: DesktopPostgresRagEmbeddingState): boolean =>
+const hasUsableEmbeddingProvider = (embedding: DesktopPostgresRagEmbeddingState): boolean =>
   embedding.providerAvailable
-  && nonBlank(embedding.model)
+  && nonBlank(embedding.model);
+
+const hasUsableEmbeddingVector = (embedding: DesktopPostgresRagEmbeddingState): boolean =>
+  hasUsableEmbeddingProvider(embedding)
   && Array.isArray(embedding.vector)
   && embedding.vector.length > 0
   && embedding.vector.every((value) => Number.isFinite(value));
@@ -143,7 +146,7 @@ export const buildDesktopPostgresRagQueryReadiness = (
   )) {
     addReason(reasons, "schema_not_ready");
   }
-  if (!hasUsableEmbedding(input.embedding)) addReason(reasons, "embedding_unavailable");
+  if (!hasUsableEmbeddingProvider(input.embedding)) addReason(reasons, "embedding_unavailable");
   if (!input.runnerAvailable) addReason(reasons, "runner_unavailable");
 
   const disabledReasons = sortReasons(reasons);
@@ -162,11 +165,14 @@ export const buildDesktopPostgresRagQueryRequest = (
   input: DesktopPostgresRagQueryControllerInput
 ): PostgresRagQueryRequest | null => {
   const readiness = buildDesktopPostgresRagQueryReadiness(input);
-  if (readiness.disabled || !input.embedding.vector || !input.embedding.model) return null;
+  const vector = input.embedding.vector;
+  if (readiness.disabled || !hasUsableEmbeddingVector(input.embedding) || !vector || !input.embedding.model) {
+    return null;
+  }
 
   return {
     query: normalizedQuery(input.query),
-    embedding: [...input.embedding.vector],
+    embedding: [...vector],
     embeddingModel: input.embedding.model.trim(),
     ...(input.limit === undefined ? {} : { limit: input.limit }),
     ...(input.workspaceId === undefined ? {} : { workspaceId: input.workspaceId }),

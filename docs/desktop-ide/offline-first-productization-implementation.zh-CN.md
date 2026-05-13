@@ -710,6 +710,16 @@ readiness；由于当前仍没有“query text -> embedding vector”的桌面 p
 Run 在无 vector 时保持 disabled，不会伪造 embedding，也不会误报 pgvector 查询已成功。
 backfill UI 暂缓到真实 provider vector 生成路径完成后再接入。
 
+2026-05-13 第五批 M6 接入完成：Desktop 新增 `create_embedding_vector`
+Tauri command，通过 `CHEMD_EMBEDDING_*` 调用 HTTP embedding gateway，发送
+`{ input, model }`，支持 Chemd `{ embedding }` 与 OpenAI-style
+`{ data: [{ embedding }] }` 响应，校验空 query、provider env、向量维度和 finite
+number，并对 provider error、API key、完整 URL 做脱敏。RAG 面板 Run 已改为两阶段：
+先为当前 query 生成真实 embedding vector，再用该 vector 调用 `query_postgres_rag`；
+不会用 fake vector 绕过 pgvector readiness。无 provider、provider 失败或真实网络不可达时，
+UI 保持 failure/degraded 信息，本地 citation-backed RAG、symbols 与 references 搜索继续可用。
+backfill UI 仍暂缓到 chunk embedding 生成与任务状态路径完成后再接入。
+
 验收：
 
 - Graph/RAG 只消费 compiler/exporter output，不重新解析 source。
@@ -873,8 +883,8 @@ env、database URL、API key、token 或 password。诊断包说明见
 - [x] RAG search 有 citation gate 基础：本地结果必须带 citation locator；connected
   pgvector query command、embedding write command、result gate、query view adapter
   与 RAG panel disabled/degraded 展示已具备；embedding provider status、query 输入
-  与 disabled Run 入口已接入。真实 query embedding vector 生成、可执行 query trigger
-  与 backfill UI 仍待补。
+  与 Run 入口已接入；query text 可通过 `create_embedding_vector` 生成真实 vector 后
+  调用 `query_postgres_rag`。真实 provider 网络 proof 与 backfill UI 仍待补。
 - [ ] Agent run 可审计，patch 需用户确认。
 - [ ] 所有增强能力离线/失败时可降级。
 
