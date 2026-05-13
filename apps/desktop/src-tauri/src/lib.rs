@@ -41,8 +41,9 @@ mod workspace_tests;
 use diagnostics_bundle::export_diagnostics_bundle;
 #[cfg(not(test))]
 use local_store::{
-    clear_local_outbox_failures, list_local_outbox, mark_local_outbox_synced,
-    read_local_store_status, save_local_runtime_snapshot,
+    clear_local_outbox_failures, list_local_outbox, list_local_reaction_intelligence_artifacts,
+    mark_local_outbox_synced, read_local_store_status, save_local_reaction_intelligence_artifact,
+    save_local_runtime_snapshot,
 };
 #[cfg(not(test))]
 use local_store_sync::sync_local_outbox_to_postgres;
@@ -89,6 +90,8 @@ pub fn run() {
             migrate_managed_postgres,
             read_local_store_status,
             save_local_runtime_snapshot,
+            save_local_reaction_intelligence_artifact,
+            list_local_reaction_intelligence_artifacts,
             list_local_outbox,
             mark_local_outbox_synced,
             clear_local_outbox_failures,

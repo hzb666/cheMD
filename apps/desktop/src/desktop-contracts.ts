@@ -1,3 +1,5 @@
+import type { ChemdReactionIntelligenceArtifactV1 } from "@chemd/reaction-map";
+
 export type RuntimeState = "ready" | "placeholder" | "degraded" | "offline";
 
 export interface WorkspaceHandle {
@@ -224,6 +226,25 @@ export interface SaveLocalRuntimeSnapshotResult {
   syncStatus: LocalOutboxSyncStatus;
   createdAt: string;
   outboxPendingCount: number;
+}
+
+export interface LocalReactionIntelligenceArtifactInput {
+  localId: string;
+  idempotencyKey: string;
+  artifact: ChemdReactionIntelligenceArtifactV1;
+  metadata: RuntimeJsonObject;
+  createdAt: string;
+}
+
+export interface LocalReactionIntelligenceArtifactEntry extends LocalReactionIntelligenceArtifactInput {
+  updatedAt: string;
+}
+
+export interface SaveLocalReactionIntelligenceArtifactResult {
+  localId: string;
+  idempotencyKey: string;
+  createdAt: string;
+  artifactCount: number;
 }
 
 export interface LocalOutboxMutationResult {
@@ -477,6 +498,17 @@ export interface DesktopCommandMap {
     input: LocalRuntimeSnapshotInput;
     output: SaveLocalRuntimeSnapshotResult;
   };
+  save_local_reaction_intelligence_artifact: {
+    input: LocalReactionIntelligenceArtifactInput;
+    output: SaveLocalReactionIntelligenceArtifactResult;
+  };
+  list_local_reaction_intelligence_artifacts: {
+    input: {
+      graphIndexId?: string;
+      limit?: number;
+    };
+    output: LocalReactionIntelligenceArtifactEntry[];
+  };
   list_local_outbox: {
     input: {
       syncStatus?: LocalOutboxSyncStatus;
@@ -568,7 +600,7 @@ export const shellDiagnosticsBundleResult: DiagnosticsBundleExportResult = {
   outputPath: "",
   summary: {
     generatedAt: "",
-    commandCount: 22,
+    commandCount: 24,
     boundarySkipCount: 5,
     supportCommandCount: 4
   }

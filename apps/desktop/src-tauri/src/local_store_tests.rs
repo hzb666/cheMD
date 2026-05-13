@@ -1,8 +1,12 @@
 use crate::local_store::{
-    clear_local_outbox_failures_impl, list_local_outbox_impl, mark_local_outbox_synced_impl,
-    read_local_store_status_impl, save_local_runtime_snapshot_impl,
+    clear_local_outbox_failures_impl, list_local_outbox_impl,
+    list_local_reaction_intelligence_artifacts_impl, mark_local_outbox_synced_impl,
+    read_local_store_status_impl, save_local_reaction_intelligence_artifact_impl,
+    save_local_runtime_snapshot_impl,
 };
-use crate::local_store_types::{LocalRuntimeSnapshotInput, LocalSyncStatus};
+use crate::local_store_types::{
+    LocalReactionIntelligenceArtifactInput, LocalRuntimeSnapshotInput, LocalSyncStatus,
+};
 use serde_json::json;
 use std::{
     fs,
@@ -89,6 +93,46 @@ fn save_snapshot_upserts_by_idempotency_key() {
     let entries = list_local_outbox_impl(&store.root, None, None).unwrap();
     assert_eq!(entries.len(), 1);
     assert_eq!(entries[0].payload["version"], 2);
+}
+
+#[test]
+fn save_reaction_intelligence_artifact_upserts_and_lists_by_graph_index() {
+    let store = TestStore::new("artifact");
+    let first = save_local_reaction_intelligence_artifact_impl(
+        &store.root,
+        artifact_input("local-artifact", "idem-artifact", "graph-index-one", 0.91),
+    )
+    .expect("artifact should save");
+    let second = save_local_reaction_intelligence_artifact_impl(
+        &store.root,
+        artifact_input("local-artifact", "idem-artifact", "graph-index-one", 0.84),
+    )
+    .expect("artifact should upsert");
+    save_local_reaction_intelligence_artifact_impl(
+        &store.root,
+        artifact_input("local-other", "idem-other", "graph-index-two", 0.72),
+    )
+    .expect("second artifact should save");
+
+    assert_eq!(first.artifact_count, 1);
+    assert_eq!(second.artifact_count, 1);
+
+    let filtered = list_local_reaction_intelligence_artifacts_impl(
+        &store.root,
+        Some("graph-index-one".into()),
+        None,
+    )
+    .expect("artifacts should list");
+    assert_eq!(filtered.len(), 1);
+    assert_eq!(filtered[0].local_id, "local-artifact");
+    assert_eq!(
+        filtered[0].artifact["similarity_edges"][0]["score"],
+        json!(0.84)
+    );
+
+    let all = list_local_reaction_intelligence_artifacts_impl(&store.root, None, Some(1))
+        .expect("artifact limit should apply");
+    assert_eq!(all.len(), 1);
 }
 
 #[test]
@@ -232,6 +276,41 @@ fn snapshot_input(
         idempotency_key: idempotency_key.into(),
         payload,
         metadata: json!({ "localStoreKind": "runtime_graph_rag_snapshot" }),
+        created_at: "2026-05-12T09:00:00.000Z".into(),
+    }
+}
+
+fn artifact_input(
+    local_id: &str,
+    idempotency_key: &str,
+    graph_index_id: &str,
+    score: f64,
+) -> LocalReactionIntelligenceArtifactInput {
+    LocalReactionIntelligenceArtifactInput {
+        local_id: local_id.into(),
+        idempotency_key: idempotency_key.into(),
+        artifact: json!({
+            "schema_version": "chemd-reaction-intelligence-artifact/v0.1",
+            "artifact_id": local_id,
+            "job_id": "job-local",
+            "graph_index_id": graph_index_id,
+            "generated_at": "2026-05-12T09:00:00.000Z",
+            "providers": [],
+            "reaction_features": [],
+            "similarity_edges": [{
+                "edge_id": "edge-local",
+                "from_reaction_entity_id": "rxn-a",
+                "to_reaction_entity_id": "rxn-b",
+                "score": score,
+                "confidence": "high",
+                "basis": ["rdkit_fingerprint_tanimoto"],
+                "provider_ids": ["rdkit-local"],
+                "source_hashes": ["hash-a", "hash-b"],
+                "warnings": []
+            }],
+            "warnings": []
+        }),
+        metadata: json!({ "localStoreKind": "reaction_intelligence_artifact" }),
         created_at: "2026-05-12T09:00:00.000Z".into(),
     }
 }

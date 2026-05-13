@@ -2,7 +2,9 @@
 
 use crate::{
     local_store_time::unix_timestamp_ms,
-    local_store_types::{LocalOutboxFile, LocalSnapshotFile},
+    local_store_types::{
+        LocalOutboxFile, LocalReactionIntelligenceArtifactFile, LocalSnapshotFile,
+    },
     workspace::DesktopCommandError,
 };
 use serde::{Deserialize, Serialize};
@@ -13,9 +15,16 @@ use std::{
 
 const SNAPSHOT_FILE: &str = "runtime-snapshot.json";
 const OUTBOX_FILE: &str = "outbox.json";
+const REACTION_INTELLIGENCE_ARTIFACTS_FILE: &str = "reaction-intelligence-artifacts.json";
 
 pub(crate) fn read_outbox_file(root: &Path) -> Result<LocalOutboxFile, DesktopCommandError> {
     read_json_file(&outbox_path(root)).map(|file| file.unwrap_or_default())
+}
+
+pub(crate) fn read_reaction_intelligence_artifacts_file(
+    root: &Path,
+) -> Result<LocalReactionIntelligenceArtifactFile, DesktopCommandError> {
+    read_json_file(&reaction_intelligence_artifacts_path(root)).map(|file| file.unwrap_or_default())
 }
 
 pub(crate) fn read_snapshot_file(root: &Path) -> Option<LocalSnapshotFile> {
@@ -34,6 +43,13 @@ pub(crate) fn write_outbox_file(
     outbox: &LocalOutboxFile,
 ) -> Result<(), DesktopCommandError> {
     write_json_file(&outbox_path(root), outbox)
+}
+
+pub(crate) fn write_reaction_intelligence_artifacts_file(
+    root: &Path,
+    file: &LocalReactionIntelligenceArtifactFile,
+) -> Result<(), DesktopCommandError> {
+    write_json_file(&reaction_intelligence_artifacts_path(root), file)
 }
 
 fn read_json_file<T>(path: &Path) -> Result<Option<T>, DesktopCommandError>
@@ -137,6 +153,10 @@ fn snapshot_path(root: &Path) -> PathBuf {
 
 fn outbox_path(root: &Path) -> PathBuf {
     root.join(OUTBOX_FILE)
+}
+
+fn reaction_intelligence_artifacts_path(root: &Path) -> PathBuf {
+    root.join(REACTION_INTELLIGENCE_ARTIFACTS_FILE)
 }
 
 fn invalid_path(detail: &str) -> DesktopCommandError {

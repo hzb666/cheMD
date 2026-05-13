@@ -1,4 +1,5 @@
 import type {
+  LocalReactionIntelligenceArtifactInput,
   LocalAuthoringCompileState,
   LocalAuthoringStatus,
   LocalAuthoringStepSummary,
@@ -12,10 +13,13 @@ import type {
   RuntimeJsonObject,
   SaveLocalRuntimeSnapshotResult
 } from "./desktop-contracts";
+import type { ChemdReactionIntelligenceArtifactV1 } from "@chemd/reaction-map";
 
 export const localStoreCommandNames = {
   readStatus: "read_local_store_status",
   saveSnapshot: "save_local_runtime_snapshot",
+  saveReactionIntelligenceArtifact: "save_local_reaction_intelligence_artifact",
+  listReactionIntelligenceArtifacts: "list_local_reaction_intelligence_artifacts",
   listOutbox: "list_local_outbox",
   markSynced: "mark_local_outbox_synced",
   clearFailures: "clear_local_outbox_failures",
@@ -106,6 +110,41 @@ export const buildLocalRuntimeSnapshotInput = (
       ...identity
     },
     createdAt: payload.createdAt ?? payload.graphSnapshot.createdAt
+  };
+};
+
+const buildReactionIntelligenceArtifactIdentity = (
+  artifact: ChemdReactionIntelligenceArtifactV1
+): RuntimeJsonObject => ({
+  graphIndexId: artifact.graph_index_id,
+  artifactId: artifact.artifact_id,
+  jobId: artifact.job_id
+});
+
+export const buildLocalReactionIntelligenceArtifactInput = (
+  artifact: ChemdReactionIntelligenceArtifactV1
+): LocalReactionIntelligenceArtifactInput => {
+  const identity = buildReactionIntelligenceArtifactIdentity(artifact);
+  return {
+    localId: [
+      "local-reaction-intelligence-artifact",
+      hashString(String(identity.graphIndexId)),
+      hashString(String(identity.artifactId))
+    ].join(":"),
+    idempotencyKey: [
+      "local-reaction-intelligence-artifact",
+      stableHash({
+        identity,
+        artifact
+      })
+    ].join(":"),
+    artifact,
+    metadata: {
+      localStoreKind: "reaction_intelligence_artifact",
+      idempotencyHashAlgorithm: HASH_PREFIX,
+      ...identity
+    },
+    createdAt: artifact.generated_at
   };
 };
 

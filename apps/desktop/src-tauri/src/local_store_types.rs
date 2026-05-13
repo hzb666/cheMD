@@ -35,6 +35,15 @@ pub(crate) struct LocalRuntimeSnapshotInput {
     pub(crate) created_at: String,
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct LocalReactionIntelligenceArtifactInput {
+    pub(crate) local_id: String,
+    pub(crate) idempotency_key: String,
+    pub(crate) artifact: Value,
+    pub(crate) metadata: Value,
+    pub(crate) created_at: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct LocalStoreStatus {
@@ -57,6 +66,26 @@ pub(crate) struct LocalSnapshotSaveResult {
     pub(crate) sync_status: LocalSyncStatus,
     pub(crate) created_at: String,
     pub(crate) outbox_pending_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct LocalReactionIntelligenceArtifactRecord {
+    pub(crate) local_id: String,
+    pub(crate) idempotency_key: String,
+    pub(crate) artifact: Value,
+    pub(crate) metadata: Value,
+    pub(crate) created_at: String,
+    pub(crate) updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct LocalReactionIntelligenceArtifactSaveResult {
+    pub(crate) local_id: String,
+    pub(crate) idempotency_key: String,
+    pub(crate) created_at: String,
+    pub(crate) artifact_count: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -126,4 +155,10 @@ pub(crate) struct LocalSnapshotFile {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct LocalOutboxFile {
     pub(crate) entries: Vec<LocalOutboxRecord>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct LocalReactionIntelligenceArtifactFile {
+    pub(crate) entries: Vec<LocalReactionIntelligenceArtifactRecord>,
 }

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import type { ChemdReactionIntelligenceArtifactV1 } from "@chemd/reaction-map";
+
 import type {
   DesktopCommandMap,
   LocalOutboxEntry,
@@ -9,6 +11,7 @@ import type {
   PersistRuntimeGraphRagPayload
 } from "./desktop-contracts";
 import {
+  buildLocalReactionIntelligenceArtifactInput,
   buildLocalRuntimeSnapshotInput,
   deriveLocalAuthoringStatus,
   localStoreCommandNames
@@ -54,6 +57,36 @@ const buildPayload = (
   createdAt
 });
 
+const buildReactionIntelligenceArtifact = (
+  artifactId = "artifact-local-1",
+  edgeScore = 0.92
+): ChemdReactionIntelligenceArtifactV1 => ({
+  schema_version: "chemd-reaction-intelligence-artifact/v0.1",
+  artifact_id: artifactId,
+  job_id: "job-local-1",
+  graph_index_id: "graph-index-local-1",
+  generated_at: createdAt,
+  providers: [{
+    provider_id: "rdkit-local",
+    kind: "rdkit_fingerprint",
+    status: "PASS",
+    warnings: []
+  }],
+  reaction_features: [],
+  similarity_edges: [{
+    edge_id: "edge-local-1",
+    from_reaction_entity_id: "rxn-a",
+    to_reaction_entity_id: "rxn-b",
+    score: edgeScore,
+    confidence: "high",
+    basis: ["rdkit_fingerprint_tanimoto"],
+    provider_ids: ["rdkit-local"],
+    source_hashes: ["hash-a", "hash-b"],
+    warnings: []
+  }],
+  warnings: []
+});
+
 const buildOutboxEntry = (
   syncStatus: LocalOutboxSyncStatus,
   overrides: Partial<LocalOutboxEntry> = {}
@@ -75,10 +108,38 @@ describe("desktop local store contract builder", () => {
     expect(localStoreCommandNames).toEqual({
       readStatus: "read_local_store_status",
       saveSnapshot: "save_local_runtime_snapshot",
+      saveReactionIntelligenceArtifact: "save_local_reaction_intelligence_artifact",
+      listReactionIntelligenceArtifacts: "list_local_reaction_intelligence_artifacts",
       listOutbox: "list_local_outbox",
       markSynced: "mark_local_outbox_synced",
       clearFailures: "clear_local_outbox_failures",
       syncOutbox: "sync_local_outbox_to_postgres"
+    });
+  });
+
+  it("builds deterministic reaction intelligence artifact store inputs", () => {
+    const artifact = buildReactionIntelligenceArtifact();
+    const first = buildLocalReactionIntelligenceArtifactInput(artifact);
+    const second = buildLocalReactionIntelligenceArtifactInput(artifact);
+    const changed = buildLocalReactionIntelligenceArtifactInput(
+      buildReactionIntelligenceArtifact("artifact-local-1", 0.85)
+    );
+
+    expect(second.localId).toBe(first.localId);
+    expect(second.idempotencyKey).toBe(first.idempotencyKey);
+    expect(changed.localId).toBe(first.localId);
+    expect(changed.idempotencyKey).not.toBe(first.idempotencyKey);
+    expect(first).toMatchObject({
+      localId: expect.stringContaining("local-reaction-intelligence-artifact:"),
+      idempotencyKey: expect.stringContaining("local-reaction-intelligence-artifact:fnv1a:"),
+      artifact,
+      createdAt,
+      metadata: {
+        localStoreKind: "reaction_intelligence_artifact",
+        graphIndexId: "graph-index-local-1",
+        artifactId: "artifact-local-1",
+        jobId: "job-local-1"
+      }
     });
   });
 

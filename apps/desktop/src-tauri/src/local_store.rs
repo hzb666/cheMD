@@ -2,12 +2,17 @@
 
 use crate::workspace::DesktopCommandError;
 use crate::{
-    local_store_io::{read_outbox_file, write_outbox_file, write_snapshot_file},
+    local_store_io::{
+        read_outbox_file, read_reaction_intelligence_artifacts_file, write_outbox_file,
+        write_reaction_intelligence_artifacts_file, write_snapshot_file,
+    },
     local_store_status::{count_status, mutation_result, status_from_outbox},
     local_store_time::unix_timestamp_ms,
     local_store_types::{
-        LocalOutboxFile, LocalOutboxMutationResult, LocalOutboxRecord, LocalRuntimeSnapshotInput,
-        LocalSnapshotFile, LocalSnapshotSaveResult, LocalStoreStatus, LocalSyncStatus,
+        LocalOutboxFile, LocalOutboxMutationResult, LocalOutboxRecord,
+        LocalReactionIntelligenceArtifactInput, LocalReactionIntelligenceArtifactRecord,
+        LocalReactionIntelligenceArtifactSaveResult, LocalRuntimeSnapshotInput, LocalSnapshotFile,
+        LocalSnapshotSaveResult, LocalStoreStatus, LocalSyncStatus,
     },
 };
 #[cfg(not(test))]
@@ -16,7 +21,9 @@ use std::path::{Path, PathBuf};
 
 const LOCAL_STORE_DIR: &str = "local-store";
 const MAX_PAYLOAD_BYTES: usize = 2 * 1024 * 1024;
+const MAX_REACTION_INTELLIGENCE_ARTIFACT_BYTES: usize = 8 * 1024 * 1024;
 const MAX_OUTBOX_ENTRIES: usize = 500;
+const MAX_ARTIFACT_ENTRIES: usize = 200;
 
 #[cfg(not(test))]
 #[tauri::command]
@@ -46,6 +53,38 @@ pub fn save_local_runtime_snapshot(
             created_at,
         },
     )
+}
+
+#[cfg(not(test))]
+#[tauri::command]
+pub fn save_local_reaction_intelligence_artifact(
+    app: tauri::AppHandle,
+    local_id: String,
+    idempotency_key: String,
+    artifact: Value,
+    metadata: Value,
+    created_at: String,
+) -> Result<LocalReactionIntelligenceArtifactSaveResult, DesktopCommandError> {
+    save_local_reaction_intelligence_artifact_impl(
+        &command_root(&app)?,
+        LocalReactionIntelligenceArtifactInput {
+            local_id,
+            idempotency_key,
+            artifact,
+            metadata,
+            created_at,
+        },
+    )
+}
+
+#[cfg(not(test))]
+#[tauri::command]
+pub fn list_local_reaction_intelligence_artifacts(
+    app: tauri::AppHandle,
+    graph_index_id: Option<String>,
+    limit: Option<usize>,
+) -> Result<Vec<LocalReactionIntelligenceArtifactRecord>, DesktopCommandError> {
+    list_local_reaction_intelligence_artifacts_impl(&command_root(&app)?, graph_index_id, limit)
 }
 
 #[cfg(not(test))]
@@ -126,6 +165,44 @@ pub(crate) fn save_local_runtime_snapshot_impl(
         created_at: record.created_at,
         outbox_pending_count: pending,
     })
+}
+
+pub(crate) fn save_local_reaction_intelligence_artifact_impl(
+    root: &Path,
+    input: LocalReactionIntelligenceArtifactInput,
+) -> Result<LocalReactionIntelligenceArtifactSaveResult, DesktopCommandError> {
+    validate_reaction_intelligence_artifact_input(&input)?;
+    let mut file = read_reaction_intelligence_artifacts_file(root)?;
+    let record = upsert_reaction_intelligence_artifact_record(&mut file, input)?;
+    write_reaction_intelligence_artifacts_file(root, &file)?;
+    Ok(LocalReactionIntelligenceArtifactSaveResult {
+        local_id: record.local_id,
+        idempotency_key: record.idempotency_key,
+        created_at: record.created_at,
+        artifact_count: file.entries.len(),
+    })
+}
+
+pub(crate) fn list_local_reaction_intelligence_artifacts_impl(
+    root: &Path,
+    graph_index_id: Option<String>,
+    limit: Option<usize>,
+) -> Result<Vec<LocalReactionIntelligenceArtifactRecord>, DesktopCommandError> {
+    let mut entries = read_reaction_intelligence_artifacts_file(root)?.entries;
+    if let Some(graph_index_id) = graph_index_id.filter(|value| !value.trim().is_empty()) {
+        entries.retain(|entry| {
+            entry
+                .artifact
+                .get("graph_index_id")
+                .and_then(|value| value.as_str())
+                .is_some_and(|value| value == graph_index_id)
+        });
+    }
+    entries.sort_by(|left, right| right.updated_at.cmp(&left.updated_at));
+    if let Some(limit) = limit {
+        entries.truncate(limit.min(MAX_ARTIFACT_ENTRIES));
+    }
+    Ok(entries)
 }
 
 pub(crate) fn mark_local_outbox_synced_impl(
@@ -211,6 +288,37 @@ fn upsert_outbox_record(
     Ok(record)
 }
 
+fn upsert_reaction_intelligence_artifact_record(
+    file: &mut crate::local_store_types::LocalReactionIntelligenceArtifactFile,
+    input: LocalReactionIntelligenceArtifactInput,
+) -> Result<LocalReactionIntelligenceArtifactRecord, DesktopCommandError> {
+    if let Some(record) = file
+        .entries
+        .iter_mut()
+        .find(|entry| entry.idempotency_key == input.idempotency_key)
+    {
+        record.artifact = input.artifact;
+        record.metadata = input.metadata;
+        record.updated_at = unix_timestamp_ms();
+        return Ok(record.clone());
+    }
+    if file.entries.len() >= MAX_ARTIFACT_ENTRIES {
+        return Err(invalid_input(
+            "local artifact store has reached 200 entries",
+        ));
+    }
+    let record = LocalReactionIntelligenceArtifactRecord {
+        local_id: input.local_id,
+        idempotency_key: input.idempotency_key,
+        artifact: input.artifact,
+        metadata: input.metadata,
+        created_at: input.created_at.clone(),
+        updated_at: input.created_at,
+    };
+    file.entries.push(record.clone());
+    Ok(record)
+}
+
 fn validate_snapshot_input(input: &LocalRuntimeSnapshotInput) -> Result<(), DesktopCommandError> {
     if input.local_id.trim().is_empty() {
         return Err(invalid_input("localId is required"));
@@ -236,6 +344,41 @@ fn validate_snapshot_input(input: &LocalRuntimeSnapshotInput) -> Result<(), Desk
             "payload is {} bytes; limit is {} bytes",
             bytes.len(),
             MAX_PAYLOAD_BYTES
+        )));
+    }
+    Ok(())
+}
+
+fn validate_reaction_intelligence_artifact_input(
+    input: &LocalReactionIntelligenceArtifactInput,
+) -> Result<(), DesktopCommandError> {
+    if input.local_id.trim().is_empty() {
+        return Err(invalid_input("localId is required"));
+    }
+    if input.idempotency_key.trim().is_empty() {
+        return Err(invalid_input("idempotencyKey is required"));
+    }
+    if input.created_at.trim().is_empty() {
+        return Err(invalid_input("createdAt is required"));
+    }
+    if !input.metadata.is_object() {
+        return Err(invalid_input("metadata must be an object"));
+    }
+    if !input.artifact.is_object() {
+        return Err(invalid_input("artifact must be an object"));
+    }
+    let bytes = serde_json::to_vec(&input.artifact).map_err(|err| {
+        DesktopCommandError::new(
+            "local_store_artifact_invalid",
+            "Local reaction intelligence artifact is invalid",
+            Some(err.to_string()),
+        )
+    })?;
+    if bytes.len() > MAX_REACTION_INTELLIGENCE_ARTIFACT_BYTES {
+        return Err(invalid_input(&format!(
+            "artifact is {} bytes; limit is {} bytes",
+            bytes.len(),
+            MAX_REACTION_INTELLIGENCE_ARTIFACT_BYTES
         )));
     }
     Ok(())
