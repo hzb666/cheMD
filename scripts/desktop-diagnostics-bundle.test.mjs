@@ -6,6 +6,7 @@ import test from "node:test";
 
 import {
   buildDesktopDiagnosticsBundle,
+  KNOWN_DESKTOP_COMMAND_NAMES,
   redactDiagnosticsValue,
   runDesktopDiagnosticsBundleCli
 } from "./desktop-diagnostics-bundle.mjs";
@@ -68,6 +69,23 @@ test("redactDiagnosticsValue redacts secrets and database URLs", () => {
   );
 });
 
+test("known desktop commands include reaction intelligence and sync surfaces", () => {
+  assert.deepEqual(
+    [
+      "run_reaction_intelligence_worker",
+      "save_local_reaction_intelligence_artifact",
+      "list_local_reaction_intelligence_artifacts",
+      "sync_local_outbox_to_postgres"
+    ].filter((command) => KNOWN_DESKTOP_COMMAND_NAMES.includes(command)),
+    [
+      "run_reaction_intelligence_worker",
+      "save_local_reaction_intelligence_artifact",
+      "list_local_reaction_intelligence_artifacts",
+      "sync_local_outbox_to_postgres"
+    ]
+  );
+});
+
 test("buildDesktopDiagnosticsBundle redacts selected env values", async () => {
   const rootDir = "D:\\repo";
   const files = createFiles({
@@ -120,6 +138,14 @@ test("buildDesktopDiagnosticsBundle marks missing dist and artifacts as skip", a
   assert.equal(bundle.runtime.releasePreflight.status, "skipped");
   assert.equal(bundle.supportContext.offlineSmoke.status, "skip");
   assert.equal(bundle.supportContext.classifications.releasePreflight, "skip");
+  assert.equal(
+    bundle.supportContext.classificationTool.contexts.find((entry) => entry.name === "artifact").status,
+    "SKIP"
+  );
+  assert.equal(
+    bundle.supportContext.classificationTool.contexts.find((entry) => entry.name === "sync").status,
+    "SKIP"
+  );
 });
 
 test("buildDesktopDiagnosticsBundle summarizes existing release artifacts as pass", async () => {
@@ -198,6 +224,21 @@ test("buildDesktopDiagnosticsBundle summarizes offline support context without p
   assert.equal(bundle.supportContext.offlineSmoke.files.outbox.summary.entryCount, 2);
   assert.equal(bundle.supportContext.offlineSmoke.files.outbox.summary.statusCounts.pending, 1);
   assert.equal(bundle.supportContext.notRun.find((entry) => entry.name === "provider").status, "skip");
+  assert.deepEqual(bundle.supportContext.classificationTool.statusValues, ["PASS", "SKIP", "BLOCKED"]);
+  assert.deepEqual(
+    bundle.supportContext.classificationTool.contexts.map((entry) => entry.name),
+    ["provider", "model", "artifact", "sync"]
+  );
+  assert.ok(
+    bundle.supportContext.supportCommands.some((entry) =>
+      entry.command.includes("run_reaction_intelligence_worker")
+    )
+  );
+  assert.ok(
+    bundle.supportContext.supportCommands.some((entry) =>
+      entry.command.includes("save_local_reaction_intelligence_artifact")
+    )
+  );
   assert.doesNotMatch(serialized, /secret-token|secret-idempotency-key|local-secret-id/u);
   assert.doesNotMatch(serialized, /postgres:\/\/chemd/u);
 });

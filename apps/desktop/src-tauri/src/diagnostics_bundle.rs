@@ -40,7 +40,7 @@ const KNOWN_TAURI_COMMANDS: [&str; 25] = [
     "export_diagnostics_bundle",
 ];
 
-const SUPPORT_COMMANDS: [SupportCommand; 4] = [
+const SUPPORT_COMMANDS: [SupportCommand; 7] = [
     SupportCommand {
         name: "diagnostics bundle",
         command: "pnpm desktop:diagnostics-bundle",
@@ -62,6 +62,24 @@ const SUPPORT_COMMANDS: [SupportCommand; 4] = [
         name: "release artifact preflight",
         command: "pnpm desktop:offline-release-smoke",
         boundary: "artifact and process-lock classification; not clean-machine installer proof",
+    },
+    SupportCommand {
+        name: "reaction intelligence worker",
+        command: "run_reaction_intelligence_worker",
+        boundary:
+            "known Tauri command only; diagnostics bundle does not invoke worker providers, models, or child processes",
+    },
+    SupportCommand {
+        name: "local reaction intelligence artifact store",
+        command: "save_local_reaction_intelligence_artifact / list_local_reaction_intelligence_artifacts",
+        boundary:
+            "known local artifact commands only; diagnostics bundle does not read artifact payload content",
+    },
+    SupportCommand {
+        name: "local outbox sync",
+        command: "sync_local_outbox_to_postgres",
+        boundary:
+            "known sync command only; diagnostics bundle does not open database connections or run outbox sync",
     },
 ];
 
@@ -245,6 +263,21 @@ fn runtime_boundaries() -> Vec<RuntimeBoundary> {
             name: "provider",
             status: SKIP,
             reason: "network providers are not contacted",
+        },
+        RuntimeBoundary {
+            name: "model",
+            status: SKIP,
+            reason: "model execution is not run",
+        },
+        RuntimeBoundary {
+            name: "artifact",
+            status: SKIP,
+            reason: "local reaction intelligence artifacts are not enumerated",
+        },
+        RuntimeBoundary {
+            name: "sync",
+            status: SKIP,
+            reason: "database and outbox sync are not executed",
         },
         RuntimeBoundary {
             name: "tauriCommandSmoke",
