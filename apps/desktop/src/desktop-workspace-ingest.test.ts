@@ -339,11 +339,13 @@ describe("desktop workspace ingest runner", () => {
     });
     const newPending = changed.items[0];
 
+    expect(changed.items).toHaveLength(2);
     expect(newPending.status).toBe("pending");
     expect(newPending.documentHash).not.toBe(oldPending.documentHash);
     expect(newPending.revisionHash).not.toBe(oldPending.revisionHash);
     expect(newPending.queueId).not.toBe(oldPending.queueId);
-    expect(oldPending.status).toBe("pending");
+    expect(changed.items[1]).toEqual(oldPending);
+    expect(changed.summary).toMatchObject({ pendingCount: 2, totalCount: 2 });
   });
 
   it("keeps failed items over the retry limit failed instead of making them pending", async () => {

@@ -306,6 +306,20 @@ const buildFailedItem = (
   });
 };
 
+const appendExistingQueueItems = (
+  target: WorkspaceIngestQueueItem[],
+  existingItems: readonly WorkspaceIngestQueueItem[] | undefined
+): void => {
+  if (!existingItems) return;
+  const queueIds = new Set(target.map((item) => item.queueId));
+  existingItems.forEach((item) => {
+    if (!queueIds.has(item.queueId)) {
+      target.push(item);
+      queueIds.add(item.queueId);
+    }
+  });
+};
+
 const processChemdFile = async (
   input: RunWorkspaceIngestInput,
   file: WorkspaceFileEntry
@@ -344,6 +358,7 @@ export const runWorkspaceIngest = async (
       items.push(buildSkippedMarkdownItem(normalizedInput, file));
     }
   }
+  appendExistingQueueItems(items, normalizedInput.existingItems);
   return {
     items,
     summary: deriveWorkspaceIngestQueueSummary(items, {
