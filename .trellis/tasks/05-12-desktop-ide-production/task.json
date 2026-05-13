@@ -1,0 +1,53 @@
+{
+  "id": "desktop-ide-production",
+  "name": "desktop-ide-production",
+  "title": "Desktop IDE production architecture implementation",
+  "description": "",
+  "status": "planning",
+  "dev_type": "fullstack",
+  "scope": null,
+  "package": "desktop-ide",
+  "priority": "P2",
+  "creator": "hzb666",
+  "assignee": "hzb666",
+  "createdAt": "2026-05-12",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "desktop-ide",
+  "worktree_path": null,
+  "current_phase": 3,
+  "next_action": [
+    {
+      "phase": 1,
+      "action": "brainstorm"
+    },
+    {
+      "phase": 2,
+      "action": "research"
+    },
+    {
+      "phase": 3,
+      "action": "implement"
+    },
+    {
+      "phase": 4,
+      "action": "check"
+    },
+    {
+      "phase": 5,
+      "action": "update-spec"
+    },
+    {
+      "phase": 6,
+      "action": "record-session"
+    }
+  ],
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

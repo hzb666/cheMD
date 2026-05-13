@@ -2,6 +2,7 @@ import type { ChemdDocument } from "@chemd/core";
 import type { RenderOptions } from "@chemd/render-profile";
 import { renderNode, type HtmlTypedSemanticNode } from "./block-render";
 import { escapeHtml, normalizeWhitespace } from "./shared";
+export { renderRenderableHtml, type RenderRenderableHtmlOptions } from "./renderable-html";
 
 export interface RenderHtmlSemanticOptions {
   typedGraph?: {

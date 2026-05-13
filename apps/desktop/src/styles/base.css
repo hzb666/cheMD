@@ -1,0 +1,186 @@
+:root {
+  color-scheme: light;
+  --background: oklch(99.1% 0.003 247.9);
+  --foreground: oklch(21.7% 0.035 257.4);
+  --card: oklch(100% 0 0);
+  --panel: oklch(98.3% 0.006 247.9);
+  --panel-elevated: oklch(96.8% 0.01 247.9);
+  --muted: oklch(96.3% 0.006 74.7);
+  --muted-foreground: oklch(45.8% 0.025 69.5);
+  --accent: oklch(96.3% 0.026 236.6);
+  --accent-foreground: oklch(53.7% 0.176 253.1);
+  --primary: oklch(56.6% 0.194 253.3);
+  --primary-foreground: oklch(100% 0 0);
+  --border: oklch(88.8% 0.012 247.9);
+  --success: oklch(62.7% 0.178 146.6);
+  --warning: oklch(62.9% 0.177 51.8);
+  --danger: oklch(54.6% 0.188 32.1);
+  --grid-line: oklch(51.2% 0.065 257.4 / 0.08);
+  --shadow-low: oklch(21.7% 0.035 257.4 / 0.06);
+  --font-sans: Inter, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-panel: var(--panel);
+  --color-panel-elevated: var(--panel-elevated);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-border: var(--border);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --font-sans: Inter, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+  --radius-desktop: 7px;
+}
+
+@layer base {
+  * {
+    @apply box-border;
+    scrollbar-color: color-mix(in oklch, var(--foreground) 18%, transparent) transparent;
+    scrollbar-width: thin;
+  }
+
+  *:hover {
+    scrollbar-color: color-mix(in oklch, var(--foreground) 32%, transparent) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 0.38rem;
+    height: 0.38rem;
+  }
+
+  *:hover::-webkit-scrollbar {
+    width: 0.62rem;
+    height: 0.62rem;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    min-height: 2rem;
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: color-mix(in oklch, var(--foreground) 18%, transparent);
+    background-clip: content-box;
+  }
+
+  *:hover::-webkit-scrollbar-thumb {
+    border-width: 1px;
+    background: color-mix(in oklch, var(--foreground) 32%, transparent);
+    background-clip: content-box;
+  }
+
+  html,
+  body,
+  #root {
+    @apply h-full min-h-full;
+  }
+
+  body {
+    @apply m-0 bg-background text-foreground font-sans;
+    text-rendering: optimizeLegibility;
+  }
+
+  button {
+    font: inherit;
+  }
+
+  button:not(:disabled) {
+    @apply cursor-pointer;
+  }
+
+  button:disabled {
+    @apply cursor-not-allowed opacity-[0.55];
+  }
+
+  body[data-desktop-resize-panel] {
+    user-select: none;
+  }
+
+  body[data-desktop-dock-drag] {
+    cursor: grabbing;
+    user-select: none;
+  }
+
+  body[data-desktop-resize-panel="sidebar"],
+  body[data-desktop-resize-panel="insight"] {
+    cursor: col-resize;
+  }
+
+  body[data-desktop-resize-panel="bottom"],
+  body[data-desktop-resize-panel="dock"] {
+    cursor: row-resize;
+  }
+}
+
+@layer components {
+  .desktop-shell {
+    @apply flex h-full min-h-[640px] min-w-0 flex-col overflow-auto bg-background;
+  }
+
+  .desktop-brand,
+  .desktop-runtime-badges,
+  .desktop-topbar-center,
+  .desktop-panel-header,
+  .desktop-sidebar-action-row,
+  .desktop-editor-toolbar,
+  .desktop-bottom-tabs,
+  .desktop-log-line,
+  .desktop-agent-heading,
+  .desktop-agent-subhead,
+  .desktop-agent-action-row,
+  .desktop-agent-ledger,
+  .desktop-sidecar-heading,
+  .desktop-sidecar-actions,
+  .desktop-postgres-heading,
+  .desktop-postgres-actions,
+  .desktop-postgres-target,
+  .desktop-postgres-subhead,
+  .desktop-managed-actions,
+  .desktop-local-store-heading,
+  .desktop-local-store-actions,
+  .desktop-persist-status-row,
+  .desktop-outline-row,
+  .desktop-quickfix-list button,
+  .desktop-agent-timeline-row,
+  .desktop-diagnostic-row,
+  .desktop-diagnostic-summary,
+  .desktop-dock-header,
+  .desktop-dock-preview,
+  .desktop-dock-tabs,
+  .desktop-sidebar-tabs,
+  .desktop-tool-search,
+  .desktop-tool-result-row,
+  .desktop-graph-node-row,
+  .desktop-sidebar-problem-row {
+    @apply flex items-center;
+  }
+
+  .desktop-workspace-name,
+  .desktop-path-chip,
+  .desktop-panel-meta,
+  .desktop-toolbar-text,
+  .desktop-file-kind,
+  .desktop-sidebar-note,
+  .desktop-log-line,
+  .desktop-empty-copy {
+    @apply text-xs text-muted-foreground;
+  }
+}
+
+@media (min-width: 900px) {
+  .desktop-shell {
+    @apply overflow-hidden;
+  }
+}

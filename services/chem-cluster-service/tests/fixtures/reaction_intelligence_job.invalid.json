@@ -1,0 +1,21 @@
+{
+  "schema_version": "chemd-reaction-intelligence-job/v0.1",
+  "job_id": "reaction-intelligence-job::invalid-fixture",
+  "graph_index_id": "graph-index::fixture",
+  "source_compile_run_ids": ["compile-run::fixture"],
+  "reactions": [
+    {
+      "reaction_entity_id": "rxn-invalid-1",
+      "document_id": "doc-invalid",
+      "canonical_rxn_smiles": "",
+      "participant_signature": "missing-canonical-rxn-smiles",
+      "source_hash": ""
+    }
+  ],
+  "requested_providers": ["rdkit_fingerprint"],
+  "provider_policy": {
+    "missing_dependency": "skip",
+    "per_reaction_failure": "warn",
+    "allow_network": false
+  }
+}

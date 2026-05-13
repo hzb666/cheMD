@@ -310,6 +310,19 @@ Playground 提供：
 
 结构化输出 tabs 包括 semantic output、runtime output、LNF、RAG export、training understanding export 和 full audit export。
 
+## Desktop IDE 规划
+
+生产版 Chemd Desktop IDE 规划以 Tauri 2、React、Monaco、PostgreSQL/pgvector 和受控 `chem-service` sidecar 为核心。桌面版不是 Web playground 的简单封装，而是本地 workspace、语言服务、反应 Graph、RAG 和 Agent 编排的生产级工作台。
+
+相关架构文档：
+
+- `docs/desktop-ide-production-plan.zh-CN.md`
+- `docs/desktop-runtime-boundaries.zh-CN.md`
+- `docs/desktop-language-service-contract.zh-CN.md`
+- `docs/postgres-graph-rag-schema.zh-CN.md`
+- `docs/agent-tool-contract.zh-CN.md`
+- `docs/desktop-ui-style-guide.zh-CN.md`
+
 ## API Surface
 
 Next.js routes：
