@@ -205,3 +205,23 @@ The implementation loop must keep the desktop IDE usable while adding:
   - Main validation passed `pnpm --filter @chemd/desktop typecheck`, focused
     desktop ESLint, the workspace symbol helper test, desktop build, and
     `git diff --check`.
+
+- `desktop-ide-monaco-workspace-completion` merged through
+  `feat(desktop)：合并 Monaco 跨文档引用补全支持`.
+  - Extended `monaco-chemd-completion.ts` so future App wiring can inject a
+    `ChemdWorkspaceSymbolIndex` and merge workspace reference suggestions with
+    local completions.
+  - The helper degrades to local completions when no workspace index is cached
+    or workspace completion fails.
+  - Main validation passed the Monaco completion provider test, desktop
+    typecheck, focused desktop ESLint, desktop build, and `git diff --check`.
+
+- `desktop-ide-semantic-preview-helper` merged through
+  `feat(desktop)：合并 semantic preview helper`.
+  - Added `buildDesktopSemanticPreview(input)` as a pure desktop helper over
+    `buildRenderableNodeTree()` and `renderRenderableHtml()`.
+  - Architect integration replaced cross-package relative imports with
+    workspace dependencies on `@chemd/renderer-json` and `@chemd/renderer-html`
+    and updated `pnpm-lock.yaml`.
+  - Main validation passed the semantic preview helper test, desktop typecheck,
+    focused desktop ESLint, desktop build, and `git diff --check`.
