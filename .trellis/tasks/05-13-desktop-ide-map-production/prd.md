@@ -138,3 +138,26 @@ The implementation loop must keep the desktop IDE usable while adding:
   - Main validation passed `pnpm --filter @chemd/renderer-json test` with
     9 tests, `pnpm --filter @chemd/renderer-json typecheck`, and
     `git diff --check`.
+
+- `desktop-ide-hover-definition-core` merged through
+  `feat(language-service)：合并 hover 和 definition core`.
+  - Added Monaco-neutral `getChemdHover(request, context)` and
+    `getChemdDefinition(request, context)` in `@chemd/language-service`.
+  - Hover now exposes symbol metadata, diagnostics at position, source line,
+    and current-document reference target data without app coupling.
+  - Definition resolves `@symbolId` and bare symbol tokens to current-document
+    symbol ranges; cross-document navigation remains a later integration.
+  - Main validation passed `pnpm --filter @chemd/language-service test` with
+    33 tests, `pnpm --filter @chemd/language-service typecheck`, and
+    `git diff --check`.
+
+- `desktop-ide-renderable-html-shell` merged through
+  `feat(renderer-html)：合并可渲染节点 HTML shell`.
+  - Added `renderRenderableHtml(tree, options?)` in `@chemd/renderer-html`.
+  - The shell emits stable `data-chemd-*` attributes, escaped source refs,
+    recursive layout/template/text rendering, and lazy hydration placeholders.
+  - Architect integration updated `pnpm-lock.yaml` for the new
+    `@chemd/renderer-json` workspace dependency.
+  - Main validation passed `pnpm --filter @chemd/renderer-html test` with
+    9 tests, `pnpm --filter @chemd/renderer-html typecheck`, and
+    `git diff --check`.
