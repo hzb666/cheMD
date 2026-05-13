@@ -293,6 +293,7 @@ export interface ReactionIntelligenceWorkerInput {
   providers?: ChemdReactionIntelligenceProviderKindV1[];
   missingDependency?: ChemdReactionIntelligenceMissingDependencyPolicyV1;
   pretty?: boolean;
+  timeoutMs?: number;
 }
 
 export interface ReactionIntelligenceWorkerResult {

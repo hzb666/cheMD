@@ -6,6 +6,7 @@ import type {
 } from "@chemd/reaction-map";
 
 import type {
+  DesktopCommandMap,
   LocalReactionIntelligenceArtifactEntry,
   SaveLocalReactionIntelligenceArtifactResult
 } from "./desktop-contracts";
@@ -278,6 +279,10 @@ describe("desktop reaction intelligence job controller", () => {
   });
 
   it("maps Tauri worker command output into controller worker results", () => {
+    const commandInput: DesktopCommandMap["run_reaction_intelligence_worker"]["input"] = {
+      jobJson: job(),
+      timeoutMs: 2_500
+    };
     const mapped = toDesktopReactionIntelligenceWorkerResult({
       status: "completed",
       message: "done",
@@ -289,6 +294,7 @@ describe("desktop reaction intelligence job controller", () => {
       stderrTail: ["stderr"]
     });
 
+    expect(commandInput.timeoutMs).toBe(2_500);
     expect(mapped).toMatchObject({
       status: "completed",
       artifact: expect.objectContaining({ artifact_id: "artifact-local-1" }),

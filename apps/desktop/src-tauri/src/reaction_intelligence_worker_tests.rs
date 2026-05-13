@@ -1,6 +1,7 @@
 use crate::reaction_intelligence_worker::{
-    find_service_dir_from, run_reaction_intelligence_worker_with, worker_spec,
-    ReactionIntelligenceWorkerInput, WorkerProcessOutput, WorkerTempPaths,
+    execute_worker_spec, find_service_dir_from, run_reaction_intelligence_worker_with, worker_spec,
+    ReactionIntelligenceWorkerInput, ReactionIntelligenceWorkerSpec, WorkerProcessOutput,
+    WorkerTempPaths,
 };
 use serde_json::{json, Value};
 use std::{
@@ -30,6 +31,7 @@ fn reaction_intelligence_worker_builds_cli_spec_with_overrides() {
             ]),
             missing_dependency: Some("skip".into()),
             pretty: Some(true),
+            timeout_ms: Some(0),
         },
     );
 
@@ -44,6 +46,55 @@ fn reaction_intelligence_worker_builds_cli_spec_with_overrides() {
     assert!(spec.args.contains(&"--missing-dependency".into()));
     assert!(spec.args.contains(&"skip".into()));
     assert!(spec.args.contains(&"--pretty".into()));
+    assert_eq!(spec.timeout_ms, 1_000);
+
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
+fn reaction_intelligence_worker_clamps_timeout_spec_to_maximum() {
+    let dir = test_dir("spec-timeout-max");
+    let service_dir = service_dir(&dir);
+    write_service_marker(&service_dir);
+    let temp_paths = WorkerTempPaths::in_dir(&dir);
+
+    let spec = worker_spec(
+        &service_dir,
+        &temp_paths,
+        &ReactionIntelligenceWorkerInput {
+            job_json: job_json(),
+            providers: None,
+            missing_dependency: None,
+            pretty: None,
+            timeout_ms: Some(u64::MAX),
+        },
+    );
+
+    assert_eq!(spec.timeout_ms, 600_000);
+
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
+fn reaction_intelligence_worker_defaults_timeout_spec() {
+    let dir = test_dir("spec-timeout-default");
+    let service_dir = service_dir(&dir);
+    write_service_marker(&service_dir);
+    let temp_paths = WorkerTempPaths::in_dir(&dir);
+
+    let spec = worker_spec(
+        &service_dir,
+        &temp_paths,
+        &ReactionIntelligenceWorkerInput {
+            job_json: job_json(),
+            providers: None,
+            missing_dependency: None,
+            pretty: None,
+            timeout_ms: None,
+        },
+    );
+
+    assert_eq!(spec.timeout_ms, 120_000);
 
     let _ = fs::remove_dir_all(dir);
 }
@@ -69,6 +120,7 @@ fn reaction_intelligence_worker_missing_service_returns_skipped() {
             providers: None,
             missing_dependency: None,
             pretty: None,
+            timeout_ms: None,
         },
         || None,
         |_| unreachable!("worker should not execute without service dir"),
@@ -97,6 +149,7 @@ fn reaction_intelligence_worker_reads_artifact_and_cleans_temp_files() {
             providers: Some(vec!["rdkit_fingerprint".into()]),
             missing_dependency: Some("skip".into()),
             pretty: Some(true),
+            timeout_ms: None,
         },
         || Some(service_dir.clone()),
         |spec| {
@@ -110,6 +163,7 @@ fn reaction_intelligence_worker_reads_artifact_and_cleans_temp_files() {
                 exit_code: Some(0),
                 stdout_tail: vec!["done".into()],
                 stderr_tail: Vec::new(),
+                timed_out: false,
             })
         },
     )
@@ -145,6 +199,7 @@ fn reaction_intelligence_worker_nonzero_exit_returns_failed() {
             providers: None,
             missing_dependency: None,
             pretty: None,
+            timeout_ms: None,
         },
         || Some(service_dir.clone()),
         |spec| {
@@ -156,6 +211,7 @@ fn reaction_intelligence_worker_nonzero_exit_returns_failed() {
                 exit_code: Some(1),
                 stdout_tail: Vec::new(),
                 stderr_tail: vec!["validation failed".into()],
+                timed_out: false,
             })
         },
     )
@@ -182,6 +238,7 @@ fn reaction_intelligence_worker_python_not_found_returns_skipped() {
             providers: None,
             missing_dependency: None,
             pretty: None,
+            timeout_ms: None,
         },
         || Some(service_dir.clone()),
         |_| Err(io::Error::new(io::ErrorKind::NotFound, "python not found")),
@@ -196,6 +253,68 @@ fn reaction_intelligence_worker_python_not_found_returns_skipped() {
     );
     assert_eq!(as_string(&value, "detail"), "python not found");
     assert!(value["artifactJson"].is_null());
+
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
+fn reaction_intelligence_worker_timeout_returns_failed_result_with_tails() {
+    let dir = test_dir("timeout-result");
+    let service_dir = service_dir(&dir);
+    write_service_marker(&service_dir);
+
+    let result = run_reaction_intelligence_worker_with(
+        ReactionIntelligenceWorkerInput {
+            job_json: job_json(),
+            providers: None,
+            missing_dependency: None,
+            pretty: None,
+            timeout_ms: Some(25),
+        },
+        || Some(service_dir.clone()),
+        |_| {
+            Ok(WorkerProcessOutput {
+                exit_code: None,
+                stdout_tail: vec!["worker started".into()],
+                stderr_tail: vec!["model call still running".into()],
+                timed_out: true,
+            })
+        },
+    )
+    .expect("worker result");
+
+    let value = result_value(&result);
+    assert_eq!(as_string(&value, "status"), "failed");
+    assert_eq!(
+        as_string(&value, "reason"),
+        "reaction_intelligence_worker_timeout"
+    );
+    assert_eq!(as_string(&value, "detail"), "model call still running");
+    assert_eq!(value["stdoutTail"][0], "worker started");
+    assert_eq!(value["stderrTail"][0], "model call still running");
+    assert!(value["artifactJson"].is_null());
+
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
+fn reaction_intelligence_worker_executor_kills_timed_out_child() {
+    let dir = test_dir("timeout-executor");
+    fs::create_dir_all(&dir).expect("test dir");
+    let (program, args) = timeout_test_command();
+    let spec = ReactionIntelligenceWorkerSpec {
+        program,
+        args,
+        cwd: dir.clone(),
+        input_path: dir.join("worker-input.json"),
+        output_path: dir.join("worker-output.json"),
+        timeout_ms: 100,
+    };
+
+    let output = execute_worker_spec(&spec).expect("timeout executor output");
+
+    assert!(output.timed_out);
+    assert!(output.exit_code.is_none());
 
     let _ = fs::remove_dir_all(dir);
 }
@@ -276,6 +395,23 @@ fn test_dir(name: &str) -> PathBuf {
         std::process::id(),
         unix_timestamp_ms()
     ))
+}
+
+#[cfg(windows)]
+fn timeout_test_command() -> (PathBuf, Vec<String>) {
+    (
+        PathBuf::from("powershell.exe"),
+        vec![
+            "-NoProfile".into(),
+            "-Command".into(),
+            "Start-Sleep -Milliseconds 2000".into(),
+        ],
+    )
+}
+
+#[cfg(not(windows))]
+fn timeout_test_command() -> (PathBuf, Vec<String>) {
+    (PathBuf::from("sh"), vec!["-c".into(), "sleep 2".into()])
 }
 
 fn unix_timestamp_ms() -> String {
