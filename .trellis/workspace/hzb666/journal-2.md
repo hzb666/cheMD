@@ -1210,3 +1210,39 @@ Merged RXNFP embedding and hybrid similarity baselines. RXNFP provider supports 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 69: Reaction Intelligence TMAP layout and worker pipeline CLI
+
+**Date**: 2026-05-13
+**Task**: Reaction Intelligence TMAP layout and worker pipeline CLI
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Merged TMAP layout provider and Reaction Intelligence worker pipeline CLI. TMAP provider supports dependency SKIP/ERROR/fallback policies, adapter layout output, deterministic fallback layout, and edge metadata preservation. Pipeline CLI validates job input, runs RDKit/RXNMapper/RXNFP/hybrid/TMAP providers, writes contract-valid artifacts, and exposes python -m chem_cluster_service.intelligence.cli. Main integration wires tmap_layout into pipeline artifact layout output and records Phase 5/6 status. Validation passed chem-cluster-service tests, compileall, CLI fixture smoke, reaction-map test/typecheck, desktop build, full pnpm typecheck, full pnpm test, and git diff --check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5265c1b` | (see git log) |
+| `133f54d` | (see git log) |
+| `07de424` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

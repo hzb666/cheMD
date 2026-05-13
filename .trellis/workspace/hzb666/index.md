@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 68
+- **Total Sessions**: 69
 - **Last Active**: 2026-05-13
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~1212 | Active |
+| `journal-2.md` | ~1248 | Active |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 69 | 2026-05-13 | Reaction Intelligence TMAP layout and worker pipeline CLI | `5265c1b`, `133f54d`, `07de424` | `desktop-ide` |
 | 68 | 2026-05-13 | Reaction Intelligence RXNFP and hybrid similarity baselines | `ab6d74d`, `5d1cc71`, `fd4a715` | `desktop-ide` |
 | 67 | 2026-05-13 | Reaction Intelligence RDKit and RXNMapper baselines | `49fd39f`, `f481b4f`, `e12f632` | `desktop-ide` |
 | 66 | 2026-05-13 | Desktop IDE ingest idempotency and reaction intelligence contracts | `32daf70`, `93e6579`, `d690b55` | `desktop-ide` |
