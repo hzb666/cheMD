@@ -161,3 +161,27 @@ The implementation loop must keep the desktop IDE usable while adding:
   - Main validation passed `pnpm --filter @chemd/renderer-html test` with
     9 tests, `pnpm --filter @chemd/renderer-html typecheck`, and
     `git diff --check`.
+
+- `desktop-ide-workspace-reference-completion` merged through
+  `feat(language-service)：合并跨文档引用补全 core`.
+  - Added Monaco-neutral `getChemdWorkspaceReferenceCompletions()` in
+    `@chemd/language-service`.
+  - Completion items read `ChemdWorkspaceSymbolIndex`, preserve document
+    identity/source hash/stale metadata, and avoid current-block self
+    references.
+  - Main validation passed `pnpm --filter @chemd/language-service test` with
+    37 tests, `pnpm --filter @chemd/language-service typecheck`, and
+    `git diff --check`.
+
+- `desktop-ide-monaco-hover-definition` merged through
+  `feat(desktop)：合并 Monaco hover 和 definition`.
+  - Registered desktop Monaco hover and definition providers against the
+    Monaco-neutral language-service navigation core.
+  - Provider state follows the existing per-URI compile output cache pattern
+    and keeps `MonacoChemdEditor.tsx` to registration/update/cleanup wiring.
+  - Main validation passed `pnpm --filter @chemd/desktop typecheck`, focused
+    desktop ESLint, `pnpm exec vitest run
+    apps/desktop/src/monaco-chemd-navigation.test.ts`, `pnpm --filter
+    @chemd/desktop build`, and `git diff --check`.
+  - `pnpm install --frozen-lockfile` was required once after the earlier
+    renderer-html dependency addition to refresh local workspace symlinks.
