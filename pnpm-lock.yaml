@@ -314,6 +314,9 @@ importers:
       '@chemd/render-profile':
         specifier: workspace:*
         version: link:../render-profile
+      '@chemd/renderer-json':
+        specifier: workspace:*
+        version: link:../renderer-json
 
   packages/renderer-json:
     dependencies:
