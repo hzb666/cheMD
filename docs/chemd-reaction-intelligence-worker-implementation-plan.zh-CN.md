@@ -406,17 +406,25 @@ hybrid_score =
 
 任务：
 
-- [ ] 独立 provider 检测 RDKit 可用性。
-- [ ] 从 `canonical_rxn_smiles` 生成 reactant/product fingerprints 或 reaction delta fingerprint。
-- [ ] 输出 `feature_ref_id`、dimension、hash、warnings。
-- [ ] 计算 Tanimoto edges。
-- [ ] 把 edge basis 写成 `rdkit_fingerprint_tanimoto`。
+- [x] 独立 provider 检测 RDKit 可用性。
+- [x] 从 `canonical_rxn_smiles` 生成 reactant/product fingerprints 或 reaction delta fingerprint。
+- [x] 输出 `feature_ref_id`、dimension、hash、warnings。
+- [x] 计算 Tanimoto edges。
+- [x] 把 edge basis 写成 `rdkit_fingerprint_tanimoto`。
 
 验收：
 
-- [ ] RDKit 缺失时 provider `SKIP`，IDE 不受影响。
-- [ ] 指纹相同/相似反应生成 computed edge。
-- [ ] 无效 SMILES 只产生 per-reaction warning。
+- [x] RDKit 缺失时 provider `SKIP`，IDE 不受影响。
+- [x] 指纹相同/相似反应生成 computed edge。
+- [x] 无效 SMILES 只产生 per-reaction warning。
+
+状态记录（Worker C / `reaction-intel-rdkit-baseline`）：
+
+- 新增 `rdkit_fingerprint.py`，真实 RDKit adapter 懒加载依赖；缺失时 provider 返回 `SKIP`。
+- PASS 路径通过可注入 fake adapter 测试，不要求本机安装 RDKit。
+- fingerprint refs 使用 inline bit vector refs，记录 `feature_ref_id`、`provider`、`kind`、`dimension`、`storage`、`hash`、`bit_indices`。
+- 相似度边使用 Tanimoto，basis 固定为 `rdkit_fingerprint_tanimoto`。
+- 单条无效 reaction smiles 转为该 reaction 的 warning，不中断 batch。
 
 ### Phase 2：RXNMapper atom mapping
 
