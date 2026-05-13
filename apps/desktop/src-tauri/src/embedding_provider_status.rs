@@ -4,9 +4,9 @@ use serde::Serialize;
 use std::{collections::BTreeMap, env};
 use url::Url;
 
-const PROVIDER_KIND: &str = "http_env";
+pub(crate) const PROVIDER_KIND: &str = "http_env";
 const DEFAULT_DISTANCE_METRIC: &str = "cosine";
-const DEFAULT_TIMEOUT_MS: u64 = 30_000;
+pub(crate) const DEFAULT_TIMEOUT_MS: u64 = 30_000;
 const EMBEDDING_ENV_KEYS: [&str; 7] = [
     "CHEMD_EMBEDDING_BASE_URL",
     "CHEMD_EMBEDDING_PATH",
@@ -16,6 +16,15 @@ const EMBEDDING_ENV_KEYS: [&str; 7] = [
     "CHEMD_EMBEDDING_TIMEOUT_MS",
     "CHEMD_EMBEDDING_API_KEY",
 ];
+
+#[derive(Debug, Clone)]
+pub(crate) struct EmbeddingProviderConfig {
+    pub(crate) endpoint: Url,
+    pub(crate) model: String,
+    pub(crate) embedding_dim: usize,
+    pub(crate) timeout_ms: u64,
+    pub(crate) api_key: Option<String>,
+}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -39,9 +48,7 @@ pub fn read_embedding_provider_status() -> EmbeddingProviderStatus {
 }
 
 pub(crate) fn read_embedding_provider_status_impl() -> EmbeddingProviderStatus {
-    let vars = env::vars()
-        .filter(|(key, _)| EMBEDDING_ENV_KEYS.contains(&key.as_str()))
-        .collect::<BTreeMap<_, _>>();
+    let vars = collect_embedding_env();
     read_embedding_provider_status_from_env(&vars)
 }
 
@@ -101,11 +108,80 @@ pub(crate) fn read_embedding_provider_status_from_env(
     }
 }
 
+pub(crate) fn read_embedding_provider_config_from_env(
+    vars: &BTreeMap<String, String>,
+) -> Result<EmbeddingProviderConfig, Vec<&'static str>> {
+    let mut issues = Vec::new();
+    let _base_url_host = read_base_url_host(vars, &mut issues);
+    let endpoint = read_endpoint(vars, &mut issues);
+    let model = read_model(vars, &mut issues);
+    let embedding_dim = read_positive_usize(vars, "CHEMD_EMBEDDING_DIM", None, &mut issues);
+    let timeout_ms = read_positive_u64(
+        vars,
+        "CHEMD_EMBEDDING_TIMEOUT_MS",
+        Some(DEFAULT_TIMEOUT_MS),
+        &mut issues,
+    );
+    if !issues.is_empty() {
+        return Err(issues);
+    }
+    Ok(EmbeddingProviderConfig {
+        endpoint: endpoint.expect("endpoint exists when there are no issues"),
+        model: model.expect("model exists when there are no issues"),
+        embedding_dim: embedding_dim.expect("dimension exists when there are no issues"),
+        timeout_ms: timeout_ms.expect("timeout exists when there are no issues"),
+        api_key: env_value(vars, "CHEMD_EMBEDDING_API_KEY").map(ToString::to_string),
+    })
+}
+
+pub(crate) fn embedding_env_configured(vars: &BTreeMap<String, String>) -> bool {
+    EMBEDDING_ENV_KEYS
+        .iter()
+        .any(|key| env_value(vars, key).is_some())
+}
+
+pub(crate) fn collect_embedding_env() -> BTreeMap<String, String> {
+    env::vars()
+        .filter(|(key, _)| EMBEDDING_ENV_KEYS.contains(&key.as_str()))
+        .collect::<BTreeMap<_, _>>()
+}
+
+pub(crate) fn embedding_status_detail(state: &str, issues: &[&str]) -> String {
+    status_detail(state, issues)
+}
+
 fn env_value<'a>(vars: &'a BTreeMap<String, String>, key: &str) -> Option<&'a str> {
     vars.get(key)
         .map(String::as_str)
         .map(str::trim)
         .filter(|value| !value.is_empty())
+}
+
+fn read_endpoint(vars: &BTreeMap<String, String>, issues: &mut Vec<&'static str>) -> Option<Url> {
+    let value = env_value(vars, "CHEMD_EMBEDDING_BASE_URL")?;
+    let Ok(mut url) = Url::parse(value) else {
+        return None;
+    };
+    let Some(path) = env_value(vars, "CHEMD_EMBEDDING_PATH") else {
+        return Some(url);
+    };
+    if Url::parse(path).is_ok() || path.contains('?') || path.contains('#') {
+        issues.push("CHEMD_EMBEDDING_PATH must be a URL path without query or fragment");
+        return None;
+    }
+    let endpoint = if path.starts_with('/') {
+        url.set_path(path);
+        url
+    } else {
+        match url.join(path) {
+            Ok(endpoint) => endpoint,
+            Err(_) => {
+                issues.push("CHEMD_EMBEDDING_PATH must be a valid URL path");
+                return None;
+            }
+        }
+    };
+    Some(endpoint)
 }
 
 fn read_base_url_host(
