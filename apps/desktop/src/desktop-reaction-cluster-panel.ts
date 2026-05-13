@@ -280,6 +280,79 @@ const buildFallbackPanel = (
   documentUri: input.documentUri ?? input.compileOutput?.documentUri
 });
 
+const getPanelCompiledAt = (input: DesktopReactionClusterPanelInput): string | undefined =>
+  input.compiledAt ?? input.compileOutput?.compiledAt;
+
+const getPanelDocumentUri = (input: DesktopReactionClusterPanelInput): string | undefined =>
+  input.documentUri ?? input.compileOutput?.documentUri;
+
+const getReactionCount = (
+  graphIndex: DesktopReactionClusterGraphIndex
+): number => new Set((graphIndex.reaction_features ?? []).map((feature) =>
+  feature.reaction_entity_id
+)).size;
+
+const selectClusterDetail = (
+  details: readonly DesktopReactionClusterPanelDetail[],
+  selectedClusterId: string | undefined
+): DesktopReactionClusterPanelDetail | null =>
+  details.find((detail) => detail.clusterId === selectedClusterId)
+  ?? details[0]
+  ?? null;
+
+const buildReadyPanel = (
+  input: DesktopReactionClusterPanelInput,
+  graphIndex: DesktopReactionClusterGraphIndex,
+  details: DesktopReactionClusterPanelDetail[]
+): DesktopReactionClusterPanel => {
+  const selectedDetail = selectClusterDetail(details, input.selectedClusterId);
+  const warnings = uniqueStrings([
+    ...(graphIndex.warnings ?? []),
+    ...details.flatMap((detail) => detail.warnings)
+  ]);
+
+  return {
+    state: "ready",
+    reason: null,
+    message: readyMessage,
+    summary: {
+      clusterCount: details.length,
+      reactionCount: getReactionCount(graphIndex),
+      similarityEdgeCount: graphIndex.reaction_similarity_edges?.length ?? 0,
+      selectedClusterId: selectedDetail?.clusterId ?? null,
+      reason: null
+    },
+    clusters: details,
+    details,
+    selectedDetail,
+    warnings,
+    compiledAt: getPanelCompiledAt(input),
+    documentUri: getPanelDocumentUri(input)
+  };
+};
+
+const buildGraphIndexPanel = (
+  input: DesktopReactionClusterPanelInput,
+  graphIndex: DesktopReactionClusterGraphIndex
+): DesktopReactionClusterPanel => {
+  const features = new Map((graphIndex.reaction_features ?? []).map((feature) => [
+    feature.reaction_entity_id,
+    feature
+  ]));
+  const details = sortDetails((graphIndex.reaction_clusters ?? []).map((cluster) =>
+    buildDetail(cluster, graphIndex, features)
+  ));
+
+  return details.length === 0
+    ? buildFallbackPanel(
+        input,
+        "no_reaction_clusters",
+        noClustersMessage,
+        graphIndex.warnings?.slice().sort() ?? []
+      )
+    : buildReadyPanel(input, graphIndex, details);
+};
+
 export const buildDesktopReactionClusterPanel = (
   rawInput: ChemdLanguageCompileOutput | DesktopReactionClusterGraphIndex | DesktopReactionClusterPanelInput
 ): DesktopReactionClusterPanel => {
@@ -293,39 +366,5 @@ export const buildDesktopReactionClusterPanel = (
     return buildFallbackPanel(input, "missing_graph_index", missingGraphIndexMessage);
   }
 
-  const features = new Map((graphIndex.reaction_features ?? []).map((feature) => [
-    feature.reaction_entity_id,
-    feature
-  ]));
-  const details = sortDetails((graphIndex.reaction_clusters ?? []).map((cluster) =>
-    buildDetail(cluster, graphIndex, features)
-  ));
-
-  if (details.length === 0) {
-    return buildFallbackPanel(input, "no_reaction_clusters", noClustersMessage, graphIndex.warnings?.slice().sort() ?? []);
-  }
-
-  const selectedDetail = details.find((detail) => detail.clusterId === input.selectedClusterId) ?? details[0];
-  const warnings = uniqueStrings([
-    ...(graphIndex.warnings ?? []),
-    ...details.flatMap((detail) => detail.warnings)
-  ]);
-  return {
-    state: "ready",
-    reason: null,
-    message: readyMessage,
-    summary: {
-      clusterCount: details.length,
-      reactionCount: new Set((graphIndex.reaction_features ?? []).map((feature) => feature.reaction_entity_id)).size,
-      similarityEdgeCount: graphIndex.reaction_similarity_edges?.length ?? 0,
-      selectedClusterId: selectedDetail?.clusterId ?? null,
-      reason: null
-    },
-    clusters: details,
-    details,
-    selectedDetail: selectedDetail ?? null,
-    warnings,
-    compiledAt: input.compiledAt ?? input.compileOutput?.compiledAt,
-    documentUri: input.documentUri ?? input.compileOutput?.documentUri
-  };
+  return buildGraphIndexPanel(input, graphIndex);
 };
