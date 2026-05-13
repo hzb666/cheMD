@@ -548,11 +548,28 @@ DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outb
     `cargo test` 65/65、`cargo check`、diagnostics Node tests 8/8、contract/scripts
     ESLint、desktop typecheck、`pnpm typecheck`、`pnpm test`、desktop build 与
     `git diff --check` 均通过；真实 DB/network/Tauri runner 未作为本轮门禁。
+- Postgres connection profile UI 与 command smoke：
+  - `feat(desktop)：合并 Postgres profile UI` 在 Postgres 面板新增 connection
+    profiles 管理区，支持 list/save/activate/delete；表单默认远端连接参数但 password
+    输入为空，保存后清空 password，只展示 `passwordSaved` / active 状态。
+  - UI 将 profile command 错误转换为结构化 code/message/detail，并做密码与 Postgres
+    URL 脱敏；command 失败不影响 Offline Core authoring。
+  - `test(desktop)：合并 Postgres profile command smoke` 扩展 Tauri command smoke：
+    使用唯一临时 profile id，覆盖 list/save/activate/delete 调用形状；delete 或
+    activate 失败时尽力恢复原 active profile / 清理临时 profile，并保证错误输出不泄漏
+    password。
+  - 当前验证：profile UI Vitest 6/6、runtime/diagnostics script tests 38/38、
+    `pnpm run test:scripts` 75/75、desktop typecheck、new-file/scripts focused ESLint、
+    desktop build、`pnpm typecheck`、`pnpm test` 与 `git diff --check` 均通过；真实
+    Tauri command runner 和真实 GUI 手测仍未执行。
 
 当前暂缓债务：
 
 - Workspace ingest UI 已合并，但 focused ESLint 复杂度门禁尚未清零：
   `LocalStorePanel` 超过 `max-lines-per-function` 与 complexity 限制。
+- Postgres profile UI 合并后，focused `App.tsx` ESLint 仍仅剩既有复杂度/函数长度
+  4 项：`PostgresProfileManagerSection`/`LocalStorePanel`/`DesktopWorkbench`/`App`
+  所在区域行号随插入变化；继续进入 M11 组件化与复杂度治理，不阻塞功能主线。
 - 最终 M11 阶段需要拆出有职责的 `WorkspaceIngestPanel`/hook，不能只靠纯 props
   转发组件搬移复杂度。
 
@@ -765,8 +782,8 @@ env、database URL、API key、token 或 password。诊断包说明见
 
 ### P2：PostgreSQL 同步生产可用
 
-- [ ] connection profile UI 可用。
-- [x] 凭据后端使用系统 secret storage；profile UI 接线待完成。
+- [x] connection profile UI 可用；真实 Tauri runner/GUI 手测待补。
+- [x] 凭据后端使用系统 secret storage；profile UI 不展示或保存明文密码。
 - [ ] migration、pgvector、schema version 状态可见。
 - [ ] 外部 DB 与 managed DB 使用同一 shared schema。
 - [ ] sync 成功、失败、冲突都有 UI 和日志。
@@ -778,7 +795,9 @@ env、database URL、API key、token 或 password。诊断包说明见
 - 外部 PostgreSQL script-level runtime smoke 已通过，包含 shared schema 写入与本地
   outbox reconnect sync。
 - Desktop profile command 后端已可保存/激活/删除 connection profile，并通过 OS
-  keyring 保存 password；当前缺口是桌面 UI 表单和真实 command-runner 手测证据。
+  keyring 保存 password；桌面 UI 已接入 list/save/activate/delete 表单与状态展示。
+- Tauri command smoke 已用 fake runner 覆盖 profile command 调用、临时 profile 清理、
+  原 active profile 恢复和 password 脱敏；真实 runner 仍按环境型 `SKIP`。
 - Tauri command-level proof 尚未配置 runner，当前按环境型 `SKIP` 处理，不阻塞离线
   优先主线。
 

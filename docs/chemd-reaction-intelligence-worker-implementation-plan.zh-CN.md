@@ -672,6 +672,21 @@ hybrid_score =
 - 当前仍未接 profile UI 表单，也未用 Tauri command runner 做真实桌面命令调用；这些
   进入后续 P2/M5 UI 与 runtime proof。
 
+状态记录（Postgres profile UI / command smoke）：
+
+- Desktop Postgres 面板已新增 connection profile 管理区，可 list/save/activate/delete
+  profile；默认连接参数对齐远端测试环境，但 password 输入保持为空，保存后清空，不在
+  UI state 中展示已保存密码。
+- Profile command smoke 已覆盖 list/save/activate/delete 调用形状；使用唯一临时
+  profile，失败路径会尽力清理临时 profile 或恢复原 active profile，并验证错误摘要不泄漏
+  password。
+- 当前验证：profile UI Vitest 6/6、runtime/diagnostics script tests 38/38、
+  `pnpm run test:scripts` 75/75、desktop typecheck、desktop build、`pnpm typecheck`、
+  `pnpm test` 与 `git diff --check` 均通过；focused `App.tsx` ESLint 仍仅剩既有
+  complexity/max-lines 4 项，继续按 M11 复杂度治理处理。
+- 当前仍未执行真实 Tauri command runner / GUI 手测；没有把真实网络、DB 或 runner
+  作为本轮阻塞。
+
 ---
 
 ## 8. 验证矩阵
