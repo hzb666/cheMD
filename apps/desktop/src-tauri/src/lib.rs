@@ -13,6 +13,10 @@ mod postgres;
 mod postgres_config;
 mod postgres_profiles;
 mod postgres_rag;
+mod postgres_rag_backfill;
+mod postgres_rag_backfill_result;
+mod postgres_rag_backfill_types;
+mod postgres_rag_backfill_validation;
 mod postgres_runtime_core;
 mod postgres_runtime_graph_cleanup;
 mod postgres_runtime_persist;
@@ -35,6 +39,8 @@ mod local_store_sync_tests;
 mod local_store_tests;
 #[cfg(test)]
 mod postgres_profiles_tests;
+#[cfg(test)]
+mod postgres_rag_backfill_tests;
 #[cfg(test)]
 mod postgres_rag_tests;
 #[cfg(test)]
@@ -70,6 +76,8 @@ use postgres_profiles::{
 };
 #[cfg(not(test))]
 use postgres_rag::query_postgres_rag;
+#[cfg(not(test))]
+use postgres_rag_backfill::backfill_postgres_rag_embeddings;
 #[cfg(not(test))]
 use postgres_runtime_persist::persist_runtime_graph_rag;
 #[cfg(not(test))]
@@ -120,6 +128,7 @@ pub fn run() {
             sync_local_outbox_to_postgres,
             persist_runtime_graph_rag,
             query_postgres_rag,
+            backfill_postgres_rag_embeddings,
             run_reaction_intelligence_worker,
             export_diagnostics_bundle
         ])
