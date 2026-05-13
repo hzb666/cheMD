@@ -1138,3 +1138,39 @@ Merged workspace ingest idempotency/retry foundation and Reaction Intelligence P
 ### Next Steps
 
 - None - task complete
+
+
+## Session 67: Reaction Intelligence RDKit and RXNMapper baselines
+
+**Date**: 2026-05-13
+**Task**: Reaction Intelligence RDKit and RXNMapper baselines
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Merged offline-safe Reaction Intelligence RDKit fingerprint and RXNMapper reaction-center baselines. RDKit provider supports dependency SKIP, traceable bit-vector refs, Tanimoto edges, and per-reaction invalid-smiles warnings. RXNMapper provider supports dependency SKIP, injected-adapter tests, atom mapping artifacts, reaction-center extraction, and computed center similarity edges. Updated implementation plan for Phase 1 and Phase 2 status. Validation passed targeted Python provider tests, chem-cluster-service tests, compileall, reaction-map test/typecheck, desktop build, full pnpm typecheck, full pnpm test, and git diff --check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `49fd39f` | (see git log) |
+| `f481b4f` | (see git log) |
+| `e12f632` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
