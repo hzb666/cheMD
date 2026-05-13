@@ -620,6 +620,19 @@ hybrid_score =
 - 当前仍未把 reaction intelligence artifact sync 接到 Tauri command/UI，也未跑真实
   artifact PostgreSQL 写入；这一步进入后续 M5/M6 集成。
 
+状态记录（Workspace ingest runner / diagnostics provider coverage）：
+
+- Desktop workspace ingest 新增纯 TypeScript outbox save runner，串联 workspace
+  ingest、outbox input 构造与注入式 `saveSnapshot`；eligible / retryable item 会写入
+  本地 snapshot outbox，单条保存失败会脱敏记录并继续后续 item。
+- Diagnostics bundle 已覆盖 reaction intelligence worker、local artifact 与 outbox
+  sync command 清单，并新增 provider/model/artifact/sync 的支持上下文分类。
+- 当前验证：desktop workspace ingest runner/local store Vitest 33/33、diagnostics
+  Node 测试 8/8、Rust diagnostics tests 3/3、focused ESLint、`pnpm typecheck`、
+  `pnpm test`、desktop build 与完整 Tauri `cargo test` 均通过。
+- 当前仍未执行真实 provider/model/DB 写入；这些按环境增强路径记录为 `SKIP`，
+  不阻塞离线优先主线。
+
 ---
 
 ## 8. 验证矩阵

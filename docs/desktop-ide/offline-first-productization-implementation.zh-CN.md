@@ -502,6 +502,19 @@ DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outb
     33/33、focused ESLint、`pnpm typecheck`、`pnpm test`、desktop build 与
     `git diff --check` 均通过；真实 DB 写入仍复用既有 runtime smoke，artifact
     command/UI 同步留到后续 M5/M6 集成。
+- Workspace ingest runner 与诊断覆盖：
+  - `feat(desktop)：合并 workspace ingest outbox runner` 新增
+    `runWorkspaceIngestOutboxSave`，把 workspace ingest、outbox input 构造和注入式
+    `saveSnapshot` 串成纯 TypeScript runner；eligible / retryable item 会写入本地
+    snapshot outbox，单条保存失败会脱敏记录并继续处理后续 item。
+  - `feat(desktop)：合并诊断包 provider 覆盖` 扩充 diagnostics bundle 的 reaction
+    intelligence worker、local artifact、outbox sync command 覆盖，并记录 provider、
+    model、artifact、sync 的静态 `PASS` / `SKIP` / `BLOCKED` 支持上下文。
+  - 当前验证：workspace ingest runner/local store Vitest 33/33、diagnostics Node 测试
+    8/8、Rust diagnostics tests 3/3、focused ESLint、`pnpm typecheck`、`pnpm test`、
+    desktop build、完整 Tauri `cargo test` 均通过；desktop build 仍有既有 lucide
+    `use client` 与 chunk size warning。真实 DB、provider、模型运行未执行，继续按
+    环境增强路径记录为 `SKIP`。
 
 当前暂缓债务：
 
@@ -526,8 +539,9 @@ DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outb
 workspace 扫描入口；runner 现在会复用同一 document hash / revision 的 existing
 pending、running、synced item，文件内容变化会生成新 revision，不覆盖旧 item；failed item
 超过 retry 阈值后保持 failed，不会自动变回 pending。当前已补 ingest queue 到
-Local Store snapshot outbox input 的纯函数桥接；后续仍需接入 UI/Tauri 执行、
-取消/重试和大 workspace 后台调度。
+Local Store snapshot outbox input 的纯函数桥接，并新增注入式
+`runWorkspaceIngestOutboxSave` 保存 eligible / retryable outbox input；App UI/Tauri
+调用链、取消/重试和大 workspace 后台调度仍归后续集成。
 
 验收：
 
@@ -696,8 +710,8 @@ env、database URL、API key、token 或 password。诊断包说明见
 
 ### P1：本地知识队列生产可用
 
-- [x] workspace ingest 可本地运行并生成 outbox-ready snapshot input；UI/Tauri 执行
-  仍归后续 M4/M5 集成。
+- [x] workspace ingest 可本地运行并通过纯 runner 保存 outbox-ready snapshot input；
+  App UI/Tauri 接线仍归后续 M4/M5 集成。
 - [x] outbox/ingest 契约支持 pending、synced、failed、skipped 与 retry eligibility。
 - [x] workspace ingest runner 可通过依赖注入本地运行并生成可恢复队列。
 - [x] 本地队列幂等基础：同一 document hash / revision 复用 existing queue item，
@@ -745,7 +759,8 @@ env、database URL、API key、token 或 password。诊断包说明见
 
 - [ ] installer、签名、升级策略明确。
 - [ ] release smoke 覆盖干净机器 Offline Core。
-- [ ] diagnostics bundle 覆盖 app、sidecar、sync、provider。
+- [x] diagnostics bundle 覆盖 app、sidecar、sync、provider 的静态命令面与支持上下文；
+  完整运行期日志包仍归 release hardening。
 - [x] 用户文档覆盖离线工作、连接 DB、同步失败恢复。
 
 当前 release 构建状态：
@@ -757,6 +772,9 @@ env、database URL、API key、token 或 password。诊断包说明见
 - 第四轮追加 `pnpm desktop:diagnostics-bundle`，生成离线、脱敏 JSON
   diagnostics bundle；当前只覆盖静态产物、命令清单与 preflight 分类，不替代
   app/sidecar/sync/provider 的完整运行期日志包。
+- 第五轮扩充 diagnostics bundle provider 覆盖，加入 reaction intelligence worker、
+  local artifact、outbox sync command 清单，以及 provider/model/artifact/sync 的
+  支持上下文分类；真实 provider/model/DB 未运行时仍按 `SKIP` 记录。
 - 还缺少“安装到干净用户环境后启动、打开 workspace、编辑保存、关闭重启恢复”的
   installer Offline Core smoke。
 
