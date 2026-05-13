@@ -1147,3 +1147,29 @@ M1 language-service completion core
   - `pnpm --filter @chemd/desktop exec eslint src/desktop-workspace-symbol-index.ts src/desktop-workspace-symbol-index.test.ts`：
     通过。
   - `git diff --check`：通过；仅输出 LF/CRLF 工作区提示。
+
+### 2026-05-13 desktop-ide-monaco-workspace-completion
+
+- 范围：扩展 desktop Monaco completion provider helper；不接入
+  `App.tsx` / `MonacoChemdEditor.tsx`，不修改 shared packages、root 配置、
+  Tauri/Rust、数据库或迁移。
+- 产物：`monaco-chemd-completion.ts` 新增 workspace symbol index
+  update/cleanup cache helper，provider 在同一次请求中合并 local
+  completions 与 `getChemdWorkspaceReferenceCompletions()` 结果。
+- 行为：workspace reference completion 映射为 Monaco Reference item，
+  保留 detail、filterText、sortText、range 和 data；缺少 workspace
+  index 或 workspace completion 异常时仅降级为 local completions，不阻断编辑。
+- 验证：待本分支执行
+  `pnpm --filter @chemd/desktop exec vitest run src/monaco-chemd-completion.test.ts`、
+  `pnpm --filter @chemd/desktop typecheck`、
+  `pnpm --filter @chemd/desktop exec eslint src/monaco-chemd-completion.ts src/monaco-chemd-completion.test.ts`
+  和 `git diff --check` 后更新最终结果。
+
+### 2026-05-13 desktop-ide-monaco-workspace-completion 验证结果
+
+- `pnpm --filter @chemd/desktop exec vitest run src/monaco-chemd-completion.test.ts`：
+  通过，1 file / 1 test。
+- `pnpm --filter @chemd/desktop typecheck`：通过。
+- `pnpm --filter @chemd/desktop exec eslint src/monaco-chemd-completion.ts src/monaco-chemd-completion.test.ts`：
+  通过。
+- `git diff --check`：通过；仅输出 LF/CRLF 工作区提示。
