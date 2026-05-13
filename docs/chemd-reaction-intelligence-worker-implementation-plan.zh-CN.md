@@ -700,6 +700,23 @@ hybrid_score =
 - 当前仍未新增 schema version mismatch 检测；需要等 shared migration contract
   明确版本来源后补齐。
 
+状态记录（Desktop Postgres RAG query command / connected gate / smoke）：
+
+- Desktop 新增 `query_postgres_rag` Tauri command contract 与 Rust runtime query；
+  request 由调用方传入 `query`、`embedding`、`embeddingModel`、`limit` 和可选
+  workspace/document/revision filter，避免 desktop 在本阶段直接管理 provider secret。
+- Rust query 复用 active Postgres config，只读查询 shared schema 的
+  `chemd_rag_chunk_embeddings`、chunks、citations 与 revision source；无 citation id
+  或无可用 source range 的 row 计入 `blockedCount`，不进入结果。
+- Workspace index 层新增 connected RAG result gate 纯函数，支持 local + connected
+  citation-backed result 去重与 score/distance 排序，为后续 UI 接入准备。
+- Runtime smoke 新增可选 `query_postgres_rag` 阶段；无 Postgres runtime、无 Tauri
+  runner 或无 embedding vector 时明确 `SKIP`，不伪装真实 DB/query 通过。
+- 当前验证：`cargo test postgres_rag` 6/6、connected RAG result Vitest 4/4、
+  runtime/diagnostics script tests 41/41、`pnpm run test:scripts` 78/78、desktop
+  typecheck 和 focused ESLint 均通过；真实 embedding provider/backfill UI 与桌面
+  RAG 面板接入仍待后续 M6 切片。
+
 ---
 
 ## 8. 验证矩阵

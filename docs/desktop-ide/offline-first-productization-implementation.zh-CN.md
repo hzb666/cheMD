@@ -673,6 +673,17 @@ command contract + Rust runtime query，再并行接 citation-gated UI、embeddi
 backfill task/status 与 runtime smoke extension；`desktop-contracts.ts`、shared
 schema/migration 与 `App.tsx` 接入点不得多人并行写。
 
+2026-05-14 第一批 M6 接入完成：Desktop 已新增 `query_postgres_rag` Tauri
+command contract 和 Rust runtime query，调用方显式传入 embedding / embedding model，
+Rust 复用 active Postgres config，只读查询 `chemd_rag_chunk_embeddings`、chunks、
+citations 与 revision source，不执行 migration，也不创建 desktop-only schema。结果必须
+带 citation id 与可用 source range；缺 citation 的 pgvector row 计入
+`blockedCount`，不进入 `results`。同时新增 connected RAG result gate 纯函数，支持
+local + connected 结果去重和按 score / distance 排序；runtime smoke 增加可选
+`query_postgres_rag` 阶段，无 DB、无 Tauri runner 或无 embedding vector 时明确
+`SKIP`。当前仍未接入真实 embedding provider/backfill UI，也未把 connected query
+接进桌面 RAG 面板。
+
 验收：
 
 - Graph/RAG 只消费 compiler/exporter output，不重新解析 source。
@@ -815,6 +826,9 @@ env、database URL、API key、token 或 password。诊断包说明见
   原 active profile 恢复和 password 脱敏；真实 runner 仍按环境型 `SKIP`。
 - Desktop Postgres status 已拆分展示 pgvector installed、core schema ready 与
   migration state；外部 DB 与 managed DB 面板共用 readiness item 模型。
+- Desktop RAG query command 已可复用 active Postgres config 查询 shared pgvector
+  rows，并强制 citation-backed results；真实 runner/真实 embedding 仍按环境型
+  `SKIP`。
 - Tauri command-level proof 尚未配置 runner，当前按环境型 `SKIP` 处理，不阻塞离线
   优先主线。
 
@@ -828,8 +842,9 @@ env、database URL、API key、token 或 password。诊断包说明见
 - [x] Knowledge map 支持 edge basis filter，并可与 cluster filter 组合过滤节点。
 - [x] Reaction intelligence job builder 不伪造 RXN SMILES，只消费真实结构字段；失败或
   缺依赖时保留本地日志 tail 和可显示状态。
-- [x] RAG search 有 citation gate 基础：本地结果必须带 citation locator；embedding /
-  pgvector 查询仍待接入。
+- [x] RAG search 有 citation gate 基础：本地结果必须带 citation locator；connected
+  pgvector query command 与 result gate 已具备，UI 接入、真实 embedding provider 与
+  backfill 仍待补。
 - [ ] Agent run 可审计，patch 需用户确认。
 - [ ] 所有增强能力离线/失败时可降级。
 
