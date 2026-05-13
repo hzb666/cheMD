@@ -25,6 +25,25 @@ Current routes:
 - `POST /reaction/render` (reaction SVG response, RDKit-first with fallback)
 - `GET|POST /structure` (session-scoped in-memory molecule structure cache, 5 minute TTL)
 
+Reaction intelligence worker / CLI:
+
+- Reaction intelligence runs as a local worker/CLI path instead of a Flask route so heavy chemistry and layout dependencies do not leak into the web app startup path.
+- Run a JSON job from `services/chem-service` with:
+  - `poetry run python -m chem_service.reaction_intelligence.cli path/to/job.json --output path/to/artifact.json`
+- The job can provide `job_id`/`jobId`, `reactionIds` plus `similarityEdges`, or `reactions` plus `edges`. Edges accept common endpoint keys such as `source`/`target`, `sourceReactionId`/`targetReactionId`, or `from`/`to`.
+- Jobs with `reactions[]` run the provider pipeline and can request providers through `options.providers`, for example `["drfp"]` or `["drfp", "rxnfp", "reaction_center"]`.
+- DRFP is the preferred deterministic reaction fingerprint provider for production clustering. It is optional and lazily imported; keep it in an isolated worker environment when the main Poetry runtime cannot install it cleanly.
+- Example DRFP worker environment:
+  - `conda create -n chemd-ri python=3.10 -y`
+  - `conda activate chemd-ri`
+  - `pip install drfp`
+  - `python -m chem_service.reaction_intelligence.cli job.json --output artifact.json`
+- The CLI always writes parseable artifact JSON using `schema_version: "chemd-reaction-intelligence-artifact/v0.1"`. Optional provider failures are reported under `provider_statuses[]` with `status: "SKIP"` or `status: "ERROR"` instead of pretending that computed chemistry or layout exists.
+- DRFP/RDKit belong to the same fingerprint family in hybrid scoring. When DRFP is available it supplies `drfp_tanimoto`; when it is unavailable, RDKit can provide the fallback `rdkit_tanimoto`.
+- Reaction clusters are deterministic connected components over computed similarity edges. The default threshold is `0.72`, and it can be changed with `options.cluster_threshold`.
+- TMAP is optional and lazily imported only when a multi-reaction layout has similarity edges. If `tmap` is not installed or its native extension cannot load, the artifact remains valid and reports `provider_unavailable`.
+- TMAP is intended for large reaction-space overview maps. The app does not need to display TMAP by default; ordinary document-scale reaction graphs should continue to use normal map/graph rendering unless the product flow explicitly asks for a large projected reaction space.
+
 Local startup modes:
 
 - Full demo: run `pnpm dev` from the repo root. This starts `@chemd/web` on `http://127.0.0.1:2436` and `chem-service` on `http://127.0.0.1:18081`.

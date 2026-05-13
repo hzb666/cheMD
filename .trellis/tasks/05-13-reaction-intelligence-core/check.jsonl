@@ -1,0 +1,4 @@
+{"file": ".trellis/workflow.md", "reason": "Finish-work and session-recording requirements"}
+{"file": ".trellis/spec/exporter-training/backend/quality-guidelines.md", "reason": "Expected TypeScript tests and typecheck commands"}
+{"file": ".trellis/spec/exporter-training/backend/training-export-contract.md", "reason": "Graph-index warnings must not overclaim computed chemistry features"}
+{"file": "docs/chemd-reaction-intelligence-kernel-implementation-plan.zh-CN.md", "reason": "Check completion status and remaining production gaps"}
