@@ -771,6 +771,21 @@ hybrid_score =
   记录：`DesktopWorkspaceIndexPanel` complexity 19/15，`App.tsx` 仍有既有
   max-lines/complexity 门禁。
 
+状态记录（Desktop connected RAG embedding backfill UI）：
+
+- RAG 面板新增 connected embedding backfill 入口；在 readiness 满足时，App 先调用
+  `create_embedding_vectors` 生成本地 citation-backed chunk embedding，再调用
+  `backfill_postgres_rag_embeddings` 写入 shared pgvector schema。
+- 新增 `desktop-postgres-rag-backfill-controller` 纯 helper 与单元测试，覆盖
+  workspace/Postgres/pgvector/schema/embedding provider readiness、chunk 去重、
+  空文本跳过、batch partial success 和 skipped summary。
+- 无 provider、真实网络不可达或 Tauri runner 不可用时，UI 只显示
+  disabled/failure/degraded 状态，不影响离线本地 RAG、symbols、references 搜索。
+- 当前验证：connected RAG backfill/query/workspace index Vitest 26/26、desktop
+  typecheck 与 `git diff --check` 通过；focused ESLint 剩余复杂度类门禁：
+  `App.tsx` max-lines/complexity 与 `DesktopWorkspaceIndexPanel` complexity，按用户要求
+  记录到最终 M11 样式和组件化治理。
+
 ---
 
 ## 8. 验证矩阵

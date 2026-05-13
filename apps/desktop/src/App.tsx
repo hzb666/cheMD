@@ -52,6 +52,12 @@ import {
   buildDesktopPostgresRagQueryControllerState,
   type DesktopPostgresRagQueryControllerState
 } from "./workspace-index/desktop-postgres-rag-query-controller";
+import {
+  buildDesktopPostgresRagBackfillEmbeddingPlan,
+  buildDesktopPostgresRagBackfillReadiness,
+  buildDesktopPostgresRagBackfillRequest,
+  formatDesktopPostgresRagBackfillCompletionMessage
+} from "./workspace-index/desktop-postgres-rag-backfill-controller";
 import type { DesktopWorkspaceIndexViewModel } from "./workspace-index/desktop-workspace-index";
 import { useDesktopWorkspaceIndexController } from "./workspace-index/use-desktop-workspace-index";
 
@@ -213,6 +219,8 @@ type DesktopWorkbenchProps = {
   workspaceRagQuery: string;
   workspaceRagQueryOperation: RagQueryOperationState;
   workspaceRagQueryMessage: string;
+  workspaceRagBackfillOperation: RagQueryOperationState;
+  workspaceRagBackfillMessage: string;
   knowledgeMapViewModel: DesktopKnowledgeMapViewModel;
   output: ChemdLanguageCompileOutput;
   compileError?: string;
@@ -239,6 +247,7 @@ type DesktopWorkbenchProps = {
   onKnowledgeMapSourceJump: (intent: DesktopSourceJumpIntent) => void;
   onWorkspaceRagQueryChange: (query: string) => void;
   onRunConnectedRagQuery: () => void;
+  onBackfillConnectedRagEmbeddings: () => void;
   onProposeQuickFix: (candidate: QuickFixCandidate) => void;
   onApprovePatch: () => void;
   onApplyPatch: () => void;
@@ -253,6 +262,8 @@ type InsightPaneProps = {
   workspaceRagQuery: string;
   workspaceRagQueryOperation: RagQueryOperationState;
   workspaceRagQueryMessage: string;
+  workspaceRagBackfillOperation: RagQueryOperationState;
+  workspaceRagBackfillMessage: string;
   knowledgeMapViewModel: DesktopKnowledgeMapViewModel;
   mode: DocumentMode;
   sidecarStatus: SidecarStatus;
@@ -300,6 +311,7 @@ type InsightPaneProps = {
   onPersistGraph: () => void;
   onWorkspaceRagQueryChange: (query: string) => void;
   onRunConnectedRagQuery: () => void;
+  onBackfillConnectedRagEmbeddings: () => void;
   onRefreshLocalStore: () => void;
   onSaveLocalSnapshot: () => void;
   onSyncLocalOutbox: () => void;
@@ -2601,7 +2613,7 @@ const InsightDockContent = ({
   const contentByPanel: Record<InsightDockPanelId, ReactNode> = {
     outline: <div className="desktop-insight-section">{props.outline.length > 0 ? <OutlineTree items={props.outline} /> : <p className="desktop-empty-copy">No outline from language service.</p>}</div>,
     preview: <SemanticPreviewPanel preview={props.semanticPreview} workspaceSymbolIndexState={props.workspaceSymbolIndexState} workspaceSymbolIndexMessage={props.workspaceSymbolIndexMessage} workspaceSymbolIndexSummary={props.workspaceSymbolIndexSummary} />,
-    rag: <DesktopWorkspaceIndexPanel viewModel={props.workspaceIndexViewModel} connectedRagQueryState={props.workspaceRagQueryState} query={props.workspaceRagQuery} connectedRagOperation={props.workspaceRagQueryOperation} connectedRagOperationMessage={props.workspaceRagQueryMessage} onQueryChange={props.onWorkspaceRagQueryChange} onRunConnectedRagQuery={props.onRunConnectedRagQuery} />,
+    rag: <DesktopWorkspaceIndexPanel viewModel={props.workspaceIndexViewModel} connectedRagQueryState={props.workspaceRagQueryState} query={props.workspaceRagQuery} connectedRagOperation={props.workspaceRagQueryOperation} connectedRagOperationMessage={props.workspaceRagQueryMessage} connectedRagBackfillOperation={props.workspaceRagBackfillOperation} connectedRagBackfillMessage={props.workspaceRagBackfillMessage} onQueryChange={props.onWorkspaceRagQueryChange} onRunConnectedRagQuery={props.onRunConnectedRagQuery} onBackfillConnectedRagEmbeddings={props.onBackfillConnectedRagEmbeddings} />,
     graph: <DesktopKnowledgeMapPanel viewModel={props.knowledgeMapViewModel} onSourceJump={props.onKnowledgeMapSourceJump} />,
     runtime: <SidecarControlPanel status={props.sidecarStatus} logTail={props.sidecarLogTail} operation={props.sidecarOperation} message={props.sidecarMessage} errorMessage={props.sidecarError} onStart={props.onStartSidecar} onStop={props.onStopSidecar} onRefresh={props.onRefreshSidecar} onLoadLogs={props.onLoadSidecarLogs} />,
     postgres: <PostgresStatusPanel status={props.postgresStatus} managedStatus={props.managedPostgresStatus} loading={props.postgresLoading} managedOperation={props.managedPostgresOperation} errorMessage={props.postgresError} managedErrorMessage={props.managedPostgresError} managedMessage={props.managedPostgresMessage} profiles={props.postgresProfiles} persistState={props.persistState} persistDisabledReason={props.persistDisabledReason} onRefresh={props.onRefreshPostgres} onInitManaged={props.onInitManagedPostgres} onStartManaged={props.onStartManagedPostgres} onStopManaged={props.onStopManagedPostgres} onMigrateManaged={props.onMigrateManagedPostgres} onRefreshManaged={props.onRefreshManagedPostgres} onPersistGraph={props.onPersistGraph} />,
@@ -3123,10 +3135,19 @@ const useConnectedRagQueryController = ({
     query: string;
     result: CreateEmbeddingVectorResult;
   } | null>(null);
+  const [backfillOperation, setBackfillOperation] = useState<RagQueryOperationState>("disabled");
+  const [backfillMessage, setBackfillMessage] = useState("Connected RAG embedding backfill needs a ready workspace, Postgres, and embedding provider.");
   const normalizedQuery = query.trim();
   const activeEmbeddingResult = embeddingResult?.query === normalizedQuery
     ? embeddingResult.result
     : null;
+  const backfillReadiness = useMemo(() => buildDesktopPostgresRagBackfillReadiness({
+    mode,
+    postgresStatus,
+    embeddingStatus,
+    localResults,
+    runnerAvailable: true
+  }), [embeddingStatus, localResults, mode, postgresStatus]);
   const queryState = useMemo(() => buildDesktopPostgresRagQueryControllerState({
     mode,
     query,
@@ -3153,6 +3174,11 @@ const useConnectedRagQueryController = ({
       ? queryState.message
       : "Enter a query to search connected RAG when an embedding vector is available.");
   }, [embeddingStatus, file.id, mode, postgresStatus, query, workspace.workspaceId]);
+
+  useEffect(() => {
+    setBackfillOperation(backfillReadiness.disabled ? "disabled" : "idle");
+    setBackfillMessage(backfillReadiness.message);
+  }, [backfillReadiness, file.id, workspace.workspaceId]);
 
   const setQuery = (nextQuery: string) => {
     setQueryValue(nextQuery);
@@ -3211,13 +3237,71 @@ const useConnectedRagQueryController = ({
     }
   };
 
+  const backfill = async () => {
+    if (backfillOperation === "pending") return;
+    if (backfillReadiness.disabled) {
+      setBackfillOperation("disabled");
+      setBackfillMessage(backfillReadiness.message);
+      return;
+    }
+    const plan = buildDesktopPostgresRagBackfillEmbeddingPlan(localResults);
+    if (plan.embeddingItems.length === 0) {
+      setBackfillOperation("failure");
+      setBackfillMessage("No local RAG chunks include full text for embedding backfill.");
+      return;
+    }
+    const model = embeddingStatus.model?.trim();
+    if (!model) {
+      setBackfillOperation("failure");
+      setBackfillMessage("Embedding provider status must include a model before backfill can run.");
+      return;
+    }
+    setBackfillOperation("pending");
+    setBackfillMessage(`Creating embedding vectors for ${plan.embeddingItems.length} local RAG chunk${plan.embeddingItems.length === 1 ? "" : "s"}.`);
+    try {
+      const embeddingBatch = await invokeDesktop("create_embedding_vectors", {
+        input: { items: plan.embeddingItems }
+      });
+      const requestBuild = buildDesktopPostgresRagBackfillRequest({
+        plan,
+        embeddingResult: embeddingBatch,
+        embeddingModel: embeddingBatch.model ?? model,
+        fallbackEmbeddingDim: embeddingStatus.embeddingDim,
+        distanceMetric: embeddingStatus.distanceMetric ?? undefined
+      });
+      if (!requestBuild.request) {
+        setBackfillOperation("failure");
+        setBackfillMessage(requestBuild.message);
+        return;
+      }
+      setBackfillMessage("Writing connected RAG embedding vectors to Postgres.");
+      const result = await invokeDesktop("backfill_postgres_rag_embeddings", {
+        input: requestBuild.request
+      });
+      setBackfillOperation(result.state === "ready" ? "success" : "failure");
+      setBackfillMessage(formatDesktopPostgresRagBackfillCompletionMessage({
+        detail: result.detail,
+        fallback: requestBuild.message,
+        skippedDuplicateCount: plan.skippedDuplicateCount,
+        skippedBlankTextCount: plan.skippedBlankTextCount,
+        skippedEmbeddingCount: requestBuild.skippedEmbeddingCount
+      }));
+    } catch (error: unknown) {
+      setBackfillOperation("failure");
+      setBackfillMessage(getCommandErrorMessage(error, "Connected RAG embedding backfill failed"));
+    }
+  };
+
   return {
     query,
     state: queryState,
     operation,
     message,
+    backfillOperation,
+    backfillMessage,
     setQuery,
-    run: () => void run()
+    run: () => void run(),
+    backfill: () => void backfill()
   };
 };
 
@@ -3713,6 +3797,8 @@ const DesktopWorkbench = ({
   workspaceRagQuery,
   workspaceRagQueryOperation,
   workspaceRagQueryMessage,
+  workspaceRagBackfillOperation,
+  workspaceRagBackfillMessage,
   knowledgeMapViewModel,
   output,
   compileError,
@@ -3739,6 +3825,7 @@ const DesktopWorkbench = ({
   onKnowledgeMapSourceJump,
   onWorkspaceRagQueryChange,
   onRunConnectedRagQuery,
+  onBackfillConnectedRagEmbeddings,
   onProposeQuickFix,
   onApprovePatch,
   onApplyPatch,
@@ -3818,6 +3905,8 @@ const DesktopWorkbench = ({
               workspaceRagQuery={workspaceRagQuery}
               workspaceRagQueryOperation={workspaceRagQueryOperation}
               workspaceRagQueryMessage={workspaceRagQueryMessage}
+              workspaceRagBackfillOperation={workspaceRagBackfillOperation}
+              workspaceRagBackfillMessage={workspaceRagBackfillMessage}
               knowledgeMapViewModel={knowledgeMapViewModel}
               mode={mode}
               sidecarStatus={sidecarController.status} sidecarLogTail={sidecarController.logTail} sidecarOperation={sidecarController.operation} sidecarMessage={sidecarController.message} sidecarError={sidecarController.error}
@@ -3848,6 +3937,7 @@ const DesktopWorkbench = ({
               onPersistGraph={persistController.persist}
               onWorkspaceRagQueryChange={onWorkspaceRagQueryChange}
               onRunConnectedRagQuery={onRunConnectedRagQuery}
+              onBackfillConnectedRagEmbeddings={onBackfillConnectedRagEmbeddings}
               onRefreshLocalStore={localStoreController.refresh}
               onSaveLocalSnapshot={localStoreController.saveSnapshot}
               onSyncLocalOutbox={localStoreController.syncPending}
@@ -4181,7 +4271,7 @@ export const App = () => {
       workspace={workspaceController.workspace} workspaceState={workspaceController.workspaceState}
       sidecarController={sidecarController} postgresController={postgresController} persistController={persistController} localStoreController={localStoreController} reactionIntelligenceJobBuild={reactionIntelligenceJobBuild} reactionIntelligenceJobController={reactionIntelligenceJobController} workspaceIngestController={workspaceIngestController} workspaceSymbolIndexController={workspaceSymbolIndexController}
       semanticPreview={semanticPreview}
-      workspaceIndexViewModel={workspaceIndexViewModel} workspaceRagQueryState={workspaceRagQueryState} workspaceRagQuery={connectedRagQueryController.query} workspaceRagQueryOperation={connectedRagQueryController.operation} workspaceRagQueryMessage={connectedRagQueryController.message} knowledgeMapViewModel={knowledgeMapViewModel}
+      workspaceIndexViewModel={workspaceIndexViewModel} workspaceRagQueryState={workspaceRagQueryState} workspaceRagQuery={connectedRagQueryController.query} workspaceRagQueryOperation={connectedRagQueryController.operation} workspaceRagQueryMessage={connectedRagQueryController.message} workspaceRagBackfillOperation={connectedRagQueryController.backfillOperation} workspaceRagBackfillMessage={connectedRagQueryController.backfillMessage} knowledgeMapViewModel={knowledgeMapViewModel}
       output={output} compileError={compileError}
       files={workspaceController.files} selectedFile={workspaceController.selectedFile} selectedFileId={workspaceController.selectedFileId}
       mode={workspaceController.mode} message={workspaceController.message} source={workspaceController.source} savedSource={workspaceController.savedSource} workspaceConflict={workspaceController.workspaceConflict}
@@ -4195,6 +4285,7 @@ export const App = () => {
       onKnowledgeMapSourceJump={handleKnowledgeMapSourceJump}
       onWorkspaceRagQueryChange={connectedRagQueryController.setQuery}
       onRunConnectedRagQuery={connectedRagQueryController.run}
+      onBackfillConnectedRagEmbeddings={connectedRagQueryController.backfill}
       onProposeQuickFix={agentPatchController.proposeQuickFix}
       onApprovePatch={agentPatchController.approvePatch} onApplyPatch={agentPatchController.applyPatch} onRejectPatch={agentPatchController.rejectPatch}
     />

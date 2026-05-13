@@ -1,4 +1,4 @@
-import { PlayCircle, Search } from "lucide-react";
+import { Database, PlayCircle, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import {
@@ -17,8 +17,11 @@ interface WorkspaceIndexPanelProps {
   query?: string;
   connectedRagOperation?: "idle" | "pending" | "success" | "failure" | "disabled";
   connectedRagOperationMessage?: string;
+  connectedRagBackfillOperation?: "idle" | "pending" | "success" | "failure" | "disabled";
+  connectedRagBackfillMessage?: string;
   onQueryChange?: (query: string) => void;
   onRunConnectedRagQuery?: () => void;
+  onBackfillConnectedRagEmbeddings?: () => void;
 }
 
 type SearchRowKind = "local" | "connected" | "symbol" | "reference";
@@ -118,8 +121,11 @@ export const DesktopWorkspaceIndexPanel = ({
   query,
   connectedRagOperation = "idle",
   connectedRagOperationMessage,
+  connectedRagBackfillOperation = "disabled",
+  connectedRagBackfillMessage,
   onQueryChange,
-  onRunConnectedRagQuery
+  onRunConnectedRagQuery,
+  onBackfillConnectedRagEmbeddings
 }: WorkspaceIndexPanelProps) => {
   const [localQuery, setLocalQuery] = useState("");
   const activeQuery = query ?? localQuery;
@@ -133,6 +139,9 @@ export const DesktopWorkspaceIndexPanel = ({
   const runDisabled = !onRunConnectedRagQuery
     || connectedRagOperation === "pending"
     || connectedRagQueryState?.disabled === true;
+  const backfillDisabled = !onBackfillConnectedRagEmbeddings
+    || connectedRagBackfillOperation === "pending"
+    || connectedRagBackfillOperation === "disabled";
   const effectiveConnectedView = connectedRagQueryState?.commandView ?? connectedRagQueryView;
   const mergedRag = useMemo(() => mergeDesktopWorkspaceRagResults({
     localResults: viewModel.ragResults,
@@ -197,6 +206,19 @@ export const DesktopWorkspaceIndexPanel = ({
             <span>{connectedRagOperation === "pending" ? "Running" : "Run"}</span>
           </button>
         ) : null}
+        {onBackfillConnectedRagEmbeddings ? (
+          <button
+            type="button"
+            className="desktop-tool-search-action"
+            disabled={backfillDisabled}
+            data-state={connectedRagBackfillOperation}
+            onClick={onBackfillConnectedRagEmbeddings}
+            title={connectedRagBackfillMessage ?? "Backfill local RAG chunk embeddings to Postgres"}
+          >
+            <Database size={13} />
+            <span>{connectedRagBackfillOperation === "pending" ? "Backfill" : "Index"}</span>
+          </button>
+        ) : null}
       </label>
       <p className="desktop-empty-copy">{viewModel.message}</p>
       <p className="desktop-empty-copy">{viewModel.ragGate.message}</p>
@@ -212,6 +234,9 @@ export const DesktopWorkspaceIndexPanel = ({
       </div>
       {connectedRagOperationMessage ? (
         <p className="desktop-empty-copy">{connectedRagOperationMessage}</p>
+      ) : null}
+      {connectedRagBackfillMessage ? (
+        <p className="desktop-empty-copy">{connectedRagBackfillMessage}</p>
       ) : null}
       <div className="desktop-tool-result-list" role="list">
         {rows.length > 0 ? rows.map((row) => (

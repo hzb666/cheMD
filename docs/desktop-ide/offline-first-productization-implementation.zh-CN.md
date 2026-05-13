@@ -729,6 +729,16 @@ workspace RAG result 现在保留完整 `text` 字段，`label` 仅用于截断�
 backfill 使用 UI display label 生成向量。真实 provider 网络 proof 与 backfill UI 仍按
 环境增强路径推进。
 
+2026-05-13 第七批 M6 接入完成：Desktop RAG 面板新增 connected embedding
+backfill 入口，App 现在按顺序执行 `create_embedding_vectors` 与
+`backfill_postgres_rag_embeddings`：先用本地 citation-backed RAG chunk 的完整
+`text` 批量生成 embedding，再把可用向量写回 shared pgvector schema。新增
+`desktop-postgres-rag-backfill-controller` 纯 helper，覆盖 workspace/Postgres/
+pgvector/schema/embedding provider readiness、chunk 去重、空文本跳过、batch
+partial success 和完成消息汇总；provider 网络不可达或无真实 runner 时仍作为
+failure/degraded 状态显示，不影响本地 RAG、symbols、references 搜索。真实 provider
+网络 proof 仍按环境型验证单独补充。
+
 验收：
 
 - Graph/RAG 只消费 compiler/exporter output，不重新解析 source。
@@ -874,8 +884,9 @@ env、database URL、API key、token 或 password。诊断包说明见
 - Desktop RAG query command 已可复用 active Postgres config 查询 shared pgvector
   rows，并强制 citation-backed results；真实 runner/真实 embedding 仍按环境型
   `SKIP`。
-- Desktop RAG embedding backfill command 已可写入 shared pgvector schema；provider
-  配置和 UI 触发仍待后续接入。
+- Desktop RAG embedding backfill command 已可写入 shared pgvector schema；RAG 面板
+  已接入 UI 触发，按 `create_embedding_vectors` -> `backfill_postgres_rag_embeddings`
+  两阶段执行。真实 provider 网络 proof 仍待环境可用后补。
 - Tauri command-level proof 尚未配置 runner，当前按环境型 `SKIP` 处理，不阻塞离线
   优先主线。
 
@@ -894,7 +905,8 @@ env、database URL、API key、token 或 password。诊断包说明见
   与 RAG panel disabled/degraded 展示已具备；embedding provider status、query 输入
   与 Run 入口已接入；query text 可通过 `create_embedding_vector` 生成真实 vector 后
   调用 `query_postgres_rag`；批量 `create_embedding_vectors` 与完整 chunk text 字段
-  已为 backfill UI 准备好 provider 侧基础。真实 provider 网络 proof 与 backfill UI 仍待补。
+  已接入 backfill UI，可把本地 chunk embedding 写回 shared pgvector schema。真实
+  provider 网络 proof 仍待补。
 - [ ] Agent run 可审计，patch 需用户确认。
 - [ ] 所有增强能力离线/失败时可降级。
 
