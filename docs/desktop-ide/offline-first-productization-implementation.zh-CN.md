@@ -455,6 +455,16 @@ DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outb
     Rust local_store 12/12、desktop typecheck、focused ESLint、desktop build、
     `git diff --check` 通过；desktop build 仍只有既有 lucide `use client` 与 chunk size
     warning。
+- Reaction intelligence artifact 读取与 basis filter：
+  - `feat(desktop)：合并 edge basis filter` 在 knowledge map 中新增 edge basis options
+    与筛选控件，basis filter 与 cluster filter 组合生效。
+  - `feat(desktop)：合并本地 artifact controller` 让 Desktop App 从本地
+    `list_local_reaction_intelligence_artifacts` 读取 artifact，并注入 knowledge map。
+  - `fix(desktop)：限制 artifact 注入当前反应` 增加 reaction id overlap guard，避免最新
+    artifact 跨文档污染当前图谱。
+  - 主分支验证：desktop local-store/artifact-controller/knowledge-map 定向 Vitest 31/31、
+    desktop typecheck、focused ESLint（不含 `App.tsx`）、desktop build、`git diff --check`
+    通过；`App.tsx` 既有复杂度/函数长度 3 项继续记录到 M11。
 
 当前暂缓债务：
 
@@ -656,6 +666,8 @@ env、database URL、API key、token 或 password。诊断包说明见
 - [x] 文件变更和 base revision 冲突有显式处理。
 - [x] Reaction intelligence artifact 可离线写入本地 local store，并可被知识图谱/cluster
   inspector 消费；DB sync 仍归 P2 shared schema 阶段。
+- [x] App 可从本地 local store 读取最新 reaction intelligence artifact，并带 reaction id
+  overlap guard 后注入当前 knowledge map。
 
 ### P2：PostgreSQL 同步生产可用
 
@@ -677,6 +689,7 @@ env、database URL、API key、token 或 password。诊断包说明见
 - [ ] Graph panel 可解释 edge evidence 并跳源码。
 - [x] Reaction intelligence artifact 的 computed/semantic basis、provider 状态与 layout
   来源可在 knowledge map/cluster inspector 中解释。
+- [x] Knowledge map 支持 edge basis filter，并可与 cluster filter 组合过滤节点。
 - [ ] RAG search 有 citation gate。
 - [ ] Agent run 可审计，patch 需用户确认。
 - [ ] 所有增强能力离线/失败时可降级。

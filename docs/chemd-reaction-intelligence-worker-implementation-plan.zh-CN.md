@@ -547,7 +547,7 @@ hybrid_score =
 - [x] CLI 增加 `python -m chem_cluster_service.intelligence.cli` worker 入口。
 - [ ] Desktop 增加“Run intelligence job”入口，默认后台任务。
 - [x] 显示 provider 状态：PASS / SKIP / ERROR 摘要。
-- [ ] Knowledge map 增加 edge basis filter。
+- [x] Knowledge map 增加 edge basis filter。
 - [x] Cluster inspector 展示 computed evidence。
 - [x] Artifact 存入 workspace local store；DB 可用时再同步仍留给 shared schema 阶段。
 
@@ -572,6 +572,13 @@ hybrid_score =
 - Knowledge map view model 保持 `buildDesktopKnowledgeMapViewModel(output)` 兼容，并可选消费 reaction intelligence artifact，展示 provider PASS/SKIP/ERROR、computed edge count、basis、warnings 与 TMAP layout 来源。
 - Cluster inspector 已区分 computed basis 与 semantic basis，包含 hybrid/computed edge 时不再被 warning 中的 `fingerprint` 字样误标为 semantic-only。
 - 本轮不启动真实模型、不联网、不接 PostgreSQL artifact sync；真实 worker 后台任务入口和 shared schema 同步仍是后续产品化项。
+
+状态记录（Desktop artifact 读取 / edge filter 集成）：
+
+- Knowledge map 新增 edge basis options 与 basis filter，和 cluster filter 可组合生效；无匹配 edge 时显示空过滤状态。
+- Desktop App 现在会通过 `list_local_reaction_intelligence_artifacts` 读取本地最新 artifact，并传入 knowledge map view model。
+- 为避免跨文档污染，App 注入前会校验 artifact reaction ids 与当前 compile output 的 reaction ids 有交集；不匹配时按无 artifact 降级。
+- `App.tsx` focused ESLint 仍有既有复杂度/函数长度 3 项，按当前策略记录到最终 UI 组件化/复杂度治理阶段，不阻塞本轮功能主线。
 
 ---
 
