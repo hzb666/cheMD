@@ -9,6 +9,7 @@ export type ReactionIntelligenceJsonObject = { [key: string]: JsonValue };
 
 export type ReactionIntelligenceProvider =
   | "semantic"
+  | "drfp"
   | "rdkit_fingerprint"
   | "rxnmapper"
   | "rxnfp"
@@ -46,6 +47,7 @@ export interface ReactionIntelligenceJob {
 }
 
 export type ReactionIntelligenceComputedFeatureKind =
+  | "drfp_reaction_fingerprint"
   | "rdkit_reaction_fingerprint"
   | "rxnfp_embedding"
   | "atom_mapping"
@@ -72,6 +74,7 @@ export interface ReactionIntelligenceComputedFeature {
 
 export type ReactionIntelligenceComputedSimilarityBasis =
   | "semantic_similarity"
+  | "drfp_tanimoto"
   | "rdkit_tanimoto"
   | "rxnfp_cosine"
   | "atom_mapping_reaction_center"
