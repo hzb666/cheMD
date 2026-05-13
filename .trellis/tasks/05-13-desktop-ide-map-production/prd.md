@@ -108,3 +108,25 @@ The implementation loop must keep the desktop IDE usable while adding:
   - Main validation passed `pnpm --filter @chemd/desktop typecheck`, focused
     desktop ESLint, `pnpm --filter @chemd/desktop build`, and
     `git diff --check`.
+
+- `desktop-ide-current-reference-completion` merged through
+  `feat(language-service)：合并当前文档引用补全`.
+  - Added `getChemdReferenceCompletions(request, context)` in
+    `@chemd/language-service`.
+  - The provider suggests local `@symbolId` references only at explicit
+    reference trigger positions and degrades to an empty list without
+    `compileOutput`.
+  - Main validation passed `pnpm --filter @chemd/language-service test` with
+    26 tests, `pnpm --filter @chemd/language-service typecheck`, and
+    `git diff --check`.
+
+- `desktop-ide-renderable-node-core` merged through
+  `feat(renderer-json)：合并可渲染节点 DTO`.
+  - Added `buildRenderableNodeTree(document, options?)` plus renderable node,
+    directive, tree, and source-ref DTOs in `@chemd/renderer-json`.
+  - The DTO layer keeps layout/template containers explicit, marks heavy nodes
+    for lazy hydration, and falls back to placeholder directives when render
+    data is unavailable.
+  - Main validation passed `pnpm --filter @chemd/renderer-json test` with
+    9 tests, `pnpm --filter @chemd/renderer-json typecheck`, and
+    `git diff --check`.
