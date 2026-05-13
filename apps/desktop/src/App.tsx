@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { Activity, AlertTriangle, Bot, CheckCircle2, ChevronRight, CircleDot, Database, FileCode2, Files, FlaskConical, GitGraph, GripHorizontal, GripVertical, HardDrive, Lightbulb, PanelBottom, PanelBottomClose, PanelBottomOpen, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PlayCircle, RefreshCw, ScrollText, Search, Settings, ShieldCheck, Sparkles, Square, UploadCloud, Wrench, XCircle } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
 
 import { appendToolCall, applyPatchDecision, approvePatchDecision, attachEvidence, createAgentRun, createToolResult, getAuditTimeline, proposePatch, rejectPatchDecision, transitionAgentRunStatus, type AgentAuditEvent, type AgentEvidence, type AgentRun, type AgentToolCall, type PatchDecision, type PatchProposal } from "@chemd/agent-tools";
 import { buildEditorGraphRagRecords, compileChemdForEditor, type ChemdEditorDiagnostic, type ChemdLanguageCompileOutput, type ChemdOutlineItem, type ChemdQuickFixProposal, type ChemdTextEdit, type ChemdWorkspaceSymbolIndex } from "@chemd/language-service";
@@ -25,8 +25,8 @@ import { buildDesktopSemanticPreview, type DesktopSemanticPreview } from "./desk
 import { buildDesktopWorkspaceSymbolIndex, type DesktopWorkspaceSymbolIndexSummary } from "./desktop-workspace-symbol-index";
 import { runWorkspaceIngest } from "./desktop-workspace-ingest";
 import { DesktopKnowledgeMapPanel } from "./knowledge-map/DesktopKnowledgeMapPanel";
-import { buildDesktopKnowledgeMapViewModel, type DesktopKnowledgeMapViewModel } from "./knowledge-map/desktop-knowledge-map";
-import { MonacoChemdEditor, toChemdDesktopModelUri } from "./MonacoChemdEditor";
+import { buildDesktopKnowledgeMapViewModel, type DesktopKnowledgeMapViewModel, type DesktopSourceJumpIntent } from "./knowledge-map/desktop-knowledge-map";
+import { isSameChemdDesktopDocumentPath, MonacoChemdEditor, toChemdDesktopModelUri, type MonacoChemdEditorHandle } from "./MonacoChemdEditor";
 import { DesktopWorkspaceIndexPanel } from "./workspace-index/DesktopWorkspaceIndexPanel";
 import type { DesktopWorkspaceIndexViewModel } from "./workspace-index/desktop-workspace-index";
 import { useDesktopWorkspaceIndexController } from "./workspace-index/use-desktop-workspace-index";
@@ -183,6 +183,7 @@ type DesktopWorkbenchProps = {
   canSave: boolean;
   agentRun: AgentRun | null;
   agentMessage: AgentMessage | null;
+  editorRef: RefObject<MonacoChemdEditorHandle | null>;
   onRootPathChange: (value: string) => void;
   onSave: () => void;
   onOpenWorkspace: () => void;
@@ -190,6 +191,7 @@ type DesktopWorkbenchProps = {
   onSourceChange: (nextSource: string) => void;
   onReloadWorkspaceConflict: () => void;
   onKeepLocalWorkspaceConflict: () => void;
+  onKnowledgeMapSourceJump: (intent: DesktopSourceJumpIntent) => void;
   onProposeQuickFix: (candidate: QuickFixCandidate) => void;
   onApprovePatch: () => void;
   onApplyPatch: () => void;
@@ -249,6 +251,7 @@ type InsightPaneProps = {
   onSyncLocalOutbox: () => void;
   onRunReactionIntelligenceJob: () => void;
   onRunWorkspaceIngest: () => void;
+  onKnowledgeMapSourceJump: (intent: DesktopSourceJumpIntent) => void;
   onProposeQuickFix: (candidate: QuickFixCandidate) => void;
   onApprovePatch: () => void;
   onApplyPatch: () => void;
@@ -1965,6 +1968,7 @@ const EditorPane = ({
   lineCount,
   compiledAt,
   workspaceConflict,
+  editorRef,
   onChange,
   onSave,
   onReloadWorkspaceConflict,
@@ -1978,6 +1982,7 @@ const EditorPane = ({
   lineCount: number;
   compiledAt: string;
   workspaceConflict: WorkspaceConflictState | null;
+  editorRef: RefObject<MonacoChemdEditorHandle | null>;
   onChange: (next: string) => void;
   onSave: () => void;
   onReloadWorkspaceConflict: () => void;
@@ -1994,6 +1999,7 @@ const EditorPane = ({
       />
     ) : null}
     <MonacoChemdEditor
+      ref={editorRef}
       value={source}
       documentPath={compileOutput.documentUri ?? fileName}
       compileOutput={compileOutput}
@@ -2386,7 +2392,7 @@ const InsightDockContent = ({
     outline: <div className="desktop-insight-section">{props.outline.length > 0 ? <OutlineTree items={props.outline} /> : <p className="desktop-empty-copy">No outline from language service.</p>}</div>,
     preview: <SemanticPreviewPanel preview={props.semanticPreview} workspaceSymbolIndexState={props.workspaceSymbolIndexState} workspaceSymbolIndexMessage={props.workspaceSymbolIndexMessage} workspaceSymbolIndexSummary={props.workspaceSymbolIndexSummary} />,
     rag: <DesktopWorkspaceIndexPanel viewModel={props.workspaceIndexViewModel} />,
-    graph: <DesktopKnowledgeMapPanel viewModel={props.knowledgeMapViewModel} />,
+    graph: <DesktopKnowledgeMapPanel viewModel={props.knowledgeMapViewModel} onSourceJump={props.onKnowledgeMapSourceJump} />,
     runtime: <SidecarControlPanel status={props.sidecarStatus} logTail={props.sidecarLogTail} operation={props.sidecarOperation} message={props.sidecarMessage} errorMessage={props.sidecarError} onStart={props.onStartSidecar} onStop={props.onStopSidecar} onRefresh={props.onRefreshSidecar} onLoadLogs={props.onLoadSidecarLogs} />,
     postgres: <PostgresStatusPanel status={props.postgresStatus} managedStatus={props.managedPostgresStatus} loading={props.postgresLoading} managedOperation={props.managedPostgresOperation} errorMessage={props.postgresError} managedErrorMessage={props.managedPostgresError} managedMessage={props.managedPostgresMessage} persistState={props.persistState} persistDisabledReason={props.persistDisabledReason} onRefresh={props.onRefreshPostgres} onInitManaged={props.onInitManagedPostgres} onStartManaged={props.onStartManagedPostgres} onStopManaged={props.onStopManagedPostgres} onMigrateManaged={props.onMigrateManagedPostgres} onRefreshManaged={props.onRefreshManagedPostgres} onPersistGraph={props.onPersistGraph} />,
     storage: <LocalStorePanel status={props.localStoreStatus} operation={props.localStoreOperation} snapshotState={props.localSnapshotState} syncState={props.localSyncState} reactionIntelligenceJobBuild={props.reactionIntelligenceJobBuild} reactionIntelligenceJobState={props.reactionIntelligenceJobState} workspaceIngestState={props.workspaceIngestState} disabledReason={props.localStoreDisabledReason} syncDisabledReason={props.localStoreSyncDisabledReason} workspaceIngestDisabledReason={props.workspaceIngestDisabledReason} errorMessage={props.localStoreError} onRefresh={props.onRefreshLocalStore} onSave={props.onSaveLocalSnapshot} onSync={props.onSyncLocalOutbox} onRunReactionIntelligenceJob={props.onRunReactionIntelligenceJob} onRunWorkspaceIngest={props.onRunWorkspaceIngest} />,
@@ -3198,6 +3204,7 @@ const DesktopWorkbench = ({
   canSave,
   agentRun,
   agentMessage,
+  editorRef,
   onRootPathChange,
   onSave,
   onOpenWorkspace,
@@ -3205,6 +3212,7 @@ const DesktopWorkbench = ({
   onSourceChange,
   onReloadWorkspaceConflict,
   onKeepLocalWorkspaceConflict,
+  onKnowledgeMapSourceJump,
   onProposeQuickFix,
   onApprovePatch,
   onApplyPatch,
@@ -3259,6 +3267,7 @@ const DesktopWorkbench = ({
             lineCount={source.split(/\r?\n/).length}
             compiledAt={output.compiledAt}
             workspaceConflict={workspaceConflict}
+            editorRef={editorRef}
             onChange={onSourceChange}
             onSave={onSave}
             onReloadWorkspaceConflict={onReloadWorkspaceConflict}
@@ -3312,6 +3321,7 @@ const DesktopWorkbench = ({
               onSyncLocalOutbox={localStoreController.syncPending}
               onRunReactionIntelligenceJob={reactionIntelligenceJobController.run}
               onRunWorkspaceIngest={workspaceIngestController.runIngest}
+              onKnowledgeMapSourceJump={onKnowledgeMapSourceJump}
               onProposeQuickFix={onProposeQuickFix}
               onApprovePatch={onApprovePatch}
               onApplyPatch={onApplyPatch}
@@ -3477,6 +3487,7 @@ const useWorkspaceFileController = () => {
     canSave,
     setRootPath,
     setSource,
+    setMessage,
     openWorkspace,
     selectFile,
     saveWorkspaceFile,
@@ -3489,6 +3500,7 @@ export const App = () => {
   const workspaceController = useWorkspaceFileController();
   const [agentRun, setAgentRun] = useState<AgentRun | null>(null);
   const [agentMessage, setAgentMessage] = useState<AgentMessage | null>(null);
+  const editorRef = useRef<MonacoChemdEditorHandle | null>(null);
   const sidecarController = useSidecarController();
   const postgresController = usePostgresController();
   const readWorkspaceIndexFile = useCallback((file: WorkspaceFileEntry) =>
@@ -3590,6 +3602,26 @@ export const App = () => {
     localStoreController.reset();
   };
 
+  const handleKnowledgeMapSourceJump = useCallback((intent: DesktopSourceJumpIntent) => {
+    const currentPath = workspaceController.selectedFile.path;
+    if (!isSameChemdDesktopDocumentPath(intent.sourceUri, currentPath)) {
+      workspaceController.setMessage(
+        `Source ref points to ${intent.sourceUri}; current phase only jumps within ${currentPath}.`
+      );
+      return;
+    }
+
+    const jumped = editorRef.current?.jumpToSource(intent) ?? false;
+    if (!jumped) {
+      workspaceController.setMessage("Source ref jump is unavailable until Monaco editor is mounted.");
+      return;
+    }
+
+    workspaceController.setMessage(
+      `Jumped to ${currentPath} L${intent.range.startLine}-L${intent.range.endLine}.`
+    );
+  }, [workspaceController]);
+
   const agentPatchController = useAgentPatchController({
     agentRun,
     setAgentRun,
@@ -3611,11 +3643,13 @@ export const App = () => {
       files={workspaceController.files} selectedFile={workspaceController.selectedFile} selectedFileId={workspaceController.selectedFileId}
       mode={workspaceController.mode} message={workspaceController.message} source={workspaceController.source} savedSource={workspaceController.savedSource} workspaceConflict={workspaceController.workspaceConflict}
       rootPath={workspaceController.rootPath} canSave={workspaceController.canSave} agentRun={agentRun} agentMessage={agentMessage}
+      editorRef={editorRef}
       onRootPathChange={workspaceController.setRootPath} onSourceChange={updateEditorSource}
       onSave={() => void workspaceController.saveWorkspaceFile()} onOpenWorkspace={() => void workspaceController.openWorkspace()}
       onSelectFile={(file) => void workspaceController.selectFile(file)}
       onReloadWorkspaceConflict={() => void workspaceController.reloadWorkspaceConflict()}
       onKeepLocalWorkspaceConflict={workspaceController.keepLocalWorkspaceConflict}
+      onKnowledgeMapSourceJump={handleKnowledgeMapSourceJump}
       onProposeQuickFix={agentPatchController.proposeQuickFix}
       onApprovePatch={agentPatchController.approvePatch} onApplyPatch={agentPatchController.applyPatch} onRejectPatch={agentPatchController.rejectPatch}
     />
