@@ -415,6 +415,16 @@ DB、无 managed binaries、无 sidecar 的条件下写入并形成 pending outb
     通过。
   - Focused ESLint 仍仅报 `LocalStorePanel` 既有复杂度/函数长度门禁；按当前策略记录到
     M11 组件化与复杂度治理，不阻塞功能主线。
+- Graph/RAG 与 Agent 面板模型：
+  - `feat(desktop)：合并反应聚类面板模型` 新增纯 TypeScript cluster panel DTO，
+    为后续 Graph/RAG UI 接入提供稳定 list/detail、member count、shared features、
+    similarity edge basis、semantic-only/weak warning 与 fallback 状态。
+  - `feat(desktop)：合并 Agent timeline 面板模型` 新增 Agent timeline/audit DTO，
+    输出 timeline rows、tool call rows、patch gate、citation safety 与 warning 摘要。
+  - 两个切片都不启动网络、不访问数据库、不写 workspace 文件；只消费 compiler/exporter
+    或 agent-tools 的现有 DTO。
+  - 主分支验证：cluster/agent timeline 定向测试 9/9、desktop typecheck、focused
+    ESLint、desktop build 和 `git diff --check` 通过。
 - Release readiness：
   - `feat(desktop)：合并发布就绪聚合脚本` 新增 `pnpm desktop:release-readiness`。
   - 聚合 desktop runtime preconditions、offline release preflight 和 diagnostics

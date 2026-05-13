@@ -1223,3 +1223,55 @@ M1 language-service completion core
   - `pnpm test`：通过 Turbo tests、72 个脚本测试与 52 个 Python 测试。
   - `pnpm typecheck`：通过 21 个 workspace。
   - `git diff --check`：通过；仅输出 LF/CRLF 工作区提示。
+
+### 2026-05-13 desktop-ide-reaction-cluster-panel-model
+
+- 范围：完成 M6.1/M6.2 的 desktop 纯 DTO 模型层；不接入
+  `App.tsx`，不修改 shared packages、package/lockfile、Tauri/Rust、数据库或 CSS。
+- 产物：新增 `buildDesktopReactionClusterPanel()`，输出面向 UI 的
+  `state`、`reason`、`summary`、`clusters`、`details`、`selectedDetail` 与
+  `warnings`。
+- 行为：ready 状态展示 member count、shared features、similarity edge basis、
+  max similarity score、semantic-only/weak warning；compile failed、缺少 graph
+  index、无 clusters 时返回 explainable fallback，不抛出。
+- 架构审查：合并前将高复杂度入口拆成 ready/fallback/build helper，focused ESLint
+  通过。
+- 验证：
+  - `pnpm --filter @chemd/desktop exec vitest run src/desktop-reaction-cluster-panel.test.ts`：
+    通过，1 file / 4 tests。
+  - `pnpm --filter @chemd/desktop typecheck`：通过。
+  - `pnpm --filter @chemd/desktop exec eslint src/desktop-reaction-cluster-panel.ts src/desktop-reaction-cluster-panel.test.ts`：
+    通过。
+
+### 2026-05-13 desktop-ide-agent-timeline-panel-model
+
+- 范围：完成 M7 的 desktop Agent timeline/audit 纯 DTO 模型层；不接入
+  `App.tsx`，不启动 agent、不访问网络、不写 workspace 文件。
+- 产物：新增 `buildDesktopAgentTimelinePanel(run, options)`，输出
+  `state`、`message`、`summary`、`timelineRows`、`toolCallRows`、`patchRows`、
+  `warnings` 与 `safety`。
+- 行为：支持 null run fallback、running/completed/blocked/failed 状态、tool
+  input/output 摘要、失败 tool error、patch approval/apply gate、RAG citation
+  safety warning。
+- 架构审查：合并前拆出 types/constants、format/evidence utilities、patch gate
+  helper，使入口文件降到 300 行以内；focused ESLint 通过。
+- 验证：
+  - `pnpm --filter @chemd/desktop exec vitest run src/desktop-agent-timeline-panel.test.ts`：
+    通过，1 file / 5 tests。
+  - `pnpm --filter @chemd/desktop typecheck`：通过。
+  - `pnpm exec eslint apps/desktop/src/desktop-agent-timeline-panel.ts apps/desktop/src/desktop-agent-timeline-panel-types.ts apps/desktop/src/desktop-agent-timeline-panel-format.ts apps/desktop/src/desktop-agent-timeline-panel-patches.ts apps/desktop/src/desktop-agent-timeline-panel.test.ts --ext .ts`：
+    通过。
+
+### 2026-05-13 desktop-ide-panel-models 合并验证
+
+- 合并提交：
+  - `7431ce5 feat(desktop)：合并反应聚类面板模型`
+  - `de014cc feat(desktop)：合并 Agent timeline 面板模型`
+- 合并后验证：
+  - `pnpm --filter @chemd/desktop exec vitest run src/desktop-reaction-cluster-panel.test.ts src/desktop-agent-timeline-panel.test.ts`：
+    通过，2 files / 9 tests。
+  - `pnpm --filter @chemd/desktop typecheck`：通过。
+  - focused ESLint：通过新增 cluster/agent timeline 文件。
+  - `pnpm --filter @chemd/desktop build`：通过；保留既有 lucide `use client`
+    与 chunk size warning。
+  - `git diff --check`：通过。
