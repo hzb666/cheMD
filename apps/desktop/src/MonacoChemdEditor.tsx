@@ -14,6 +14,11 @@ import {
   registerChemdCompletionProvider,
   updateChemdCompletionOutput
 } from "./monaco-chemd-completion";
+import {
+  cleanupChemdNavigationOutput,
+  registerChemdNavigationProviders,
+  updateChemdNavigationOutput
+} from "./monaco-chemd-navigation";
 
 export const CHEMD_LANGUAGE_ID = "chemd";
 
@@ -147,6 +152,7 @@ const registerChemdLanguage = (monaco: Monaco): void => {
   configureChemdTokens(monaco);
   defineChemdTheme(monaco);
   registerChemdCompletionProvider(monaco, CHEMD_LANGUAGE_ID);
+  registerChemdNavigationProviders(monaco, CHEMD_LANGUAGE_ID);
 };
 
 export const MonacoChemdEditor = ({
@@ -167,8 +173,10 @@ export const MonacoChemdEditor = ({
 
   useEffect(() => {
     updateChemdCompletionOutput(modelPath, compileOutput);
+    updateChemdNavigationOutput(modelPath, compileOutput);
     return () => {
       cleanupChemdCompletionOutput(modelPath, compileOutput);
+      cleanupChemdNavigationOutput(modelPath, compileOutput);
     };
   }, [compileOutput, modelPath]);
 
