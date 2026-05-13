@@ -1,0 +1,53 @@
+{
+  "id": "reaction-intelligence-core",
+  "name": "reaction-intelligence-core",
+  "title": "Reaction intelligence kernel",
+  "description": "",
+  "status": "planning",
+  "dev_type": "backend",
+  "scope": "packages/exporter-training, services/chem-service/chem_service/reaction_intelligence, docs",
+  "package": "exporter-training",
+  "priority": "P2",
+  "creator": "codex-agent",
+  "assignee": "codex-agent",
+  "createdAt": "2026-05-13",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "reaction-intelligence-core",
+  "worktree_path": null,
+  "current_phase": 0,
+  "next_action": [
+    {
+      "phase": 1,
+      "action": "brainstorm"
+    },
+    {
+      "phase": 2,
+      "action": "research"
+    },
+    {
+      "phase": 3,
+      "action": "implement"
+    },
+    {
+      "phase": 4,
+      "action": "check"
+    },
+    {
+      "phase": 5,
+      "action": "update-spec"
+    },
+    {
+      "phase": 6,
+      "action": "record-session"
+    }
+  ],
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
