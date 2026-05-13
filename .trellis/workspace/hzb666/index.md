@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 63
+- **Total Sessions**: 64
 - **Last Active**: 2026-05-13
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~1028 | Active |
+| `journal-2.md` | ~1070 | Active |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 64 | 2026-05-13 | Desktop IDE panel model merge | `7431ce5`, `de014cc`, `7f5bf3a` | `desktop-ide` |
 | 63 | 2026-05-13 | Desktop IDE preview and workspace index UI | `13c2cfc` | `desktop-ide` |
 | 62 | 2026-05-13 | Desktop IDE workspace completions and semantic preview helper | `8e894d4`, `3346867`, `41c3514`, `7041d4f`, `326e14b` | `desktop-ide` |
 | 61 | 2026-05-13 | Desktop IDE code actions and workspace symbol helper | `8a621be`, `b2d8d9a`, `b015ec8`, `f0ea9bc`, `a284d35` | `desktop-ide` |
