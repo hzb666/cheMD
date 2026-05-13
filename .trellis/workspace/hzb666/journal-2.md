@@ -647,3 +647,68 @@ Merged workspace ingest UI into the desktop Local Store panel. Main validation p
 ### Next Steps
 
 - None - task complete
+
+
+## Session 54: Desktop IDE map production integration
+
+**Date**: 2026-05-13
+**Task**: Desktop IDE map production integration
+**Package**: web
+**Branch**: `desktop-ide-map`
+
+### Summary
+
+完成 desktop-ide-map 生产级地图与 IDE 能力集成：新增 language-service 补全核心、workspace-index 跨文档符号索引、semantic-rendering 语义渲染树、reaction-map 反应聚类地图数据层，并在 desktop 端接入 Monaco 补全/hover/definition/references、工作区引用面板、知识地图面板和组件化收尾。验证已运行 pnpm --filter @chemd/desktop build、pnpm typecheck、pnpm test、desktop 修改模块 eslint；仅 App.tsx 既有 complexity/max-lines-per-function 门禁按用户要求作为非阻塞项记录。归档本轮 5 个 Trellis 任务，失败的临时子代理 worktree/branch 已清理。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8131982` | (see git log) |
+| `2ec4152` | (see git log) |
+| `148df8e` | (see git log) |
+| `1b4bebe` | (see git log) |
+| `4505d50` | (see git log) |
+| `39f199a` | (see git log) |
+| `f13457b` | (see git log) |
+| `b993795` | (see git log) |
+| `242e145` | (see git log) |
+| `f40830c` | (see git log) |
+| `aceac9d` | (see git log) |
+| `c7475f4` | (see git log) |
+| `c448480` | (see git log) |
+| `68f153d` | (see git log) |
+| `367fb10` | (see git log) |
+| `5fd42db` | (see git log) |
+| `89b784f` | (see git log) |
+| `b7a1410` | (see git log) |
+| `b4745ce` | (see git log) |
+| `67a0446` | (see git log) |
+| `6253685` | (see git log) |
+| `acd4ded` | (see git log) |
+| `46bf0a6` | (see git log) |
+| `79235ed` | (see git log) |
+| `74b09bb` | (see git log) |
+| `f5b571c` | (see git log) |
+| `94c0625` | (see git log) |
+| `e1aee2e` | (see git log) |
+| `1af913f` | (see git log) |
+| `de56cd2` | (see git log) |
+| `bad2465` | (see git log) |
+| `c0a1e1a` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
