@@ -235,6 +235,7 @@ export interface PersistRuntimeGraphRagResult {
 }
 
 export type PostgresRagQueryState = "ready" | "degraded" | "offline";
+export type PgvectorDistanceMetric = "cosine" | "l2" | "inner_product";
 
 export interface PostgresRagQueryRequest {
   query: string;
@@ -275,6 +276,43 @@ export interface PostgresRagQueryResult {
   results: PostgresRagQueryResultItem[];
   blockedCount: number;
   target: PostgresTargetSummary | null;
+}
+
+export interface PostgresRagEmbeddingBackfillItem {
+  revisionId: string;
+  chunkId: string;
+  embedding: number[];
+}
+
+export interface PostgresRagEmbeddingBackfillRequest {
+  embeddingModel: string;
+  embeddingDim?: number;
+  distanceMetric?: PgvectorDistanceMetric;
+  items: PostgresRagEmbeddingBackfillItem[];
+  dryRun?: boolean;
+}
+
+export type PostgresRagEmbeddingBackfillItemState = "ready" | "skipped" | "failed";
+
+export interface PostgresRagEmbeddingBackfillItemSummary {
+  inputIndex: number;
+  revisionId?: string;
+  chunkId?: string;
+  state: PostgresRagEmbeddingBackfillItemState;
+  label: string;
+  detail: string;
+  embeddingDim?: number;
+}
+
+export interface PostgresRagEmbeddingBackfillResult {
+  state: RuntimeState;
+  label: string;
+  detail: string;
+  target: PostgresTargetSummary | null;
+  writtenCount: number;
+  skippedCount: number;
+  failedCount: number;
+  items: PostgresRagEmbeddingBackfillItemSummary[];
 }
 
 export type LocalOutboxSyncStatus = "pending" | "synced" | "failed";
@@ -626,6 +664,12 @@ export interface DesktopCommandMap {
     };
     output: PostgresRagQueryResult;
   };
+  backfill_postgres_rag_embeddings: {
+    input: {
+      input: PostgresRagEmbeddingBackfillRequest;
+    };
+    output: PostgresRagEmbeddingBackfillResult;
+  };
   read_local_store_status: {
     input: void;
     output: LocalStoreStatus;
@@ -743,7 +787,7 @@ export const shellDiagnosticsBundleResult: DiagnosticsBundleExportResult = {
   outputPath: "",
   summary: {
     generatedAt: "",
-    commandCount: 30,
+    commandCount: 31,
     boundarySkipCount: 5,
     supportCommandCount: 4
   }
