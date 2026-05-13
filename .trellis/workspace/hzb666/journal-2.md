@@ -746,3 +746,57 @@ Merged workspace ingest UI into the desktop Local Store panel. Main validation p
 ### Next Steps
 
 - None - task complete
+
+
+## Session 56: Desktop IDE map production closure
+
+**Date**: 2026-05-13
+**Task**: Desktop IDE map production closure
+**Package**: web
+**Branch**: `desktop-ide-map`
+
+### Summary
+
+(Add summary)
+
+### Main Changes
+
+| Area | Result |
+| --- | --- |
+| Parallel slices | Merged hover details, preview source refs, and TMAP worker slices into `desktop-ide-map`. |
+| Desktop IDE | Monaco hover now includes diagnostics and template params; knowledge map rows expose expansion, cluster badges, and source jump intents. |
+| Cluster worker | Added `services/chem-cluster-service` deterministic fallback worker with missing-TMAP SKIP/ERROR/fallback behavior. |
+| Release evidence | Built Tauri release exe, MSI, and NSIS artifacts; installer artifact preflight passes but does not replace clean-machine install smoke. |
+| Verification | Targeted Vitest, Python worker unittest/compileall, desktop typecheck/build, Tauri workspace cargo tests, Tauri build, offline/runtime/release/installer smoke, full `pnpm typecheck`, and full `pnpm test` passed. Runtime smoke marks PostgreSQL persistence as SKIP because full local PostgreSQL binaries are unavailable. |
+| Cleanup | Removed merged temporary worktrees and local branches for `desktop-ide-map-hover-details`, `desktop-ide-map-preview-source-ref`, and `desktop-ide-map-tmap-worker`. |
+
+Updated docs:
+- `docs/chemd-production-ide-knowledge-map-implementation-plan.zh-CN.md`
+- `.trellis/tasks/archive/2026-05/05-13-desktop-ide-map-remaining-production/prd.md`
+
+Residual external acceptance:
+- Clean-machine GUI install/open/edit/save/restart smoke still requires a real clean environment and must not be inferred from artifact preflight.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8914de3` | (see git log) |
+| `111e450` | (see git log) |
+| `71bdea0` | (see git log) |
+| `bf02237` | (see git log) |
+| `b910126` | (see git log) |
+| `d5b28bd` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
