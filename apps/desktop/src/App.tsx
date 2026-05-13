@@ -9,7 +9,9 @@ import { shellFiles, shellPostgresStatus, shellSidecarStatus, shellWorkspace, ty
 import { buildLocalRuntimeSnapshotInput } from "./desktop-local-store";
 import { buildPersistRuntimeGraphRagCommandInput } from "./desktop-runtime-persistence";
 import { runWorkspaceIngest } from "./desktop-workspace-ingest";
+import { buildDesktopKnowledgeMapViewModel, type DesktopKnowledgeMapViewModel } from "./knowledge-map/desktop-knowledge-map";
 import { MonacoChemdEditor } from "./MonacoChemdEditor";
+import { buildDesktopWorkspaceIndexViewModel, type DesktopWorkspaceIndexViewModel } from "./workspace-index/desktop-workspace-index";
 
 type WorkspaceState = "empty" | "opening" | "open" | "error"; type DocumentMode = "sample" | "workspace";
 type SidecarOperation = "start" | "stop" | "refresh" | "logs";
@@ -127,6 +129,8 @@ type DesktopWorkbenchProps = {
   persistController: ReturnType<typeof usePersistRuntimeController>;
   localStoreController: ReturnType<typeof useLocalStoreController>;
   workspaceIngestController: ReturnType<typeof useWorkspaceIngestController>;
+  workspaceIndexViewModel: DesktopWorkspaceIndexViewModel;
+  knowledgeMapViewModel: DesktopKnowledgeMapViewModel;
   output: ChemdLanguageCompileOutput;
   compileError?: string;
   files: WorkspaceFileEntry[];
@@ -157,6 +161,8 @@ type InsightPaneProps = {
   activeTool: ActivityTool;
   outline: ChemdOutlineItem[];
   diagnostics: ChemdEditorDiagnostic[];
+  workspaceIndexViewModel: DesktopWorkspaceIndexViewModel;
+  knowledgeMapViewModel: DesktopKnowledgeMapViewModel;
   mode: DocumentMode;
   sidecarStatus: SidecarStatus;
   sidecarLogTail: string[];
@@ -355,9 +361,6 @@ const moveDockPanel = (
   nextOrder.splice(targetIndex, 0, source);
   return nextOrder;
 };
-
-const flattenOutlineItems = (items: ChemdOutlineItem[]): ChemdOutlineItem[] =>
-  items.flatMap((item) => [item, ...flattenOutlineItems(item.children ?? [])]);
 
 const statusToneByState: Record<RuntimeState, string> = { ready: "success", placeholder: "pending", degraded: "warning", offline: "danger" };
 const workspaceStateLabel: Record<WorkspaceState, string> = { empty: "Empty", opening: "Opening", open: "Open", error: "Fallback" };
@@ -1860,6 +1863,7 @@ const EditorPane = ({
   mode,
   source,
   compileOutput,
+  workspaceIndex,
   lineCount,
   compiledAt,
   workspaceConflict,
@@ -1872,6 +1876,7 @@ const EditorPane = ({
   mode: DocumentMode;
   source: string;
   compileOutput: ChemdLanguageCompileOutput;
+  workspaceIndex?: DesktopWorkspaceIndexViewModel["completionIndex"];
   lineCount: number;
   compiledAt: string;
   workspaceConflict: WorkspaceConflictState | null;
@@ -1894,6 +1899,7 @@ const EditorPane = ({
       value={source}
       documentPath={compileOutput.documentUri ?? fileName}
       compileOutput={compileOutput}
+      workspaceIndex={workspaceIndex}
       onChange={onChange}
       onSave={onSave}
     />
@@ -2074,36 +2080,39 @@ const AgentLedger = ({ agentRun }: { agentRun: AgentRun | null }) => (
 );
 
 const RagSearchPanel = ({
-  outline,
-  diagnostics
+  workspaceIndexViewModel
 }: {
-  outline: ChemdOutlineItem[];
-  diagnostics: ChemdEditorDiagnostic[];
+  workspaceIndexViewModel: DesktopWorkspaceIndexViewModel;
 }) => {
   const [query, setQuery] = useState("");
   const rows = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    const outlineRows = flattenOutlineItems(outline).map((item) => ({
-      id: `outline-${item.id}`,
-      kind: item.kind,
-      label: item.label,
-      detail: `L${item.range.startLine}`
+    const symbolRows = workspaceIndexViewModel.symbols.map((symbol) => ({
+      id: `symbol-${symbol.id}`,
+      kind: symbol.kind,
+      label: symbol.label,
+      detail: `${symbol.documentPath}:L${symbol.line}`
     }));
-    const diagnosticRows = diagnostics.map((diagnostic) => ({
-      id: `diagnostic-${diagnostic.code}-${diagnostic.range.startLine}-${diagnostic.range.startColumn}`,
-      kind: diagnostic.severity,
-      label: diagnostic.message,
-      detail: diagnostic.code
+    const referenceRows = workspaceIndexViewModel.references.map((reference) => ({
+      id: `reference-${reference.id}`,
+      kind: reference.status,
+      label: reference.target,
+      detail: `${reference.field} L${reference.line}`
     }));
-    const allRows = [...outlineRows, ...diagnosticRows];
+    const allRows = [...symbolRows, ...referenceRows];
     if (!normalizedQuery) return allRows.slice(0, 8);
     return allRows.filter((row) =>
       `${row.kind} ${row.label} ${row.detail}`.toLowerCase().includes(normalizedQuery)
     ).slice(0, 12);
-  }, [diagnostics, outline, query]);
+  }, [query, workspaceIndexViewModel.references, workspaceIndexViewModel.symbols]);
 
   return (
     <div className="desktop-tool-panel">
+      <div className="desktop-graph-summary">
+        {workspaceIndexViewModel.badges.slice(0, 3).map((badge) => (
+          <div key={badge.label} data-state={badge.tone}><span>{badge.label}</span><strong>{badge.value}</strong></div>
+        ))}
+      </div>
       <label className="desktop-tool-search">
         <Search size={14} />
         <input
@@ -2113,6 +2122,7 @@ const RagSearchPanel = ({
           aria-label="RAG search query"
         />
       </label>
+      <p className="desktop-empty-copy">{workspaceIndexViewModel.message}</p>
       <div className="desktop-tool-result-list" role="list">
         {rows.length > 0 ? rows.map((row) => (
           <div key={row.id} className="desktop-tool-result-row" role="listitem">
@@ -2127,31 +2137,37 @@ const RagSearchPanel = ({
 };
 
 const ReactionGraphPanel = ({
-  outline,
-  diagnostics,
-  compileStatus
+  knowledgeMapViewModel
 }: {
-  outline: ChemdOutlineItem[];
-  diagnostics: ChemdEditorDiagnostic[];
-  compileStatus: "ok" | "failed";
+  knowledgeMapViewModel: DesktopKnowledgeMapViewModel;
 }) => {
-  const graphNodes = flattenOutlineItems(outline).slice(0, 10);
+  const graphNodes = knowledgeMapViewModel.reactionMap.nodes.slice(0, 10);
   return (
     <div className="desktop-tool-panel">
       <div className="desktop-graph-summary">
-        <div><span>Compile</span><strong>{compileStatus}</strong></div>
-        <div><span>Nodes</span><strong>{graphNodes.length}</strong></div>
-        <div><span>Diagnostics</span><strong>{diagnostics.length}</strong></div>
+        <div><span>State</span><strong>{knowledgeMapViewModel.state}</strong></div>
+        <div><span>Reactions</span><strong>{knowledgeMapViewModel.reactionSummary.reactionCount}</strong></div>
+        <div><span>Clusters</span><strong>{knowledgeMapViewModel.reactionSummary.clusterCount}</strong></div>
       </div>
+      <p className="desktop-empty-copy">{knowledgeMapViewModel.reactionSummary.message}</p>
       <div className="desktop-graph-node-list" role="list">
         {graphNodes.length > 0 ? graphNodes.map((node) => (
-          <div key={node.id} className="desktop-graph-node-row" role="listitem">
+          <div key={node.reaction_entity_id} className="desktop-graph-node-row" role="listitem">
             <GitGraph size={13} />
-            <span>{node.kind}</span>
-            <strong title={node.label}>{node.label}</strong>
-            <code>L{node.range.startLine}</code>
+            <span>{node.cluster_id ? "clustered" : "reaction"}</span>
+            <strong title={node.reaction_entity_id}>{node.reaction_entity_id}</strong>
+            <code>{Math.round(node.x)},{Math.round(node.y)}</code>
           </div>
-        )) : <p className="desktop-empty-copy">No graph nodes.</p>}
+        )) : <p className="desktop-empty-copy">{knowledgeMapViewModel.message}</p>}
+      </div>
+      <div className="desktop-tool-result-list" role="list" aria-label="Reaction clusters">
+        {knowledgeMapViewModel.clusters.slice(0, 6).map((cluster) => (
+          <div key={cluster.id} className="desktop-tool-result-row" role="listitem">
+            <span>{cluster.basis}</span>
+            <strong title={cluster.label}>{cluster.label}</strong>
+            <code>{cluster.memberCount}</code>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -2330,8 +2346,8 @@ const InsightDockContent = ({
   const appliedDecision = findPatchDecision(props.agentRun, activeProposal?.patchProposalId, "applied");
   const contentByPanel: Record<InsightDockPanelId, ReactNode> = {
     outline: <div className="desktop-insight-section">{props.outline.length > 0 ? <OutlineTree items={props.outline} /> : <p className="desktop-empty-copy">No outline from language service.</p>}</div>,
-    rag: <RagSearchPanel outline={props.outline} diagnostics={props.diagnostics} />,
-    graph: <ReactionGraphPanel outline={props.outline} diagnostics={props.diagnostics} compileStatus={props.diagnostics.some((item) => item.severity === "error") ? "failed" : "ok"} />,
+    rag: <RagSearchPanel workspaceIndexViewModel={props.workspaceIndexViewModel} />,
+    graph: <ReactionGraphPanel knowledgeMapViewModel={props.knowledgeMapViewModel} />,
     runtime: <SidecarControlPanel status={props.sidecarStatus} logTail={props.sidecarLogTail} operation={props.sidecarOperation} message={props.sidecarMessage} errorMessage={props.sidecarError} onStart={props.onStartSidecar} onStop={props.onStopSidecar} onRefresh={props.onRefreshSidecar} onLoadLogs={props.onLoadSidecarLogs} />,
     postgres: <PostgresStatusPanel status={props.postgresStatus} managedStatus={props.managedPostgresStatus} loading={props.postgresLoading} managedOperation={props.managedPostgresOperation} errorMessage={props.postgresError} managedErrorMessage={props.managedPostgresError} managedMessage={props.managedPostgresMessage} persistState={props.persistState} persistDisabledReason={props.persistDisabledReason} onRefresh={props.onRefreshPostgres} onInitManaged={props.onInitManagedPostgres} onStartManaged={props.onStartManagedPostgres} onStopManaged={props.onStopManagedPostgres} onMigrateManaged={props.onMigrateManagedPostgres} onRefreshManaged={props.onRefreshManagedPostgres} onPersistGraph={props.onPersistGraph} />,
     storage: <LocalStorePanel status={props.localStoreStatus} operation={props.localStoreOperation} snapshotState={props.localSnapshotState} syncState={props.localSyncState} workspaceIngestState={props.workspaceIngestState} disabledReason={props.localStoreDisabledReason} syncDisabledReason={props.localStoreSyncDisabledReason} workspaceIngestDisabledReason={props.workspaceIngestDisabledReason} errorMessage={props.localStoreError} onRefresh={props.onRefreshLocalStore} onSave={props.onSaveLocalSnapshot} onSync={props.onSyncLocalOutbox} onRunWorkspaceIngest={props.onRunWorkspaceIngest} />,
@@ -2976,6 +2992,8 @@ const DesktopWorkbench = ({
   persistController,
   localStoreController,
   workspaceIngestController,
+  workspaceIndexViewModel,
+  knowledgeMapViewModel,
   output,
   compileError,
   files,
@@ -3047,6 +3065,7 @@ const DesktopWorkbench = ({
             mode={mode}
             source={source}
             compileOutput={output}
+            workspaceIndex={workspaceIndexViewModel.completionIndex}
             lineCount={source.split(/\r?\n/).length}
             compiledAt={output.compiledAt}
             workspaceConflict={workspaceConflict}
@@ -3069,6 +3088,8 @@ const DesktopWorkbench = ({
               activeTool={activeTool}
               outline={output.outline}
               diagnostics={output.diagnostics}
+              workspaceIndexViewModel={workspaceIndexViewModel}
+              knowledgeMapViewModel={knowledgeMapViewModel}
               mode={mode}
               sidecarStatus={sidecarController.status} sidecarLogTail={sidecarController.logTail} sidecarOperation={sidecarController.operation} sidecarMessage={sidecarController.message} sidecarError={sidecarController.error}
               postgresStatus={postgresController.status} managedPostgresStatus={postgresController.managedStatus} postgresLoading={postgresController.loading} managedPostgresOperation={postgresController.managedOperation} postgresError={postgresController.error} managedPostgresError={postgresController.managedError} managedPostgresMessage={postgresController.managedMessage}
@@ -3281,6 +3302,25 @@ export const App = () => {
     documentUri: workspaceController.selectedFile.path,
     options: { strictChemdKind: true, procedureMode: "auto" }
   }), [workspaceController.selectedFile.path, workspaceController.source]);
+  const workspaceIndexViewModel = useMemo(() => buildDesktopWorkspaceIndexViewModel({
+    workspaceId: workspaceController.workspace.workspaceId,
+    files: workspaceController.files,
+    currentDocument: workspaceController.selectedFile.kind === "file"
+      ? {
+        path: workspaceController.selectedFile.path,
+        source: workspaceController.source
+      }
+      : undefined
+  }), [
+    workspaceController.files,
+    workspaceController.selectedFile.kind,
+    workspaceController.selectedFile.path,
+    workspaceController.source,
+    workspaceController.workspace.workspaceId
+  ]);
+  const knowledgeMapViewModel = useMemo(() =>
+    buildDesktopKnowledgeMapViewModel(output),
+  [output]);
   const compileError = output.status === "failed" ? output.error.message : undefined;
   const persistController = usePersistRuntimeController({
     mode: workspaceController.mode,
@@ -3328,6 +3368,7 @@ export const App = () => {
     <DesktopWorkbench
       workspace={workspaceController.workspace} workspaceState={workspaceController.workspaceState}
       sidecarController={sidecarController} postgresController={postgresController} persistController={persistController} localStoreController={localStoreController} workspaceIngestController={workspaceIngestController}
+      workspaceIndexViewModel={workspaceIndexViewModel} knowledgeMapViewModel={knowledgeMapViewModel}
       output={output} compileError={compileError}
       files={workspaceController.files} selectedFile={workspaceController.selectedFile} selectedFileId={workspaceController.selectedFileId}
       mode={workspaceController.mode} message={workspaceController.message} source={workspaceController.source} savedSource={workspaceController.savedSource} workspaceConflict={workspaceController.workspaceConflict}

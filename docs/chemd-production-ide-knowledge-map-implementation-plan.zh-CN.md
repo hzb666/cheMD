@@ -105,12 +105,14 @@
 - [x] `apps/desktop/src/workspace-index/desktop-workspace-index.ts`：workspace symbol/reference index view-model 与 completion index adapter。
 - [x] `apps/desktop/src/knowledge-map/desktop-knowledge-map.ts`：semantic render tree 与 reaction map fallback layout view-model。
 - [x] 新增 desktop focused tests：Monaco provider、workspace index view-model、knowledge map view-model。
+- [x] `apps/desktop/src/App.tsx` 薄接线：completion 接入 workspace index，RAG dock 展示 symbol/reference rows，Reaction Graph dock 展示 reaction map 与 cluster summary。
 
 已验证：
 
 - [x] `pnpm exec vitest run apps/desktop/src/monaco/chemd-completion-provider.test.ts apps/desktop/src/workspace-index/desktop-workspace-index.test.ts apps/desktop/src/knowledge-map/desktop-knowledge-map.test.ts`
 - [x] `pnpm --filter @chemd/desktop typecheck`
 - [x] `pnpm exec eslint apps/desktop/src/monaco apps/desktop/src/workspace-index apps/desktop/src/knowledge-map apps/desktop/src/MonacoChemdEditor.tsx --ext .ts,.tsx`
+- [x] `pnpm exec eslint apps/desktop/src/App.tsx apps/desktop/src/MonacoChemdEditor.tsx apps/desktop/src/monaco apps/desktop/src/workspace-index apps/desktop/src/knowledge-map --ext .ts,.tsx` 已清理新增 unused 问题；剩余 3 项为 `App.tsx` 既有 complexity / max-lines-per-function 门禁，按本轮“复杂度不作为阻塞项”不在此切片拆分。
 
 ---
 
