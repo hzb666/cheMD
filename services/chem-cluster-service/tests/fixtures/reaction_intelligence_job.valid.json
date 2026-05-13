@@ -1,0 +1,54 @@
+{
+  "schema_version": "chemd-reaction-intelligence-job/v0.1",
+  "job_id": "reaction-intelligence-job::fixture",
+  "graph_index_id": "graph-index::fixture",
+  "source_compile_run_ids": ["compile-run::fixture"],
+  "reactions": [
+    {
+      "reaction_entity_id": "rxn-ester-1",
+      "document_id": "doc-ester",
+      "canonical_rxn_smiles": "CC(=O)O.CCO>>CC(=O)OCC",
+      "participant_signature": "acetic-acid+ethanol=>ethyl-acetate",
+      "reaction_family": "esterification",
+      "procedure_signature": "fischer-esterification",
+      "condition_signature": "acid-catalyst|heat",
+      "source_hash": "sha256:ester-1"
+    },
+    {
+      "reaction_entity_id": "rxn-ester-2",
+      "document_id": "doc-ester",
+      "canonical_rxn_smiles": "O=C(O)c1ccccc1.CO>>COC(=O)c1ccccc1",
+      "participant_signature": "benzoic-acid+methanol=>methyl-benzoate",
+      "reaction_family": "esterification",
+      "procedure_signature": "fischer-esterification",
+      "condition_signature": "acid-catalyst|reflux",
+      "source_hash": "sha256:ester-2"
+    },
+    {
+      "reaction_entity_id": "rxn-suzuki-1",
+      "document_id": "doc-suzuki",
+      "canonical_rxn_smiles": "B(O)(O)c1ccccc1.Brc1ccccc1>>c1ccc(-c2ccccc2)cc1",
+      "participant_signature": "aryl-bromide+phenylboronic-acid=>biaryl",
+      "reaction_family": "cross_coupling",
+      "procedure_signature": "suzuki-coupling",
+      "condition_signature": "Pd|base|dioxane-water",
+      "source_hash": "sha256:suzuki-1"
+    },
+    {
+      "reaction_entity_id": "rxn-suzuki-2",
+      "document_id": "doc-suzuki",
+      "canonical_rxn_smiles": "Clc1ccc(Br)cc1.COB(O)OC>>c1ccc(-c2ccccc2)cc1",
+      "participant_signature": "aryl-chloride+boronate=>biaryl",
+      "reaction_family": "cross_coupling",
+      "procedure_signature": "suzuki-coupling",
+      "condition_signature": "Pd|base|toluene-water",
+      "source_hash": "sha256:suzuki-2"
+    }
+  ],
+  "requested_providers": ["rdkit_fingerprint", "rxnmapper", "rxnfp", "hybrid_graph", "tmap_layout"],
+  "provider_policy": {
+    "missing_dependency": "skip",
+    "per_reaction_failure": "warn",
+    "allow_network": false
+  }
+}
