@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { appendToolCall, applyPatchDecision, approvePatchDecision, attachEvidence, createAgentRun, createToolResult, getAuditTimeline, proposePatch, rejectPatchDecision, transitionAgentRunStatus, type AgentAuditEvent, type AgentEvidence, type AgentRun, type AgentToolCall, type PatchDecision, type PatchProposal } from "@chemd/agent-tools";
 import { buildEditorGraphRagRecords, compileChemdForEditor, type ChemdEditorDiagnostic, type ChemdLanguageCompileOutput, type ChemdOutlineItem, type ChemdQuickFixProposal, type ChemdTextEdit, type ChemdWorkspaceSymbolIndex } from "@chemd/language-service";
 
-import { shellFiles, shellPostgresStatus, shellSidecarStatus, shellWorkspace, type DesktopCommandError, type DesktopCommandMap, type LocalStoreStatus, type ManagedPostgresStatus, type PostgresStatus, type RuntimeState, type SidecarStatus, type WorkspaceFileEntry, type WorkspaceHandle, type WorkspaceIngestQueueItem, type WorkspaceIngestQueueSummary } from "./desktop-contracts";
+import { shellFiles, shellPostgresStatus, shellSidecarStatus, shellWorkspace, type DesktopCommandError, type DesktopCommandMap, type EmbeddingProviderStatus, type LocalStoreStatus, type ManagedPostgresStatus, type PostgresRagQueryResult, type PostgresStatus, type RuntimeState, type SidecarStatus, type WorkspaceFileEntry, type WorkspaceHandle, type WorkspaceIngestQueueItem, type WorkspaceIngestQueueSummary } from "./desktop-contracts";
 import { buildLocalRuntimeSnapshotInput } from "./desktop-local-store";
 import {
   buildPostgresProfileRows,
@@ -59,6 +59,7 @@ type WorkspaceState = "empty" | "opening" | "open" | "error"; type DocumentMode 
 type SidecarOperation = "start" | "stop" | "refresh" | "logs";
 type ManagedPostgresOperation = "init" | "start" | "stop" | "migrate" | "refresh";
 type LocalStoreOperation = "refresh" | "save" | "sync";
+type RagQueryOperationState = PersistOperationState | "disabled";
 type AgentMessageTone = "info" | "warning" | "success" | "danger";
 type AgentMessage = { tone: AgentMessageTone; text: string };
 type QuickFixCandidate = { diagnostic: ChemdEditorDiagnostic; quickFix: ChemdQuickFixProposal };
@@ -209,6 +210,9 @@ type DesktopWorkbenchProps = {
   semanticPreview: DesktopSemanticPreview;
   workspaceIndexViewModel: DesktopWorkspaceIndexViewModel;
   workspaceRagQueryState: DesktopPostgresRagQueryControllerState;
+  workspaceRagQuery: string;
+  workspaceRagQueryOperation: RagQueryOperationState;
+  workspaceRagQueryMessage: string;
   knowledgeMapViewModel: DesktopKnowledgeMapViewModel;
   output: ChemdLanguageCompileOutput;
   compileError?: string;
@@ -233,6 +237,8 @@ type DesktopWorkbenchProps = {
   onReloadWorkspaceConflict: () => void;
   onKeepLocalWorkspaceConflict: () => void;
   onKnowledgeMapSourceJump: (intent: DesktopSourceJumpIntent) => void;
+  onWorkspaceRagQueryChange: (query: string) => void;
+  onRunConnectedRagQuery: () => void;
   onProposeQuickFix: (candidate: QuickFixCandidate) => void;
   onApprovePatch: () => void;
   onApplyPatch: () => void;
@@ -244,6 +250,9 @@ type InsightPaneProps = {
   diagnostics: ChemdEditorDiagnostic[];
   workspaceIndexViewModel: DesktopWorkspaceIndexViewModel;
   workspaceRagQueryState: DesktopPostgresRagQueryControllerState;
+  workspaceRagQuery: string;
+  workspaceRagQueryOperation: RagQueryOperationState;
+  workspaceRagQueryMessage: string;
   knowledgeMapViewModel: DesktopKnowledgeMapViewModel;
   mode: DocumentMode;
   sidecarStatus: SidecarStatus;
@@ -289,6 +298,8 @@ type InsightPaneProps = {
   onMigrateManagedPostgres: () => void;
   onRefreshManagedPostgres: () => void;
   onPersistGraph: () => void;
+  onWorkspaceRagQueryChange: (query: string) => void;
+  onRunConnectedRagQuery: () => void;
   onRefreshLocalStore: () => void;
   onSaveLocalSnapshot: () => void;
   onSyncLocalOutbox: () => void;
@@ -484,6 +495,18 @@ const initialLocalStoreStatus: LocalStoreStatus = {
   outboxFailedCount: 0,
   lastSavedAt: null,
   lastSyncedAt: null
+};
+const initialEmbeddingProviderStatus: EmbeddingProviderStatus = {
+  state: "offline",
+  configured: false,
+  providerKind: "http_env",
+  model: null,
+  embeddingDim: null,
+  distanceMetric: null,
+  baseUrlHost: null,
+  timeoutMs: null,
+  apiKeyConfigured: false,
+  detail: "Embedding provider status has not been refreshed."
 };
 const agentStatusLabel: Record<AgentRun["status"], string> = {
   created: "Created",
@@ -2578,7 +2601,7 @@ const InsightDockContent = ({
   const contentByPanel: Record<InsightDockPanelId, ReactNode> = {
     outline: <div className="desktop-insight-section">{props.outline.length > 0 ? <OutlineTree items={props.outline} /> : <p className="desktop-empty-copy">No outline from language service.</p>}</div>,
     preview: <SemanticPreviewPanel preview={props.semanticPreview} workspaceSymbolIndexState={props.workspaceSymbolIndexState} workspaceSymbolIndexMessage={props.workspaceSymbolIndexMessage} workspaceSymbolIndexSummary={props.workspaceSymbolIndexSummary} />,
-    rag: <DesktopWorkspaceIndexPanel viewModel={props.workspaceIndexViewModel} connectedRagQueryState={props.workspaceRagQueryState} />,
+    rag: <DesktopWorkspaceIndexPanel viewModel={props.workspaceIndexViewModel} connectedRagQueryState={props.workspaceRagQueryState} query={props.workspaceRagQuery} connectedRagOperation={props.workspaceRagQueryOperation} connectedRagOperationMessage={props.workspaceRagQueryMessage} onQueryChange={props.onWorkspaceRagQueryChange} onRunConnectedRagQuery={props.onRunConnectedRagQuery} />,
     graph: <DesktopKnowledgeMapPanel viewModel={props.knowledgeMapViewModel} onSourceJump={props.onKnowledgeMapSourceJump} />,
     runtime: <SidecarControlPanel status={props.sidecarStatus} logTail={props.sidecarLogTail} operation={props.sidecarOperation} message={props.sidecarMessage} errorMessage={props.sidecarError} onStart={props.onStartSidecar} onStop={props.onStopSidecar} onRefresh={props.onRefreshSidecar} onLoadLogs={props.onLoadSidecarLogs} />,
     postgres: <PostgresStatusPanel status={props.postgresStatus} managedStatus={props.managedPostgresStatus} loading={props.postgresLoading} managedOperation={props.managedPostgresOperation} errorMessage={props.postgresError} managedErrorMessage={props.managedPostgresError} managedMessage={props.managedPostgresMessage} profiles={props.postgresProfiles} persistState={props.persistState} persistDisabledReason={props.persistDisabledReason} onRefresh={props.onRefreshPostgres} onInitManaged={props.onInitManagedPostgres} onStartManaged={props.onStartManagedPostgres} onStopManaged={props.onStopManagedPostgres} onMigrateManaged={props.onMigrateManagedPostgres} onRefreshManaged={props.onRefreshManagedPostgres} onPersistGraph={props.onPersistGraph} />,
@@ -3043,6 +3066,116 @@ const usePostgresController = () => {
     stopManaged: () => void runManagedCommand("stop"),
     migrateManaged: () => void runManagedCommand("migrate"),
     refreshManaged: () => void runManagedCommand("refresh")
+  };
+};
+
+const useEmbeddingProviderController = () => {
+  const [status, setStatus] = useState<EmbeddingProviderStatus>(initialEmbeddingProviderStatus);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = async () => {
+    setLoading(true);
+    try {
+      const nextStatus = await invokeDesktop("read_embedding_provider_status", undefined);
+      setStatus(nextStatus);
+      setError(null);
+    } catch (nextError: unknown) {
+      setStatus(initialEmbeddingProviderStatus);
+      setError(getCommandErrorMessage(nextError, "Embedding provider status unavailable"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void refresh();
+  }, []);
+
+  return {
+    status,
+    loading,
+    error,
+    refresh: () => void refresh()
+  };
+};
+
+const useConnectedRagQueryController = ({
+  mode,
+  file,
+  workspace,
+  postgresStatus,
+  embeddingStatus,
+  localResults
+}: {
+  mode: DocumentMode;
+  file: WorkspaceFileEntry;
+  workspace: WorkspaceHandle;
+  postgresStatus: PostgresStatus;
+  embeddingStatus: EmbeddingProviderStatus;
+  localResults: DesktopWorkspaceIndexViewModel["ragResults"];
+}) => {
+  const [query, setQueryValue] = useState("");
+  const [operation, setOperation] = useState<RagQueryOperationState>("idle");
+  const [message, setMessage] = useState("Connected RAG needs a configured embedding vector before it can query Postgres.");
+  const [commandResult, setCommandResult] = useState<PostgresRagQueryResult | null>(null);
+  const queryState = useMemo(() => buildDesktopPostgresRagQueryControllerState({
+    mode,
+    query,
+    postgresStatus,
+    embedding: {
+      providerAvailable: embeddingStatus.state === "ready",
+      vector: null,
+      model: embeddingStatus.model,
+      distanceMetric: embeddingStatus.distanceMetric ?? undefined
+    },
+    runnerAvailable: true,
+    localResults,
+    commandResult,
+    workspaceId: workspace.workspaceId,
+    documentId: file.path,
+    limit: 8
+  }), [commandResult, embeddingStatus, file.path, localResults, mode, postgresStatus, query, workspace.workspaceId]);
+
+  useEffect(() => {
+    setCommandResult(null);
+    setOperation(query.trim() ? "idle" : "disabled");
+    setMessage(query.trim()
+      ? queryState.message
+      : "Enter a query to search connected RAG when an embedding vector is available.");
+  }, [embeddingStatus, file.id, mode, postgresStatus, query, workspace.workspaceId]);
+
+  const setQuery = (nextQuery: string) => {
+    setQueryValue(nextQuery);
+  };
+
+  const run = async () => {
+    if (operation === "pending") return;
+    if (!queryState.request) {
+      setOperation("disabled");
+      setMessage(queryState.message);
+      return;
+    }
+    setOperation("pending");
+    setMessage("Querying connected Postgres RAG.");
+    try {
+      const result = await invokeDesktop("query_postgres_rag", { input: queryState.request });
+      setCommandResult(result);
+      setOperation(result.state === "ready" ? "success" : "failure");
+      setMessage(result.detail || queryState.message);
+    } catch (error: unknown) {
+      setOperation("failure");
+      setMessage(getCommandErrorMessage(error, "Connected RAG query failed"));
+    }
+  };
+
+  return {
+    query,
+    state: queryState,
+    operation,
+    message,
+    setQuery,
+    run: () => void run()
   };
 };
 
@@ -3535,6 +3668,9 @@ const DesktopWorkbench = ({
   semanticPreview,
   workspaceIndexViewModel,
   workspaceRagQueryState,
+  workspaceRagQuery,
+  workspaceRagQueryOperation,
+  workspaceRagQueryMessage,
   knowledgeMapViewModel,
   output,
   compileError,
@@ -3559,6 +3695,8 @@ const DesktopWorkbench = ({
   onReloadWorkspaceConflict,
   onKeepLocalWorkspaceConflict,
   onKnowledgeMapSourceJump,
+  onWorkspaceRagQueryChange,
+  onRunConnectedRagQuery,
   onProposeQuickFix,
   onApprovePatch,
   onApplyPatch,
@@ -3635,6 +3773,9 @@ const DesktopWorkbench = ({
               diagnostics={output.diagnostics}
               workspaceIndexViewModel={workspaceIndexViewModel}
               workspaceRagQueryState={workspaceRagQueryState}
+              workspaceRagQuery={workspaceRagQuery}
+              workspaceRagQueryOperation={workspaceRagQueryOperation}
+              workspaceRagQueryMessage={workspaceRagQueryMessage}
               knowledgeMapViewModel={knowledgeMapViewModel}
               mode={mode}
               sidecarStatus={sidecarController.status} sidecarLogTail={sidecarController.logTail} sidecarOperation={sidecarController.operation} sidecarMessage={sidecarController.message} sidecarError={sidecarController.error}
@@ -3663,6 +3804,8 @@ const DesktopWorkbench = ({
               onMigrateManagedPostgres={postgresController.migrateManaged}
               onRefreshManagedPostgres={postgresController.refreshManaged}
               onPersistGraph={persistController.persist}
+              onWorkspaceRagQueryChange={onWorkspaceRagQueryChange}
+              onRunConnectedRagQuery={onRunConnectedRagQuery}
               onRefreshLocalStore={localStoreController.refresh}
               onSaveLocalSnapshot={localStoreController.saveSnapshot}
               onSyncLocalOutbox={localStoreController.syncPending}
@@ -3885,26 +4028,16 @@ export const App = () => {
     readFile: readWorkspaceIndexFile
   });
   const workspaceIndexViewModel = workspaceIndexController.viewModel;
-  const workspaceRagQueryState = useMemo(() => buildDesktopPostgresRagQueryControllerState({
+  const embeddingProviderController = useEmbeddingProviderController();
+  const connectedRagQueryController = useConnectedRagQueryController({
     mode: workspaceController.mode,
-    query: "",
     postgresStatus: postgresController.status,
-    embedding: {
-      providerAvailable: false,
-      vector: null,
-      model: null
-    },
-    runnerAvailable: true,
+    embeddingStatus: embeddingProviderController.status,
     localResults: workspaceIndexViewModel.ragResults,
-    workspaceId: workspaceController.workspace.workspaceId,
-    documentId: workspaceController.selectedFile.path
-  }), [
-    postgresController.status,
-    workspaceController.mode,
-    workspaceController.selectedFile.path,
-    workspaceController.workspace.workspaceId,
-    workspaceIndexViewModel.ragResults
-  ]);
+    file: workspaceController.selectedFile,
+    workspace: workspaceController.workspace
+  });
+  const workspaceRagQueryState = connectedRagQueryController.state;
   const compileError = output.status === "failed" ? output.error.message : undefined;
   const persistController = usePersistRuntimeController({
     mode: workspaceController.mode,
@@ -4006,7 +4139,7 @@ export const App = () => {
       workspace={workspaceController.workspace} workspaceState={workspaceController.workspaceState}
       sidecarController={sidecarController} postgresController={postgresController} persistController={persistController} localStoreController={localStoreController} reactionIntelligenceJobBuild={reactionIntelligenceJobBuild} reactionIntelligenceJobController={reactionIntelligenceJobController} workspaceIngestController={workspaceIngestController} workspaceSymbolIndexController={workspaceSymbolIndexController}
       semanticPreview={semanticPreview}
-      workspaceIndexViewModel={workspaceIndexViewModel} workspaceRagQueryState={workspaceRagQueryState} knowledgeMapViewModel={knowledgeMapViewModel}
+      workspaceIndexViewModel={workspaceIndexViewModel} workspaceRagQueryState={workspaceRagQueryState} workspaceRagQuery={connectedRagQueryController.query} workspaceRagQueryOperation={connectedRagQueryController.operation} workspaceRagQueryMessage={connectedRagQueryController.message} knowledgeMapViewModel={knowledgeMapViewModel}
       output={output} compileError={compileError}
       files={workspaceController.files} selectedFile={workspaceController.selectedFile} selectedFileId={workspaceController.selectedFileId}
       mode={workspaceController.mode} message={workspaceController.message} source={workspaceController.source} savedSource={workspaceController.savedSource} workspaceConflict={workspaceController.workspaceConflict}
@@ -4018,6 +4151,8 @@ export const App = () => {
       onReloadWorkspaceConflict={() => void workspaceController.reloadWorkspaceConflict()}
       onKeepLocalWorkspaceConflict={workspaceController.keepLocalWorkspaceConflict}
       onKnowledgeMapSourceJump={handleKnowledgeMapSourceJump}
+      onWorkspaceRagQueryChange={connectedRagQueryController.setQuery}
+      onRunConnectedRagQuery={connectedRagQueryController.run}
       onProposeQuickFix={agentPatchController.proposeQuickFix}
       onApprovePatch={agentPatchController.approvePatch} onApplyPatch={agentPatchController.applyPatch} onRejectPatch={agentPatchController.rejectPatch}
     />

@@ -1399,6 +1399,26 @@
     font-size: 0.74rem;
   }
 
+  .desktop-tool-search-action {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 0.24rem;
+    height: 1.35rem;
+    padding: 0 0.42rem;
+    border: 1px solid color-mix(in oklch, var(--primary) 30%, var(--border));
+    border-radius: 6px;
+    background: color-mix(in oklch, var(--primary) 7%, var(--panel));
+    color: var(--foreground);
+    font-size: 0.66rem;
+    font-weight: 650;
+  }
+
+  .desktop-tool-search-action:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
   .desktop-tool-search select {
     min-width: 0;
     flex: 1;

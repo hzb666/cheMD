@@ -1,4 +1,4 @@
-import { Search } from "lucide-react";
+import { PlayCircle, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import {
@@ -14,6 +14,11 @@ interface WorkspaceIndexPanelProps {
   viewModel: DesktopWorkspaceIndexViewModel;
   connectedRagQueryView?: DesktopPostgresRagQueryView | null;
   connectedRagQueryState?: DesktopPostgresRagQueryControllerState | null;
+  query?: string;
+  connectedRagOperation?: "idle" | "pending" | "success" | "failure" | "disabled";
+  connectedRagOperationMessage?: string;
+  onQueryChange?: (query: string) => void;
+  onRunConnectedRagQuery?: () => void;
 }
 
 type SearchRowKind = "local" | "connected" | "symbol" | "reference";
@@ -109,9 +114,25 @@ const connectedSummaryCopy = (summary: ConnectedRagPanelSummary): string => {
 export const DesktopWorkspaceIndexPanel = ({
   viewModel,
   connectedRagQueryView = null,
-  connectedRagQueryState = null
+  connectedRagQueryState = null,
+  query,
+  connectedRagOperation = "idle",
+  connectedRagOperationMessage,
+  onQueryChange,
+  onRunConnectedRagQuery
 }: WorkspaceIndexPanelProps) => {
-  const [query, setQuery] = useState("");
+  const [localQuery, setLocalQuery] = useState("");
+  const activeQuery = query ?? localQuery;
+  const updateQuery = (nextQuery: string) => {
+    if (onQueryChange) {
+      onQueryChange(nextQuery);
+      return;
+    }
+    setLocalQuery(nextQuery);
+  };
+  const runDisabled = !onRunConnectedRagQuery
+    || connectedRagOperation === "pending"
+    || connectedRagQueryState?.disabled === true;
   const effectiveConnectedView = connectedRagQueryState?.commandView ?? connectedRagQueryView;
   const mergedRag = useMemo(() => mergeDesktopWorkspaceRagResults({
     localResults: viewModel.ragResults,
@@ -125,7 +146,7 @@ export const DesktopWorkspaceIndexPanel = ({
     mergedRag.blocked
   );
   const rows = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
+    const normalizedQuery = activeQuery.trim().toLowerCase();
     const symbolRows = viewModel.symbols.map((symbol) => ({
       id: `symbol-${symbol.id}`,
       kind: "symbol" as const,
@@ -146,7 +167,7 @@ export const DesktopWorkspaceIndexPanel = ({
     const allRows = [...ragRows, ...symbolRows, ...referenceRows];
     if (!normalizedQuery) return allRows.slice(0, 8);
     return allRows.filter((row) => rowMatchesQuery(row, normalizedQuery)).slice(0, 12);
-  }, [mergedRag.results, query, viewModel.references, viewModel.symbols]);
+  }, [activeQuery, mergedRag.results, viewModel.references, viewModel.symbols]);
 
   return (
     <div className="desktop-tool-panel">
@@ -158,11 +179,24 @@ export const DesktopWorkspaceIndexPanel = ({
       <label className="desktop-tool-search">
         <Search size={14} />
         <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          value={activeQuery}
+          onChange={(event) => updateQuery(event.target.value)}
           placeholder="Search citation-backed RAG, symbols, references"
           aria-label="RAG search query"
         />
+        {onRunConnectedRagQuery ? (
+          <button
+            type="button"
+            className="desktop-tool-search-action"
+            disabled={runDisabled}
+            data-state={connectedRagOperation}
+            onClick={onRunConnectedRagQuery}
+            title={connectedRagOperationMessage ?? connectedSummary.message}
+          >
+            <PlayCircle size={13} />
+            <span>{connectedRagOperation === "pending" ? "Running" : "Run"}</span>
+          </button>
+        ) : null}
       </label>
       <p className="desktop-empty-copy">{viewModel.message}</p>
       <p className="desktop-empty-copy">{viewModel.ragGate.message}</p>
@@ -176,6 +210,9 @@ export const DesktopWorkspaceIndexPanel = ({
         <code>{blockedSummary}</code>
         <small title={connectedSummary.detail}>{connectedSummaryCopy(connectedSummary)}</small>
       </div>
+      {connectedRagOperationMessage ? (
+        <p className="desktop-empty-copy">{connectedRagOperationMessage}</p>
+      ) : null}
       <div className="desktop-tool-result-list" role="list">
         {rows.length > 0 ? rows.map((row) => (
           <div
