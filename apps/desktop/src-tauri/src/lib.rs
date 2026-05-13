@@ -1,4 +1,5 @@
 mod diagnostics_bundle;
+mod embedding_provider_batch;
 mod embedding_provider_client;
 mod embedding_provider_status;
 mod local_store;

@@ -720,6 +720,15 @@ number，并对 provider error、API key、完整 URL 做脱敏。RAG 面板 Run
 UI 保持 failure/degraded 信息，本地 citation-backed RAG、symbols 与 references 搜索继续可用。
 backfill UI 仍暂缓到 chunk embedding 生成与任务状态路径完成后再接入。
 
+2026-05-13 第六批 M6 接入完成：Desktop 新增 `create_embedding_vectors`
+Tauri command foundation，为后续 RAG backfill UI 提供批量 query/chunk text -> embedding
+vector 能力。该 command 逐项处理 `{ id, text }`，限制单批 100 项，空 id/text
+只让对应 item 降级，其他有效 item 仍可继续生成 embedding；provider env 缺失或不可用时
+整体返回 offline/degraded 且不泄露文本、API key、完整 URL 或 provider body。同时
+workspace RAG result 现在保留完整 `text` 字段，`label` 仅用于截断展示，避免未来
+backfill 使用 UI display label 生成向量。真实 provider 网络 proof 与 backfill UI 仍按
+环境增强路径推进。
+
 验收：
 
 - Graph/RAG 只消费 compiler/exporter output，不重新解析 source。
@@ -884,7 +893,8 @@ env、database URL、API key、token 或 password。诊断包说明见
   pgvector query command、embedding write command、result gate、query view adapter
   与 RAG panel disabled/degraded 展示已具备；embedding provider status、query 输入
   与 Run 入口已接入；query text 可通过 `create_embedding_vector` 生成真实 vector 后
-  调用 `query_postgres_rag`。真实 provider 网络 proof 与 backfill UI 仍待补。
+  调用 `query_postgres_rag`；批量 `create_embedding_vectors` 与完整 chunk text 字段
+  已为 backfill UI 准备好 provider 侧基础。真实 provider 网络 proof 与 backfill UI 仍待补。
 - [ ] Agent run 可审计，patch 需用户确认。
 - [ ] 所有增强能力离线/失败时可降级。
 

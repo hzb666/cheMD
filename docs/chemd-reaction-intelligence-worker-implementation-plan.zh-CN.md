@@ -762,8 +762,11 @@ hybrid_score =
 - Desktop 新增 `create_embedding_vector` Tauri command，复用 `CHEMD_EMBEDDING_*`
   HTTP gateway contract，将 query text 转成真实 embedding vector；Run 点击后先生成
   vector，再调用 `query_postgres_rag`，不伪造 embedding，也不误报 pgvector 查询成功。
-- 当前验证：embedding provider Rust tests 9/9、diagnostics bundle Rust tests 3/3、
-  diagnostics script tests 8/8、connected RAG Vitest 21/21、desktop typecheck/build、
+- Desktop 新增 `create_embedding_vectors` Tauri command foundation，支持后续 RAG
+  backfill UI 批量生成 chunk embedding；workspace RAG result 已保留完整 `text`，
+  `label` 只负责截断展示。
+- 当前验证：embedding provider Rust tests 14/14、diagnostics bundle Rust tests 3/3、
+  diagnostics script tests 8/8、connected RAG/workspace index Vitest 25/25、desktop typecheck/build、
   focused ESLint 与 `git diff --check` 均通过。复杂度类 focused ESLint 仍按 M11
   记录：`DesktopWorkspaceIndexPanel` complexity 19/15，`App.tsx` 仍有既有
   max-lines/complexity 门禁。

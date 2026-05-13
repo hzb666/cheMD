@@ -1,7 +1,10 @@
+use crate::embedding_provider_batch::{
+    build_embedding_provider_batch_request_specs, redact_embedding_provider_detail,
+    CreateEmbeddingVectorItemInput, CreateEmbeddingVectorsInput,
+};
 use crate::embedding_provider_client::{
-    build_embedding_provider_batch_request_specs, build_embedding_provider_request_spec,
-    parse_embedding_response, redact_embedding_provider_detail, validate_embedding_vector,
-    CreateEmbeddingVectorInput, CreateEmbeddingVectorItemInput, CreateEmbeddingVectorsInput,
+    build_embedding_provider_request_spec, parse_embedding_response, validate_embedding_vector,
+    CreateEmbeddingVectorInput,
 };
 use serde_json::json;
 use std::collections::BTreeMap;
