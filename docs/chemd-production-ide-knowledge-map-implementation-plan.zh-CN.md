@@ -1101,3 +1101,27 @@ M1 language-service completion core
 - `pnpm exec vitest run apps/desktop/src/monaco-chemd-navigation.test.ts`：
   通过，1 file / 2 tests；Vitest 输出 workspace file deprecation warning。
 - `git diff --check`：通过；仅输出 LF/CRLF 工作区提示。
+
+### 2026-05-13 desktop-ide-monaco-code-actions
+
+- 范围：把已存在的 `toMonacoCodeActions()` quick-fix DTO 接入
+  desktop Monaco code action provider；不改变 UI 布局，不修改 `App.tsx`、
+  root 配置、package/lockfile、Tauri/Rust、数据库或 shared packages。
+- 产物：新增 `apps/desktop/src/monaco-chemd-code-actions.ts`，负责
+  code action provider 单例注册、当前 model URI 到 `compileOutput` 的缓存、
+  diagnostics quick fix 到 Monaco `WorkspaceEdit` 的映射；`MonacoChemdEditor.tsx`
+  只负责注册调用与 update/cleanup 生命周期。
+- 行为：provider 从当前 model URI 对应的 `compileOutput.diagnostics`
+  读取 quick fixes，返回 `quickfix` kind actions；WorkspaceEdit metadata
+  保留 proposal id 与 `beforeHash`，供后续审计/审批链路复用。
+- 降级：缺少 compile output、无 diagnostics、无 quick fixes 或 provider
+  内部异常时返回空 actions，不阻断编辑。
+- 验证：
+  - `pnpm --filter @chemd/desktop typecheck`：通过。
+  - `pnpm --filter @chemd/desktop exec eslint src/MonacoChemdEditor.tsx src/monaco-chemd-code-actions.ts src/monaco-chemd-code-actions.test.ts`：
+    通过。
+  - `pnpm exec vitest run apps/desktop/src/monaco-chemd-code-actions.test.ts`：
+    通过，1 file / 1 test；Vitest 输出 workspace file deprecation warning。
+  - `pnpm --filter @chemd/desktop build`：通过；Vite 输出 lucide
+    `use client` directive ignored warning 和 chunk size warning。
+  - `git diff --check`：通过；仅输出 LF/CRLF 工作区提示。
