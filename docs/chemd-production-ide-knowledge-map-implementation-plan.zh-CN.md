@@ -104,6 +104,7 @@
 - [x] `apps/desktop/src/MonacoChemdEditor.tsx`：薄接入 completion provider，通过 ref 读取当前 compile output / workspace index。
 - [x] `apps/desktop/src/monaco/chemd-navigation-provider.ts`：Monaco hover、go to definition、find references provider，复用 workspace symbol index。
 - [x] `apps/desktop/src/workspace-index/desktop-workspace-index.ts`：workspace symbol/reference index view-model 与 completion index adapter。
+- [x] `apps/desktop/src/workspace-index/use-desktop-workspace-index.ts`：workspace 打开后读取可见 Chemd 文档，当前编辑 buffer 覆盖缓存文档，形成 cross-document index。
 - [x] `apps/desktop/src/knowledge-map/desktop-knowledge-map.ts`：semantic render tree 与 reaction map fallback layout view-model。
 - [x] 新增 desktop focused tests：Monaco provider、workspace index view-model、knowledge map view-model。
 - [x] `apps/desktop/src/App.tsx` 薄接线：completion 接入 workspace index，RAG dock 展示 symbol/reference rows，Reaction Graph dock 展示 reaction map 与 cluster summary。
@@ -115,6 +116,7 @@
 - [x] `pnpm exec eslint apps/desktop/src/monaco apps/desktop/src/workspace-index apps/desktop/src/knowledge-map apps/desktop/src/MonacoChemdEditor.tsx --ext .ts,.tsx`
 - [x] `pnpm exec eslint apps/desktop/src/App.tsx apps/desktop/src/MonacoChemdEditor.tsx apps/desktop/src/monaco apps/desktop/src/workspace-index apps/desktop/src/knowledge-map --ext .ts,.tsx` 已清理新增 unused 问题；剩余 3 项为 `App.tsx` 既有 complexity / max-lines-per-function 门禁，按本轮“复杂度不作为阻塞项”不在此切片拆分。
 - [x] `pnpm exec vitest run apps/desktop/src/monaco/chemd-navigation-provider.test.ts apps/desktop/src/monaco/chemd-completion-provider.test.ts`
+- [x] `pnpm exec vitest run apps/desktop/src/workspace-index/desktop-workspace-index.test.ts apps/desktop/src/monaco/chemd-navigation-provider.test.ts`
 - [x] `pnpm --filter @chemd/desktop build` 通过；仅保留 Vite/lucide/module directive 与 chunk size warning。
 - [x] `poetry install` 于 `services/chem-service` 安装 lockfile 依赖，解决新工作树 venv 缺 `flask` 的环境问题。
 - [x] `poetry run python -m unittest discover tests` 通过：52 tests。

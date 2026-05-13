@@ -61,7 +61,7 @@ export interface DesktopWorkspaceIndexViewModel {
   badges: Array<{ label: string; value: string; tone: "neutral" | "ready" | "warning" | "error" }>;
 }
 
-const isChemdDocumentPath = (path: string): boolean =>
+export const isDesktopChemdDocumentPath = (path: string): boolean =>
   path.endsWith(".chemd") || path.endsWith(".chemd.md");
 
 const pathToUri = (workspaceId: string, path: string): string =>
@@ -79,17 +79,17 @@ const buildDocuments = (
   input: DesktopWorkspaceIndexInput
 ): WorkspaceDocumentInput[] => {
   const visibleChemdPaths = new Set(input.files
-    .filter((file) => file.kind === "file" && isChemdDocumentPath(file.path))
+    .filter((file) => file.kind === "file" && isDesktopChemdDocumentPath(file.path))
     .map((file) => file.path));
   const byPath = new Map<string, DesktopWorkspaceDocumentSource>();
 
   for (const document of input.documents ?? []) {
-    if (visibleChemdPaths.has(document.path) || isChemdDocumentPath(document.path)) {
+    if (visibleChemdPaths.has(document.path) || isDesktopChemdDocumentPath(document.path)) {
       byPath.set(document.path, document);
     }
   }
 
-  if (input.currentDocument && isChemdDocumentPath(input.currentDocument.path)) {
+  if (input.currentDocument && isDesktopChemdDocumentPath(input.currentDocument.path)) {
     byPath.set(input.currentDocument.path, input.currentDocument);
   }
 
@@ -223,4 +223,3 @@ export const getWorkspaceReferenceRowsForSymbol = (
   symbol: WorkspaceSymbol
 ): DesktopWorkspaceReferenceRow[] =>
   findReferences(index, { symbolId: symbol.symbolId }).map(toReferenceRow);
-

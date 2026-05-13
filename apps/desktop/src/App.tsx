@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { Activity, AlertTriangle, Bot, CheckCircle2, ChevronRight, CircleDot, Database, FileCode2, Files, FlaskConical, GitGraph, GripHorizontal, GripVertical, HardDrive, Lightbulb, PanelBottom, PanelBottomClose, PanelBottomOpen, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, PlayCircle, RefreshCw, ScrollText, Search, Settings, ShieldCheck, Sparkles, Square, UploadCloud, Wrench, XCircle } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
 import { appendToolCall, applyPatchDecision, approvePatchDecision, attachEvidence, createAgentRun, createToolResult, getAuditTimeline, proposePatch, rejectPatchDecision, transitionAgentRunStatus, type AgentAuditEvent, type AgentEvidence, type AgentRun, type AgentToolCall, type PatchDecision, type PatchProposal } from "@chemd/agent-tools";
 import { buildEditorGraphRagRecords, compileChemdForEditor, type ChemdEditorDiagnostic, type ChemdLanguageCompileOutput, type ChemdOutlineItem, type ChemdQuickFixProposal, type ChemdTextEdit } from "@chemd/language-service";
@@ -11,7 +11,8 @@ import { buildPersistRuntimeGraphRagCommandInput } from "./desktop-runtime-persi
 import { runWorkspaceIngest } from "./desktop-workspace-ingest";
 import { buildDesktopKnowledgeMapViewModel, type DesktopKnowledgeMapViewModel } from "./knowledge-map/desktop-knowledge-map";
 import { MonacoChemdEditor } from "./MonacoChemdEditor";
-import { buildDesktopWorkspaceIndexViewModel, type DesktopWorkspaceIndexViewModel } from "./workspace-index/desktop-workspace-index";
+import type { DesktopWorkspaceIndexViewModel } from "./workspace-index/desktop-workspace-index";
+import { useDesktopWorkspaceIndexController } from "./workspace-index/use-desktop-workspace-index";
 
 type WorkspaceState = "empty" | "opening" | "open" | "error"; type DocumentMode = "sample" | "workspace";
 type SidecarOperation = "start" | "stop" | "refresh" | "logs";
@@ -3301,27 +3302,30 @@ export const App = () => {
   const [agentMessage, setAgentMessage] = useState<AgentMessage | null>(null);
   const sidecarController = useSidecarController();
   const postgresController = usePostgresController();
+  const readWorkspaceIndexFile = useCallback((file: WorkspaceFileEntry) =>
+    invokeDesktop("read_workspace_file", {
+      workspaceId: workspaceController.workspace.workspaceId,
+      path: file.path
+    }).then((result) => ({
+      content: result.content,
+      modifiedAtMs: result.modifiedAtMs
+    })),
+  [workspaceController.workspace.workspaceId]);
   const output = useMemo(() => compileChemdForEditor({
     source: workspaceController.source,
     documentUri: workspaceController.selectedFile.path,
     options: { strictChemdKind: true, procedureMode: "auto" }
   }), [workspaceController.selectedFile.path, workspaceController.source]);
-  const workspaceIndexViewModel = useMemo(() => buildDesktopWorkspaceIndexViewModel({
-    workspaceId: workspaceController.workspace.workspaceId,
+  const workspaceIndexController = useDesktopWorkspaceIndexController({
+    mode: workspaceController.mode,
+    workspaceState: workspaceController.workspaceState,
+    workspace: workspaceController.workspace,
     files: workspaceController.files,
-    currentDocument: workspaceController.selectedFile.kind === "file"
-      ? {
-        path: workspaceController.selectedFile.path,
-        source: workspaceController.source
-      }
-      : undefined
-  }), [
-    workspaceController.files,
-    workspaceController.selectedFile.kind,
-    workspaceController.selectedFile.path,
-    workspaceController.source,
-    workspaceController.workspace.workspaceId
-  ]);
+    selectedFile: workspaceController.selectedFile,
+    source: workspaceController.source,
+    readFile: readWorkspaceIndexFile
+  });
+  const workspaceIndexViewModel = workspaceIndexController.viewModel;
   const knowledgeMapViewModel = useMemo(() =>
     buildDesktopKnowledgeMapViewModel(output),
   [output]);
