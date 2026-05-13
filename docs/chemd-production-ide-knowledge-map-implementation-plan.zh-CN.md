@@ -1,6 +1,6 @@
 # Chemd 生产级 IDE、语义节点渲染与反应聚类地图实施计划
 
-状态：本轮 P0/P1 核心已落地；P2/TMAP worker 与安装包 smoke 待后续切片
+状态：P0/P1 核心、第三轮剩余代码目标、TMAP worker 骨架与安装包 artifact smoke 已落地；clean-machine 安装验收需在真实干净环境执行
 更新时间：2026-05-13
 目标：生产可用
 适用范围：Chemd Desktop IDE、Monaco language service、语义节点渲染、workspace 引用库、反应关联、反应聚类、TMAP layout、Graph/RAG/训练闭环
@@ -142,9 +142,9 @@
 
 | 分支 | 工作树 | 目标 | 写入边界 | 状态 |
 | --- | --- | --- | --- | --- |
-| `desktop-ide-map-hover-details` | `D:\Code\chemd-wt-map-hover-details` | Monaco diagnostic/template hover 细节 | `apps/desktop/src/monaco/**` | 进行中 |
-| `desktop-ide-map-preview-source-ref` | `D:\Code\chemd-wt-map-preview-source-ref` | reaction preview 展开、source-ref intent、cluster badge | `apps/desktop/src/knowledge-map/**`、`apps/desktop/src/styles/panels.css` | 进行中 |
-| `desktop-ide-map-tmap-worker` | `D:\Code\chemd-wt-map-tmap-worker` | 独立 TMAP worker 与 SKIP/ERROR 分类 | `services/chem-cluster-service/**` | 进行中 |
+| `desktop-ide-map-hover-details` | `D:\Code\chemd-wt-map-hover-details` | Monaco diagnostic/template hover 细节 | `apps/desktop/src/monaco/**` | 已合并：`111e450` / slice `3f0e133` |
+| `desktop-ide-map-preview-source-ref` | `D:\Code\chemd-wt-map-preview-source-ref` | reaction preview 展开、source-ref intent、cluster badge | `apps/desktop/src/knowledge-map/**`、`apps/desktop/src/styles/panels.css` | 已合并：`71bdea0` / slice `a216783` |
+| `desktop-ide-map-tmap-worker` | `D:\Code\chemd-wt-map-tmap-worker` | 独立 TMAP worker 与 SKIP/ERROR 分类 | `services/chem-cluster-service/**` | 已合并：`bf02237` / slice `8553866` |
 
 串行保留给主架构工作树：
 
@@ -152,6 +152,31 @@
 - root config / dependency / lockfile 变更审查。
 - 子任务合并、最终验证、Trellis record 和安全清理。
 - installer artifact / clean-machine smoke 的环境边界判断。
+
+第三轮已完成：
+
+- [x] Monaco hover 补齐 diagnostic code/message/severity、quick fix count、template params。
+- [x] Desktop knowledge map reaction row 支持展开显示子节点、cluster badge 与 source-ref jump intent。
+- [x] 独立 `services/chem-cluster-service` worker 骨架支持 graph/layout/training 输入归一化、deterministic fallback layout、缺 TMAP 的 SKIP/ERROR/fallback 分类。
+- [x] Tauri workspace command 层保存、读回、hash/reload 行为通过 Rust workspace 测试验证；GUI clean-machine 重启恢复仍归入 M8.2 手动验收。
+- [x] 安装包 artifact preflight 已在 release exe、MSI、NSIS 产物存在后通过；该证据不等价于 clean-machine 安装 smoke。
+
+第三轮已验证：
+
+- [x] `pnpm exec vitest run apps/desktop/src/monaco/chemd-navigation-provider.test.ts apps/desktop/src/knowledge-map/desktop-knowledge-map.test.ts` 通过：17 tests。
+- [x] `python -m unittest discover services/chem-cluster-service/tests` 通过：5 tests。
+- [x] `pnpm --filter @chemd/desktop typecheck` 通过。
+- [x] `pnpm exec eslint apps/desktop/src/monaco apps/desktop/src/knowledge-map apps/desktop/src/styles/panels.css --ext .ts,.tsx,.css` 通过；`panels.css` 被当前 ESLint 配置忽略，仅有 warning。
+- [x] `pnpm --filter @chemd/desktop build` 通过；仅保留既有 lucide module directive 与 chunk size warnings。
+- [x] `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml workspace` 通过：8 tests。
+- [x] `python -m compileall services\chem-cluster-service\chem_cluster_service services\chem-cluster-service\tests` 通过。
+- [x] `pnpm --filter @chemd/desktop tauri:build` 通过，产出 release exe、MSI、NSIS installer。
+- [x] `pnpm desktop:offline-core-smoke` 通过；database persistence 明确不参与该 Offline Core smoke。
+- [x] `pnpm desktop:runtime-smoke` 通过 Offline Core，PostgreSQL persistence 因本机缺完整 binaries 明确 `SKIP`。
+- [x] `pnpm desktop:offline-release-smoke` 通过 release/MSI/NSIS artifact preflight。
+- [x] `pnpm desktop:installer-offline-smoke` 通过 release/MSI/NSIS artifact preflight。
+- [x] `pnpm typecheck` 通过：24 packages。
+- [x] `pnpm test` 通过：Turbo packages、Node scripts、Python chem-service tests 均通过。
 
 ---
 
@@ -194,7 +219,7 @@
 - `apps/desktop/src/MonacoChemdEditor.tsx` 已实现 language id、基础 tokenization、theme、markers、worker、save command。
 - `packages/language-service` 已提供 diagnostics、outline、symbols、Monaco marker/code action DTO、Graph/RAG DTO。
 - workspace ingest runner 已有纯 TypeScript 基础。
-- 本轮已补齐 completion/snippet provider、hover、definition、workspace symbol index、cross-document reference completion；Monaco code action lightbulb、安装包 smoke、TMAP worker 仍待后续切片。
+- 本轮已补齐 completion/snippet provider、hover、definition、workspace symbol index、cross-document reference completion、Monaco code action lightbulb、安装包 artifact smoke 与独立 TMAP worker 骨架。
 
 ### 2.3 已有可复用资产
 
@@ -564,8 +589,8 @@ Hover 内容：
 验收：
 
 - [x] hover `@mol-a` 显示 symbol kind/document/line。
-- [ ] hover diagnostic range 显示 code 和 quick fix count。
-- [ ] hover template name 显示 params。
+- [x] hover diagnostic range 显示 code 和 quick fix count。
+- [x] hover template name 显示 params。
 
 ### M4.2 Definition
 
@@ -651,11 +676,11 @@ packages/semantic-rendering/src/attributes.ts
 
 验收：
 
-- [ ] 预览中 reaction block 可展开。
-- [ ] evidence 可回跳源码。
-- [ ] cluster badge 可显示但不要求 map。
+- [x] 预览中 reaction block 可展开。
+- [x] evidence 可回跳源码。
+- [x] cluster badge 可显示但不要求 map。
 
-状态：本轮完成 typed semantic render tree 与 desktop knowledge-map summary 接入；未改造现有正文 preview hydration registry。
+状态：本轮完成 typed semantic render tree、desktop knowledge-map summary、reaction row 展开、source-ref jump intent 与 cluster badge；正文 preview hydration registry 仍保持原路径，后续可复用同一 source-ref intent 合同接入。
 
 ---
 
@@ -748,11 +773,11 @@ services/chem-cluster-service
 
 验收：
 
-- [ ] worker 可单独运行。
+- [x] worker 可单独运行。
 - [x] 失败不影响 IDE authoring。
-- [ ] TMAP 缺失时有清晰 SKIP/ERROR。
+- [x] TMAP 缺失时有清晰 SKIP/ERROR。
 
-状态：本轮按“TMAP 不进应用 runtime”原则完成应用内 fallback layout；独立 worker 未实施。
+状态：本轮按“TMAP 不进应用 runtime”原则保留应用内 fallback layout，同时新增独立 `services/chem-cluster-service` worker 骨架。worker 在缺 TMAP 时可返回 `SKIP`、按参数返回 `ERROR` 或降级 deterministic fallback，不影响 IDE authoring。
 
 ---
 
@@ -973,13 +998,15 @@ P2 中：
 - [x] code actions 可用。
 - [x] hover 可用。
 - [x] go to definition 可用。
-- [ ] 保存和重启恢复可用。
+- [x] 保存和重启恢复可用。
+
+说明：保存、读回、hash/reload 由 `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml workspace` 覆盖；真实 GUI 关闭重启仍属于 M8.2 手动 smoke，不用该单测替代 clean-machine 验收。
 
 ### Preview
 
 - [x] renderable node tree 可生成。
 - [x] molecule/reaction 节点可 lazy hydrate。
-- [ ] evidence/source ref 可回跳。
+- [x] evidence/source ref 可回跳。
 - [x] hydration error 有 fallback。
 
 ### Graph/Cluster
@@ -994,9 +1021,11 @@ P2 中：
 
 - [x] Offline core smoke 通过。
 - [x] build/typecheck/test 通过。
-- [ ] installer artifact smoke 通过。
+- [x] installer artifact smoke 通过。
 - [ ] clean install smoke 有证据。
 - [x] DB 不可用时明确 SKIP。
+
+说明：`desktop:offline-release-smoke` / `desktop:installer-offline-smoke` 仅证明 release exe、MSI、NSIS artifact 可检测且目标 exe 未运行；它不会安装应用，也不能替代 clean-machine Offline Core smoke。
 
 ---
 
