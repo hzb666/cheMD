@@ -1,5 +1,6 @@
 import type {
   PersistRuntimeGraphRagPayload,
+  LocalRuntimeSnapshotInput,
   RuntimeJsonObject,
   RuntimeJsonValue,
   WorkspaceFileContent,
@@ -9,7 +10,10 @@ import type {
   WorkspaceIngestQueueStatus,
   WorkspaceIngestQueueSummary
 } from "./desktop-contracts";
-import { toSafeLocalDisplaySummary } from "./desktop-local-store";
+import {
+  buildLocalRuntimeSnapshotInput,
+  toSafeLocalDisplaySummary
+} from "./desktop-local-store";
 
 const HASH_PREFIX = "fnv1a";
 const DEFAULT_MAX_ERROR_LENGTH = 160,
@@ -32,6 +36,51 @@ export interface DeriveWorkspaceIngestQueueSummaryOptions {
   maxErrors?: number;
   maxErrorLength?: number;
   maxRetryFailures?: number;
+}
+
+export type WorkspaceIngestOutboxDisposition = "eligible" | "retryable" | "skipped" | "blocked";
+
+export type WorkspaceIngestOutboxReason =
+  | "pending_runtime_payload"
+  | "failed_retryable_runtime_payload"
+  | "status_skipped"
+  | "already_synced"
+  | "currently_running"
+  | "missing_runtime_payload"
+  | "retry_limit_reached";
+
+export interface BuildWorkspaceIngestOutboxInputsOptions {
+  maxRetryFailures?: number;
+  maxErrorLength?: number;
+}
+
+export interface WorkspaceIngestOutboxItemSummary {
+  queueId: string;
+  documentPath: string;
+  status: WorkspaceIngestQueueStatus;
+  disposition: WorkspaceIngestOutboxDisposition;
+  reason: WorkspaceIngestOutboxReason;
+  failureCount: number;
+  retryable: boolean;
+  localId: string | null;
+  idempotencyKey: string | null;
+  graphSnapshotId: string | null;
+  errorSummary: string | null;
+}
+
+export interface WorkspaceIngestOutboxSummary {
+  eligibleCount: number;
+  retryableCount: number;
+  skippedCount: number;
+  blockedCount: number;
+  outboxCount: number;
+  totalCount: number;
+  items: WorkspaceIngestOutboxItemSummary[];
+}
+
+export interface BuildWorkspaceIngestOutboxInputsResult {
+  inputs: LocalRuntimeSnapshotInput[];
+  summary: WorkspaceIngestOutboxSummary;
 }
 
 type MaybePromise<T> = T | Promise<T>;
@@ -197,6 +246,105 @@ const countByStatus = (
   items: readonly WorkspaceIngestQueueItem[],
   status: WorkspaceIngestQueueStatus
 ): number => items.filter((item) => item.status === status).length;
+
+const getSkippedOutboxReason = (
+  status: Exclude<WorkspaceIngestQueueStatus, "pending" | "failed">
+): WorkspaceIngestOutboxReason => {
+  if (status === "synced") return "already_synced";
+  if (status === "running") return "currently_running";
+  return "status_skipped";
+};
+
+interface BuildOutboxSummaryItemInput {
+  item: WorkspaceIngestQueueItem;
+  input: LocalRuntimeSnapshotInput | null;
+  state: Pick<WorkspaceIngestOutboxItemSummary, "disposition" | "reason" | "retryable">;
+  maxErrorLength: number;
+}
+
+const buildOutboxSummaryItem = ({
+  item,
+  input,
+  state,
+  maxErrorLength
+}: BuildOutboxSummaryItemInput): WorkspaceIngestOutboxItemSummary => ({
+  queueId: item.queueId,
+  documentPath: item.documentPath,
+  status: item.status,
+  disposition: state.disposition,
+  reason: state.reason,
+  failureCount: item.failureCount,
+  retryable: state.retryable,
+  localId: input?.localId ?? null,
+  idempotencyKey: input?.idempotencyKey ?? null,
+  graphSnapshotId: input?.payload.graphSnapshot.graphSnapshotId ?? item.graphSnapshotId,
+  errorSummary: toSafeLocalDisplaySummary(item.errorSummary, maxErrorLength)
+});
+
+const deriveOutboxDisposition = (
+  item: WorkspaceIngestQueueItem,
+  maxRetryFailures: number
+): Pick<WorkspaceIngestOutboxItemSummary, "disposition" | "reason" | "retryable"> => {
+  const retryable = canRetry(item, maxRetryFailures);
+  if (item.status !== "pending" && item.status !== "failed") {
+    return {
+      disposition: "skipped",
+      reason: getSkippedOutboxReason(item.status),
+      retryable
+    };
+  }
+  if (!item.runtimePayload) {
+    return { disposition: "blocked", reason: "missing_runtime_payload", retryable };
+  }
+  if (item.status === "failed" && !retryable) {
+    return { disposition: "blocked", reason: "retry_limit_reached", retryable };
+  }
+  if (item.status === "failed") {
+    return { disposition: "retryable", reason: "failed_retryable_runtime_payload", retryable };
+  }
+  return { disposition: "eligible", reason: "pending_runtime_payload", retryable };
+};
+
+const countByDisposition = (
+  items: readonly WorkspaceIngestOutboxItemSummary[],
+  disposition: WorkspaceIngestOutboxDisposition
+): number => items.filter((item) => item.disposition === disposition).length;
+
+export const buildWorkspaceIngestOutboxInputs = (
+  items: readonly WorkspaceIngestQueueItem[],
+  options: BuildWorkspaceIngestOutboxInputsOptions = {}
+): BuildWorkspaceIngestOutboxInputsResult => {
+  const maxRetryFailures = options.maxRetryFailures ?? DEFAULT_MAX_RETRY_FAILURES;
+  const maxErrorLength = options.maxErrorLength ?? DEFAULT_MAX_ERROR_LENGTH;
+  const inputs: LocalRuntimeSnapshotInput[] = [];
+  const summaries = items.map((item) => {
+    const state = deriveOutboxDisposition(item, maxRetryFailures);
+    const input = item.runtimePayload
+      && (state.disposition === "eligible" || state.disposition === "retryable")
+      ? buildLocalRuntimeSnapshotInput(item.runtimePayload)
+      : null;
+    if (input) inputs.push(input);
+    return buildOutboxSummaryItem({
+      item,
+      input,
+      state,
+      maxErrorLength
+    });
+  });
+
+  return {
+    inputs,
+    summary: {
+      eligibleCount: countByDisposition(summaries, "eligible"),
+      retryableCount: countByDisposition(summaries, "retryable"),
+      skippedCount: countByDisposition(summaries, "skipped"),
+      blockedCount: countByDisposition(summaries, "blocked"),
+      outboxCount: inputs.length,
+      totalCount: items.length,
+      items: summaries
+    }
+  };
+};
 
 export const deriveWorkspaceIngestQueueSummary = (
   items: readonly WorkspaceIngestQueueItem[],
