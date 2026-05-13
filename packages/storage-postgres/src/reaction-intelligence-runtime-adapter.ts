@@ -1,75 +1,17 @@
+import {
+  REACTION_INTELLIGENCE_ARTIFACT_SCHEMA_VERSION,
+  type ChemdReactionIntelligenceArtifactV1
+} from "@chemd/reaction-map";
 import type {
   BuildPostgresRuntimeGraphRagInput,
   RuntimeEditorGraphEdge,
   RuntimeEditorGraphNode
 } from "./graph-rag-runtime-types";
 
-export type ReactionIntelligenceProviderStatus = "PASS" | "SKIP" | "ERROR";
-export type ReactionIntelligenceConfidence = "high" | "medium" | "low";
+export type { ChemdReactionIntelligenceArtifactV1 } from "@chemd/reaction-map";
 
-export interface ReactionIntelligenceProviderReport {
-  provider_id: string;
-  kind: string;
-  status: ReactionIntelligenceProviderStatus;
-  package_name?: string;
-  package_version?: string;
-  model_id?: string;
-  model_hash?: string;
-  warnings: string[];
-}
-
-export interface ReactionIntelligenceFeatureRef {
-  feature_ref_id: string;
-  provider: string;
-  kind: string;
-  dimension: number;
-  storage: string;
-  hash: string;
-}
-
-export interface ReactionIntelligenceComputedFeature {
-  reaction_entity_id: string;
-  source_hash: string;
-  fingerprint_refs: ReactionIntelligenceFeatureRef[];
-  atom_mapping?: {
-    provider: string;
-    confidence: number;
-    mapping_hash: string;
-    warnings: string[];
-  };
-  reaction_center?: {
-    provider: string;
-    center_signature: string;
-    confidence: ReactionIntelligenceConfidence;
-    warnings: string[];
-  };
-  warnings: string[];
-}
-
-export interface ReactionIntelligenceSimilarityEdge {
-  edge_id: string;
-  from_reaction_entity_id: string;
-  to_reaction_entity_id: string;
-  score: number;
-  confidence: ReactionIntelligenceConfidence;
-  basis: string[];
-  provider_ids: string[];
-  source_hashes: string[];
-  warnings: string[];
-}
-
-export interface ChemdReactionIntelligenceArtifactV1 {
-  schema_version: "chemd-reaction-intelligence-artifact/v0.1";
-  artifact_id: string;
-  job_id: string;
-  graph_index_id: string;
-  generated_at: string;
-  providers: ReactionIntelligenceProviderReport[];
-  reaction_features: ReactionIntelligenceComputedFeature[];
-  similarity_edges: ReactionIntelligenceSimilarityEdge[];
-  layout?: unknown;
-  warnings: string[];
-}
+type ReactionIntelligenceSimilarityEdge =
+  ChemdReactionIntelligenceArtifactV1["similarity_edges"][number];
 
 export interface ReactionIntelligenceArtifactValidationResult {
   valid: boolean;
@@ -87,8 +29,6 @@ export interface BuildReactionIntelligenceRuntimeGraphRagInputResult {
   appendedEdgeCount: number;
   validation: ReactionIntelligenceArtifactValidationResult;
 }
-
-const ARTIFACT_SCHEMA_VERSION = "chemd-reaction-intelligence-artifact/v0.1";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -112,7 +52,7 @@ const validateArtifact = (
   if (!isRecord(artifact)) {
     return { valid: false, errors: ["artifact is required"], warnings };
   }
-  if (artifact.schema_version !== ARTIFACT_SCHEMA_VERSION) {
+  if (artifact.schema_version !== REACTION_INTELLIGENCE_ARTIFACT_SCHEMA_VERSION) {
     errors.push("schema_version is invalid");
   }
   ["artifact_id", "job_id", "graph_index_id", "generated_at"].forEach((field) => {

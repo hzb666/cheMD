@@ -77,6 +77,7 @@ const artifactFixture = (
     {
       reaction_entity_id: "rxn-a",
       source_hash: "sha256:rxn-a",
+      canonical_rxn_smiles: "CCO>>CC=O",
       fingerprint_refs: [
         {
           feature_ref_id: "feature-rxn-a-rdkit",
@@ -90,6 +91,8 @@ const artifactFixture = (
       reaction_center: {
         provider: "rxnmapper_derived",
         center_signature: "C-O",
+        changed_bonds: ["C-O"],
+        changed_atoms: ["C", "O"],
         confidence: "medium",
         warnings: ["reaction_center_inferred"]
       },

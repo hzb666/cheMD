@@ -65,15 +65,15 @@ importers:
       '@chemd/language-service':
         specifier: workspace:*
         version: link:../../packages/language-service
+      '@chemd/reaction-map':
+        specifier: workspace:*
+        version: link:../../packages/reaction-map
       '@chemd/renderer-html':
         specifier: workspace:*
         version: link:../../packages/renderer-html
       '@chemd/renderer-json':
         specifier: workspace:*
         version: link:../../packages/renderer-json
-      '@chemd/reaction-map':
-        specifier: workspace:*
-        version: link:../../packages/reaction-map
       '@chemd/semantic-rendering':
         specifier: workspace:*
         version: link:../../packages/semantic-rendering
@@ -401,6 +401,9 @@ importers:
       '@chemd/lnf':
         specifier: workspace:*
         version: link:../lnf
+      '@chemd/reaction-map':
+        specifier: workspace:*
+        version: link:../reaction-map
     devDependencies:
       '@chemd/compiler':
         specifier: workspace:*
