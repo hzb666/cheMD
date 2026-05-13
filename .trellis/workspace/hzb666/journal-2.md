@@ -910,3 +910,41 @@ Merged workspace reference completion core into @chemd/language-service and desk
 ### Next Steps
 
 - None - task complete
+
+
+## Session 61: Desktop IDE code actions and workspace symbol helper
+
+**Date**: 2026-05-13
+**Task**: Desktop IDE code actions and workspace symbol helper
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Merged desktop Monaco code actions and a desktop workspace symbol index helper into desktop-ide. Validation passed: desktop typecheck, focused desktop ESLint, monaco code-action and workspace-symbol helper tests 7/7, desktop build, conflict marker scan, and git diff --check. Warnings were limited to existing Vite lucide/chunk warnings and Vitest workspace file deprecation.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8a621be` | (see git log) |
+| `b2d8d9a` | (see git log) |
+| `b015ec8` | (see git log) |
+| `f0ea9bc` | (see git log) |
+| `a284d35` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
