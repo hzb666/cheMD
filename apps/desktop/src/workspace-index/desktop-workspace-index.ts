@@ -15,6 +15,11 @@ import {
 } from "@chemd/workspace-index";
 
 import type { WorkspaceFileEntry } from "../desktop-contracts";
+import {
+  buildDesktopWorkspaceRagView,
+  type DesktopWorkspaceRagGate,
+  type DesktopWorkspaceRagResult
+} from "./desktop-rag-citation-gate";
 
 export type DesktopWorkspaceIndexState = "empty" | "ready" | "degraded" | "failed";
 
@@ -58,6 +63,8 @@ export interface DesktopWorkspaceIndexViewModel {
   completionIndex: ChemdWorkspaceSymbolIndex | undefined;
   symbols: DesktopWorkspaceSymbolRow[];
   references: DesktopWorkspaceReferenceRow[];
+  ragResults: DesktopWorkspaceRagResult[];
+  ragGate: DesktopWorkspaceRagGate;
   badges: Array<{ label: string; value: string; tone: "neutral" | "ready" | "warning" | "error" }>;
 }
 
@@ -242,6 +249,7 @@ export const buildDesktopWorkspaceIndexViewModel = (
     : null;
   const summary = index ? summarizeWorkspaceIndex(index) : null;
   const state = buildState(index, documents.length);
+  const ragView = buildDesktopWorkspaceRagView(input.workspaceId, documents);
 
   return {
     state,
@@ -250,14 +258,18 @@ export const buildDesktopWorkspaceIndexViewModel = (
     completionIndex: index ? toCompletionIndex(index) : undefined,
     symbols: index ? listWorkspaceSymbols(index).map(toSymbolRow) : [],
     references: index ? index.references.map(toReferenceRow) : [],
+    ragResults: ragView.ragResults,
+    ragGate: ragView.ragGate,
     badges: summary ? [
       { label: "Docs", value: String(summary.documentCount), tone: "neutral" },
       { label: "Symbols", value: String(summary.symbolCount), tone: "ready" },
       { label: "Refs", value: String(summary.referenceCount), tone: "neutral" },
+      { label: "RAG", value: String(ragView.ragResults.length), tone: ragView.ragGate.state === "ready" ? "ready" : "warning" },
       { label: "Unresolved", value: String(summary.unresolvedReferenceCount), tone: badgeTone(summary.unresolvedReferenceCount) },
       { label: "Failed", value: String(summary.failedDocumentCount), tone: summary.failedDocumentCount > 0 ? "error" : "ready" }
     ] : [
-      { label: "Docs", value: "0", tone: "neutral" }
+      { label: "Docs", value: "0", tone: "neutral" },
+      { label: "RAG", value: "0", tone: "warning" }
     ]
   };
 };

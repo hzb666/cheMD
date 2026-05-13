@@ -25,17 +25,23 @@ export const DesktopWorkspaceIndexPanel = ({
       label: reference.target,
       detail: `${reference.field} L${reference.line}`
     }));
-    const allRows = [...symbolRows, ...referenceRows];
+    const ragRows = viewModel.ragResults.map((result) => ({
+      id: result.id,
+      kind: "rag",
+      label: result.label,
+      detail: `${result.detail} ${result.revisionId}/${result.chunkId}`
+    }));
+    const allRows = [...ragRows, ...symbolRows, ...referenceRows];
     if (!normalizedQuery) return allRows.slice(0, 8);
     return allRows.filter((row) =>
       `${row.kind} ${row.label} ${row.detail}`.toLowerCase().includes(normalizedQuery)
     ).slice(0, 12);
-  }, [query, viewModel.references, viewModel.symbols]);
+  }, [query, viewModel.ragResults, viewModel.references, viewModel.symbols]);
 
   return (
     <div className="desktop-tool-panel">
       <div className="desktop-graph-summary">
-        {viewModel.badges.slice(0, 3).map((badge) => (
+        {viewModel.badges.slice(0, 4).map((badge) => (
           <div key={badge.label} data-state={badge.tone}><span>{badge.label}</span><strong>{badge.value}</strong></div>
         ))}
       </div>
@@ -44,11 +50,12 @@ export const DesktopWorkspaceIndexPanel = ({
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search symbols, diagnostics, graph text"
+          placeholder="Search citation-backed RAG, symbols, references"
           aria-label="RAG search query"
         />
       </label>
       <p className="desktop-empty-copy">{viewModel.message}</p>
+      <p className="desktop-empty-copy">{viewModel.ragGate.message}</p>
       <div className="desktop-tool-result-list" role="list">
         {rows.length > 0 ? rows.map((row) => (
           <div key={row.id} className="desktop-tool-result-row" role="listitem">
