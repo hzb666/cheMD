@@ -948,3 +948,41 @@ Merged desktop Monaco code actions and a desktop workspace symbol index helper i
 ### Next Steps
 
 - None - task complete
+
+
+## Session 62: Desktop IDE workspace completions and semantic preview helper
+
+**Date**: 2026-05-13
+**Task**: Desktop IDE workspace completions and semantic preview helper
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+Merged Monaco workspace reference completion support and a desktop semantic preview helper into desktop-ide. Architect integration converted semantic preview imports to @chemd/renderer-json and @chemd/renderer-html workspace dependencies and updated pnpm-lock.yaml. Validation passed: Monaco completion and semantic preview tests 5/5, desktop typecheck, focused desktop ESLint, desktop build, conflict marker scan, and git diff --check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8e894d4` | (see git log) |
+| `3346867` | (see git log) |
+| `41c3514` | (see git log) |
+| `7041d4f` | (see git log) |
+| `326e14b` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
