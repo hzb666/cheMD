@@ -113,6 +113,11 @@
 - [x] `pnpm --filter @chemd/desktop typecheck`
 - [x] `pnpm exec eslint apps/desktop/src/monaco apps/desktop/src/workspace-index apps/desktop/src/knowledge-map apps/desktop/src/MonacoChemdEditor.tsx --ext .ts,.tsx`
 - [x] `pnpm exec eslint apps/desktop/src/App.tsx apps/desktop/src/MonacoChemdEditor.tsx apps/desktop/src/monaco apps/desktop/src/workspace-index apps/desktop/src/knowledge-map --ext .ts,.tsx` 已清理新增 unused 问题；剩余 3 项为 `App.tsx` 既有 complexity / max-lines-per-function 门禁，按本轮“复杂度不作为阻塞项”不在此切片拆分。
+- [x] `pnpm --filter @chemd/desktop build` 通过；仅保留 Vite/lucide/module directive 与 chunk size warning。
+- [x] `poetry install` 于 `services/chem-service` 安装 lockfile 依赖，解决新工作树 venv 缺 `flask` 的环境问题。
+- [x] `poetry run python -m unittest discover tests` 通过：52 tests。
+- [x] `pnpm test` 通过：Turbo packages、Node scripts、Python chem-service tests 均通过。
+- [x] `pnpm typecheck` 通过：24 packages。
 
 ---
 
