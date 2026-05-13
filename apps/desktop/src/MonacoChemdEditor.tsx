@@ -1,5 +1,5 @@
 import { loader, Editor, type BeforeMount, type Monaco, type OnChange, type OnMount } from "@monaco-editor/react";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import type { editor } from "monaco-editor";
 import * as monacoRuntime from "monaco-editor/esm/vs/editor/editor.api.js";
 import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
@@ -49,6 +49,9 @@ loader.config({ monaco: monacoRuntime });
 
 type MonacoEditor = editor.IStandaloneCodeEditor;
 
+export type MonacoSourceJumpIntent = { range: { startLine: number; endLine?: number; startColumn?: number; endColumn?: number; startOffset?: number; endOffset?: number } };
+export type MonacoChemdEditorHandle = { jumpToSource: (intent: MonacoSourceJumpIntent) => boolean };
+
 type MonacoChemdEditorProps = {
   value: string;
   documentPath: string;
@@ -71,6 +74,75 @@ const toModelPath = (documentPath: string): string => {
 };
 
 export const toChemdDesktopModelUri = toModelPath;
+
+const normalizeChemdDesktopDocumentPath = (documentPath: string): string =>
+  documentPath
+    .trim()
+    .replace(/\\/g, "/")
+    .replace(/^chemd:\/\/desktop\//u, "")
+    .replace(/^\/+/u, "")
+    .replace(/\/+/gu, "/")
+    .toLowerCase();
+
+export const isSameChemdDesktopDocumentPath = (
+  sourceUri: string | undefined,
+  documentPath: string
+): boolean => {
+  if (!sourceUri) return true;
+  const sourcePath = normalizeChemdDesktopDocumentPath(sourceUri);
+  const currentPath = normalizeChemdDesktopDocumentPath(documentPath);
+  return sourcePath === currentPath
+    || currentPath.endsWith(`/${sourcePath}`)
+    || sourcePath.endsWith(`/${currentPath}`);
+};
+
+type SourceJumpModel = {
+  getLineCount: () => number;
+  getLineMaxColumn: (lineNumber: number) => number;
+  getPositionAt: (offset: number) => { lineNumber: number; column: number };
+};
+
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value);
+
+const clampInteger = (value: number, min: number, max: number): number =>
+  Math.min(Math.max(Math.trunc(value), min), max);
+
+export const resolveMonacoSourceJumpSelection = (
+  model: SourceJumpModel,
+  range: MonacoSourceJumpIntent["range"]
+) => {
+  if (isFiniteNumber(range.startOffset)) {
+    const startOffset = Math.max(0, Math.trunc(range.startOffset));
+    const endOffset = isFiniteNumber(range.endOffset)
+      ? Math.max(startOffset, Math.trunc(range.endOffset))
+      : startOffset;
+    const start = model.getPositionAt(startOffset);
+    const end = model.getPositionAt(endOffset);
+
+    return {
+      startLineNumber: start.lineNumber,
+      startColumn: start.column,
+      endLineNumber: end.lineNumber,
+      endColumn: Math.max(end.column, start.lineNumber === end.lineNumber ? start.column + 1 : 1)
+    };
+  }
+
+  const lineCount = model.getLineCount();
+  const startLineNumber = clampInteger(range.startLine, 1, lineCount);
+  const endLineNumber = clampInteger(range.endLine ?? range.startLine, startLineNumber, lineCount);
+  const startColumn = clampInteger(isFiniteNumber(range.startColumn) ? range.startColumn : 1, 1, model.getLineMaxColumn(startLineNumber));
+  const endColumn = isFiniteNumber(range.endColumn)
+    ? clampInteger(range.endColumn, 1, model.getLineMaxColumn(endLineNumber))
+    : model.getLineMaxColumn(endLineNumber);
+
+  return {
+    startLineNumber,
+    startColumn,
+    endLineNumber,
+    endColumn: Math.max(endColumn, startLineNumber === endLineNumber ? startColumn + 1 : 1)
+  };
+};
 
 const toEditorMarker = (marker: MonacoMarkerLike): editor.IMarkerData => ({
   startLineNumber: marker.startLineNumber,
@@ -167,14 +239,14 @@ const registerChemdLanguage = (monaco: Monaco): void => {
   registerChemdNavigationProviders(monaco, CHEMD_LANGUAGE_ID);
 };
 
-export const MonacoChemdEditor = ({
+export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemdEditorProps>(function MonacoChemdEditor({
   value,
   documentPath,
   compileOutput,
   workspaceSymbolIndex,
   onChange,
   onSave
-}: MonacoChemdEditorProps) => {
+}: MonacoChemdEditorProps, ref) {
   const editorRef = useRef<MonacoEditor | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
   const onSaveRef = useRef(onSave);
@@ -227,6 +299,19 @@ export const MonacoChemdEditor = ({
     syncMarkers();
   }, [modelPath, syncMarkers]);
 
+  useImperativeHandle(ref, () => ({
+    jumpToSource: (intent) => {
+      const editorInstance = editorRef.current;
+      const model = editorInstance?.getModel();
+      if (!editorInstance || !model) return false;
+      const selection = resolveMonacoSourceJumpSelection(model, intent.range);
+      editorInstance.setSelection(selection);
+      editorInstance.revealRangeInCenterIfOutsideViewport(selection);
+      editorInstance.focus();
+      return true;
+    }
+  }), []);
+
   const handleBeforeMount = useCallback<BeforeMount>((monaco) => {
     registerChemdLanguage(monaco);
   }, []);
@@ -276,4 +361,4 @@ export const MonacoChemdEditor = ({
       />
     </div>
   );
-};
+});
