@@ -275,3 +275,50 @@ Validation:
 ### Next Steps
 
 - Continue with the next non-network-blocked desktop IDE productization slice: offline/degraded capability aggregation or release smoke hardening.
+
+## Session 95: Desktop enhanced capability degradation gate
+
+**Date**: 2026-05-14
+**Task**: Aggregate offline/degraded boundaries for enhanced desktop capabilities
+**Package**: desktop scripts, docs
+**Branch**: `desktop-ide`
+
+### Summary
+
+Completed the P3 enhanced capability degradation closure. Release readiness now exposes a static product gate proving enhanced features have explicit offline/degraded/fallback boundaries without running real network, GUI, sidecar, or database smoke.
+
+### Main Changes
+
+- Added `enhancedCapabilityDegradation` to `pnpm desktop:release-readiness` JSON.
+- Covered PostgreSQL sync, connected RAG, embedding provider, sidecar, and Agent patch degradation boundaries.
+- Preserved release readiness overall `skip` while clean-machine installer smoke and real network checks remain not-run.
+- Updated release readiness docs and the productization implementation plan.
+
+Merged commits:
+- 64fd58c feat(desktop)：聚合增强能力降级门禁
+
+Validation:
+- node --test scripts/desktop-release-readiness.test.mjs (6/6 passed)
+- pnpm desktop:release-readiness -- --json (reported enhancedCapabilityDegradation pass; overall skip)
+- pnpm run test:scripts (78/78 passed)
+- git diff --check (passed)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `64fd58c` | feat(desktop)：聚合增强能力降级门禁 |
+
+### Testing
+
+- [OK] Release readiness focused tests passed
+- [OK] Full script tests passed
+- [OK] Release readiness JSON preserved offline-only boundaries
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Continue with P4 installer/signing/clean-machine smoke planning and any remaining productization gaps that are not blocked by real environment access.

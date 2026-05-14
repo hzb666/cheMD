@@ -946,7 +946,7 @@ P2 local sync result UI 阶段性完成记录（2026-05-14）：
   已接入 backfill UI，可把本地 chunk embedding 写回 shared pgvector schema。真实
   provider 网络 proof 仍待补。
 - [x] Agent run 可审计，patch 需用户确认。
-- [ ] 所有增强能力离线/失败时可降级。
+- [x] 所有增强能力离线/失败时可降级。
 
 
 P3 Graph edge evidence 阶段性完成记录（2026-05-14）：
@@ -986,6 +986,25 @@ P3 Agent audit replay 阶段性完成记录（2026-05-14）：
   storage/desktop typecheck、focused ESLint、desktop build、root `pnpm typecheck`
   24/24 tasks、root `pnpm test` 23 turbo test tasks + 78 script tests + 86 Python
   tests 均通过。desktop build 仍有既有 Vite `use client` 与 chunk-size warnings。
+
+P3 enhanced capability degradation 阶段性完成记录（2026-05-14）：
+
+- 代码提交：`64fd58c feat(desktop)：聚合增强能力降级门禁`。
+- `pnpm desktop:release-readiness` 新增 `enhancedCapabilityDegradation` 聚合检查，
+  将 PostgreSQL sync、connected RAG、embedding provider、sidecar、Agent patch 五类
+  增强能力的 offline/degraded/fallback 边界作为 release readiness JSON 的显式
+  `pass` 证据。
+- 该检查只做静态产品门禁汇总，不启动 GUI、不联网、不启动 sidecar、不运行真实 DB
+  smoke；真实网络和 clean-machine installer smoke 仍保持 `skip/not-run`，不被误报为
+  通过。
+- 聚合证据来自现有离线可验证能力：local snapshot/outbox、runtime smoke SKIP 分类、
+  connected RAG disabled/degraded controller、embedding provider offline/degraded
+  result、diagnostics bundle support context、Agent approval/hash/compile gate 与
+  audit timeline persistence。
+- 验证：`node --test scripts/desktop-release-readiness.test.mjs` 6/6 通过；
+  `pnpm desktop:release-readiness -- --json` 输出 `enhancedCapabilityDegradation:
+  pass` 且整体仍为 `skip`；`pnpm run test:scripts` 78/78 通过；`git diff --check`
+  通过。
 
 ### P4：发布质量生产可用
 

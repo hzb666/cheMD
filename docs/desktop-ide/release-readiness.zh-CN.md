@@ -61,8 +61,14 @@ readiness 在真实安装机验证完成前通常应保持 `overallStatus=skip`�
   preflight，检查 release exe、MSI、NSIS 产物与 Windows release exe 锁。
 - Diagnostics bundle builder：构建脱敏 diagnostics bundle 摘要，验证支持上下文可
   离线生成。
+- Enhanced capability degradation：聚合 PostgreSQL sync、connected RAG、embedding
+  provider、sidecar、Agent patch 的离线/失败降级边界，作为静态产品门禁证据。
 - Production smoke placeholders：显式记录 clean-machine installer smoke 与真实网络
   smoke 尚未运行。
+
+`enhancedCapabilityDegradation` 是静态聚合检查，只证明增强能力都有明确
+offline/degraded/fallback 边界；它不会启动 GUI、sidecar、provider、网络连接或真实
+数据库 smoke。
 
 ## 与其他命令的关系
 
