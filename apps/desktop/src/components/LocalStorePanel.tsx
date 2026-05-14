@@ -11,12 +11,12 @@ import type {
 } from "../desktop-types";
 import type { DesktopReactionIntelligenceJobBuildResult } from "../desktop-reaction-intelligence-job";
 import type { DesktopReactionIntelligenceJobState } from "../desktop-reaction-intelligence-job-controller";
+import { buildLocalSyncResultRows } from "../desktop-local-sync-view";
 import type { DesktopSemanticPreview } from "../desktop-semantic-preview";
 import type { DesktopWorkspaceSymbolIndexSummary } from "../desktop-workspace-symbol-index";
 import {
   formatLocalSyncCounts,
   formatPostgresValue,
-  getLocalOutboxErrorText,
   getLocalStoreFields,
   redactSensitiveRuntimeText,
   summarizeLocalId,
@@ -139,6 +139,7 @@ export const LocalStorePanel = ({
   const unavailableMessage = status.available
     ? null
     : "Local Store is unavailable. Refresh status before relying on the offline outbox.";
+  const syncRows = buildLocalSyncResultRows(syncState);
 
   return (
     <section className="desktop-local-store-panel" aria-label="Offline Local Store">
@@ -283,12 +284,16 @@ export const LocalStorePanel = ({
               <div><dt>Database</dt><dd>{formatPostgresValue(syncState.summary.target.database)}</dd></div>
               <div><dt>User</dt><dd>{formatPostgresValue(syncState.summary.target.user)}</dd></div>
             </dl>
-            {syncState.summary.failedEntries.length > 0 ? (
-              <ul className="desktop-local-sync-errors" aria-label="Local outbox sync failures">
-                {syncState.summary.failedEntries.slice(0, 4).map((entry) => (
-                  <li key={entry.localId}>
-                    <code title={entry.localId}>{summarizeLocalId(entry.localId)}</code>
-                    <span title={getLocalOutboxErrorText(entry.error)}>{getLocalOutboxErrorText(entry.error)}</span>
+            {syncRows.length > 0 ? (
+              <ul className="desktop-local-sync-results" aria-label="Local outbox sync results">
+                {syncRows.slice(0, 6).map((row) => (
+                  <li key={row.rowId} data-category={row.category}>
+                    <span>{row.conflict ? "conflict" : row.status}</span>
+                    <code title={row.localId}>{summarizeLocalId(row.localId)}</code>
+                    <strong title={row.message}>{row.message}</strong>
+                    <small title={row.graphSnapshotId ?? row.idempotencyKey}>
+                      {row.graphSnapshotId ? summarizeLocalId(row.graphSnapshotId) : summarizeLocalId(row.idempotencyKey)}
+                    </small>
                   </li>
                 ))}
               </ul>

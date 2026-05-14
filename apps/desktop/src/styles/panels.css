@@ -1296,7 +1296,8 @@
     color: var(--danger);
   }
 
-  .desktop-local-sync-errors {
+  .desktop-local-sync-errors,
+  .desktop-local-sync-results {
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
@@ -1305,24 +1306,50 @@
     list-style: none;
   }
 
-  .desktop-local-sync-errors li {
+  .desktop-local-sync-errors li,
+  .desktop-local-sync-results li {
     display: grid;
-    grid-template-columns: 8rem minmax(0, 1fr);
+    grid-template-columns: 4.6rem 7rem minmax(0, 1fr) 6.8rem;
     gap: 0.45rem;
     align-items: start;
-    color: var(--danger);
     font-size: 0.68rem;
   }
 
+  .desktop-local-sync-errors li,
+  .desktop-local-sync-results li[data-category="failed"] {
+    color: var(--danger);
+  }
+
+  .desktop-local-sync-results li[data-category="synced"] {
+    color: var(--success);
+  }
+
+  .desktop-local-sync-results li[data-category="retryable"] {
+    color: var(--warning);
+  }
+
   .desktop-local-sync-errors code,
-  .desktop-local-sync-errors span {
+  .desktop-local-sync-errors span,
+  .desktop-local-sync-results span,
+  .desktop-local-sync-results code,
+  .desktop-local-sync-results strong,
+  .desktop-local-sync-results small {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .desktop-local-sync-errors code {
+  .desktop-local-sync-results strong {
+    font-weight: 600;
+  }
+
+  .desktop-local-sync-results small {
+    color: var(--muted-foreground);
+  }
+
+  .desktop-local-sync-errors code,
+  .desktop-local-sync-results code {
     color: var(--foreground);
     font-family: var(--font-mono);
   }
