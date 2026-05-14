@@ -1055,6 +1055,30 @@ IDE/文档工作台，而不是 demo 面板集合。
 
 ---
 
+### M10/M11 阶段性合并记录（2026-05-14）
+
+`desktop-ui` 分支的桌面 UI 重构已作为阶段性成果合入 `desktop-ide`：
+
+- 代码提交：`d49e63c refactor(desktop)：合并桌面 UI 组件化`。
+- 合入内容：`App.tsx` 收敛为控制器装配入口，新增 `DesktopShell`、`TopBar`、
+  `EditorPane`、`LocalStorePanel`、`PostgresPanel`、`SidecarPanel`、基础 UI
+  primitives 与桌面 layout/hooks。
+- 集成处理：保留并重新接线 connected RAG query/backfill、embedding provider
+  状态、Agent timeline contract panel、quick-fix patch gate、workspace index 与
+  knowledge map 跳转，不回退 M6/M7 已完成能力。
+- 依赖与样式：补入 desktop shadcn/base-ui 依赖、`components.json`、desktop
+  radius token，并保持当前 light desktop workbench 风格基线。
+- 验证：`pnpm --filter @chemd/desktop typecheck` 通过；focused RAG/Agent
+  Vitest 5 files / 36 tests 通过；`pnpm --filter @chemd/desktop build` 通过；
+  `git diff --check` 通过。
+- 非阻塞债务：focused ESLint 仅剩 `App.tsx`、`DesktopShell.tsx`、
+  `LocalStorePanel.tsx`、`TopBar.tsx`、`use-connected-rag-controller.ts` 的
+  complexity/max-lines 6 项，按用户指示继续留到最终 M11 复杂度治理，不阻塞
+  当前功能产品化主线。
+
+该合并是 M10/M11 的提前基础设施落地，不代表最终视觉验收与复杂度门禁完成；最终
+仍需补截图/真实 GUI 手测、UI 组件 API 收敛、props drilling 治理和复杂度清零。
+
 ## 9. Release readiness 聚合状态
 
 2026-05-13 追加发布前聚合入口：`pnpm desktop:release-readiness`。该命令只汇总

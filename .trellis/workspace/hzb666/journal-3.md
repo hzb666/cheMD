@@ -60,3 +60,53 @@ Validation:
 ### Next Steps
 
 - None - task complete
+
+## Session 91: Desktop UI componentization merge
+
+**Date**: 2026-05-14
+**Task**: Merge desktop-ui into desktop-ide
+**Package**: desktop
+**Branch**: `desktop-ide`
+
+### Summary
+
+Merged the `desktop-ui` refactor into `desktop-ide` while preserving the newer connected RAG and Agent panel capabilities.
+
+### Main Changes
+
+- Cherry-picked `desktop-ui` commit `1f1db37` instead of a normal branch merge because `desktop-ui` was based on an older baseline.
+- Replaced the monolithic desktop App UI with `DesktopWorkbench`, shell/panel components, desktop hooks, and UI primitives.
+- Restored connected RAG query/backfill wiring through `use-connected-rag-controller` after the UI split.
+- Preserved Agent timeline contract display and patch-gate source hash integration.
+- Updated the productization implementation doc with the staged M10/M11 merge result and remaining complexity debt.
+
+Merged commits:
+- d49e63c refactor(desktop)：合并桌面 UI 组件化
+
+Validation:
+- pnpm --filter @chemd/desktop typecheck (passed)
+- pnpm exec vitest run apps/desktop/src/agent-panel/DesktopAgentPanel.test.tsx apps/desktop/src/agent-tools/contracts.test.ts apps/desktop/src/desktop-agent-timeline-panel.test.ts apps/desktop/src/workspace-index/desktop-postgres-rag-query-controller.test.ts apps/desktop/src/workspace-index/desktop-postgres-rag-backfill-controller.test.ts --config packages/compiler/vitest.config.ts --pool=threads (5 files / 36 tests passed)
+- pnpm --filter @chemd/desktop build (passed; Vite use-client and chunk-size warnings remain)
+- git diff --check (passed)
+- focused eslint reports 6 complexity/max-lines errors only; deferred to M11 per user direction.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d49e63c` | refactor(desktop)：合并桌面 UI 组件化 |
+
+### Testing
+
+- [OK] Desktop typecheck passed
+- [OK] Focused Agent/RAG Vitest passed
+- [OK] Desktop build passed
+- [WARN] Focused ESLint complexity gate deferred to M11
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Resume the desktop IDE productization plan from the next non-network-blocked slice.
