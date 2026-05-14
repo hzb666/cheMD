@@ -290,8 +290,12 @@ CREATE TABLE IF NOT EXISTS chemd_agent_runs (
   status text NOT NULL,
   goal text NOT NULL,
   started_at timestamptz NOT NULL,
-  finished_at timestamptz
+  finished_at timestamptz,
+  audit_timeline jsonb NOT NULL DEFAULT '[]'::jsonb
 );
+
+ALTER TABLE IF EXISTS chemd_agent_runs
+  ADD COLUMN IF NOT EXISTS audit_timeline jsonb NOT NULL DEFAULT '[]'::jsonb;
 
 CREATE TABLE IF NOT EXISTS chemd_agent_tool_calls (
   tool_call_id text PRIMARY KEY,

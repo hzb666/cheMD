@@ -181,6 +181,7 @@ export interface RuntimeAgentRunRecord {
   revisionId?: string;
   status: RuntimeAgentRunStatus;
   goal: string;
+  auditTimeline: RuntimeJsonValue[];
   startedAt: string;
   finishedAt?: string;
 }

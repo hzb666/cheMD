@@ -133,7 +133,18 @@ const agentRun: AgentRun = {
     userApprovalId: "approval-desktop-1",
     decidedAt: createdAt
   }],
-  auditTimeline: [],
+  auditTimeline: [{
+    eventId: "event-desktop-1",
+    agentRunId: "run-desktop-1",
+    type: "status_transitioned",
+    summary: "Agent moved from validating to completed.",
+    at: createdAt,
+    fromStatus: "validating",
+    toStatus: "completed",
+    toolCallId: "tool-desktop-1",
+    patchProposalId: "patch-desktop-1",
+    evidenceIndexes: [0]
+  }],
   validationResult: {
     toolCallId: "tool-desktop-1",
     status: "ok",
@@ -193,6 +204,13 @@ describe("desktop runtime persistence payload builder", () => {
       experimentId: "exp-desktop-persist",
       revisionId: document.revisionId,
       status: "completed",
+      auditTimeline: [{
+        eventId: "event-desktop-1",
+        agentRunId: "run-desktop-1",
+        type: "status_transitioned",
+        summary: "Agent moved from validating to completed.",
+        at: createdAt
+      }],
       finishedAt: createdAt
     });
     expect(payload.agentToolCalls[0]).toMatchObject({

@@ -322,8 +322,61 @@ fn managed_migration_uses_shared_storage_columns_without_desktop_tables() {
     assert!(sql.contains("embedding_dim integer NOT NULL"));
     assert!(sql.contains("CREATE TABLE IF NOT EXISTS chemd_reaction_graph_snapshots"));
     assert!(sql.contains("CREATE TABLE IF NOT EXISTS chemd_agent_runs"));
+    assert!(sql.contains("audit_timeline jsonb NOT NULL DEFAULT '[]'::jsonb"));
+    assert!(sql.contains("ADD COLUMN IF NOT EXISTS audit_timeline"));
     assert!(!sql.contains("CREATE TABLE IF NOT EXISTS desktop_"));
     assert!(!sql.contains("CREATE TABLE IF NOT EXISTS chemd_desktop_"));
+}
+
+#[test]
+fn runtime_agent_run_sql_persists_audit_timeline() {
+    let sql = include_str!("postgres_runtime_sql.rs");
+
+    assert!(sql.contains("audit_timeline"));
+    assert!(sql.contains("$8::jsonb"));
+    assert!(sql.contains("audit_timeline = EXCLUDED.audit_timeline"));
+}
+
+#[test]
+fn runtime_payload_deserializes_agent_run_audit_timeline() {
+    let value = serde_json::json!({
+        "graphSnapshot": {
+            "graphSnapshotId": "graph-1",
+            "experimentId": "exp-1",
+            "sourceRevisionIds": ["rev-1"],
+            "graphKind": "reaction",
+            "nodeCount": 0,
+            "edgeCount": 0,
+            "createdAt": "2026-05-12T00:00:00Z"
+        },
+        "agentRuns": [{
+            "agentRunId": "run-1",
+            "experimentId": "exp-1",
+            "revisionId": "rev-1",
+            "status": "completed",
+            "goal": "Replay audit timeline",
+            "startedAt": "2026-05-12T00:00:00Z",
+            "finishedAt": "2026-05-12T00:00:01Z",
+            "auditTimeline": [{
+                "eventId": "event-1",
+                "agentRunId": "run-1",
+                "type": "status_transitioned",
+                "summary": "completed"
+            }]
+        }]
+    });
+    let records: PersistRuntimeGraphRagInput =
+        serde_json::from_value(value).expect("payload should deserialize");
+
+    assert_eq!(
+        records.agent_runs[0].audit_timeline,
+        serde_json::json!([{
+            "eventId": "event-1",
+            "agentRunId": "run-1",
+            "type": "status_transitioned",
+            "summary": "completed"
+        }])
+    );
 }
 
 #[test]

@@ -197,6 +197,7 @@ const buildAgentRuns = (runs: readonly AgentRun[], identity: RuntimeIdentity): J
     revisionId: identity.revisionId,
     status: run.status,
     goal: run.goal,
+    auditTimeline: run.auditTimeline,
     createdAt: run.createdAt ?? identity.createdAt,
     startedAt: run.createdAt ?? identity.createdAt,
     updatedAt: run.updatedAt,

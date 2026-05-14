@@ -3,6 +3,10 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+fn empty_json_array() -> Value {
+    Value::Array(Vec::new())
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PersistRuntimeGraphRagInput {
@@ -87,6 +91,8 @@ pub struct RuntimeAgentRunRecord {
     pub(crate) revision_id: Option<String>,
     pub(crate) status: String,
     pub(crate) goal: String,
+    #[serde(default = "empty_json_array")]
+    pub(crate) audit_timeline: Value,
     pub(crate) started_at: String,
     pub(crate) finished_at: Option<String>,
 }

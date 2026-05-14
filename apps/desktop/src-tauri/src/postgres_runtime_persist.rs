@@ -113,6 +113,9 @@ pub(crate) fn validate_runtime_graph_rag_input(
         require_text("agentRun.status", &run.status)?;
         require_text("agentRun.goal", &run.goal)?;
         require_text("agentRun.startedAt", &run.started_at)?;
+        if !run.audit_timeline.is_array() {
+            return invalid_input("agentRun.auditTimeline must be an array");
+        }
         require_optional_text("agentRun.experimentId", run.experiment_id.as_deref())?;
         require_optional_text("agentRun.revisionId", run.revision_id.as_deref())?;
     }
