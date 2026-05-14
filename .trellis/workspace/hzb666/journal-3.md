@@ -218,3 +218,60 @@ Validation:
 ### Next Steps
 
 - Continue with the next non-network-blocked desktop IDE productization slice: Agent audit/patch confirmation hardening or offline degradation coverage.
+
+## Session 94: Desktop Agent audit replay persistence
+
+**Date**: 2026-05-14
+**Task**: Persist Agent audit timeline for replay
+**Package**: desktop, storage-postgres
+**Branch**: `desktop-ide`
+
+### Summary
+
+Completed the P3 Agent audit replay slice. Agent run persistence now includes the full audit timeline across the shared PostgreSQL contract, desktop payload builder, Rust Tauri runtime, and managed Postgres migration.
+
+### Main Changes
+
+- Worker A added `chemd_agent_runs.audit_timeline` to the `@chemd/storage-postgres` shared schema, runtime adapters, write queries, and contract tests.
+- Worker B wired desktop runtime payloads and Rust Tauri persistence to carry `AgentRun.auditTimeline` through serde into `audit_timeline`.
+- Managed Postgres migration now carries the same shared schema column and compatibility `ADD COLUMN IF NOT EXISTS` path.
+- Updated the productization plan to mark Agent run auditability and explicit patch confirmation complete.
+
+Merged commits:
+- 5affb52 feat(storage-postgres)：持久化 Agent audit timeline
+- 9696778 feat(desktop)：持久化 Agent audit timeline
+
+Validation:
+- pnpm --filter @chemd/storage-postgres test (8 files / 33 tests passed)
+- pnpm exec vitest run apps/desktop/src/desktop-runtime-persistence.test.ts --config packages/compiler/vitest.config.ts --pool=threads (5/5 passed)
+- cargo test --manifest-path apps\\desktop\\src-tauri\\Cargo.toml --lib audit_timeline -- --nocapture (2/2 passed)
+- cargo test --manifest-path apps\\desktop\\src-tauri\\Cargo.toml --lib managed_migration_uses_shared_storage_columns_without_desktop_tables -- --nocapture (1/1 passed)
+- pnpm --filter @chemd/storage-postgres typecheck (passed)
+- pnpm --filter @chemd/desktop typecheck (passed)
+- focused eslint on changed TS files (passed)
+- pnpm --filter @chemd/desktop build (passed; known Vite use-client and chunk-size warnings remain)
+- pnpm typecheck (24/24 tasks passed)
+- pnpm test (23 turbo test tasks, 78 script tests, 86 Python tests passed)
+- git diff --check (passed)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5affb52` | feat(storage-postgres)：持久化 Agent audit timeline |
+| `9696778` | feat(desktop)：持久化 Agent audit timeline |
+
+### Testing
+
+- [OK] Storage contract tests passed
+- [OK] Desktop runtime persistence tests passed
+- [OK] Rust focused audit/migration tests passed
+- [OK] Root typecheck and root tests passed
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Continue with the next non-network-blocked desktop IDE productization slice: offline/degraded capability aggregation or release smoke hardening.

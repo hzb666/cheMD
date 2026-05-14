@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-3.md`
-- **Total Sessions**: 93
+- **Total Sessions**: 94
 - **Last Active**: 2026-05-14
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-3.md` | ~240 | Active |
+| `journal-3.md` | ~300 | Active |
 | `journal-2.md` | ~1956 | Archived |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
@@ -31,6 +31,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 94 | 2026-05-14 | Desktop Agent audit replay persistence | `5affb52`, `9696778` | `desktop-ide` |
 | 93 | 2026-05-14 | Desktop local sync result UI | `3273a0e`, `6392aea` | `desktop-ide` |
 | 92 | 2026-05-14 | Desktop Graph edge evidence panel | `3816374`, `e99c92b`, `9a060aa` | `desktop-ide` |
 | 91 | 2026-05-14 | Desktop UI componentization merge | `d49e63c` | `desktop-ide` |

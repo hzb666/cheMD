@@ -945,7 +945,7 @@ P2 local sync result UI 阶段性完成记录（2026-05-14）：
   调用 `query_postgres_rag`；批量 `create_embedding_vectors` 与完整 chunk text 字段
   已接入 backfill UI，可把本地 chunk embedding 写回 shared pgvector schema。真实
   provider 网络 proof 仍待补。
-- [ ] Agent run 可审计，patch 需用户确认。
+- [x] Agent run 可审计，patch 需用户确认。
 - [ ] 所有增强能力离线/失败时可降级。
 
 
@@ -965,6 +965,27 @@ P3 Graph edge evidence 阶段性完成记录（2026-05-14）：
   root `pnpm typecheck` 24/24 tasks、root `pnpm test` 23 turbo test tasks + 78 script tests
   + 86 Python tests 均通过。desktop build 仍有已知 Vite `use client` 与 chunk-size
   warning，不影响本阶段功能验证。
+
+P3 Agent audit replay 阶段性完成记录（2026-05-14）：
+
+- 代码提交：`5affb52 feat(storage-postgres)：持久化 Agent audit timeline`、
+  `9696778 feat(desktop)：持久化 Agent audit timeline`。
+- shared schema 的 `chemd_agent_runs` 新增 `audit_timeline jsonb NOT NULL DEFAULT '[]'::jsonb`，
+  并通过 `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` 兼容已安装 schema；外部 DB 与
+  managed Postgres migration 保持同一列契约。
+- Desktop runtime persistence payload 现在把 `AgentRun.auditTimeline` 作为 JSON-safe
+  `auditTimeline` 写入 agentRuns；Rust Tauri runtime 通过 serde 接收并 upsert 到
+  `chemd_agent_runs.audit_timeline`。
+- 现有 Agent patch gate 保留：patch proposal 必须先 approve，apply 时校验
+  `beforeHash`/approval id，apply 前运行 compile gate；失败时记录 blocked audit event，
+  不修改 editor buffer。
+- 本阶段补齐数据库 replay 的关键缺口：run/tool/patch 之外，状态转移、evidence
+  attach、patch approve/apply/reject/blocked 等 audit event 可以随 Agent run 入库。
+- 验证：`@chemd/storage-postgres` Vitest 8 files / 33 tests、desktop runtime
+  persistence Vitest 5/5、Rust audit timeline 2 tests、managed migration 1 test、
+  storage/desktop typecheck、focused ESLint、desktop build、root `pnpm typecheck`
+  24/24 tasks、root `pnpm test` 23 turbo test tasks + 78 script tests + 86 Python
+  tests 均通过。desktop build 仍有既有 Vite `use client` 与 chunk-size warnings。
 
 ### P4：发布质量生产可用
 
