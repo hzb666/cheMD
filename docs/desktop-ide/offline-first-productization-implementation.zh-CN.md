@@ -884,7 +884,7 @@ env、database URL、API key、token 或 password。诊断包说明见
 - [x] migration、pgvector、schema readiness 状态可见；schema version mismatch
   检测仍待 shared migration contract 明确后补。
 - [ ] 外部 DB 与 managed DB 使用同一 shared schema。
-- [ ] sync 成功、失败、冲突都有 UI 和日志。
+- [x] sync 成功、失败、冲突都有 UI 和日志。
 - [x] Reaction intelligence artifact 可映射为 shared schema runtime graph edge
   input；实际 artifact sync command/UI 仍待接入。
 
@@ -904,8 +904,29 @@ env、database URL、API key、token 或 password。诊断包说明见
 - Desktop RAG embedding backfill command 已可写入 shared pgvector schema；RAG 面板
   已接入 UI 触发，按 `create_embedding_vectors` -> `backfill_postgres_rag_embeddings`
   两阶段执行。真实 provider 网络 proof 仍待环境可用后补。
+- Desktop local sync 结果视图已展示 synced、failed、retryable/skipped 与 conflict
+  分类，保留 sanitized message、local id、graph snapshot id 与 idempotency key，便于
+  用户判断成功、失败、冲突与可重试状态；真实 runner/真实 DB proof 仍按环境型
+  `SKIP`。
 - Tauri command-level proof 尚未配置 runner，当前按环境型 `SKIP` 处理，不阻塞离线
   优先主线。
+
+P2 local sync result UI 阶段性完成记录（2026-05-14）：
+
+- 代码提交：`3273a0e feat(desktop)：补充本地同步结果视图模型`、
+  `6392aea feat(desktop)：接入本地同步结果列表`。
+- Local sync summary 保留完整 entries，同时兼容既有 failedEntries；新增
+  `buildLocalSyncResultRows`，将 synced、failed、pending/skipped 与 conflict
+  message 归一为 UI 可消费行。
+- Local Store 面板从“只显示失败”升级为完整同步结果列表，显示 status/conflict、
+  local item、message、graph snapshot id 与 idempotency key；错误文案会截断并
+  脱敏，避免将 password/token/secret 泄露到 UI。
+- 本阶段不依赖真实网络或真实 DB，只验证离线 view-model、React 接线和构建路径；
+  实际 sync command 的真实运行 proof 仍按环境条件后补。
+- 验证：local sync view Vitest 5/5、desktop typecheck、desktop build、root
+  `pnpm typecheck` 24/24 tasks、root `pnpm test` 23 turbo test tasks + 78 script tests
+  + 86 Python tests 均通过；focused ESLint 仅剩 `LocalStorePanel.tsx`
+  complexity/max-lines，按用户指示留到最终复杂度治理，不阻塞当前功能主线。
 
 ### P3：Graph/RAG/Agent 产品化
 

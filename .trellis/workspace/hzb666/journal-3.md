@@ -165,3 +165,56 @@ Validation:
 ### Next Steps
 
 - Continue with the next non-network-blocked P3/P4 slice: sync result/conflict UI, Agent audit completion, or offline degradation hardening.
+
+## Session 93: Desktop local sync result UI
+
+**Date**: 2026-05-14
+**Task**: Desktop local sync success/failure/conflict visibility
+**Package**: desktop
+**Branch**: `desktop-ide`
+
+### Summary
+
+Completed the P2 local sync result visibility slice. The desktop Local Store panel now exposes full sync outcomes instead of failed-only summaries, including success, retryable failure, skipped/pending, and conflict classification.
+
+### Main Changes
+
+- Worker C added `buildLocalSyncResultRows` and preserved full sync entries in `LocalSyncSummary`.
+- Integrated the view-model into `LocalStorePanel` and rendered synced/failed/retryable/skipped result rows with sanitized messages.
+- Added conflict-aware labels for base revision/stale revision style failures without changing the shared sync contract.
+- Updated the productization implementation doc to mark sync success/failure/conflict UI and logs complete for the local-verifiable desktop path.
+
+Merged commits:
+- 3273a0e feat(desktop)：补充本地同步结果视图模型
+- 6392aea feat(desktop)：接入本地同步结果列表
+
+Validation:
+- pnpm exec vitest run apps/desktop/src/desktop-local-sync-view.test.ts --config packages/compiler/vitest.config.ts --pool=threads (5/5 passed)
+- pnpm --filter @chemd/desktop typecheck (passed)
+- pnpm --filter @chemd/desktop build (passed; known Vite use-client and chunk-size warnings remain)
+- pnpm typecheck (24/24 tasks passed)
+- pnpm test (23 turbo test tasks, 78 script tests, 86 Python tests passed)
+- git diff --check (passed; line-ending warnings only)
+- focused eslint reports only existing `LocalStorePanel.tsx` max-lines/complexity; deferred to M11 per user direction.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3273a0e` | feat(desktop)：补充本地同步结果视图模型 |
+| `6392aea` | feat(desktop)：接入本地同步结果列表 |
+
+### Testing
+
+- [OK] Local sync view-model focused tests passed
+- [OK] Desktop typecheck and build passed
+- [OK] Root typecheck and root tests passed
+- [WARN] LocalStorePanel complexity/max-lines deferred to M11
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Continue with the next non-network-blocked desktop IDE productization slice: Agent audit/patch confirmation hardening or offline degradation coverage.
