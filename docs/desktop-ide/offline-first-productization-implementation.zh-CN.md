@@ -909,7 +909,7 @@ env、database URL、API key、token 或 password。诊断包说明见
 
 ### P3：Graph/RAG/Agent 产品化
 
-- [ ] Graph panel 可解释 edge evidence 并跳源码。
+- [x] Graph panel 可解释 edge evidence 并跳源码。
 - [x] Graph panel 可从 source-ref/evidence action 跳到当前 Monaco editor range；跨文件
   source ref 明确 no-op，不误开文件。
 - [x] Reaction intelligence artifact 的 computed/semantic basis、provider 状态与 layout
@@ -926,6 +926,24 @@ env、database URL、API key、token 或 password。诊断包说明见
   provider 网络 proof 仍待补。
 - [ ] Agent run 可审计，patch 需用户确认。
 - [ ] 所有增强能力离线/失败时可降级。
+
+
+P3 Graph edge evidence 阶段性完成记录（2026-05-14）：
+
+- 代码提交：`3816374 feat(desktop)：增加 Knowledge Map edge evidence view-model`、
+  `e99c92b feat(desktop)：补充图谱边证据面板草案`、
+  `9a060aa feat(desktop)：接入图谱边证据面板`。
+- Knowledge Map view-model 新增 `edgeEvidenceRows`，每条 reaction map edge 都可展示
+  from/to reaction、basis、score、warnings 与 evidence source，并为 from/to 两端提供
+  sourceRef/jump intent；缺少 source span 时安全显示 pending，不伪造来源。
+- Graph 面板新增 Edge Evidence 区域，按 edge basis filter 联动过滤，展示 evidence id、
+  source、warnings，并复用现有 SourceRefAction 跳转当前 Monaco source。
+- 本阶段不依赖真实网络、真实 PostgreSQL 或 sidecar；只推进离线可验证的 Graph
+  解释性与源码追溯能力。
+- 验证：Knowledge Map Vitest 17/17、desktop typecheck、focused ESLint、desktop build、
+  root `pnpm typecheck` 24/24 tasks、root `pnpm test` 23 turbo test tasks + 78 script tests
+  + 86 Python tests 均通过。desktop build 仍有已知 Vite `use client` 与 chunk-size
+  warning，不影响本阶段功能验证。
 
 ### P4：发布质量生产可用
 

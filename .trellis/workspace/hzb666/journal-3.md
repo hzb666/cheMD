@@ -110,3 +110,58 @@ Validation:
 ### Next Steps
 
 - Resume the desktop IDE productization plan from the next non-network-blocked slice.
+
+## Session 92: Desktop Graph edge evidence panel
+
+**Date**: 2026-05-14
+**Task**: Desktop Graph edge evidence panel
+**Package**: desktop
+**Branch**: `desktop-ide`
+
+### Summary
+
+Completed the P3 Knowledge Map edge evidence slice with parallel view-model and UI worktrees, then integrated source-jump aware Graph edge evidence into the desktop panel.
+
+### Main Changes
+
+- Worker A added `edgeEvidenceRows` to the Knowledge Map view-model with from/to reaction labels, source refs, jump intents, basis, score, warnings, and evidence sources.
+- Worker B added the Edge Evidence panel UI and preserved the desktop-ui lightweight row/chip style.
+- Architect integration rewired the UI to consume `edgeEvidenceRows` instead of temporary raw reaction-map edges.
+- Updated the productization plan to mark Graph panel edge evidence explanation/source jump complete.
+- Closed both subagents after review and integration.
+
+Merged commits:
+- 3816374 feat(desktop)：增加 Knowledge Map edge evidence view-model
+- e99c92b feat(desktop)：补充图谱边证据面板草案
+- 9a060aa feat(desktop)：接入图谱边证据面板
+
+Validation:
+- pnpm exec vitest run apps/desktop/src/knowledge-map/desktop-knowledge-map.test.ts --config packages/compiler/vitest.config.ts --pool=threads (17/17 passed)
+- pnpm --filter @chemd/desktop typecheck (passed)
+- pnpm --filter @chemd/desktop exec eslint src/knowledge-map/DesktopKnowledgeMapPanel.tsx src/knowledge-map/desktop-knowledge-map.ts (passed)
+- pnpm --filter @chemd/desktop build (passed; known Vite use-client and chunk-size warnings remain)
+- pnpm typecheck (24/24 tasks passed)
+- pnpm test (23 turbo test tasks, 78 script tests, 86 Python tests passed)
+- git diff --check (passed; line-ending warnings only)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3816374` | feat(desktop)：增加 Knowledge Map edge evidence view-model |
+| `e99c92b` | feat(desktop)：补充图谱边证据面板草案 |
+| `9a060aa` | feat(desktop)：接入图谱边证据面板 |
+
+### Testing
+
+- [OK] Knowledge Map focused tests passed
+- [OK] Desktop focused lint/typecheck/build passed
+- [OK] Root typecheck and root tests passed
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Continue with the next non-network-blocked P3/P4 slice: sync result/conflict UI, Agent audit completion, or offline degradation hardening.
