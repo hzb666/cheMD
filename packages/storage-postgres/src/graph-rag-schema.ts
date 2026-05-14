@@ -62,9 +62,13 @@ CREATE TABLE IF NOT EXISTS chemd_agent_runs (
   revision_id text REFERENCES chemd_experiment_revisions(revision_id),
   status text NOT NULL,
   goal text NOT NULL,
+  audit_timeline jsonb NOT NULL DEFAULT '[]'::jsonb,
   started_at timestamptz NOT NULL,
   finished_at timestamptz
 );
+
+ALTER TABLE chemd_agent_runs
+  ADD COLUMN IF NOT EXISTS audit_timeline jsonb NOT NULL DEFAULT '[]'::jsonb;
 
 CREATE TABLE IF NOT EXISTS chemd_agent_tool_calls (
   tool_call_id text PRIMARY KEY,

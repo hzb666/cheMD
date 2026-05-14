@@ -201,6 +201,7 @@ export const buildPostgresAgentRunRecordFromRuntime = (
     revisionId: input.revisionId,
     status: mapRuntimeAgentRunStatus(input.status),
     goal: input.goal,
+    auditTimeline: (input.auditTimeline ?? []).map(toJsonRecord),
     startedAt: input.startedAt ?? input.createdAt ?? fallback,
     finishedAt: input.finishedAt
   };

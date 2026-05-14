@@ -159,22 +159,24 @@ export const buildRecordAgentRunQuery = (
 ): PostgresGraphRagQuery => query(`
 INSERT INTO chemd_agent_runs (
   agent_run_id, experiment_id, revision_id, status, goal, started_at,
-  finished_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7)
+  finished_at, audit_timeline
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
 ON CONFLICT (agent_run_id) DO UPDATE SET
   experiment_id = EXCLUDED.experiment_id,
   revision_id = EXCLUDED.revision_id,
   status = EXCLUDED.status,
   goal = EXCLUDED.goal,
   started_at = EXCLUDED.started_at,
-  finished_at = EXCLUDED.finished_at`, [
+  finished_at = EXCLUDED.finished_at,
+  audit_timeline = EXCLUDED.audit_timeline`, [
   record.agentRunId,
   record.experimentId,
   record.revisionId,
   record.status,
   record.goal,
   record.startedAt,
-  record.finishedAt
+  record.finishedAt,
+  toJsonParam(record.auditTimeline)
 ]);
 
 export const buildRecordAgentToolCallQuery = (

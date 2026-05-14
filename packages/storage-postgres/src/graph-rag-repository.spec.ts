@@ -157,6 +157,7 @@ describe("PostgreSQL Graph/RAG repository query builders", () => {
       revisionId: "rev-1",
       status: "succeeded",
       goal: "Review graph",
+      auditTimeline: [{ event_id: "event-1", type: "run_created" }],
       startedAt: createdAt,
       finishedAt: createdAt
     });
@@ -199,8 +200,11 @@ describe("PostgreSQL Graph/RAG repository query builders", () => {
       "succeeded",
       "Review graph",
       createdAt,
-      createdAt
+      createdAt,
+      JSON.stringify([{ event_id: "event-1", type: "run_created" }])
     ]);
+    expect(runQuery.sql).toContain("audit_timeline");
+    expect(runQuery.sql).toContain("$8::jsonb");
     expect(toolCallQuery.values[3]).toBe(JSON.stringify({ graphSnapshotId: "graph-1" }));
     expect(toolCallQuery.values[4]).toBe(JSON.stringify({ nodeCount: 1 }));
     expect(patchQuery.values).toEqual([
