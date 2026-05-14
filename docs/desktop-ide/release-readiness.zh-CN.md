@@ -83,3 +83,6 @@ pnpm desktop:release-readiness -- --json
 
 `desktop:release-readiness` 是汇总层，不替代各专项 smoke。若输出 `blocked`，先按
 对应 check 的 `reason` 修复；若输出 `skip`，继续补缺失产物或执行真实安装机 smoke。
+
+installer、签名与升级策略见
+[`release-hardening-strategy.zh-CN.md`](./release-hardening-strategy.zh-CN.md)。

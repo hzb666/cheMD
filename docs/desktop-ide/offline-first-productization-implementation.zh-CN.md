@@ -1023,7 +1023,7 @@ P3 enhanced capability degradation 阶段性完成记录（2026-05-14）：
 
 ### P4：发布质量生产可用
 
-- [ ] installer、签名、升级策略明确。
+- [x] installer、签名、升级策略明确。
 - [ ] release smoke 覆盖干净机器 Offline Core。
 - [x] diagnostics bundle 覆盖 app、sidecar、sync、provider 的静态命令面与支持上下文；
   完整运行期日志包仍归 release hardening。
@@ -1041,6 +1041,8 @@ P3 enhanced capability degradation 阶段性完成记录（2026-05-14）：
 - 第五轮扩充 diagnostics bundle provider 覆盖，加入 reaction intelligence worker、
   local artifact、outbox sync command 清单，以及 provider/model/artifact/sync 的
   支持上下文分类；真实 provider/model/DB 未运行时仍按 `SKIP` 记录。
+- 第六轮补充 release hardening strategy，明确 Windows installer 形态、code signing
+  路径、updater 启用前置条件、覆盖安装数据保留要求和 clean-machine smoke 流程。
 - 还缺少“安装到干净用户环境后启动、打开 workspace、编辑保存、关闭重启恢复”的
   installer Offline Core smoke。
 
@@ -1063,7 +1065,8 @@ diagnostics bundle 同样是支持分层判断工具，不是产品通过证明�
 
 用户与支持人员操作说明见
 `docs/desktop-ide/user-offline-first-guide.zh-CN.md`；release artifact preflight
-详细说明见 `docs/desktop-ide/release-offline-smoke.zh-CN.md`。
+详细说明见 `docs/desktop-ide/release-offline-smoke.zh-CN.md`；installer、签名与升级
+策略见 `docs/desktop-ide/release-hardening-strategy.zh-CN.md`。
 
 ---
 
