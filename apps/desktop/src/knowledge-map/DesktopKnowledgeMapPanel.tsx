@@ -28,6 +28,13 @@ export const DesktopKnowledgeMapPanel = ({
     }),
     [selectedClusterId, selectedEdgeBasis, viewModel.reactionMap]
   );
+  const edgeEvidenceRows = useMemo(
+    () => filterEdgeEvidenceRows(
+      buildEdgeEvidenceRows(viewModel.reactionMap.edges),
+      selectedEdgeBasis
+    ),
+    [selectedEdgeBasis, viewModel.reactionMap.edges]
+  );
   const selectedNode = graphNodes.find((node) =>
     node.reaction_entity_id === selectedReactionId
   ) ?? graphNodes[0];
@@ -93,6 +100,10 @@ export const DesktopKnowledgeMapPanel = ({
           <p>{selectedCluster?.shared_features.join(", ") || "No shared features available."}</p>
         </div>
       ) : null}
+      <EdgeEvidencePanel
+        rows={edgeEvidenceRows}
+        onSourceJump={onSourceJump}
+      />
       <div className="desktop-graph-node-list" role="list">
         {graphNodes.slice(0, 20).map((node) => (
           <div key={node.reaction_entity_id} className="desktop-graph-node-row" role="listitem">
@@ -132,6 +143,102 @@ export const DesktopKnowledgeMapPanel = ({
           </div>
         ))}
       </div>
+    </div>
+  );
+};
+
+type EdgeEvidenceRow = {
+  edgeId: string;
+  fromReactionId: string;
+  toReactionId: string;
+  confidence: string;
+  score?: number;
+  basis: readonly string[];
+  evidenceIds: readonly string[];
+  warnings: readonly string[];
+  sourceRef: DesktopRenderableSourceRef | null;
+};
+
+const buildEdgeEvidenceRows = (
+  edges: DesktopKnowledgeMapViewModel["reactionMap"]["edges"]
+): EdgeEvidenceRow[] => edges.map((edge) => ({
+  edgeId: edge.edge_id,
+  fromReactionId: edge.from_reaction_entity_id,
+  toReactionId: edge.to_reaction_entity_id,
+  confidence: edge.confidence,
+  score: edge.score,
+  basis: edge.basis,
+  evidenceIds: edge.evidence.map((item) => item.evidence_id),
+  warnings: edge.warnings,
+  // TODO: Wire edge-level source refs when the view-model exposes edgeEvidenceRows.
+  sourceRef: null
+}));
+
+const filterEdgeEvidenceRows = (
+  rows: readonly EdgeEvidenceRow[],
+  selectedBasis: string
+): EdgeEvidenceRow[] => {
+  if (selectedBasis === "all") {
+    return [...rows];
+  }
+  return rows.filter((row) => row.basis.includes(selectedBasis));
+};
+
+const formatEdgeScore = (score: number | undefined): string =>
+  score === undefined ? "score pending" : score.toFixed(2);
+
+type EdgeEvidencePanelProps = {
+  rows: readonly EdgeEvidenceRow[];
+  onSourceJump?: (intent: DesktopSourceJumpIntent) => void;
+};
+
+const EdgeEvidencePanel = ({
+  rows,
+  onSourceJump
+}: EdgeEvidencePanelProps) => {
+  const sourceReadyCount = rows.filter((row) => row.sourceRef !== null).length;
+  return (
+    <div className="desktop-renderable-node-list" role="list" aria-label="Graph edge evidence">
+      <div className="desktop-tool-result-row" role="listitem">
+        <span>Edge Evidence</span>
+        <div className="desktop-tool-result-main">
+          <strong>{rows.length} visible edges</strong>
+          <small>{sourceReadyCount} source refs ready</small>
+        </div>
+        <code>graph</code>
+      </div>
+      {rows.slice(0, 12).map((row) => (
+        <div key={row.edgeId} className="desktop-tool-result-row" role="listitem">
+          <span>{row.confidence}</span>
+          <div className="desktop-tool-result-main">
+            <strong title={`${row.fromReactionId} -> ${row.toReactionId}`}>
+              {row.fromReactionId} {"->"} {row.toReactionId}
+            </strong>
+            <small title={row.basis.join(", ")}>
+              {row.basis.join(" / ") || "basis pending"}
+            </small>
+            <small title={row.evidenceIds.join(", ")}>
+              {row.evidenceIds.length > 0
+                ? row.evidenceIds.join(", ")
+                : "evidence pending"}
+            </small>
+            {row.warnings.length > 0 ? (
+              <small title={row.warnings.join(", ")}>
+                {row.warnings.join(", ")}
+              </small>
+            ) : null}
+          </div>
+          <code>{formatEdgeScore(row.score)}</code>
+          <SourceRefAction
+            sourceRef={row.sourceRef}
+            onSourceJump={onSourceJump}
+            missingLabel="Source pending"
+          />
+        </div>
+      ))}
+      {rows.length === 0 ? (
+        <p className="desktop-empty-copy">No graph edges match the current evidence filters.</p>
+      ) : null}
     </div>
   );
 };
@@ -244,14 +351,16 @@ const ReactionRenderableList = ({
 type SourceRefActionProps = {
   sourceRef: DesktopRenderableSourceRef | null;
   onSourceJump?: (intent: DesktopSourceJumpIntent) => void;
+  missingLabel?: string;
 };
 
 const SourceRefAction = ({
   sourceRef,
-  onSourceJump
+  onSourceJump,
+  missingLabel
 }: SourceRefActionProps) => {
   if (!sourceRef) {
-    return <span className="desktop-source-ref-chip">No source</span>;
+    return <span className="desktop-source-ref-chip">{missingLabel ?? "No source"}</span>;
   }
   if (!sourceRef.intent || !onSourceJump) {
     return <span className="desktop-source-ref-chip">{sourceRef.label}</span>;
