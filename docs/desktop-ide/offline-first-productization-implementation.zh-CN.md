@@ -883,7 +883,7 @@ env、database URL、API key、token 或 password。诊断包说明见
 - [x] 凭据后端使用系统 secret storage；profile UI 不展示或保存明文密码。
 - [x] migration、pgvector、schema readiness 状态可见；schema version mismatch
   检测仍待 shared migration contract 明确后补。
-- [ ] 外部 DB 与 managed DB 使用同一 shared schema。
+- [x] 外部 DB 与 managed DB 使用同一 shared schema。
 - [x] sync 成功、失败、冲突都有 UI 和日志。
 - [x] Reaction intelligence artifact 可映射为 shared schema runtime graph edge
   input；实际 artifact sync command/UI 仍待接入。
@@ -927,6 +927,21 @@ P2 local sync result UI 阶段性完成记录（2026-05-14）：
   `pnpm typecheck` 24/24 tasks、root `pnpm test` 23 turbo test tasks + 78 script tests
   + 86 Python tests 均通过；focused ESLint 仅剩 `LocalStorePanel.tsx`
   complexity/max-lines，按用户指示留到最终复杂度治理，不阻塞当前功能主线。
+
+P2 shared schema parity 阶段性完成记录（2026-05-14）：
+
+- 代码提交：`84e94d3 test(desktop)：校验 managed shared schema parity`。
+- `scripts/desktop-postgres-bundle.test.mjs` 新增 managed/external shared schema
+  signature 测试，静态读取 `packages/storage-postgres/src/graph-rag-schema.ts` 与
+  `apps/desktop/src-tauri/src/managed_postgres_migrations.rs`。
+- 覆盖 shared Graph/RAG/Agent 表：`chemd_reaction_graph_snapshots`、
+  `chemd_reaction_graph_nodes`、`chemd_reaction_graph_edges`、
+  `chemd_rag_chunk_citations`、`chemd_agent_runs`、`chemd_agent_tool_calls`、
+  `chemd_patch_proposals` 的关键列；同时断言 managed schema 不引入 desktop-only 表。
+- 该测试是本地静态 parity 门禁，不连接真实 DB；真实外部 PostgreSQL/managed
+  runtime 仍由 runtime smoke 或环境验收补充。
+- 验证：`node --test scripts/desktop-postgres-bundle.test.mjs` 12/12 通过；
+  `pnpm run test:scripts` 79/79 通过；`git diff --check` 通过。
 
 ### P3：Graph/RAG/Agent 产品化
 

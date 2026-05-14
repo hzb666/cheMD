@@ -322,3 +322,48 @@ Validation:
 ### Next Steps
 
 - Continue with P4 installer/signing/clean-machine smoke planning and any remaining productization gaps that are not blocked by real environment access.
+
+## Session 96: Desktop managed shared schema parity
+
+**Date**: 2026-05-14
+**Task**: Prove external and managed DB use the same shared schema
+**Package**: desktop scripts, docs
+**Branch**: `desktop-ide`
+
+### Summary
+
+Closed the P2 shared schema parity gap with a static script-level test. The test compares the external `@chemd/storage-postgres` Graph/RAG/Agent schema signature against the desktop managed Postgres migration.
+
+### Main Changes
+
+- Added a shared schema signature test to `scripts/desktop-postgres-bundle.test.mjs`.
+- Covered key Graph, RAG citation, Agent run/tool-call, and patch proposal tables and columns.
+- Asserted that managed migration does not introduce desktop-only table names into the shared schema.
+- Updated the productization implementation plan to mark external DB and managed DB shared schema parity complete.
+
+Merged commits:
+- 84e94d3 test(desktop)：校验 managed shared schema parity
+
+Validation:
+- node --test scripts/desktop-postgres-bundle.test.mjs (12/12 passed)
+- pnpm run test:scripts (79/79 passed)
+- git diff --check (passed)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `84e94d3` | test(desktop)：校验 managed shared schema parity |
+
+### Testing
+
+- [OK] Desktop Postgres bundle focused tests passed
+- [OK] Full script tests passed
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Continue with P4 release hardening items that can be verified locally, while keeping clean-machine installer smoke as an explicit environment/manual gate.
