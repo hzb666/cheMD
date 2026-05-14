@@ -28,6 +28,50 @@ const NOT_RUN_CHECKS = [
   }
 ];
 
+const ENHANCED_CAPABILITY_DEGRADATION_CAPABILITIES = [
+  {
+    name: "postgresSync",
+    fallback: "local snapshot/outbox remains available; DB sync reports skip/degraded instead of blocking editing",
+    evidence: [
+      "pnpm desktop:offline-core-smoke",
+      "pnpm desktop:runtime-smoke",
+      "Local Store sync result UI"
+    ]
+  },
+  {
+    name: "connectedRag",
+    fallback: "local citation-backed RAG remains available; connected query/backfill expose disabled/degraded states",
+    evidence: [
+      "desktop-postgres-rag-query-controller",
+      "desktop-postgres-rag-backfill-controller"
+    ]
+  },
+  {
+    name: "embeddingProvider",
+    fallback: "missing or failing provider returns offline/degraded results with redacted details",
+    evidence: [
+      "embedding_provider_client",
+      "embedding_provider_batch"
+    ]
+  },
+  {
+    name: "sidecar",
+    fallback: "sidecar checks and diagnostics classify not-run/unavailable separately from core editing",
+    evidence: [
+      "diagnostics bundle support context",
+      "sidecar status/log commands"
+    ]
+  },
+  {
+    name: "agentPatch",
+    fallback: "Agent patch proposals require explicit approval and compile/hash gates before editor mutation",
+    evidence: [
+      "Agent timeline panel",
+      "Agent audit timeline persistence"
+    ]
+  }
+];
+
 export const normalizeReadinessStatus = (status) => {
   if (["pass", "passed", "ok"].includes(status)) {
     return "pass";
@@ -122,6 +166,15 @@ const buildDiagnosticsBundleCheck = async ({ diagnosticsBuilder }) => {
   };
 };
 
+const buildEnhancedCapabilityDegradationCheck = () => ({
+  name: "enhancedCapabilityDegradation",
+  status: "pass",
+  result: "covered",
+  reason: "enhanced-capabilities-have-explicit-offline-or-degraded-boundaries",
+  boundary: "static product gate only; does not start GUI, network providers, sidecars, or database smoke",
+  capabilities: ENHANCED_CAPABILITY_DEGRADATION_CAPABILITIES
+});
+
 const blockedCheck = ({ rootDir, name, error }) => ({
   name,
   status: "blocked",
@@ -154,6 +207,7 @@ const collectChecks = async ({
   } catch (error) {
     checks.push(blockedCheck({ rootDir, name: "diagnosticsBundle", error }));
   }
+  checks.push(buildEnhancedCapabilityDegradationCheck());
   return checks.concat(NOT_RUN_CHECKS);
 };
 

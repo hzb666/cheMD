@@ -69,6 +69,10 @@ test("buildDesktopReleaseReadinessReport keeps production smoke not-run as skip"
   assert.equal(report.boundaries.startsGui, false);
   assert.equal(report.boundaries.opensNetwork, false);
   assert.equal(report.boundaries.readsDotEnv, false);
+  const degradation = report.checks.find((check) => check.name === "enhancedCapabilityDegradation");
+  assert.equal(degradation.status, "pass");
+  assert.equal(degradation.result, "covered");
+  assert.equal(degradation.capabilities.length, 5);
 });
 
 test("buildDesktopReleaseReadinessReport reports blocked offline checks", async () => {
@@ -83,6 +87,7 @@ test("buildDesktopReleaseReadinessReport reports blocked offline checks", async 
   assert.equal(report.overallStatus, "blocked");
   assert.equal(report.overall.reason, "one-or-more-offline-checks-blocked");
   assert.equal(report.checks.find((check) => check.name === "offlineReleasePreflight").status, "blocked");
+  assert.equal(report.checks.find((check) => check.name === "enhancedCapabilityDegradation").status, "pass");
 });
 
 test("buildDesktopReleaseReadinessReport redacts sensitive values", async () => {
@@ -128,6 +133,10 @@ test("runDesktopReleaseReadinessCli writes --output JSON", async () => {
     const written = JSON.parse(readFileSync(outputPath, "utf8"));
     assert.equal(written.overallStatus, "skip");
     assert.equal(written.cleanMachineInstallerSmoke.result, "not-run");
+    assert.equal(
+      written.checks.find((check) => check.name === "enhancedCapabilityDegradation").status,
+      "pass"
+    );
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
@@ -145,4 +154,8 @@ test("runDesktopReleaseReadinessCli prints JSON for --json", async () => {
   const printed = JSON.parse(logger.lines.join("\n"));
   assert.equal(printed.overallStatus, "skip");
   assert.equal(printed.realNetwork.status, "skip");
+  assert.match(
+    JSON.stringify(printed.checks.find((check) => check.name === "enhancedCapabilityDegradation")),
+    /connectedRag/u
+  );
 });
