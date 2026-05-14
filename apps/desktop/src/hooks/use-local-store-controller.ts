@@ -157,6 +157,7 @@ export const useLocalStoreController = ({
           failedCount: result.failedCount,
           skippedCount: result.skippedCount,
           target: result.target,
+          entries: result.entries,
           failedEntries
         }
       });

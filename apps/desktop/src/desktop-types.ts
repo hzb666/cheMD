@@ -186,6 +186,7 @@ export type LocalSyncSummary = {
   failedCount: number;
   skippedCount: number;
   target: DesktopCommandMap["sync_local_outbox_to_postgres"]["output"]["target"];
+  entries: LocalSyncEntryResult[];
   failedEntries: LocalSyncEntryResult[];
 };
 
@@ -193,6 +194,26 @@ export type LocalSyncState = {
   state: PersistOperationState;
   message: string;
   summary: LocalSyncSummary | null;
+};
+
+export type LocalSyncResultRowStatus = "synced" | "failed" | "skipped";
+
+export type LocalSyncResultRowCategory = "synced" | "failed" | "retryable" | "skipped";
+
+export type LocalSyncResultRow = {
+  rowId: string;
+  status: LocalSyncResultRowStatus;
+  category: LocalSyncResultRowCategory;
+  localId: string;
+  graphSnapshotId: string | null;
+  idempotencyKey: string;
+  message: string;
+  error: string | null;
+  conflict: boolean;
+  retryable: boolean;
+  failed: boolean;
+  synced: boolean;
+  skipped: boolean;
 };
 
 // ════════════════════════════════════════════════════════════════════════
