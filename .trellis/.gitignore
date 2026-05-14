@@ -4,6 +4,9 @@
 # Current task pointer (each dev works on different task)
 .current-task
 
+# Session/window scoped runtime state
+.runtime/
+
 # Ralph Loop state file
 .ralph-state.json
 
@@ -11,7 +14,6 @@
 .agents/
 .agent-log
 .session-id
-hooks.local.json
 
 # Task directory runtime files
 .plan-log
