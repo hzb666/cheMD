@@ -367,3 +367,43 @@ Validation:
 ### Next Steps
 
 - Continue with P4 release hardening items that can be verified locally, while keeping clean-machine installer smoke as an explicit environment/manual gate.
+
+## Session 97: Desktop release hardening strategy
+
+**Date**: 2026-05-14
+**Task**: Define installer, signing, and upgrade strategy
+**Package**: desktop docs
+**Branch**: `desktop-ide`
+
+### Summary
+
+Closed the P4 installer/signing/upgrade strategy item with a dedicated release hardening runbook. The remaining clean-machine installer smoke stays explicit and unclaimed because it requires a real clean Windows user environment or VM.
+
+### Main Changes
+
+- Added `docs/desktop-ide/release-hardening-strategy.zh-CN.md`.
+- Defined Windows installer targets, managed PostgreSQL staging requirements, code signing paths, updater preconditions, data retention rules, and clean-machine smoke steps.
+- Linked the strategy from release readiness docs and the main productization plan.
+- Marked installer/signing/upgrade strategy complete while keeping clean-machine Offline Core smoke open.
+
+Validation:
+- git diff --check (passed)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d80c902` | docs(desktop)：明确 release hardening 策略 |
+
+### Testing
+
+- [OK] Documentation-only change; no runtime command required
+- [OK] git diff --check passed
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- The only remaining unchecked productization item is clean-machine installer Offline Core smoke, which needs a real isolated install environment.

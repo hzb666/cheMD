@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-3.md`
-- **Total Sessions**: 96
+- **Total Sessions**: 97
 - **Last Active**: 2026-05-14
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-3.md` | ~410 | Active |
+| `journal-3.md` | ~455 | Active |
 | `journal-2.md` | ~1956 | Archived |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
@@ -31,6 +31,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 97 | 2026-05-14 | Desktop release hardening strategy | `d80c902` | `desktop-ide` |
 | 96 | 2026-05-14 | Desktop managed shared schema parity | `84e94d3` | `desktop-ide` |
 | 95 | 2026-05-14 | Desktop enhanced capability degradation gate | `64fd58c` | `desktop-ide` |
 | 94 | 2026-05-14 | Desktop Agent audit replay persistence | `5affb52`, `9696778` | `desktop-ide` |
