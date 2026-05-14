@@ -3,15 +3,24 @@
   --background: oklch(99.1% 0.003 247.9);
   --foreground: oklch(21.7% 0.035 257.4);
   --card: oklch(100% 0 0);
+  --card-foreground: oklch(21.7% 0.035 257.4);
+  --popover: oklch(100% 0 0);
+  --popover-foreground: oklch(21.7% 0.035 257.4);
   --panel: oklch(98.3% 0.006 247.9);
   --panel-elevated: oklch(96.8% 0.01 247.9);
+  --primary: oklch(56.6% 0.194 253.3);
+  --primary-foreground: oklch(100% 0 0);
+  --secondary: oklch(96.3% 0.026 236.6);
+  --secondary-foreground: oklch(53.7% 0.176 253.1);
   --muted: oklch(96.3% 0.006 74.7);
   --muted-foreground: oklch(45.8% 0.025 69.5);
   --accent: oklch(96.3% 0.026 236.6);
   --accent-foreground: oklch(53.7% 0.176 253.1);
-  --primary: oklch(56.6% 0.194 253.3);
-  --primary-foreground: oklch(100% 0 0);
+  --destructive: oklch(54.6% 0.188 32.1);
   --border: oklch(88.8% 0.012 247.9);
+  --input: oklch(88.8% 0.012 247.9);
+  --ring: oklch(56.6% 0.194 253.3);
+  --radius: 7px;
   --success: oklch(62.7% 0.178 146.6);
   --warning: oklch(62.9% 0.177 51.8);
   --danger: oklch(54.6% 0.188 32.1);
@@ -25,26 +34,37 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
   --color-panel: var(--panel);
   --color-panel-elevated: var(--panel-elevated);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
+  --color-destructive: var(--destructive);
   --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
   --font-sans: Inter, "Segoe UI", system-ui, sans-serif;
   --font-mono: "SFMono-Regular", "Cascadia Code", Consolas, monospace;
-  --radius-desktop: 7px;
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
 }
 
 @layer base {
   * {
-    @apply box-border;
+    @apply box-border border-border outline-ring/50;
     scrollbar-color: color-mix(in oklch, var(--foreground) 18%, transparent) transparent;
     scrollbar-width: thin;
   }
