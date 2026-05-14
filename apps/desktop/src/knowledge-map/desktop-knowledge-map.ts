@@ -127,6 +127,30 @@ export interface DesktopEvidenceSourceRow {
   sourceRef: DesktopRenderableSourceRef;
 }
 
+export interface DesktopEdgeEvidenceSourceRow {
+  evidenceId?: string;
+  source: string;
+  basis: string[];
+  warnings: string[];
+}
+
+export interface DesktopEdgeEvidenceEndpoint {
+  reactionId: string;
+  label: string;
+  sourceRef: DesktopRenderableSourceRef | null;
+  jumpIntent: DesktopSourceJumpIntent | null;
+}
+
+export interface DesktopEdgeEvidenceRow {
+  edgeId: string;
+  from: DesktopEdgeEvidenceEndpoint;
+  to: DesktopEdgeEvidenceEndpoint;
+  basis: string[];
+  score: number | null;
+  warnings: string[];
+  evidenceSources: DesktopEdgeEvidenceSourceRow[];
+}
+
 export interface DesktopKnowledgeMapViewModel {
   state: DesktopKnowledgeMapState;
   message: string;
@@ -139,6 +163,7 @@ export interface DesktopKnowledgeMapViewModel {
   clusters: DesktopReactionClusterRow[];
   reactionRenderables: DesktopReactionRenderableRow[];
   evidenceSourceRefs: DesktopEvidenceSourceRow[];
+  edgeEvidenceRows: DesktopEdgeEvidenceRow[];
 }
 
 export interface BuildDesktopKnowledgeMapViewModelOptions {
@@ -297,6 +322,9 @@ const uniqueSortedStrings = (values: readonly string[]): string[] =>
   Array.from(new Set(values.filter(Boolean))).sort((left, right) =>
     left.localeCompare(right, "en")
   );
+
+const uniqueStrings = (values: readonly string[]): string[] =>
+  Array.from(new Set(values.filter(Boolean)));
 
 const providerStatusCounts = (
   artifact: ChemdReactionIntelligenceArtifactV1
@@ -495,6 +523,174 @@ const evidenceSourceRows = (
       sourceRef
     }));
 
+type ReactionMapNode = ReactionMapLayout["nodes"][number];
+type ReactionMapEdge = ReactionMapLayout["edges"][number];
+
+type ReactionMapNodeWithSource = ReactionMapNode & {
+  label?: string;
+  reaction_signature?: string;
+  source_ref?: ChemdSourceRefV1;
+};
+
+type ReactionMapEdgeEvidencePayload = {
+  evidence_id?: string;
+  source?: string;
+  basis?: readonly string[] | string;
+  warnings?: readonly string[];
+};
+
+type ReactionMapEdgeWithEvidence = ReactionMapEdge & {
+  edge_id?: string;
+  evidence?: readonly ReactionMapEdgeEvidencePayload[];
+  score?: number;
+  warnings?: readonly string[];
+};
+
+const sourceRefForReactionMapNode = (
+  node: ReactionMapNodeWithSource
+): DesktopRenderableSourceRef | null => {
+  if (!node.source_ref) {
+    return null;
+  }
+  return {
+    label: sourceRefLabel(node.source_ref),
+    sourceKind: node.source_ref.source_kind,
+    sourceUri: node.source_ref.source_uri,
+    startLine: node.source_ref.start_line,
+    endLine: node.source_ref.end_line,
+    intent: createKnowledgeMapSourceJumpIntent(
+      `reaction::${node.reaction_entity_id}`,
+      node.reaction_entity_id,
+      node.source_ref
+    )
+  };
+};
+
+const reactionSourceRefMap = (
+  tree: ChemdSemanticRenderTreeV1 | null
+): Map<string, DesktopRenderableSourceRef | null> =>
+  new Map((tree?.nodes ?? [])
+    .filter((node) => node.node_type === "ChemdReactionNode" && node.semantic_id)
+    .map((node) => [node.semantic_id ?? node.node_id, toDesktopSourceRef(node)]));
+
+const reactionLabel = (
+  node: ReactionMapNodeWithSource | undefined,
+  reactionId: string
+): string =>
+  node?.label ?? node?.reaction_signature ?? reactionId;
+
+const sourceRefForReactionEndpoint = (
+  node: ReactionMapNodeWithSource | undefined,
+  sourceRefsByReactionId: ReadonlyMap<string, DesktopRenderableSourceRef | null>,
+  reactionId: string
+): DesktopRenderableSourceRef | null => {
+  if (!node) {
+    return null;
+  }
+  return sourceRefForReactionMapNode(node)
+    ?? sourceRefsByReactionId.get(reactionId)
+    ?? null;
+};
+
+const edgeEndpoint = (
+  node: ReactionMapNodeWithSource | undefined,
+  sourceRefsByReactionId: ReadonlyMap<string, DesktopRenderableSourceRef | null>,
+  reactionId: string
+): DesktopEdgeEvidenceEndpoint => {
+  const sourceRef = sourceRefForReactionEndpoint(node, sourceRefsByReactionId, reactionId);
+  return {
+    reactionId,
+    label: reactionLabel(node, reactionId),
+    sourceRef,
+    jumpIntent: sourceRef?.intent ?? null
+  };
+};
+
+const edgeEvidenceBasis = (
+  basis: ReactionMapEdgeEvidencePayload["basis"],
+  fallbackBasis: readonly string[]
+): string[] => {
+  if (Array.isArray(basis)) {
+    return [...basis];
+  }
+  if (typeof basis === "string" && basis.length > 0) {
+    return [basis];
+  }
+  return [...fallbackBasis];
+};
+
+const edgeEvidenceSources = (
+  edge: ReactionMapEdgeWithEvidence,
+  fallbackBasis: readonly string[],
+  fallbackWarnings: readonly string[]
+): DesktopEdgeEvidenceSourceRow[] => {
+  const evidence = edge.evidence ?? [];
+  if (evidence.length === 0) {
+    return [{
+      evidenceId: edge.edge_id,
+      source: "reaction_map_edge",
+      basis: [...fallbackBasis],
+      warnings: [...fallbackWarnings]
+    }];
+  }
+  return evidence.map((item) => ({
+    evidenceId: item.evidence_id,
+    source: item.source ?? "reaction_map_edge",
+    basis: edgeEvidenceBasis(item.basis, fallbackBasis),
+    warnings: [...(item.warnings ?? [])]
+  }));
+};
+
+const edgeWarnings = (
+  edge: ReactionMapEdgeWithEvidence
+): string[] =>
+  uniqueStrings([
+    ...(edge.warnings ?? []),
+    ...((edge.evidence ?? []).flatMap((item) => item.warnings ?? []))
+  ]);
+
+const edgeId = (
+  edge: ReactionMapEdgeWithEvidence,
+  basis: readonly string[]
+): string =>
+  edge.edge_id
+  ?? edge.evidence?.find((item) => item.evidence_id)?.evidence_id
+  ?? `${edge.from_reaction_entity_id}->${edge.to_reaction_entity_id}:${basis.join("|") || "edge"}`;
+
+const edgeEvidenceRows = (
+  reactionMap: ReactionMapLayout,
+  tree: ChemdSemanticRenderTreeV1 | null
+): DesktopEdgeEvidenceRow[] => {
+  const sourceRefsByReactionId = reactionSourceRefMap(tree);
+  const nodesByReactionId = new Map(reactionMap.nodes.map((node) => [
+    node.reaction_entity_id,
+    node as ReactionMapNodeWithSource
+  ]));
+
+  return reactionMap.edges.map((rawEdge) => {
+    const edge = rawEdge as ReactionMapEdgeWithEvidence;
+    const basis = [...edge.basis];
+    const warnings = edgeWarnings(edge);
+    return {
+      edgeId: edgeId(edge, basis),
+      from: edgeEndpoint(
+        nodesByReactionId.get(edge.from_reaction_entity_id),
+        sourceRefsByReactionId,
+        edge.from_reaction_entity_id
+      ),
+      to: edgeEndpoint(
+        nodesByReactionId.get(edge.to_reaction_entity_id),
+        sourceRefsByReactionId,
+        edge.to_reaction_entity_id
+      ),
+      basis,
+      score: typeof edge.score === "number" ? edge.score : null,
+      warnings,
+      evidenceSources: edgeEvidenceSources(edge, basis, warnings)
+    };
+  });
+};
+
 const highestDiagnosticSeverity = (
   diagnostics: readonly ChemdEditorDiagnostic[]
 ): ChemdEditorDiagnostic["severity"] | null => {
@@ -554,6 +750,7 @@ export const buildDesktopKnowledgeMapViewModel = (
     edgeBasisOptions: buildEdgeBasisOptions(reactionMap, reactionIntelligenceArtifact),
     clusters: clusterRows(reactionMap),
     reactionRenderables: reactionRenderableRows(semanticTree, reactionMap),
-    evidenceSourceRefs: evidenceSourceRows(semanticTree)
+    evidenceSourceRefs: evidenceSourceRows(semanticTree),
+    edgeEvidenceRows: edgeEvidenceRows(reactionMap, semanticTree)
   };
 };

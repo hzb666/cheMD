@@ -133,6 +133,25 @@ const outputWithManyReactions = (count: number): ChemdLanguageCompileSuccess => 
   };
 };
 
+const outputWithManyReactionsWithoutSourceRefs = (
+  count: number
+): ChemdLanguageCompileSuccess => {
+  const output = outputWithManyReactions(count);
+  return {
+    ...output,
+    result: ({
+      document: {
+        ...output.result.document,
+        children: output.result.document.children.map((child) => ({
+          ...child,
+          sourceSpan: undefined
+        }))
+      },
+      diagnostics: output.result.diagnostics
+    } as unknown) as ChemdLanguageCompileSuccess["result"]
+  };
+};
+
 const reactionIntelligenceArtifact = (
   layout?: ReactionMapLayout
 ): ChemdReactionIntelligenceArtifactV1 => ({
@@ -286,6 +305,81 @@ describe("desktop knowledge map view model", () => {
     expect(filterDesktopKnowledgeMapNodes(viewModel.reactionMap, {
       edgeBasis: "rxnfp_cosine"
     })).toEqual([]);
+  });
+
+  it("builds edge evidence rows for artifact explicit edges", () => {
+    const viewModel = buildDesktopKnowledgeMapViewModel(outputWithManyReactions(2), {
+      reactionIntelligenceArtifact: reactionIntelligenceArtifact()
+    });
+
+    expect(viewModel.edgeEvidenceRows).toHaveLength(1);
+    expect(viewModel.edgeEvidenceRows[0]).toMatchObject({
+      from: {
+        reactionId: "rxn-1",
+        label: "rxn-1"
+      },
+      to: {
+        reactionId: "rxn-2",
+        label: "rxn-2"
+      },
+      basis: ["hybrid_consensus", "rdkit_fingerprint_tanimoto"],
+      score: 0.91,
+      warnings: ["computed_edge_reviewed"],
+      evidenceSources: [{
+        evidenceId: "edge::rxn-1::rxn-2",
+        source: "explicit_edge",
+        basis: ["rdkit_fingerprint_tanimoto", "hybrid_consensus"],
+        warnings: ["computed_edge_reviewed"]
+      }]
+    });
+  });
+
+  it("adds source refs and jump intents to both edge evidence endpoints", () => {
+    const viewModel = buildDesktopKnowledgeMapViewModel(outputWithManyReactions(2), {
+      reactionIntelligenceArtifact: reactionIntelligenceArtifact()
+    });
+    const row = viewModel.edgeEvidenceRows[0];
+
+    expect(row.from.sourceRef).toMatchObject({
+      label: "map.chemd.md L1-L1",
+      startLine: 1,
+      endLine: 1
+    });
+    expect(row.from.jumpIntent).toEqual({
+      kind: "chemd-source-jump",
+      nodeId: "reaction::rxn-1",
+      semanticId: "rxn-1",
+      sourceKind: "chemd",
+      sourceUri: "experiments/map.chemd.md",
+      range: {
+        startLine: 1,
+        endLine: 1,
+        startOffset: 10,
+        endOffset: 10
+      }
+    });
+    expect(row.to.sourceRef).toMatchObject({
+      label: "map.chemd.md L2-L2",
+      startLine: 2,
+      endLine: 2
+    });
+    expect(row.to.jumpIntent?.range).toMatchObject({
+      startLine: 2,
+      endLine: 2
+    });
+  });
+
+  it("keeps edge evidence endpoints safe when reactions have no source refs", () => {
+    const viewModel = buildDesktopKnowledgeMapViewModel(
+      outputWithManyReactionsWithoutSourceRefs(2),
+      { reactionIntelligenceArtifact: reactionIntelligenceArtifact() }
+    );
+
+    expect(viewModel.edgeEvidenceRows).toHaveLength(1);
+    expect(viewModel.edgeEvidenceRows[0].from.sourceRef).toBeNull();
+    expect(viewModel.edgeEvidenceRows[0].from.jumpIntent).toBeNull();
+    expect(viewModel.edgeEvidenceRows[0].to.sourceRef).toBeNull();
+    expect(viewModel.edgeEvidenceRows[0].to.jumpIntent).toBeNull();
   });
 
   it("uses artifact TMAP layout when the artifact carries a layout payload", () => {
