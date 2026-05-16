@@ -15,7 +15,7 @@ fn export_diagnostics_bundle_writes_parseable_json() {
     let parsed: Value = serde_json::from_str(&json).expect("bundle is valid JSON");
 
     assert_eq!(parsed["schemaVersion"], 1);
-    assert_eq!(parsed["summary"]["commandCount"], 34);
+    assert_eq!(parsed["summary"]["commandCount"], 37);
     assert_eq!(parsed["summary"]["boundarySkipCount"], 8);
     assert_eq!(parsed["summary"]["supportCommandCount"], 7);
     assert_eq!(parsed["runtimeBoundaries"][0]["status"], "SKIP");

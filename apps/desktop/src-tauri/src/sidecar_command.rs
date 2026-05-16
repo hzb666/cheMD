@@ -1,4 +1,4 @@
-use crate::workspace::DesktopCommandError;
+use crate::workspace::CommandError;
 use std::{
     env,
     path::{Path, PathBuf},
@@ -12,9 +12,9 @@ pub(crate) struct SidecarCommandSpec {
     pub(crate) label: String,
 }
 
-pub(crate) fn default_sidecar_command_spec() -> Result<SidecarCommandSpec, DesktopCommandError> {
+pub(crate) fn default_sidecar_command_spec() -> Result<SidecarCommandSpec, CommandError> {
     let service_dir = discover_service_dir().ok_or_else(|| {
-        DesktopCommandError::new(
+        CommandError::new(
             "sidecar_service_not_found",
             "chem-service directory was not found",
             Some("Expected services/chem-service below the repo or workspace root".into()),

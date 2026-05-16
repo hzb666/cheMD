@@ -1,27 +1,27 @@
 import {
-  getDesktopAgentToolContract,
-  type DesktopAgentConnectivity,
-  type DesktopAgentToolAvailabilityContract,
-  type DesktopOrchestratedToolName
+  getAgentToolContract,
+  type AgentConnectivity,
+  type AgentToolAvailabilityContract,
+  type OrchestratedToolName
 } from "./contracts";
 
-export interface DesktopAgentToolRuntimeState {
-  connectivity: DesktopAgentConnectivity;
+export interface AgentToolRuntimeState {
+  connectivity: AgentConnectivity;
   hasWorkspace: boolean;
   hasCurrentFile: boolean;
   hasExplicitApproval: boolean;
 }
 
-export interface DesktopAgentToolAvailabilityView
-  extends DesktopAgentToolAvailabilityContract {
+export interface AgentToolAvailabilityView
+  extends AgentToolAvailabilityContract {
   blockedReasons: readonly string[];
 }
 
-export const resolveDesktopAgentToolAvailability = (
-  toolName: DesktopOrchestratedToolName,
-  state: DesktopAgentToolRuntimeState
-): DesktopAgentToolAvailabilityView => {
-  const contract = getDesktopAgentToolContract(toolName);
+export const resolveAgentToolAvailability = (
+  toolName: OrchestratedToolName,
+  state: AgentToolRuntimeState
+): AgentToolAvailabilityView => {
+  const contract = getAgentToolContract(toolName);
   const blockedReasons = buildBlockedReasons(contract.toolName, state);
 
   if (blockedReasons.length > 0) {
@@ -38,27 +38,27 @@ export const resolveDesktopAgentToolAvailability = (
   };
 };
 
-export const summarizeDesktopAgentToolInput = (
-  toolName: DesktopOrchestratedToolName,
+export const summarizeAgentToolInput = (
+  toolName: OrchestratedToolName,
   input: unknown
 ): string => {
-  const contract = getDesktopAgentToolContract(toolName);
+  const contract = getAgentToolContract(toolName);
   return summarizeKnownPayload(toolName, input, contract.summaryStrategy.maxInputLength);
 };
 
-export const summarizeDesktopAgentToolOutput = (
-  toolName: DesktopOrchestratedToolName,
+export const summarizeAgentToolOutput = (
+  toolName: OrchestratedToolName,
   output: unknown
 ): string => {
-  const contract = getDesktopAgentToolContract(toolName);
+  const contract = getAgentToolContract(toolName);
   return summarizeKnownPayload(toolName, output, contract.summaryStrategy.maxOutputLength);
 };
 
 const buildBlockedReasons = (
-  toolName: DesktopOrchestratedToolName,
-  state: DesktopAgentToolRuntimeState
+  toolName: OrchestratedToolName,
+  state: AgentToolRuntimeState
 ): readonly string[] => {
-  const contract = getDesktopAgentToolContract(toolName);
+  const contract = getAgentToolContract(toolName);
   const reasons: string[] = [];
 
   if (contract.requires.workspace && !state.hasWorkspace) {
@@ -75,7 +75,7 @@ const buildBlockedReasons = (
 };
 
 const summarizeKnownPayload = (
-  toolName: DesktopOrchestratedToolName,
+  toolName: OrchestratedToolName,
   payload: unknown,
   maxLength: number
 ): string => {

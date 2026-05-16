@@ -88,6 +88,7 @@ export interface PostgresAgentRunRecord {
   revisionId?: string;
   status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
   goal: string;
+  auditTimeline: readonly JsonRecord[];
   startedAt: string;
   finishedAt?: string;
 }

@@ -98,6 +98,7 @@ export interface RuntimeAgentRunInput {
   startedAt?: string;
   updatedAt?: string;
   finishedAt?: string;
+  auditTimeline?: readonly unknown[];
 }
 
 export interface RuntimeAgentToolCallInput {

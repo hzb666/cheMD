@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-3.md`
-- **Total Sessions**: 90
-- **Last Active**: 2026-05-14
+- **Total Sessions**: 98
+- **Last Active**: 2026-05-16
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-3.md` | ~62 | Active |
+| `journal-3.md` | ~443 | Active |
 | `journal-2.md` | ~1956 | Archived |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
@@ -31,6 +31,14 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 98 | 2026-05-16 | Desktop IDE 产品化重组收尾 | `4670c0e` | `desktop-ide` |
+| 97 | 2026-05-14 | Desktop release hardening strategy | `d80c902` | `desktop-ide` |
+| 96 | 2026-05-14 | Desktop managed shared schema parity | `84e94d3` | `desktop-ide` |
+| 95 | 2026-05-14 | Desktop enhanced capability degradation gate | `64fd58c` | `desktop-ide` |
+| 94 | 2026-05-14 | Desktop Agent audit replay persistence | `5affb52`, `9696778` | `desktop-ide` |
+| 93 | 2026-05-14 | Desktop local sync result UI | `3273a0e`, `6392aea` | `desktop-ide` |
+| 92 | 2026-05-14 | Desktop Graph edge evidence panel | `3816374`, `e99c92b`, `9a060aa` | `desktop-ide` |
+| 91 | 2026-05-14 | Desktop UI componentization merge | `d49e63c` | `desktop-ide` |
 | 90 | 2026-05-14 | Desktop Agent panel and tool contracts | `67e3606`, `e2174ee`, `7a576f8` | `desktop-ide` |
 | 89 | 2026-05-14 | Desktop Agent patch compile gate | `ea726ae` | `desktop-ide` |
 | 88 | 2026-05-14 | Desktop connected RAG backfill UI | `8970c4d` | `desktop-ide` |

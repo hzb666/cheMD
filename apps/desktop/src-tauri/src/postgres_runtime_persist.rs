@@ -8,7 +8,7 @@ use crate::{
         PersistRuntimeGraphRagCounts, PersistRuntimeGraphRagInput, PersistRuntimeGraphRagResult,
         PostgresTargetSummary, RuntimeGraphEdgeRecord, RuntimeGraphNodeRecord,
     },
-    workspace::DesktopCommandError,
+    workspace::CommandError,
 };
 use serde_json::Value;
 use std::collections::BTreeSet;
@@ -17,12 +17,12 @@ use std::collections::BTreeSet;
 #[tauri::command]
 pub async fn persist_runtime_graph_rag(
     payload: PersistRuntimeGraphRagInput,
-) -> Result<PersistRuntimeGraphRagResult, DesktopCommandError> {
+) -> Result<PersistRuntimeGraphRagResult, CommandError> {
     match tauri::async_runtime::spawn_blocking(move || persist_runtime_graph_rag_impl(payload))
         .await
     {
         Ok(result) => result,
-        Err(error) => Err(DesktopCommandError::new(
+        Err(error) => Err(CommandError::new(
             "postgres_runtime_task_failed",
             "Runtime persistence task failed",
             Some(error.to_string()),
@@ -32,11 +32,11 @@ pub async fn persist_runtime_graph_rag(
 
 pub(crate) fn persist_runtime_graph_rag_impl(
     records: PersistRuntimeGraphRagInput,
-) -> Result<PersistRuntimeGraphRagResult, DesktopCommandError> {
+) -> Result<PersistRuntimeGraphRagResult, CommandError> {
     validate_runtime_graph_rag_input(&records)?;
     let config = load_postgres_config().ok_or_else(missing_config_error)?;
     let mut client = connect(&config).map_err(|detail| {
-        DesktopCommandError::new(
+        CommandError::new(
             "postgres_connect_failed",
             "Failed to connect to PostgreSQL",
             Some(detail),
@@ -44,7 +44,7 @@ pub(crate) fn persist_runtime_graph_rag_impl(
     })?;
 
     persist_runtime_graph_rag_records(&mut client, &records).map_err(|error| {
-        DesktopCommandError::new(
+        CommandError::new(
             "postgres_runtime_persist_failed",
             "Failed to persist runtime Graph/RAG records",
             Some(redact_config_detail(&error.to_string(), &config)),
@@ -56,7 +56,7 @@ pub(crate) fn persist_runtime_graph_rag_impl(
 
 pub(crate) fn validate_runtime_graph_rag_input(
     records: &PersistRuntimeGraphRagInput,
-) -> Result<(), DesktopCommandError> {
+) -> Result<(), CommandError> {
     require_text(
         "graphSnapshot.graphSnapshotId",
         &records.graph_snapshot.graph_snapshot_id,
@@ -113,6 +113,9 @@ pub(crate) fn validate_runtime_graph_rag_input(
         require_text("agentRun.status", &run.status)?;
         require_text("agentRun.goal", &run.goal)?;
         require_text("agentRun.startedAt", &run.started_at)?;
+        if !run.audit_timeline.is_array() {
+            return invalid_input("agentRun.auditTimeline must be an array");
+        }
         require_optional_text("agentRun.experimentId", run.experiment_id.as_deref())?;
         require_optional_text("agentRun.revisionId", run.revision_id.as_deref())?;
     }
@@ -145,7 +148,7 @@ pub(crate) fn optional_json_param(value: &Option<Value>) -> Option<String> {
 fn validate_node(
     node: &RuntimeGraphNodeRecord,
     records: &PersistRuntimeGraphRagInput,
-) -> Result<(), DesktopCommandError> {
+) -> Result<(), CommandError> {
     require_text("node.nodeId", &node.node_id)?;
     require_text("node.graphSnapshotId", &node.graph_snapshot_id)?;
     require_text("node.experimentId", &node.experiment_id)?;
@@ -160,7 +163,7 @@ fn validate_edge(
     edge: &RuntimeGraphEdgeRecord,
     records: &PersistRuntimeGraphRagInput,
     node_ids: &BTreeSet<&str>,
-) -> Result<(), DesktopCommandError> {
+) -> Result<(), CommandError> {
     require_text("edge.edgeId", &edge.edge_id)?;
     require_text("edge.graphSnapshotId", &edge.graph_snapshot_id)?;
     require_text("edge.experimentId", &edge.experiment_id)?;
@@ -182,7 +185,7 @@ fn validate_edge(
 fn require_same_snapshot(
     graph_snapshot_id: &str,
     records: &PersistRuntimeGraphRagInput,
-) -> Result<(), DesktopCommandError> {
+) -> Result<(), CommandError> {
     if graph_snapshot_id != records.graph_snapshot.graph_snapshot_id {
         return invalid_input("record graphSnapshotId must match graphSnapshot.graphSnapshotId");
     }
@@ -192,37 +195,37 @@ fn require_same_snapshot(
 fn require_same_experiment(
     experiment_id: &str,
     records: &PersistRuntimeGraphRagInput,
-) -> Result<(), DesktopCommandError> {
+) -> Result<(), CommandError> {
     if experiment_id != records.graph_snapshot.experiment_id {
         return invalid_input("record experimentId must match graphSnapshot.experimentId");
     }
     Ok(())
 }
 
-fn require_text(field: &str, value: &str) -> Result<(), DesktopCommandError> {
+fn require_text(field: &str, value: &str) -> Result<(), CommandError> {
     if value.trim().is_empty() {
         return invalid_input(&format!("{field} must not be empty"));
     }
     Ok(())
 }
 
-fn require_optional_text(field: &str, value: Option<&str>) -> Result<(), DesktopCommandError> {
+fn require_optional_text(field: &str, value: Option<&str>) -> Result<(), CommandError> {
     if matches!(value, Some(text) if text.trim().is_empty()) {
         return invalid_input(&format!("{field} must not be empty when provided"));
     }
     Ok(())
 }
 
-fn invalid_input(detail: &str) -> Result<(), DesktopCommandError> {
-    Err(DesktopCommandError::new(
+fn invalid_input(detail: &str) -> Result<(), CommandError> {
+    Err(CommandError::new(
         "postgres_runtime_invalid_input",
         "Invalid runtime Graph/RAG persistence input",
         Some(detail.into()),
     ))
 }
 
-fn missing_config_error() -> DesktopCommandError {
-    DesktopCommandError::new(
+fn missing_config_error() -> CommandError {
+    CommandError::new(
         "postgres_config_missing",
         "PostgreSQL is not configured",
         Some(

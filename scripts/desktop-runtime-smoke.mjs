@@ -423,7 +423,7 @@ export const loadDesktopRuntimeGraphModules = async () => {
 };
 
 export const loadDesktopLocalStoreModules = async () => {
-  const localStore = await import("../apps/desktop/src/desktop-local-store.ts");
+  const localStore = await import("../apps/desktop/src/features/local-store/store.ts");
   return {
     buildLocalRuntimeSnapshotInput: localStore.buildLocalRuntimeSnapshotInput
   };

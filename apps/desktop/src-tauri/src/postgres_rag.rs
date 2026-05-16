@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 #[cfg(not(test))]
-use crate::workspace::DesktopCommandError;
+use crate::workspace::CommandError;
 
 const DEFAULT_LIMIT: i64 = 8;
 const MAX_LIMIT: i64 = 20;
@@ -105,10 +105,10 @@ pub(crate) struct PostgresRagCandidateRow {
 #[tauri::command]
 pub async fn query_postgres_rag(
     input: PostgresRagQueryInput,
-) -> Result<PostgresRagQueryResult, DesktopCommandError> {
+) -> Result<PostgresRagQueryResult, CommandError> {
     match tauri::async_runtime::spawn_blocking(move || query_postgres_rag_impl(input)).await {
         Ok(result) => Ok(result),
-        Err(error) => Err(DesktopCommandError::new(
+        Err(error) => Err(CommandError::new(
             "postgres_rag_query_task_failed",
             "Postgres RAG query task failed",
             Some(error.to_string()),

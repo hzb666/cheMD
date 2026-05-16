@@ -4,7 +4,7 @@ use crate::{
         list_postgres_profiles_with_store, postgres_profile_env_source_with_store,
         save_postgres_profile_with_store, PostgresProfileSecretStore, SavePostgresProfileInput,
     },
-    workspace::DesktopCommandError,
+    workspace::CommandError,
 };
 use std::{
     collections::BTreeMap,
@@ -20,7 +20,7 @@ struct MemorySecretStore {
 }
 
 impl PostgresProfileSecretStore for MemorySecretStore {
-    fn write(&self, secret_ref: &str, password: &str) -> Result<(), DesktopCommandError> {
+    fn write(&self, secret_ref: &str, password: &str) -> Result<(), CommandError> {
         self.values
             .lock()
             .expect("secret store lock should be available")
@@ -28,14 +28,14 @@ impl PostgresProfileSecretStore for MemorySecretStore {
         Ok(())
     }
 
-    fn read(&self, secret_ref: &str) -> Result<String, DesktopCommandError> {
+    fn read(&self, secret_ref: &str) -> Result<String, CommandError> {
         self.values
             .lock()
             .expect("secret store lock should be available")
             .get(secret_ref)
             .cloned()
             .ok_or_else(|| {
-                DesktopCommandError::new(
+                CommandError::new(
                     "postgres_profile_secret_storage_failed",
                     "Postgres profile secret storage failed",
                     Some("missing test secret".into()),
@@ -43,7 +43,7 @@ impl PostgresProfileSecretStore for MemorySecretStore {
             })
     }
 
-    fn delete(&self, secret_ref: &str) -> Result<(), DesktopCommandError> {
+    fn delete(&self, secret_ref: &str) -> Result<(), CommandError> {
         self.values
             .lock()
             .expect("secret store lock should be available")

@@ -80,7 +80,8 @@ const buildRuntimeRecords = (): PostgresRuntimeGraphRagRecords =>
       experimentId: "exp-runtime",
       revisionId: "rev-runtime",
       status: "completed",
-      goal: "Apply reviewed patch"
+      goal: "Apply reviewed patch",
+      auditTimeline: [{ eventId: "event-1", type: "run_created" }]
     }],
     agentToolCalls: [{
       toolCallId: "tool-call-1",

@@ -117,6 +117,7 @@ const buildRecords = () => {
         revisionId: "rev-graph-rag-1",
         status: "succeeded",
         goal: "Propose a repair",
+        auditTimeline: [{ event_id: "event-1", type: "run_created" }],
         startedAt: "2026-05-12T00:00:00.000Z"
       }
     ],
@@ -145,6 +146,7 @@ describe("PostgreSQL Graph/RAG extension schema", () => {
     expect(sql).toContain("CREATE TABLE IF NOT EXISTS chemd_reaction_graph_edges");
     expect(sql).toContain("CREATE TABLE IF NOT EXISTS chemd_rag_chunk_citations");
     expect(sql).toContain("CREATE TABLE IF NOT EXISTS chemd_agent_runs");
+    expect(sql).toContain("audit_timeline jsonb NOT NULL DEFAULT '[]'::jsonb");
     expect(sql).toContain("CREATE TABLE IF NOT EXISTS chemd_agent_tool_calls");
     expect(sql).toContain("CREATE TABLE IF NOT EXISTS chemd_patch_proposals");
     expect(sql).toContain("REFERENCES chemd_experiments(experiment_id)");
@@ -191,7 +193,8 @@ describe("PostgreSQL Graph/RAG extension records", () => {
     });
     expect(records.agentRuns[0]).toMatchObject({
       experimentId: "exp-desktop",
-      revisionId: "rev-graph-rag-1"
+      revisionId: "rev-graph-rag-1",
+      auditTimeline: [{ event_id: "event-1", type: "run_created" }]
     });
     expect(records.patchProposals[0]).toMatchObject({
       experimentId: "exp-desktop",

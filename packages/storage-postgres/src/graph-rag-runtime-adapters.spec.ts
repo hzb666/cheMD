@@ -126,6 +126,7 @@ describe("PostgreSQL Graph/RAG runtime adapters", () => {
       experimentId: "exp-runtime",
       revisionId: "rev-runtime",
       goal: "Repair ambiguous reaction",
+      auditTimeline: [{ eventId: "event-1", type: "run_created" }],
       createdAt
     });
     const completedRun = buildPostgresAgentRunRecordFromRuntime({
@@ -161,6 +162,7 @@ describe("PostgreSQL Graph/RAG runtime adapters", () => {
     expect(run).toMatchObject({
       agentRunId: "run-1",
       status: "queued",
+      auditTimeline: [{ eventId: "event-1", type: "run_created" }],
       startedAt: createdAt
     });
     expect(completedRun.status).toBe("succeeded");

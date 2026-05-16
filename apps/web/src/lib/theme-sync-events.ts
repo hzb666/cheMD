@@ -1,8 +1,10 @@
+import { PREVIEW_THEME_SYNC_ACK_MESSAGE_TYPE } from "@chemd/renderer-html";
+
 export type ThemeSyncTheme = "light" | "dark";
 
 export const PREVIEW_THEME_SYNC_REQUEST_EVENT = "chemd:theme-sync-request";
 export const PREVIEW_THEME_SYNC_ACK_EVENT = "chemd:theme-sync-ack";
-export const PREVIEW_THEME_SYNC_ACK_MESSAGE_TYPE = "chemd:theme-sync-applied";
+export { PREVIEW_THEME_SYNC_ACK_MESSAGE_TYPE };
 
 export interface ThemeSyncRequestDetail {
   requestId: string;

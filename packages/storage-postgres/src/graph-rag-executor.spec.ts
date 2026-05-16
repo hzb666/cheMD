@@ -229,6 +229,7 @@ describe("PostgreSQL Graph/RAG executor helpers", () => {
       revisionId: "rev-1",
       status: "succeeded",
       goal: "Review graph",
+      auditTimeline: [{ event_id: "event-1", type: "run_created" }],
       startedAt: createdAt,
       finishedAt: createdAt
     });

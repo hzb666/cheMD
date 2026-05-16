@@ -1,4 +1,4 @@
-use crate::workspace::{not_selected, DesktopCommandError, WorkspaceFileEntry, WorkspaceHandle};
+use crate::workspace::{not_selected, CommandError, WorkspaceFileEntry, WorkspaceHandle};
 use crate::workspace_path::{chemd_kind_for_path, relative_path};
 use std::{
     fs,
@@ -8,22 +8,44 @@ use std::{
 const MAX_DEPTH: usize = 6;
 const MAX_ENTRIES: usize = 1_000;
 const MAX_CHILDREN_PER_DIR: usize = 256;
+const IGNORED_DIRS: &[&str] = &[
+    ".git",
+    ".hg",
+    ".svn",
+    ".next",
+    ".turbo",
+    ".ruff_cache",
+    ".pytest_cache",
+    ".venv",
+    "__pycache__",
+    "build",
+    "coverage",
+    "dist",
+    "node_modules",
+    "target",
+];
+const SENSITIVE_FILES: &[&str] = &[
+    ".env",
+    ".env.local",
+    ".env.development",
+    ".env.production",
+    ".npmrc",
+    ".pypirc",
+];
 
-pub(crate) fn canonical_workspace_root(
-    root_path: Option<&str>,
-) -> Result<PathBuf, DesktopCommandError> {
+pub(crate) fn canonical_workspace_root(root_path: Option<&str>) -> Result<PathBuf, CommandError> {
     let root_path = root_path
         .filter(|value| !value.trim().is_empty())
         .ok_or_else(not_selected)?;
     let root = fs::canonicalize(root_path).map_err(|err| {
-        DesktopCommandError::io(
+        CommandError::io(
             "workspace_not_found",
             "Workspace path cannot be opened",
             err,
         )
     })?;
     if !root.is_dir() {
-        return Err(DesktopCommandError::new(
+        return Err(CommandError::new(
             "workspace_not_directory",
             "Workspace path is not a directory",
             Some(root.display().to_string()),
@@ -32,9 +54,9 @@ pub(crate) fn canonical_workspace_root(
     Ok(root)
 }
 
-pub(crate) fn workspace_handle(root: &Path) -> Result<WorkspaceHandle, DesktopCommandError> {
+pub(crate) fn workspace_handle(root: &Path) -> Result<WorkspaceHandle, CommandError> {
     let metadata = fs::metadata(root).map_err(|err| {
-        DesktopCommandError::io(
+        CommandError::io(
             "workspace_unavailable",
             "Workspace metadata cannot be read",
             err,
@@ -56,7 +78,7 @@ pub(crate) fn workspace_handle(root: &Path) -> Result<WorkspaceHandle, DesktopCo
 pub(crate) fn list_workspace_files_impl(
     workspace_id: &str,
     root: &Path,
-) -> Result<Vec<WorkspaceFileEntry>, DesktopCommandError> {
+) -> Result<Vec<WorkspaceFileEntry>, CommandError> {
     let mut entries = Vec::new();
     visit_directory(workspace_id, root, root, 0, &mut entries)?;
     entries.sort_by(|left, right| left.path.cmp(&right.path));
@@ -69,12 +91,12 @@ fn visit_directory(
     dir: &Path,
     depth: usize,
     entries: &mut Vec<WorkspaceFileEntry>,
-) -> Result<(), DesktopCommandError> {
+) -> Result<(), CommandError> {
     if depth >= MAX_DEPTH || entries.len() >= MAX_ENTRIES {
         return Ok(());
     }
 
-    let children = read_visible_children(dir)?;
+    let children = read_workspace_children(dir)?;
     if children.len() > MAX_CHILDREN_PER_DIR {
         return Ok(());
     }
@@ -84,7 +106,7 @@ fn visit_directory(
             break;
         }
         let file_type = child.file_type().map_err(|err| {
-            DesktopCommandError::io(
+            CommandError::io(
                 "workspace_list_failed",
                 "Workspace entry cannot be read",
                 err,
@@ -96,6 +118,9 @@ fn visit_directory(
 
         let path = child.path();
         let relative = relative_path(root, &path)?;
+        if should_ignore_workspace_path(Path::new(&relative)) {
+            continue;
+        }
         if file_type.is_dir() {
             entries.push(file_entry(
                 workspace_id,
@@ -105,7 +130,7 @@ fn visit_directory(
                 None,
             ));
             visit_directory(workspace_id, root, &path, depth + 1, entries)?;
-        } else if file_type.is_file() && is_markdown_file(&path) {
+        } else if file_type.is_file() {
             entries.push(file_entry(
                 workspace_id,
                 &path,
@@ -118,10 +143,10 @@ fn visit_directory(
     Ok(())
 }
 
-fn read_visible_children(dir: &Path) -> Result<Vec<fs::DirEntry>, DesktopCommandError> {
+fn read_workspace_children(dir: &Path) -> Result<Vec<fs::DirEntry>, CommandError> {
     let mut children = Vec::new();
     let read_dir = fs::read_dir(dir).map_err(|err| {
-        DesktopCommandError::io(
+        CommandError::io(
             "workspace_list_failed",
             "Workspace directory cannot be read",
             err,
@@ -130,21 +155,41 @@ fn read_visible_children(dir: &Path) -> Result<Vec<fs::DirEntry>, DesktopCommand
 
     for child in read_dir {
         let child = child.map_err(|err| {
-            DesktopCommandError::io(
+            CommandError::io(
                 "workspace_list_failed",
                 "Workspace entry cannot be read",
                 err,
             )
         })?;
-        if !is_hidden_name(&child.file_name()) {
-            children.push(child);
+        if should_ignore_name(&child.file_name()) {
+            continue;
         }
+        children.push(child);
         if children.len() > MAX_CHILDREN_PER_DIR {
             break;
         }
     }
     children.sort_by_key(|entry| entry.file_name());
     Ok(children)
+}
+
+pub(crate) fn should_ignore_workspace_path(path: &Path) -> bool {
+    path.components().any(|component| {
+        let std::path::Component::Normal(name) = component else {
+            return false;
+        };
+        should_ignore_name(name)
+    })
+}
+
+fn should_ignore_name(name: &std::ffi::OsStr) -> bool {
+    let Some(name) = name.to_str() else {
+        return false;
+    };
+    let normalized = name.to_ascii_lowercase();
+    normalized.starts_with('.')
+        || IGNORED_DIRS.contains(&normalized.as_str())
+        || SENSITIVE_FILES.contains(&normalized.as_str())
 }
 
 fn file_entry(
@@ -165,19 +210,6 @@ fn file_entry(
         kind: kind.into(),
         chemd_kind,
     }
-}
-
-fn is_markdown_file(path: &Path) -> bool {
-    path.file_name()
-        .and_then(|name| name.to_str())
-        .map(|name| name.to_ascii_lowercase().ends_with(".md"))
-        .unwrap_or(false)
-}
-
-fn is_hidden_name(name: &std::ffi::OsStr) -> bool {
-    name.to_str()
-        .map(|name| name.starts_with('.'))
-        .unwrap_or(false)
 }
 
 pub(crate) fn workspace_id_for_root(root: &Path) -> String {

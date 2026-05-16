@@ -7,7 +7,7 @@ use crate::local_store_types::{
 use crate::postgres_runtime_types::{
     PersistRuntimeGraphRagCounts, PersistRuntimeGraphRagResult, PostgresTargetSummary,
 };
-use crate::workspace::DesktopCommandError;
+use crate::workspace::CommandError;
 use serde_json::json;
 use std::{
     fs,
@@ -92,7 +92,7 @@ fn sync_local_outbox_keeps_payload_and_bounds_error_on_failure() {
     .expect("snapshot should save");
 
     let result = sync_local_outbox_to_postgres_with_target(&store.root, sync_target(), |_| {
-        Err(DesktopCommandError::new(
+        Err(CommandError::new(
             "postgres_runtime_persist_failed",
             "Failed to persist runtime Graph/RAG records",
             Some("x".repeat(800)),

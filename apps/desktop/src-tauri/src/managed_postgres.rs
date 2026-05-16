@@ -15,7 +15,7 @@ use crate::{
         spawn_postgres, write_pid_file, ManagedPostgresPidFile,
     },
     postgres::{connect, schema_ready_from_rows, CORE_SCHEMA_TABLES},
-    workspace::DesktopCommandError,
+    workspace::CommandError,
 };
 use postgres::Client;
 use serde::Serialize;
@@ -78,7 +78,7 @@ impl ManagedPostgresManager {
         &self,
         root: &Path,
         bundled_dirs: &[PathBuf],
-    ) -> Result<ManagedPostgresStatus, DesktopCommandError> {
+    ) -> Result<ManagedPostgresStatus, CommandError> {
         let paths = ManagedPostgresPaths::for_root(root);
         let mut state = self.lock_state()?;
         if let Some(owned) = state.child.as_mut() {
@@ -96,9 +96,9 @@ impl ManagedPostgresManager {
         &self,
         root: &Path,
         bundled_dirs: &[PathBuf],
-    ) -> Result<ManagedPostgresStatus, DesktopCommandError> {
+    ) -> Result<ManagedPostgresStatus, CommandError> {
         let paths = create_managed_paths(root).map_err(|err| {
-            DesktopCommandError::io(
+            CommandError::io(
                 "managed_postgres_app_data_unavailable",
                 "Failed to create managed Postgres app data directories",
                 err,
@@ -112,7 +112,7 @@ impl ManagedPostgresManager {
         let config = ensure_config(&paths)?;
         if !pg_version_exists(&paths) {
             run_initdb(&binaries, &paths, &config).map_err(|detail| {
-                DesktopCommandError::new(
+                CommandError::new(
                     "managed_postgres_initdb_failed",
                     "Failed to initialize managed Postgres data directory",
                     Some(redact_detail(&detail, &config)),
@@ -126,9 +126,9 @@ impl ManagedPostgresManager {
         &self,
         root: &Path,
         bundled_dirs: &[PathBuf],
-    ) -> Result<ManagedPostgresStatus, DesktopCommandError> {
+    ) -> Result<ManagedPostgresStatus, CommandError> {
         let paths = create_managed_paths(root).map_err(|err| {
-            DesktopCommandError::io(
+            CommandError::io(
                 "managed_postgres_app_data_unavailable",
                 "Failed to create managed Postgres app data directories",
                 err,
@@ -158,14 +158,14 @@ impl ManagedPostgresManager {
             return Ok(status);
         }
         let child = spawn_postgres(&binaries, &paths, &config).map_err(|detail| {
-            DesktopCommandError::new(
+            CommandError::new(
                 "managed_postgres_spawn_failed",
                 "Failed to start managed Postgres",
                 Some(redact_detail(&detail, &config)),
             )
         })?;
         let pid_file = write_pid_file(&paths, child.id()).map_err(|detail| {
-            DesktopCommandError::new(
+            CommandError::new(
                 "managed_postgres_pid_write_failed",
                 "Failed to write managed Postgres pid file",
                 Some(detail),
@@ -198,7 +198,7 @@ impl ManagedPostgresManager {
         Ok(status)
     }
 
-    pub(crate) fn stop(&self, root: &Path) -> Result<ManagedPostgresStatus, DesktopCommandError> {
+    pub(crate) fn stop(&self, root: &Path) -> Result<ManagedPostgresStatus, CommandError> {
         let paths = ManagedPostgresPaths::for_root(root);
         let config = read_managed_config(&paths).ok().flatten();
         let mut state = self.lock_state()?;
@@ -239,21 +239,18 @@ impl ManagedPostgresManager {
         Ok(status)
     }
 
-    pub(crate) fn migrate(
-        &self,
-        root: &Path,
-    ) -> Result<ManagedPostgresStatus, DesktopCommandError> {
+    pub(crate) fn migrate(&self, root: &Path) -> Result<ManagedPostgresStatus, CommandError> {
         let paths = ManagedPostgresPaths::for_root(root);
         let config = read_managed_config(&paths)
             .map_err(|detail| {
-                DesktopCommandError::new(
+                CommandError::new(
                     "managed_postgres_config_read_failed",
                     "Failed to read managed Postgres config",
                     Some(detail),
                 )
             })?
             .ok_or_else(|| {
-                DesktopCommandError::new(
+                CommandError::new(
                     "managed_postgres_not_initialized",
                     "Managed Postgres is not initialized",
                     Some("Missing managed connection config".into()),
@@ -262,7 +259,7 @@ impl ManagedPostgresManager {
         ensure_managed_database(&config)?;
         let mut client =
             connect(&config.runtime_config("managed postgres migration")).map_err(|detail| {
-                DesktopCommandError::new(
+                CommandError::new(
                     "managed_postgres_migration_connect_failed",
                     "Failed to connect to managed Postgres for migration",
                     Some(redact_detail(&detail, &config)),
@@ -271,7 +268,7 @@ impl ManagedPostgresManager {
         client
             .batch_execute(managed_migration_sql())
             .map_err(|error| {
-                DesktopCommandError::new(
+                CommandError::new(
                     "managed_postgres_migration_failed",
                     "Failed to migrate managed Postgres schema",
                     Some(redact_detail(&error.to_string(), &config)),
@@ -279,7 +276,7 @@ impl ManagedPostgresManager {
             })?;
         let vector_installed = read_vector_installed(&mut client, &config)?;
         let found_tables = read_existing_core_tables(&mut client).map_err(|error| {
-            DesktopCommandError::new(
+            CommandError::new(
                 "managed_postgres_migration_schema_check_failed",
                 "Failed to inspect managed Postgres schema after migration",
                 Some(redact_detail(&error.to_string(), &config)),
@@ -292,7 +289,7 @@ impl ManagedPostgresManager {
                 found_tables.len()
             );
             let _ = write_migration_state(&paths.migration_file, "failed", &detail);
-            return Err(DesktopCommandError::new(
+            return Err(CommandError::new(
                 "managed_postgres_migration_verification_failed",
                 "Managed Postgres migration did not produce the required shared schema",
                 Some(detail),
@@ -304,7 +301,7 @@ impl ManagedPostgresManager {
             "Managed schema migration applied",
         )
         .map_err(|detail| {
-            DesktopCommandError::new(
+            CommandError::new(
                 "managed_postgres_migration_state_failed",
                 "Failed to record managed Postgres migration state",
                 Some(detail),
@@ -322,11 +319,9 @@ impl ManagedPostgresManager {
         ))
     }
 
-    fn lock_state(
-        &self,
-    ) -> Result<std::sync::MutexGuard<'_, ManagedPostgresState>, DesktopCommandError> {
+    fn lock_state(&self) -> Result<std::sync::MutexGuard<'_, ManagedPostgresState>, CommandError> {
         self.inner.lock().map_err(|_| {
-            DesktopCommandError::new(
+            CommandError::new(
                 "managed_postgres_state_unavailable",
                 "Managed Postgres state is unavailable",
                 None,
@@ -344,7 +339,7 @@ pub(crate) fn managed_postgres_root(app_data_dir: PathBuf) -> PathBuf {
 pub fn read_managed_postgres_status(
     app: tauri::AppHandle,
     manager: tauri::State<'_, ManagedPostgresManager>,
-) -> Result<ManagedPostgresStatus, DesktopCommandError> {
+) -> Result<ManagedPostgresStatus, CommandError> {
     manager.status(&command_root(&app)?, &bundled_binary_dirs(&app))
 }
 
@@ -353,7 +348,7 @@ pub fn read_managed_postgres_status(
 pub fn initialize_managed_postgres(
     app: tauri::AppHandle,
     manager: tauri::State<'_, ManagedPostgresManager>,
-) -> Result<ManagedPostgresStatus, DesktopCommandError> {
+) -> Result<ManagedPostgresStatus, CommandError> {
     manager.initialize(&command_root(&app)?, &bundled_binary_dirs(&app))
 }
 
@@ -362,7 +357,7 @@ pub fn initialize_managed_postgres(
 pub fn start_managed_postgres(
     app: tauri::AppHandle,
     manager: tauri::State<'_, ManagedPostgresManager>,
-) -> Result<ManagedPostgresStatus, DesktopCommandError> {
+) -> Result<ManagedPostgresStatus, CommandError> {
     manager.start(&command_root(&app)?, &bundled_binary_dirs(&app))
 }
 
@@ -371,7 +366,7 @@ pub fn start_managed_postgres(
 pub fn stop_managed_postgres(
     app: tauri::AppHandle,
     manager: tauri::State<'_, ManagedPostgresManager>,
-) -> Result<ManagedPostgresStatus, DesktopCommandError> {
+) -> Result<ManagedPostgresStatus, CommandError> {
     manager.stop(&command_root(&app)?)
 }
 
@@ -380,18 +375,18 @@ pub fn stop_managed_postgres(
 pub fn migrate_managed_postgres(
     app: tauri::AppHandle,
     manager: tauri::State<'_, ManagedPostgresManager>,
-) -> Result<ManagedPostgresStatus, DesktopCommandError> {
+) -> Result<ManagedPostgresStatus, CommandError> {
     manager.migrate(&command_root(&app)?)
 }
 
 #[cfg(not(test))]
-fn command_root(app: &tauri::AppHandle) -> Result<PathBuf, DesktopCommandError> {
+fn command_root(app: &tauri::AppHandle) -> Result<PathBuf, CommandError> {
     use tauri::Manager;
     app.path()
         .app_data_dir()
         .map(managed_postgres_root)
         .map_err(|err| {
-            DesktopCommandError::new(
+            CommandError::new(
                 "managed_postgres_app_data_unavailable",
                 "Failed to resolve app data directory",
                 Some(err.to_string()),
@@ -457,9 +452,9 @@ fn status_for_paths(
 
 fn ensure_config(
     paths: &ManagedPostgresPaths,
-) -> Result<ManagedPostgresConnectionConfig, DesktopCommandError> {
+) -> Result<ManagedPostgresConnectionConfig, CommandError> {
     if let Some(config) = read_managed_config(paths).map_err(|detail| {
-        DesktopCommandError::new(
+        CommandError::new(
             "managed_postgres_config_read_failed",
             "Failed to read managed Postgres config",
             Some(detail),
@@ -469,7 +464,7 @@ fn ensure_config(
     }
     let config = generated_managed_config(&paths.root);
     write_managed_config(paths, &config).map_err(|detail| {
-        DesktopCommandError::new(
+        CommandError::new(
             "managed_postgres_config_write_failed",
             "Failed to write managed Postgres config",
             Some(detail),
@@ -480,17 +475,17 @@ fn ensure_config(
 
 fn ensure_started_config(
     paths: &ManagedPostgresPaths,
-) -> Result<ManagedPostgresConnectionConfig, DesktopCommandError> {
+) -> Result<ManagedPostgresConnectionConfig, CommandError> {
     read_managed_config(paths)
         .map_err(|detail| {
-            DesktopCommandError::new(
+            CommandError::new(
                 "managed_postgres_config_read_failed",
                 "Failed to read managed Postgres config",
                 Some(detail),
             )
         })?
         .ok_or_else(|| {
-            DesktopCommandError::new(
+            CommandError::new(
                 "managed_postgres_not_initialized",
                 "Managed Postgres is not initialized",
                 Some("Missing managed connection config".into()),
@@ -511,7 +506,7 @@ fn running_owned_status(
     state: &mut ManagedPostgresState,
     paths: &ManagedPostgresPaths,
     config: &ManagedPostgresConnectionConfig,
-) -> Result<Option<ManagedPostgresStatus>, DesktopCommandError> {
+) -> Result<Option<ManagedPostgresStatus>, CommandError> {
     let Some(owned) = state.child.as_mut() else {
         return Ok(None);
     };
@@ -530,7 +525,7 @@ fn running_owned_status(
             state.child = None;
             Ok(None)
         }
-        Err(err) => Err(DesktopCommandError::io(
+        Err(err) => Err(CommandError::io(
             "managed_postgres_status_failed",
             "Failed to inspect managed Postgres process",
             err,
@@ -649,7 +644,7 @@ pub(crate) fn read_existing_core_tables(
 fn read_vector_installed(
     client: &mut Client,
     config: &ManagedPostgresConnectionConfig,
-) -> Result<bool, DesktopCommandError> {
+) -> Result<bool, CommandError> {
     client
         .query_one(
             "SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')",
@@ -657,7 +652,7 @@ fn read_vector_installed(
         )
         .map(|row| row.get(0))
         .map_err(|error| {
-            DesktopCommandError::new(
+            CommandError::new(
                 "managed_postgres_migration_vector_check_failed",
                 "Failed to inspect managed Postgres pgvector extension",
                 Some(redact_detail(&error.to_string(), config)),
@@ -683,13 +678,11 @@ fn wait_for_postgres_accepting_connections(config: &ManagedPostgresConnectionCon
     false
 }
 
-fn ensure_managed_database(
-    config: &ManagedPostgresConnectionConfig,
-) -> Result<(), DesktopCommandError> {
+fn ensure_managed_database(config: &ManagedPostgresConnectionConfig) -> Result<(), CommandError> {
     let maintenance_config =
         config.runtime_config_for_database("postgres", "managed postgres maintenance");
     let mut client = connect(&maintenance_config).map_err(|detail| {
-        DesktopCommandError::new(
+        CommandError::new(
             "managed_postgres_maintenance_connect_failed",
             "Failed to connect to managed Postgres maintenance database",
             Some(redact_detail(&detail, config)),
@@ -701,7 +694,7 @@ fn ensure_managed_database(
             &[&config.database],
         )
         .map_err(|error| {
-            DesktopCommandError::new(
+            CommandError::new(
                 "managed_postgres_database_check_failed",
                 "Failed to inspect managed Postgres database",
                 Some(redact_detail(&error.to_string(), config)),
@@ -717,7 +710,7 @@ fn ensure_managed_database(
         quote_ident(&config.user)
     );
     client.batch_execute(&sql).map_err(|error| {
-        DesktopCommandError::new(
+        CommandError::new(
             "managed_postgres_database_create_failed",
             "Failed to create managed Postgres database",
             Some(redact_detail(&error.to_string(), config)),

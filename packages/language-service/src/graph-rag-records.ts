@@ -14,7 +14,6 @@ import type {
   BuildEditorGraphRagRecordsInput,
   EditorGraphRagCitationCandidate,
   EditorGraphRagEdge,
-  EditorGraphRagEdgeType,
   EditorGraphRagNode,
   EditorGraphRagRecords,
   EditorGraphRagSourceRange,
@@ -35,14 +34,14 @@ import type {
 const createOutlineNode = (
   context: GraphBuildContext,
   item: ChemdOutlineItem
-): EditorGraphRagNode => createNode(
+): EditorGraphRagNode => createNode({
   context,
-  item.kind === "metadata" ? "metadata" : "block",
-  item.id,
-  item.range,
-  { label: item.label, outline_kind: item.kind },
-  item.kind === "metadata" ? undefined : item.id
-);
+  nodeKind: item.kind === "metadata" ? "metadata" : "block",
+  entityId: item.id,
+  sourceRange: item.range,
+  payload: { label: item.label, outline_kind: item.kind },
+  blockId: item.kind === "metadata" ? undefined : item.id
+});
 
 const collectEntityCandidates = (
   output: Extract<ChemdLanguageCompileOutput, { status: "ok" }>,
@@ -82,19 +81,25 @@ const buildNodes = (
   output: ChemdLanguageCompileOutput,
   context: GraphBuildContext
 ): EditorGraphRagNode[] => {
-  const documentNode = createNode(context, "document", context.input.experimentId, context.documentRange, {
-    document_uri: context.input.documentUri,
-    source_hash: createSourceHash(context.input.source)
+  const documentNode = createNode({
+    context,
+    nodeKind: "document",
+    entityId: context.input.experimentId,
+    sourceRange: context.documentRange,
+    payload: {
+      document_uri: context.input.documentUri,
+      source_hash: createSourceHash(context.input.source)
+    }
   });
   const outlineNodes = output.outline.map((item) => createOutlineNode(context, item));
-  const entityNodes = [...context.entityById.values()].map((entity) => createNode(
+  const entityNodes = [...context.entityById.values()].map((entity) => createNode({
     context,
-    "entity",
-    entity.entityId,
-    entity.sourceRange,
-    { ...entity.payload, entity_kind: entity.kind },
-    entity.originalId
-  ));
+    nodeKind: "entity",
+    entityId: entity.entityId,
+    sourceRange: entity.sourceRange,
+    payload: { ...entity.payload, entity_kind: entity.kind },
+    blockId: entity.originalId
+  }));
   const diagnosticNodes = output.diagnostics.map((diagnostic, index) => createDiagnosticNode(context, diagnostic, index));
   return [documentNode, ...outlineNodes, ...entityNodes, ...diagnosticNodes];
 };
@@ -103,31 +108,31 @@ const createDiagnosticNode = (
   context: GraphBuildContext,
   diagnostic: ChemdEditorDiagnostic,
   index: number
-): EditorGraphRagNode => createNode(
+): EditorGraphRagNode => createNode({
   context,
-  "diagnostic",
-  makeId("diagnostic", String(index), diagnostic.code),
-  diagnostic.range,
-  {
+  nodeKind: "diagnostic",
+  entityId: makeId("diagnostic", String(index), diagnostic.code),
+  sourceRange: diagnostic.range,
+  payload: {
     code: diagnostic.code,
     severity: diagnostic.severity,
     message: diagnostic.message,
     source_node_id: diagnostic.sourceNodeId
   },
-  diagnostic.sourceNodeId
-);
+  blockId: diagnostic.sourceNodeId
+});
 
 const buildOrderEdges = (
   context: GraphBuildContext,
   nodes: readonly EditorGraphRagNode[]
-): EditorGraphRagEdge[] => nodes.slice(1).map((node, index) => createEdge(
+): EditorGraphRagEdge[] => nodes.slice(1).map((node, index) => createEdge({
   context,
-  "document_order",
-  nodes[index].nodeId,
-  node.nodeId,
-  "high",
-  { source: "editor_outline_order" }
-));
+  edgeType: "document_order",
+  fromNodeId: nodes[index].nodeId,
+  toNodeId: node.nodeId,
+  confidence: "high",
+  evidence: { source: "editor_outline_order" }
+}));
 
 const buildContainmentEdges = (context: GraphBuildContext): EditorGraphRagEdge[] =>
   [...context.entityById.values()].flatMap((entity) => {
@@ -136,10 +141,17 @@ const buildContainmentEdges = (context: GraphBuildContext): EditorGraphRagEdge[]
     if (!blockNode || !entityNode) {
       return [];
     }
-    return [createEdge(context, "block_contains_entity", blockNode.nodeId, entityNode.nodeId, "high", {
-      source: "training_export_entity_original_id",
-      block_id: entity.originalId,
-      entity_id: entity.entityId
+    return [createEdge({
+      context,
+      edgeType: "block_contains_entity",
+      fromNodeId: blockNode.nodeId,
+      toNodeId: entityNode.nodeId,
+      confidence: "high",
+      evidence: {
+        source: "training_export_entity_original_id",
+        block_id: entity.originalId,
+        entity_id: entity.entityId
+      }
     })];
   });
 
@@ -159,9 +171,16 @@ const buildRouteEdges = (
   if (!fromNode || !toNode) {
     return [];
   }
-  return [createEdge(context, edgeType, fromNode.nodeId, toNode.nodeId, confidenceFromScore(payload.confidence), {
-    source: "training_export_semantic_relation",
-    relation
+  return [createEdge({
+    context,
+    edgeType,
+    fromNodeId: fromNode.nodeId,
+    toNodeId: toNode.nodeId,
+    confidence: confidenceFromScore(payload.confidence),
+    evidence: {
+      source: "training_export_semantic_relation",
+      relation
+    }
   })];
 });
 
@@ -186,11 +205,18 @@ const buildDiagnosticEdges = (
   if (!sourceNode || !diagnosticNode) {
     return [];
   }
-  return [createEdge(context, "diagnostic_evidence", sourceNode.nodeId, diagnosticNode.nodeId, sourceNode.nodeKind === "document" ? "low" : "high", {
-    source: "editor_diagnostic_range",
-    diagnostic_code: diagnostic.code,
-    source_node_id: diagnostic.sourceNodeId,
-    source_range: diagnostic.range
+  return [createEdge({
+    context,
+    edgeType: "diagnostic_evidence",
+    fromNodeId: sourceNode.nodeId,
+    toNodeId: diagnosticNode.nodeId,
+    confidence: sourceNode.nodeKind === "document" ? "low" : "high",
+    evidence: {
+      source: "editor_diagnostic_range",
+      diagnostic_code: diagnostic.code,
+      source_node_id: diagnostic.sourceNodeId,
+      source_range: diagnostic.range
+    }
   })];
 });
 

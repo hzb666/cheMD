@@ -1,7 +1,7 @@
 use crate::{
     sidecar_command::{default_sidecar_command_spec, SidecarCommandSpec},
     sidecar_log::{spawn_log_reader, LogTail, SharedLogTail},
-    workspace::DesktopCommandError,
+    workspace::CommandError,
 };
 #[path = "sidecar_health.rs"]
 pub(crate) mod sidecar_health;
@@ -61,7 +61,7 @@ pub struct SidecarLogs {
 
 impl SidecarManager {
     #[cfg_attr(test, allow(dead_code))]
-    pub(crate) fn start(&self) -> Result<SidecarStatus, DesktopCommandError> {
+    pub(crate) fn start(&self) -> Result<SidecarStatus, CommandError> {
         let spec = default_sidecar_command_spec()?;
         self.start_with_spec(spec)
     }
@@ -69,7 +69,7 @@ impl SidecarManager {
     pub(crate) fn start_with_spec(
         &self,
         spec: SidecarCommandSpec,
-    ) -> Result<SidecarStatus, DesktopCommandError> {
+    ) -> Result<SidecarStatus, CommandError> {
         self.start_with_spec_and_health_config(spec, HealthProbeConfig::default())
     }
 
@@ -77,7 +77,7 @@ impl SidecarManager {
         &self,
         spec: SidecarCommandSpec,
         health: HealthProbeConfig,
-    ) -> Result<SidecarStatus, DesktopCommandError> {
+    ) -> Result<SidecarStatus, CommandError> {
         let mut state = self.lock_state()?;
         if let Some(status) = running_status_if_alive(&mut state)? {
             return Ok(status);
@@ -92,7 +92,7 @@ impl SidecarManager {
             .stderr(Stdio::piped());
 
         let mut child = command.spawn().map_err(|err| {
-            DesktopCommandError::io(
+            CommandError::io(
                 "sidecar_spawn_failed",
                 "Failed to start chem-service sidecar",
                 err,
@@ -120,7 +120,7 @@ impl SidecarManager {
         Ok(status)
     }
 
-    pub(crate) fn stop(&self) -> Result<SidecarStatus, DesktopCommandError> {
+    pub(crate) fn stop(&self) -> Result<SidecarStatus, CommandError> {
         let mut state = self.lock_state()?;
         let Some(mut managed) = state.process.take() else {
             let status = offline_status("chem-service sidecar is not running", Vec::new());
@@ -135,14 +135,14 @@ impl SidecarManager {
         }
 
         managed.child.kill().map_err(|err| {
-            DesktopCommandError::io(
+            CommandError::io(
                 "sidecar_stop_failed",
                 "Failed to stop chem-service sidecar",
                 err,
             )
         })?;
         managed.child.wait().map_err(|err| {
-            DesktopCommandError::io(
+            CommandError::io(
                 "sidecar_wait_failed",
                 "Failed to wait for chem-service sidecar shutdown",
                 err,
@@ -161,7 +161,7 @@ impl SidecarManager {
         Ok(status)
     }
 
-    pub(crate) fn status(&self) -> Result<SidecarStatus, DesktopCommandError> {
+    pub(crate) fn status(&self) -> Result<SidecarStatus, CommandError> {
         let mut state = self.lock_state()?;
         if let Some(managed) = state.process.as_mut() {
             if let Some(exit) = try_wait(managed)? {
@@ -181,7 +181,7 @@ impl SidecarManager {
             .unwrap_or_else(|| offline_status("chem-service sidecar has not been started", vec![])))
     }
 
-    pub(crate) fn logs(&self) -> Result<SidecarLogs, DesktopCommandError> {
+    pub(crate) fn logs(&self) -> Result<SidecarLogs, CommandError> {
         let state = self.lock_state()?;
         let lines = state
             .process
@@ -197,9 +197,9 @@ impl SidecarManager {
         Ok(SidecarLogs { lines })
     }
 
-    fn lock_state(&self) -> Result<std::sync::MutexGuard<'_, SidecarState>, DesktopCommandError> {
+    fn lock_state(&self) -> Result<std::sync::MutexGuard<'_, SidecarState>, CommandError> {
         self.inner.lock().map_err(|_| {
-            DesktopCommandError::new(
+            CommandError::new(
                 "sidecar_state_unavailable",
                 "Sidecar state is unavailable",
                 None,
@@ -212,7 +212,7 @@ impl SidecarManager {
 #[tauri::command]
 pub fn start_sidecar(
     manager: tauri::State<'_, SidecarManager>,
-) -> Result<SidecarStatus, DesktopCommandError> {
+) -> Result<SidecarStatus, CommandError> {
     manager.start()
 }
 
@@ -220,7 +220,7 @@ pub fn start_sidecar(
 #[tauri::command]
 pub fn stop_sidecar(
     manager: tauri::State<'_, SidecarManager>,
-) -> Result<SidecarStatus, DesktopCommandError> {
+) -> Result<SidecarStatus, CommandError> {
     manager.stop()
 }
 
@@ -228,7 +228,7 @@ pub fn stop_sidecar(
 #[tauri::command]
 pub fn read_sidecar_status(
     manager: tauri::State<'_, SidecarManager>,
-) -> Result<SidecarStatus, DesktopCommandError> {
+) -> Result<SidecarStatus, CommandError> {
     manager.status()
 }
 
@@ -236,13 +236,13 @@ pub fn read_sidecar_status(
 #[tauri::command]
 pub fn read_sidecar_logs(
     manager: tauri::State<'_, SidecarManager>,
-) -> Result<SidecarLogs, DesktopCommandError> {
+) -> Result<SidecarLogs, CommandError> {
     manager.logs()
 }
 
 fn running_status_if_alive(
     state: &mut SidecarState,
-) -> Result<Option<SidecarStatus>, DesktopCommandError> {
+) -> Result<Option<SidecarStatus>, CommandError> {
     let Some(managed) = state.process.as_mut() else {
         return Ok(None);
     };
@@ -277,9 +277,9 @@ fn offline_status(detail: &str, log_tail: Vec<String>) -> SidecarStatus {
     }
 }
 
-fn try_wait(managed: &mut ManagedSidecar) -> Result<Option<ExitStatus>, DesktopCommandError> {
+fn try_wait(managed: &mut ManagedSidecar) -> Result<Option<ExitStatus>, CommandError> {
     managed.child.try_wait().map_err(|err| {
-        DesktopCommandError::io(
+        CommandError::io(
             "sidecar_status_failed",
             "Failed to inspect chem-service sidecar status",
             err,

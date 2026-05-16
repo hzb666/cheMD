@@ -235,3 +235,60 @@ test("stagePostgresBinaries fails when required source binaries are missing", ()
       /PostgreSQL binaries not found/u
     );
   }));
+
+const SHARED_SCHEMA_SIGNATURE = [
+  {
+    table: "chemd_reaction_graph_snapshots",
+    columns: ["graph_snapshot_id text PRIMARY KEY", "source_revision_ids jsonb NOT NULL"]
+  },
+  {
+    table: "chemd_reaction_graph_nodes",
+    columns: ["node_id text PRIMARY KEY", "graph_snapshot_id text NOT NULL", "source_range jsonb NOT NULL"]
+  },
+  {
+    table: "chemd_reaction_graph_edges",
+    columns: ["edge_id text PRIMARY KEY", "from_node_id text NOT NULL", "evidence jsonb NOT NULL"]
+  },
+  {
+    table: "chemd_rag_chunk_citations",
+    columns: ["PRIMARY KEY (revision_id, chunk_id)", "quality jsonb NOT NULL"]
+  },
+  {
+    table: "chemd_agent_runs",
+    columns: ["agent_run_id text PRIMARY KEY", "audit_timeline jsonb NOT NULL DEFAULT '[]'::jsonb"]
+  },
+  {
+    table: "chemd_agent_tool_calls",
+    columns: ["tool_call_id text PRIMARY KEY", "agent_run_id text NOT NULL", "input jsonb NOT NULL"]
+  },
+  {
+    table: "chemd_patch_proposals",
+    columns: ["patch_proposal_id text PRIMARY KEY", "patch jsonb NOT NULL", "validation_result jsonb"]
+  }
+];
+
+const assertSharedSchemaSignature = ({ sql, label }) => {
+  for (const { table, columns } of SHARED_SCHEMA_SIGNATURE) {
+    assert.ok(sql.includes(`CREATE TABLE IF NOT EXISTS ${table}`), `${label} missing ${table}`);
+    for (const column of columns) {
+      assert.ok(sql.includes(column), `${label} missing ${column}`);
+    }
+  }
+};
+
+test("managed Postgres migration keeps external shared Graph/RAG/Agent schema signature", () => {
+  const externalSchema = readFileSync(
+    path.resolve("packages/storage-postgres/src/graph-rag-schema.ts"),
+    "utf8"
+  );
+  const managedSchema = readFileSync(
+    path.resolve("apps/desktop/src-tauri/src/managed_postgres_migrations.rs"),
+    "utf8"
+  );
+
+  assertSharedSchemaSignature({ sql: externalSchema, label: "external schema" });
+  assertSharedSchemaSignature({ sql: managedSchema, label: "managed schema" });
+  assert.match(managedSchema, /ALTER TABLE IF EXISTS chemd_agent_runs/u);
+  assert.doesNotMatch(managedSchema, /CREATE TABLE IF NOT EXISTS desktop_/u);
+  assert.doesNotMatch(managedSchema, /CREATE TABLE IF NOT EXISTS chemd_desktop_/u);
+});

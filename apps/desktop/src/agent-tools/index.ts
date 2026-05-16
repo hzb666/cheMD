@@ -1,23 +1,23 @@
 export {
-  DESKTOP_AGENT_TOOL_CONTRACTS,
-  DESKTOP_AGENT_TOOL_NAMES,
-  getDesktopAgentToolContract,
-  listDesktopAgentToolContracts,
-  type DesktopAgentConnectivity,
-  type DesktopAgentToolAvailabilityContract,
-  type DesktopAgentToolAvailabilityLevel,
-  type DesktopAgentToolCategory,
-  type DesktopAgentToolContract,
-  type DesktopAgentToolDisplayContract,
-  type DesktopAgentToolRequirementContract,
-  type DesktopAgentToolSummaryContract,
-  type DesktopOrchestratedToolName
+  AGENT_TOOL_CONTRACTS,
+  AGENT_TOOL_NAMES,
+  getAgentToolContract,
+  listAgentToolContracts,
+  type AgentConnectivity,
+  type AgentToolAvailabilityContract,
+  type AgentToolAvailabilityLevel,
+  type AgentToolCategory,
+  type AgentToolContract,
+  type AgentToolDisplayContract,
+  type AgentToolRequirementContract,
+  type AgentToolSummaryContract,
+  type OrchestratedToolName
 } from "./contracts";
 
 export {
-  resolveDesktopAgentToolAvailability,
-  summarizeDesktopAgentToolInput,
-  summarizeDesktopAgentToolOutput,
-  type DesktopAgentToolAvailabilityView,
-  type DesktopAgentToolRuntimeState
+  resolveAgentToolAvailability,
+  summarizeAgentToolInput,
+  summarizeAgentToolOutput,
+  type AgentToolAvailabilityView,
+  type AgentToolRuntimeState
 } from "./summary";

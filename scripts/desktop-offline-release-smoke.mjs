@@ -221,6 +221,43 @@ const checkInstallerArtifacts = ({ checks, rootDir, artifactFinder }) => {
 const findReleaseExeLocks = ({ processes, releaseExePath }) =>
   processes.filter((row) => isSamePath(row.executablePath, releaseExePath));
 
+const inspectReleaseExeLocks = async ({
+  checks,
+  processLister,
+  releaseExePath,
+  rootDir
+}) => {
+  const processResult = await processLister({ rootDir, releaseExePath });
+  if (processResult.status === "skipped") {
+    addCheck(checks, "release exe lock", "skip", processResult.reason);
+    return {
+      status: "skipped",
+      detail: processResult.reason,
+      blockingProcesses: []
+    };
+  }
+
+  const blockingProcesses = findReleaseExeLocks({
+    processes: processResult.processes,
+    releaseExePath
+  });
+  addCheck(
+    checks,
+    "release exe lock",
+    blockingProcesses.length === 0 ? "pass" : "blocked",
+    blockingProcesses.length === 0
+      ? `${RELEASE_EXE_PATH} is not running`
+      : blockingProcesses
+          .map((row) => `PID ${row.pid}: ${row.executablePath || "(path unavailable)"}`)
+          .join("; ")
+  );
+
+  return {
+    status: blockingProcesses.length === 0 ? "passed" : "blocked",
+    blockingProcesses
+  };
+};
+
 export const checkDesktopOfflineReleaseSmokePreflight = async ({
   rootDir = REPO_ROOT,
   fileExists = existsSync,
@@ -243,34 +280,20 @@ export const checkDesktopOfflineReleaseSmokePreflight = async ({
     };
   }
 
-  const processResult = await processLister({ rootDir, releaseExePath });
-  if (processResult.status !== "skipped") {
-    const blockingProcesses = findReleaseExeLocks({
-      processes: processResult.processes,
-      releaseExePath
-    });
-    addCheck(
+  const lockResult = await inspectReleaseExeLocks({
+    checks,
+    processLister,
+    releaseExePath,
+    rootDir
+  });
+  if (lockResult.status === "blocked") {
+    return {
+      status: "blocked",
+      reason: "release-exe-running",
+      releaseExePath,
       checks,
-      "release exe lock",
-      blockingProcesses.length === 0 ? "pass" : "blocked",
-      blockingProcesses.length === 0
-        ? `${RELEASE_EXE_PATH} is not running`
-        : blockingProcesses
-            .map((row) => `PID ${row.pid}: ${row.executablePath || "(path unavailable)"}`)
-            .join("; ")
-    );
-
-    if (blockingProcesses.length > 0) {
-      return {
-        status: "blocked",
-        reason: "release-exe-running",
-        releaseExePath,
-        checks,
-        blockingProcesses
-      };
-    }
-  } else {
-    addCheck(checks, "release exe lock", "skip", processResult.reason);
+      blockingProcesses: lockResult.blockingProcesses
+    };
   }
 
   const artifactResult = checkInstallerArtifacts({ checks, rootDir, artifactFinder });
@@ -304,11 +327,11 @@ export const checkDesktopOfflineReleaseSmokePreflight = async ({
     };
   }
 
-  if (processResult.status === "skipped") {
+  if (lockResult.status === "skipped") {
     return {
       status: "skipped",
       reason: "process-inspection-unavailable",
-      detail: processResult.reason,
+      detail: lockResult.detail,
       releaseExePath,
       checks,
       blockingProcesses: []

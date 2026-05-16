@@ -1,6 +1,6 @@
 #![cfg_attr(test, allow(dead_code))]
 
-use crate::workspace::DesktopCommandError;
+use crate::workspace::CommandError;
 use crate::{
     local_store_io::{
         read_outbox_file, read_reaction_intelligence_artifacts_file, write_outbox_file,
@@ -27,9 +27,7 @@ const MAX_ARTIFACT_ENTRIES: usize = 200;
 
 #[cfg(not(test))]
 #[tauri::command]
-pub fn read_local_store_status(
-    app: tauri::AppHandle,
-) -> Result<LocalStoreStatus, DesktopCommandError> {
+pub fn read_local_store_status(app: tauri::AppHandle) -> Result<LocalStoreStatus, CommandError> {
     read_local_store_status_impl(&command_root(&app)?)
 }
 
@@ -42,7 +40,7 @@ pub fn save_local_runtime_snapshot(
     payload: Value,
     metadata: Value,
     created_at: String,
-) -> Result<LocalSnapshotSaveResult, DesktopCommandError> {
+) -> Result<LocalSnapshotSaveResult, CommandError> {
     save_local_runtime_snapshot_impl(
         &command_root(&app)?,
         LocalRuntimeSnapshotInput {
@@ -64,7 +62,7 @@ pub fn save_local_reaction_intelligence_artifact(
     artifact: Value,
     metadata: Value,
     created_at: String,
-) -> Result<LocalReactionIntelligenceArtifactSaveResult, DesktopCommandError> {
+) -> Result<LocalReactionIntelligenceArtifactSaveResult, CommandError> {
     save_local_reaction_intelligence_artifact_impl(
         &command_root(&app)?,
         LocalReactionIntelligenceArtifactInput {
@@ -83,7 +81,7 @@ pub fn list_local_reaction_intelligence_artifacts(
     app: tauri::AppHandle,
     graph_index_id: Option<String>,
     limit: Option<usize>,
-) -> Result<Vec<LocalReactionIntelligenceArtifactRecord>, DesktopCommandError> {
+) -> Result<Vec<LocalReactionIntelligenceArtifactRecord>, CommandError> {
     list_local_reaction_intelligence_artifacts_impl(&command_root(&app)?, graph_index_id, limit)
 }
 
@@ -93,7 +91,7 @@ pub fn list_local_outbox(
     app: tauri::AppHandle,
     sync_status: Option<LocalSyncStatus>,
     limit: Option<usize>,
-) -> Result<Vec<LocalOutboxRecord>, DesktopCommandError> {
+) -> Result<Vec<LocalOutboxRecord>, CommandError> {
     list_local_outbox_impl(&command_root(&app)?, sync_status, limit)
 }
 
@@ -103,7 +101,7 @@ pub fn mark_local_outbox_synced(
     app: tauri::AppHandle,
     local_ids: Vec<String>,
     synced_at: Option<String>,
-) -> Result<LocalOutboxMutationResult, DesktopCommandError> {
+) -> Result<LocalOutboxMutationResult, CommandError> {
     mark_local_outbox_synced_impl(&command_root(&app)?, &local_ids, synced_at)
 }
 
@@ -111,7 +109,7 @@ pub fn mark_local_outbox_synced(
 #[tauri::command]
 pub fn clear_local_outbox_failures(
     app: tauri::AppHandle,
-) -> Result<LocalOutboxMutationResult, DesktopCommandError> {
+) -> Result<LocalOutboxMutationResult, CommandError> {
     clear_local_outbox_failures_impl(&command_root(&app)?)
 }
 
@@ -119,9 +117,7 @@ pub(crate) fn local_store_root(app_data_dir: PathBuf) -> PathBuf {
     app_data_dir.join(LOCAL_STORE_DIR)
 }
 
-pub(crate) fn read_local_store_status_impl(
-    root: &Path,
-) -> Result<LocalStoreStatus, DesktopCommandError> {
+pub(crate) fn read_local_store_status_impl(root: &Path) -> Result<LocalStoreStatus, CommandError> {
     let outbox = read_outbox_file(root)?;
     Ok(status_from_outbox(root, &outbox))
 }
@@ -130,7 +126,7 @@ pub(crate) fn list_local_outbox_impl(
     root: &Path,
     sync_status: Option<LocalSyncStatus>,
     limit: Option<usize>,
-) -> Result<Vec<LocalOutboxRecord>, DesktopCommandError> {
+) -> Result<Vec<LocalOutboxRecord>, CommandError> {
     let mut entries = read_outbox_file(root)?.entries;
     if let Some(status) = sync_status {
         entries.retain(|entry| entry.sync_status == status);
@@ -144,7 +140,7 @@ pub(crate) fn list_local_outbox_impl(
 pub(crate) fn save_local_runtime_snapshot_impl(
     root: &Path,
     input: LocalRuntimeSnapshotInput,
-) -> Result<LocalSnapshotSaveResult, DesktopCommandError> {
+) -> Result<LocalSnapshotSaveResult, CommandError> {
     validate_snapshot_input(&input)?;
     let mut outbox = read_outbox_file(root)?;
     let record = upsert_outbox_record(&mut outbox, input)?;
@@ -170,7 +166,7 @@ pub(crate) fn save_local_runtime_snapshot_impl(
 pub(crate) fn save_local_reaction_intelligence_artifact_impl(
     root: &Path,
     input: LocalReactionIntelligenceArtifactInput,
-) -> Result<LocalReactionIntelligenceArtifactSaveResult, DesktopCommandError> {
+) -> Result<LocalReactionIntelligenceArtifactSaveResult, CommandError> {
     validate_reaction_intelligence_artifact_input(&input)?;
     let mut file = read_reaction_intelligence_artifacts_file(root)?;
     let record = upsert_reaction_intelligence_artifact_record(&mut file, input)?;
@@ -187,7 +183,7 @@ pub(crate) fn list_local_reaction_intelligence_artifacts_impl(
     root: &Path,
     graph_index_id: Option<String>,
     limit: Option<usize>,
-) -> Result<Vec<LocalReactionIntelligenceArtifactRecord>, DesktopCommandError> {
+) -> Result<Vec<LocalReactionIntelligenceArtifactRecord>, CommandError> {
     let mut entries = read_reaction_intelligence_artifacts_file(root)?.entries;
     if let Some(graph_index_id) = graph_index_id.filter(|value| !value.trim().is_empty()) {
         entries.retain(|entry| {
@@ -209,7 +205,7 @@ pub(crate) fn mark_local_outbox_synced_impl(
     root: &Path,
     local_ids: &[String],
     synced_at: Option<String>,
-) -> Result<LocalOutboxMutationResult, DesktopCommandError> {
+) -> Result<LocalOutboxMutationResult, CommandError> {
     let ids = normalized_ids(local_ids);
     if ids.is_empty() {
         return Err(invalid_input("localIds is required"));
@@ -240,7 +236,7 @@ pub(crate) fn mark_local_outbox_synced_impl(
 
 pub(crate) fn clear_local_outbox_failures_impl(
     root: &Path,
-) -> Result<LocalOutboxMutationResult, DesktopCommandError> {
+) -> Result<LocalOutboxMutationResult, CommandError> {
     let mut outbox = read_outbox_file(root)?;
     let before = outbox.entries.len();
     outbox
@@ -254,7 +250,7 @@ pub(crate) fn clear_local_outbox_failures_impl(
 fn upsert_outbox_record(
     outbox: &mut LocalOutboxFile,
     input: LocalRuntimeSnapshotInput,
-) -> Result<LocalOutboxRecord, DesktopCommandError> {
+) -> Result<LocalOutboxRecord, CommandError> {
     if let Some(record) = outbox
         .entries
         .iter_mut()
@@ -291,7 +287,7 @@ fn upsert_outbox_record(
 fn upsert_reaction_intelligence_artifact_record(
     file: &mut crate::local_store_types::LocalReactionIntelligenceArtifactFile,
     input: LocalReactionIntelligenceArtifactInput,
-) -> Result<LocalReactionIntelligenceArtifactRecord, DesktopCommandError> {
+) -> Result<LocalReactionIntelligenceArtifactRecord, CommandError> {
     if let Some(record) = file
         .entries
         .iter_mut()
@@ -319,7 +315,7 @@ fn upsert_reaction_intelligence_artifact_record(
     Ok(record)
 }
 
-fn validate_snapshot_input(input: &LocalRuntimeSnapshotInput) -> Result<(), DesktopCommandError> {
+fn validate_snapshot_input(input: &LocalRuntimeSnapshotInput) -> Result<(), CommandError> {
     if input.local_id.trim().is_empty() {
         return Err(invalid_input("localId is required"));
     }
@@ -333,7 +329,7 @@ fn validate_snapshot_input(input: &LocalRuntimeSnapshotInput) -> Result<(), Desk
         return Err(invalid_input("metadata must be an object"));
     }
     let bytes = serde_json::to_vec(&input.payload).map_err(|err| {
-        DesktopCommandError::new(
+        CommandError::new(
             "local_store_payload_invalid",
             "Local runtime snapshot payload is invalid",
             Some(err.to_string()),
@@ -351,7 +347,7 @@ fn validate_snapshot_input(input: &LocalRuntimeSnapshotInput) -> Result<(), Desk
 
 fn validate_reaction_intelligence_artifact_input(
     input: &LocalReactionIntelligenceArtifactInput,
-) -> Result<(), DesktopCommandError> {
+) -> Result<(), CommandError> {
     if input.local_id.trim().is_empty() {
         return Err(invalid_input("localId is required"));
     }
@@ -368,7 +364,7 @@ fn validate_reaction_intelligence_artifact_input(
         return Err(invalid_input("artifact must be an object"));
     }
     let bytes = serde_json::to_vec(&input.artifact).map_err(|err| {
-        DesktopCommandError::new(
+        CommandError::new(
             "local_store_artifact_invalid",
             "Local reaction intelligence artifact is invalid",
             Some(err.to_string()),
@@ -393,8 +389,8 @@ fn normalized_ids(local_ids: &[String]) -> Vec<String> {
         .collect()
 }
 
-fn invalid_input(detail: &str) -> DesktopCommandError {
-    DesktopCommandError::new(
+fn invalid_input(detail: &str) -> CommandError {
+    CommandError::new(
         "local_store_invalid_input",
         "Invalid local store input",
         Some(detail.into()),
@@ -402,13 +398,13 @@ fn invalid_input(detail: &str) -> DesktopCommandError {
 }
 
 #[cfg(not(test))]
-fn command_root(app: &tauri::AppHandle) -> Result<PathBuf, DesktopCommandError> {
+fn command_root(app: &tauri::AppHandle) -> Result<PathBuf, CommandError> {
     use tauri::Manager;
     app.path()
         .app_data_dir()
         .map(local_store_root)
         .map_err(|err| {
-            DesktopCommandError::new(
+            CommandError::new(
                 "local_store_app_data_unavailable",
                 "Failed to resolve app data directory",
                 Some(err.to_string()),
