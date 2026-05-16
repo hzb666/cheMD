@@ -407,3 +407,37 @@ Validation:
 ### Next Steps
 
 - The only remaining unchecked productization item is clean-machine installer Offline Core smoke, which needs a real isolated install environment.
+
+
+## Session 98: Desktop IDE 产品化重组收尾
+
+**Date**: 2026-05-16
+**Task**: Desktop IDE 产品化重组收尾
+**Package**: web
+**Branch**: `desktop-ide`
+
+### Summary
+
+完成 desktop-ide 产品化重组收尾：组件化桌面工作台与功能模块，补齐桌面 Vitest、离线 smoke、runtime smoke 与 release readiness 验证，修复 lint error；Tauri build 因当前环境缺少 cargo 被记录为阻塞。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4670c0e` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
