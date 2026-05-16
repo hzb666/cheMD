@@ -116,7 +116,10 @@ fn embedding_provider_client_builds_batch_request_specs_from_env() {
         specs.specs[0].request.endpoint.as_str(),
         "https://embed.example/v1/embeddings"
     );
-    assert_eq!(specs.specs[0].request.payload.model, "text-embedding-3-small");
+    assert_eq!(
+        specs.specs[0].request.payload.model,
+        "text-embedding-3-small"
+    );
     assert_eq!(specs.specs[0].request.expected_dimension, 3);
     assert_eq!(
         specs.specs[0].request.bearer_token.as_deref(),
@@ -162,8 +165,12 @@ fn embedding_provider_client_keeps_valid_batch_items_when_others_are_blank() {
     assert_eq!(batch.specs[0].request.payload.input, "ibuprofen");
     assert_eq!(batch.invalid_items.len(), 2);
     assert_eq!(batch.invalid_items[0].id, "chunk-1");
-    assert!(batch.invalid_items[0].detail.contains("text must not be empty"));
-    assert!(batch.invalid_items[1].detail.contains("id must not be empty"));
+    assert!(batch.invalid_items[0]
+        .detail
+        .contains("text must not be empty"));
+    assert!(batch.invalid_items[1]
+        .detail
+        .contains("id must not be empty"));
     assert!(!serialized.contains("super-secret provider body"));
     assert!(!serialized.contains("sk-test-secret"));
     assert!(!serialized.contains("secret@example"));

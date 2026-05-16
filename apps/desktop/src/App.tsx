@@ -1,17 +1,17 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { AgentRun } from "@chemd/agent-tools";
 import { compileChemdForEditor } from "@chemd/language-service";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { DesktopWorkbench } from "./components/DesktopShell";
-import { useDesktopWorkspaceIndexController } from "./workspace-index/use-desktop-workspace-index";
-import { buildDesktopReactionIntelligenceJob } from "./desktop-reaction-intelligence-job";
-import { reactionIntelligenceArtifactHasReactionOverlap } from "./desktop-reaction-intelligence-artifact-controller";
-import { buildDesktopSemanticPreview } from "./desktop-semantic-preview";
-import { buildDesktopKnowledgeMapViewModel, type DesktopSourceJumpIntent } from "./knowledge-map/desktop-knowledge-map";
-import { isSameChemdDesktopDocumentPath, type MonacoChemdEditorHandle } from "./MonacoChemdEditor";
-import { createEditorSourceHash, invokeDesktop } from "./desktop-utils";
+import { Workbench } from "./features/workbench/workbench-shell";
+import { useWorkspaceIndexController } from "./workspace-index/use-workspace-index";
+import { buildReactionIntelligenceJob } from "./features/reaction-intelligence/job";
+import { reactionIntelligenceArtifactHasReactionOverlap } from "./features/reaction-intelligence/artifact-controller";
+import { buildSemanticPreview } from "./features/preview/semantic-preview";
+import { buildKnowledgeMapViewModel, type SourceJumpIntent } from "./knowledge-map/knowledge-map";
+import { isSameChemdDocumentPath, type MonacoChemdEditorHandle } from "./features/editor/source-path";
+import { createEditorSourceHash, invokeCommand } from "./utils";
 
 import { useWorkspaceFileController } from "./hooks/use-workspace-file-controller";
 import { useSidecarController } from "./hooks/use-sidecar-controller";
@@ -24,22 +24,54 @@ import {
 } from "./hooks/use-local-store-controller";
 import { useAgentPatchController } from "./hooks/use-agent-patch-controller";
 import { useConnectedRagQueryController, useEmbeddingProviderController } from "./hooks/use-connected-rag-controller";
+import { useSettings } from "./features/settings/settings";
 
-import type { AgentMessage } from "./desktop-types";
-import type { WorkspaceFileEntry } from "./desktop-contracts";
+import type { AgentMessage } from "./types";
+import type { WorkspaceFileEntry } from "./contracts";
+
+const useDebouncedValue = <T,>(value: T, delayMs: number): T => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setDebouncedValue(value), delayMs);
+    return () => window.clearTimeout(timeoutId);
+  }, [delayMs, value]);
+
+  return debouncedValue;
+};
 
 export const App = () => {
   const workspaceController = useWorkspaceFileController();
+  const settingsController = useSettings();
+  const { settings, updateSettings, resetSettings } = settingsController;
   const [agentRun, setAgentRun] = useState<AgentRun | null>(null);
   const [agentMessage, setAgentMessage] = useState<AgentMessage | null>(null);
   const editorRef = useRef<MonacoChemdEditorHandle | null>(null);
+  const autostartAttemptedRef = useRef(false);
+  const restoreWorkspaceAttemptedRef = useRef(false);
 
   const sidecarController = useSidecarController();
   const postgresController = usePostgresController();
+  const compileInput = useMemo(
+    () => ({
+      fileId: workspaceController.selectedFileId,
+      documentUri: workspaceController.selectedFile.path,
+      source: workspaceController.source,
+    }),
+    [
+      workspaceController.selectedFile.path,
+      workspaceController.selectedFileId,
+      workspaceController.source,
+    ],
+  );
+  const debouncedCompileInput = useDebouncedValue(
+    compileInput,
+    settings.compileDebounceMs,
+  );
 
   const readWorkspaceIndexFile = useCallback(
     (file: WorkspaceFileEntry) =>
-      invokeDesktop("read_workspace_file", {
+      invokeCommand("read_workspace_file", {
         workspaceId: workspaceController.workspace.workspaceId,
         path: file.path,
       }).then((result) => ({
@@ -52,11 +84,11 @@ export const App = () => {
   const output = useMemo(
     () =>
       compileChemdForEditor({
-        source: workspaceController.source,
-        documentUri: workspaceController.selectedFile.path,
+        source: debouncedCompileInput.source,
+        documentUri: debouncedCompileInput.documentUri,
         options: { strictChemdKind: true, procedureMode: "auto" },
       }),
-    [workspaceController.selectedFile.path, workspaceController.source],
+    [debouncedCompileInput],
   );
 
   const outputReactionIds = useMemo(
@@ -67,9 +99,9 @@ export const App = () => {
     [output],
   );
 
-  const semanticPreview = useMemo(() => buildDesktopSemanticPreview(output), [output]);
+  const semanticPreview = useMemo(() => buildSemanticPreview(output), [output]);
 
-  const workspaceIndexController = useDesktopWorkspaceIndexController({
+  const workspaceIndexController = useWorkspaceIndexController({
     mode: workspaceController.mode,
     workspaceState: workspaceController.workspaceState,
     workspace: workspaceController.workspace,
@@ -115,7 +147,7 @@ export const App = () => {
 
   const reactionIntelligenceJobBuild = useMemo(
     () =>
-      buildDesktopReactionIntelligenceJob({
+      buildReactionIntelligenceJob({
         compileOutput: output,
         source: workspaceController.source,
         documentUri: workspaceController.selectedFile.path,
@@ -138,7 +170,7 @@ export const App = () => {
   }, [localStoreController.reactionIntelligenceArtifactState.artifact, outputReactionIds]);
 
   const knowledgeMapViewModel = useMemo(
-    () => buildDesktopKnowledgeMapViewModel(output, { reactionIntelligenceArtifact: localReactionIntelligenceArtifact }),
+    () => buildKnowledgeMapViewModel(output, { reactionIntelligenceArtifact: localReactionIntelligenceArtifact }),
     [localReactionIntelligenceArtifact, output],
   );
 
@@ -165,10 +197,59 @@ export const App = () => {
     localStoreController.reset();
   };
 
+  useEffect(() => {
+    const rootPath = workspaceController.rootPath.trim();
+    if (!rootPath || rootPath === settings.lastWorkspacePath) return;
+    updateSettings({ lastWorkspacePath: rootPath });
+  }, [settings.lastWorkspacePath, updateSettings, workspaceController.rootPath]);
+
+  useEffect(() => {
+    if (
+      restoreWorkspaceAttemptedRef.current
+      || !settings.restoreLastWorkspace
+      || !settings.lastWorkspacePath
+      || workspaceController.workspaceState !== "empty"
+    ) {
+      return;
+    }
+    restoreWorkspaceAttemptedRef.current = true;
+    void workspaceController.openWorkspacePath(settings.lastWorkspacePath);
+  }, [
+    settings.lastWorkspacePath,
+    settings.restoreLastWorkspace,
+    workspaceController,
+  ]);
+
+  useEffect(() => {
+    if (
+      !settings.sidecarAutostart
+      || autostartAttemptedRef.current
+      || sidecarController.operation
+      || sidecarController.status.state === "ready"
+    ) {
+      return;
+    }
+    autostartAttemptedRef.current = true;
+    sidecarController.start();
+  }, [settings.sidecarAutostart, sidecarController]);
+
+  const dirtyWorkspaceFileSignature = useMemo(
+    () => workspaceController.dirtyWorkspaceFileIds.join("\u001f"),
+    [workspaceController.dirtyWorkspaceFileIds],
+  );
+
+  useEffect(() => {
+    if (settings.autoSaveMode !== "afterDelay" || !dirtyWorkspaceFileSignature) return;
+    const timeoutId = window.setTimeout(() => {
+      void workspaceController.saveDirtyWorkspaceFiles();
+    }, 1200);
+    return () => window.clearTimeout(timeoutId);
+  }, [dirtyWorkspaceFileSignature, settings.autoSaveMode, workspaceController.saveDirtyWorkspaceFiles]);
+
   const handleKnowledgeMapSourceJump = useCallback(
-    (intent: DesktopSourceJumpIntent) => {
+    (intent: SourceJumpIntent) => {
       const currentPath = workspaceController.selectedFile.path;
-      if (!isSameChemdDesktopDocumentPath(intent.sourceUri, currentPath)) {
+      if (!isSameChemdDocumentPath(intent.sourceUri, currentPath)) {
         workspaceController.setMessage(`Source ref points to ${intent.sourceUri}; current phase only jumps within ${currentPath}.`);
         return;
       }
@@ -195,7 +276,7 @@ export const App = () => {
 
   return (
     <TooltipProvider>
-      <DesktopWorkbench
+      <Workbench
         workspace={workspaceController.workspace}
         workspaceState={workspaceController.workspaceState}
         sidecarController={sidecarController}
@@ -218,6 +299,8 @@ export const App = () => {
         output={output}
         compileError={compileError}
         files={workspaceController.files}
+        openedTabs={workspaceController.openedTabs}
+        dirtyFileIds={workspaceController.dirtyFileIds}
         selectedFile={workspaceController.selectedFile}
         selectedFileId={workspaceController.selectedFileId}
         mode={workspaceController.mode}
@@ -231,11 +314,17 @@ export const App = () => {
         agentMessage={agentMessage}
         agentCurrentBeforeHash={createEditorSourceHash(workspaceController.source)}
         editorRef={editorRef}
+        settings={settings}
+        onSettingsChange={updateSettings}
+        onResetSettings={resetSettings}
         onRootPathChange={workspaceController.setRootPath}
         onSourceChange={updateEditorSource}
         onSave={() => void workspaceController.saveWorkspaceFile()}
         onOpenWorkspace={() => void workspaceController.openWorkspace()}
         onSelectFile={(file) => void workspaceController.selectFile(file)}
+        onCloseFileTab={(fileId) => void workspaceController.closeFileTab(fileId)}
+        onReorderFileTabs={workspaceController.reorderFileTabs}
+        onOpenNewTab={() => void workspaceController.openNewTab()}
         onReloadWorkspaceConflict={() => void workspaceController.reloadWorkspaceConflict()}
         onKeepLocalWorkspaceConflict={workspaceController.keepLocalWorkspaceConflict}
         onKnowledgeMapSourceJump={handleKnowledgeMapSourceJump}

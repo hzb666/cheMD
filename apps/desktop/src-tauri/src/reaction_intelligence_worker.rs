@@ -1,6 +1,6 @@
 #![cfg_attr(test, allow(dead_code))]
 
-use crate::workspace::DesktopCommandError;
+use crate::workspace::CommandError;
 use serde::Serialize;
 use serde_json::Value;
 use std::{
@@ -59,7 +59,7 @@ pub fn run_reaction_intelligence_worker(
     missing_dependency: Option<String>,
     pretty: Option<bool>,
     timeout_ms: Option<u64>,
-) -> Result<ReactionIntelligenceWorkerResult, DesktopCommandError> {
+) -> Result<ReactionIntelligenceWorkerResult, CommandError> {
     run_reaction_intelligence_worker_impl(ReactionIntelligenceWorkerInput {
         job_json,
         providers,
@@ -71,7 +71,7 @@ pub fn run_reaction_intelligence_worker(
 
 pub(crate) fn run_reaction_intelligence_worker_impl(
     input: ReactionIntelligenceWorkerInput,
-) -> Result<ReactionIntelligenceWorkerResult, DesktopCommandError> {
+) -> Result<ReactionIntelligenceWorkerResult, CommandError> {
     run_reaction_intelligence_worker_with(input, default_service_dir, execute_worker_spec)
 }
 
@@ -80,7 +80,7 @@ pub(crate) fn run_reaction_intelligence_worker_with<F, G>(
     input: ReactionIntelligenceWorkerInput,
     service_dir: F,
     executor: G,
-) -> Result<ReactionIntelligenceWorkerResult, DesktopCommandError>
+) -> Result<ReactionIntelligenceWorkerResult, CommandError>
 where
     F: FnOnce() -> Option<PathBuf>,
     G: FnOnce(&ReactionIntelligenceWorkerSpec) -> Result<WorkerProcessOutput, io::Error>,
@@ -146,7 +146,7 @@ fn run_with_spec<G>(
     job_json: &Value,
     spec: &ReactionIntelligenceWorkerSpec,
     executor: G,
-) -> Result<ReactionIntelligenceWorkerResult, DesktopCommandError>
+) -> Result<ReactionIntelligenceWorkerResult, CommandError>
 where
     G: FnOnce(&ReactionIntelligenceWorkerSpec) -> Result<WorkerProcessOutput, io::Error>,
 {
@@ -166,8 +166,8 @@ where
 #[rustfmt::skip]
 fn classify_worker_output(
     output: WorkerProcessOutput,
-    parsed: Result<Value, DesktopCommandError>,
-) -> Result<ReactionIntelligenceWorkerResult, DesktopCommandError> {
+    parsed: Result<Value, CommandError>,
+) -> Result<ReactionIntelligenceWorkerResult, CommandError> {
     let exit_code = output.exit_code;
     if output.timed_out {
         let detail = first_tail_line(&output.stderr_tail)
@@ -235,22 +235,22 @@ fn python_program(service_dir: &Path) -> PathBuf {
 }
 
 #[rustfmt::skip]
-fn write_job_json(path: &Path, job_json: &Value) -> Result<(), DesktopCommandError> {
+fn write_job_json(path: &Path, job_json: &Value) -> Result<(), CommandError> {
     let json = serde_json::to_string_pretty(job_json).map_err(|error| {
-        DesktopCommandError::new("reaction_intelligence_job_serialize_failed", "Failed to serialize reaction intelligence job JSON", Some(error.to_string()))
+        CommandError::new("reaction_intelligence_job_serialize_failed", "Failed to serialize reaction intelligence job JSON", Some(error.to_string()))
     })?;
     fs::write(path, format!("{json}\n")).map_err(|error| {
-        DesktopCommandError::io("reaction_intelligence_job_write_failed", "Failed to write reaction intelligence worker input", error)
+        CommandError::io("reaction_intelligence_job_write_failed", "Failed to write reaction intelligence worker input", error)
     })
 }
 
 #[rustfmt::skip]
-fn read_output_json(path: &Path) -> Result<Value, DesktopCommandError> {
+fn read_output_json(path: &Path) -> Result<Value, CommandError> {
     let content = fs::read_to_string(path).map_err(|error| {
-        DesktopCommandError::io("reaction_intelligence_output_read_failed", "Failed to read reaction intelligence worker output", error)
+        CommandError::io("reaction_intelligence_output_read_failed", "Failed to read reaction intelligence worker output", error)
     })?;
     serde_json::from_str(&content).map_err(|error| {
-        DesktopCommandError::new("reaction_intelligence_output_parse_failed", "Failed to parse reaction intelligence worker output", Some(error.to_string()))
+        CommandError::new("reaction_intelligence_output_parse_failed", "Failed to parse reaction intelligence worker output", Some(error.to_string()))
     })
 }
 

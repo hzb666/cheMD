@@ -1,8 +1,8 @@
 import type { AgentToolName } from "@chemd/agent-tools";
 
-export type DesktopOrchestratedToolName = Exclude<AgentToolName, "validate_workspace">;
+export type OrchestratedToolName = Exclude<AgentToolName, "validate_workspace">;
 
-export type DesktopAgentToolCategory =
+export type AgentToolCategory =
   | "compile"
   | "rag"
   | "graph"
@@ -10,62 +10,62 @@ export type DesktopAgentToolCategory =
   | "repair"
   | "patch";
 
-export type DesktopAgentConnectivity = "offline" | "connected";
+export type AgentConnectivity = "offline" | "connected";
 
-export type DesktopAgentToolAvailabilityLevel =
+export type AgentToolAvailabilityLevel =
   | "available"
   | "degraded"
   | "unavailable";
 
-export interface DesktopAgentToolAvailabilityContract {
-  level: DesktopAgentToolAvailabilityLevel;
+export interface AgentToolAvailabilityContract {
+  level: AgentToolAvailabilityLevel;
   summary: string;
 }
 
-export interface DesktopAgentToolRequirementContract {
+export interface AgentToolRequirementContract {
   workspace: boolean;
   currentFile: boolean;
   explicitApproval: boolean;
 }
 
-export interface DesktopAgentToolDisplayContract {
+export interface AgentToolDisplayContract {
   label: string;
   description: string;
-  category: DesktopAgentToolCategory;
+  category: AgentToolCategory;
   resultLabel: string;
 }
 
-export interface DesktopAgentToolSummaryContract {
+export interface AgentToolSummaryContract {
   input: string;
   output: string;
   maxInputLength: number;
   maxOutputLength: number;
 }
 
-export interface DesktopAgentToolContract {
-  toolName: DesktopOrchestratedToolName;
-  display: DesktopAgentToolDisplayContract;
-  requires: DesktopAgentToolRequirementContract;
+export interface AgentToolContract {
+  toolName: OrchestratedToolName;
+  display: AgentToolDisplayContract;
+  requires: AgentToolRequirementContract;
   availability: Record<
-    DesktopAgentConnectivity,
-    DesktopAgentToolAvailabilityContract
+    AgentConnectivity,
+    AgentToolAvailabilityContract
   >;
-  summaryStrategy: DesktopAgentToolSummaryContract;
+  summaryStrategy: AgentToolSummaryContract;
 }
 
-export const DESKTOP_AGENT_TOOL_NAMES = [
+export const AGENT_TOOL_NAMES = [
   "compile_current_file",
   "query_rag",
   "inspect_reaction_graph",
   "semantic_diff",
   "propose_repair",
   "apply_approved_patch"
-] as const satisfies readonly DesktopOrchestratedToolName[];
+] as const satisfies readonly OrchestratedToolName[];
 
 const DEFAULT_INPUT_LENGTH = 120;
 const DEFAULT_OUTPUT_LENGTH = 160;
 
-export const DESKTOP_AGENT_TOOL_CONTRACTS = {
+export const AGENT_TOOL_CONTRACTS = {
   compile_current_file: {
     toolName: "compile_current_file",
     display: {
@@ -247,13 +247,13 @@ export const DESKTOP_AGENT_TOOL_CONTRACTS = {
     }
   }
 } as const satisfies Readonly<
-  Record<DesktopOrchestratedToolName, DesktopAgentToolContract>
+  Record<OrchestratedToolName, AgentToolContract>
 >;
 
-export const listDesktopAgentToolContracts = ():
-  readonly DesktopAgentToolContract[] =>
-  DESKTOP_AGENT_TOOL_NAMES.map((toolName) => DESKTOP_AGENT_TOOL_CONTRACTS[toolName]);
+export const listAgentToolContracts = ():
+  readonly AgentToolContract[] =>
+  AGENT_TOOL_NAMES.map((toolName) => AGENT_TOOL_CONTRACTS[toolName]);
 
-export const getDesktopAgentToolContract = (
-  toolName: DesktopOrchestratedToolName
-): DesktopAgentToolContract => DESKTOP_AGENT_TOOL_CONTRACTS[toolName];
+export const getAgentToolContract = (
+  toolName: OrchestratedToolName
+): AgentToolContract => AGENT_TOOL_CONTRACTS[toolName];

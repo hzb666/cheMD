@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  DESKTOP_AGENT_TOOL_NAMES,
-  getDesktopAgentToolContract,
-  listDesktopAgentToolContracts,
-  resolveDesktopAgentToolAvailability,
-  summarizeDesktopAgentToolInput,
-  summarizeDesktopAgentToolOutput
+  AGENT_TOOL_NAMES,
+  getAgentToolContract,
+  listAgentToolContracts,
+  resolveAgentToolAvailability,
+  summarizeAgentToolInput,
+  summarizeAgentToolOutput
 } from "./index";
 
 describe("desktop agent tool contracts", () => {
   it("locks the desktop-orchestrated tool list", () => {
-    expect(DESKTOP_AGENT_TOOL_NAMES).toEqual([
+    expect(AGENT_TOOL_NAMES).toEqual([
       "compile_current_file",
       "query_rag",
       "inspect_reaction_graph",
@@ -22,7 +22,7 @@ describe("desktop agent tool contracts", () => {
   });
 
   it("defines UI, summary, requirement, and availability metadata for every tool", () => {
-    for (const contract of listDesktopAgentToolContracts()) {
+    for (const contract of listAgentToolContracts()) {
       expect(contract.display.label.length).toBeGreaterThan(0);
       expect(contract.display.description.length).toBeGreaterThan(0);
       expect(contract.display.resultLabel.length).toBeGreaterThan(0);
@@ -37,7 +37,7 @@ describe("desktop agent tool contracts", () => {
   });
 
   it("marks write application as requiring explicit approval", () => {
-    const contract = getDesktopAgentToolContract("apply_approved_patch");
+    const contract = getAgentToolContract("apply_approved_patch");
 
     expect(contract.requires).toEqual({
       workspace: true,
@@ -47,7 +47,7 @@ describe("desktop agent tool contracts", () => {
   });
 
   it("keeps connected RAG available and offline RAG degraded", () => {
-    expect(getDesktopAgentToolContract("query_rag").availability).toMatchObject({
+    expect(getAgentToolContract("query_rag").availability).toMatchObject({
       offline: {
         level: "degraded"
       },
@@ -60,7 +60,7 @@ describe("desktop agent tool contracts", () => {
 
 describe("desktop agent tool availability", () => {
   it("blocks workspace-bound tools when no workspace is selected", () => {
-    const availability = resolveDesktopAgentToolAvailability("query_rag", {
+    const availability = resolveAgentToolAvailability("query_rag", {
       connectivity: "connected",
       hasWorkspace: false,
       hasCurrentFile: true,
@@ -75,7 +75,7 @@ describe("desktop agent tool availability", () => {
   });
 
   it("blocks patch application until explicit approval exists", () => {
-    const availability = resolveDesktopAgentToolAvailability("apply_approved_patch", {
+    const availability = resolveAgentToolAvailability("apply_approved_patch", {
       connectivity: "offline",
       hasWorkspace: true,
       hasCurrentFile: false,
@@ -87,7 +87,7 @@ describe("desktop agent tool availability", () => {
   });
 
   it("returns mode-specific availability once requirements are met", () => {
-    const availability = resolveDesktopAgentToolAvailability("propose_repair", {
+    const availability = resolveAgentToolAvailability("propose_repair", {
       connectivity: "offline",
       hasWorkspace: true,
       hasCurrentFile: true,
@@ -103,7 +103,7 @@ describe("desktop agent tool availability", () => {
 
 describe("desktop agent tool summaries", () => {
   it("summarizes compile input without inlining source", () => {
-    const summary = summarizeDesktopAgentToolInput("compile_current_file", {
+    const summary = summarizeAgentToolInput("compile_current_file", {
       filePath: "experiments/demo.chemd",
       source: "step a\nstep b"
     });
@@ -112,7 +112,7 @@ describe("desktop agent tool summaries", () => {
   });
 
   it("summarizes RAG output with result and citation counts", () => {
-    const summary = summarizeDesktopAgentToolOutput("query_rag", {
+    const summary = summarizeAgentToolOutput("query_rag", {
       query: "catalyst workup",
       hits: [{ id: "chunk-1" }, { id: "chunk-2" }],
       citations: [{ citationId: "c1" }],
@@ -125,7 +125,7 @@ describe("desktop agent tool summaries", () => {
   });
 
   it("summarizes approved patch application state", () => {
-    const summary = summarizeDesktopAgentToolInput("apply_approved_patch", {
+    const summary = summarizeAgentToolInput("apply_approved_patch", {
       patchProposalId: "proposal-1",
       userApprovalId: "approval-1",
       edits: [{ replacement: "fixed" }],

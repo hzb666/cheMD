@@ -8,6 +8,24 @@ import type {
   GraphBuildContext
 } from "./graph-rag-types";
 
+interface CreateGraphNodeInput {
+  context: GraphBuildContext;
+  nodeKind: EditorGraphRagNodeKind;
+  entityId: string;
+  sourceRange: EditorGraphRagSourceRange;
+  payload: Record<string, unknown>;
+  blockId?: string;
+}
+
+interface CreateGraphEdgeInput {
+  context: GraphBuildContext;
+  edgeType: EditorGraphRagEdgeType;
+  fromNodeId: string;
+  toNodeId: string;
+  confidence: EditorGraphRagConfidence;
+  evidence: Record<string, unknown>;
+}
+
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
@@ -60,14 +78,14 @@ export const readEntityRange = (
     ?? fallback;
 };
 
-export const createNode = (
-  context: GraphBuildContext,
-  nodeKind: EditorGraphRagNodeKind,
-  entityId: string,
-  sourceRange: EditorGraphRagSourceRange,
-  payload: Record<string, unknown>,
-  blockId?: string
-): EditorGraphRagNode => ({
+export const createNode = ({
+  context,
+  nodeKind,
+  entityId,
+  sourceRange,
+  payload,
+  blockId
+}: CreateGraphNodeInput): EditorGraphRagNode => ({
   nodeId: makeId(context.graphSnapshotId, nodeKind, entityId),
   graphSnapshotId: context.graphSnapshotId,
   experimentId: context.input.experimentId,
@@ -80,14 +98,14 @@ export const createNode = (
   createdAt: context.input.createdAt
 });
 
-export const createEdge = (
-  context: GraphBuildContext,
-  edgeType: EditorGraphRagEdgeType,
-  fromNodeId: string,
-  toNodeId: string,
-  confidence: EditorGraphRagConfidence,
-  evidence: Record<string, unknown>
-): EditorGraphRagEdge => ({
+export const createEdge = ({
+  context,
+  edgeType,
+  fromNodeId,
+  toNodeId,
+  confidence,
+  evidence
+}: CreateGraphEdgeInput): EditorGraphRagEdge => ({
   edgeId: makeId(context.graphSnapshotId, edgeType, fromNodeId, toNodeId),
   graphSnapshotId: context.graphSnapshotId,
   experimentId: context.input.experimentId,

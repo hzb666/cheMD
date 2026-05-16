@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import type {
-  DesktopCommandMap,
+  CommandMap,
   ManagedPostgresStatus,
   PostgresStatus,
-} from "../desktop-contracts";
-import { shellPostgresStatus } from "../desktop-contracts";
+} from "../contracts";
+import { shellPostgresStatus } from "../contracts";
 import type {
   ManagedPostgresOperation,
   PersistControllerInput,
   PersistState,
   PostgresProfilePanelController,
-} from "../desktop-types";
+} from "../types";
 import {
   buildPersistCommandInput,
   getPostgresErrorMessage,
@@ -18,8 +18,8 @@ import {
   getPersistErrorMessage,
   initialManagedPostgresStatus,
   initialPersistState,
-  invokeDesktop,
-} from "../desktop-utils";
+  invokeCommand,
+} from "../utils";
 import {
   buildPostgresProfileRows,
   buildPostgresProfileSaveInput,
@@ -32,12 +32,25 @@ import {
   type PostgresProfileCommandError,
   type PostgresProfileForm,
   type PostgresProfileOperation,
-} from "../desktop-postgres-profiles";
+} from "../features/postgres/profiles";
+
+type ManagedPostgresCommand = keyof Pick<
+  CommandMap,
+  "initialize_managed_postgres" | "start_managed_postgres" | "stop_managed_postgres" | "migrate_managed_postgres" | "read_managed_postgres_status"
+>;
+
+const managedPostgresCommandByOperation: Record<ManagedPostgresOperation, ManagedPostgresCommand> = {
+  init: "initialize_managed_postgres",
+  start: "start_managed_postgres",
+  stop: "stop_managed_postgres",
+  migrate: "migrate_managed_postgres",
+  refresh: "read_managed_postgres_status"
+};
 
 
 export const usePostgresProfileController = (
   onRuntimeStatusChange: () => Promise<void>
-): { panel: PostgresProfilePanelController; readProfiles: () => Promise<DesktopCommandMap["list_postgres_profiles"]["output"] | null> } => {
+): { panel: PostgresProfilePanelController; readProfiles: () => Promise<CommandMap["list_postgres_profiles"]["output"] | null> } => {
   const [profilesState, setProfilesState] = useState(initialPostgresProfilesState);
   const [profileForm, setProfileForm] = useState(createInitialPostgresProfileForm);
   const [profileOperation, setProfileOperation] = useState<PostgresProfileOperation | null>(null);
@@ -47,7 +60,7 @@ export const usePostgresProfileController = (
 
   const readProfiles = async () => {
     try {
-      const nextProfiles = await invokeDesktop("list_postgres_profiles", undefined);
+      const nextProfiles = await invokeCommand("list_postgres_profiles", undefined);
       setProfilesState(nextProfiles);
       setProfileError(null);
       return nextProfiles;
@@ -85,7 +98,7 @@ export const usePostgresProfileController = (
     setProfileOperation("save");
     setProfileMessage(null);
     try {
-      const nextProfiles = await invokeDesktop("save_postgres_profile", { input: saveInput.input });
+      const nextProfiles = await invokeCommand("save_postgres_profile", { input: saveInput.input });
       setProfilesState(nextProfiles);
       setProfileForm((current) => clearPostgresProfilePassword(current));
       setProfileError(null);
@@ -105,7 +118,7 @@ export const usePostgresProfileController = (
     setProfileOperation("activate");
     setProfileMessage(null);
     try {
-      const nextProfiles = await invokeDesktop("activate_postgres_profile", { profileId });
+      const nextProfiles = await invokeCommand("activate_postgres_profile", { profileId });
       setProfilesState(nextProfiles);
       setProfileError(null);
       setProfileMessage("Postgres profile activated.");
@@ -124,7 +137,7 @@ export const usePostgresProfileController = (
     setProfileOperation("delete");
     setProfileMessage(null);
     try {
-      const nextProfiles = await invokeDesktop("delete_postgres_profile", { profileId });
+      const nextProfiles = await invokeCommand("delete_postgres_profile", { profileId });
       setProfilesState(nextProfiles);
       setProfileForm((current) =>
         current.profileId === profileId ? createInitialPostgresProfileForm() : current
@@ -189,7 +202,7 @@ export const usePostgresController = () => {
 
   const readRuntimeStatus = async () => {
     try {
-      const nextStatus = await invokeDesktop("read_postgres_status", undefined);
+      const nextStatus = await invokeCommand("read_postgres_status", undefined);
       setStatus(nextStatus);
       setError(null);
     } catch (nextError: unknown) {
@@ -200,7 +213,7 @@ export const usePostgresController = () => {
 
   const readManagedStatus = async () => {
     try {
-      const nextStatus = await invokeDesktop("read_managed_postgres_status", undefined);
+      const nextStatus = await invokeCommand("read_managed_postgres_status", undefined);
       setManagedStatus(nextStatus);
       setManagedError(null);
     } catch (nextError: unknown) {
@@ -229,19 +242,8 @@ export const usePostgresController = () => {
     setManagedOperation(operation);
     setManagedMessage(null);
     try {
-      const command: keyof Pick<
-        DesktopCommandMap,
-        "initialize_managed_postgres" | "start_managed_postgres" | "stop_managed_postgres" | "migrate_managed_postgres" | "read_managed_postgres_status"
-      > = operation === "init"
-        ? "initialize_managed_postgres"
-        : operation === "start"
-          ? "start_managed_postgres"
-          : operation === "stop"
-            ? "stop_managed_postgres"
-            : operation === "migrate"
-              ? "migrate_managed_postgres"
-              : "read_managed_postgres_status";
-      const nextStatus = await invokeDesktop(command, undefined);
+      const command = managedPostgresCommandByOperation[operation];
+      const nextStatus = await invokeCommand(command, undefined);
       setManagedStatus(nextStatus);
       setManagedError(null);
       const actionLabel: Record<ManagedPostgresOperation, string> = {
@@ -314,7 +316,7 @@ export const usePersistRuntimeController = ({
     setState({ state: "pending", message: "Persisting Graph/RAG payload to Postgres.", summary: null });
     try {
       const input = buildPersistCommandInput({ source, workspace, file, compileOutput, agentRun });
-      const result = await invokeDesktop("persist_runtime_graph_rag", input);
+      const result = await invokeCommand("persist_runtime_graph_rag", input);
       setState({
         state: "success",
         message: result.detail || "Persisted Graph/RAG payload.",

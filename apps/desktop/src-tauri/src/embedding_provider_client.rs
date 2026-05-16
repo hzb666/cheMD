@@ -1,13 +1,13 @@
 #![cfg_attr(test, allow(dead_code))]
 
 #[cfg(not(test))]
-use crate::embedding_provider_status::collect_embedding_env;
-#[cfg(not(test))]
 use crate::embedding_provider_batch::{
     batch_item_degraded, batch_item_ready, batch_result_from_items,
     build_embedding_provider_batch_request_specs, redact_embedding_provider_detail,
     CreateEmbeddingVectorsInput, CreateEmbeddingVectorsResult,
 };
+#[cfg(not(test))]
+use crate::embedding_provider_status::collect_embedding_env;
 use crate::embedding_provider_status::{
     embedding_env_configured, embedding_status_detail, read_embedding_provider_config_from_env,
     EmbeddingProviderConfig, PROVIDER_KIND,

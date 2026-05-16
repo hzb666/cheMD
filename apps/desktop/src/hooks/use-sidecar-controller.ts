@@ -1,7 +1,19 @@
 import { useState, useEffect, useRef } from "react";
-import type { SidecarOperation } from "../desktop-types";
-import { invokeDesktop, getSidecarErrorMessage } from "../desktop-utils";
-import { shellSidecarStatus, type SidecarStatus } from "../desktop-contracts";
+import type { SidecarOperation } from "../types";
+import { invokeCommand, getSidecarErrorMessage } from "../utils";
+import { shellSidecarStatus, type SidecarStatus } from "../contracts";
+
+const sidecarLifecycleCommand = {
+  refresh: "read_sidecar_status",
+  start: "start_sidecar",
+  stop: "stop_sidecar"
+} as const;
+
+const sidecarLifecycleVerb = {
+  refresh: "refreshed",
+  start: "started",
+  stop: "stopped"
+} as const;
 
 export const useSidecarController = () => {
   const [status, setStatus] = useState<SidecarStatus>(shellSidecarStatus);
@@ -12,7 +24,7 @@ export const useSidecarController = () => {
   const operationRef = useRef<SidecarOperation | null>(null);
 
   useEffect(() => {
-    void invokeDesktop("read_sidecar_status", undefined)
+    void invokeCommand("read_sidecar_status", undefined)
       .then((nextStatus) => {
         setStatus(nextStatus);
         setLogTail(nextStatus.logTail);
@@ -35,13 +47,9 @@ export const useSidecarController = () => {
     operationRef.current = nextOperation;
     setOperation(nextOperation);
     try {
-      const command = nextOperation === "start"
-        ? "start_sidecar"
-        : nextOperation === "stop"
-          ? "stop_sidecar"
-          : "read_sidecar_status";
-      const nextStatus = await invokeDesktop(command, undefined);
-      const verb = nextOperation === "start" ? "started" : nextOperation === "stop" ? "stopped" : "refreshed";
+      const command = sidecarLifecycleCommand[nextOperation];
+      const nextStatus = await invokeCommand(command, undefined);
+      const verb = sidecarLifecycleVerb[nextOperation];
       commitStatus(nextStatus, `chem-service ${verb}.`);
     } catch (nextError: unknown) {
       setError(getSidecarErrorMessage(nextError));
@@ -58,8 +66,8 @@ export const useSidecarController = () => {
     setOperation("logs");
     try {
       const [nextLogs, nextStatus] = await Promise.all([
-        invokeDesktop("read_sidecar_logs", undefined),
-        invokeDesktop("read_sidecar_status", undefined),
+        invokeCommand("read_sidecar_logs", undefined),
+        invokeCommand("read_sidecar_status", undefined),
       ]);
       setStatus(nextStatus);
       setLogTail(nextLogs.lines);

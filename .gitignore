@@ -22,3 +22,9 @@ apps/desktop/src-tauri/resources/postgres/**
 !apps/desktop/src-tauri/resources/postgres/README.md
 !apps/desktop/src-tauri/resources/postgres/bin/
 !apps/desktop/src-tauri/resources/postgres/bin/.gitkeep
+.playwright-cli
+.codex-desktop-vite*.log
+desktop-vite-*.log
+desktop-vite-*.err.log
+eslint-desktop*.json
+apps/desktop/src-tauri/cargo-llvm-cov.exe

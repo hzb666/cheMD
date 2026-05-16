@@ -19,12 +19,12 @@ import type {
   AgentOperationResult,
   AgentPatchControllerInput,
   QuickFixCandidate,
-} from "../desktop-types";
-import type { WorkspaceFileEntry } from "../desktop-contracts";
+} from "../types";
+import type { WorkspaceFileEntry } from "../contracts";
 import {
   applyTextEdits,
   createEditorSourceHash,
-} from "../desktop-utils";
+} from "../utils";
 import { useEffect } from "react";
 
 // ─── Agent orchestration helpers ────────────────────────────────────────

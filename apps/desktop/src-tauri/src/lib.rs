@@ -1,3 +1,4 @@
+mod chem_preview_render;
 mod diagnostics_bundle;
 mod embedding_provider_batch;
 mod embedding_provider_client;
@@ -29,6 +30,7 @@ mod reaction_intelligence_worker;
 mod sidecar;
 mod sidecar_command;
 mod sidecar_log;
+mod windows_snap_layout;
 mod workspace;
 mod workspace_file_io;
 mod workspace_io;
@@ -57,6 +59,8 @@ mod sidecar_tests;
 #[cfg(test)]
 mod workspace_tests;
 
+#[cfg(not(test))]
+use chem_preview_render::render_chem_preview;
 #[cfg(not(test))]
 use diagnostics_bundle::export_diagnostics_bundle;
 #[cfg(not(test))]
@@ -96,20 +100,25 @@ use sidecar::{
     read_sidecar_logs, read_sidecar_status, start_sidecar, stop_sidecar, SidecarManager,
 };
 #[cfg(not(test))]
+use windows_snap_layout::{set_window_maximize_button_rect, WindowsSnapLayoutState};
+#[cfg(not(test))]
 use workspace::{
-    list_workspace_files, open_workspace, read_workspace_file, write_workspace_file,
-    WorkspaceRegistry,
+    list_workspace_files, open_workspace, open_workspace_path, read_workspace_file,
+    write_workspace_file, WorkspaceRegistry,
 };
 
 #[cfg(not(test))]
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(WorkspaceRegistry::default())
         .manage(SidecarManager::default())
         .manage(ManagedPostgresManager::default())
+        .manage(WindowsSnapLayoutState::default())
         .invoke_handler(tauri::generate_handler![
             open_workspace,
+            open_workspace_path,
             list_workspace_files,
             read_workspace_file,
             write_workspace_file,
@@ -142,6 +151,8 @@ pub fn run() {
             query_postgres_rag,
             backfill_postgres_rag_embeddings,
             run_reaction_intelligence_worker,
+            render_chem_preview,
+            set_window_maximize_button_rect,
             export_diagnostics_bundle
         ])
         .run(tauri::generate_context!())

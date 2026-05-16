@@ -1,26 +1,207 @@
 @import "tailwindcss";
-@import "./styles/base.css";
-@import "./styles/topbar.css";
-@import "./styles/workbench.css";
-@import "./styles/panels.css";
-@import "tw-animate-css";
+@import "./features/workbench/shell.css";
+@import "./features/editor-tabs/editor-tabs.css";
 
 @custom-variant dark (&:is(.dark *));
 
+:root {
+  color-scheme: light;
+  --background: oklch(98.9% 0.013 236.8);
+  --foreground: oklch(25.6% 0.031 255.1);
+  --card: oklch(100% 0 0 / 0.82);
+  --card-foreground: var(--foreground);
+  --editor-surface: #f8fafc;
+  --popover: oklch(100% 0 0 / 0.94);
+  --popover-foreground: var(--foreground);
+  --primary: oklch(59.8% 0.17 251.8);
+  --primary-foreground: oklch(100% 0 0);
+  --secondary: oklch(94.9% 0.022 245.8);
+  --secondary-foreground: oklch(39.6% 0.078 251.6);
+  --muted: oklch(94.9% 0.017 246.8);
+  --muted-foreground: oklch(49.5% 0.029 253.2);
+  --accent: oklch(92.7% 0.037 244.2);
+  --accent-foreground: oklch(35.8% 0.081 250.1);
+  --destructive: oklch(57.7% 0.216 27.7);
+  --border: oklch(89.2% 0.016 247.8 / 0.72);
+  --input: oklch(89.2% 0.016 247.8);
+  --ring: oklch(66.1% 0.142 247.3);
+  --success: oklch(63.9% 0.146 151.5);
+  --warning: oklch(71.4% 0.154 75.7);
+  --danger: var(--destructive);
+  --chemd-background: oklch(44% 0.052 179 / 0.09);
+  --chemd-foreground: oklch(44% 0.052 179);
+  --radius: 14px;
+  --font-sans: "Geist", "Noto Sans SC", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono";
+}
+
 @theme inline {
-    --font-heading: var(--font-sans);
-    --radius-desktop: var(--radius-md);
-    --color-sidebar-ring: var(--sidebar-ring);
-    --color-sidebar-border: var(--sidebar-border);
-    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-    --color-sidebar-accent: var(--sidebar-accent);
-    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-    --color-sidebar-primary: var(--sidebar-primary);
-    --color-sidebar-foreground: var(--sidebar-foreground);
-    --color-sidebar: var(--sidebar);
-    --color-chart-5: var(--chart-5);
-    --color-chart-4: var(--chart-4);
-    --color-chart-3: var(--chart-3);
-    --color-chart-2: var(--chart-2);
-    --color-chart-1: var(--chart-1);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-editor-surface: var(--editor-surface);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-chemd-background: var(--chemd-background);
+  --color-chemd-foreground: var(--chemd-foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-heading: var(--font-sans);
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: var(--radius);
+  --radius-xl: 18px;
+}
+
+@layer base {
+  * {
+    @apply box-border border-border outline-ring/40;
+  }
+
+  html,
+  body,
+  #root {
+    @apply h-full min-h-full;
+    background: transparent;
+  }
+
+  body {
+    @apply m-0 overflow-hidden font-sans text-foreground antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  button {
+    font: inherit;
+  }
+
+  button:not(:disabled) {
+    @apply cursor-pointer;
+  }
+
+  button:disabled {
+    @apply cursor-not-allowed;
+  }
+
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  body[data-desktop-resize-panel] {
+    user-select: none;
+  }
+
+  body[data-desktop-dock-drag] {
+    cursor: grabbing;
+    user-select: none;
+  }
+
+  body[data-desktop-resize-panel="sidebar"],
+  body[data-desktop-resize-panel="insight"] {
+    cursor: col-resize;
+  }
+
+  body[data-desktop-resize-panel="bottom"],
+  body[data-desktop-resize-panel="dock"] {
+    cursor: row-resize;
+  }
+}
+
+@layer components {
+  .reference-sidebar-resize-handle::after {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 4px;
+    width: 4px;
+    border-radius: 999px;
+    background: transparent;
+    content: "";
+    transition: background-color 160ms ease;
+  }
+
+  .reference-sidebar-resize-handle:hover::after,
+  body[data-desktop-resize-panel="sidebar"] .reference-sidebar-resize-handle::after {
+    background: var(--shell-resize-handle);
+  }
+
+  .shell-window ::-webkit-scrollbar,
+  .dialog-content ::-webkit-scrollbar {
+    width: 0.44rem;
+    height: 0.44rem;
+  }
+
+  .shell-window ::-webkit-scrollbar-button,
+  .dialog-content ::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  .shell-window ::-webkit-scrollbar-track,
+  .dialog-content ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .shell-window ::-webkit-scrollbar-thumb,
+  .dialog-content ::-webkit-scrollbar-thumb {
+    min-height: 2rem;
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: color-mix(in oklch, var(--foreground) 22%, transparent);
+    background-clip: content-box;
+  }
+
+  .shell-window ::-webkit-scrollbar-thumb:hover,
+  .dialog-content ::-webkit-scrollbar-thumb:hover {
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: color-mix(in oklch, var(--foreground) 38%, transparent);
+    background-clip: content-box;
+  }
+
+  .shell-window ::-webkit-scrollbar-corner,
+  .dialog-content ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  .monaco-shell .monaco-editor,
+  .monaco-shell .monaco-editor-background,
+  .monaco-shell .monaco-editor .margin {
+    background-color: transparent !important;
+  }
+}
+
+@layer utilities {
+  body[data-desktop-resize-panel="sidebar"] .reference-sidebar,
+  body[data-desktop-resize-panel="sidebar"] .reference-sidebar-spacer {
+    transition: none;
+  }
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  .shell-window,
+  .shell-window *,
+  .dialog-content,
+  .dialog-content * {
+    scrollbar-color: color-mix(in oklch, var(--foreground) 18%, transparent) transparent;
+    scrollbar-width: thin;
+  }
 }

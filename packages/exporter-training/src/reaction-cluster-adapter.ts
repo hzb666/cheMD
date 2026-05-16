@@ -81,6 +81,20 @@ export interface ReactionClusterViewModel {
   details: ReactionClusterDetailViewModel[];
 }
 
+const toClusterListItem = (detail: ReactionClusterDetailViewModel): ReactionClusterListItemViewModel => ({
+  cluster_id: detail.cluster_id,
+  label: detail.label,
+  basis: detail.basis,
+  confidence: detail.confidence,
+  reaction_count: detail.reaction_count,
+  edge_count: detail.edge_count,
+  ...(detail.representative_reaction_id ? { representative_reaction_id: detail.representative_reaction_id } : {}),
+  citation_ids: detail.citation_ids,
+  source_ids: detail.source_ids,
+  warnings: detail.warnings,
+  similarity_summary: detail.similarity_summary
+});
+
 const basisLabels: Record<TrainingReactionClusterBasisV1, string> = {
   reaction_signature: "Reaction signature",
   reaction_family: "Reaction family",
@@ -242,7 +256,7 @@ export const buildReactionClusterViewModel = (
       warnings: uniqueStrings(input.warnings),
       ...(details.length === 0 ? { empty_reason: "no_reaction_clusters" as const } : {})
     },
-    clusters: details.map(({ key, shared_features, members, similarity_edges, evidence_summary, ...item }) => item),
+    clusters: details.map(toClusterListItem),
     details
   };
 };

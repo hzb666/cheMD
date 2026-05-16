@@ -1,0 +1,32 @@
+@layer components {
+  .shell-window {
+    --reference-editor-font-size: 13px;
+    --reference-editor-line-height-ratio: 1.5;
+    --reference-surface-bg: oklch(97.2% 0.004 247 / 0.96);
+    --shell-background: oklch(94% 0.003 247 / 0.6);
+    --shell-card-border: oklch(87% 0.012 248 / 0.5);
+    --shell-card-shadow: 0 2px 14px oklch(52% 0.025 252 / 0.06);
+    --shell-border: oklch(82% 0.018 247 / 0.5);
+    --shell-border-muted: oklch(82% 0.018 247 / 0.45);
+    --shell-border-strong: oklch(82% 0.018 247 / 0.55);
+    --shell-panel-header: oklch(100% 0 0 / 0.16);
+    --shell-preview-host: oklch(100% 0 0 / 0.7);
+    --shell-graph-body: oklch(98% 0.003 247 / 0.42);
+    --shell-bottom-tabs: oklch(100% 0 0 / 0.14);
+    --shell-tab-active: oklch(100% 0 0 / 0.42);
+    --shell-tab-action-active: oklch(100% 0 0 / 0.48);
+    --shell-diagnostics-ok-bg: oklch(92% 0.03 143 / 0.6);
+    --shell-diagnostics-error-bg: oklch(94% 0.045 24 / 0.7);
+    --shell-diagnostics-message-bg: oklch(95% 0.04 24 / 0.75);
+    --shell-diagnostics-row-bg: oklch(100% 0 0 / 0.24);
+    --shell-terminal-bg: oklch(24% 0.018 250 / 0.92);
+    --shell-terminal-fg: oklch(92% 0.012 248);
+    --shell-terminal-code: oklch(86% 0.03 142);
+    --shell-conflict-border: oklch(86% 0.045 70 / 0.65);
+    --shell-conflict-bg: oklch(96% 0.04 83 / 0.86);
+    --shell-conflict-fg: oklch(34% 0.06 61);
+    --shell-tree-hover-bg: oklch(100% 0 0 / 0.32);
+    --shell-tree-selected-bg: oklch(92% 0.032 95 / 0.72);
+    --shell-resize-handle: oklch(63% 0.21 278 / 0.85);
+  }
+}

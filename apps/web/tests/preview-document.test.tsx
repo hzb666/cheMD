@@ -20,7 +20,9 @@ describe("preview document hardening", () => {
 
     expect(document).toContain("Content-Security-Policy");
     expect(document).toContain("default-src 'none'");
-    expect(document).toContain("script-src 'unsafe-inline'");
+    expect(document).toContain("script-src 'nonce-");
+    expect(document).not.toContain("script-src 'unsafe-inline'");
+    expect(document).toMatch(/<script nonce="[a-z0-9]+">\(\(\) => \{/);
     expect(document).toContain('Arial, "Source Han Sans SC"');
     expect(document).toContain("::-webkit-scrollbar-button {");
     expect(document).toContain(".chemd-block--reaction:hover > .chemd-edit-chem");

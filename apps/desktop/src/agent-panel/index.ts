@@ -1,8 +1,8 @@
 export {
-  DesktopAgentPanel,
+  AgentPanel,
   canApply,
   canApprove,
   canReject,
-  type DesktopAgentPanelProps,
-  type DesktopAgentPatchAction
-} from "./DesktopAgentPanel";
+  type AgentPanelProps,
+  type AgentPatchAction
+} from "./agent-panel";

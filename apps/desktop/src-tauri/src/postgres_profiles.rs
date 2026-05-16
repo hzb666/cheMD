@@ -3,7 +3,7 @@
 use crate::{
     local_store_time::unix_timestamp_ms,
     postgres_config::{normalize_postgres_database_url, EnvSource},
-    workspace::DesktopCommandError,
+    workspace::CommandError,
 };
 use keyring::Entry;
 use serde::{Deserialize, Serialize};
@@ -86,7 +86,7 @@ pub(crate) struct PostgresProfilesState {
 #[tauri::command]
 pub fn list_postgres_profiles(
     app: tauri::AppHandle,
-) -> Result<PostgresProfilesState, DesktopCommandError> {
+) -> Result<PostgresProfilesState, CommandError> {
     list_postgres_profiles_impl(&profile_root(command_root(&app)?))
 }
 
@@ -95,7 +95,7 @@ pub fn list_postgres_profiles(
 pub fn save_postgres_profile(
     app: tauri::AppHandle,
     input: SavePostgresProfileInput,
-) -> Result<PostgresProfilesState, DesktopCommandError> {
+) -> Result<PostgresProfilesState, CommandError> {
     save_postgres_profile_impl(&profile_root(command_root(&app)?), input)
 }
 
@@ -104,7 +104,7 @@ pub fn save_postgres_profile(
 pub fn activate_postgres_profile(
     app: tauri::AppHandle,
     profile_id: String,
-) -> Result<PostgresProfilesState, DesktopCommandError> {
+) -> Result<PostgresProfilesState, CommandError> {
     activate_postgres_profile_impl(&profile_root(command_root(&app)?), &profile_id)
 }
 
@@ -113,7 +113,7 @@ pub fn activate_postgres_profile(
 pub fn delete_postgres_profile(
     app: tauri::AppHandle,
     profile_id: String,
-) -> Result<PostgresProfilesState, DesktopCommandError> {
+) -> Result<PostgresProfilesState, CommandError> {
     delete_postgres_profile_impl(&profile_root(command_root(&app)?), &profile_id)
 }
 
@@ -149,27 +149,27 @@ pub(crate) fn postgres_profile_candidate_roots() -> Vec<PathBuf> {
 }
 
 pub(crate) trait PostgresProfileSecretStore {
-    fn write(&self, secret_ref: &str, password: &str) -> Result<(), DesktopCommandError>;
-    fn read(&self, secret_ref: &str) -> Result<String, DesktopCommandError>;
-    fn delete(&self, secret_ref: &str) -> Result<(), DesktopCommandError>;
+    fn write(&self, secret_ref: &str, password: &str) -> Result<(), CommandError>;
+    fn read(&self, secret_ref: &str) -> Result<String, CommandError>;
+    fn delete(&self, secret_ref: &str) -> Result<(), CommandError>;
 }
 
 struct KeyringPostgresProfileSecretStore;
 
 impl PostgresProfileSecretStore for KeyringPostgresProfileSecretStore {
-    fn write(&self, secret_ref: &str, password: &str) -> Result<(), DesktopCommandError> {
+    fn write(&self, secret_ref: &str, password: &str) -> Result<(), CommandError> {
         Entry::new(KEYRING_SERVICE, secret_ref)
             .and_then(|entry| entry.set_password(password))
             .map_err(keyring_error)
     }
 
-    fn read(&self, secret_ref: &str) -> Result<String, DesktopCommandError> {
+    fn read(&self, secret_ref: &str) -> Result<String, CommandError> {
         Entry::new(KEYRING_SERVICE, secret_ref)
             .and_then(|entry| entry.get_password())
             .map_err(keyring_error)
     }
 
-    fn delete(&self, secret_ref: &str) -> Result<(), DesktopCommandError> {
+    fn delete(&self, secret_ref: &str) -> Result<(), CommandError> {
         Entry::new(KEYRING_SERVICE, secret_ref)
             .and_then(|entry| entry.delete_credential())
             .map_err(keyring_error)
@@ -214,21 +214,21 @@ pub(crate) fn postgres_profile_env_source_with_store(
 
 pub(crate) fn list_postgres_profiles_impl(
     root: &Path,
-) -> Result<PostgresProfilesState, DesktopCommandError> {
+) -> Result<PostgresProfilesState, CommandError> {
     list_postgres_profiles_with_store(root, &KeyringPostgresProfileSecretStore)
 }
 
 pub(crate) fn list_postgres_profiles_with_store(
     root: &Path,
     secret_store: &dyn PostgresProfileSecretStore,
-) -> Result<PostgresProfilesState, DesktopCommandError> {
+) -> Result<PostgresProfilesState, CommandError> {
     Ok(to_state(read_profiles_file(root)?, secret_store))
 }
 
 pub(crate) fn save_postgres_profile_impl(
     root: &Path,
     input: SavePostgresProfileInput,
-) -> Result<PostgresProfilesState, DesktopCommandError> {
+) -> Result<PostgresProfilesState, CommandError> {
     save_postgres_profile_with_store(root, input, &KeyringPostgresProfileSecretStore)
 }
 
@@ -236,7 +236,7 @@ pub(crate) fn save_postgres_profile_with_store(
     root: &Path,
     input: SavePostgresProfileInput,
     secret_store: &dyn PostgresProfileSecretStore,
-) -> Result<PostgresProfilesState, DesktopCommandError> {
+) -> Result<PostgresProfilesState, CommandError> {
     let mut file = read_profiles_file(root)?;
     let now = unix_timestamp_ms();
     let profile_id = input
@@ -274,7 +274,7 @@ pub(crate) fn save_postgres_profile_with_store(
 pub(crate) fn activate_postgres_profile_impl(
     root: &Path,
     profile_id: &str,
-) -> Result<PostgresProfilesState, DesktopCommandError> {
+) -> Result<PostgresProfilesState, CommandError> {
     activate_postgres_profile_with_store(root, profile_id, &KeyringPostgresProfileSecretStore)
 }
 
@@ -282,7 +282,7 @@ pub(crate) fn activate_postgres_profile_with_store(
     root: &Path,
     profile_id: &str,
     secret_store: &dyn PostgresProfileSecretStore,
-) -> Result<PostgresProfilesState, DesktopCommandError> {
+) -> Result<PostgresProfilesState, CommandError> {
     let mut file = read_profiles_file(root)?;
     let id = normalize_profile_id(profile_id);
     if !file.profiles.iter().any(|profile| profile.profile_id == id) {
@@ -296,7 +296,7 @@ pub(crate) fn activate_postgres_profile_with_store(
 pub(crate) fn delete_postgres_profile_impl(
     root: &Path,
     profile_id: &str,
-) -> Result<PostgresProfilesState, DesktopCommandError> {
+) -> Result<PostgresProfilesState, CommandError> {
     delete_postgres_profile_with_store(root, profile_id, &KeyringPostgresProfileSecretStore)
 }
 
@@ -304,7 +304,7 @@ pub(crate) fn delete_postgres_profile_with_store(
     root: &Path,
     profile_id: &str,
     secret_store: &dyn PostgresProfileSecretStore,
-) -> Result<PostgresProfilesState, DesktopCommandError> {
+) -> Result<PostgresProfilesState, CommandError> {
     let mut file = read_profiles_file(root)?;
     let id = normalize_profile_id(profile_id);
     let before = file.profiles.len();
@@ -329,20 +329,20 @@ pub(crate) fn delete_postgres_profile_with_store(
     Ok(to_state(file, secret_store))
 }
 
-fn read_profiles_file(root: &Path) -> Result<PostgresProfilesFile, DesktopCommandError> {
+fn read_profiles_file(root: &Path) -> Result<PostgresProfilesFile, CommandError> {
     let path = root.join(POSTGRES_PROFILES_FILE);
     if !path.exists() {
         return Ok(PostgresProfilesFile::default());
     }
     let content = fs::read_to_string(&path).map_err(|error| {
-        DesktopCommandError::io(
+        CommandError::io(
             "postgres_profile_read_failed",
             "Failed to read Postgres profiles",
             error,
         )
     })?;
     serde_json::from_str(&content).map_err(|error| {
-        DesktopCommandError::new(
+        CommandError::new(
             "postgres_profile_parse_failed",
             "Failed to parse Postgres profiles",
             Some(error.to_string()),
@@ -350,26 +350,23 @@ fn read_profiles_file(root: &Path) -> Result<PostgresProfilesFile, DesktopComman
     })
 }
 
-fn write_profiles_file(
-    root: &Path,
-    file: &PostgresProfilesFile,
-) -> Result<(), DesktopCommandError> {
+fn write_profiles_file(root: &Path, file: &PostgresProfilesFile) -> Result<(), CommandError> {
     fs::create_dir_all(root).map_err(|error| {
-        DesktopCommandError::io(
+        CommandError::io(
             "postgres_profile_dir_failed",
             "Failed to create Postgres profile directory",
             error,
         )
     })?;
     let content = serde_json::to_string_pretty(file).map_err(|error| {
-        DesktopCommandError::new(
+        CommandError::new(
             "postgres_profile_serialize_failed",
             "Failed to serialize Postgres profiles",
             Some(error.to_string()),
         )
     })?;
     fs::write(root.join(POSTGRES_PROFILES_FILE), content).map_err(|error| {
-        DesktopCommandError::io(
+        CommandError::io(
             "postgres_profile_write_failed",
             "Failed to write Postgres profiles",
             error,
@@ -382,7 +379,7 @@ fn build_record(
     profile_id: &str,
     existing_created_at: Option<String>,
     now: &str,
-) -> Result<(PostgresProfileRecord, Option<String>, bool), DesktopCommandError> {
+) -> Result<(PostgresProfileRecord, Option<String>, bool), CommandError> {
     let host = required(input.host, "host")?;
     let database = required(input.database, "database")?;
     let user = required(input.user, "user")?;
@@ -472,15 +469,15 @@ fn profile_database_url(profile: &PostgresProfileRecord, password: &str) -> Stri
     ))
 }
 
-fn keyring_error(error: keyring::Error) -> DesktopCommandError {
-    DesktopCommandError::new(
+fn keyring_error(error: keyring::Error) -> CommandError {
+    CommandError::new(
         "postgres_profile_secret_storage_failed",
         "Postgres profile secret storage failed",
         Some(error.to_string()),
     )
 }
 
-fn required(value: String, field: &str) -> Result<String, DesktopCommandError> {
+fn required(value: String, field: &str) -> Result<String, CommandError> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
         return Err(invalid_input(&format!(
@@ -490,7 +487,7 @@ fn required(value: String, field: &str) -> Result<String, DesktopCommandError> {
     Ok(trimmed.into())
 }
 
-fn required_port(port: u16) -> Result<u16, DesktopCommandError> {
+fn required_port(port: u16) -> Result<u16, CommandError> {
     if port == 0 {
         return Err(invalid_input(
             "Postgres profile port must be greater than 0",
@@ -499,8 +496,8 @@ fn required_port(port: u16) -> Result<u16, DesktopCommandError> {
     Ok(port)
 }
 
-fn invalid_input(message: &str) -> DesktopCommandError {
-    DesktopCommandError::new("postgres_profile_invalid_input", message, None)
+fn invalid_input(message: &str) -> CommandError {
+    CommandError::new("postgres_profile_invalid_input", message, None)
 }
 
 fn normalize_profile_id(value: &str) -> String {
@@ -524,10 +521,10 @@ fn encode_url_part(value: &str) -> String {
 }
 
 #[cfg(not(test))]
-fn command_root(app: &tauri::AppHandle) -> Result<PathBuf, DesktopCommandError> {
+fn command_root(app: &tauri::AppHandle) -> Result<PathBuf, CommandError> {
     use tauri::Manager;
     app.path().app_data_dir().map_err(|err| {
-        DesktopCommandError::new(
+        CommandError::new(
             "postgres_profile_app_data_unavailable",
             "Failed to resolve app data directory for Postgres profiles",
             Some(err.to_string()),

@@ -16,7 +16,7 @@ use crate::{
 use postgres::Client;
 
 #[cfg(not(test))]
-use crate::workspace::DesktopCommandError;
+use crate::workspace::CommandError;
 
 pub(crate) use crate::postgres_rag_backfill_result::dry_run_result;
 pub(crate) use crate::postgres_rag_backfill_result::redact_postgres_rag_backfill_detail;
@@ -29,12 +29,12 @@ pub(crate) use crate::postgres_rag_backfill_validation::validate_postgres_rag_em
 #[tauri::command]
 pub async fn backfill_postgres_rag_embeddings(
     input: PostgresRagEmbeddingBackfillRequest,
-) -> Result<PostgresRagEmbeddingBackfillResult, DesktopCommandError> {
+) -> Result<PostgresRagEmbeddingBackfillResult, CommandError> {
     match tauri::async_runtime::spawn_blocking(move || backfill_postgres_rag_embeddings_impl(input))
         .await
     {
         Ok(result) => Ok(result),
-        Err(error) => Err(DesktopCommandError::new(
+        Err(error) => Err(CommandError::new(
             "postgres_rag_embedding_backfill_task_failed",
             "Postgres RAG embedding backfill task failed",
             Some(error.to_string()),

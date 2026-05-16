@@ -107,9 +107,11 @@ pub(crate) fn build_embedding_provider_batch_request_specs(
             };
             let detail = embedding_status_detail(state, &issues);
             let mut items = invalid_items;
-            items.extend(valid_items.into_iter().map(|item| {
-                batch_item_degraded(item.id, label, detail.clone(), None)
-            }));
+            items.extend(
+                valid_items
+                    .into_iter()
+                    .map(|item| batch_item_degraded(item.id, label, detail.clone(), None)),
+            );
             return Err(batch_result_from_state(
                 state.into(),
                 label.into(),
@@ -155,7 +157,10 @@ pub(crate) fn build_embedding_provider_batch_request_specs(
 
 fn split_batch_items(
     items: Vec<CreateEmbeddingVectorItemInput>,
-) -> (Vec<CreateEmbeddingVectorItemResult>, Vec<CreateEmbeddingVectorItemInput>) {
+) -> (
+    Vec<CreateEmbeddingVectorItemResult>,
+    Vec<CreateEmbeddingVectorItemInput>,
+) {
     let mut invalid_items = Vec::new();
     let mut valid_items = Vec::new();
     for item in items {
@@ -223,7 +228,15 @@ fn batch_result_from_state(
     dimension: Option<usize>,
     items: Vec<CreateEmbeddingVectorItemResult>,
 ) -> CreateEmbeddingVectorsResult {
-    CreateEmbeddingVectorsResult { state, label, detail, provider_kind: PROVIDER_KIND.into(), model, dimension, items }
+    CreateEmbeddingVectorsResult {
+        state,
+        label,
+        detail,
+        provider_kind: PROVIDER_KIND.into(),
+        model,
+        dimension,
+        items,
+    }
 }
 
 fn batch_degraded_result(
@@ -233,7 +246,14 @@ fn batch_degraded_result(
     dimension: Option<usize>,
     items: Vec<CreateEmbeddingVectorItemResult>,
 ) -> CreateEmbeddingVectorsResult {
-    batch_result_from_state("degraded".into(), label.into(), detail, model, dimension, items)
+    batch_result_from_state(
+        "degraded".into(),
+        label.into(),
+        detail,
+        model,
+        dimension,
+        items,
+    )
 }
 
 pub(crate) fn batch_item_ready(id: String, embedding: Vec<f64>) -> CreateEmbeddingVectorItemResult {
@@ -256,7 +276,11 @@ pub(crate) fn batch_item_degraded(
     detail: String,
     dimension: Option<usize>,
 ) -> CreateEmbeddingVectorItemResult {
-    let state = if label.ends_with("offline") { "offline" } else { "degraded" };
+    let state = if label.ends_with("offline") {
+        "offline"
+    } else {
+        "degraded"
+    };
     CreateEmbeddingVectorItemResult {
         id,
         state: state.into(),
@@ -290,8 +314,16 @@ pub(crate) fn redact_embedding_provider_detail(detail: &str) -> String {
 
 fn contains_sensitive_marker(detail: &str) -> bool {
     let lowered = detail.to_ascii_lowercase();
-    ["http://", "https://", "api_key", "token", "password", "authorization", "bearer"]
-        .iter()
-        .any(|marker| lowered.contains(marker))
+    [
+        "http://",
+        "https://",
+        "api_key",
+        "token",
+        "password",
+        "authorization",
+        "bearer",
+    ]
+    .iter()
+    .any(|marker| lowered.contains(marker))
         || detail.contains("sk-")
 }

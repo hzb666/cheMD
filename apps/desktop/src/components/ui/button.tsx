@@ -15,6 +15,16 @@ const buttonVariants = cva(
           "bg-secondary text-secondary-foreground hover:bg-secondary/80 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
         ghost:
           "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
+        surface:
+          "border-white/45 bg-white/35 text-foreground hover:bg-white/55 focus-visible:ring-2 focus-visible:ring-ring/40 active:not-aria-[haspopup]:translate-y-0",
+        chrome:
+          "text-muted-foreground hover:bg-white/35 hover:text-foreground data-[state=open]:bg-white/85 data-[state=open]:text-foreground data-[state=open]:shadow-sm active:not-aria-[haspopup]:translate-y-0",
+        rail:
+          "text-muted-foreground hover:bg-white/45 hover:text-foreground hover:shadow-sm aria-pressed:bg-white/65 aria-pressed:text-foreground data-[state=open]:bg-white/65 data-[state=open]:text-foreground data-[state=open]:shadow-sm active:not-aria-[haspopup]:translate-y-0",
+        window:
+          "text-muted-foreground hover:bg-white/45 hover:text-foreground hover:shadow-sm data-[maximized=true]:text-foreground data-[control=close]:hover:bg-destructive data-[control=close]:hover:text-white data-[control=close]:hover:shadow-none data-[control=close]:active:bg-destructive/90 focus-visible:ring-2 focus-visible:ring-primary/25 data-[control=close]:focus-visible:ring-destructive/35 active:not-aria-[haspopup]:translate-y-0",
+        settingsItem:
+          "!grid !border-0 text-left hover:bg-slate-900/[0.04] data-[active=true]:bg-chemd-background active:not-aria-[haspopup]:translate-y-0",
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",
@@ -23,14 +33,18 @@ const buttonVariants = cva(
         default:
           "h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
         xs: "h-6 gap-1 rounded-[min(var(--radius-md),10px)] px-2 text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
+        sm: "h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
         lg: "h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
+        control: "h-8 gap-1.5 rounded-md px-2 text-xs",
+        settingsItem: "!h-auto !w-full grid-cols-[1.5rem_1fr] gap-2 px-2 py-2",
         icon: "size-8",
         "icon-xs":
           "size-6 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3",
         "icon-sm":
           "size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg",
+        "window-icon": "size-8 rounded-[min(var(--radius-sm),7px)]",
         "icon-lg": "size-9",
+        "icon-xl": "size-10 rounded-[min(var(--radius-md),10px)] [&_svg:not([class*='size-'])]:size-5",
       },
     },
     defaultVariants: {

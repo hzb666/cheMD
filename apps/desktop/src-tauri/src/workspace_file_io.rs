@@ -1,4 +1,5 @@
-use crate::workspace::{DesktopCommandError, WorkspaceFileContent, WorkspaceWriteResult};
+use crate::workspace::{CommandError, WorkspaceFileContent, WorkspaceWriteResult};
+use crate::workspace_io::should_ignore_workspace_path;
 use crate::workspace_path::{
     chemd_kind_for_path, clean_relative_path, outside_root, relative_to_string,
 };
@@ -16,25 +17,26 @@ const HASH_PRIME: u64 = 0x100000001b3;
 pub(crate) fn read_workspace_file_impl(
     root: &Path,
     path: &str,
-) -> Result<WorkspaceFileContent, DesktopCommandError> {
+) -> Result<WorkspaceFileContent, CommandError> {
     let relative = clean_relative_path(path)?;
+    ensure_workspace_path_allowed(&relative)?;
     let target = canonical_existing_file(root, &relative)?;
     let metadata = fs::metadata(&target).map_err(|err| {
-        DesktopCommandError::io(
+        CommandError::io(
             "workspace_read_failed",
             "Workspace file metadata failed",
             err,
         )
     })?;
     if metadata.len() > MAX_READ_BYTES {
-        return Err(DesktopCommandError::new(
+        return Err(CommandError::new(
             "workspace_file_too_large",
             "Workspace file is too large to read safely",
             Some(relative_to_string(&relative)),
         ));
     }
     let content = fs::read_to_string(&target).map_err(|err| {
-        DesktopCommandError::io(
+        CommandError::io(
             "workspace_read_failed",
             "Workspace file cannot be read",
             err,
@@ -56,13 +58,14 @@ pub(crate) fn write_workspace_file_impl(
     path: &str,
     content: &str,
     base_hash: Option<&str>,
-) -> Result<WorkspaceWriteResult, DesktopCommandError> {
+) -> Result<WorkspaceWriteResult, CommandError> {
     let relative = clean_relative_path(path)?;
+    ensure_workspace_path_allowed(&relative)?;
     let target = root.join(&relative);
     ensure_write_target_inside_root(root, &target)?;
     if let Some(parent) = target.parent() {
         fs::create_dir_all(parent).map_err(|err| {
-            DesktopCommandError::io(
+            CommandError::io(
                 "workspace_write_failed",
                 "Workspace directory cannot be created",
                 err,
@@ -76,7 +79,7 @@ pub(crate) fn write_workspace_file_impl(
     }
     commit_temp_file(&tmp_path, &target)?;
     let metadata = fs::metadata(&target).map_err(|err| {
-        DesktopCommandError::io(
+        CommandError::io(
             "workspace_write_failed",
             "Workspace file metadata failed after write",
             err,
@@ -98,9 +101,20 @@ pub(crate) fn content_hash(content: &[u8]) -> String {
     format!("fnv1a64:{hash:016x}")
 }
 
-fn canonical_existing_file(root: &Path, relative: &Path) -> Result<PathBuf, DesktopCommandError> {
+fn ensure_workspace_path_allowed(relative: &Path) -> Result<(), CommandError> {
+    if should_ignore_workspace_path(relative) {
+        return Err(CommandError::new(
+            "workspace_path_ignored",
+            "Workspace file path is ignored by the desktop workspace policy",
+            Some(relative_to_string(relative)),
+        ));
+    }
+    Ok(())
+}
+
+fn canonical_existing_file(root: &Path, relative: &Path) -> Result<PathBuf, CommandError> {
     let target = fs::canonicalize(root.join(relative)).map_err(|err| {
-        DesktopCommandError::io(
+        CommandError::io(
             "workspace_file_not_found",
             "Workspace file cannot be found",
             err,
@@ -110,7 +124,7 @@ fn canonical_existing_file(root: &Path, relative: &Path) -> Result<PathBuf, Desk
         return Err(outside_root(relative));
     }
     if !target.is_file() {
-        return Err(DesktopCommandError::new(
+        return Err(CommandError::new(
             "workspace_not_file",
             "Workspace path is not a file",
             Some(relative.display().to_string()),
@@ -119,10 +133,10 @@ fn canonical_existing_file(root: &Path, relative: &Path) -> Result<PathBuf, Desk
     Ok(target)
 }
 
-fn ensure_write_target_inside_root(root: &Path, target: &Path) -> Result<(), DesktopCommandError> {
+fn ensure_write_target_inside_root(root: &Path, target: &Path) -> Result<(), CommandError> {
     if target.exists() {
         let canonical = fs::canonicalize(target).map_err(|err| {
-            DesktopCommandError::io(
+            CommandError::io(
                 "workspace_write_failed",
                 "Workspace target cannot be checked",
                 err,
@@ -138,7 +152,7 @@ fn ensure_write_target_inside_root(root: &Path, target: &Path) -> Result<(), Des
     while let Some(path) = ancestor {
         if path.exists() {
             let canonical = fs::canonicalize(path).map_err(|err| {
-                DesktopCommandError::io(
+                CommandError::io(
                     "workspace_write_failed",
                     "Workspace parent cannot be checked",
                     err,
@@ -155,7 +169,7 @@ fn ensure_write_target_inside_root(root: &Path, target: &Path) -> Result<(), Des
     Err(outside_root(target))
 }
 
-fn ensure_base_hash(target: &Path, base_hash: Option<&str>) -> Result<(), DesktopCommandError> {
+fn ensure_base_hash(target: &Path, base_hash: Option<&str>) -> Result<(), CommandError> {
     let Some(expected) = normalized_base_hash(base_hash) else {
         return Ok(());
     };
@@ -167,7 +181,7 @@ fn ensure_base_hash(target: &Path, base_hash: Option<&str>) -> Result<(), Deskto
         ));
     }
     let current = fs::read(target).map_err(|err| {
-        DesktopCommandError::io(
+        CommandError::io(
             "workspace_read_failed",
             "Workspace file cannot be checked before save",
             err,
@@ -193,12 +207,8 @@ fn normalized_base_hash(base_hash: Option<&str>) -> Option<&str> {
     }
 }
 
-fn conflict_error(
-    message: &str,
-    expected: Option<String>,
-    actual: Option<String>,
-) -> DesktopCommandError {
-    DesktopCommandError::new(
+fn conflict_error(message: &str, expected: Option<String>, actual: Option<String>) -> CommandError {
+    CommandError::new(
         "workspace_file_conflict",
         message,
         Some(format!(
@@ -209,24 +219,24 @@ fn conflict_error(
     )
 }
 
-fn write_temp_file(target: &Path, content: &[u8]) -> Result<PathBuf, DesktopCommandError> {
+fn write_temp_file(target: &Path, content: &[u8]) -> Result<PathBuf, CommandError> {
     let tmp_path = temp_path(target);
     let mut file = File::create(&tmp_path).map_err(|err| {
-        DesktopCommandError::io(
+        CommandError::io(
             "workspace_atomic_write_failed",
             "Workspace temp file cannot be created",
             err,
         )
     })?;
     file.write_all(content).map_err(|err| {
-        DesktopCommandError::io(
+        CommandError::io(
             "workspace_atomic_write_failed",
             "Workspace temp file cannot be written",
             err,
         )
     })?;
     file.sync_all().map_err(|err| {
-        DesktopCommandError::io(
+        CommandError::io(
             "workspace_atomic_write_failed",
             "Workspace temp file cannot be flushed",
             err,
@@ -235,10 +245,10 @@ fn write_temp_file(target: &Path, content: &[u8]) -> Result<PathBuf, DesktopComm
     Ok(tmp_path)
 }
 
-fn commit_temp_file(tmp_path: &Path, target: &Path) -> Result<(), DesktopCommandError> {
+fn commit_temp_file(tmp_path: &Path, target: &Path) -> Result<(), CommandError> {
     replace_file(tmp_path, target).map_err(|err| {
         let _ = fs::remove_file(tmp_path);
-        DesktopCommandError::new(
+        CommandError::new(
             "workspace_atomic_commit_failed",
             "Workspace temp file cannot be committed",
             Some(format!("{} while replacing {}", err, target.display())),

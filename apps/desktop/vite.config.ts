@@ -22,6 +22,11 @@ const manualChunks = (id: string) => {
   return undefined;
 };
 
+const isUseClientDirectiveWarning = (warning: { code?: string; message?: string }) => (
+  warning.code === "MODULE_LEVEL_DIRECTIVE"
+  && warning.message?.includes('"use client"')
+);
+
 export default defineConfig({
   plugins: [tailwindcss()],
   resolve: {
@@ -39,6 +44,13 @@ export default defineConfig({
   build: {
     target: "es2022",
     rollupOptions: {
+      onwarn(warning, defaultHandler) {
+        if (isUseClientDirectiveWarning(warning)) {
+          return;
+        }
+
+        defaultHandler(warning);
+      },
       output: {
         manualChunks
       }

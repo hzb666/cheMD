@@ -11,7 +11,7 @@ use crate::{
     postgres_config::{load_postgres_config, PostgresRuntimeConfig},
     postgres_runtime_persist::persist_runtime_graph_rag_impl,
     postgres_runtime_types::{PersistRuntimeGraphRagInput, PersistRuntimeGraphRagResult},
-    workspace::DesktopCommandError,
+    workspace::CommandError,
 };
 use std::path::Path;
 #[cfg(not(test))]
@@ -23,14 +23,14 @@ const MAX_LAST_ERROR_CHARS: usize = 500;
 #[tauri::command]
 pub async fn sync_local_outbox_to_postgres(
     app: tauri::AppHandle,
-) -> Result<LocalOutboxSyncResult, DesktopCommandError> {
+) -> Result<LocalOutboxSyncResult, CommandError> {
     match tauri::async_runtime::spawn_blocking(move || {
         sync_local_outbox_to_postgres_impl(&command_root(&app)?)
     })
     .await
     {
         Ok(result) => result,
-        Err(error) => Err(DesktopCommandError::new(
+        Err(error) => Err(CommandError::new(
             "local_outbox_sync_task_failed",
             "Local outbox sync task failed",
             Some(error.to_string()),
@@ -40,7 +40,7 @@ pub async fn sync_local_outbox_to_postgres(
 
 pub(crate) fn sync_local_outbox_to_postgres_impl(
     root: &Path,
-) -> Result<LocalOutboxSyncResult, DesktopCommandError> {
+) -> Result<LocalOutboxSyncResult, CommandError> {
     let target = load_sync_target()?;
     sync_local_outbox_to_postgres_with_target(root, target, persist_runtime_graph_rag_impl)
 }
@@ -49,11 +49,9 @@ pub(crate) fn sync_local_outbox_to_postgres_with_target<F>(
     root: &Path,
     target: LocalOutboxSyncTargetSummary,
     mut persist: F,
-) -> Result<LocalOutboxSyncResult, DesktopCommandError>
+) -> Result<LocalOutboxSyncResult, CommandError>
 where
-    F: FnMut(
-        PersistRuntimeGraphRagInput,
-    ) -> Result<PersistRuntimeGraphRagResult, DesktopCommandError>,
+    F: FnMut(PersistRuntimeGraphRagInput) -> Result<PersistRuntimeGraphRagResult, CommandError>,
 {
     let mut outbox = read_outbox_file(root)?;
     let mut synced_count = 0;
@@ -102,15 +100,13 @@ where
 fn parse_and_persist<F>(
     record: &LocalOutboxRecord,
     persist: &mut F,
-) -> Result<PersistRuntimeGraphRagResult, DesktopCommandError>
+) -> Result<PersistRuntimeGraphRagResult, CommandError>
 where
-    F: FnMut(
-        PersistRuntimeGraphRagInput,
-    ) -> Result<PersistRuntimeGraphRagResult, DesktopCommandError>,
+    F: FnMut(PersistRuntimeGraphRagInput) -> Result<PersistRuntimeGraphRagResult, CommandError>,
 {
     let payload = serde_json::from_value::<PersistRuntimeGraphRagInput>(record.payload.clone())
         .map_err(|error| {
-            DesktopCommandError::new(
+            CommandError::new(
                 "local_outbox_payload_invalid",
                 "Local outbox payload does not match runtime persistence input",
                 Some(error.to_string()),
@@ -150,7 +146,7 @@ fn entry_result(
     }
 }
 
-fn bounded_error(error: &DesktopCommandError) -> String {
+fn bounded_error(error: &CommandError) -> String {
     let detail = error
         .detail
         .as_deref()
@@ -194,11 +190,11 @@ fn sync_result(
     }
 }
 
-fn load_sync_target() -> Result<LocalOutboxSyncTargetSummary, DesktopCommandError> {
+fn load_sync_target() -> Result<LocalOutboxSyncTargetSummary, CommandError> {
     load_postgres_config()
         .map(|config| target_from_config(&config))
         .ok_or_else(|| {
-            DesktopCommandError::new(
+            CommandError::new(
                 "postgres_config_missing",
                 "PostgreSQL is not configured",
                 Some(
@@ -275,14 +271,14 @@ fn sync_status_text(
 }
 
 #[cfg(not(test))]
-fn command_root(app: &tauri::AppHandle) -> Result<PathBuf, DesktopCommandError> {
+fn command_root(app: &tauri::AppHandle) -> Result<PathBuf, CommandError> {
     use crate::local_store::local_store_root;
     use tauri::Manager;
     app.path()
         .app_data_dir()
         .map(local_store_root)
         .map_err(|err| {
-            DesktopCommandError::new(
+            CommandError::new(
                 "local_store_app_data_unavailable",
                 "Failed to resolve app data directory",
                 Some(err.to_string()),

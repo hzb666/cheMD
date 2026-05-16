@@ -3,6 +3,14 @@ import type { RenderOptions } from "@chemd/render-profile";
 import { renderNode, type HtmlTypedSemanticNode } from "./block-render";
 import { escapeHtml, normalizeWhitespace } from "./shared";
 export { renderRenderableHtml, type RenderRenderableHtmlOptions } from "./renderable-html";
+export {
+  buildPreviewThemeSyncScriptTag,
+  PREVIEW_DOCUMENT_STYLE,
+  PREVIEW_THEME_SYNC_ACK_MESSAGE_TYPE,
+  PREVIEW_THEME_SYNC_MESSAGE_TYPE,
+  toSandboxedPreviewDocument,
+  type PreviewTheme
+} from "./preview-document";
 
 export interface RenderHtmlSemanticOptions {
   typedGraph?: {

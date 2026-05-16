@@ -1,27 +1,27 @@
 import { useEffect, useRef, useState } from "react";
 import { compileChemdForEditor } from "@chemd/language-service";
-import { toChemdDesktopModelUri } from "../MonacoChemdEditor";
+import { toChemdModelUri } from "../features/editor/source-path";
 import {
   type LocalStoreStatus,
-} from "../desktop-contracts";
-import { buildLocalRuntimeSnapshotInput } from "../desktop-local-store";
-import { initialLocalReactionIntelligenceArtifactState, readLatestLocalReactionIntelligenceArtifact, type LocalReactionIntelligenceArtifactState } from "../desktop-reaction-intelligence-artifact-controller";
+} from "../contracts";
+import { buildLocalRuntimeSnapshotInput } from "../features/local-store/store";
+import { initialLocalReactionIntelligenceArtifactState, readLatestLocalReactionIntelligenceArtifact, type LocalReactionIntelligenceArtifactState } from "../features/reaction-intelligence/artifact-controller";
 import {
-  createDesktopReactionIntelligenceJobController,
-  toDesktopReactionIntelligenceWorkerResult,
-  type DesktopReactionIntelligenceJobController,
-} from "../desktop-reaction-intelligence-job-controller";
+  createReactionIntelligenceJobController,
+  toReactionIntelligenceWorkerResult,
+  type ReactionIntelligenceJobController,
+} from "../features/reaction-intelligence/job-controller";
 import type {
   LocalSnapshotState,
-  LocalStoreControllerInput,
   LocalStoreOperation,
+  PersistControllerInput,
   LocalSyncState,
   ReactionIntelligenceJobControllerInput,
   WorkspaceIngestControllerInput,
   WorkspaceIngestState,
   WorkspaceSymbolIndexControllerInput,
   WorkspaceSymbolIndexControllerState,
-} from "../desktop-types";
+} from "../types";
 import {
   buildPersistCommandInput,
   formatWorkspaceIngestCounts,
@@ -35,13 +35,13 @@ import {
   initialLocalSyncState,
   initialWorkspaceIngestState,
   initialWorkspaceSymbolIndexState,
-  invokeDesktop,
-} from "../desktop-utils";
-import { runWorkspaceIngestOutboxSave } from "../desktop-workspace-ingest-runner";
+  invokeCommand,
+} from "../utils";
+import { runWorkspaceIngestOutboxSave } from "../features/workspace-ingest/runner";
 import {
-  buildDesktopWorkspaceSymbolIndex,
-  type DesktopWorkspaceSymbolIndexSummary,
-} from "../desktop-workspace-symbol-index";
+  buildWorkspaceSymbolIndex,
+  type WorkspaceSymbolIndexSummary,
+} from "../workspace-index/symbol-index";
 
 
 export const useLocalStoreController = ({
@@ -52,7 +52,7 @@ export const useLocalStoreController = ({
   workspace,
   compileOutput,
   agentRun
-}: LocalStoreControllerInput) => {
+}: PersistControllerInput) => {
   const [status, setStatus] = useState<LocalStoreStatus>(initialLocalStoreStatus);
   const [snapshotState, setSnapshotState] = useState<LocalSnapshotState>(initialLocalSnapshotState);
   const [syncState, setSyncState] = useState<LocalSyncState>(initialLocalSyncState);
@@ -73,7 +73,7 @@ export const useLocalStoreController = ({
 
   const readStatus = async (): Promise<LocalStoreStatus | null> => {
     try {
-      const nextStatus = await invokeDesktop("read_local_store_status", undefined);
+      const nextStatus = await invokeCommand("read_local_store_status", undefined);
       setStatus(nextStatus);
       setError(null);
       return nextStatus;
@@ -86,7 +86,7 @@ export const useLocalStoreController = ({
 
   const readReactionIntelligenceArtifact = async (): Promise<LocalReactionIntelligenceArtifactState> => {
     const nextState = await readLatestLocalReactionIntelligenceArtifact({
-      listArtifacts: (input) => invokeDesktop("list_local_reaction_intelligence_artifacts", input)
+      listArtifacts: (input) => invokeCommand("list_local_reaction_intelligence_artifacts", input)
     });
     setReactionIntelligenceArtifactState(nextState);
     return nextState;
@@ -116,7 +116,7 @@ export const useLocalStoreController = ({
     try {
       const persistInput = buildPersistCommandInput({ source, workspace, file, compileOutput, agentRun });
       const localInput = buildLocalRuntimeSnapshotInput(persistInput.payload);
-      const result = await invokeDesktop("save_local_runtime_snapshot", localInput);
+      const result = await invokeCommand("save_local_runtime_snapshot", localInput);
       setSnapshotState({
         state: "success",
         message: "Saved local snapshot. It is pending Postgres sync until a target reconnects.",
@@ -145,7 +145,7 @@ export const useLocalStoreController = ({
     setOperation("sync");
     setSyncState({ state: "pending", message: "Syncing pending Local Store entries to Postgres.", summary: null });
     try {
-      const result = await invokeDesktop("sync_local_outbox_to_postgres", undefined);
+      const result = await invokeCommand("sync_local_outbox_to_postgres", undefined);
       const failedEntries = result.entries.filter((entry) => entry.syncStatus === "failed" || entry.error !== undefined);
       setSyncState({
         state: result.failedCount > 0 ? "failure" : "success",
@@ -205,21 +205,21 @@ export const useReactionIntelligenceJobController = ({
   jobBuild,
   onAfterRun
 }: ReactionIntelligenceJobControllerInput) => {
-  const controllerRef = useRef<DesktopReactionIntelligenceJobController | null>(null);
+  const controllerRef = useRef<ReactionIntelligenceJobController | null>(null);
   if (controllerRef.current === null) {
-    controllerRef.current = createDesktopReactionIntelligenceJobController({
+    controllerRef.current = createReactionIntelligenceJobController({
       runWorker: async (input) => {
-        const result = await invokeDesktop("run_reaction_intelligence_worker", {
+        const result = await invokeCommand("run_reaction_intelligence_worker", {
           jobJson: input.job,
           providers: input.job.requested_providers,
           missingDependency: input.job.provider_policy.missing_dependency,
           pretty: false
         });
-        return toDesktopReactionIntelligenceWorkerResult(result);
+        return toReactionIntelligenceWorkerResult(result);
       },
-      saveArtifact: (input) => invokeDesktop("save_local_reaction_intelligence_artifact", input),
+      saveArtifact: (input) => invokeCommand("save_local_reaction_intelligence_artifact", input),
       readLatestArtifact: (input) => readLatestLocalReactionIntelligenceArtifact({
-        listArtifacts: (listInput) => invokeDesktop("list_local_reaction_intelligence_artifacts", listInput),
+        listArtifacts: (listInput) => invokeCommand("list_local_reaction_intelligence_artifacts", listInput),
         graphIndexId: input.graphIndexId
       }),
       now: () => new Date().toISOString()
@@ -286,7 +286,7 @@ export const useWorkspaceIngestController = ({
         workspaceId: workspace.workspaceId,
         files,
         existingItems: state.items,
-        readFile: (file) => invokeDesktop("read_workspace_file", {
+        readFile: (file) => invokeCommand("read_workspace_file", {
           workspaceId: workspace.workspaceId,
           path: file.path
         }),
@@ -309,7 +309,7 @@ export const useWorkspaceIngestController = ({
           };
         },
         saveSnapshot: (input) => {
-          return invokeDesktop("save_local_runtime_snapshot", input);
+          return invokeCommand("save_local_runtime_snapshot", input);
         }
       });
       setState({
@@ -339,7 +339,7 @@ export const useWorkspaceIngestController = ({
 
 
 export const formatWorkspaceSymbolIndexMessage = (
-  summary: DesktopWorkspaceSymbolIndexSummary
+  summary: WorkspaceSymbolIndexSummary
 ): string =>
   `Workspace symbols indexed: ${summary.indexedFiles} ready, ${summary.failedFiles} failed, ${summary.skippedFiles} skipped.`;
 
@@ -369,16 +369,16 @@ export const useWorkspaceSymbolIndexController = ({
       message: "Building workspace symbol index from local Chemd documents."
     }));
 
-    void buildDesktopWorkspaceSymbolIndex({
+    void buildWorkspaceSymbolIndex({
       workspace,
       files,
-      createDocumentUri: (file) => toChemdDesktopModelUri(file.path),
+      createDocumentUri: (file) => toChemdModelUri(file.path),
       readFile: async (file) => {
         if (file.id === selectedFile.id || file.path === selectedFile.path) {
           return source;
         }
 
-        const content = await invokeDesktop("read_workspace_file", {
+        const content = await invokeCommand("read_workspace_file", {
           workspaceId: workspace.workspaceId,
           path: file.path
         });

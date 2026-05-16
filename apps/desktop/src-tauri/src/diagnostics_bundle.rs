@@ -1,6 +1,6 @@
 #![cfg_attr(test, allow(dead_code))]
 
-use crate::workspace::DesktopCommandError;
+use crate::workspace::CommandError;
 use serde::Serialize;
 use std::{
     fs,
@@ -12,8 +12,9 @@ const SCHEMA_VERSION: u8 = 1;
 const DEFAULT_OUTPUT_DIR: &str = "chemd-desktop-diagnostics-bundle";
 const SKIP: &str = "SKIP";
 
-const KNOWN_TAURI_COMMANDS: [&str; 34] = [
+const KNOWN_TAURI_COMMANDS: [&str; 37] = [
     "open_workspace",
+    "open_workspace_path",
     "list_workspace_files",
     "read_workspace_file",
     "write_workspace_file",
@@ -46,6 +47,8 @@ const KNOWN_TAURI_COMMANDS: [&str; 34] = [
     "query_postgres_rag",
     "backfill_postgres_rag_embeddings",
     "run_reaction_intelligence_worker",
+    "render_chem_preview",
+    "set_window_maximize_button_rect",
     "export_diagnostics_bundle",
 ];
 
@@ -158,17 +161,17 @@ struct RuntimeBoundary {
 
 #[cfg(not(test))]
 #[tauri::command]
-pub fn export_diagnostics_bundle() -> Result<DiagnosticsBundleExportResult, DesktopCommandError> {
+pub fn export_diagnostics_bundle() -> Result<DiagnosticsBundleExportResult, CommandError> {
     export_bundle_impl()
 }
 
-pub(crate) fn export_bundle_impl() -> Result<DiagnosticsBundleExportResult, DesktopCommandError> {
+pub(crate) fn export_bundle_impl() -> Result<DiagnosticsBundleExportResult, CommandError> {
     export_diagnostics_bundle_to_dir(default_output_dir())
 }
 
 pub(crate) fn export_diagnostics_bundle_to_dir(
     output_dir: PathBuf,
-) -> Result<DiagnosticsBundleExportResult, DesktopCommandError> {
+) -> Result<DiagnosticsBundleExportResult, CommandError> {
     let generated_at = unix_timestamp_ms();
     let bundle = build_bundle(generated_at);
     let output_path = output_dir.join(file_name(&bundle.generated_at));
@@ -200,30 +203,30 @@ fn default_output_dir() -> PathBuf {
     std::env::temp_dir().join(DEFAULT_OUTPUT_DIR)
 }
 
-fn write_bundle(path: &Path, bundle: &DiagnosticsBundle) -> Result<(), DesktopCommandError> {
+fn write_bundle(path: &Path, bundle: &DiagnosticsBundle) -> Result<(), CommandError> {
     let json = serde_json::to_string_pretty(bundle).map_err(|error| {
-        DesktopCommandError::new(
+        CommandError::new(
             "diagnostics_bundle_serialize_failed",
             "Failed to serialize diagnostics bundle",
             Some(error.to_string()),
         )
     })?;
     let parent = path.parent().ok_or_else(|| {
-        DesktopCommandError::new(
+        CommandError::new(
             "diagnostics_bundle_path_invalid",
             "Diagnostics bundle output path is invalid",
             None,
         )
     })?;
     fs::create_dir_all(parent).map_err(|error| {
-        DesktopCommandError::io(
+        CommandError::io(
             "diagnostics_bundle_directory_failed",
             "Failed to create diagnostics bundle directory",
             error,
         )
     })?;
     fs::write(path, format!("{json}\n")).map_err(|error| {
-        DesktopCommandError::io(
+        CommandError::io(
             "diagnostics_bundle_write_failed",
             "Failed to write diagnostics bundle",
             error,

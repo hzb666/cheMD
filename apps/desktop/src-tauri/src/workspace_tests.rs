@@ -83,12 +83,19 @@ fn rejects_parent_path_traversal_for_read_and_write() {
 }
 
 #[test]
-fn lists_markdown_files_and_visible_directories_only() {
+fn lists_workspace_tree_entries_without_expanding_heavy_dirs() {
     let workspace = TestWorkspace::new("list");
     workspace.write("experiments/screen.chemd.md", "doc");
     workspace.write("notes.md", "note");
-    workspace.write("ignore.txt", "ignored");
+    workspace.write("ignore.txt", "listed");
     workspace.write(".hidden/secret.chemd.md", "hidden");
+    workspace.write(".env", "DATABASE_URL=postgres://secret");
+    workspace.write(".git/config", "heavy");
+    workspace.write(".venv/bin/python", "heavy");
+    workspace.write(".next/cache/chunk", "heavy");
+    workspace.write("coverage/report.json", "heavy");
+    workspace.write("build/output.js", "heavy");
+    workspace.write("__pycache__/module.pyc", "heavy");
     workspace.mkdir("materials");
 
     let entries = list_workspace_files_impl("workspace-test", &workspace.canonical_root())
@@ -103,6 +110,7 @@ fn lists_markdown_files_and_visible_directories_only() {
         vec![
             "experiments",
             "experiments/screen.chemd.md",
+            "ignore.txt",
             "materials",
             "notes.md"
         ]
@@ -113,6 +121,51 @@ fn lists_markdown_files_and_visible_directories_only() {
         .expect("chemd file should be listed");
     assert_eq!(screen.kind, "file");
     assert_eq!(screen.chemd_kind.as_deref(), Some("document"));
+    let asset = entries
+        .iter()
+        .find(|entry| entry.path == "ignore.txt")
+        .expect("plain file should be listed");
+    assert_eq!(asset.chemd_kind.as_deref(), Some("asset"));
+    assert!(
+        !entries.iter().any(|entry| {
+            entry.path.starts_with('.')
+                || entry.path.starts_with("coverage")
+                || entry.path.starts_with("build")
+                || entry.path.starts_with("__pycache__")
+        }),
+        "hidden and heavy metadata entries should be filtered"
+    );
+}
+
+#[test]
+fn lists_visible_entries_after_filtering_ignored_children() {
+    let workspace = TestWorkspace::new("list-filtered-limit");
+    for index in 0..300 {
+        workspace.write(&format!(".ignored-{index}/secret.chemd.md"), "hidden");
+    }
+    workspace.write("visible.chemd.md", "doc");
+
+    let entries = list_workspace_files_impl("workspace-test", &workspace.canonical_root())
+        .expect("workspace should list");
+
+    assert!(entries.iter().any(|entry| entry.path == "visible.chemd.md"));
+    assert!(!entries.iter().any(|entry| entry.path.starts_with('.')));
+}
+
+#[test]
+fn read_and_write_reject_ignored_workspace_paths() {
+    let workspace = TestWorkspace::new("ignored-read-write");
+    workspace.write(".env", "DATABASE_URL=postgres://secret");
+    workspace.write(".git/config", "secret");
+    let root = workspace.canonical_root();
+
+    let read_error =
+        read_workspace_file_impl(&root, ".env").expect_err("sensitive file should not be readable");
+    let write_error = write_workspace_file_impl(&root, ".git/config", "unsafe", None)
+        .expect_err("vcs config should not be writable");
+
+    assert_eq!(read_error.code, "workspace_path_ignored");
+    assert_eq!(write_error.code, "workspace_path_ignored");
 }
 
 #[test]

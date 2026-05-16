@@ -7,20 +7,20 @@ import type {
   PostgresStatus,
   WorkspaceFileEntry,
   WorkspaceHandle
-} from "../desktop-contracts";
-import type { DocumentMode, RagQueryOperationState } from "../desktop-types";
-import { getCommandErrorMessage, invokeDesktop } from "../desktop-utils";
-import type { DesktopWorkspaceIndexViewModel } from "../workspace-index/desktop-workspace-index";
+} from "../contracts";
+import type { DocumentMode, RagQueryOperationState } from "../types";
+import { getCommandErrorMessage, invokeCommand } from "../utils";
+import type { WorkspaceIndexViewModel } from "../workspace-index/workspace-index";
 import {
-  buildDesktopPostgresRagQueryControllerState,
-  type DesktopPostgresRagQueryControllerState
-} from "../workspace-index/desktop-postgres-rag-query-controller";
+  buildPostgresRagQueryControllerState,
+  type PostgresRagQueryControllerState
+} from "../workspace-index/postgres-rag-query-controller";
 import {
-  buildDesktopPostgresRagBackfillEmbeddingPlan,
-  buildDesktopPostgresRagBackfillReadiness,
-  buildDesktopPostgresRagBackfillRequest,
-  formatDesktopPostgresRagBackfillCompletionMessage
-} from "../workspace-index/desktop-postgres-rag-backfill-controller";
+  buildPostgresRagBackfillEmbeddingPlan,
+  buildPostgresRagBackfillReadiness,
+  buildPostgresRagBackfillRequest,
+  formatPostgresRagBackfillCompletionMessage
+} from "../workspace-index/postgres-rag-backfill-controller";
 
 const initialEmbeddingProviderStatus: EmbeddingProviderStatus = {
   state: "offline",
@@ -43,7 +43,7 @@ export const useEmbeddingProviderController = () => {
   const refresh = async () => {
     setLoading(true);
     try {
-      const nextStatus = await invokeDesktop("read_embedding_provider_status", undefined);
+      const nextStatus = await invokeCommand("read_embedding_provider_status", undefined);
       setStatus(nextStatus);
       setError(null);
     } catch (nextError: unknown) {
@@ -79,7 +79,7 @@ export const useConnectedRagQueryController = ({
   workspace: WorkspaceHandle;
   postgresStatus: PostgresStatus;
   embeddingStatus: EmbeddingProviderStatus;
-  localResults: DesktopWorkspaceIndexViewModel["ragResults"];
+  localResults: WorkspaceIndexViewModel["ragResults"];
 }) => {
   const [query, setQueryValue] = useState("");
   const [operation, setOperation] = useState<RagQueryOperationState>("idle");
@@ -94,7 +94,7 @@ export const useConnectedRagQueryController = ({
   const normalizedQuery = query.trim();
   const activeEmbeddingResult = embeddingResult?.query === normalizedQuery ? embeddingResult.result : null;
 
-  const backfillReadiness = useMemo(() => buildDesktopPostgresRagBackfillReadiness({
+  const backfillReadiness = useMemo(() => buildPostgresRagBackfillReadiness({
     mode,
     postgresStatus,
     embeddingStatus,
@@ -102,7 +102,7 @@ export const useConnectedRagQueryController = ({
     runnerAvailable: true
   }), [embeddingStatus, localResults, mode, postgresStatus]);
 
-  const state: DesktopPostgresRagQueryControllerState = useMemo(() => buildDesktopPostgresRagQueryControllerState({
+  const state: PostgresRagQueryControllerState = useMemo(() => buildPostgresRagQueryControllerState({
     mode,
     query,
     postgresStatus,
@@ -147,7 +147,7 @@ export const useConnectedRagQueryController = ({
     setOperation("pending");
     setMessage("Creating query embedding vector.");
     try {
-      const embedding = await invokeDesktop("create_embedding_vector", {
+      const embedding = await invokeCommand("create_embedding_vector", {
         input: { text: queryText }
       });
       setEmbeddingResult({ query: queryText, result: embedding });
@@ -156,7 +156,7 @@ export const useConnectedRagQueryController = ({
         setMessage(embedding.detail || "Embedding provider did not return a usable vector.");
         return;
       }
-      const readyState = buildDesktopPostgresRagQueryControllerState({
+      const readyState = buildPostgresRagQueryControllerState({
         mode,
         query: queryText,
         postgresStatus,
@@ -179,7 +179,7 @@ export const useConnectedRagQueryController = ({
         return;
       }
       setMessage("Querying connected Postgres RAG.");
-      const result = await invokeDesktop("query_postgres_rag", { input: readyState.request });
+      const result = await invokeCommand("query_postgres_rag", { input: readyState.request });
       setCommandResult(result);
       setOperation(result.state === "ready" ? "success" : "failure");
       setMessage(result.detail || readyState.message);
@@ -196,7 +196,7 @@ export const useConnectedRagQueryController = ({
       setBackfillMessage(backfillReadiness.message);
       return;
     }
-    const plan = buildDesktopPostgresRagBackfillEmbeddingPlan(localResults);
+    const plan = buildPostgresRagBackfillEmbeddingPlan(localResults);
     if (plan.embeddingItems.length === 0) {
       setBackfillOperation("failure");
       setBackfillMessage("No local RAG chunks include full text for embedding backfill.");
@@ -211,10 +211,10 @@ export const useConnectedRagQueryController = ({
     setBackfillOperation("pending");
     setBackfillMessage(`Creating embedding vectors for ${plan.embeddingItems.length} local RAG chunk${plan.embeddingItems.length === 1 ? "" : "s"}.`);
     try {
-      const embeddingBatch = await invokeDesktop("create_embedding_vectors", {
+      const embeddingBatch = await invokeCommand("create_embedding_vectors", {
         input: { items: plan.embeddingItems }
       });
-      const requestBuild = buildDesktopPostgresRagBackfillRequest({
+      const requestBuild = buildPostgresRagBackfillRequest({
         plan,
         embeddingResult: embeddingBatch,
         embeddingModel: embeddingBatch.model ?? model,
@@ -227,11 +227,11 @@ export const useConnectedRagQueryController = ({
         return;
       }
       setBackfillMessage("Writing connected RAG embedding vectors to Postgres.");
-      const result = await invokeDesktop("backfill_postgres_rag_embeddings", {
+      const result = await invokeCommand("backfill_postgres_rag_embeddings", {
         input: requestBuild.request
       });
       setBackfillOperation(result.state === "ready" ? "success" : "failure");
-      setBackfillMessage(formatDesktopPostgresRagBackfillCompletionMessage({
+      setBackfillMessage(formatPostgresRagBackfillCompletionMessage({
         detail: result.detail,
         fallback: requestBuild.message,
         skippedDuplicateCount: plan.skippedDuplicateCount,
