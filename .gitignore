@@ -28,3 +28,4 @@ desktop-vite-*.log
 desktop-vite-*.err.log
 eslint-desktop*.json
 apps/desktop/src-tauri/cargo-llvm-cov.exe
+.claude/
