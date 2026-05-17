@@ -31,19 +31,19 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
-| 113 | 2026-05-17 | Regression review and test hardening | `31e5298` | `develop` |
-| 112 | 2026-05-17 | Phase 9 dock panel primitives | `e5ccdb6` | `develop` |
-| 111 | 2026-05-17 | Phase 8 Workbench render boundary cleanup | `c8f43a4` | `develop` |
-| 110 | 2026-05-17 | Phase 7 local-store list pagination | `96076f7` | `develop` |
-| 109 | 2026-05-17 | Phase 6 Knowledge Map and window rect sync | `48f92a9` | `develop` |
-| 108 | 2026-05-17 | Phase 6 Monaco editor surface micro-optimizations | `ee0a235` | `develop` |
-| 107 | 2026-05-17 | Phase 5 preview hydration queue and cache | `586d4de` | `develop` |
-| 106 | 2026-05-17 | Phase 5 lazy active dock panel construction | `e919915` | `develop` |
-| 105 | 2026-05-17 | Phase 4 Rust workspace ingest plan command | `4f925ff` | `develop` |
-| 104 | 2026-05-17 | Phase 3 workspace symbol gateway migration | `f9b0cec` | `develop` |
-| 103 | 2026-05-17 | Phase 2 WorkspaceDataGateway foundation | `98396f9` | `develop` |
-| 102 | 2026-05-17 | Phase 1 Rust workspace manifest query | `33c03fc` | `develop` |
-| 101 | 2026-05-17 | Phase 0 desktop IDE performance baseline instrumentation | `c7047be` | `develop` |
+| 113 | 2026-05-17 | Regression review and test hardening | `2ceb3fe77f` | `develop` |
+| 112 | 2026-05-17 | Phase 9 dock panel primitives | `2ceb3fe77f` | `develop` |
+| 111 | 2026-05-17 | Phase 8 Workbench render boundary cleanup | `2ceb3fe77f` | `develop` |
+| 110 | 2026-05-17 | Phase 7 local-store list pagination | `2ceb3fe77f` | `develop` |
+| 109 | 2026-05-17 | Phase 6 Knowledge Map and window rect sync | `2ceb3fe77f` | `develop` |
+| 108 | 2026-05-17 | Phase 6 Monaco editor surface micro-optimizations | `2ceb3fe77f` | `develop` |
+| 107 | 2026-05-17 | Phase 5 preview hydration queue and cache | `2ceb3fe77f` | `develop` |
+| 106 | 2026-05-17 | Phase 5 lazy active dock panel construction | `2ceb3fe77f` | `develop` |
+| 105 | 2026-05-17 | Phase 4 Rust workspace ingest plan command | `2ceb3fe77f` | `develop` |
+| 104 | 2026-05-17 | Phase 3 workspace symbol gateway migration | `2ceb3fe77f` | `develop` |
+| 103 | 2026-05-17 | Phase 2 WorkspaceDataGateway foundation | `2ceb3fe77f` | `develop` |
+| 102 | 2026-05-17 | Phase 1 Rust workspace manifest query | `2ceb3fe77f` | `develop` |
+| 101 | 2026-05-17 | Phase 0 desktop IDE performance baseline instrumentation | `2ceb3fe77f` | `develop` |
 | 100 | 2026-05-17 | Reaction intelligence core finishwork | `8b25e11` | `develop` |
 | 99 | 2026-05-17 | Chemd 0.6 desktop finishwork | `2055d35` | `develop` |
 | 98 | 2026-05-16 | Desktop IDE 产品化重组收尾 | `4670c0e` | `desktop-ide` |

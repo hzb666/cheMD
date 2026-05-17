@@ -555,7 +555,7 @@ Added dev-gated desktop performance metrics for workspace indexing, preview hydr
 
 | Hash | Message |
 |------|---------|
-| `c7047be` | (see git log) |
+| `2ceb3fe77f` | feat(desktop)：优化 IDE 工作区性能 |
 
 ### Testing
 
@@ -589,7 +589,7 @@ Added query_workspace_index to return bounded workspace manifest rows and metada
 
 | Hash | Message |
 |------|---------|
-| `33c03fc` | (see git log) |
+| `2ceb3fe77f` | feat(desktop)：优化 IDE 工作区性能 |
 
 ### Testing
 
@@ -623,7 +623,7 @@ Added a frontend WorkspaceDataGateway boundary for manifest state, current-sourc
 
 | Hash | Message |
 |------|---------|
-| `98396f9` | (see git log) |
+| `2ceb3fe77f` | feat(desktop)：优化 IDE 工作区性能 |
 
 ### Testing
 
@@ -657,7 +657,7 @@ Routed workspace symbol indexing through the WorkspaceDataGateway only when mani
 
 | Hash | Message |
 |------|---------|
-| `f9b0cec` | (see git log) |
+| `2ceb3fe77f` | feat(desktop)：优化 IDE 工作区性能 |
 
 ### Testing
 
@@ -691,7 +691,7 @@ Added build_workspace_ingest_plan to let Rust enumerate and page workspace inges
 
 | Hash | Message |
 |------|---------|
-| `4f925ff` | (see git log) |
+| `2ceb3fe77f` | feat(desktop)：优化 IDE 工作区性能 |
 
 ### Testing
 
@@ -725,7 +725,7 @@ Replaced eager insight dock contentByPanel construction with active-panel switch
 
 | Hash | Message |
 |------|---------|
-| `e919915` | (see git log) |
+| `2ceb3fe77f` | feat(desktop)：优化 IDE 工作区性能 |
 
 ### Testing
 
@@ -759,7 +759,7 @@ Added a desktop preview render scheduler and cache for render_chem_preview hydra
 
 | Hash | Message |
 |------|---------|
-| `586d4de` | (see git log) |
+| `2ceb3fe77f` | feat(desktop)：优化 IDE 工作区性能 |
 
 ### Testing
 
@@ -793,7 +793,7 @@ Memoized Monaco options, coalesced undo-redo notifications, guarded duplicate re
 
 | Hash | Message |
 |------|---------|
-| `ee0a235` | (see git log) |
+| `2ceb3fe77f` | feat(desktop)：优化 IDE 工作区性能 |
 
 ### Testing
 
@@ -827,7 +827,7 @@ Prevented ForceGraph selection-only changes from reheating simulations and remov
 
 | Hash | Message |
 |------|---------|
-| `48f92a9` | (see git log) |
+| `2ceb3fe77f` | feat(desktop)：优化 IDE 工作区性能 |
 
 ### Testing
 
@@ -880,7 +880,7 @@ Notes:
 
 | Hash | Message |
 |------|---------|
-| `96076f7` | (see git log) |
+| `2ceb3fe77f` | feat(desktop)：优化 IDE 工作区性能 |
 
 ### Testing
 
@@ -932,7 +932,7 @@ Notes:
 
 | Hash | Message |
 |------|---------|
-| `c8f43a4` | (see git log) |
+| `2ceb3fe77f` | feat(desktop)：优化 IDE 工作区性能 |
 
 ### Testing
 
@@ -982,7 +982,7 @@ Notes:
 
 | Hash | Message |
 |------|---------|
-| `e5ccdb6` | (see git log) |
+| `2ceb3fe77f` | feat(desktop)：优化 IDE 工作区性能 |
 
 ### Testing
 
@@ -1041,7 +1041,7 @@ Notes:
 
 | Hash | Message |
 |------|---------|
-| `31e5298` | (see git log) |
+| `2ceb3fe77f` | feat(desktop)：优化 IDE 工作区性能 |
 
 ### Testing
 
