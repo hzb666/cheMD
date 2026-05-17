@@ -1054,3 +1054,37 @@ Notes:
 ### Next Steps
 
 - None - task complete
+
+
+## Session 114: Desktop workspace explorer and IDE surface polish
+
+**Date**: 2026-05-18
+**Task**: Desktop workspace explorer and IDE surface polish
+**Package**: desktop
+**Branch**: `develop`
+
+### Summary
+
+Completed a desktop workspace performance slice: moved workspace IO behind blocking Tauri tasks, added bounded directory-layer loading and workspace ignore settings, polished editor breadcrumbs/preview/bottom-panel behavior, updated task PRD evidence, and verified with Rust, desktop, script, typecheck, build, and offline release gates.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3f8de85d540785ac21ae1212d621e4e500ab2048` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

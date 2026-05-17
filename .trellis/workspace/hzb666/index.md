@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-3.md`
-- **Total Sessions**: 113
-- **Last Active**: 2026-05-17
+- **Total Sessions**: 114
+- **Last Active**: 2026-05-18
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-3.md` | ~1056 | Active |
+| `journal-3.md` | ~1090 | Active |
 | `journal-2.md` | ~1956 | Archived |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
@@ -31,6 +31,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 114 | 2026-05-18 | Desktop workspace explorer and IDE surface polish | `3f8de85d540785ac21ae1212d621e4e500ab2048` | `develop` |
 | 113 | 2026-05-17 | Regression review and test hardening | `2ceb3fe77f` | `develop` |
 | 112 | 2026-05-17 | Phase 9 dock panel primitives | `2ceb3fe77f` | `develop` |
 | 111 | 2026-05-17 | Phase 8 Workbench render boundary cleanup | `2ceb3fe77f` | `develop` |
