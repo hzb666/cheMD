@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-3.md`
-- **Total Sessions**: 98
-- **Last Active**: 2026-05-16
+- **Total Sessions**: 99
+- **Last Active**: 2026-05-17
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-3.md` | ~443 | Active |
+| `journal-3.md` | ~502 | Active |
 | `journal-2.md` | ~1956 | Archived |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
@@ -31,6 +31,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 99 | 2026-05-17 | Chemd 0.6 desktop finishwork | `2055d35` | `develop` |
 | 98 | 2026-05-16 | Desktop IDE 产品化重组收尾 | `4670c0e` | `desktop-ide` |
 | 97 | 2026-05-14 | Desktop release hardening strategy | `d80c902` | `desktop-ide` |
 | 96 | 2026-05-14 | Desktop managed shared schema parity | `84e94d3` | `desktop-ide` |

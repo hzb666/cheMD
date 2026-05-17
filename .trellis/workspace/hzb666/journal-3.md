@@ -441,3 +441,62 @@ Validation:
 ### Next Steps
 
 - None - task complete
+
+
+## Session 99: Chemd 0.6 desktop finishwork
+
+**Date**: 2026-05-17
+**Task**: Chemd 0.6 desktop finishwork
+**Package**: desktop
+**Branch**: `develop`
+
+### Summary
+
+Completed Chemd 0.6 desktop finishwork with validation, build, installer artifact preflight, and Trellis archive.
+
+### Main Changes
+
+### Finishwork Notes
+
+- Code commit: 2055d35
+- Scope: Chemd 0.6 source extension migration, desktop workspace save/session hardening, preview and Postgres profile binding, desktop release readiness.
+- Fixed finishwork lint blockers in postgres profile UI/controller and editor surface before commit.
+
+### Verification
+
+- git diff --check: pass
+- pnpm run lint -- --quiet: pass
+- pnpm --filter @chemd/desktop typecheck: pass
+- pnpm --filter @chemd/desktop test: 39 files, 208 tests pass
+- pnpm typecheck: 24 packages pass
+- pnpm test: turbo test + scripts + Python unittest pass; Python unittest ran 86 tests
+- pnpm --filter @chemd/desktop build: pass with existing Vite large chunk warning
+- pnpm --filter @chemd/desktop tauri:build: pass; produced release exe, MSI, and NSIS installer
+- cargo test in apps/desktop/src-tauri: 115 tests pass
+- pnpm desktop:offline-core-smoke: pass
+- pnpm desktop:runtime-smoke: offline core pass; DB/RAG smoke skipped because staged PostgreSQL binaries are missing
+- pnpm desktop:release-readiness -- --json: artifact preflight pass; overallStatus remains skip because clean-machine installer smoke and real-network proof are explicitly not run
+
+### Known Gaps
+
+- pnpm desktop:postgres:verify failed because staged PostgreSQL binaries are missing: initdb, psql, postgres or pg_ctl.
+- Clean-machine installer launch smoke and real-network proof were not run in this local finishwork session.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2055d35` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
