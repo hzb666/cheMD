@@ -20,6 +20,7 @@ import {
   type WorkspaceRagGate,
   type WorkspaceRagResult
 } from "./rag-citation-gate";
+import { measureDesktopPerformance } from "../performance-marks";
 
 export type WorkspaceIndexState = "empty" | "ready" | "degraded" | "failed";
 
@@ -245,11 +246,25 @@ export const buildWorkspaceIndexViewModel = (
 ): WorkspaceIndexViewModel => {
   const documents = buildDocuments(input);
   const index = documents.length > 0
-    ? buildWorkspaceSymbolIndex(documents, input.compile)
+    ? measureDesktopPerformance(
+      "workspaceIndex.symbolIndex",
+      () => buildWorkspaceSymbolIndex(documents, input.compile),
+      {
+        documentCount: documents.length,
+        workspaceId: input.workspaceId,
+      }
+    )
     : null;
   const summary = index ? summarizeWorkspaceIndex(index) : null;
   const state = buildState(index, documents.length);
-  const ragView = buildWorkspaceRagView(input.workspaceId, documents);
+  const ragView = measureDesktopPerformance(
+    "workspaceIndex.ragView",
+    () => buildWorkspaceRagView(input.workspaceId, documents),
+    {
+      documentCount: documents.length,
+      workspaceId: input.workspaceId,
+    }
+  );
 
   return {
     state,

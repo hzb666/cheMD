@@ -6,6 +6,8 @@ import type {
   WorkspaceFileContent,
   WorkspaceFileEntry,
   WorkspaceIngestDocumentMetadata,
+  WorkspaceIngestKnownRevision,
+  WorkspaceIngestPlanItem,
   WorkspaceIngestQueueItem,
   WorkspaceIngestQueueStatus,
   WorkspaceIngestQueueSummary
@@ -92,6 +94,7 @@ export interface RunWorkspaceIngestInput {
   readFile: (file: WorkspaceFileEntry) => MaybePromise<WorkspaceIngestFileContent>;
   compile: (source: string, file: WorkspaceFileEntry) => MaybePromise<unknown>;
   existingItems?: readonly WorkspaceIngestQueueItem[];
+  manifestRevisionKeys?: ReadonlyMap<string, string>;
   maxRetryFailures?: number;
   createdAt?: string;
 }
@@ -418,6 +421,14 @@ const reachedRetryLimit = (input: RunWorkspaceIngestInput, item: WorkspaceIngest
   item.status === "failed"
   && item.failureCount >= (input.maxRetryFailures ?? DEFAULT_MAX_RETRY_FAILURES);
 
+const manifestRevisionMetadata = (
+  input: RunWorkspaceIngestInput,
+  file: WorkspaceFileEntry
+): RuntimeJsonObject | undefined => {
+  const revisionKey = input.manifestRevisionKeys?.get(file.path);
+  return revisionKey ? { workspaceManifestRevisionKey: revisionKey } : undefined;
+};
+
 const buildSkippedMarkdownItem = (
   input: RunWorkspaceIngestInput,
   file: WorkspaceFileEntry
@@ -433,7 +444,10 @@ const buildSkippedMarkdownItem = (
       revisionHash
     },
     status: "skipped",
-    metadata: { skipReason: "non_chemd_markdown" },
+    metadata: {
+      skipReason: "non_chemd_markdown",
+      ...manifestRevisionMetadata(input, file),
+    },
     createdAt: input.createdAt,
     updatedAt: input.createdAt
   });
@@ -456,6 +470,7 @@ const buildFailedItem = (
     status: "failed",
     failureCount: (previous?.failureCount ?? 0) + 1,
     errorSummary: getErrorMessage(error),
+    metadata: manifestRevisionMetadata(input, file),
     createdAt: previous?.createdAt ?? input.createdAt,
     updatedAt: input.createdAt
   });
@@ -492,6 +507,7 @@ const processChemdFile = async (
       document,
       compileOutput: await input.compile(source, file),
       status: "pending",
+      metadata: manifestRevisionMetadata(input, file),
       createdAt: existing?.createdAt ?? input.createdAt,
       updatedAt: input.createdAt
     });
@@ -521,3 +537,40 @@ export const runWorkspaceIngest = async (
     })
   };
 };
+
+const readMetadataString = (
+  item: WorkspaceIngestQueueItem,
+  key: string
+): string | null => {
+  const value = item.metadata[key];
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+};
+
+export const buildWorkspaceIngestKnownRevisions = (
+  items: readonly WorkspaceIngestQueueItem[]
+): WorkspaceIngestKnownRevision[] =>
+  items.flatMap((item) => {
+    const revisionKey = readMetadataString(item, "workspaceManifestRevisionKey");
+    return revisionKey ? [{ documentPath: item.documentPath, revisionKey }] : [];
+  });
+
+export const workspaceIngestPlanItemsToFiles = (
+  items: readonly WorkspaceIngestPlanItem[]
+): WorkspaceFileEntry[] =>
+  items.map((item) => ({
+    id: item.id,
+    name: item.name,
+    path: item.path,
+    kind: "file",
+    chemdKind: item.chemdKind,
+  }));
+
+export const selectRunnableWorkspaceIngestPlanItems = (
+  items: readonly WorkspaceIngestPlanItem[]
+): WorkspaceIngestPlanItem[] =>
+  items.filter((item) => item.disposition === "pending" || item.disposition === "skipped");
+
+export const workspaceIngestManifestRevisionMapFromPlan = (
+  items: readonly WorkspaceIngestPlanItem[]
+): Map<string, string> =>
+  new Map(items.map((item) => [item.path, item.revisionKey]));

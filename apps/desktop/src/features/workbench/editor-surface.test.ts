@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { clampPreviewWidthPercent, formatStatusClockTime, getDelayUntilNextMinute } from "./editor-surface";
+import { clampPreviewWidthPercent, countSourceLines, formatStatusClockTime, getDelayUntilNextMinute } from "./editor-surface";
 
 describe("editor status clock", () => {
   it("formats the current time without seconds", () => {
@@ -21,5 +21,14 @@ describe("editor preview sizing", () => {
     expect(clampPreviewWidthPercent(12)).toBe(28);
     expect(clampPreviewWidthPercent(40)).toBe(40);
     expect(clampPreviewWidthPercent(80)).toBe(62);
+  });
+});
+
+describe("editor source metrics", () => {
+  it("counts source lines without splitting the full document", () => {
+    expect(countSourceLines("")).toBe(1);
+    expect(countSourceLines("a\nb\n")).toBe(3);
+    expect(countSourceLines("a\r\nb")).toBe(2);
+    expect(countSourceLines("a\rb")).toBe(2);
   });
 });

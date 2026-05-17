@@ -12,11 +12,13 @@ const SCHEMA_VERSION: u8 = 1;
 const DEFAULT_OUTPUT_DIR: &str = "chemd-desktop-diagnostics-bundle";
 const SKIP: &str = "SKIP";
 
-const KNOWN_TAURI_COMMANDS: [&str; 40] = [
+const KNOWN_TAURI_COMMANDS: [&str; 42] = [
     "open_workspace",
     "open_workspace_path",
     "list_workspace_files",
     "query_workspace_documents",
+    "query_workspace_index",
+    "build_workspace_ingest_plan",
     "read_workspace_file",
     "write_workspace_file",
     "start_sidecar",

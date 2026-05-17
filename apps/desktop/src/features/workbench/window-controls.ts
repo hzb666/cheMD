@@ -177,10 +177,6 @@ export const useReferenceSnapLayoutButtonRect = (buttonRef: RefObject<HTMLButton
   }, [buttonRef]);
 
   useEffect(() => {
-    scheduleSyncRef.current?.();
-  });
-
-  useEffect(() => {
     let disposed = false;
     const unlisteners: Array<() => void> = [];
 

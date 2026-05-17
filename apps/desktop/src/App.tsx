@@ -25,9 +25,14 @@ import {
 import { useAgentPatchController } from "./hooks/use-agent-patch-controller";
 import { useConnectedRagQueryController, useEmbeddingProviderController } from "./hooks/use-connected-rag-controller";
 import { useSettings, type AutoSaveMode } from "./features/settings/settings";
+import { measureDesktopPerformance } from "./performance-marks";
+import {
+  canUseGatewayForCompleteWorkspaceSemantics,
+  useWorkspaceDataGateway
+} from "./workspace-data/workspace-data-gateway";
 
 import type { AgentMessage } from "./types";
-import type { WorkspaceFileEntry } from "./contracts";
+import type { CommandMap, WorkspaceFileEntry } from "./contracts";
 
 const useDebouncedValue = <T,>(value: T, delayMs: number): T => {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -104,24 +109,32 @@ export const App = () => {
     [workspaceController.workspace.workspaceId],
   );
 
+  const queryWorkspaceIndex = useCallback(
+    (input: CommandMap["query_workspace_index"]["input"]) =>
+      invokeCommand("query_workspace_index", input),
+    [],
+  );
+
   const queryWorkspaceIndexDocuments = useCallback(
-    (input: {
-      workspaceId?: string;
-      query?: string;
-      excludePath?: string;
-      cursor?: number;
-      limit?: number;
-    }) => invokeCommand("query_workspace_documents", input),
+    (input: CommandMap["query_workspace_documents"]["input"]) =>
+      invokeCommand("query_workspace_documents", input),
     [],
   );
 
   const output = useMemo(
     () =>
-      compileChemdForEditor({
-        source: debouncedCompileInput.source,
-        documentUri: debouncedCompileInput.documentUri,
-        options: { strictChemdKind: true, procedureMode: "auto" },
-      }),
+      measureDesktopPerformance(
+        "editor.compile",
+        () => compileChemdForEditor({
+          source: debouncedCompileInput.source,
+          documentUri: debouncedCompileInput.documentUri,
+          options: { strictChemdKind: true, procedureMode: "auto" },
+        }),
+        {
+          documentUri: debouncedCompileInput.documentUri,
+          sourceLength: debouncedCompileInput.source.length,
+        }
+      ),
     [debouncedCompileInput],
   );
 
@@ -135,14 +148,30 @@ export const App = () => {
 
   const semanticPreview = useMemo(() => buildSemanticPreview(output), [output]);
 
+  const workspaceDataGateway = useWorkspaceDataGateway({
+    mode: workspaceController.mode,
+    workspaceState: workspaceController.workspaceState,
+    workspace: workspaceController.workspace,
+    selectedFile: workspaceController.selectedFile,
+    source: workspaceController.source,
+    readFile: readWorkspaceIndexFile,
+    queryIndex: queryWorkspaceIndex,
+  });
+  const canUseCompleteGatewayData = canUseGatewayForCompleteWorkspaceSemantics(
+    workspaceDataGateway.state
+  );
+
   const workspaceIndexController = useWorkspaceIndexController({
     mode: workspaceController.mode,
     workspaceState: workspaceController.workspaceState,
     workspace: workspaceController.workspace,
     files: workspaceController.files,
+    documentFiles: workspaceDataGateway.state === "degraded"
+      ? undefined
+      : workspaceDataGateway.documentFiles,
     selectedFile: workspaceController.selectedFile,
     source: workspaceController.source,
-    readFile: readWorkspaceIndexFile,
+    readFile: workspaceDataGateway.readFile,
     queryDocuments: queryWorkspaceIndexDocuments,
   });
 
@@ -205,7 +234,14 @@ export const App = () => {
   }, [localStoreController.reactionIntelligenceArtifactState.artifact, outputReactionIds]);
 
   const knowledgeMapViewModel = useMemo(
-    () => buildKnowledgeMapViewModel(output, { reactionIntelligenceArtifact: localReactionIntelligenceArtifact }),
+    () => measureDesktopPerformance(
+      "knowledgeMap.viewModel",
+      () => buildKnowledgeMapViewModel(output, { reactionIntelligenceArtifact: localReactionIntelligenceArtifact }),
+      {
+        documentUri: output.documentUri,
+        status: output.status,
+      }
+    ),
     [localReactionIntelligenceArtifact, output],
   );
 
@@ -222,15 +258,25 @@ export const App = () => {
     workspaceState: workspaceController.workspaceState,
     workspace: workspaceController.workspace,
     files: workspaceController.files,
+    documentFiles: canUseCompleteGatewayData
+      ? workspaceDataGateway.documentFiles
+      : undefined,
     selectedFile: workspaceController.selectedFile,
     source: workspaceController.source,
+    readFile: canUseCompleteGatewayData
+      ? workspaceDataGateway.readFile
+      : undefined,
   });
 
-  const updateEditorSource = (nextSource: string) => {
+  const updateEditorSource = useCallback((nextSource: string) => {
     workspaceController.setSource(nextSource);
     persistController.reset();
     localStoreController.reset();
-  };
+  }, [
+    localStoreController.reset,
+    persistController.reset,
+    workspaceController.setSource,
+  ]);
 
   useEffect(() => {
     const rootPath = workspaceController.rootPath.trim();
@@ -252,7 +298,8 @@ export const App = () => {
   }, [
     settings.lastWorkspacePath,
     settings.restoreLastWorkspace,
-    workspaceController,
+    workspaceController.openWorkspacePath,
+    workspaceController.workspaceState,
   ]);
 
   useEffect(() => {
@@ -266,7 +313,12 @@ export const App = () => {
     }
     autostartAttemptedRef.current = true;
     sidecarController.start();
-  }, [settings.sidecarAutostart, sidecarController]);
+  }, [
+    settings.sidecarAutostart,
+    sidecarController.operation,
+    sidecarController.start,
+    sidecarController.status.state,
+  ]);
 
   const dirtyWorkspaceFileSignature = useMemo(
     () => workspaceController.dirtyWorkspaceFileSignature,
@@ -314,6 +366,30 @@ export const App = () => {
     return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
   }, [workspaceController.saveWorkspaceFile]);
 
+  const saveWorkspaceFile = useCallback(() => {
+    void workspaceController.saveWorkspaceFile();
+  }, [workspaceController.saveWorkspaceFile]);
+
+  const openWorkspace = useCallback(() => {
+    void workspaceController.openWorkspace();
+  }, [workspaceController.openWorkspace]);
+
+  const closeFileTab = useCallback((fileId: string) => {
+    void workspaceController.closeFileTab(fileId);
+  }, [workspaceController.closeFileTab]);
+
+  const closeAllFileTabs = useCallback(() => {
+    void workspaceController.closeAllFileTabs();
+  }, [workspaceController.closeAllFileTabs]);
+
+  const openNewTab = useCallback(() => {
+    void workspaceController.openNewTab();
+  }, [workspaceController.openNewTab]);
+
+  const reloadWorkspaceConflict = useCallback(() => {
+    void workspaceController.reloadWorkspaceConflict();
+  }, [workspaceController.reloadWorkspaceConflict]);
+
   const handleSelectFile = useCallback((file: WorkspaceFileEntry) => {
     if (file.id !== workspaceController.selectedFileId) {
       runImmediateWorkspaceAutoSave();
@@ -339,7 +415,10 @@ export const App = () => {
       }
       workspaceController.setMessage(`Jumped to ${currentPath} L${intent.range.startLine}-L${intent.range.endLine}.`);
     },
-    [workspaceController],
+    [
+      workspaceController.selectedFile.path,
+      workspaceController.setMessage,
+    ],
   );
 
   const agentPatchController = useAgentPatchController({
@@ -399,14 +478,14 @@ export const App = () => {
         onResetSettings={resetSettings}
         onRootPathChange={workspaceController.setRootPath}
         onSourceChange={updateEditorSource}
-        onSave={() => void workspaceController.saveWorkspaceFile()}
-        onOpenWorkspace={() => void workspaceController.openWorkspace()}
+        onSave={saveWorkspaceFile}
+        onOpenWorkspace={openWorkspace}
         onSelectFile={handleSelectFile}
-        onCloseFileTab={(fileId) => void workspaceController.closeFileTab(fileId)}
-        onCloseAllFileTabs={() => void workspaceController.closeAllFileTabs()}
+        onCloseFileTab={closeFileTab}
+        onCloseAllFileTabs={closeAllFileTabs}
         onReorderFileTabs={workspaceController.reorderFileTabs}
-        onOpenNewTab={() => void workspaceController.openNewTab()}
-        onReloadWorkspaceConflict={() => void workspaceController.reloadWorkspaceConflict()}
+        onOpenNewTab={openNewTab}
+        onReloadWorkspaceConflict={reloadWorkspaceConflict}
         onKeepLocalWorkspaceConflict={workspaceController.keepLocalWorkspaceConflict}
         onKnowledgeMapSourceJump={handleKnowledgeMapSourceJump}
         onWorkspaceRagQueryChange={connectedRagQueryController.setQuery}

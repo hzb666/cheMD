@@ -55,6 +55,19 @@ export const formatStatusClockTime = (date: Date): string =>
 export const clampPreviewWidthPercent = (value: number): number =>
   Math.min(MAX_PREVIEW_WIDTH_PERCENT, Math.max(MIN_PREVIEW_WIDTH_PERCENT, value));
 
+export const countSourceLines = (source: string): number => {
+  let count = 1;
+  for (let index = 0; index < source.length; index += 1) {
+    const character = source[index];
+    if (character === "\n") {
+      count += 1;
+    } else if (character === "\r" && source[index + 1] !== "\n") {
+      count += 1;
+    }
+  }
+  return count;
+};
+
 const useCurrentMinute = (): Date => {
   const [currentTime, setCurrentTime] = useState(() => new Date());
 
@@ -174,7 +187,7 @@ export function ReferenceDocumentSurface({
   });
   const diagnostics = compileOutput.diagnostics;
   const diagnosticStats = getDiagnosticStats(diagnostics);
-  const lineCount = useMemo(() => source.split(/\r?\n/).length, [source]);
+  const lineCount = useMemo(() => countSourceLines(source), [source]);
   const autoSaveEnabled = settings.autoSaveMode !== "off";
   const autoSaved = autoSaveEnabled && !dirty && Boolean(savedAt);
   const saveStatusLabel = autoSaved ? formatSaveStatusLabel(savedAt) : "Save";

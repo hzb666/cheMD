@@ -87,8 +87,8 @@ export const readLatestLocalReactionIntelligenceArtifact = async ({
   graphIndexId
 }: ReadLatestLocalReactionIntelligenceArtifactInput): Promise<LocalReactionIntelligenceArtifactState> => {
   try {
-    const entries = await listArtifacts(buildListLocalReactionIntelligenceArtifactsInput(graphIndexId));
-    const entry = selectLatestLocalReactionIntelligenceArtifactEntry(entries);
+    const page = await listArtifacts(buildListLocalReactionIntelligenceArtifactsInput(graphIndexId));
+    const entry = selectLatestLocalReactionIntelligenceArtifactEntry(page.entries);
     return entry
       ? { state: "ready", artifact: entry.artifact, entry, error: null }
       : initialLocalReactionIntelligenceArtifactState;

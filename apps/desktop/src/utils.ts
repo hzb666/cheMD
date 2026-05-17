@@ -33,6 +33,7 @@ import type {
 import { formatPostgresDisplayValue } from "./features/postgres/status";
 import { buildPersistRuntimeGraphRagCommandInput } from "./features/runtime/persistence";
 import { isScratchFile } from "./features/workspace/scratch-file";
+import { measureDesktopPerformanceAsync } from "./performance-marks";
 
 // ---------------------------------------------------------------------------
 // Sample sources
@@ -57,7 +58,11 @@ export const invokeCommand = async <Command extends keyof CommandMap>(
   command: Command,
   input: CommandMap[Command]["input"]
 ): Promise<CommandMap[Command]["output"]> =>
-  input === undefined ? invoke(command) : invoke(command, input as Record<string, unknown>);
+  measureDesktopPerformanceAsync(
+    "tauri.invoke",
+    () => input === undefined ? invoke(command) : invoke(command, input as Record<string, unknown>),
+    { command: String(command) }
+  );
 
 export const redactSensitiveRuntimeText = (message: string): string =>
   message

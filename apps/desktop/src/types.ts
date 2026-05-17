@@ -248,8 +248,12 @@ export type WorkspaceIngestControllerInput = {
 // ════════════════════════════════════════════════════════════════════════
 
 export type WorkspaceSymbolIndexControllerInput = WorkspaceIngestControllerInput & {
+  documentFiles?: readonly WorkspaceFileEntry[];
   selectedFile: WorkspaceFileEntry;
   source: string;
+  readFile?: (
+    file: WorkspaceFileEntry
+  ) => Promise<{ content: string; modifiedAtMs?: number | null; contentHash?: string | null }>;
 };
 
 export type WorkspaceSymbolIndexControllerState = {

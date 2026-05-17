@@ -215,6 +215,28 @@ describe("desktop local store contract builder", () => {
     expect(entry.syncedAt).toBe(createdAt);
   });
 
+  it("locks paged local list command output shapes", () => {
+    const outboxEntry = buildOutboxEntry("pending");
+    const outboxPage: CommandMap["list_local_outbox"]["output"] = {
+      entries: [outboxEntry],
+      totalCount: 2,
+      nextCursor: 1
+    };
+    const artifactEntry = buildLocalReactionIntelligenceArtifactInput(
+      buildReactionIntelligenceArtifact()
+    );
+    const artifactPage: CommandMap["list_local_reaction_intelligence_artifacts"]["output"] = {
+      entries: [{ ...artifactEntry, updatedAt: createdAt }],
+      totalCount: 1,
+      nextCursor: null
+    };
+
+    expect(outboxPage.entries[0]).toBe(outboxEntry);
+    expect(outboxPage.nextCursor).toBe(1);
+    expect(artifactPage.totalCount).toBe(1);
+    expect(artifactPage.nextCursor).toBeNull();
+  });
+
   it("locks the sync local outbox command output shape", () => {
     const entry: LocalOutboxSyncEntryResult = {
       localId: "local-runtime-snapshot:workspace:revision:snapshot",

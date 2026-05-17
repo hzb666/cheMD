@@ -8,8 +8,8 @@ use tauri_plugin_dialog::DialogExt;
 use crate::{
     workspace_file_io::{read_workspace_file_impl, write_workspace_file_impl},
     workspace_io::{
-        canonical_workspace_root, list_workspace_files_impl, query_workspace_documents_impl,
-        workspace_handle,
+        build_workspace_ingest_plan_impl, canonical_workspace_root, list_workspace_files_impl,
+        query_workspace_documents_impl, query_workspace_index_impl, workspace_handle,
     },
 };
 
@@ -61,6 +61,96 @@ pub struct WorkspaceDocumentQueryOptions {
 pub struct WorkspaceDocumentQueryResult {
     pub(crate) files: Vec<WorkspaceFileEntry>,
     pub(crate) total_count: usize,
+    pub(crate) next_cursor: Option<usize>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceIndexQueryOptions {
+    pub(crate) query: Option<String>,
+    pub(crate) kind: Option<String>,
+    pub(crate) document_path: Option<String>,
+    pub(crate) cursor: Option<usize>,
+    pub(crate) limit: Option<usize>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceIndexRow {
+    pub(crate) id: String,
+    pub(crate) name: String,
+    pub(crate) path: String,
+    pub(crate) kind: String,
+    pub(crate) chemd_kind: Option<String>,
+    pub(crate) bytes: u64,
+    pub(crate) modified_at_ms: Option<u64>,
+    pub(crate) revision_key: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceIndexSummary {
+    pub(crate) total_count: usize,
+    pub(crate) returned_count: usize,
+    pub(crate) document_count: usize,
+    pub(crate) cursor: usize,
+    pub(crate) limit: usize,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceIndexQueryResult {
+    pub(crate) rows: Vec<WorkspaceIndexRow>,
+    pub(crate) summary: WorkspaceIndexSummary,
+    pub(crate) next_cursor: Option<usize>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceIngestKnownRevision {
+    pub(crate) document_path: String,
+    pub(crate) revision_key: String,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceIngestPlanOptions {
+    pub(crate) cursor: Option<usize>,
+    pub(crate) limit: Option<usize>,
+    pub(crate) known_revisions: Option<Vec<WorkspaceIngestKnownRevision>>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceIngestPlanItem {
+    pub(crate) id: String,
+    pub(crate) name: String,
+    pub(crate) path: String,
+    pub(crate) chemd_kind: Option<String>,
+    pub(crate) bytes: u64,
+    pub(crate) modified_at_ms: Option<u64>,
+    pub(crate) revision_key: String,
+    pub(crate) disposition: String,
+    pub(crate) reason: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceIngestPlanSummary {
+    pub(crate) total_count: usize,
+    pub(crate) returned_count: usize,
+    pub(crate) pending_count: usize,
+    pub(crate) unchanged_count: usize,
+    pub(crate) skipped_count: usize,
+    pub(crate) cursor: usize,
+    pub(crate) limit: usize,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceIngestPlanResult {
+    pub(crate) items: Vec<WorkspaceIngestPlanItem>,
+    pub(crate) summary: WorkspaceIngestPlanSummary,
     pub(crate) next_cursor: Option<usize>,
 }
 
@@ -146,6 +236,46 @@ pub fn query_workspace_documents(
         limit,
     };
     query_workspace_documents_impl(&id, &root, &options)
+}
+
+#[cfg(not(test))]
+#[tauri::command]
+pub fn query_workspace_index(
+    workspace_id: Option<String>,
+    query: Option<String>,
+    kind: Option<String>,
+    document_path: Option<String>,
+    cursor: Option<usize>,
+    limit: Option<usize>,
+    registry: tauri::State<'_, WorkspaceRegistry>,
+) -> Result<WorkspaceIndexQueryResult, CommandError> {
+    let (id, root) = resolve_workspace(workspace_id, &registry)?;
+    let options = WorkspaceIndexQueryOptions {
+        query,
+        kind,
+        document_path,
+        cursor,
+        limit,
+    };
+    query_workspace_index_impl(&id, &root, &options)
+}
+
+#[cfg(not(test))]
+#[tauri::command]
+pub fn build_workspace_ingest_plan(
+    workspace_id: Option<String>,
+    cursor: Option<usize>,
+    limit: Option<usize>,
+    known_revisions: Option<Vec<WorkspaceIngestKnownRevision>>,
+    registry: tauri::State<'_, WorkspaceRegistry>,
+) -> Result<WorkspaceIngestPlanResult, CommandError> {
+    let (id, root) = resolve_workspace(workspace_id, &registry)?;
+    let options = WorkspaceIngestPlanOptions {
+        cursor,
+        limit,
+        known_revisions,
+    };
+    build_workspace_ingest_plan_impl(&id, &root, &options)
 }
 
 #[cfg(not(test))]

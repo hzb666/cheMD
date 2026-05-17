@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-3.md`
-- **Total Sessions**: 100
+- **Total Sessions**: 113
 - **Last Active**: 2026-05-17
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-3.md` | ~536 | Active |
+| `journal-3.md` | ~1056 | Active |
 | `journal-2.md` | ~1956 | Archived |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
@@ -31,6 +31,19 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 113 | 2026-05-17 | Regression review and test hardening | `31e5298` | `develop` |
+| 112 | 2026-05-17 | Phase 9 dock panel primitives | `e5ccdb6` | `develop` |
+| 111 | 2026-05-17 | Phase 8 Workbench render boundary cleanup | `c8f43a4` | `develop` |
+| 110 | 2026-05-17 | Phase 7 local-store list pagination | `96076f7` | `develop` |
+| 109 | 2026-05-17 | Phase 6 Knowledge Map and window rect sync | `48f92a9` | `develop` |
+| 108 | 2026-05-17 | Phase 6 Monaco editor surface micro-optimizations | `ee0a235` | `develop` |
+| 107 | 2026-05-17 | Phase 5 preview hydration queue and cache | `586d4de` | `develop` |
+| 106 | 2026-05-17 | Phase 5 lazy active dock panel construction | `e919915` | `develop` |
+| 105 | 2026-05-17 | Phase 4 Rust workspace ingest plan command | `4f925ff` | `develop` |
+| 104 | 2026-05-17 | Phase 3 workspace symbol gateway migration | `f9b0cec` | `develop` |
+| 103 | 2026-05-17 | Phase 2 WorkspaceDataGateway foundation | `98396f9` | `develop` |
+| 102 | 2026-05-17 | Phase 1 Rust workspace manifest query | `33c03fc` | `develop` |
+| 101 | 2026-05-17 | Phase 0 desktop IDE performance baseline instrumentation | `c7047be` | `develop` |
 | 100 | 2026-05-17 | Reaction intelligence core finishwork | `8b25e11` | `develop` |
 | 99 | 2026-05-17 | Chemd 0.6 desktop finishwork | `2055d35` | `develop` |
 | 98 | 2026-05-16 | Desktop IDE 产品化重组收尾 | `4670c0e` | `desktop-ide` |

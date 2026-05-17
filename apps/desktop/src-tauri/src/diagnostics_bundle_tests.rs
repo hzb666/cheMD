@@ -27,6 +27,8 @@ fn export_diagnostics_bundle_writes_parseable_json() {
     assert!(json.contains("run_reaction_intelligence_worker"));
     assert!(json.contains("save_local_reaction_intelligence_artifact"));
     assert!(json.contains("query_workspace_documents"));
+    assert!(json.contains("query_workspace_index"));
+    assert!(json.contains("build_workspace_ingest_plan"));
     assert!(json.contains("list_local_reaction_intelligence_artifacts"));
     assert!(json.contains("sync_local_outbox_to_postgres"));
     assert!(json.contains("list_postgres_profiles"));

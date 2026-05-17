@@ -11,6 +11,12 @@ import {
   selectLatestLocalReactionIntelligenceArtifactEntry
 } from "./artifact-controller";
 
+const artifactPage = (entries: LocalReactionIntelligenceArtifactEntry[]) => ({
+  entries,
+  totalCount: entries.length,
+  nextCursor: null
+});
+
 const artifact = (
   artifactId: string,
   generatedAt: string
@@ -72,7 +78,7 @@ describe("desktop reaction intelligence artifact controller", () => {
 
   it("returns null artifact state for empty local artifact lists", async () => {
     const result = await readLatestLocalReactionIntelligenceArtifact({
-      listArtifacts: async () => []
+      listArtifacts: async () => artifactPage([])
     });
 
     expect(result).toEqual({
@@ -101,7 +107,7 @@ describe("desktop reaction intelligence artifact controller", () => {
   it("passes through the stored artifact object without reshaping it", async () => {
     const latest = entry("artifact-latest", "2026-05-13T09:00:00.000Z");
     const result = await readLatestLocalReactionIntelligenceArtifact({
-      listArtifacts: async () => [latest]
+      listArtifacts: async () => artifactPage([latest])
     });
 
     expect(result.state).toBe("ready");

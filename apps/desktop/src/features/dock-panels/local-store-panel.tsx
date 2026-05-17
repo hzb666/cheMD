@@ -21,26 +21,43 @@ import {
   redactSensitiveRuntimeText,
   summarizeLocalId,
 } from "../../utils";
+import {
+  DockPanelButton,
+  dockPanelActionRowClassName,
+  dockPanelCardClassName,
+  dockPanelEmptyCopyClassName,
+  dockPanelHeadingClassName,
+  dockPanelListClassName,
+  dockPanelListItemClassName,
+  dockPanelLogClassName,
+  dockPanelMessageClassName,
+  dockPanelMetricCellClassName,
+  dockPanelMetricGridClassName,
+  dockPanelMetricTermClassName,
+  dockPanelMetricValueClassName,
+  dockPanelClassName,
+  dockPanelSubheadClassName,
+} from "./panel-primitives";
 
-const panelClassName = "flex min-h-0 flex-col gap-3 rounded-xl border border-white/35 bg-white/15 p-3 text-sm shadow-none";
-const headingClassName = "flex items-center justify-between gap-2";
-const subheadClassName = "flex items-center gap-2 text-xs font-medium text-muted-foreground";
-const actionRowClassName = "flex flex-wrap items-center gap-2";
-const messageClassName = "m-0 text-xs leading-relaxed text-muted-foreground data-[tone=danger]:text-destructive data-[tone=warning]:text-warning";
-const cardClassName = "rounded-xl border border-white/35 bg-white/18 p-3";
+const panelClassName = dockPanelClassName;
+const headingClassName = dockPanelHeadingClassName;
+const subheadClassName = dockPanelSubheadClassName;
+const actionRowClassName = dockPanelActionRowClassName;
+const messageClassName = dockPanelMessageClassName;
+const cardClassName = dockPanelCardClassName;
 const statusRowClassName = "flex items-center gap-2";
 const statusPillClassName = "rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary";
 const statusMessageClassName = "m-0 min-w-0 flex-1 truncate text-xs text-muted-foreground";
-const summaryGridClassName = "grid grid-cols-[repeat(auto-fit,minmax(8rem,1fr))] gap-2 text-xs";
-const summaryCellClassName = "min-w-0 rounded-lg border border-white/35 bg-white/18 px-2.5 py-2";
-const summaryTermClassName = "m-0 truncate text-xs font-medium uppercase text-muted-foreground";
-const summaryValueClassName = "mt-0.5 truncate font-mono text-xs text-foreground";
-const listClassName = "m-0 flex list-none flex-col gap-2 p-0";
-const listItemClassName = "min-w-0 rounded-xl border border-white/35 bg-white/18 p-2 text-xs";
-const logClassName = "flex max-h-40 min-h-20 flex-col gap-1 overflow-auto rounded-xl border bg-slate-950/90 p-3 font-mono text-xs text-slate-100";
-const fieldsClassName = "grid grid-cols-[repeat(auto-fit,minmax(8rem,1fr))] gap-2 text-xs";
+const summaryGridClassName = dockPanelMetricGridClassName;
+const summaryCellClassName = dockPanelMetricCellClassName;
+const summaryTermClassName = dockPanelMetricTermClassName;
+const summaryValueClassName = dockPanelMetricValueClassName;
+const listClassName = dockPanelListClassName;
+const listItemClassName = dockPanelListItemClassName;
+const logClassName = dockPanelLogClassName;
+const fieldsClassName = dockPanelMetricGridClassName;
 const fieldWideClassName = "col-span-full";
-const emptyCopyClassName = "m-0 text-xs leading-relaxed text-muted-foreground";
+const emptyCopyClassName = dockPanelEmptyCopyClassName;
 
 // ---------------------------------------------------------------------------
 // LocalStoreButton
@@ -63,12 +80,16 @@ export const LocalStoreButton = ({
   disabled: boolean;
   onClick: () => void;
 }) => {
-  const loading = activeOperation === operation;
   return (
-    <Button variant="outline" size="sm" disabled={disabled} aria-busy={loading} onClick={onClick}>
-      <Icon size={14} />
-      <span>{loading ? loadingLabel : label}</span>
-    </Button>
+    <DockPanelButton
+      label={label}
+      loadingLabel={loadingLabel}
+      icon={Icon}
+      operation={operation}
+      activeOperation={activeOperation}
+      disabled={disabled}
+      onClick={onClick}
+    />
   );
 };
 

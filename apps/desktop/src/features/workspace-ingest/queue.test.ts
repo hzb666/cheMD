@@ -7,9 +7,13 @@ import type {
 } from "../../contracts";
 import {
   buildWorkspaceIngestOutboxInputs,
+  buildWorkspaceIngestKnownRevisions,
   buildWorkspaceIngestQueueItem,
   deriveWorkspaceIngestQueueSummary,
-  runWorkspaceIngest
+  runWorkspaceIngest,
+  selectRunnableWorkspaceIngestPlanItems,
+  workspaceIngestManifestRevisionMapFromPlan,
+  workspaceIngestPlanItemsToFiles
 } from "./queue";
 import { buildLocalRuntimeSnapshotInput } from "../local-store/store";
 
@@ -128,6 +132,81 @@ describe("desktop workspace ingest queue builder", () => {
     expect(item.graphSnapshotId).toBe("compile-snapshot-1");
     expect(item.metadata.compileOutputHash).toMatch(/^fnv1a:/);
     expect(item.revisionHash).toMatch(/^fnv1a:/);
+  });
+
+  it("stores backend manifest revision keys for later unchanged planning", async () => {
+    const [item] = (await runWorkspaceIngest({
+      workspaceId: "workspace-alpha",
+      files: [{ id: "alpha", name: "alpha.chemd", path: "experiments/alpha.chemd", kind: "file" }],
+      manifestRevisionKeys: new Map([["experiments/alpha.chemd", "meta:12:99"]]),
+      readFile: () => ({ content: "source:alpha", modifiedAtMs: 99 }),
+      compile: () => ({ status: "ok", graphSnapshot: { graphSnapshotId: "snapshot-alpha" } }),
+      createdAt
+    })).items;
+
+    expect(item.metadata.workspaceManifestRevisionKey).toBe("meta:12:99");
+    expect(buildWorkspaceIngestKnownRevisions([item])).toEqual([{
+      documentPath: "experiments/alpha.chemd",
+      revisionKey: "meta:12:99"
+    }]);
+  });
+
+  it("maps backend ingest plan items to frontend files and revision cache", () => {
+    const planItems = [{
+      id: "workspace:alpha",
+      name: "alpha.chemd",
+      path: "experiments/alpha.chemd",
+      chemdKind: "document" as const,
+      bytes: 12,
+      modifiedAtMs: 99,
+      revisionKey: "meta:12:99",
+      disposition: "pending" as const,
+      reason: "revision_changed" as const
+    }];
+
+    expect(workspaceIngestPlanItemsToFiles(planItems)).toEqual([{
+      id: "workspace:alpha",
+      name: "alpha.chemd",
+      path: "experiments/alpha.chemd",
+      kind: "file",
+      chemdKind: "document"
+    }]);
+    expect(workspaceIngestManifestRevisionMapFromPlan(planItems).get("experiments/alpha.chemd"))
+      .toBe("meta:12:99");
+  });
+
+  it("keeps pending documents and skipped markdown runnable while excluding unchanged documents", () => {
+    const pending = {
+      id: "workspace:alpha",
+      name: "alpha.chemd",
+      path: "alpha.chemd",
+      chemdKind: "document" as const,
+      bytes: 12,
+      modifiedAtMs: 99,
+      revisionKey: "meta:12:99",
+      disposition: "pending" as const,
+      reason: "revision_changed" as const
+    };
+    const skipped = {
+      ...pending,
+      id: "workspace:notes",
+      name: "notes.md",
+      path: "notes.md",
+      chemdKind: "unknown" as const,
+      disposition: "skipped" as const,
+      reason: "non_chemd_markdown" as const
+    };
+    const unchanged = {
+      ...pending,
+      id: "workspace:unchanged",
+      name: "unchanged.chemd",
+      path: "unchanged.chemd",
+      disposition: "unchanged" as const,
+      reason: "revision_match" as const
+    };
+
+    expect(selectRunnableWorkspaceIngestPlanItems([pending, skipped, unchanged]))
+      .toEqual([pending, skipped]);
   });
 
   it("counts failed, skipped, running, pending, synced, and retryable items", () => {

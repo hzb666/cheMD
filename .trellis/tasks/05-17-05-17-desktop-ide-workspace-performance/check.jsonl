@@ -1,0 +1,13 @@
+{"file": ".trellis/workflow.md", "reason": "Completion, commit, and session-record requirements"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Review data flow, boundary contracts, and stale result handling"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Review reuse of workspace policies, command DTOs, caches, and UI primitives"}
+{"file": ".trellis/spec/compiler/backend/error-handling.md", "reason": "Review explicit diagnostics and failure behavior for compiler-adjacent paths"}
+{"file": ".trellis/spec/storage-postgres/backend/storage-contract.md", "reason": "Review persistence contract compatibility when ingest/RAG paths change"}
+{"file": "apps/desktop/src/contracts.ts", "reason": "Check Rust/TypeScript command contract synchronization"}
+{"file": "apps/desktop/src-tauri/src/lib.rs", "reason": "Check invoke handler registration for new or changed commands"}
+{"file": "apps/desktop/src-tauri/src/diagnostics_bundle.rs", "reason": "Check diagnostics bundle command list remains current"}
+{"file": "apps/desktop/src-tauri/src/workspace_tests.rs", "reason": "Check Rust workspace command coverage"}
+{"file": "apps/desktop/src/workspace-index/workspace-index.test.ts", "reason": "Check workspace index semantic regression coverage"}
+{"file": "apps/desktop/src/features/workspace-ingest/runner.test.ts", "reason": "Check ingest idempotency and outbox semantics"}
+{"file": "apps/desktop/src/features/editor/monaco-chemd-editor.test.ts", "reason": "Check Monaco editor behavior after optimization"}
+{"file": "apps/desktop/src/knowledge-map/knowledge-map.test.ts", "reason": "Check graph/view-model behavior where possible"}

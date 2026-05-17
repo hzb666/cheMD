@@ -81,6 +81,22 @@ pub(crate) struct LocalReactionIntelligenceArtifactRecord {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct LocalReactionIntelligenceArtifactListResult {
+    pub(crate) entries: Vec<LocalReactionIntelligenceArtifactRecord>,
+    pub(crate) total_count: usize,
+    pub(crate) next_cursor: Option<usize>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct LocalOutboxListResult {
+    pub(crate) entries: Vec<LocalOutboxRecord>,
+    pub(crate) total_count: usize,
+    pub(crate) next_cursor: Option<usize>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct LocalReactionIntelligenceArtifactSaveResult {
     pub(crate) local_id: String,
     pub(crate) idempotency_key: String,

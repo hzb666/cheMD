@@ -275,6 +275,7 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
   const cursorDisposableRef = useRef<{ dispose: () => void } | null>(null);
   const blurDisposableRef = useRef<{ dispose: () => void } | null>(null);
   const contentDisposableRef = useRef<{ dispose: () => void } | null>(null);
+  const undoRedoNotifyTimeoutRef = useRef<number | null>(null);
   const onSaveRef = useRef(onSave);
   const onBlurSaveRef = useRef(onBlurSave);
   const onUndoRedoStateChangeRef = useRef(onUndoRedoStateChange);
@@ -337,6 +338,9 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
     cursorDisposableRef.current?.dispose();
     blurDisposableRef.current?.dispose();
     contentDisposableRef.current?.dispose();
+    if (undoRedoNotifyTimeoutRef.current !== null) {
+      window.clearTimeout(undoRedoNotifyTimeoutRef.current);
+    }
   }, []);
 
   useEffect(() => {
@@ -344,7 +348,8 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
     if (!shellElement) return;
 
     const updateScrollPadding = () => {
-      setScrollBottomPadding(Math.round(shellElement.clientHeight / 2));
+      const nextPadding = Math.round(shellElement.clientHeight / 2);
+      setScrollBottomPadding((current) => current === nextPadding ? current : nextPadding);
     };
 
     updateScrollPadding();
@@ -356,6 +361,16 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
   const notifyUndoRedoState = useCallback(() => {
     onUndoRedoStateChangeRef.current?.(readUndoRedoState(editorRef.current));
   }, []);
+
+  const scheduleUndoRedoStateNotification = useCallback(() => {
+    if (undoRedoNotifyTimeoutRef.current !== null) {
+      return;
+    }
+    undoRedoNotifyTimeoutRef.current = window.setTimeout(() => {
+      undoRedoNotifyTimeoutRef.current = null;
+      notifyUndoRedoState();
+    }, 0);
+  }, [notifyUndoRedoState]);
 
   const syncMarkers = useCallback(() => {
     const editorInstance = editorRef.current;
@@ -389,7 +404,7 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
       if (!editorInstance) return false;
       editorInstance.trigger("keyboard", "redo", null);
       editorInstance.focus();
-      window.setTimeout(notifyUndoRedoState, 0);
+      scheduleUndoRedoStateNotification();
       return true;
     },
     undo: () => {
@@ -397,10 +412,10 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
       if (!editorInstance) return false;
       editorInstance.trigger("keyboard", "undo", null);
       editorInstance.focus();
-      window.setTimeout(notifyUndoRedoState, 0);
+      scheduleUndoRedoStateNotification();
       return true;
     }
-  }), [notifyUndoRedoState]);
+  }), [scheduleUndoRedoStateNotification]);
 
   const handleBeforeMount = useCallback<BeforeMount>((monaco) => {
     registerChemdLanguage(monaco);
@@ -432,15 +447,46 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
       onBlurSaveRef.current?.();
     });
     contentDisposableRef.current = editorInstance.onDidChangeModelContent(() => {
-      window.setTimeout(notifyUndoRedoState, 0);
+      scheduleUndoRedoStateNotification();
     });
     notifyUndoRedoState();
     syncMarkers();
-  }, [notifyUndoRedoState, onCursorPositionChange, syncMarkers]);
+  }, [notifyUndoRedoState, onCursorPositionChange, scheduleUndoRedoStateNotification, syncMarkers]);
 
   const handleChange = useCallback<OnChange>((nextValue) => {
     onChange(nextValue ?? "");
   }, [onChange]);
+
+  const editorOptions = useMemo<editor.IStandaloneEditorConstructionOptions>(() => ({
+    automaticLayout: true,
+    fixedOverflowWidgets: true,
+    fontFamily: EDITOR_FONT_FAMILY,
+    fontLigatures: false,
+    fontSize: typography.fontSize,
+    letterSpacing: 0,
+    lineHeight: typography.lineHeight,
+    disableMonospaceOptimizations: true,
+    glyphMargin: true,
+    lineDecorationsWidth: 12,
+    lineNumbers: editorSettings.lineNumbers,
+    lineNumbersMinChars: editorSettings.lineNumbers === "off" ? 0 : 4,
+    minimap: { enabled: editorSettings.minimap },
+    renderLineHighlight: "line",
+    renderWhitespace: "selection",
+    padding: { bottom: scrollBottomPadding },
+    scrollBeyondLastLine: false,
+    smoothScrolling: true,
+    tabSize: 2,
+    wordWrap: editorSettings.wordWrap ? "on" : "off",
+    wrappingStrategy: "advanced"
+  }), [
+    editorSettings.lineNumbers,
+    editorSettings.minimap,
+    editorSettings.wordWrap,
+    scrollBottomPadding,
+    typography.fontSize,
+    typography.lineHeight,
+  ]);
 
   return (
     <div ref={shellRef} className="monaco-shell min-h-0 flex-1 overflow-hidden bg-[var(--reference-surface-bg)]" data-language={CHEMD_LANGUAGE_ID}>
@@ -455,29 +501,7 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
         onMount={handleMount}
         onChange={handleChange}
         loading={<div className="monaco-loading flex h-full w-full items-center justify-center text-sm text-muted-foreground">Loading Monaco editor...</div>}
-        options={{
-          automaticLayout: true,
-          fixedOverflowWidgets: true,
-          fontFamily: EDITOR_FONT_FAMILY,
-          fontLigatures: false,
-          fontSize: typography.fontSize,
-          letterSpacing: 0,
-          lineHeight: typography.lineHeight,
-          disableMonospaceOptimizations: true,
-          glyphMargin: true,
-          lineDecorationsWidth: 12,
-          lineNumbers: editorSettings.lineNumbers,
-          lineNumbersMinChars: editorSettings.lineNumbers === "off" ? 0 : 4,
-          minimap: { enabled: editorSettings.minimap },
-          renderLineHighlight: "line",
-          renderWhitespace: "selection",
-          padding: { bottom: scrollBottomPadding },
-          scrollBeyondLastLine: false,
-          smoothScrolling: true,
-          tabSize: 2,
-          wordWrap: editorSettings.wordWrap ? "on" : "off",
-          wrappingStrategy: "advanced"
-        }}
+        options={editorOptions}
       />
     </div>
   );

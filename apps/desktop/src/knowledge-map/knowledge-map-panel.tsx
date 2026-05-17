@@ -966,6 +966,29 @@ const documentLinkColor = (link: DocumentForceGraphLink): string =>
 const documentGraphLabel = (node: DocumentForceGraphNode): string =>
   `${node.label}<br/>${node.symbolCount} symbols`;
 
+export const documentForceGraphStructureKey = (
+  graph: DocumentForceGraphData
+): string =>
+  JSON.stringify({
+    nodes: graph.nodes.map((node) => [
+      node.id,
+      node.path,
+      node.status,
+      node.symbolCount,
+      node.incomingCount,
+      node.outgoingCount,
+      node.internalReferenceCount
+    ]),
+    links: graph.links.map((link) => [
+      link.id,
+      typeof link.source === "string" ? link.source : link.source.id,
+      typeof link.target === "string" ? link.target : link.target.id,
+      link.referenceCount,
+      link.statuses,
+      link.fields
+    ])
+  });
+
 const DocumentGraphCanvas = ({
   graph,
   selectedDocumentId,
@@ -984,6 +1007,11 @@ const DocumentGraphCanvas = ({
   }), [graph, selectedDocumentId]);
 
   const graphDataRef = useRef(graphData);
+  const graphStructureKey = useMemo(
+    () => documentForceGraphStructureKey(graph),
+    [graph]
+  );
+  const graphStructureKeyRef = useRef(graphStructureKey);
   useEffect(() => {
     graphDataRef.current = graphData;
   }, [graphData]);
@@ -1030,10 +1058,17 @@ const DocumentGraphCanvas = ({
   }, [onSelectDocument]);
 
   useEffect(() => {
-    graphRef.current
-      ?.graphData(graphData)
-      .d3ReheatSimulation();
-  }, [graphData]);
+    const graphInstance = graphRef.current;
+    if (!graphInstance) {
+      return;
+    }
+    const structureChanged = graphStructureKeyRef.current !== graphStructureKey;
+    graphStructureKeyRef.current = graphStructureKey;
+    graphInstance.graphData(graphData);
+    if (structureChanged) {
+      graphInstance.d3ReheatSimulation();
+    }
+  }, [graphData, graphStructureKey]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -1143,6 +1178,28 @@ const reactionLinkColor = (link: ReactionForceGraphLink): string =>
 const forceGraphLabel = (node: ReactionForceGraphNode): string =>
   `${node.label}<br/>${node.qualityTier}`;
 
+export const reactionForceGraphStructureKey = (
+  graphData: ReactionForceGraphData
+): string =>
+  JSON.stringify({
+    nodes: graphData.nodes.map((node) => [
+      node.id,
+      node.reactionId,
+      node.label,
+      node.clusterId,
+      node.qualityTier,
+      node.x,
+      node.y
+    ]),
+    links: graphData.links.map((link) => [
+      link.edgeId,
+      typeof link.source === "string" ? link.source : link.source.id,
+      typeof link.target === "string" ? link.target : link.target.id,
+      link.basis,
+      link.score
+    ])
+  });
+
 const ReactionLayoutCanvas = ({
   nodes,
   edges,
@@ -1158,6 +1215,11 @@ const ReactionLayoutCanvas = ({
   );
 
   const graphDataRef = useRef(graphData);
+  const graphStructureKey = useMemo(
+    () => reactionForceGraphStructureKey(graphData),
+    [graphData]
+  );
+  const graphStructureKeyRef = useRef(graphStructureKey);
   useEffect(() => {
     graphDataRef.current = graphData;
   }, [graphData]);
@@ -1203,10 +1265,17 @@ const ReactionLayoutCanvas = ({
   }, [onSelectReaction]);
 
   useEffect(() => {
-    graphRef.current
-      ?.graphData(graphData)
-      .d3ReheatSimulation();
-  }, [graphData]);
+    const graph = graphRef.current;
+    if (!graph) {
+      return;
+    }
+    const structureChanged = graphStructureKeyRef.current !== graphStructureKey;
+    graphStructureKeyRef.current = graphStructureKey;
+    graph.graphData(graphData);
+    if (structureChanged) {
+      graph.d3ReheatSimulation();
+    }
+  }, [graphData, graphStructureKey]);
 
   useEffect(() => {
     const container = containerRef.current;

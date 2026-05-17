@@ -1,6 +1,8 @@
 import {
   lazy,
   Suspense,
+  useCallback,
+  useMemo,
   useState,
   type CSSProperties,
 } from "react";
@@ -43,14 +45,17 @@ export const Workbench = (props: WorkbenchProps) => {
   const [sidebarWidth, setSidebarWidth] = useState(300);
   const [previewVisible, setPreviewVisible] = useState(false);
   const [bottomPanel, setBottomPanel] = useState<ReferenceBottomPanelId | null>(null);
-  const insightProps = buildInsightPaneProps(activeTool, props);
+  const insightProps = useMemo(
+    () => buildInsightPaneProps(activeTool, props),
+    [activeTool, props]
+  );
   const { shellRef, beginResize } = useReferenceSidebarResize(
     sidebarVisible,
     sidebarWidth,
     setSidebarWidth
   );
 
-  const selectActivityTool = (tool: ActivityTool) => {
+  const selectActivityTool = useCallback((tool: ActivityTool) => {
     if (tool === activeTool) {
       setSidebarVisible((current) => !current);
       return;
@@ -61,16 +66,18 @@ export const Workbench = (props: WorkbenchProps) => {
     if (tool === "graph") {
       setPreviewVisible(false);
     }
-  };
-  const toggleTerminalPanel = () => {
+  }, [activeTool]);
+  const toggleTerminalPanel = useCallback(() => {
     setBottomPanel((current) => current === "terminal" ? null : "terminal");
-  };
-  const toggleDiagnosticsPanel = () => {
+  }, []);
+  const toggleDiagnosticsPanel = useCallback(() => {
     setBottomPanel((current) => current === "diagnostics" ? null : "diagnostics");
-  };
-  const togglePreview = () => {
+  }, []);
+  const togglePreview = useCallback(() => {
     setPreviewVisible((current) => !current);
-  };
+  }, []);
+  const closeGraphPane = useCallback(() => setActiveTool("files"), []);
+  const closeBottomPanel = useCallback(() => setBottomPanel(null), []);
 
   return (
     <main
@@ -159,7 +166,7 @@ export const Workbench = (props: WorkbenchProps) => {
               {!previewVisible && activeTool === "graph" ? (
                 <ReferenceGraphPane
                   props={insightProps}
-                  onClose={() => setActiveTool("files")}
+                  onClose={closeGraphPane}
                 />
               ) : null}
             </div>
@@ -170,7 +177,7 @@ export const Workbench = (props: WorkbenchProps) => {
                 compileOutput={props.output}
                 compileError={props.compileError}
                 onSelectPanel={setBottomPanel}
-                onClose={() => setBottomPanel(null)}
+                onClose={closeBottomPanel}
               />
             ) : null}
           </section>

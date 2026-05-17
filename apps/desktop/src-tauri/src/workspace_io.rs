@@ -1,11 +1,14 @@
 use crate::workspace::{
     not_selected, CommandError, WorkspaceDocumentQueryOptions, WorkspaceDocumentQueryResult,
-    WorkspaceFileEntry, WorkspaceHandle,
+    WorkspaceFileEntry, WorkspaceHandle, WorkspaceIndexQueryOptions, WorkspaceIndexQueryResult,
+    WorkspaceIndexRow, WorkspaceIndexSummary, WorkspaceIngestPlanItem, WorkspaceIngestPlanOptions,
+    WorkspaceIngestPlanResult, WorkspaceIngestPlanSummary,
 };
 use crate::workspace_path::{chemd_kind_for_path, relative_path};
 use std::{
     fs,
     path::{Path, PathBuf},
+    time::UNIX_EPOCH,
 };
 
 const MAX_DEPTH: usize = 6;
@@ -13,6 +16,10 @@ const MAX_ENTRIES: usize = 1_000;
 const MAX_CHILDREN_PER_DIR: usize = 256;
 const DEFAULT_DOCUMENT_QUERY_LIMIT: usize = 100;
 const MAX_DOCUMENT_QUERY_LIMIT: usize = 250;
+const DEFAULT_INDEX_QUERY_LIMIT: usize = 100;
+const MAX_INDEX_QUERY_LIMIT: usize = 500;
+const DEFAULT_INGEST_PLAN_LIMIT: usize = 100;
+const MAX_INGEST_PLAN_LIMIT: usize = 500;
 const IGNORED_DIRS: &[&str] = &[
     ".git",
     ".hg",
@@ -140,6 +147,130 @@ pub(crate) fn query_workspace_documents_impl(
     })
 }
 
+pub(crate) fn query_workspace_index_impl(
+    workspace_id: &str,
+    root: &Path,
+    options: &WorkspaceIndexQueryOptions,
+) -> Result<WorkspaceIndexQueryResult, CommandError> {
+    let query = normalized_query(options.query.as_deref());
+    let kind = normalized_query(options.kind.as_deref());
+    let document_path = options
+        .document_path
+        .as_deref()
+        .map(normalize_workspace_path)
+        .filter(|value| !value.is_empty());
+    let cursor = options.cursor.unwrap_or(0);
+    let limit = options
+        .limit
+        .unwrap_or(DEFAULT_INDEX_QUERY_LIMIT)
+        .clamp(1, MAX_INDEX_QUERY_LIMIT);
+    let files = list_workspace_files_impl(workspace_id, root)?;
+    let document_count = files
+        .iter()
+        .filter(|entry| is_chemd_document_entry(entry))
+        .count();
+    let matches = files
+        .into_iter()
+        .filter(|entry| entry.kind == "file")
+        .filter(|entry| {
+            kind.as_deref()
+                .map_or(true, |value| entry_matches_kind(entry, value))
+        })
+        .filter(|entry| {
+            if kind.is_none() {
+                is_chemd_document_entry(entry)
+            } else {
+                true
+            }
+        })
+        .filter(|entry| {
+            document_path
+                .as_deref()
+                .map_or(true, |path| normalize_workspace_path(&entry.path) == path)
+        })
+        .filter(|entry| {
+            query
+                .as_deref()
+                .map_or(true, |value| document_matches_query(entry, value))
+        })
+        .collect::<Vec<_>>();
+    let total_count = matches.len();
+    let rows = matches
+        .into_iter()
+        .skip(cursor)
+        .take(limit)
+        .map(|entry| index_row(root, entry))
+        .collect::<Result<Vec<_>, _>>()?;
+    let next_cursor = (cursor + rows.len() < total_count).then_some(cursor + rows.len());
+    let returned_count = rows.len();
+    Ok(WorkspaceIndexQueryResult {
+        rows,
+        summary: WorkspaceIndexSummary {
+            total_count,
+            returned_count,
+            document_count,
+            cursor,
+            limit,
+        },
+        next_cursor,
+    })
+}
+
+pub(crate) fn build_workspace_ingest_plan_impl(
+    workspace_id: &str,
+    root: &Path,
+    options: &WorkspaceIngestPlanOptions,
+) -> Result<WorkspaceIngestPlanResult, CommandError> {
+    let cursor = options.cursor.unwrap_or(0);
+    let limit = options
+        .limit
+        .unwrap_or(DEFAULT_INGEST_PLAN_LIMIT)
+        .clamp(1, MAX_INGEST_PLAN_LIMIT);
+    let known_revisions = options
+        .known_revisions
+        .as_deref()
+        .unwrap_or_default()
+        .iter()
+        .map(|item| {
+            (
+                normalize_workspace_path(&item.document_path),
+                item.revision_key.trim().to_string(),
+            )
+        })
+        .collect::<std::collections::HashMap<_, _>>();
+    let files = list_workspace_files_impl(workspace_id, root)?;
+    let plan_entries = files
+        .into_iter()
+        .filter(|entry| entry.kind == "file")
+        .filter(|entry| is_chemd_document_entry(entry) || is_plain_markdown_entry(entry))
+        .collect::<Vec<_>>();
+    let total_count = plan_entries.len();
+    let items = plan_entries
+        .into_iter()
+        .skip(cursor)
+        .take(limit)
+        .map(|entry| ingest_plan_item(root, entry, &known_revisions))
+        .collect::<Result<Vec<_>, _>>()?;
+    let next_cursor = (cursor + items.len() < total_count).then_some(cursor + items.len());
+    let returned_count = items.len();
+    let pending_count = count_plan_disposition(&items, "pending");
+    let unchanged_count = count_plan_disposition(&items, "unchanged");
+    let skipped_count = count_plan_disposition(&items, "skipped");
+    Ok(WorkspaceIngestPlanResult {
+        items,
+        summary: WorkspaceIngestPlanSummary {
+            total_count,
+            returned_count,
+            pending_count,
+            unchanged_count,
+            skipped_count,
+            cursor,
+            limit,
+        },
+        next_cursor,
+    })
+}
+
 fn visit_directory(
     workspace_id: &str,
     root: &Path,
@@ -235,9 +366,31 @@ fn is_chemd_document_entry(entry: &WorkspaceFileEntry) -> bool {
             || entry.path.ends_with(".chemd.md"))
 }
 
+fn is_plain_markdown_entry(entry: &WorkspaceFileEntry) -> bool {
+    entry.kind == "file"
+        && entry.path.to_ascii_lowercase().ends_with(".md")
+        && !is_chemd_document_entry(entry)
+}
+
 fn document_matches_query(entry: &WorkspaceFileEntry, normalized_query: &str) -> bool {
     entry.name.to_ascii_lowercase().contains(normalized_query)
         || entry.path.to_ascii_lowercase().contains(normalized_query)
+}
+
+fn normalized_query(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_ascii_lowercase)
+}
+
+fn entry_matches_kind(entry: &WorkspaceFileEntry, kind: &str) -> bool {
+    entry
+        .chemd_kind
+        .as_deref()
+        .map(|value| value.eq_ignore_ascii_case(kind))
+        .unwrap_or(false)
+        || entry.kind.eq_ignore_ascii_case(kind)
 }
 
 fn normalize_workspace_path(path: &str) -> String {
@@ -281,6 +434,80 @@ fn file_entry(
         kind: kind.into(),
         chemd_kind,
     }
+}
+
+fn index_row(root: &Path, entry: WorkspaceFileEntry) -> Result<WorkspaceIndexRow, CommandError> {
+    let path = root.join(&entry.path);
+    let metadata = fs::metadata(&path).map_err(|err| {
+        CommandError::io(
+            "workspace_index_metadata_failed",
+            "Workspace index row metadata cannot be read",
+            err,
+        )
+    })?;
+    let modified_at_ms = modified_at_ms(&metadata);
+    let bytes = metadata.len();
+    Ok(WorkspaceIndexRow {
+        id: entry.id,
+        name: entry.name,
+        path: entry.path,
+        kind: entry.kind,
+        chemd_kind: entry.chemd_kind,
+        bytes,
+        modified_at_ms,
+        revision_key: revision_key(bytes, modified_at_ms),
+    })
+}
+
+fn ingest_plan_item(
+    root: &Path,
+    entry: WorkspaceFileEntry,
+    known_revisions: &std::collections::HashMap<String, String>,
+) -> Result<WorkspaceIngestPlanItem, CommandError> {
+    let row = index_row(root, entry)?;
+    let normalized_path = normalize_workspace_path(&row.path);
+    let is_document = row.chemd_kind.as_deref() == Some("document")
+        || row.path.ends_with(".chemd")
+        || row.path.ends_with(".chemd.md");
+    let (disposition, reason) = if !is_document {
+        ("skipped", "non_chemd_markdown")
+    } else if known_revisions
+        .get(&normalized_path)
+        .map(|known| known == &row.revision_key)
+        .unwrap_or(false)
+    {
+        ("unchanged", "revision_match")
+    } else {
+        ("pending", "revision_changed")
+    };
+    Ok(WorkspaceIngestPlanItem {
+        id: row.id,
+        name: row.name,
+        path: row.path,
+        chemd_kind: row.chemd_kind,
+        bytes: row.bytes,
+        modified_at_ms: row.modified_at_ms,
+        revision_key: row.revision_key,
+        disposition: disposition.into(),
+        reason: reason.into(),
+    })
+}
+
+fn count_plan_disposition(items: &[WorkspaceIngestPlanItem], disposition: &str) -> usize {
+    items
+        .iter()
+        .filter(|item| item.disposition == disposition)
+        .count()
+}
+
+fn revision_key(bytes: u64, modified_at_ms: Option<u64>) -> String {
+    format!("meta:{}:{}", bytes, modified_at_ms.unwrap_or_default())
+}
+
+fn modified_at_ms(metadata: &fs::Metadata) -> Option<u64> {
+    let modified = metadata.modified().ok()?;
+    let millis = modified.duration_since(UNIX_EPOCH).ok()?.as_millis();
+    Some(u64::try_from(millis).unwrap_or(u64::MAX))
 }
 
 pub(crate) fn workspace_id_for_root(root: &Path) -> String {

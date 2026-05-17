@@ -1,6 +1,7 @@
 use crate::local_store::{
-    clear_local_outbox_failures_impl, list_local_outbox_impl,
-    list_local_reaction_intelligence_artifacts_impl, mark_local_outbox_synced_impl,
+    clear_local_outbox_failures_impl, list_local_outbox_impl, list_local_outbox_page_impl,
+    list_local_reaction_intelligence_artifacts_impl,
+    list_local_reaction_intelligence_artifacts_page_impl, mark_local_outbox_synced_impl,
     read_local_store_status_impl, save_local_reaction_intelligence_artifact_impl,
     save_local_runtime_snapshot_impl,
 };
@@ -200,6 +201,91 @@ fn list_outbox_filters_status_and_limits_results() {
 
     assert_eq!(pending.len(), 1);
     assert_eq!(pending[0].local_id, "local-a");
+}
+
+#[test]
+fn list_outbox_returns_cursor_pages_with_total_count() {
+    let store = TestStore::new("outbox-page");
+    for index in 0..3 {
+        save_local_runtime_snapshot_impl(
+            &store.root,
+            snapshot_input(
+                &format!("local-{index}"),
+                &format!("idem-{index}"),
+                json!({ "value": index }),
+            ),
+        )
+        .expect("snapshot should save");
+    }
+
+    let first_page =
+        list_local_outbox_page_impl(&store.root, None, Some(0), Some(2)).expect("page should list");
+    let second_page =
+        list_local_outbox_page_impl(&store.root, None, first_page.next_cursor, Some(2))
+            .expect("second page should list");
+
+    assert_eq!(first_page.total_count, 3);
+    assert_eq!(first_page.entries.len(), 2);
+    assert_eq!(first_page.next_cursor, Some(2));
+    assert_eq!(second_page.total_count, 3);
+    assert_eq!(second_page.entries.len(), 1);
+    assert_eq!(second_page.next_cursor, None);
+}
+
+#[test]
+fn list_outbox_cursor_beyond_total_returns_empty_page() {
+    let store = TestStore::new("outbox-empty-page");
+    save_local_runtime_snapshot_impl(
+        &store.root,
+        snapshot_input("local-a", "idem-a", json!({ "value": "a" })),
+    )
+    .expect("snapshot should save");
+
+    let page = list_local_outbox_page_impl(&store.root, None, Some(25), Some(2))
+        .expect("page should list");
+
+    assert_eq!(page.total_count, 1);
+    assert!(page.entries.is_empty());
+    assert_eq!(page.next_cursor, None);
+}
+
+#[test]
+fn list_reaction_artifacts_returns_cursor_pages_with_total_count() {
+    let store = TestStore::new("artifact-page");
+    for index in 0..3 {
+        save_local_reaction_intelligence_artifact_impl(
+            &store.root,
+            artifact_input(
+                &format!("local-artifact-{index}"),
+                &format!("idem-artifact-{index}"),
+                "graph-index-page",
+                0.7 + f64::from(index) / 10.0,
+            ),
+        )
+        .expect("artifact should save");
+    }
+
+    let first_page = list_local_reaction_intelligence_artifacts_page_impl(
+        &store.root,
+        Some("graph-index-page".into()),
+        Some(0),
+        Some(2),
+    )
+    .expect("artifact page should list");
+    let second_page = list_local_reaction_intelligence_artifacts_page_impl(
+        &store.root,
+        Some("graph-index-page".into()),
+        first_page.next_cursor,
+        Some(2),
+    )
+    .expect("second artifact page should list");
+
+    assert_eq!(first_page.total_count, 3);
+    assert_eq!(first_page.entries.len(), 2);
+    assert_eq!(first_page.next_cursor, Some(2));
+    assert_eq!(second_page.total_count, 3);
+    assert_eq!(second_page.entries.len(), 1);
+    assert_eq!(second_page.next_cursor, None);
 }
 
 #[test]

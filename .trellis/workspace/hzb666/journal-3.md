@@ -534,3 +534,523 @@ Completed reaction intelligence kernel finishwork across parser, renderer, works
 ### Next Steps
 
 - None - task complete
+
+
+## Session 101: Phase 0 desktop IDE performance baseline instrumentation
+
+**Date**: 2026-05-17
+**Task**: Phase 0 desktop IDE performance baseline instrumentation
+**Package**: desktop
+**Branch**: `develop`
+
+### Summary
+
+Added dev-gated desktop performance metrics for workspace indexing, preview hydration, Tauri invokes, editor compile, and knowledge-map view-model construction.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c7047be` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 102: Phase 1 Rust workspace manifest query
+
+**Date**: 2026-05-17
+**Task**: Phase 1 Rust workspace manifest query
+**Package**: desktop
+**Branch**: `develop`
+
+### Summary
+
+Added query_workspace_index to return bounded workspace manifest rows and metadata without document source text, with synced TypeScript contracts and diagnostics coverage.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `33c03fc` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 103: Phase 2 WorkspaceDataGateway foundation
+
+**Date**: 2026-05-17
+**Task**: Phase 2 WorkspaceDataGateway foundation
+**Package**: desktop
+**Branch**: `develop`
+
+### Summary
+
+Added a frontend WorkspaceDataGateway boundary for manifest state, current-source revisions, stale guards, and cached workspace reads, then routed workspace index through it with fallback behavior preserved.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `98396f9` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 104: Phase 3 workspace symbol gateway migration
+
+**Date**: 2026-05-17
+**Task**: Phase 3 workspace symbol gateway migration
+**Package**: desktop
+**Branch**: `develop`
+
+### Summary
+
+Routed workspace symbol indexing through the WorkspaceDataGateway only when manifest coverage is complete, preserving the legacy full-workspace path for partial or degraded gateway states.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f9b0cec` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 105: Phase 4 Rust workspace ingest plan command
+
+**Date**: 2026-05-17
+**Task**: Phase 4 Rust workspace ingest plan command
+**Package**: desktop
+**Branch**: `develop`
+
+### Summary
+
+Added build_workspace_ingest_plan to let Rust enumerate and page workspace ingest candidates, returning pending, unchanged, and skipped metadata rows without source text or compiler migration.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4f925ff` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 106: Phase 5 lazy active dock panel construction
+
+**Date**: 2026-05-17
+**Task**: Phase 5 lazy active dock panel construction
+**Package**: desktop
+**Branch**: `develop`
+
+### Summary
+
+Replaced eager insight dock contentByPanel construction with active-panel switch rendering so inactive dock panels and agent quick-fix derivations are not rebuilt every render.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e919915` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 107: Phase 5 preview hydration queue and cache
+
+**Date**: 2026-05-17
+**Task**: Phase 5 preview hydration queue and cache
+**Package**: desktop
+**Branch**: `develop`
+
+### Summary
+
+Added a desktop preview render scheduler and cache for render_chem_preview hydration while preserving base HTML, localized render failures, and stale hydration guards.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `586d4de` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 108: Phase 6 Monaco editor surface micro-optimizations
+
+**Date**: 2026-05-17
+**Task**: Phase 6 Monaco editor surface micro-optimizations
+**Package**: desktop
+**Branch**: `develop`
+
+### Summary
+
+Memoized Monaco options, coalesced undo-redo notifications, guarded duplicate resize padding updates, and replaced source.split line counting with countSourceLines.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ee0a235` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 109: Phase 6 Knowledge Map and window rect sync
+
+**Date**: 2026-05-17
+**Task**: Phase 6 Knowledge Map and window rect sync
+**Package**: desktop
+**Branch**: `develop`
+
+### Summary
+
+Prevented ForceGraph selection-only changes from reheating simulations and removed the per-render native maximize button rect sync while keeping resize, scale, and cleanup paths.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `48f92a9` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 110: Phase 7 local-store list pagination
+
+**Date**: 2026-05-17
+**Task**: Phase 7 local-store list pagination
+**Package**: desktop
+**Branch**: `develop`
+
+### Summary
+
+Added paged Rust local-store list command results and synchronized desktop contracts.
+
+### Main Changes
+
+Phase 7 local-store pagination completed on develop.
+
+Changes:
+- Extended Rust local-store list commands with cursor/limit pagination.
+- Returned { entries, totalCount, nextCursor } instead of full arrays from Tauri commands.
+- Kept test-only Vec helpers for existing sync/unit tests.
+- Updated desktop TypeScript command contracts and reaction-intelligence artifact reader to consume page.entries.
+
+Validation:
+- cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml local_store_tests
+- cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml local_store_sync_tests
+- pnpm --filter @chemd/desktop typecheck
+- pnpm --filter @chemd/desktop test -- store.test.ts artifact-controller.test.ts
+- pnpm --filter @chemd/desktop exec eslint src/contracts.ts src/features/reaction-intelligence/artifact-controller.ts src/features/reaction-intelligence/artifact-controller.test.ts src/features/local-store/store.test.ts
+- python ./.trellis/scripts/task.py validate .trellis/tasks/05-17-05-17-desktop-ide-workspace-performance
+- git diff --check
+
+Notes:
+- ESLint completed with existing warnings only in contracts.ts and store.test.ts.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `96076f7` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 111: Phase 8 Workbench render boundary cleanup
+
+**Date**: 2026-05-17
+**Task**: Phase 8 Workbench render boundary cleanup
+**Package**: desktop
+**Branch**: `develop`
+
+### Summary
+
+Reduced App-to-Workbench callback churn and memoized Workbench insight props.
+
+### Main Changes
+
+Phase 8 App/Workbench render-boundary cleanup completed on develop.
+
+Changes:
+- Memoized Workbench insight prop derivation so local shell state changes do not rebuild the dock prop bag unless active tool or parent props change.
+- Stabilized Workbench shell callbacks for activity selection, preview toggles, graph close, and bottom panel close.
+- Stabilized App callbacks passed into Workbench for save/open/tab/conflict operations.
+- Narrowed workspace restore and sidecar autostart effects to concrete dependencies instead of whole controller objects.
+
+Validation:
+- pnpm --filter @chemd/desktop typecheck
+- pnpm --filter @chemd/desktop exec eslint src/App.tsx src/features/workbench/workbench-shell.tsx
+- pnpm --filter @chemd/desktop test -- App.test.ts workbench-shell.test.ts
+- python ./.trellis/scripts/task.py validate .trellis/tasks/05-17-05-17-desktop-ide-workspace-performance
+- git diff --check
+
+Notes:
+- ESLint completed with warnings only; these are existing App.tsx size/complexity/void-use style warnings, not blocking errors.
+- Vitest matched App.test.tsx; no dedicated workbench-shell test file was present.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c8f43a4` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 112: Phase 9 dock panel primitives
+
+**Date**: 2026-05-17
+**Task**: Phase 9 dock panel primitives
+**Package**: desktop
+**Branch**: `develop`
+
+### Summary
+
+Extracted shared dock panel primitives and migrated sidecar/local-store panels.
+
+### Main Changes
+
+Phase 9 dock panel primitive cleanup completed on develop.
+
+Changes:
+- Added shared dock panel primitive constants and DockPanelButton.
+- Migrated Sidecar panel to shared container, metric, message, log, action row, and button primitives.
+- Migrated Local Store panel shell/list/metric/log/button constants to the same primitives while preserving business-specific sections and disabled logic.
+
+Validation:
+- pnpm --filter @chemd/desktop typecheck
+- pnpm --filter @chemd/desktop exec eslint src/features/dock-panels/panel-primitives.tsx src/features/dock-panels/sidecar-panel.tsx src/features/dock-panels/local-store-panel.tsx
+- python ./.trellis/scripts/task.py validate .trellis/tasks/05-17-05-17-desktop-ide-workspace-performance
+- git diff --check
+
+Notes:
+- ESLint completed with existing LocalStorePanel size/complexity warnings only; no errors.
+- No dedicated dock-panel tests were present, so this refactor is covered by TypeScript and lint.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e5ccdb6` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 113: Regression review and test hardening
+
+**Date**: 2026-05-17
+**Task**: Regression review and test hardening
+**Package**: desktop
+**Branch**: `develop`
+
+### Summary
+
+Reviewed performance refactors, connected workspace ingest to Rust plans, and added regression tests.
+
+### Main Changes
+
+Final regression review and test hardening completed on develop.
+
+Review findings:
+- Checked the performance/refactor changes across Rust workspace commands, local-store list pagination, WorkspaceDataGateway, preview render scheduling, Knowledge Map selection-only graph updates, Workbench callback cleanup, and dock panel primitive extraction.
+- Found one incomplete backend-processing loop: build_workspace_ingest_plan existed but Workspace ingest still used the old frontend file list path directly.
+- Fixed that by having Workspace ingest request Rust paged ingest plans first, then passing only runnable pending/skipped files into the existing TS compile/outbox compatibility layer.
+- Preserved business behavior with a fallback to the original files path if the Rust plan command fails.
+- Stored backend manifest revision keys on ingest queue items so future runs can send knownRevisions and let Rust mark unchanged files.
+
+Tests added:
+- Ingest queue tests for manifest revision key persistence, knownRevisions generation, runnable plan item filtering, and plan item mapping.
+- Ingest runner test for carrying manifest revision keys through outbox-save flow.
+- Preview scheduler test that queued renders continue after a rejected task.
+- Local-store Rust test for cursor beyond total returning an empty page without bogus nextCursor.
+
+Validation:
+- pnpm --filter @chemd/desktop test
+- pnpm --filter @chemd/desktop typecheck
+- pnpm --filter @chemd/desktop exec eslint src/hooks/use-local-store-controller.ts src/features/workspace-ingest/queue.ts src/features/workspace-ingest/queue.test.ts src/features/workspace-ingest/runner.ts src/features/workspace-ingest/runner.test.ts src/hooks/use-rendered-preview.test.ts
+- cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
+- python ./.trellis/scripts/task.py validate .trellis/tasks/05-17-05-17-desktop-ide-workspace-performance
+- git diff --check
+
+Notes:
+- ESLint returned warnings only, no errors. Warnings are existing complexity/void-use/null-style warnings in the touched files.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `31e5298` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

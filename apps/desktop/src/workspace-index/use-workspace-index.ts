@@ -7,6 +7,7 @@ import {
   type WorkspaceDocumentSource,
   type WorkspaceIndexViewModel
 } from "./workspace-index";
+import { measureDesktopPerformance, measureDesktopPerformanceAsync } from "../performance-marks";
 
 export type WorkspaceIndexLoadState = "idle" | "loading" | "ready" | "error";
 
@@ -29,6 +30,7 @@ export interface UseWorkspaceIndexInput {
   workspaceState: "empty" | "opening" | "open" | "error";
   workspace: WorkspaceHandle;
   files: readonly WorkspaceFileEntry[];
+  documentFiles?: readonly WorkspaceFileEntry[];
   selectedFile: WorkspaceFileEntry;
   source: string;
   readFile: WorkspaceIndexReadFile;
@@ -78,6 +80,7 @@ export const useWorkspaceIndexController = ({
   workspaceState,
   workspace,
   files,
+  documentFiles,
   selectedFile,
   source,
   readFile,
@@ -102,17 +105,26 @@ export const useWorkspaceIndexController = ({
       if (mode !== "workspace" || workspaceState !== "open") {
         return [];
       }
-      const filesToRead = queryDocuments
+      const filesToRead = documentFiles
+        ? documentFiles.filter((file) => file.path !== currentDocumentPath)
+        : queryDocuments
         ? (await queryDocuments({
           workspaceId: workspace.workspaceId,
           excludePath: currentDocumentPath,
           limit: DEFAULT_WORKSPACE_INDEX_DOCUMENT_LIMIT
         })).files
         : visibleChemdFiles(files).filter((file) => file.path !== currentDocumentPath);
-      return Promise.all(filesToRead.map(async (file) => {
-        const result = await readFile(file);
-        return toDocumentSource(file, result.content, result.modifiedAtMs);
-      }));
+      return measureDesktopPerformanceAsync(
+        "workspaceIndex.loadDocuments",
+        () => Promise.all(filesToRead.map(async (file) => {
+          const result = await readFile(file);
+          return toDocumentSource(file, result.content, result.modifiedAtMs);
+        })),
+        {
+          fileCount: filesToRead.length,
+          workspaceId: workspace.workspaceId,
+        }
+      );
     };
 
     setLoadState(hasCurrentDocument ? "loading" : "idle");
@@ -138,6 +150,7 @@ export const useWorkspaceIndexController = ({
     };
   }, [
     currentDocumentPath,
+    documentFiles,
     files,
     hasCurrentDocument,
     mode,
@@ -151,12 +164,20 @@ export const useWorkspaceIndexController = ({
   const documents = currentDocument
     ? replaceCurrentDocument(loadedDocuments, currentDocument)
     : loadedDocuments;
-  const viewModel = useMemo(() => buildWorkspaceIndexViewModel({
-    workspaceId: workspace.workspaceId,
-    files,
-    currentDocument,
-    documents
-  }), [currentDocument, documents, files, workspace.workspaceId]);
+  const viewModel = useMemo(() => measureDesktopPerformance(
+    "workspaceIndex.viewModel",
+    () => buildWorkspaceIndexViewModel({
+      workspaceId: workspace.workspaceId,
+      files,
+      currentDocument,
+      documents
+    }),
+    {
+      documentCount: documents.length,
+      fileCount: files.length,
+      workspaceId: workspace.workspaceId,
+    }
+  ), [currentDocument, documents, files, workspace.workspaceId]);
   const refresh = useCallback(() => {
     setRefreshToken((value) => value + 1);
   }, []);

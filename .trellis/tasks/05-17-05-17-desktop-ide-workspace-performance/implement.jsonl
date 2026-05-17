@@ -1,0 +1,18 @@
+{"file": ".trellis/workflow.md", "reason": "Trellis task lifecycle, start/check/update-spec/commit/session loop"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Workspace manifest, gateway, ingest, and UI consumers cross Rust/Tauri/React boundaries"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Avoid duplicating workspace IO, compile, panel primitives, and command contract logic"}
+{"file": ".trellis/spec/compiler/backend/index.md", "reason": "Chemd compiler semantics must remain the source of truth while backend task planning changes"}
+{"file": ".trellis/spec/compiler/backend/error-handling.md", "reason": "Diagnostics and typed failures should not be replaced by silent degradation"}
+{"file": ".trellis/spec/storage-postgres/backend/index.md", "reason": "Graph/RAG/local snapshot persistence must keep storage contracts pure"}
+{"file": ".trellis/spec/storage-postgres/backend/storage-contract.md", "reason": "Persistence records and runtime payloads must stay compatible"}
+{"file": "apps/desktop/src/workspace-index/use-workspace-index.ts", "reason": "Current workspace document query/read and React state path"}
+{"file": "apps/desktop/src/workspace-index/workspace-index.ts", "reason": "Workspace symbol index and local RAG view model construction"}
+{"file": "apps/desktop/src/hooks/use-local-store-controller.ts", "reason": "Workspace symbol index and ingest duplicate read/compile paths"}
+{"file": "apps/desktop/src-tauri/src/workspace_io.rs", "reason": "Rust workspace scan/filter/pagination implementation home"}
+{"file": "apps/desktop/src-tauri/src/workspace.rs", "reason": "Tauri workspace command DTO and wrapper surface"}
+{"file": "apps/desktop/src/contracts.ts", "reason": "TypeScript CommandMap and desktop IPC contract"}
+{"file": "apps/desktop/src/hooks/use-rendered-preview.ts", "reason": "Preview hydration queue/cache optimization target"}
+{"file": "apps/desktop/src/knowledge-map/knowledge-map-panel.tsx", "reason": "Knowledge Map graph reheat and selection semantics"}
+{"file": "apps/desktop/src/features/dock-panels/insight-content.tsx", "reason": "Active panel lazy construction and dock state preservation"}
+{"file": "apps/desktop/src/features/editor/monaco-chemd-editor.tsx", "reason": "Monaco micro-optimization target"}
+{"file": "apps/desktop/src/features/workbench/window-controls.ts", "reason": "Native maximize-button rect sync optimization target"}

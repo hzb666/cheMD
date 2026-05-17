@@ -9,10 +9,11 @@ use crate::{
     local_store_status::{count_status, mutation_result, status_from_outbox},
     local_store_time::unix_timestamp_ms,
     local_store_types::{
-        LocalOutboxFile, LocalOutboxMutationResult, LocalOutboxRecord,
-        LocalReactionIntelligenceArtifactInput, LocalReactionIntelligenceArtifactRecord,
-        LocalReactionIntelligenceArtifactSaveResult, LocalRuntimeSnapshotInput, LocalSnapshotFile,
-        LocalSnapshotSaveResult, LocalStoreStatus, LocalSyncStatus,
+        LocalOutboxFile, LocalOutboxListResult, LocalOutboxMutationResult, LocalOutboxRecord,
+        LocalReactionIntelligenceArtifactInput, LocalReactionIntelligenceArtifactListResult,
+        LocalReactionIntelligenceArtifactRecord, LocalReactionIntelligenceArtifactSaveResult,
+        LocalRuntimeSnapshotInput, LocalSnapshotFile, LocalSnapshotSaveResult, LocalStoreStatus,
+        LocalSyncStatus,
     },
 };
 #[cfg(not(test))]
@@ -80,9 +81,15 @@ pub fn save_local_reaction_intelligence_artifact(
 pub fn list_local_reaction_intelligence_artifacts(
     app: tauri::AppHandle,
     graph_index_id: Option<String>,
+    cursor: Option<usize>,
     limit: Option<usize>,
-) -> Result<Vec<LocalReactionIntelligenceArtifactRecord>, CommandError> {
-    list_local_reaction_intelligence_artifacts_impl(&command_root(&app)?, graph_index_id, limit)
+) -> Result<LocalReactionIntelligenceArtifactListResult, CommandError> {
+    list_local_reaction_intelligence_artifacts_page_impl(
+        &command_root(&app)?,
+        graph_index_id,
+        cursor,
+        limit,
+    )
 }
 
 #[cfg(not(test))]
@@ -90,9 +97,10 @@ pub fn list_local_reaction_intelligence_artifacts(
 pub fn list_local_outbox(
     app: tauri::AppHandle,
     sync_status: Option<LocalSyncStatus>,
+    cursor: Option<usize>,
     limit: Option<usize>,
-) -> Result<Vec<LocalOutboxRecord>, CommandError> {
-    list_local_outbox_impl(&command_root(&app)?, sync_status, limit)
+) -> Result<LocalOutboxListResult, CommandError> {
+    list_local_outbox_page_impl(&command_root(&app)?, sync_status, cursor, limit)
 }
 
 #[cfg(not(test))]
@@ -122,19 +130,32 @@ pub(crate) fn read_local_store_status_impl(root: &Path) -> Result<LocalStoreStat
     Ok(status_from_outbox(root, &outbox))
 }
 
+#[cfg(test)]
 pub(crate) fn list_local_outbox_impl(
     root: &Path,
     sync_status: Option<LocalSyncStatus>,
     limit: Option<usize>,
 ) -> Result<Vec<LocalOutboxRecord>, CommandError> {
+    Ok(list_local_outbox_page_impl(root, sync_status, None, limit)?.entries)
+}
+
+pub(crate) fn list_local_outbox_page_impl(
+    root: &Path,
+    sync_status: Option<LocalSyncStatus>,
+    cursor: Option<usize>,
+    limit: Option<usize>,
+) -> Result<LocalOutboxListResult, CommandError> {
     let mut entries = read_outbox_file(root)?.entries;
     if let Some(status) = sync_status {
         entries.retain(|entry| entry.sync_status == status);
     }
-    if let Some(limit) = limit {
-        entries.truncate(limit.min(MAX_OUTBOX_ENTRIES));
-    }
-    Ok(entries)
+    Ok(page_outbox_entries(
+        entries,
+        cursor.unwrap_or(0),
+        limit
+            .unwrap_or(MAX_OUTBOX_ENTRIES)
+            .clamp(1, MAX_OUTBOX_ENTRIES),
+    ))
 }
 
 pub(crate) fn save_local_runtime_snapshot_impl(
@@ -179,11 +200,24 @@ pub(crate) fn save_local_reaction_intelligence_artifact_impl(
     })
 }
 
+#[cfg(test)]
 pub(crate) fn list_local_reaction_intelligence_artifacts_impl(
     root: &Path,
     graph_index_id: Option<String>,
     limit: Option<usize>,
 ) -> Result<Vec<LocalReactionIntelligenceArtifactRecord>, CommandError> {
+    Ok(
+        list_local_reaction_intelligence_artifacts_page_impl(root, graph_index_id, None, limit)?
+            .entries,
+    )
+}
+
+pub(crate) fn list_local_reaction_intelligence_artifacts_page_impl(
+    root: &Path,
+    graph_index_id: Option<String>,
+    cursor: Option<usize>,
+    limit: Option<usize>,
+) -> Result<LocalReactionIntelligenceArtifactListResult, CommandError> {
     let mut entries = read_reaction_intelligence_artifacts_file(root)?.entries;
     if let Some(graph_index_id) = graph_index_id.filter(|value| !value.trim().is_empty()) {
         entries.retain(|entry| {
@@ -195,10 +229,51 @@ pub(crate) fn list_local_reaction_intelligence_artifacts_impl(
         });
     }
     entries.sort_by(|left, right| right.updated_at.cmp(&left.updated_at));
-    if let Some(limit) = limit {
-        entries.truncate(limit.min(MAX_ARTIFACT_ENTRIES));
+    Ok(page_reaction_intelligence_artifact_entries(
+        entries,
+        cursor.unwrap_or(0),
+        limit
+            .unwrap_or(MAX_ARTIFACT_ENTRIES)
+            .clamp(1, MAX_ARTIFACT_ENTRIES),
+    ))
+}
+
+fn page_outbox_entries(
+    entries: Vec<LocalOutboxRecord>,
+    cursor: usize,
+    limit: usize,
+) -> LocalOutboxListResult {
+    let total_count = entries.len();
+    let page_entries = entries
+        .into_iter()
+        .skip(cursor)
+        .take(limit)
+        .collect::<Vec<_>>();
+    let consumed = cursor.saturating_add(page_entries.len());
+    LocalOutboxListResult {
+        entries: page_entries,
+        total_count,
+        next_cursor: (consumed < total_count).then_some(consumed),
     }
-    Ok(entries)
+}
+
+fn page_reaction_intelligence_artifact_entries(
+    entries: Vec<LocalReactionIntelligenceArtifactRecord>,
+    cursor: usize,
+    limit: usize,
+) -> LocalReactionIntelligenceArtifactListResult {
+    let total_count = entries.len();
+    let page_entries = entries
+        .into_iter()
+        .skip(cursor)
+        .take(limit)
+        .collect::<Vec<_>>();
+    let consumed = cursor.saturating_add(page_entries.len());
+    LocalReactionIntelligenceArtifactListResult {
+        entries: page_entries,
+        total_count,
+        next_cursor: (consumed < total_count).then_some(consumed),
+    }
 }
 
 pub(crate) fn mark_local_outbox_synced_impl(

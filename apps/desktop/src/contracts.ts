@@ -30,6 +30,66 @@ export interface WorkspaceDocumentQueryResult {
   nextCursor: number | null;
 }
 
+export interface WorkspaceIndexRow {
+  id: string;
+  name: string;
+  path: string;
+  kind: "file";
+  chemdKind?: "document" | "asset" | "unknown";
+  bytes: number;
+  modifiedAtMs: number | null;
+  revisionKey: string;
+}
+
+export interface WorkspaceIndexSummary {
+  totalCount: number;
+  returnedCount: number;
+  documentCount: number;
+  cursor: number;
+  limit: number;
+}
+
+export interface WorkspaceIndexQueryResult {
+  rows: WorkspaceIndexRow[];
+  summary: WorkspaceIndexSummary;
+  nextCursor: number | null;
+}
+
+export type WorkspaceIngestPlanDisposition = "pending" | "unchanged" | "skipped";
+
+export interface WorkspaceIngestKnownRevision {
+  documentPath: string;
+  revisionKey: string;
+}
+
+export interface WorkspaceIngestPlanItem {
+  id: string;
+  name: string;
+  path: string;
+  chemdKind?: "document" | "asset" | "unknown";
+  bytes: number;
+  modifiedAtMs: number | null;
+  revisionKey: string;
+  disposition: WorkspaceIngestPlanDisposition;
+  reason: "revision_changed" | "revision_match" | "non_chemd_markdown";
+}
+
+export interface WorkspaceIngestPlanSummary {
+  totalCount: number;
+  returnedCount: number;
+  pendingCount: number;
+  unchangedCount: number;
+  skippedCount: number;
+  cursor: number;
+  limit: number;
+}
+
+export interface WorkspaceIngestPlanResult {
+  items: WorkspaceIngestPlanItem[];
+  summary: WorkspaceIngestPlanSummary;
+  nextCursor: number | null;
+}
+
 export interface SidecarStatus {
   state: RuntimeState;
   label: string;
@@ -465,6 +525,18 @@ export interface LocalReactionIntelligenceArtifactEntry extends LocalReactionInt
   updatedAt: string;
 }
 
+export interface LocalReactionIntelligenceArtifactListResult {
+  entries: LocalReactionIntelligenceArtifactEntry[];
+  totalCount: number;
+  nextCursor: number | null;
+}
+
+export interface LocalOutboxListResult {
+  entries: LocalOutboxEntry[];
+  totalCount: number;
+  nextCursor: number | null;
+}
+
 export interface SaveLocalReactionIntelligenceArtifactResult {
   localId: string;
   idempotencyKey: string;
@@ -685,6 +757,26 @@ export interface CommandMap {
     };
     output: WorkspaceDocumentQueryResult;
   };
+  query_workspace_index: {
+    input: {
+      workspaceId?: string;
+      query?: string;
+      kind?: "document" | "asset" | "unknown";
+      documentPath?: string;
+      cursor?: number;
+      limit?: number;
+    };
+    output: WorkspaceIndexQueryResult;
+  };
+  build_workspace_ingest_plan: {
+    input: {
+      workspaceId?: string;
+      cursor?: number;
+      limit?: number;
+      knownRevisions?: WorkspaceIngestKnownRevision[];
+    };
+    output: WorkspaceIngestPlanResult;
+  };
   read_workspace_file: {
     input: {
       workspaceId?: string;
@@ -836,16 +928,18 @@ export interface CommandMap {
   list_local_reaction_intelligence_artifacts: {
     input: {
       graphIndexId?: string;
+      cursor?: number;
       limit?: number;
     };
-    output: LocalReactionIntelligenceArtifactEntry[];
+    output: LocalReactionIntelligenceArtifactListResult;
   };
   list_local_outbox: {
     input: {
       syncStatus?: LocalOutboxSyncStatus;
+      cursor?: number;
       limit?: number;
     };
-    output: LocalOutboxEntry[];
+    output: LocalOutboxListResult;
   };
   mark_local_outbox_synced: {
     input: {
@@ -945,7 +1039,7 @@ export const shellDiagnosticsBundleResult: DiagnosticsBundleExportResult = {
   outputPath: "",
   summary: {
     generatedAt: "",
-    commandCount: 38,
+    commandCount: 42,
     boundarySkipCount: 8,
     supportCommandCount: 7
   }

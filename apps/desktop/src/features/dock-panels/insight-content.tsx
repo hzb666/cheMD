@@ -1,5 +1,4 @@
 import { lazy, Suspense } from "react";
-import type { ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import type { ChemdOutlineItem } from "@chemd/language-service";
 import type { InsightDockPanelId, InsightPaneProps } from "../../types";
@@ -47,141 +46,149 @@ export const InsightDockContent = ({
   panel: InsightDockPanelId;
   props: InsightPaneProps;
 }) => {
-  const quickFixes = getQuickFixCandidates(props.diagnostics);
-  const agentPanel = buildAgentTimelinePanel(props.agentRun, {
-    currentBeforeHash: props.agentCurrentBeforeHash,
-  });
-  const quickFixControls = (
-    <>
-      {props.agentMessage ? (
-        <p className="rounded-xl border border-white/35 bg-white/18 p-3 text-sm data-[tone=danger]:text-destructive data-[tone=info]:text-primary" data-tone={props.agentMessage.tone}>
-          {props.agentMessage.text}
-        </p>
-      ) : null}
-      <AgentEmptyState mode={props.mode} hasQuickFixes={quickFixes.length > 0} />
-      <AgentQuickFixList
-        mode={props.mode}
-        quickFixes={quickFixes}
-        onProposeQuickFix={props.onProposeQuickFix}
-      />
-    </>
-  );
-
-  const contentByPanel: Record<InsightDockPanelId, ReactNode> = {
-    outline: (
-      <div className="py-2">
-        {props.outline.length > 0 ? (
-          <OutlineTree items={props.outline} />
-        ) : (
-          <p className="reference-dock-text px-3 text-xs text-muted-foreground">No outline from language service.</p>
-        )}
-      </div>
-    ),
-    preview: (
-      <SemanticPreviewPanel
-        preview={props.semanticPreview}
-        workspaceSymbolIndexState={props.workspaceSymbolIndexState}
-        workspaceSymbolIndexMessage={props.workspaceSymbolIndexMessage}
-        workspaceSymbolIndexSummary={props.workspaceSymbolIndexSummary}
-      />
-    ),
-    rag: (
-      <WorkspaceIndexPanel
-        viewModel={props.workspaceIndexViewModel}
-        connectedRagQueryState={props.workspaceRagQueryState}
-        query={props.workspaceRagQuery}
-        connectedRagOperation={props.workspaceRagQueryOperation}
-        connectedRagOperationMessage={props.workspaceRagQueryMessage}
-        connectedRagBackfillOperation={props.workspaceRagBackfillOperation}
-        connectedRagBackfillMessage={props.workspaceRagBackfillMessage}
-        onQueryChange={props.onWorkspaceRagQueryChange}
-        onRunConnectedRagQuery={props.onRunConnectedRagQuery}
-        onBackfillConnectedRagEmbeddings={props.onBackfillConnectedRagEmbeddings}
-      />
-    ),
-    graph: (
-      <Suspense fallback={<p className={emptyCopyClassName}>Loading reaction graph...</p>}>
-        <KnowledgeMapPanel
-          mode="compact"
-          viewModel={props.knowledgeMapViewModel}
-          workspaceIndexViewModel={props.workspaceIndexViewModel}
-          postgresStatus={props.postgresStatus}
-          onSourceJump={props.onKnowledgeMapSourceJump}
+  switch (panel) {
+    case "outline":
+      return (
+        <div className="py-2">
+          {props.outline.length > 0 ? (
+            <OutlineTree items={props.outline} />
+          ) : (
+            <p className="reference-dock-text px-3 text-xs text-muted-foreground">No outline from language service.</p>
+          )}
+        </div>
+      );
+    case "preview":
+      return (
+        <SemanticPreviewPanel
+          preview={props.semanticPreview}
+          workspaceSymbolIndexState={props.workspaceSymbolIndexState}
+          workspaceSymbolIndexMessage={props.workspaceSymbolIndexMessage}
+          workspaceSymbolIndexSummary={props.workspaceSymbolIndexSummary}
         />
-      </Suspense>
-    ),
-    runtime: (
-      <SidecarControlPanel
-        status={props.sidecarStatus}
-        logTail={props.sidecarLogTail}
-        operation={props.sidecarOperation}
-        message={props.sidecarMessage}
-        errorMessage={props.sidecarError}
-        onStart={props.onStartSidecar}
-        onStop={props.onStopSidecar}
-        onRefresh={props.onRefreshSidecar}
-        onLoadLogs={props.onLoadSidecarLogs}
-      />
-    ),
-    postgres: (
-      <PostgresStatusPanel
-        status={props.postgresStatus}
-        managedStatus={props.managedPostgresStatus}
-        loading={props.postgresLoading}
-        managedOperation={props.managedPostgresOperation}
-        errorMessage={props.postgresError}
-        managedErrorMessage={props.managedPostgresError}
-        managedMessage={props.managedPostgresMessage}
-        profiles={props.postgresProfiles}
-        persistState={props.persistState}
-        persistDisabledReason={props.persistDisabledReason}
-        onRefresh={props.onRefreshPostgres}
-        onInitManaged={props.onInitManagedPostgres}
-        onStartManaged={props.onStartManagedPostgres}
-        onStopManaged={props.onStopManagedPostgres}
-        onMigrateManaged={props.onMigrateManagedPostgres}
-        onRefreshManaged={props.onRefreshManagedPostgres}
-        onPersistGraph={props.onPersistGraph}
-      />
-    ),
-    storage: (
-      <LocalStorePanel
-        status={props.localStoreStatus}
-        operation={props.localStoreOperation}
-        snapshotState={props.localSnapshotState}
-        syncState={props.localSyncState}
-        reactionIntelligenceJobBuild={props.reactionIntelligenceJobBuild}
-        reactionIntelligenceJobState={props.reactionIntelligenceJobState}
-        workspaceIngestState={props.workspaceIngestState}
-        disabledReason={props.localStoreDisabledReason}
-        syncDisabledReason={props.localStoreSyncDisabledReason}
-        workspaceIngestDisabledReason={props.workspaceIngestDisabledReason}
-        errorMessage={props.localStoreError}
-        onRefresh={props.onRefreshLocalStore}
-        onSave={props.onSaveLocalSnapshot}
-        onSync={props.onSyncLocalOutbox}
-        onRunReactionIntelligenceJob={props.onRunReactionIntelligenceJob}
-        onRunWorkspaceIngest={props.onRunWorkspaceIngest}
-      />
-    ),
-    settings: (
-      <SettingsDockPanel
-        mode={props.mode}
-        sidecarStatus={props.sidecarStatus}
-        postgresStatus={props.postgresStatus}
-        localStoreStatus={props.localStoreStatus}
-      />
-    ),
-    agent: (
-      <AgentPanel
-        panel={agentPanel}
-        quickFixControls={quickFixControls}
-        onApprovePatch={() => props.onApprovePatch()}
-        onApplyPatch={() => props.onApplyPatch()}
-        onRejectPatch={() => props.onRejectPatch()}
-      />
-    ),
-  };
-
-  return <>{contentByPanel[panel]}</>;
+      );
+    case "rag":
+      return (
+        <WorkspaceIndexPanel
+          viewModel={props.workspaceIndexViewModel}
+          connectedRagQueryState={props.workspaceRagQueryState}
+          query={props.workspaceRagQuery}
+          connectedRagOperation={props.workspaceRagQueryOperation}
+          connectedRagOperationMessage={props.workspaceRagQueryMessage}
+          connectedRagBackfillOperation={props.workspaceRagBackfillOperation}
+          connectedRagBackfillMessage={props.workspaceRagBackfillMessage}
+          onQueryChange={props.onWorkspaceRagQueryChange}
+          onRunConnectedRagQuery={props.onRunConnectedRagQuery}
+          onBackfillConnectedRagEmbeddings={props.onBackfillConnectedRagEmbeddings}
+        />
+      );
+    case "graph":
+      return (
+        <Suspense fallback={<p className={emptyCopyClassName}>Loading reaction graph...</p>}>
+          <KnowledgeMapPanel
+            mode="compact"
+            viewModel={props.knowledgeMapViewModel}
+            workspaceIndexViewModel={props.workspaceIndexViewModel}
+            postgresStatus={props.postgresStatus}
+            onSourceJump={props.onKnowledgeMapSourceJump}
+          />
+        </Suspense>
+      );
+    case "runtime":
+      return (
+        <SidecarControlPanel
+          status={props.sidecarStatus}
+          logTail={props.sidecarLogTail}
+          operation={props.sidecarOperation}
+          message={props.sidecarMessage}
+          errorMessage={props.sidecarError}
+          onStart={props.onStartSidecar}
+          onStop={props.onStopSidecar}
+          onRefresh={props.onRefreshSidecar}
+          onLoadLogs={props.onLoadSidecarLogs}
+        />
+      );
+    case "postgres":
+      return (
+        <PostgresStatusPanel
+          status={props.postgresStatus}
+          managedStatus={props.managedPostgresStatus}
+          loading={props.postgresLoading}
+          managedOperation={props.managedPostgresOperation}
+          errorMessage={props.postgresError}
+          managedErrorMessage={props.managedPostgresError}
+          managedMessage={props.managedPostgresMessage}
+          profiles={props.postgresProfiles}
+          persistState={props.persistState}
+          persistDisabledReason={props.persistDisabledReason}
+          onRefresh={props.onRefreshPostgres}
+          onInitManaged={props.onInitManagedPostgres}
+          onStartManaged={props.onStartManagedPostgres}
+          onStopManaged={props.onStopManagedPostgres}
+          onMigrateManaged={props.onMigrateManagedPostgres}
+          onRefreshManaged={props.onRefreshManagedPostgres}
+          onPersistGraph={props.onPersistGraph}
+        />
+      );
+    case "storage":
+      return (
+        <LocalStorePanel
+          status={props.localStoreStatus}
+          operation={props.localStoreOperation}
+          snapshotState={props.localSnapshotState}
+          syncState={props.localSyncState}
+          reactionIntelligenceJobBuild={props.reactionIntelligenceJobBuild}
+          reactionIntelligenceJobState={props.reactionIntelligenceJobState}
+          workspaceIngestState={props.workspaceIngestState}
+          disabledReason={props.localStoreDisabledReason}
+          syncDisabledReason={props.localStoreSyncDisabledReason}
+          workspaceIngestDisabledReason={props.workspaceIngestDisabledReason}
+          errorMessage={props.localStoreError}
+          onRefresh={props.onRefreshLocalStore}
+          onSave={props.onSaveLocalSnapshot}
+          onSync={props.onSyncLocalOutbox}
+          onRunReactionIntelligenceJob={props.onRunReactionIntelligenceJob}
+          onRunWorkspaceIngest={props.onRunWorkspaceIngest}
+        />
+      );
+    case "settings":
+      return (
+        <SettingsDockPanel
+          mode={props.mode}
+          sidecarStatus={props.sidecarStatus}
+          postgresStatus={props.postgresStatus}
+          localStoreStatus={props.localStoreStatus}
+        />
+      );
+    case "agent": {
+      const quickFixes = getQuickFixCandidates(props.diagnostics);
+      const agentPanel = buildAgentTimelinePanel(props.agentRun, {
+        currentBeforeHash: props.agentCurrentBeforeHash,
+      });
+      const quickFixControls = (
+        <>
+          {props.agentMessage ? (
+            <p className="rounded-xl border border-white/35 bg-white/18 p-3 text-sm data-[tone=danger]:text-destructive data-[tone=info]:text-primary" data-tone={props.agentMessage.tone}>
+              {props.agentMessage.text}
+            </p>
+          ) : null}
+          <AgentEmptyState mode={props.mode} hasQuickFixes={quickFixes.length > 0} />
+          <AgentQuickFixList
+            mode={props.mode}
+            quickFixes={quickFixes}
+            onProposeQuickFix={props.onProposeQuickFix}
+          />
+        </>
+      );
+      return (
+        <AgentPanel
+          panel={agentPanel}
+          quickFixControls={quickFixControls}
+          onApprovePatch={() => props.onApprovePatch()}
+          onApplyPatch={() => props.onApplyPatch()}
+          onRejectPatch={() => props.onRejectPatch()}
+        />
+      );
+    }
+  }
+  return null;
 };

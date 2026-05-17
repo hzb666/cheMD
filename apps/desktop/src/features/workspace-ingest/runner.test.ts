@@ -102,6 +102,29 @@ describe("desktop workspace ingest outbox save runner", () => {
     expect(result.message).toBe("Workspace ingest saved 2 outbox-ready local snapshot(s).");
   });
 
+  it("carries backend manifest revision keys through saved queue items", async () => {
+    const file = fileEntry("experiments/alpha.chemd");
+    const result = await runWorkspaceIngestOutboxSave({
+      workspaceId: "workspace-alpha",
+      files: [file],
+      manifestRevisionKeys: new Map([[file.path, "meta:17:123"]]),
+      readFile: () => ({ content: "source:alpha", modifiedAtMs: 123 }),
+      compile: (_source, entry) => {
+        const payload = buildPayload(entry.path, "rev-alpha", "snapshot-alpha");
+        return {
+          compileOutput: { status: "ok", graphSnapshot: payload.graphSnapshot },
+          runtimePayload: payload
+        };
+      },
+      saveSnapshot: (input) => buildSaveResult(input),
+      now: () => createdAt
+    });
+
+    expect(result.ingest.items[0].metadata.workspaceManifestRevisionKey)
+      .toBe("meta:17:123");
+    expect(result.saveResults).toHaveLength(1);
+  });
+
   it("continues saving after a failed save and redacts the failure summary", async () => {
     const files = [
       fileEntry("experiments/alpha.chemd"),

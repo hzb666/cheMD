@@ -41,6 +41,7 @@ export interface RunWorkspaceIngestOutboxSaveInput {
   ) => MaybePromise<SaveLocalRuntimeSnapshotResult>;
   now?: () => string;
   existingItems?: readonly WorkspaceIngestQueueItem[];
+  manifestRevisionKeys?: ReadonlyMap<string, string>;
   maxRetryFailures?: number;
 }
 
@@ -154,6 +155,7 @@ export const runWorkspaceIngestOutboxSave = async (
     files: input.files,
     readFile: input.readFile,
     existingItems: input.existingItems,
+    manifestRevisionKeys: input.manifestRevisionKeys,
     maxRetryFailures,
     createdAt,
     compile: async (source, file) => {

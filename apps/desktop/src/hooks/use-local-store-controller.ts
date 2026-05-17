@@ -3,6 +3,8 @@ import { compileChemdForEditor } from "@chemd/language-service";
 import { toChemdModelUri } from "../features/editor/source-path";
 import {
   type LocalStoreStatus,
+  type WorkspaceFileEntry,
+  type WorkspaceIngestPlanItem,
 } from "../contracts";
 import { buildLocalRuntimeSnapshotInput } from "../features/local-store/store";
 import { initialLocalReactionIntelligenceArtifactState, readLatestLocalReactionIntelligenceArtifact, type LocalReactionIntelligenceArtifactState } from "../features/reaction-intelligence/artifact-controller";
@@ -39,10 +41,27 @@ import {
 } from "../utils";
 import { runWorkspaceIngestOutboxSave } from "../features/workspace-ingest/runner";
 import {
+  buildWorkspaceIngestKnownRevisions,
+  selectRunnableWorkspaceIngestPlanItems,
+  workspaceIngestManifestRevisionMapFromPlan,
+  workspaceIngestPlanItemsToFiles,
+} from "../features/workspace-ingest/queue";
+import {
   buildWorkspaceSymbolIndex,
   type WorkspaceSymbolIndexSummary,
 } from "../workspace-index/symbol-index";
 
+const WORKSPACE_INGEST_PLAN_LIMIT = 100;
+
+const workspaceIngestPlanFallback = (
+  files: readonly WorkspaceFileEntry[]
+): {
+  files: readonly WorkspaceFileEntry[];
+  manifestRevisionKeys: ReadonlyMap<string, string>;
+} => ({
+  files,
+  manifestRevisionKeys: new Map(),
+});
 
 export const useLocalStoreController = ({
   mode,
@@ -269,6 +288,31 @@ export const useWorkspaceIngestController = ({
     setState(initialWorkspaceIngestState);
   }, [mode, workspace.workspaceId]);
 
+  const loadWorkspaceIngestPlan = async (): Promise<{
+    files: readonly WorkspaceFileEntry[];
+    manifestRevisionKeys: ReadonlyMap<string, string>;
+  }> => {
+    const items: WorkspaceIngestPlanItem[] = [];
+    let cursor: number | undefined;
+    const knownRevisions = buildWorkspaceIngestKnownRevisions(state.items);
+
+    do {
+      const page = await invokeCommand("build_workspace_ingest_plan", {
+        workspaceId: workspace.workspaceId,
+        cursor,
+        limit: WORKSPACE_INGEST_PLAN_LIMIT,
+        knownRevisions,
+      });
+      items.push(...page.items);
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor !== undefined);
+
+    return {
+      files: workspaceIngestPlanItemsToFiles(selectRunnableWorkspaceIngestPlanItems(items)),
+      manifestRevisionKeys: workspaceIngestManifestRevisionMapFromPlan(items),
+    };
+  };
+
   const runIngest = async () => {
     if (runningRef.current) return;
     if (disabledReason !== null) {
@@ -282,10 +326,14 @@ export const useWorkspaceIngestController = ({
       message: "Scanning workspace files and saving eligible Chemd snapshots to the Local Store outbox."
     }));
     try {
+      const ingestPlan = await loadWorkspaceIngestPlan().catch(() =>
+        workspaceIngestPlanFallback(files)
+      );
       const result = await runWorkspaceIngestOutboxSave({
         workspaceId: workspace.workspaceId,
-        files,
+        files: ingestPlan.files,
         existingItems: state.items,
+        manifestRevisionKeys: ingestPlan.manifestRevisionKeys,
         readFile: (file) => invokeCommand("read_workspace_file", {
           workspaceId: workspace.workspaceId,
           path: file.path
@@ -349,8 +397,10 @@ export const useWorkspaceSymbolIndexController = ({
   workspaceState,
   workspace,
   files,
+  documentFiles,
   selectedFile,
-  source
+  source,
+  readFile
 }: WorkspaceSymbolIndexControllerInput): WorkspaceSymbolIndexControllerState => {
   const [state, setState] = useState<WorkspaceSymbolIndexControllerState>(
     initialWorkspaceSymbolIndexState
@@ -369,19 +419,22 @@ export const useWorkspaceSymbolIndexController = ({
       message: "Building workspace symbol index from local Chemd documents."
     }));
 
+    const symbolFiles = documentFiles ?? files;
     void buildWorkspaceSymbolIndex({
       workspace,
-      files,
+      files: symbolFiles,
       createDocumentUri: (file) => toChemdModelUri(file.path),
       readFile: async (file) => {
         if (file.id === selectedFile.id || file.path === selectedFile.path) {
           return source;
         }
 
-        const content = await invokeCommand("read_workspace_file", {
-          workspaceId: workspace.workspaceId,
-          path: file.path
-        });
+        const content = readFile
+          ? await readFile(file)
+          : await invokeCommand("read_workspace_file", {
+            workspaceId: workspace.workspaceId,
+            path: file.path
+          });
         return content.content;
       }
     }).then((result) => {
@@ -410,7 +463,9 @@ export const useWorkspaceSymbolIndexController = ({
     };
   }, [
     files,
+    documentFiles,
     mode,
+    readFile,
     selectedFile.id,
     selectedFile.path,
     source,

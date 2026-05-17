@@ -1,12 +1,15 @@
 use crate::{
-    workspace::WorkspaceDocumentQueryOptions,
+    workspace::{
+        WorkspaceDocumentQueryOptions, WorkspaceIndexQueryOptions, WorkspaceIngestKnownRevision,
+        WorkspaceIngestPlanOptions,
+    },
     workspace_file_io::{
         content_hash, read_workspace_file_impl, set_before_workspace_commit_hook_for_test,
         write_workspace_file_impl, MAX_WORKSPACE_FILE_BYTES,
     },
     workspace_io::{
-        canonical_workspace_root, list_workspace_files_impl, query_workspace_documents_impl,
-        workspace_handle,
+        build_workspace_ingest_plan_impl, canonical_workspace_root, list_workspace_files_impl,
+        query_workspace_documents_impl, query_workspace_index_impl, workspace_handle,
     },
 };
 use std::{
@@ -231,6 +234,162 @@ fn query_workspace_documents_returns_limited_pages_with_next_cursor() {
             .collect::<Vec<_>>(),
         vec!["c.chemd"]
     );
+}
+
+#[test]
+fn query_workspace_index_returns_paged_document_manifest_rows() {
+    let workspace = TestWorkspace::new("query-index-page");
+    workspace.write("a.chemd", "alpha");
+    workspace.write("b.chemd.md", "beta");
+    workspace.write("notes.md", "note");
+
+    let first_page = query_workspace_index_impl(
+        "workspace-test",
+        &workspace.canonical_root(),
+        &WorkspaceIndexQueryOptions {
+            limit: Some(1),
+            ..WorkspaceIndexQueryOptions::default()
+        },
+    )
+    .expect("first index page should query");
+    let second_page = query_workspace_index_impl(
+        "workspace-test",
+        &workspace.canonical_root(),
+        &WorkspaceIndexQueryOptions {
+            cursor: first_page.next_cursor,
+            limit: Some(1),
+            ..WorkspaceIndexQueryOptions::default()
+        },
+    )
+    .expect("second index page should query");
+
+    assert_eq!(first_page.summary.document_count, 2);
+    assert_eq!(first_page.summary.total_count, 2);
+    assert_eq!(first_page.summary.returned_count, 1);
+    assert_eq!(first_page.next_cursor, Some(1));
+    assert_eq!(first_page.rows[0].path, "a.chemd");
+    assert_eq!(first_page.rows[0].bytes, 5);
+    assert!(first_page.rows[0].modified_at_ms.is_some());
+    assert!(first_page.rows[0].revision_key.starts_with("meta:5:"));
+    assert_eq!(second_page.rows[0].path, "b.chemd.md");
+    assert_eq!(second_page.next_cursor, None);
+}
+
+#[test]
+fn query_workspace_index_filters_by_kind_query_and_document_path() {
+    let workspace = TestWorkspace::new("query-index-filters");
+    workspace.write("experiments/alpha.chemd", "alpha");
+    workspace.write("experiments/beta.chemd", "beta");
+    workspace.write("assets/image.txt", "asset");
+
+    let by_query = query_workspace_index_impl(
+        "workspace-test",
+        &workspace.canonical_root(),
+        &WorkspaceIndexQueryOptions {
+            query: Some("beta".into()),
+            ..WorkspaceIndexQueryOptions::default()
+        },
+    )
+    .expect("index query should filter by text");
+    let by_document_path = query_workspace_index_impl(
+        "workspace-test",
+        &workspace.canonical_root(),
+        &WorkspaceIndexQueryOptions {
+            document_path: Some("experiments\\alpha.chemd".into()),
+            ..WorkspaceIndexQueryOptions::default()
+        },
+    )
+    .expect("index query should normalize document path");
+    let by_asset_kind = query_workspace_index_impl(
+        "workspace-test",
+        &workspace.canonical_root(),
+        &WorkspaceIndexQueryOptions {
+            kind: Some("asset".into()),
+            ..WorkspaceIndexQueryOptions::default()
+        },
+    )
+    .expect("index query should support explicit kind filters");
+
+    assert_eq!(by_query.rows[0].path, "experiments/beta.chemd");
+    assert_eq!(by_document_path.rows[0].path, "experiments/alpha.chemd");
+    assert_eq!(by_asset_kind.rows[0].path, "assets/image.txt");
+    assert_eq!(by_asset_kind.rows[0].chemd_kind.as_deref(), Some("asset"));
+}
+
+#[test]
+fn build_workspace_ingest_plan_returns_paged_pending_and_skipped_items() {
+    let workspace = TestWorkspace::new("ingest-plan-page");
+    workspace.write("a.chemd", "alpha");
+    workspace.write("b.chemd.md", "beta");
+    workspace.write("notes.md", "note");
+    workspace.write("image.txt", "asset");
+
+    let first_page = build_workspace_ingest_plan_impl(
+        "workspace-test",
+        &workspace.canonical_root(),
+        &WorkspaceIngestPlanOptions {
+            limit: Some(2),
+            ..WorkspaceIngestPlanOptions::default()
+        },
+    )
+    .expect("first ingest plan page should build");
+    let second_page = build_workspace_ingest_plan_impl(
+        "workspace-test",
+        &workspace.canonical_root(),
+        &WorkspaceIngestPlanOptions {
+            cursor: first_page.next_cursor,
+            limit: Some(2),
+            ..WorkspaceIngestPlanOptions::default()
+        },
+    )
+    .expect("second ingest plan page should build");
+
+    assert_eq!(first_page.summary.total_count, 3);
+    assert_eq!(first_page.summary.returned_count, 2);
+    assert_eq!(first_page.summary.pending_count, 2);
+    assert_eq!(first_page.next_cursor, Some(2));
+    assert_eq!(
+        first_page
+            .items
+            .iter()
+            .map(|item| item.path.as_str())
+            .collect::<Vec<_>>(),
+        vec!["a.chemd", "b.chemd.md"]
+    );
+    assert_eq!(second_page.items[0].path, "notes.md");
+    assert_eq!(second_page.items[0].disposition, "skipped");
+    assert_eq!(second_page.items[0].reason, "non_chemd_markdown");
+    assert_eq!(second_page.next_cursor, None);
+}
+
+#[test]
+fn build_workspace_ingest_plan_marks_known_revisions_unchanged() {
+    let workspace = TestWorkspace::new("ingest-plan-known");
+    workspace.write("a.chemd", "alpha");
+    let initial = build_workspace_ingest_plan_impl(
+        "workspace-test",
+        &workspace.canonical_root(),
+        &WorkspaceIngestPlanOptions::default(),
+    )
+    .expect("initial ingest plan should build");
+    let known = initial.items[0].revision_key.clone();
+
+    let unchanged = build_workspace_ingest_plan_impl(
+        "workspace-test",
+        &workspace.canonical_root(),
+        &WorkspaceIngestPlanOptions {
+            known_revisions: Some(vec![WorkspaceIngestKnownRevision {
+                document_path: "a.chemd".into(),
+                revision_key: known,
+            }]),
+            ..WorkspaceIngestPlanOptions::default()
+        },
+    )
+    .expect("known ingest plan should build");
+
+    assert_eq!(unchanged.items[0].disposition, "unchanged");
+    assert_eq!(unchanged.items[0].reason, "revision_match");
+    assert_eq!(unchanged.summary.unchanged_count, 1);
 }
 
 #[test]
