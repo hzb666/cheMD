@@ -41,14 +41,14 @@ import type {
   RuntimeState,
   SidecarStatus,
 } from "../../contracts"
-import type { AppSettings, AppSettingsPatch } from "./settings"
+import { normalizeWorkspaceIgnoreNames, type AppSettings, type AppSettingsPatch } from "./settings"
 import type {
   DocumentMode,
   PostgresProfilePanelController,
   WorkspaceState,
 } from "../../types"
 
-type AppSettingsCategory = "account" | "general" | "appearance" | "editor" | "runtime"
+type AppSettingsCategory = "account" | "general" | "workspace" | "appearance" | "editor" | "runtime"
 
 type AppSettingsDialogProps = {
   mode: DocumentMode
@@ -79,6 +79,7 @@ const categories: {
 }[] = [
   { id: "account", label: "Account", description: "Local identity", icon: UserCircle },
   { id: "general", label: "General", description: "Startup behavior", icon: SlidersHorizontal },
+  { id: "workspace", label: "Workspace", description: "Explorer loading", icon: FolderOpen },
   { id: "appearance", label: "Appearance", description: "Theme and density", icon: Paintbrush },
   { id: "editor", label: "Editor", description: "Monaco defaults", icon: Monitor },
   { id: "runtime", label: "Runtime", description: "Sidecar and storage", icon: Activity },
@@ -135,7 +136,7 @@ function SettingsInfoRow({
 }) {
   return (
     <Surface className="grid grid-cols-[2rem_1fr_auto] items-start gap-3 px-3 py-3">
-      <div className="flex size-8 items-center justify-center rounded-lg border border-white/40 bg-transparent text-muted-foreground">
+      <div className="flex size-8 items-center justify-center rounded-lg border border-border/35 bg-transparent text-muted-foreground">
         <Icon size={16} />
       </div>
       <div className="min-w-0">
@@ -242,6 +243,29 @@ function RangeField({
   )
 }
 
+function TextListField({
+  label,
+  description,
+  value,
+  onChange,
+}: {
+  label: string
+  description?: string
+  value: string[]
+  onChange: (value: string[]) => void
+}) {
+  return (
+    <SettingsField label={label} description={description}>
+      <textarea
+        className="min-h-28 resize-none rounded-md border border-transparent bg-[var(--control-surface)] px-3 py-2 font-mono text-xs text-foreground shadow-none outline-none transition-colors placeholder:text-muted-foreground hover:border-border/35 hover:bg-[var(--control-surface-hover)] focus:border-border/55 focus:bg-[var(--control-surface-active)]"
+        value={value.join("\n")}
+        spellCheck={false}
+        onChange={(event) => onChange(normalizeWorkspaceIgnoreNames(event.currentTarget.value))}
+      />
+    </SettingsField>
+  )
+}
+
 function SettingsSection({
   title,
   description,
@@ -253,7 +277,7 @@ function SettingsSection({
 }) {
   return (
     <section className="grid gap-3">
-      <div className="border-b border-white/35 pb-2">
+      <div className="border-b border-border/35 pb-2">
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>
       </div>
@@ -296,15 +320,15 @@ export function SettingsDialog({
           <Settings size={21} strokeWidth={2} />
         </Button>
       </DialogTrigger>
-      <DialogContent className="h-[min(680px,calc(100vh-2rem))] max-w-[860px] grid-rows-[auto_1fr] gap-0 overflow-hidden border-border bg-editor-surface p-0 shadow-[0_6px_20px_rgba(15,23,42,0.06)]">
-        <DialogHeader className="border-b border-white/40 bg-white/16 px-5 py-4 pr-12">
+      <DialogContent className="h-[min(680px,calc(100vh-2rem))] max-w-[860px] grid-rows-[auto_1fr] gap-0 overflow-hidden border-border/45 bg-editor-surface p-0 shadow-[0_6px_20px_rgba(15,23,42,0.06)]">
+        <DialogHeader className="border-b border-border/30 bg-background/20 px-5 py-4 pr-12">
           <DialogTitle className="text-lg">Settings</DialogTitle>
           <DialogDescription>
             Account, appearance, editor, and runtime defaults for Chemd Desktop.
           </DialogDescription>
         </DialogHeader>
         <div className="grid min-h-0 grid-cols-[178px_1fr]">
-          <aside className="flex min-h-0 flex-col border-r border-white/40 bg-white/12 p-3" aria-label="Settings bookmarks">
+          <aside className="flex min-h-0 flex-col border-r border-border/30 bg-background/12 p-3" aria-label="Settings bookmarks">
             <nav className="grid gap-1">
               {categories.map((category) => {
                 const Icon = category.icon
@@ -318,7 +342,7 @@ export function SettingsDialog({
                     data-active={active ? "true" : undefined}
                     onClick={() => setActiveCategory(category.id)}
                   >
-                    <span className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors group-hover:bg-slate-900/[0.04] data-[active=true]:bg-chemd-background data-[active=true]:text-chemd-foreground" data-active={active ? "true" : undefined}>
+                    <span className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors group-hover:bg-foreground/[0.05] data-[active=true]:bg-chemd-background data-[active=true]:text-chemd-foreground dark:group-hover:bg-foreground/[0.08]" data-active={active ? "true" : undefined}>
                       <Icon size={15} />
                     </span>
                     <span className="min-w-0">
@@ -384,6 +408,26 @@ export function SettingsDialog({
                   label="Last workspace"
                   value={settings.lastWorkspacePath || "No saved workspace"}
                   detail="This updates automatically after a workspace is opened."
+                />
+              </SettingsSection>
+              ) : null}
+
+              {activeCategory === "workspace" ? (
+              <SettingsSection
+                title="Workspace"
+                description="Tune how the local file explorer loads large workspaces."
+              >
+                <SettingsInfoRow
+                  icon={FolderOpen}
+                  label="Initial file tree depth"
+                  value="2 levels"
+                  detail="The explorer loads root entries and one nested level, then loads deeper folders when expanded."
+                />
+                <TextListField
+                  label="Ignored folder and file names"
+                  description="One name per line. Matching entries are skipped by the workspace explorer."
+                  value={settings.workspaceIgnoreNames}
+                  onChange={(workspaceIgnoreNames) => onSettingsChange({ workspaceIgnoreNames })}
                 />
               </SettingsSection>
               ) : null}

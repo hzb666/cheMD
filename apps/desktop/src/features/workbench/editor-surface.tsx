@@ -23,9 +23,10 @@ import type { ChemdLanguageCompileOutput } from "@chemd/language-service";
 import { Button } from "@/components/ui/button";
 import type { WorkbenchProps } from "../../types";
 import { getDiagnosticStats } from "../../utils";
+import { findChemdBlockPathAtLine, parseChemdBlockStructure } from "../editor/chemd-block-structure";
 import type { MonacoCursorPosition, MonacoUndoRedoState } from "../editor/source-path";
 import { HtmlPreview } from "../preview/html-preview";
-import type { ReferenceBottomPanelId } from "./bottom-panel";
+import { referenceBottomPanelDomId, type ReferenceBottomPanelId } from "./bottom-panel";
 import { useHorizontalResize } from "./use-horizontal-resize";
 
 const MonacoChemdEditor = lazy(() =>
@@ -67,6 +68,18 @@ export const countSourceLines = (source: string): number => {
   }
   return count;
 };
+
+export const isBottomPanelToggleActive = (bottomPanel: ReferenceBottomPanelId | null): boolean =>
+  bottomPanel !== null;
+
+export const getEditorBreadcrumbItems = (
+  source: string,
+  lineNumber: number,
+  fileName: string,
+): string[] => [
+  fileName,
+  ...findChemdBlockPathAtLine(parseChemdBlockStructure(source), lineNumber).map((node) => node.label),
+];
 
 const useCurrentMinute = (): Date => {
   const [currentTime, setCurrentTime] = useState(() => new Date());
@@ -131,6 +144,7 @@ export function ReferenceDocumentSurface({
   dirty,
   editorRef,
   settings,
+  resolvedTheme,
   sidebarVisible,
   previewVisible,
   bottomPanel,
@@ -152,6 +166,7 @@ export function ReferenceDocumentSurface({
   dirty: boolean;
   editorRef: WorkbenchProps["editorRef"];
   settings: WorkbenchProps["settings"];
+  resolvedTheme: WorkbenchProps["resolvedTheme"];
   sidebarVisible: boolean;
   previewVisible: boolean;
   bottomPanel: ReferenceBottomPanelId | null;
@@ -188,6 +203,10 @@ export function ReferenceDocumentSurface({
   const diagnostics = compileOutput.diagnostics;
   const diagnosticStats = getDiagnosticStats(diagnostics);
   const lineCount = useMemo(() => countSourceLines(source), [source]);
+  const breadcrumbItems = useMemo(
+    () => getEditorBreadcrumbItems(source, cursorPosition.lineNumber, file.name),
+    [cursorPosition.lineNumber, file.name, source]
+  );
   const autoSaveEnabled = settings.autoSaveMode !== "off";
   const autoSaved = autoSaveEnabled && !dirty && Boolean(savedAt);
   const saveStatusLabel = autoSaved ? formatSaveStatusLabel(savedAt) : "Save";
@@ -201,8 +220,8 @@ export function ReferenceDocumentSurface({
   return (
     <section className="relative z-10 min-w-0 flex-1 overflow-visible bg-transparent pb-2 pl-2 pr-2">
       {sidebarVisible ? <ReferenceSidebarResizeHandle onPointerDown={onSidebarResize} /> : null}
-      <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-sm border border-border/50 bg-[var(--reference-surface-bg)] shadow-[0_2px_14px] shadow-foreground/5">
-        <div className="grid h-[50px] shrink-0 grid-cols-[8.5rem_minmax(0,1fr)_8.5rem] items-center gap-3 bg-[var(--reference-surface-bg)] px-6 max-[880px]:grid-cols-[8.25rem_minmax(0,1fr)_8.25rem] max-[720px]:px-3">
+      <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-sm border border-border/50 bg-[var(--editor-workspace-surface)] shadow-[0_2px_14px] shadow-foreground/5">
+        <div className="grid h-[50px] shrink-0 grid-cols-[8.5rem_minmax(0,1fr)_8.5rem] items-center gap-3 bg-[var(--editor-workspace-surface)] px-6 max-[880px]:grid-cols-[8.25rem_minmax(0,1fr)_8.25rem] max-[720px]:px-3">
           <div className="flex min-w-0 items-center gap-1 text-muted-foreground" aria-label="Editor history controls">
             <Button
               type="button"
@@ -268,10 +287,11 @@ export function ReferenceDocumentSurface({
               variant="ghost"
               size="icon-sm"
               className={tabActionClassName}
-              data-active={bottomPanel === "diagnostics" ? "true" : undefined}
-              aria-pressed={bottomPanel === "diagnostics"}
-              aria-label="Toggle diagnostics panel"
-              title="Toggle diagnostics panel"
+              data-active={isBottomPanelToggleActive(bottomPanel) ? "true" : undefined}
+              aria-pressed={isBottomPanelToggleActive(bottomPanel)}
+              aria-controls={referenceBottomPanelDomId}
+              aria-label="Toggle bottom panel"
+              title="Toggle bottom panel"
               onClick={onToggleDiagnostics}
             >
               <PanelBottom size={14} />
@@ -291,6 +311,7 @@ export function ReferenceDocumentSurface({
             </Button>
           </div>
         </div>
+        <ReferenceEditorBreadcrumb items={breadcrumbItems} />
         {workspaceConflict ? (
           <div className="flex shrink-0 items-center gap-2 border-y border-warning/40 bg-warning/15 px-3 py-2 text-xs text-warning" role="alert">
             <AlertTriangle size={15} aria-hidden="true" />
@@ -318,7 +339,7 @@ export function ReferenceDocumentSurface({
             </Button>
           </div>
         ) : null}
-        <div ref={editorBodyRef} className="flex min-h-0 flex-1 overflow-hidden bg-editor-surface">
+        <div ref={editorBodyRef} className="flex min-h-0 flex-1 overflow-hidden bg-[var(--editor-workspace-surface)]">
           <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
             <Suspense fallback={<div className="monaco-loading flex min-h-0 flex-1 items-center justify-center text-sm text-muted-foreground">Loading Monaco editor...</div>}>
               <MonacoChemdEditor
@@ -328,6 +349,7 @@ export function ReferenceDocumentSurface({
                 compileOutput={compileOutput}
                 workspaceSymbolIndex={workspaceSymbolIndex}
                 editorSettings={settings}
+                resolvedTheme={resolvedTheme}
                 onChange={onChange}
                 onSave={onSave}
                 onBlurSave={settings.autoSaveMode === "onFocusLost" ? onSave : undefined}
@@ -338,7 +360,7 @@ export function ReferenceDocumentSurface({
           </div>
           {previewVisible ? (
             <section
-              className="relative min-h-0 shrink-0 overflow-hidden border-l border-border/65 bg-[var(--reference-surface-bg)] pl-1"
+              className="relative min-h-0 shrink-0 overflow-hidden border-l border-border/65 bg-[var(--editor-workspace-surface)] pl-1"
               style={{ width: `var(--reference-preview-width, ${previewWidthPercent}%)` } as CSSProperties}
               aria-label="Chemd HTML preview"
             >
@@ -349,7 +371,7 @@ export function ReferenceDocumentSurface({
                 aria-orientation="vertical"
                 onPointerDown={beginPreviewResize}
               />
-              <HtmlPreview output={compileOutput} />
+              <HtmlPreview output={compileOutput} previewTheme={resolvedTheme} />
             </section>
           ) : null}
         </div>
@@ -362,6 +384,25 @@ export function ReferenceDocumentSurface({
         />
       </div>
     </section>
+  );
+}
+
+function ReferenceEditorBreadcrumb({
+  items,
+}: {
+  items: readonly string[];
+}) {
+  return (
+    <nav className="flex h-5 shrink-0 items-center gap-1 overflow-hidden bg-[var(--editor-workspace-surface)] px-6 text-xs font-medium text-muted-foreground max-[720px]:px-3" aria-label="Editor breadcrumbs">
+      {items.map((item, index) => (
+        <span key={`${item}-${index}`} className="flex min-w-0 items-center gap-1">
+          {index > 0 ? <ChevronRight size={13} aria-hidden="true" className="shrink-0 text-muted-foreground/70" /> : null}
+          <span className="min-w-0 truncate data-[current=true]:text-foreground" data-current={index === items.length - 1 ? "true" : undefined} title={item}>
+            {item}
+          </span>
+        </span>
+      ))}
+    </nav>
   );
 }
 
@@ -383,7 +424,7 @@ function ReferenceEditorStatusBar({
   const currentTime = useCurrentMinute();
 
   return (
-    <footer className="flex min-h-7 shrink-0 items-center justify-between gap-3 overflow-hidden border-t border-border/65 bg-[var(--reference-surface-bg)] px-3.5 text-xs font-semibold text-muted-foreground" aria-label="Editor status">
+    <footer className="flex min-h-7 shrink-0 items-center justify-between gap-3 overflow-hidden border-t border-border/85 bg-[var(--editor-workspace-surface)] px-3.5 text-xs font-semibold text-muted-foreground" aria-label="Editor status">
       <div className="reference-status-group reference-status-group-left flex min-w-0 flex-[1_1_auto] items-center gap-2 overflow-hidden">
         <span className={`${statusItemClassName} border-l-0 pl-0 ${status === "ok" ? "text-success" : "text-destructive"}`}>
           <StatusIcon size={13} />

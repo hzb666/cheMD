@@ -1,26 +1,25 @@
 use crate::workspace::{
-    not_selected, CommandError, WorkspaceDocumentQueryOptions, WorkspaceDocumentQueryResult,
-    WorkspaceFileEntry, WorkspaceHandle, WorkspaceIndexQueryOptions, WorkspaceIndexQueryResult,
-    WorkspaceIndexRow, WorkspaceIndexSummary, WorkspaceIngestPlanItem, WorkspaceIngestPlanOptions,
-    WorkspaceIngestPlanResult, WorkspaceIngestPlanSummary,
+    not_selected, CommandError, WorkspaceChildrenOptions, WorkspaceDocumentQueryOptions,
+    WorkspaceDocumentQueryResult, WorkspaceFileEntry, WorkspaceHandle, WorkspaceIndexQueryOptions,
+    WorkspaceIndexQueryResult, WorkspaceIndexRow, WorkspaceIndexSummary, WorkspaceIngestPlanItem,
+    WorkspaceIngestPlanOptions, WorkspaceIngestPlanResult, WorkspaceIngestPlanSummary,
 };
-use crate::workspace_path::{chemd_kind_for_path, relative_path};
+use crate::workspace_path::{
+    chemd_kind_for_path, clean_relative_path, outside_root, relative_path,
+};
 use std::{
     fs,
     path::{Path, PathBuf},
     time::UNIX_EPOCH,
 };
 
-const MAX_DEPTH: usize = 6;
-const MAX_ENTRIES: usize = 1_000;
-const MAX_CHILDREN_PER_DIR: usize = 256;
 const DEFAULT_DOCUMENT_QUERY_LIMIT: usize = 100;
 const MAX_DOCUMENT_QUERY_LIMIT: usize = 250;
 const DEFAULT_INDEX_QUERY_LIMIT: usize = 100;
 const MAX_INDEX_QUERY_LIMIT: usize = 500;
 const DEFAULT_INGEST_PLAN_LIMIT: usize = 100;
 const MAX_INGEST_PLAN_LIMIT: usize = 500;
-const IGNORED_DIRS: &[&str] = &[
+const DEFAULT_IGNORED_WORKSPACE_NAMES: &[&str] = &[
     ".git",
     ".hg",
     ".svn",
@@ -35,14 +34,6 @@ const IGNORED_DIRS: &[&str] = &[
     "dist",
     "node_modules",
     "target",
-];
-const SENSITIVE_FILES: &[&str] = &[
-    ".env",
-    ".env.local",
-    ".env.development",
-    ".env.production",
-    ".npmrc",
-    ".pypirc",
 ];
 
 pub(crate) fn canonical_workspace_root(root_path: Option<&str>) -> Result<PathBuf, CommandError> {
@@ -92,7 +83,35 @@ pub(crate) fn list_workspace_files_impl(
     root: &Path,
 ) -> Result<Vec<WorkspaceFileEntry>, CommandError> {
     let mut entries = Vec::new();
-    visit_directory(workspace_id, root, root, 0, &mut entries)?;
+    let ignore_names = default_ignored_workspace_names();
+    visit_directory(workspace_id, root, root, None, &ignore_names, &mut entries)?;
+    entries.sort_by(|left, right| left.path.cmp(&right.path));
+    Ok(entries)
+}
+
+fn default_ignored_workspace_names() -> Vec<String> {
+    DEFAULT_IGNORED_WORKSPACE_NAMES
+        .iter()
+        .map(|name| (*name).to_string())
+        .collect()
+}
+
+pub(crate) fn list_workspace_children_impl(
+    workspace_id: &str,
+    root: &Path,
+    options: &WorkspaceChildrenOptions,
+) -> Result<Vec<WorkspaceFileEntry>, CommandError> {
+    let dir = workspace_directory(root, options.path.as_deref())?;
+    let ignore_names = normalized_ignore_names(options.ignore_names.as_deref());
+    let mut entries = Vec::new();
+    visit_directory(
+        workspace_id,
+        root,
+        &dir,
+        Some(options.depth.unwrap_or(1).max(1)),
+        &ignore_names,
+        &mut entries,
+    )?;
     entries.sort_by(|left, right| left.path.cmp(&right.path));
     Ok(entries)
 }
@@ -275,22 +294,16 @@ fn visit_directory(
     workspace_id: &str,
     root: &Path,
     dir: &Path,
-    depth: usize,
+    remaining_depth: Option<usize>,
+    ignore_names: &[String],
     entries: &mut Vec<WorkspaceFileEntry>,
 ) -> Result<(), CommandError> {
-    if depth >= MAX_DEPTH || entries.len() >= MAX_ENTRIES {
+    if remaining_depth == Some(0) {
         return Ok(());
     }
-
     let children = read_workspace_children(dir)?;
-    if children.len() > MAX_CHILDREN_PER_DIR {
-        return Ok(());
-    }
 
     for child in children {
-        if entries.len() >= MAX_ENTRIES {
-            break;
-        }
         let file_type = child.file_type().map_err(|err| {
             CommandError::io(
                 "workspace_list_failed",
@@ -298,16 +311,14 @@ fn visit_directory(
                 err,
             )
         })?;
-        if file_type.is_symlink() {
+        if should_ignore_name(&child.file_name(), ignore_names) {
             continue;
         }
 
         let path = child.path();
         let relative = relative_path(root, &path)?;
-        if should_ignore_workspace_path(Path::new(&relative)) {
-            continue;
-        }
-        if file_type.is_dir() {
+        let entry_kind = workspace_entry_kind(&path, &file_type);
+        if entry_kind == "directory" {
             entries.push(file_entry(
                 workspace_id,
                 &path,
@@ -315,8 +326,11 @@ fn visit_directory(
                 "directory",
                 None,
             ));
-            visit_directory(workspace_id, root, &path, depth + 1, entries)?;
-        } else if file_type.is_file() {
+            if !file_type.is_symlink() {
+                let next_depth = remaining_depth.and_then(|depth| depth.checked_sub(1));
+                visit_directory(workspace_id, root, &path, next_depth, ignore_names, entries)?;
+            }
+        } else if entry_kind == "file" {
             entries.push(file_entry(
                 workspace_id,
                 &path,
@@ -347,16 +361,73 @@ fn read_workspace_children(dir: &Path) -> Result<Vec<fs::DirEntry>, CommandError
                 err,
             )
         })?;
-        if should_ignore_name(&child.file_name()) {
-            continue;
-        }
         children.push(child);
-        if children.len() > MAX_CHILDREN_PER_DIR {
-            break;
-        }
     }
     children.sort_by_key(|entry| entry.file_name());
     Ok(children)
+}
+
+fn workspace_entry_kind(path: &Path, file_type: &fs::FileType) -> &'static str {
+    if file_type.is_dir() {
+        return "directory";
+    }
+    if file_type.is_file() {
+        return "file";
+    }
+    if file_type.is_symlink() {
+        return fs::metadata(path)
+            .map(|metadata| {
+                if metadata.is_dir() {
+                    "directory"
+                } else {
+                    "file"
+                }
+            })
+            .unwrap_or("file");
+    }
+    "file"
+}
+
+fn workspace_directory(root: &Path, path: Option<&str>) -> Result<PathBuf, CommandError> {
+    let Some(path) = path.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(root.to_path_buf());
+    };
+    let relative = clean_relative_path(path)?;
+    let target = fs::canonicalize(root.join(&relative)).map_err(|err| {
+        CommandError::io(
+            "workspace_directory_not_found",
+            "Workspace directory cannot be found",
+            err,
+        )
+    })?;
+    if !target.starts_with(root) {
+        return Err(outside_root(&relative));
+    }
+    if !target.is_dir() {
+        return Err(CommandError::new(
+            "workspace_not_directory",
+            "Workspace path is not a directory",
+            Some(relative.display().to_string()),
+        ));
+    }
+    Ok(target)
+}
+
+fn normalized_ignore_names(ignore_names: Option<&[String]>) -> Vec<String> {
+    ignore_names
+        .unwrap_or_default()
+        .iter()
+        .map(|name| name.trim().to_ascii_lowercase())
+        .filter(|name| !name.is_empty())
+        .collect()
+}
+
+fn should_ignore_name(name: &std::ffi::OsStr, ignore_names: &[String]) -> bool {
+    let Some(name) = name.to_str() else {
+        return false;
+    };
+    let normalized = name.to_ascii_lowercase();
+    ignore_names.iter().any(|ignored| ignored == &normalized)
 }
 
 fn is_chemd_document_entry(entry: &WorkspaceFileEntry) -> bool {
@@ -395,25 +466,6 @@ fn entry_matches_kind(entry: &WorkspaceFileEntry, kind: &str) -> bool {
 
 fn normalize_workspace_path(path: &str) -> String {
     path.replace('\\', "/").trim_start_matches('/').to_string()
-}
-
-pub(crate) fn should_ignore_workspace_path(path: &Path) -> bool {
-    path.components().any(|component| {
-        let std::path::Component::Normal(name) = component else {
-            return false;
-        };
-        should_ignore_name(name)
-    })
-}
-
-fn should_ignore_name(name: &std::ffi::OsStr) -> bool {
-    let Some(name) = name.to_str() else {
-        return false;
-    };
-    let normalized = name.to_ascii_lowercase();
-    normalized.starts_with('.')
-        || IGNORED_DIRS.contains(&normalized.as_str())
-        || SENSITIVE_FILES.contains(&normalized.as_str())
 }
 
 fn file_entry(

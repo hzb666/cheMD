@@ -207,7 +207,7 @@ preserve user-visible IDE states.
       independent full-workspace read/compile loops.
 - [ ] Workspace ingest planning is owned by Rust/Tauri metadata and queue
       policy, while TS compile semantics remain intact.
-- [ ] Preview, dock, graph, Monaco, and window-control optimizations preserve
+- [x] Preview, dock, graph, Monaco, and window-control optimizations preserve
       IDE behavior under targeted tests.
 - [ ] Workbench/App decomposition happens only after data and state contracts
       are stable.
@@ -354,3 +354,33 @@ preserve user-visible IDE states.
 - Validation:
   - `pnpm --filter @chemd/desktop test -- knowledge-map-panel.test.ts knowledge-map.test.ts`
   - `pnpm --filter @chemd/desktop typecheck`
+
+### Phase 6 - Workspace Explorer And IDE Surface Polish
+
+- Moved workspace file IO commands behind blocking Tauri tasks so large
+  workspace reads do not sit on the async command thread.
+- Added `list_workspace_children` with bounded depth and configurable ignored
+  names so the desktop explorer can load root and expanded directory layers
+  instead of eagerly materializing the full tree.
+- Added settings UI and normalization for workspace ignore names.
+- Preserved initial file open, conflict, deleted-file, and save behavior with
+  focused controller tests.
+- Added editor block-structure breadcrumbs, bottom-panel resize isolation,
+  theme-aware HTML preview rendering, and switch active-state polish.
+- Validation:
+  - `git diff --check`
+  - `cargo fmt --manifest-path apps\desktop\src-tauri\Cargo.toml -- --check`
+  - `cargo test --manifest-path apps\desktop\src-tauri\Cargo.toml workspace_tests`
+  - `cargo test --manifest-path apps\desktop\src-tauri\Cargo.toml diagnostics_bundle_tests`
+  - `pnpm --filter @chemd/desktop typecheck`
+  - `pnpm --filter @chemd/desktop test`
+  - `pnpm run test:scripts`
+  - `pnpm typecheck`
+  - `pnpm --filter @chemd/desktop build`
+  - `pnpm desktop:offline-core-smoke`
+  - `pnpm desktop:runtime-smoke`
+  - `pnpm desktop:release-readiness -- --json`
+- Limitation: `desktop:runtime-smoke` skipped database/RAG paths on this
+  machine because managed PostgreSQL binaries were not available. Release
+  readiness remains `overallStatus: skip` until clean-machine installer and
+  real-network smoke are run in the required external environments.

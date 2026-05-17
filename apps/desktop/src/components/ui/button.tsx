@@ -16,15 +16,15 @@ const buttonVariants = cva(
         ghost:
           "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
         surface:
-          "border-white/45 bg-white/35 text-foreground hover:bg-white/55 focus-visible:ring-2 focus-visible:ring-ring/40 active:not-aria-[haspopup]:translate-y-0",
+          "border-transparent bg-transparent text-foreground hover:border-border/35 hover:bg-foreground/[0.055] focus-visible:ring-2 focus-visible:ring-ring/40 active:not-aria-[haspopup]:translate-y-0 dark:hover:bg-foreground/[0.07]",
         chrome:
-          "text-muted-foreground hover:bg-white/35 hover:text-foreground data-[state=open]:bg-white/85 data-[state=open]:text-foreground data-[state=open]:shadow-sm active:not-aria-[haspopup]:translate-y-0",
+          "text-muted-foreground hover:bg-card/55 hover:text-foreground data-[state=open]:bg-card/80 data-[state=open]:text-foreground data-[state=open]:shadow-sm active:not-aria-[haspopup]:translate-y-0 dark:hover:bg-card/55 dark:data-[state=open]:bg-card/80",
         rail:
-          "text-muted-foreground hover:bg-white/45 hover:text-foreground hover:shadow-sm aria-pressed:bg-white/65 aria-pressed:text-foreground data-[state=open]:bg-white/65 data-[state=open]:text-foreground data-[state=open]:shadow-sm active:not-aria-[haspopup]:translate-y-0",
+          "text-muted-foreground hover:bg-card/60 hover:text-foreground hover:shadow-sm aria-pressed:bg-card/80 aria-pressed:text-foreground data-[state=open]:bg-card/80 data-[state=open]:text-foreground data-[state=open]:shadow-sm active:not-aria-[haspopup]:translate-y-0 dark:text-foreground/72 dark:hover:bg-card/55 dark:hover:text-foreground dark:aria-pressed:bg-card/72 dark:aria-pressed:text-foreground dark:aria-pressed:ring-1 dark:aria-pressed:ring-border/45 dark:data-[state=open]:bg-card/72 dark:data-[state=open]:text-foreground",
         window:
-          "text-muted-foreground hover:bg-white/45 hover:text-foreground hover:shadow-sm data-[maximized=true]:text-foreground data-[control=close]:hover:bg-destructive data-[control=close]:hover:text-white data-[control=close]:hover:shadow-none data-[control=close]:active:bg-destructive/90 focus-visible:ring-2 focus-visible:ring-primary/25 data-[control=close]:focus-visible:ring-destructive/35 active:not-aria-[haspopup]:translate-y-0",
+          "text-muted-foreground hover:bg-card/60 hover:text-foreground hover:shadow-sm data-[maximized=true]:text-foreground data-[control=close]:hover:bg-destructive data-[control=close]:hover:text-primary-foreground data-[control=close]:hover:shadow-none data-[control=close]:active:bg-destructive/90 focus-visible:ring-2 focus-visible:ring-ring/30 data-[control=close]:focus-visible:ring-destructive/35 active:not-aria-[haspopup]:translate-y-0 dark:text-foreground/72 dark:hover:bg-card/55 dark:hover:text-foreground",
         settingsItem:
-          "!grid !border-0 text-left hover:bg-slate-900/[0.04] data-[active=true]:bg-chemd-background active:not-aria-[haspopup]:translate-y-0",
+          "!grid !border-0 text-left hover:bg-foreground/[0.04] data-[active=true]:bg-foreground/[0.06] data-[active=true]:text-foreground active:not-aria-[haspopup]:translate-y-0 dark:hover:bg-foreground/[0.055] dark:data-[active=true]:bg-foreground/[0.075]",
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",

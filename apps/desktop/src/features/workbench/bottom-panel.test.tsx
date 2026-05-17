@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { ChemdLanguageCompileOutput } from "@chemd/language-service";
 
 import type { InsightPaneProps } from "../../types";
-import { ReferenceBottomPanel } from "./bottom-panel";
+import { ReferenceBottomPanel, ReferenceBottomPanelResizeHandle } from "./bottom-panel";
 
 const failedCompileOutput: ChemdLanguageCompileOutput = {
   status: "failed",
@@ -41,6 +41,7 @@ describe("ReferenceBottomPanel", () => {
     expect(html).toContain("1 errors / 0 warnings / 0 info");
     expect(html).toContain("Missing required field");
     expect(html).toContain("L4:C3");
+    expect(html).toContain('data-control="close"');
     expect(html).toContain('aria-pressed="true"');
   });
 
@@ -59,5 +60,15 @@ describe("ReferenceBottomPanel", () => {
     expect(html).toContain("Terminal output is not attached yet.");
     expect(html).toContain("Runtime logs are available from the Runtime tab.");
     expect(html).toContain('aria-pressed="true"');
+  });
+
+  it("renders a top resize separator for bottom panel resizing", () => {
+    const html = renderToStaticMarkup(
+      <ReferenceBottomPanelResizeHandle onPointerDown={vi.fn()} />
+    );
+
+    expect(html).toContain('role="separator"');
+    expect(html).toContain('aria-label="Resize bottom panel"');
+    expect(html).toContain('aria-orientation="horizontal"');
   });
 });

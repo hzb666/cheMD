@@ -1,5 +1,6 @@
 import type { DocumentMode, WorkspaceConflictState, WorkspaceState } from "../types";
 import type { WorkspaceFileEntry, WorkspaceHandle } from "../contracts";
+import type { AppSettings } from "../features/settings/settings";
 import { shellFiles, shellWorkspace } from "../contracts";
 import {
   DEFAULT_SAMPLE_SOURCE_NAME,
@@ -39,9 +40,111 @@ const getFileSelectedMessage = (file: WorkspaceFileEntry, mode: DocumentMode): s
   return `Read ${file.path} from the local workspace.`;
 };
 
+type InitialWorkspaceFileSource = {
+  source: string;
+  contentHash: string | null;
+  readFailed: boolean;
+};
+
+const WORKSPACE_CHILDREN_LAYER_DEPTH = 1;
+const WORKSPACE_CHILDREN_HYDRATION_DEPTH = 2;
+
+const workspacePathDepth = (path: string): number =>
+  path.replace(/\\/g, "/").split("/").filter(Boolean).length;
+
+const isWorkspaceDescendant = (parentPath: string, path: string): boolean => {
+  if (!parentPath) return path.length > 0;
+  return path.startsWith(`${parentPath}/`);
+};
+
+const relativeWorkspacePathDepth = (parentPath: string, path: string): number => {
+  if (!parentPath) return workspacePathDepth(path);
+  if (path === parentPath) return 0;
+  if (!isWorkspaceDescendant(parentPath, path)) return Number.POSITIVE_INFINITY;
+  return workspacePathDepth(path.slice(parentPath.length + 1));
+};
+
+export const resolveInitialWorkspaceFileSource = async (
+  file: WorkspaceFileEntry,
+  readFile: (path: string) => Promise<{ content: string; contentHash: string }>,
+): Promise<InitialWorkspaceFileSource> => {
+  const shouldReadInitialFile = file.kind === "file" && file.chemdKind !== "asset";
+  if (!shouldReadInitialFile) {
+    return {
+      source: getSampleSource(file),
+      contentHash: null,
+      readFailed: false,
+    };
+  }
+
+  try {
+    const content = await readFile(file.path);
+    return {
+      source: content.content,
+      contentHash: content.contentHash,
+      readFailed: false,
+    };
+  } catch {
+    return {
+      source: getSampleSource(file),
+      contentHash: null,
+      readFailed: true,
+    };
+  }
+};
+
+export const mergeWorkspaceChildren = (
+  currentFiles: readonly WorkspaceFileEntry[],
+  directoryPath: string,
+  children: readonly WorkspaceFileEntry[],
+  replaceDepth?: number,
+): WorkspaceFileEntry[] => {
+  const preservedDescendantPaths = replaceDepth === undefined
+    ? []
+    : currentFiles
+      .filter((file) => (
+        isWorkspaceDescendant(directoryPath, file.path)
+        && relativeWorkspacePathDepth(directoryPath, file.path) > replaceDepth
+      ))
+      .map((file) => file.path);
+  const base = currentFiles.filter((file) => (
+    file.path === directoryPath
+    || !isWorkspaceDescendant(directoryPath, file.path)
+    || (
+      replaceDepth !== undefined
+      && relativeWorkspacePathDepth(directoryPath, file.path) > replaceDepth
+    )
+    || (
+      file.kind === "directory"
+      && preservedDescendantPaths.some((path) => isWorkspaceDescendant(file.path, path))
+    )
+  ));
+  const merged = new Map<string, WorkspaceFileEntry>();
+  [...base, ...children].forEach((file) => merged.set(file.path, file));
+  return [...merged.values()].sort((left, right) => left.path.localeCompare(right.path));
+};
+
+export const getLoadedDirectoryPathsForRequest = (
+  directoryPath: string,
+  depth: number,
+  children: readonly WorkspaceFileEntry[],
+): string[] => [
+  directoryPath,
+  ...children
+    .filter((file) => (
+      file.kind === "directory"
+      && relativeWorkspacePathDepth(directoryPath, file.path) < depth
+    ))
+    .map((file) => file.path),
+];
+
 // ─── Hook ───────────────────────────────────────────────────────────────
 
-export const useWorkspaceFileController = () => {
+export const useWorkspaceFileController = ({
+  workspaceIgnoreNames,
+}: {
+  workspaceIgnoreNames: AppSettings["workspaceIgnoreNames"];
+}) => {
   const initialSource = sampleSources[DEFAULT_SAMPLE_SOURCE_NAME];
   const [workspaceState, setWorkspaceState] = useState<WorkspaceState>("empty");
   const [workspace, setWorkspace] = useState<WorkspaceHandle>(shellWorkspace);
@@ -49,6 +152,13 @@ export const useWorkspaceFileController = () => {
   const [session, setSession] = useState(() =>
     createEditorSession(shellFiles[0], { source: initialSource }));
   const [workspaceConflict, setWorkspaceConflict] = useState<WorkspaceConflictState | null>(null);
+  const [loadedDirectoryPaths, setLoadedDirectoryPaths] = useState<Set<string>>(() => new Set());
+  const [loadingDirectoryPaths, setLoadingDirectoryPaths] = useState<Set<string>>(() => new Set());
+  const [failedDirectoryMessages, setFailedDirectoryMessages] = useState<Map<string, string>>(() => new Map());
+  const loadedDirectoryPathsRef = useRef(new Set<string>());
+  const loadingDirectoryPathsRef = useRef(new Set<string>());
+  const failedDirectoryMessagesRef = useRef(new Map<string, string>());
+  const hydratedDirectoryPathsRef = useRef(new Set<string>());
   const [mode, setMode] = useState<DocumentMode>("sample");
   const [rootPath, setRootPath] = useState("");
   const [message, setMessage] = useState("No workspace is open. Editing bundled sample content.");
@@ -94,30 +204,157 @@ export const useWorkspaceFileController = () => {
     ?? nextFiles.find((file) => file.kind === "file")
     ?? nextFiles[0];
 
+  const listWorkspaceChildren = async (
+    workspaceId: string,
+    path: string,
+    depth: number,
+  ) => invokeCommand("list_workspace_children", {
+    workspaceId,
+    path: path || undefined,
+    depth,
+    ignoreNames: workspaceIgnoreNames,
+  });
+
+  const replaceLoadedDirectoryPaths = (paths: Iterable<string>) => {
+    const next = new Set(paths);
+    loadedDirectoryPathsRef.current = next;
+    setLoadedDirectoryPaths(new Set(next));
+  };
+
+  const addLoadedDirectoryPath = (path: string) => {
+    const next = new Set(loadedDirectoryPathsRef.current).add(path);
+    loadedDirectoryPathsRef.current = next;
+    setLoadedDirectoryPaths(new Set(next));
+  };
+
+  const addLoadingDirectoryPath = (path: string): boolean => {
+    if (loadedDirectoryPathsRef.current.has(path) || loadingDirectoryPathsRef.current.has(path)) {
+      return false;
+    }
+    const next = new Set(loadingDirectoryPathsRef.current).add(path);
+    loadingDirectoryPathsRef.current = next;
+    setLoadingDirectoryPaths(new Set(next));
+    return true;
+  };
+
+  const removeLoadingDirectoryPath = (path: string) => {
+    const next = new Set(loadingDirectoryPathsRef.current);
+    next.delete(path);
+    loadingDirectoryPathsRef.current = next;
+    setLoadingDirectoryPaths(new Set(next));
+  };
+
+  const clearFailedDirectoryMessage = (path: string) => {
+    if (!failedDirectoryMessagesRef.current.has(path)) return;
+    const next = new Map(failedDirectoryMessagesRef.current);
+    next.delete(path);
+    failedDirectoryMessagesRef.current = next;
+    setFailedDirectoryMessages(new Map(next));
+  };
+
+  const setFailedDirectoryMessage = (path: string, message: string) => {
+    const next = new Map(failedDirectoryMessagesRef.current);
+    next.set(path, message);
+    failedDirectoryMessagesRef.current = next;
+    setFailedDirectoryMessages(new Map(next));
+  };
+
+  const loadDirectoryLayer = async (
+    workspaceId: string,
+    path: string,
+  ): Promise<WorkspaceFileEntry[] | null> => {
+    if (!addLoadingDirectoryPath(path)) {
+      return null;
+    }
+
+    try {
+      clearFailedDirectoryMessage(path);
+      const children = await listWorkspaceChildren(
+        workspaceId,
+        path,
+        WORKSPACE_CHILDREN_LAYER_DEPTH,
+      );
+      setFiles((current) => mergeWorkspaceChildren(current, path, children));
+      addLoadedDirectoryPath(path);
+      return children;
+    } catch (error: unknown) {
+      setFailedDirectoryMessage(path, getDisplayableError(error));
+      throw error;
+    } finally {
+      removeLoadingDirectoryPath(path);
+    }
+  };
+
+  const hydrateWorkspaceDirectory = async (
+    workspaceId: string,
+    path: string,
+  ) => {
+    if (hydratedDirectoryPathsRef.current.has(path)) {
+      return;
+    }
+    hydratedDirectoryPathsRef.current = new Set(hydratedDirectoryPathsRef.current).add(path);
+    try {
+      const children = await listWorkspaceChildren(
+        workspaceId,
+        path,
+        WORKSPACE_CHILDREN_HYDRATION_DEPTH,
+      );
+      setFiles((current) => mergeWorkspaceChildren(
+        current,
+        path,
+        children,
+        WORKSPACE_CHILDREN_HYDRATION_DEPTH,
+      ));
+      getLoadedDirectoryPathsForRequest(path, WORKSPACE_CHILDREN_HYDRATION_DEPTH, children)
+        .forEach(addLoadedDirectoryPath);
+      clearFailedDirectoryMessage(path);
+    } catch (error: unknown) {
+      setFailedDirectoryMessage(path, getDisplayableError(error));
+      hydratedDirectoryPathsRef.current = new Set(
+        [...hydratedDirectoryPathsRef.current].filter((loadedPath) => loadedPath !== path),
+      );
+    }
+  };
+
   const loadWorkspace = async (nextWorkspace: WorkspaceHandle, messagePrefix: string) => {
-    const nextFiles = await invokeCommand("list_workspace_files", { workspaceId: nextWorkspace.workspaceId });
+    const nextFiles = await listWorkspaceChildren(
+      nextWorkspace.workspaceId,
+      "",
+      WORKSPACE_CHILDREN_LAYER_DEPTH,
+    );
     const usableFiles = nextFiles.length > 0 ? nextFiles : shellFiles;
     const firstFile = selectInitialWorkspaceFile(usableFiles);
-    const shouldReadInitialFile = firstFile.kind === "file" && firstFile.chemdKind !== "asset";
-    const nextContent = shouldReadInitialFile
-      ? await invokeCommand("read_workspace_file", {
+    const initialFileSource = await resolveInitialWorkspaceFileSource(
+      firstFile,
+      async (path) => invokeCommand("read_workspace_file", {
         workspaceId: nextWorkspace.workspaceId,
-        path: firstFile.path,
-      })
-      : undefined;
-    const nextSource = nextContent?.content ?? getSampleSource(firstFile);
-    const nextContentHash = nextContent?.contentHash ?? null;
+        path,
+      }),
+    );
     setWorkspace(nextWorkspace);
     setFiles(usableFiles);
+    replaceLoadedDirectoryPaths(getLoadedDirectoryPathsForRequest(
+      "",
+      WORKSPACE_CHILDREN_LAYER_DEPTH,
+      usableFiles,
+    ));
+    loadingDirectoryPathsRef.current = new Set();
+    hydratedDirectoryPathsRef.current = new Set();
+    setLoadingDirectoryPaths(new Set());
+    failedDirectoryMessagesRef.current = new Map();
+    setFailedDirectoryMessages(new Map());
     setSession(createEditorSession(firstFile, {
-      source: nextSource,
-      savedContentHash: nextContentHash,
+      source: initialFileSource.source,
+      savedContentHash: initialFileSource.contentHash,
     }));
     setWorkspaceConflict(null);
     setRootPath(nextWorkspace.rootPath);
     setMode("workspace");
-    setMessage(`${messagePrefix} ${usableFiles.length} workspace entries from the local workspace.`);
+    setMessage(initialFileSource.readFailed
+      ? `${messagePrefix} ${usableFiles.length} workspace entries. Initial file could not be read, so bundled content is shown until another file is selected.`
+      : `${messagePrefix} ${usableFiles.length} workspace entries from the local workspace.`);
     setWorkspaceState("open");
+    void hydrateWorkspaceDirectory(nextWorkspace.workspaceId, "");
   };
 
   const openWorkspacePath = async (selectedRootPath: string) => {
@@ -180,6 +417,22 @@ export const useWorkspaceFileController = () => {
       setMessage(getFileSelectedMessage(file, mode));
     } catch (error: unknown) {
       setMessage(`Workspace read failed: ${getDisplayableError(error)}.`);
+    }
+  };
+
+  const loadDirectoryChildren = async (path: string) => {
+    if (mode !== "workspace"
+      || loadedDirectoryPathsRef.current.has(path)
+      || loadingDirectoryPathsRef.current.has(path)) {
+      return;
+    }
+    try {
+      const children = await loadDirectoryLayer(workspace.workspaceId, path);
+      if (!children) return;
+      setMessage(`Loaded ${children.length} entries from ${path || workspace.displayName}.`);
+      void hydrateWorkspaceDirectory(workspace.workspaceId, path);
+    } catch (error: unknown) {
+      setMessage(`Workspace folder load failed: ${getDisplayableError(error)}.`);
     }
   };
 
@@ -327,6 +580,9 @@ export const useWorkspaceFileController = () => {
     workspaceState,
     workspace,
     files,
+    loadedDirectoryPaths,
+    loadingDirectoryPaths,
+    failedDirectoryMessages,
     openedTabs,
     dirtyFileIds,
     dirtyWorkspaceFileIds,
@@ -346,6 +602,7 @@ export const useWorkspaceFileController = () => {
     setMessage,
     openWorkspace,
     openWorkspacePath,
+    loadDirectoryChildren,
     selectFile,
     closeFileTab,
     closeAllFileTabs,

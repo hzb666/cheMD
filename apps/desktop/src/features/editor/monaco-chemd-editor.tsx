@@ -1,6 +1,8 @@
 import { loader, Editor, type BeforeMount, type Monaco, type OnChange, type OnMount } from "@monaco-editor/react";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
-import type { editor } from "monaco-editor";
+import type { editor, languages } from "monaco-editor";
+import "monaco-editor/esm/vs/base/browser/ui/codicons/codicon/codicon.css";
+import "monaco-editor/esm/vs/base/browser/ui/codicons/codicon/codicon-modifiers.css";
 import * as monacoRuntime from "monaco-editor/esm/vs/editor/editor.api.js";
 import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 
@@ -27,7 +29,7 @@ import {
   registerChemdNavigationProviders,
   updateChemdNavigationOutput
 } from "./navigation";
-import type { AppSettings } from "../settings/settings";
+import type { AppSettings, ResolvedTheme } from "../settings/settings";
 import {
   toChemdModelUri,
   type MonacoChemdEditorHandle,
@@ -35,6 +37,11 @@ import {
   type MonacoUndoRedoState,
   type MonacoSourceJumpIntent
 } from "./source-path";
+import {
+  flattenChemdBlockStructure,
+  parseChemdBlockStructure,
+  type ChemdBlockNode,
+} from "./chemd-block-structure";
 
 export {
   isSameChemdDocumentPath,
@@ -48,14 +55,10 @@ export {
 export const CHEMD_LANGUAGE_ID = "chemd";
 
 const CHEMD_MARKER_OWNER = "chemd-language-service";
-const CHEMD_THEME_ID = "chemd-desktop";
-const EDITOR_SURFACE_FALLBACK = "#ffffff";
+const CHEMD_LIGHT_THEME_ID = "chemd-desktop-light";
+const CHEMD_DARK_THEME_ID = "chemd-desktop-dark";
+const MONACO_TRANSPARENT_COLOR = "#00000000";
 const EDITOR_FONT_FAMILY = "\"JetBrains Mono\"";
-
-const readCssColorToken = (name: string, fallback: string): string => {
-  if (typeof document === "undefined") return fallback;
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
-};
 
 type MonacoWorkerEnvironment = {
   getWorker: (_moduleId: string, _label: string) => Worker;
@@ -71,7 +74,21 @@ globalMonacoScope.MonacoEnvironment ??= {
 
 loader.config({ monaco: monacoRuntime });
 
+let monacoEditorContributionsReady: Promise<void> | null = null;
+
+const loadMonacoEditorContributions = (): Promise<void> => {
+  if (typeof window === "undefined") return Promise.resolve();
+
+  monacoEditorContributionsReady ??= Promise.all([
+    import("monaco-editor/esm/vs/editor/contrib/folding/browser/folding.js"),
+    import("monaco-editor/esm/vs/editor/contrib/stickyScroll/browser/stickyScrollContribution.js"),
+  ]).then(() => undefined);
+
+  return monacoEditorContributionsReady;
+};
+
 type MonacoEditor = editor.IStandaloneCodeEditor;
+type MonacoDisposable = { dispose: () => void };
 type MonacoTypography = {
   fontSize: number;
   lineHeight: number;
@@ -85,12 +102,16 @@ const createDefaultMonacoTypography = (): MonacoTypography => ({
   lineHeight: Math.round(DEFAULT_EDITOR_FONT_SIZE * DEFAULT_EDITOR_LINE_HEIGHT_RATIO)
 });
 
+let chemdFoldingProviderDisposable: MonacoDisposable | null = null;
+let chemdDocumentSymbolProviderDisposable: MonacoDisposable | null = null;
+
 type MonacoChemdEditorProps = {
   value: string;
   documentPath: string;
   compileOutput: ChemdLanguageCompileOutput;
   workspaceSymbolIndex?: ChemdWorkspaceSymbolIndex | null;
   editorSettings: Pick<AppSettings, "editorFontSize" | "lineNumbers" | "minimap" | "wordWrap">;
+  resolvedTheme: ResolvedTheme;
   onChange: (nextSource: string) => void;
   onSave: () => void;
   onBlurSave?: () => void;
@@ -219,10 +240,66 @@ const configureChemdTokens = (monaco: Monaco): void => {
   });
 };
 
-const defineChemdTheme = (monaco: Monaco): void => {
-  const editorSurface = readCssColorToken("--editor-surface", EDITOR_SURFACE_FALLBACK);
+const createRangeForBlock = (
+  monaco: Monaco,
+  model: editor.ITextModel,
+  node: ChemdBlockNode
+): languages.DocumentSymbol["range"] =>
+  new monaco.Range(node.startLine, 1, node.endLine, model.getLineMaxColumn(node.endLine));
 
-  monaco.editor.defineTheme(CHEMD_THEME_ID, {
+const createSelectionRangeForBlock = (
+  monaco: Monaco,
+  node: ChemdBlockNode
+): languages.DocumentSymbol["selectionRange"] =>
+  new monaco.Range(node.startLine, 1, node.startLine, node.header.length + 1);
+
+const toDocumentSymbol = (
+  monaco: Monaco,
+  model: editor.ITextModel,
+  node: ChemdBlockNode
+): languages.DocumentSymbol => ({
+  name: node.label,
+  detail: node.header,
+  kind: monaco.languages.SymbolKind.Object,
+  tags: [],
+  range: createRangeForBlock(monaco, model, node),
+  selectionRange: createSelectionRangeForBlock(monaco, node),
+  children: node.children.map((child) => toDocumentSymbol(monaco, model, child))
+});
+
+const registerChemdStructureProviders = (monaco: Monaco): void => {
+  if (!chemdFoldingProviderDisposable) {
+    chemdFoldingProviderDisposable = monaco.languages.registerFoldingRangeProvider(
+      CHEMD_LANGUAGE_ID,
+      {
+        provideFoldingRanges: (model: editor.ITextModel) =>
+          flattenChemdBlockStructure(parseChemdBlockStructure(model.getValue()))
+            .filter((node) => node.endLine > node.startLine)
+            .map((node) => ({
+              start: node.startLine,
+              end: node.endLine,
+              kind: monaco.languages.FoldingRangeKind.Region
+            }))
+      }
+    );
+  }
+
+  if (!chemdDocumentSymbolProviderDisposable) {
+    chemdDocumentSymbolProviderDisposable = monaco.languages.registerDocumentSymbolProvider(
+      CHEMD_LANGUAGE_ID,
+      {
+        provideDocumentSymbols: (model: editor.ITextModel) =>
+          parseChemdBlockStructure(model.getValue()).map((node) => toDocumentSymbol(monaco, model, node))
+      }
+    );
+  }
+};
+
+export const toChemdMonacoThemeId = (theme: ResolvedTheme): string =>
+  theme === "dark" ? CHEMD_DARK_THEME_ID : CHEMD_LIGHT_THEME_ID;
+
+const defineChemdTheme = (monaco: Monaco): void => {
+  monaco.editor.defineTheme(CHEMD_LIGHT_THEME_ID, {
     base: "vs",
     inherit: true,
     rules: [
@@ -236,13 +313,48 @@ const defineChemdTheme = (monaco: Monaco): void => {
       { token: "string", foreground: "be123c" }
     ],
     colors: {
-      "editor.background": editorSurface,
+      "editor.background": MONACO_TRANSPARENT_COLOR,
       "editor.foreground": "#0f172a",
+      "editorGutter.background": MONACO_TRANSPARENT_COLOR,
       "editorLineNumber.foreground": "#94a3b8",
       "editorLineNumber.activeForeground": "#334155",
       "editor.selectionBackground": "#bae6fd",
       "editor.lineHighlightBackground": "#305c5312",
-      "editor.lineHighlightBorder": "#00000000"
+      "editor.lineHighlightBorder": "#00000000",
+      "editorStickyScroll.background": MONACO_TRANSPARENT_COLOR,
+      "editorStickyScroll.border": "#d6dde733",
+      "editorStickyScroll.shadow": "#64748b33",
+      "editorStickyScrollHover.background": "#e2e8f04d",
+      "editorStickyScrollGutter.background": MONACO_TRANSPARENT_COLOR
+    }
+  });
+  monaco.editor.defineTheme(CHEMD_DARK_THEME_ID, {
+    base: "vs-dark",
+    inherit: true,
+    rules: [
+      { token: "delimiter.frontmatter", foreground: "94a3b8", fontStyle: "bold" },
+      { token: "keyword.block", foreground: "2dd4bf", fontStyle: "bold" },
+      { token: "tag.identifier", foreground: "c4b5fd" },
+      { token: "attribute.name", foreground: "93c5fd" },
+      { token: "keyword.status", foreground: "fbbf24" },
+      { token: "number.quantity", foreground: "86efac" },
+      { token: "comment", foreground: "64748b", fontStyle: "italic" },
+      { token: "string", foreground: "fda4af" }
+    ],
+    colors: {
+      "editor.background": MONACO_TRANSPARENT_COLOR,
+      "editor.foreground": "#dbe4ee",
+      "editorGutter.background": MONACO_TRANSPARENT_COLOR,
+      "editorLineNumber.foreground": "#64748b",
+      "editorLineNumber.activeForeground": "#cbd5e1",
+      "editor.selectionBackground": "#164e6378",
+      "editor.lineHighlightBackground": "#e2e8f00d",
+      "editor.lineHighlightBorder": "#00000000",
+      "editorStickyScroll.background": MONACO_TRANSPARENT_COLOR,
+      "editorStickyScroll.border": "#4755694d",
+      "editorStickyScroll.shadow": "#02061780",
+      "editorStickyScrollHover.background": "#33415566",
+      "editorStickyScrollGutter.background": MONACO_TRANSPARENT_COLOR
     }
   });
 };
@@ -251,6 +363,7 @@ const registerChemdLanguage = (monaco: Monaco): void => {
   registerChemdLanguageMetadata(monaco);
   configureChemdLanguage(monaco);
   configureChemdTokens(monaco);
+  registerChemdStructureProviders(monaco);
   defineChemdTheme(monaco);
   registerChemdCodeActionProvider(monaco, CHEMD_LANGUAGE_ID);
   registerChemdCompletionProvider(monaco, CHEMD_LANGUAGE_ID);
@@ -263,6 +376,7 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
   compileOutput,
   workspaceSymbolIndex,
   editorSettings,
+  resolvedTheme,
   onChange,
   onSave,
   onBlurSave,
@@ -279,6 +393,7 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
   const onSaveRef = useRef(onSave);
   const onBlurSaveRef = useRef(onBlurSave);
   const onUndoRedoStateChangeRef = useRef(onUndoRedoStateChange);
+  const [contributionsReady, setContributionsReady] = useState(() => typeof window === "undefined");
   const [typography, setTypography] = useState<MonacoTypography>(createDefaultMonacoTypography);
   const [scrollBottomPadding, setScrollBottomPadding] = useState(0);
   const markers = useMemo(
@@ -286,6 +401,7 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
     [compileOutput]
   );
   const modelPath = useMemo(() => toChemdModelUri(documentPath), [documentPath]);
+  const monacoThemeId = toChemdMonacoThemeId(resolvedTheme);
 
   useEffect(() => {
     updateChemdCodeActionOutput(modelPath, compileOutput);
@@ -453,9 +569,27 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
     syncMarkers();
   }, [notifyUndoRedoState, onCursorPositionChange, scheduleUndoRedoStateNotification, syncMarkers]);
 
+  useEffect(() => {
+    monacoRef.current?.editor.setTheme(monacoThemeId);
+  }, [monacoThemeId]);
+
   const handleChange = useCallback<OnChange>((nextValue) => {
     onChange(nextValue ?? "");
   }, [onChange]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    void loadMonacoEditorContributions().then(() => {
+      if (isMounted) {
+        setContributionsReady(true);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const editorOptions = useMemo<editor.IStandaloneEditorConstructionOptions>(() => ({
     automaticLayout: true,
@@ -476,6 +610,12 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
     padding: { bottom: scrollBottomPadding },
     scrollBeyondLastLine: false,
     smoothScrolling: true,
+    stickyScroll: {
+      defaultModel: "foldingProviderModel",
+      enabled: true,
+      maxLineCount: 2,
+      scrollWithEditor: true
+    },
     tabSize: 2,
     wordWrap: editorSettings.wordWrap ? "on" : "off",
     wrappingStrategy: "advanced"
@@ -489,20 +629,24 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
   ]);
 
   return (
-    <div ref={shellRef} className="monaco-shell min-h-0 flex-1 overflow-hidden bg-[var(--reference-surface-bg)]" data-language={CHEMD_LANGUAGE_ID}>
-      <Editor
-        height="100%"
-        width="100%"
-        language={CHEMD_LANGUAGE_ID}
-        path={modelPath}
-        value={value}
-        theme={CHEMD_THEME_ID}
-        beforeMount={handleBeforeMount}
-        onMount={handleMount}
-        onChange={handleChange}
-        loading={<div className="monaco-loading flex h-full w-full items-center justify-center text-sm text-muted-foreground">Loading Monaco editor...</div>}
-        options={editorOptions}
-      />
+    <div ref={shellRef} className="monaco-shell min-h-0 flex-1 overflow-hidden bg-[var(--editor-workspace-surface)]" data-language={CHEMD_LANGUAGE_ID}>
+      {contributionsReady ? (
+        <Editor
+          height="100%"
+          width="100%"
+          language={CHEMD_LANGUAGE_ID}
+          path={modelPath}
+          value={value}
+          theme={monacoThemeId}
+          beforeMount={handleBeforeMount}
+          onMount={handleMount}
+          onChange={handleChange}
+          loading={<div className="monaco-loading flex h-full w-full items-center justify-center text-sm text-muted-foreground">Loading Monaco editor...</div>}
+          options={editorOptions}
+        />
+      ) : (
+        <div className="monaco-loading flex h-full w-full items-center justify-center text-sm text-muted-foreground">Loading Monaco editor...</div>
+      )}
     </div>
   );
 });

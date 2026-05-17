@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { clampPreviewWidthPercent, countSourceLines, formatStatusClockTime, getDelayUntilNextMinute } from "./editor-surface";
+import {
+  clampBottomPanelHeight,
+  DEFAULT_BOTTOM_PANEL_HEIGHT,
+} from "./use-reference-bottom-panel-resize";
+
+import {
+  clampPreviewWidthPercent,
+  countSourceLines,
+  formatStatusClockTime,
+  getDelayUntilNextMinute,
+  getEditorBreadcrumbItems,
+  isBottomPanelToggleActive,
+} from "./editor-surface";
 
 describe("editor status clock", () => {
   it("formats the current time without seconds", () => {
@@ -30,5 +42,42 @@ describe("editor source metrics", () => {
     expect(countSourceLines("a\nb\n")).toBe(3);
     expect(countSourceLines("a\r\nb")).toBe(2);
     expect(countSourceLines("a\rb")).toBe(2);
+  });
+});
+
+describe("editor bottom panel toggle", () => {
+  it("stays active for any open bottom panel tab", () => {
+    expect(isBottomPanelToggleActive(null)).toBe(false);
+    expect(isBottomPanelToggleActive("diagnostics")).toBe(true);
+    expect(isBottomPanelToggleActive("terminal")).toBe(true);
+    expect(isBottomPanelToggleActive("runtime")).toBe(true);
+    expect(isBottomPanelToggleActive("storage")).toBe(true);
+  });
+});
+
+describe("editor bottom panel sizing", () => {
+  it("keeps the draggable bottom panel within useful vertical bounds", () => {
+    expect(DEFAULT_BOTTOM_PANEL_HEIGHT).toBe(280);
+    expect(clampBottomPanelHeight(120, 900)).toBe(160);
+    expect(clampBottomPanelHeight(300, 900)).toBe(300);
+    expect(clampBottomPanelHeight(800, 900)).toBe(520);
+    expect(clampBottomPanelHeight(400, 480)).toBe(345);
+  });
+});
+
+describe("editor breadcrumbs", () => {
+  it("includes nested Chemd block labels for the active cursor line", () => {
+    const source = `:::procedure #proc-main
+:::step s-heat
+family: heat
+:::
+:::
+`;
+
+    expect(getEditorBreadcrumbItems(source, 3, "run.chemd")).toEqual([
+      "run.chemd",
+      "procedure proc-main",
+      "step s-heat",
+    ]);
   });
 });

@@ -3,8 +3,17 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { WorkspaceFileEntry } from "../../contracts";
 import { referenceBottomPanelDomId } from "./bottom-panel";
+
+vi.mock("../../../../../vision/logo-01.svg?url", () => ({
+  default: "/vision/logo-01.svg",
+}));
+vi.mock("../../../../../vision/logo-02.svg?url", () => ({
+  default: "/vision/logo-02.svg",
+}));
+
 import {
   ReferenceActivityRail,
+  ReferenceBrandLogo,
   ReferenceGlobalHeaderActions,
   ReferenceTabBar,
 } from "./window-chrome";
@@ -32,6 +41,17 @@ describe("ReferenceActivityRail", () => {
     expect(html).toContain('aria-label="Reaction Graph"');
     expect(html).toContain('aria-pressed="true"');
     expect(html).toContain("Settings");
+  });
+});
+
+describe("ReferenceBrandLogo", () => {
+  it("renders separate light and dark theme logo assets", () => {
+    const html = renderToStaticMarkup(<ReferenceBrandLogo />);
+
+    expect(html).toContain("logo-01.svg");
+    expect(html).toContain("logo-02.svg");
+    expect(html).toContain("dark:hidden");
+    expect(html).toContain("dark:block");
   });
 });
 

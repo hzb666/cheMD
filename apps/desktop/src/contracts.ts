@@ -747,6 +747,15 @@ export interface CommandMap {
     };
     output: WorkspaceFileEntry[];
   };
+  list_workspace_children: {
+    input: {
+      workspaceId?: string;
+      path?: string;
+      depth?: number;
+      ignoreNames?: string[];
+    };
+    output: WorkspaceFileEntry[];
+  };
   query_workspace_documents: {
     input: {
       workspaceId?: string;

@@ -24,7 +24,7 @@ interface StatusBadgeProps {
 }
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ label, tone, detail, dot }) => (
-  <Badge variant={toneVariant[tone] ?? "outline"} className="max-w-[14rem] gap-1.5 rounded-full border-white/35 bg-white/16 font-medium text-foreground shadow-none">
+  <Badge variant={toneVariant[tone] ?? "outline"} className="max-w-[14rem] gap-1.5 rounded-full border-border/40 bg-card/35 font-medium text-foreground shadow-none">
     {dot && (
       <span
         className="h-1.5 w-1.5 rounded-full bg-current"

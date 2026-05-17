@@ -13,23 +13,32 @@ const fileEntry = (path: string, name = path.split("/").at(-1) ?? path): Workspa
   chemdKind: "document",
 });
 
-const renderExplorer = (props: Partial<Parameters<typeof ReferenceExplorer>[0]> = {}) =>
-  renderToStaticMarkup(
+const renderExplorer = (props: Partial<Parameters<typeof ReferenceExplorer>[0]> = {}) => {
+  const explorerProps = {
+    activeTool: "files",
+    files: [],
+    loadedDirectoryPaths: new Set<string>(),
+    loadingDirectoryPaths: new Set<string>(),
+    failedDirectoryMessages: new Map<string, string>(),
+    selectedFileId: "",
+    mode: "sample",
+    message: "",
+    visible: true,
+    workspaceName: "No workspace",
+    workspaceState: "empty",
+    insightProps: {} as InsightPaneProps,
+    onOpenWorkspace: vi.fn(),
+    onSelectFile: vi.fn(),
+    onLoadDirectory: vi.fn(),
+    ...props,
+  } satisfies Parameters<typeof ReferenceExplorer>[0];
+
+  return renderToStaticMarkup(
     <ReferenceExplorer
-      activeTool="files"
-      files={[]}
-      selectedFileId=""
-      mode="sample"
-      message=""
-      visible
-      workspaceName="No workspace"
-      workspaceState="empty"
-      insightProps={{} as InsightPaneProps}
-      onOpenWorkspace={vi.fn()}
-      onSelectFile={vi.fn()}
-      {...props}
+      {...explorerProps}
     />,
   );
+};
 
 describe("ReferenceExplorer", () => {
   it("marks the workspace picker as unavailable and busy while opening", () => {
@@ -49,6 +58,7 @@ describe("ReferenceExplorer", () => {
       workspaceState: "open",
       workspaceName: "Lab Workspace",
       selectedFileId: "file:experiments/run-a/main.chemd",
+      loadedDirectoryPaths: new Set(["", "experiments", "experiments/run-a"]),
       files: [
         fileEntry("experiments/run-a/main.chemd"),
         fileEntry("notes.chemd"),

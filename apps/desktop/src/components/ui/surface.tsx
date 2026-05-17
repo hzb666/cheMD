@@ -7,7 +7,7 @@ const surfaceVariants = cva("", {
   variants: {
     variant: {
       control:
-        "select-none rounded-lg border border-white/35 bg-transparent transition-colors duration-150 hover:border-foreground/35 hover:bg-white/22 data-[active=true]:border-foreground/35 data-[active=true]:bg-white/22",
+        "select-none rounded-lg border border-transparent bg-transparent transition-colors duration-150 hover:border-border/35 hover:bg-foreground/[0.04] data-[active=true]:border-border/45 data-[active=true]:bg-foreground/[0.05] dark:hover:bg-foreground/[0.055] dark:data-[active=true]:bg-foreground/[0.065]",
     },
   },
   defaultVariants: {

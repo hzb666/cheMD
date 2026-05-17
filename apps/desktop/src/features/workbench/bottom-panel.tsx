@@ -1,4 +1,5 @@
 import { X } from "lucide-react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import type {
   ChemdEditorDiagnostic,
   ChemdLanguageCompileOutput,
@@ -40,15 +41,15 @@ export function ReferenceBottomPanel({
   return (
     <section
       id={referenceBottomPanelDomId}
-      className="flex h-[min(280px,36vh)] min-h-0 shrink-0 flex-col overflow-hidden border-t border-border/65 bg-transparent"
+      className="flex h-[var(--reference-bottom-panel-height,280px)] min-h-[160px] shrink-0 flex-col overflow-hidden bg-transparent"
       aria-label="Terminal and diagnostics"
     >
-      <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border/50 bg-card/15 px-2">
+      <div className="flex h-9 shrink-0 items-center gap-1 px-2">
         {bottomPanelTabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
-            className="h-7 cursor-pointer rounded-lg border-0 bg-transparent px-2.5 text-xs font-semibold text-muted-foreground transition-[background-color,color] duration-150 ease-in-out hover:bg-card/45 hover:text-foreground data-[active=true]:bg-card/45 data-[active=true]:text-foreground"
+            className="h-7 cursor-pointer rounded-lg border-0 bg-transparent px-2.5 text-xs font-semibold text-muted-foreground transition-[background-color,color] duration-150 ease-in-out hover:bg-card/45 hover:text-foreground data-[active=true]:bg-[var(--editor-workspace-surface)] data-[active=true]:text-foreground"
             data-active={panel === tab.id ? "true" : undefined}
             aria-pressed={panel === tab.id}
             onClick={() => onSelectPanel(tab.id)}
@@ -61,6 +62,8 @@ export function ReferenceBottomPanel({
           type="button"
           variant="window"
           size="window-icon"
+          className="size-7"
+          data-control="close"
           aria-label="Close bottom panel"
           title="Close bottom panel"
           onClick={onClose}
@@ -86,6 +89,25 @@ export function ReferenceBottomPanel({
         ) : null}
       </div>
     </section>
+  );
+}
+
+export function ReferenceBottomPanelResizeHandle({
+  onPointerDown,
+}: {
+  onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
+}) {
+  return (
+    <div className="relative h-0 shrink-0">
+      <div
+        className="absolute -top-2 left-2 right-2 z-30 h-4 cursor-row-resize bg-transparent after:absolute after:left-0 after:right-0 after:top-1/2 after:h-1 after:-translate-y-1/2 after:bg-primary/60 after:opacity-0 after:transition-opacity hover:after:opacity-100"
+        role="separator"
+        aria-controls={referenceBottomPanelDomId}
+        aria-label="Resize bottom panel"
+        aria-orientation="horizontal"
+        onPointerDown={onPointerDown}
+      />
+    </div>
   );
 }
 

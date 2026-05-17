@@ -1,5 +1,4 @@
 use crate::workspace::{CommandError, WorkspaceFileContent, WorkspaceWriteResult};
-use crate::workspace_io::should_ignore_workspace_path;
 use crate::workspace_path::{
     chemd_kind_for_path, clean_relative_path, outside_root, relative_to_string,
 };
@@ -46,7 +45,6 @@ pub(crate) fn read_workspace_file_impl(
     path: &str,
 ) -> Result<WorkspaceFileContent, CommandError> {
     let relative = clean_relative_path(path)?;
-    ensure_workspace_path_allowed(&relative)?;
     let target = canonical_existing_file(root, &relative)?;
     let metadata = fs::metadata(&target).map_err(|err| {
         CommandError::io(
@@ -83,7 +81,6 @@ pub(crate) fn write_workspace_file_impl(
     base_hash: Option<&str>,
 ) -> Result<WorkspaceWriteResult, CommandError> {
     let relative = clean_relative_path(path)?;
-    ensure_workspace_path_allowed(&relative)?;
     ensure_content_within_limit(&relative, content.as_bytes())?;
     let target = root.join(&relative);
     let tmp_path = write_checked_temp_file(root, &target, content.as_bytes())?;
@@ -109,17 +106,6 @@ pub(crate) fn content_hash(content: &[u8]) -> String {
         (hash ^ u64::from(*byte)).wrapping_mul(HASH_PRIME)
     });
     format!("fnv1a64:{hash:016x}")
-}
-
-fn ensure_workspace_path_allowed(relative: &Path) -> Result<(), CommandError> {
-    if should_ignore_workspace_path(relative) {
-        return Err(CommandError::new(
-            "workspace_path_ignored",
-            "Workspace file path is ignored by the desktop workspace policy",
-            Some(relative_to_string(relative)),
-        ));
-    }
-    Ok(())
 }
 
 fn canonical_existing_file(root: &Path, relative: &Path) -> Result<PathBuf, CommandError> {

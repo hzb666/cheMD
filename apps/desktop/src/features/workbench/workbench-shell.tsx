@@ -18,7 +18,11 @@ import type {
 } from "../../types";
 import { SettingsDialog } from "../settings/settings-dialog";
 import { buildInsightPaneProps } from "../dock-panels/insight-props";
-import { ReferenceBottomPanel, type ReferenceBottomPanelId } from "./bottom-panel";
+import {
+  ReferenceBottomPanel,
+  ReferenceBottomPanelResizeHandle,
+  type ReferenceBottomPanelId,
+} from "./bottom-panel";
 import { ReferenceDocumentSurface } from "./editor-surface";
 import {
   ReferenceActivityRail,
@@ -27,6 +31,10 @@ import {
   ReferenceTabBar,
 } from "./window-chrome";
 import { ReferenceExplorer } from "../workspace-sidebar/workspace-sidebar";
+import {
+  DEFAULT_BOTTOM_PANEL_HEIGHT,
+  useReferenceBottomPanelResize,
+} from "./use-reference-bottom-panel-resize";
 import { useReferenceSidebarResize } from "./use-reference-sidebar-resize";
 
 const KnowledgeMapPanel = lazy(() =>
@@ -45,6 +53,7 @@ export const Workbench = (props: WorkbenchProps) => {
   const [sidebarWidth, setSidebarWidth] = useState(300);
   const [previewVisible, setPreviewVisible] = useState(false);
   const [bottomPanel, setBottomPanel] = useState<ReferenceBottomPanelId | null>(null);
+  const [bottomPanelHeight, setBottomPanelHeight] = useState(DEFAULT_BOTTOM_PANEL_HEIGHT);
   const insightProps = useMemo(
     () => buildInsightPaneProps(activeTool, props),
     [activeTool, props]
@@ -53,6 +62,14 @@ export const Workbench = (props: WorkbenchProps) => {
     sidebarVisible,
     sidebarWidth,
     setSidebarWidth
+  );
+  const {
+    beginResize: beginBottomPanelResize,
+    containerRef: workbenchBodyRef,
+  } = useReferenceBottomPanelResize(
+    bottomPanel !== null,
+    bottomPanelHeight,
+    setBottomPanelHeight
   );
 
   const selectActivityTool = useCallback((tool: ActivityTool) => {
@@ -129,6 +146,9 @@ export const Workbench = (props: WorkbenchProps) => {
           <ReferenceExplorer
             activeTool={activeTool}
             files={props.files}
+            loadedDirectoryPaths={props.loadedDirectoryPaths}
+            loadingDirectoryPaths={props.loadingDirectoryPaths}
+            failedDirectoryMessages={props.failedDirectoryMessages}
             selectedFileId={props.selectedFileId}
             mode={props.mode}
             message={props.message}
@@ -138,8 +158,13 @@ export const Workbench = (props: WorkbenchProps) => {
             insightProps={insightProps}
             onOpenWorkspace={props.onOpenWorkspace}
             onSelectFile={props.onSelectFile}
+            onLoadDirectory={props.onLoadDirectory}
           />
-          <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <section
+            ref={workbenchBodyRef}
+            className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+            style={{ "--reference-bottom-panel-height": `${bottomPanelHeight}px` } as CSSProperties}
+          >
             <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
               <ReferenceDocumentSurface
                 file={props.selectedFile}
@@ -152,6 +177,7 @@ export const Workbench = (props: WorkbenchProps) => {
                 dirty={props.dirtyFileIds.includes(props.selectedFileId)}
                 editorRef={props.editorRef}
                 settings={props.settings}
+                resolvedTheme={props.resolvedTheme}
                 sidebarVisible={sidebarVisible}
                 previewVisible={previewVisible}
                 bottomPanel={bottomPanel}
@@ -171,14 +197,17 @@ export const Workbench = (props: WorkbenchProps) => {
               ) : null}
             </div>
             {bottomPanel ? (
-              <ReferenceBottomPanel
-                panel={bottomPanel}
-                props={insightProps}
-                compileOutput={props.output}
-                compileError={props.compileError}
-                onSelectPanel={setBottomPanel}
-                onClose={closeBottomPanel}
-              />
+              <>
+                <ReferenceBottomPanelResizeHandle onPointerDown={beginBottomPanelResize} />
+                <ReferenceBottomPanel
+                  panel={bottomPanel}
+                  props={insightProps}
+                  compileOutput={props.output}
+                  compileError={props.compileError}
+                  onSelectPanel={setBottomPanel}
+                  onClose={closeBottomPanel}
+                />
+              </>
             ) : null}
           </section>
         </div>

@@ -29,6 +29,9 @@ import {
 export function ReferenceExplorer({
   activeTool,
   files,
+  loadedDirectoryPaths,
+  loadingDirectoryPaths,
+  failedDirectoryMessages,
   selectedFileId,
   mode,
   message,
@@ -38,9 +41,13 @@ export function ReferenceExplorer({
   insightProps,
   onOpenWorkspace,
   onSelectFile,
+  onLoadDirectory,
 }: {
   activeTool: ActivityTool;
   files: WorkbenchProps["files"];
+  loadedDirectoryPaths: WorkbenchProps["loadedDirectoryPaths"];
+  loadingDirectoryPaths: WorkbenchProps["loadingDirectoryPaths"];
+  failedDirectoryMessages: WorkbenchProps["failedDirectoryMessages"];
   selectedFileId: string;
   mode: WorkbenchProps["mode"];
   message: string;
@@ -50,6 +57,7 @@ export function ReferenceExplorer({
   insightProps: InsightPaneProps;
   onOpenWorkspace: WorkbenchProps["onOpenWorkspace"];
   onSelectFile: WorkbenchProps["onSelectFile"];
+  onLoadDirectory: WorkbenchProps["onLoadDirectory"];
 }) {
   const sidebarTitle = getReferenceSidebarTitle(activeTool);
   const workspaceOpen = mode === "workspace" && workspaceState === "open";
@@ -73,11 +81,15 @@ export function ReferenceExplorer({
             {workspaceOpen ? (
               <WorkspaceTree
                 files={files}
+                loadedDirectoryPaths={loadedDirectoryPaths}
+                loadingDirectoryPaths={loadingDirectoryPaths}
+                failedDirectoryMessages={failedDirectoryMessages}
                 selectedFileId={selectedFileId}
                 onSelectFile={onSelectFile}
+                onLoadDirectory={onLoadDirectory}
               />
             ) : (
-              <p className="reference-sidebar-caption mt-3 rounded-lg bg-white/25 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+              <p className="reference-sidebar-caption mt-3 rounded-lg border border-border/35 bg-card/35 px-3 py-2 text-xs leading-relaxed text-foreground/80 dark:bg-card/28 dark:text-foreground/80">
                 {message || "Choose a workspace folder before loading the file tree."}
               </p>
             )}
@@ -117,12 +129,20 @@ function WorkspacePickerControl({
 
 function WorkspaceTree({
   files,
+  loadedDirectoryPaths,
+  loadingDirectoryPaths,
+  failedDirectoryMessages,
   selectedFileId,
   onSelectFile,
+  onLoadDirectory,
 }: {
   files: WorkbenchProps["files"];
+  loadedDirectoryPaths: WorkbenchProps["loadedDirectoryPaths"];
+  loadingDirectoryPaths: WorkbenchProps["loadingDirectoryPaths"];
+  failedDirectoryMessages: WorkbenchProps["failedDirectoryMessages"];
   selectedFileId: string;
   onSelectFile: WorkbenchProps["onSelectFile"];
+  onLoadDirectory: WorkbenchProps["onLoadDirectory"];
 }) {
   const tree = useMemo(() => buildWorkspaceTree(files), [files]);
   const selectedAncestors = useMemo(
@@ -149,10 +169,14 @@ function WorkspaceTree({
           node={node}
           depth={0}
           expanded={expanded}
+          loadedDirectoryPaths={loadedDirectoryPaths}
+          loadingDirectoryPaths={loadingDirectoryPaths}
+          failedDirectoryMessages={failedDirectoryMessages}
           selectedAncestors={selectedAncestors}
           selectedFileId={selectedFileId}
           onToggle={toggleExpanded}
           onSelectFile={onSelectFile}
+          onLoadDirectory={onLoadDirectory}
         />
       ))}
     </div>
@@ -167,16 +191,20 @@ const TreeRowButton = memo(function TreeRowButton({
   isFile,
   isExpanded,
   selected,
+  shouldLoadDirectory,
   onToggle,
   onSelectFile,
+  onLoadDirectory,
 }: {
   node: WorkspaceTreeNode;
   depth: number;
   isFile: boolean;
   isExpanded: boolean;
   selected: boolean;
+  shouldLoadDirectory: boolean;
   onToggle: (path: string) => void;
   onSelectFile: WorkbenchProps["onSelectFile"];
+  onLoadDirectory: WorkbenchProps["onLoadDirectory"];
 }) {
   const Icon = isFile ? FileText : Folder;
 
@@ -193,6 +221,7 @@ const TreeRowButton = memo(function TreeRowButton({
       onClick={() => {
         if (!isFile) {
           onToggle(node.path);
+          if (shouldLoadDirectory) onLoadDirectory(node.path);
           return;
         }
         if (node.entry) onSelectFile(node.entry);
@@ -218,23 +247,35 @@ function WorkspaceTreeRow({
   node,
   depth,
   expanded,
+  loadedDirectoryPaths,
+  loadingDirectoryPaths,
+  failedDirectoryMessages,
   selectedAncestors,
   selectedFileId,
   onToggle,
   onSelectFile,
+  onLoadDirectory,
 }: {
   node: WorkspaceTreeNode;
   depth: number;
   expanded: Set<string>;
+  loadedDirectoryPaths: WorkbenchProps["loadedDirectoryPaths"];
+  loadingDirectoryPaths: WorkbenchProps["loadingDirectoryPaths"];
+  failedDirectoryMessages: WorkbenchProps["failedDirectoryMessages"];
   selectedAncestors: Set<string>;
   selectedFileId: string;
   onToggle: (path: string) => void;
   onSelectFile: WorkbenchProps["onSelectFile"];
+  onLoadDirectory: WorkbenchProps["onLoadDirectory"];
 }) {
   const isFile = node.entry?.kind === "file";
   // The boolean evaluation stays fast in this lightweight wrapper container
   const isExpanded = !isFile && (expanded.has(node.path) || selectedAncestors.has(node.path));
   const selected = node.entry?.id === selectedFileId;
+  const isLoading = !isFile && loadingDirectoryPaths.has(node.path);
+  const isLoaded = isFile || loadedDirectoryPaths.has(node.path);
+  const failedMessage = !isFile ? failedDirectoryMessages.get(node.path) : undefined;
+  const shouldLoadDirectory = !isFile && !isLoaded && !isLoading;
 
   return (
     <>
@@ -244,9 +285,28 @@ function WorkspaceTreeRow({
         isFile={isFile}
         isExpanded={isExpanded}
         selected={selected}
+        shouldLoadDirectory={shouldLoadDirectory}
         onToggle={onToggle}
         onSelectFile={onSelectFile}
+        onLoadDirectory={onLoadDirectory}
       />
+      {isLoading ? (
+        <div
+          className="h-6 truncate py-1 pl-[calc(2.75rem+var(--tree-depth,0)*1rem)] pr-2 text-xs text-muted-foreground"
+          style={{ "--tree-depth": depth } as CSSProperties}
+        >
+          Loading...
+        </div>
+      ) : null}
+      {failedMessage ? (
+        <div
+          className="min-h-6 truncate py-1 pl-[calc(2.75rem+var(--tree-depth,0)*1rem)] pr-2 text-xs text-destructive"
+          title={failedMessage}
+          style={{ "--tree-depth": depth } as CSSProperties}
+        >
+          Load failed: {failedMessage}
+        </div>
+      ) : null}
       {isExpanded
         ? node.children.map((child) => (
           <WorkspaceTreeRow
@@ -254,13 +314,25 @@ function WorkspaceTreeRow({
             node={child}
             depth={depth + 1}
             expanded={expanded}
+            loadedDirectoryPaths={loadedDirectoryPaths}
+            loadingDirectoryPaths={loadingDirectoryPaths}
+            failedDirectoryMessages={failedDirectoryMessages}
             selectedAncestors={selectedAncestors}
             selectedFileId={selectedFileId}
             onToggle={onToggle}
             onSelectFile={onSelectFile}
+            onLoadDirectory={onLoadDirectory}
           />
         ))
         : null}
+      {isExpanded && isLoaded && node.children.length === 0 ? (
+        <div
+          className="h-6 truncate py-1 pl-[calc(2.75rem+var(--tree-depth,0)*1rem)] pr-2 text-xs text-muted-foreground"
+          style={{ "--tree-depth": depth } as CSSProperties}
+        >
+          Empty
+        </div>
+      ) : null}
     </>
   );
 }

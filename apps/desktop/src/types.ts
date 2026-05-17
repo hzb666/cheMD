@@ -38,7 +38,7 @@ import type {
   KnowledgeMapViewModel,
   SourceJumpIntent,
 } from "./knowledge-map/knowledge-map";
-import type { AppSettings, AppSettingsPatch } from "./features/settings/settings";
+import type { AppSettings, AppSettingsPatch, ResolvedTheme } from "./features/settings/settings";
 
 // ─── Hook return types ─────────────────────────────────────────────────
 import type { useSidecarController } from "./hooks/use-sidecar-controller";
@@ -321,6 +321,9 @@ export type WorkbenchProps = {
   output: ChemdLanguageCompileOutput;
   compileError?: string;
   files: WorkspaceFileEntry[];
+  loadedDirectoryPaths: Set<string>;
+  loadingDirectoryPaths: Set<string>;
+  failedDirectoryMessages: Map<string, string>;
   openedTabs: WorkspaceFileEntry[];
   dirtyFileIds: string[];
   selectedFile: WorkspaceFileEntry;
@@ -338,12 +341,14 @@ export type WorkbenchProps = {
   agentCurrentBeforeHash: string;
   editorRef: RefObject<MonacoChemdEditorHandle | null>;
   settings: AppSettings;
+  resolvedTheme: ResolvedTheme;
   onSettingsChange: (patch: AppSettingsPatch) => void;
   onResetSettings: () => void;
   onRootPathChange: (value: string) => void;
   onSave: () => void;
   onOpenWorkspace: () => void;
   onSelectFile: (file: WorkspaceFileEntry) => void;
+  onLoadDirectory: (path: string) => void;
   onCloseFileTab: (fileId: string) => void;
   onCloseAllFileTabs: () => void;
   onReorderFileTabs: (orderedFileIds: readonly string[]) => void;

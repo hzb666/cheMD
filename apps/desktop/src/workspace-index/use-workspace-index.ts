@@ -74,6 +74,29 @@ const errorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
 const DEFAULT_WORKSPACE_INDEX_DOCUMENT_LIMIT = 200;
+const MAX_WORKSPACE_INDEX_READ_CONCURRENCY = 4;
+
+const mapWithConcurrency = async <Input, Output>(
+  items: readonly Input[],
+  concurrency: number,
+  mapper: (item: Input) => Promise<Output>,
+): Promise<Output[]> => {
+  const results: Output[] = [];
+  let cursor = 0;
+  const runNext = async (): Promise<void> => {
+    const index = cursor;
+    cursor += 1;
+    const item = items[index];
+    if (item === undefined) return;
+    results[index] = await mapper(item);
+    await runNext();
+  };
+  await Promise.all(Array.from(
+    { length: Math.min(concurrency, items.length) },
+    () => runNext(),
+  ));
+  return results;
+};
 
 export const useWorkspaceIndexController = ({
   mode,
@@ -116,10 +139,10 @@ export const useWorkspaceIndexController = ({
         : visibleChemdFiles(files).filter((file) => file.path !== currentDocumentPath);
       return measureDesktopPerformanceAsync(
         "workspaceIndex.loadDocuments",
-        () => Promise.all(filesToRead.map(async (file) => {
+        () => mapWithConcurrency(filesToRead, MAX_WORKSPACE_INDEX_READ_CONCURRENCY, async (file) => {
           const result = await readFile(file);
           return toDocumentSource(file, result.content, result.modifiedAtMs);
-        })),
+        }),
         {
           fileCount: filesToRead.length,
           workspaceId: workspace.workspaceId,

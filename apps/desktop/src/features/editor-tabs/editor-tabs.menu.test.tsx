@@ -48,6 +48,7 @@ describe("EditorTabActionsMenu", () => {
     });
 
     expect(html).toContain('role="menu"');
+    expect(html).toContain("w-64");
     expect(html).toContain("Search tabs");
     expect(html).not.toContain("alpha.chemd");
     expect(html).toContain("beta.chemd");

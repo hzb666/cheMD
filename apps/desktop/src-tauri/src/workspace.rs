@@ -8,8 +8,9 @@ use tauri_plugin_dialog::DialogExt;
 use crate::{
     workspace_file_io::{read_workspace_file_impl, write_workspace_file_impl},
     workspace_io::{
-        build_workspace_ingest_plan_impl, canonical_workspace_root, list_workspace_files_impl,
-        query_workspace_documents_impl, query_workspace_index_impl, workspace_handle,
+        build_workspace_ingest_plan_impl, canonical_workspace_root, list_workspace_children_impl,
+        list_workspace_files_impl, query_workspace_documents_impl, query_workspace_index_impl,
+        workspace_handle,
     },
 };
 
@@ -45,6 +46,14 @@ pub struct WorkspaceFileEntry {
     pub(crate) path: String,
     pub(crate) kind: String,
     pub(crate) chemd_kind: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceChildrenOptions {
+    pub(crate) path: Option<String>,
+    pub(crate) depth: Option<usize>,
+    pub(crate) ignore_names: Option<Vec<String>>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -210,17 +219,35 @@ pub fn open_workspace_path(
 
 #[cfg(not(test))]
 #[tauri::command]
-pub fn list_workspace_files(
+pub async fn list_workspace_files(
     workspace_id: Option<String>,
     registry: tauri::State<'_, WorkspaceRegistry>,
 ) -> Result<Vec<WorkspaceFileEntry>, CommandError> {
     let (id, root) = resolve_workspace(workspace_id, &registry)?;
-    list_workspace_files_impl(&id, &root)
+    run_workspace_io(move || list_workspace_files_impl(&id, &root)).await
 }
 
 #[cfg(not(test))]
 #[tauri::command]
-pub fn query_workspace_documents(
+pub async fn list_workspace_children(
+    workspace_id: Option<String>,
+    path: Option<String>,
+    depth: Option<usize>,
+    ignore_names: Option<Vec<String>>,
+    registry: tauri::State<'_, WorkspaceRegistry>,
+) -> Result<Vec<WorkspaceFileEntry>, CommandError> {
+    let (id, root) = resolve_workspace(workspace_id, &registry)?;
+    let options = WorkspaceChildrenOptions {
+        path,
+        depth,
+        ignore_names,
+    };
+    run_workspace_io(move || list_workspace_children_impl(&id, &root, &options)).await
+}
+
+#[cfg(not(test))]
+#[tauri::command]
+pub async fn query_workspace_documents(
     workspace_id: Option<String>,
     query: Option<String>,
     exclude_path: Option<String>,
@@ -235,12 +262,12 @@ pub fn query_workspace_documents(
         cursor,
         limit,
     };
-    query_workspace_documents_impl(&id, &root, &options)
+    run_workspace_io(move || query_workspace_documents_impl(&id, &root, &options)).await
 }
 
 #[cfg(not(test))]
 #[tauri::command]
-pub fn query_workspace_index(
+pub async fn query_workspace_index(
     workspace_id: Option<String>,
     query: Option<String>,
     kind: Option<String>,
@@ -257,12 +284,12 @@ pub fn query_workspace_index(
         cursor,
         limit,
     };
-    query_workspace_index_impl(&id, &root, &options)
+    run_workspace_io(move || query_workspace_index_impl(&id, &root, &options)).await
 }
 
 #[cfg(not(test))]
 #[tauri::command]
-pub fn build_workspace_ingest_plan(
+pub async fn build_workspace_ingest_plan(
     workspace_id: Option<String>,
     cursor: Option<usize>,
     limit: Option<usize>,
@@ -275,23 +302,23 @@ pub fn build_workspace_ingest_plan(
         limit,
         known_revisions,
     };
-    build_workspace_ingest_plan_impl(&id, &root, &options)
+    run_workspace_io(move || build_workspace_ingest_plan_impl(&id, &root, &options)).await
 }
 
 #[cfg(not(test))]
 #[tauri::command]
-pub fn read_workspace_file(
+pub async fn read_workspace_file(
     workspace_id: Option<String>,
     path: String,
     registry: tauri::State<'_, WorkspaceRegistry>,
 ) -> Result<WorkspaceFileContent, CommandError> {
     let (_, root) = resolve_workspace(workspace_id, &registry)?;
-    read_workspace_file_impl(&root, &path)
+    run_workspace_io(move || read_workspace_file_impl(&root, &path)).await
 }
 
 #[cfg(not(test))]
 #[tauri::command]
-pub fn write_workspace_file(
+pub async fn write_workspace_file(
     workspace_id: Option<String>,
     path: String,
     content: String,
@@ -299,7 +326,10 @@ pub fn write_workspace_file(
     registry: tauri::State<'_, WorkspaceRegistry>,
 ) -> Result<WorkspaceWriteResult, CommandError> {
     let (_, root) = resolve_workspace(workspace_id, &registry)?;
-    write_workspace_file_impl(&root, &path, &content, base_hash.as_deref())
+    run_workspace_io(move || {
+        write_workspace_file_impl(&root, &path, &content, base_hash.as_deref())
+    })
+    .await
 }
 
 impl WorkspaceRegistry {
@@ -368,6 +398,23 @@ fn resolve_workspace(
         )
     })?;
     Ok((workspace_id, root))
+}
+
+#[cfg(not(test))]
+async fn run_workspace_io<T, F>(operation: F) -> Result<T, CommandError>
+where
+    T: Send + 'static,
+    F: FnOnce() -> Result<T, CommandError> + Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(operation)
+        .await
+        .map_err(|err| {
+            CommandError::new(
+                "workspace_task_failed",
+                "Workspace file operation failed before completion",
+                Some(err.to_string()),
+            )
+        })?
 }
 
 pub(crate) fn not_selected() -> CommandError {

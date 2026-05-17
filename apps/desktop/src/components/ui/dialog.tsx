@@ -54,7 +54,7 @@ const DialogOverlay = React.forwardRef<
     ref={ref}
     data-slot="dialog-overlay"
     className={cn(
-      "dialog-overlay fixed inset-0 z-50 bg-white/22 opacity-100 backdrop-blur-2xl transition-opacity duration-[220ms] ease-out will-change-[opacity] data-[starting-style]:opacity-0 data-[ending-style]:opacity-0 data-[ending-style]:duration-[180ms] data-[ending-style]:ease-in motion-reduce:transition-none",
+      "dialog-overlay fixed inset-0 z-50 bg-background/28 opacity-100 backdrop-blur-2xl transition-opacity duration-[220ms] ease-out will-change-[opacity] data-[starting-style]:opacity-0 data-[ending-style]:opacity-0 data-[ending-style]:duration-[180ms] data-[ending-style]:ease-in motion-reduce:transition-none dark:bg-background/42",
       className,
     )}
     {...props}
@@ -77,7 +77,7 @@ const DialogContent = React.forwardRef<
         ref={ref}
         data-slot="dialog-content"
         className={cn(
-          "dialog-content pointer-events-auto relative grid max-h-full w-full max-w-lg gap-4 rounded-lg border border-white/45 bg-background/95 p-6 text-foreground opacity-100 shadow-[0_8px_24px_rgba(15,23,42,0.07)] outline-none transition-opacity duration-[220ms] ease-out will-change-[opacity] data-[starting-style]:opacity-0 data-[ending-style]:opacity-0 data-[ending-style]:duration-[180ms] data-[ending-style]:ease-in motion-reduce:transition-none",
+          "dialog-content pointer-events-auto relative grid max-h-full w-full max-w-lg gap-4 rounded-lg border border-border/50 bg-background/95 p-6 text-foreground opacity-100 shadow-[0_8px_24px_rgba(15,23,42,0.07)] outline-none transition-opacity duration-[220ms] ease-out will-change-[opacity] data-[starting-style]:opacity-0 data-[ending-style]:opacity-0 data-[ending-style]:duration-[180ms] data-[ending-style]:ease-in motion-reduce:transition-none dark:shadow-[0_18px_48px_rgba(0,0,0,0.32)]",
           className,
         )}
         {...props}

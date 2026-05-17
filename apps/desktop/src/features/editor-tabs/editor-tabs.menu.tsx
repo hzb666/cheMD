@@ -51,7 +51,7 @@ export function EditorTabActionsMenu({
 
   return (
     <div
-      className="reference-editor-tab-menu absolute left-0 top-full z-30 flex h-auto max-h-[min(34rem,calc(100vh-4rem))] w-72 flex-col gap-2 overflow-hidden rounded-sm p-2"
+      className="reference-editor-tab-menu absolute left-0 top-full z-30 flex h-auto max-h-[min(34rem,calc(100vh-4rem))] w-64 flex-col gap-2 overflow-hidden rounded-sm p-2"
       role="menu"
       onPointerDownCapture={(event) => {
         if (!closeAllAction.isConfirming) return;

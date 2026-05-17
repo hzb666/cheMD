@@ -15,7 +15,8 @@ vi.mock("monaco-editor/esm/vs/editor/editor.worker?worker", () => ({
 
 import {
   isSameChemdDocumentPath,
-  resolveMonacoSourceJumpSelection
+  resolveMonacoSourceJumpSelection,
+  toChemdMonacoThemeId
 } from "./monaco-chemd-editor";
 
 const model = {
@@ -82,5 +83,12 @@ describe("MonacoChemdEditor source jump helpers", () => {
       endLineNumber: 5,
       endColumn: 12
     });
+  });
+});
+
+describe("MonacoChemdEditor theme helpers", () => {
+  it("maps resolved app themes to dedicated Monaco themes", () => {
+    expect(toChemdMonacoThemeId("light")).toBe("chemd-desktop-light");
+    expect(toChemdMonacoThemeId("dark")).toBe("chemd-desktop-dark");
   });
 });

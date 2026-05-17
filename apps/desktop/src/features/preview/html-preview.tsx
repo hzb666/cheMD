@@ -1,10 +1,11 @@
 import type { ChemdLanguageCompileOutput } from "@chemd/language-service";
-import { toSandboxedPreviewDocument } from "@chemd/renderer-html";
+import { toSandboxedPreviewDocument, type PreviewTheme } from "@chemd/renderer-html";
 import { useMemo } from "react";
 import { useRenderedPreview } from "../../hooks/use-rendered-preview";
 
 interface HtmlPreviewProps {
   output: ChemdLanguageCompileOutput;
+  previewTheme: PreviewTheme;
 }
 
 const PREVIEW_BACKGROUND_FALLBACK = "#f8fafc";
@@ -14,15 +15,24 @@ const readCssColorToken = (name: string, fallback: string): string => {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 };
 
-export const HtmlPreview = ({ output }: HtmlPreviewProps) => {
+export const buildDesktopPreviewDocument = (
+  html: string,
+  previewTheme: PreviewTheme,
+  backgroundColor?: string
+): string =>
+  toSandboxedPreviewDocument(html, previewTheme, {
+    backgroundColor
+  });
+
+export const HtmlPreview = ({ output, previewTheme }: HtmlPreviewProps) => {
   const baseHtml = output.status === "ok" ? output.result.html : "";
   const hydratedHtml = useRenderedPreview(
     baseHtml,
     output.status === "ok" ? output.result.renderOptions : undefined
   );
   const previewBackground = useMemo(
-    () => readCssColorToken("--reference-surface-bg", PREVIEW_BACKGROUND_FALLBACK),
-    []
+    () => readCssColorToken("--editor-workspace-surface", PREVIEW_BACKGROUND_FALLBACK),
+    [previewTheme]
   );
 
   if (output.status === "failed") {
@@ -49,10 +59,12 @@ export const HtmlPreview = ({ output }: HtmlPreviewProps) => {
       title="Chemd HTML preview"
       sandbox="allow-scripts"
       referrerPolicy="no-referrer"
-      className="reference-html-preview-frame block h-full w-full border-0 bg-[var(--reference-surface-bg)]"
-      srcDoc={toSandboxedPreviewDocument(hydratedHtml, "light", {
-        backgroundColor: previewBackground
-      })}
+      className="reference-html-preview-frame block h-full w-full border-0 bg-[var(--editor-workspace-surface)]"
+      srcDoc={buildDesktopPreviewDocument(
+        hydratedHtml,
+        previewTheme,
+        previewTheme === "light" ? previewBackground : undefined
+      )}
     />
   );
 };

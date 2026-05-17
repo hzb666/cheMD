@@ -10,7 +10,8 @@
   --card: oklch(100% 0 0 / 0.82);
   --card-foreground: var(--foreground);
   --editor-surface: #f8fafc;
-  --reference-surface-bg: oklch(97.2% 0.004 247 / 0.96);
+  --editor-workspace-surface: oklch(97.2% 0.004 247 / 0.96);
+  --reference-surface-bg: var(--editor-workspace-surface);
   --popover: oklch(100% 0 0 / 0.94);
   --popover-foreground: var(--foreground);
   --primary: oklch(59.8% 0.17 251.8);
@@ -30,9 +31,45 @@
   --danger: var(--destructive);
   --chemd-background: oklch(44% 0.052 179 / 0.09);
   --chemd-foreground: oklch(44% 0.052 179);
+  --control-surface: oklch(88% 0.012 248 / 0.36);
+  --control-surface-hover: oklch(88% 0.012 248 / 0.5);
+  --control-surface-active: oklch(88% 0.012 248 / 0.58);
   --radius: 14px;
   --font-sans: "Geist", "Noto Sans SC", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono";
+}
+
+.dark {
+  color-scheme: dark;
+  --background: oklch(18.5% 0 0);
+  --foreground: oklch(91.5% 0 0);
+  --card: oklch(23% 0 0 / 0.88);
+  --card-foreground: var(--foreground);
+  --editor-surface: #171717;
+  --editor-workspace-surface: oklch(19.5% 0 0 / 0.96);
+  --reference-surface-bg: var(--editor-workspace-surface);
+  --popover: oklch(22.5% 0 0 / 0.96);
+  --popover-foreground: var(--foreground);
+  --primary: oklch(72% 0.09 178);
+  --primary-foreground: oklch(14% 0 0);
+  --secondary: oklch(27% 0 0);
+  --secondary-foreground: oklch(86% 0 0);
+  --muted: oklch(26% 0 0);
+  --muted-foreground: oklch(69% 0 0);
+  --accent: oklch(30% 0 0);
+  --accent-foreground: oklch(88% 0 0);
+  --destructive: oklch(67% 0.19 25);
+  --border: oklch(38% 0 0 / 0.72);
+  --input: oklch(31% 0 0);
+  --ring: oklch(72% 0.09 178);
+  --success: oklch(70% 0.13 151);
+  --warning: oklch(77% 0.14 76);
+  --danger: var(--destructive);
+  --chemd-background: oklch(66% 0.1 178 / 0.38);
+  --chemd-foreground: oklch(79% 0.09 178);
+  --control-surface: oklch(28% 0 0 / 0.72);
+  --control-surface-hover: oklch(31% 0 0 / 0.78);
+  --control-surface-active: oklch(33% 0 0 / 0.84);
 }
 
 @theme inline {
@@ -86,6 +123,25 @@
     text-rendering: optimizeLegibility;
   }
 
+  body[data-desktop-theme-transition] {
+    transition:
+      background-color 180ms ease,
+      color 180ms ease;
+  }
+
+  body[data-desktop-theme-transition] *:not(.shell-window),
+  body[data-desktop-theme-transition] *:not(.shell-window)::before,
+  body[data-desktop-theme-transition] *:not(.shell-window)::after {
+    animation-duration: 0s !important;
+    transition: none !important;
+  }
+
+  body[data-desktop-theme-transition] .shell-window {
+    transition:
+      background-color 180ms ease,
+      color 180ms ease !important;
+  }
+
   button {
     font: inherit;
   }
@@ -128,8 +184,8 @@
 @layer components {
   .shell-window ::-webkit-scrollbar,
   .dialog-content ::-webkit-scrollbar {
-    width: 0.44rem;
-    height: 0.44rem;
+    width: 0.6rem;
+    height: 0.6rem;
   }
 
   .shell-window ::-webkit-scrollbar-button,
@@ -166,11 +222,6 @@
     background: transparent;
   }
 
-  .monaco-shell .monaco-editor,
-  .monaco-shell .monaco-editor-background,
-  .monaco-shell .monaco-editor .margin {
-    background-color: transparent !important;
-  }
 }
 
 @layer utilities {
@@ -192,4 +243,32 @@
     scrollbar-color: color-mix(in oklch, var(--foreground) 18%, transparent) transparent;
     scrollbar-width: thin;
   }
+}
+
+.monaco-shell .monaco-editor .sticky-widget .sticky-line-number-inner {
+  box-sizing: content-box;
+  display: inline-block;
+  text-align: right;
+}
+
+.monaco-shell .monaco-editor .margin-view-overlays .codicon-folding-manual-collapsed,
+.monaco-shell .monaco-editor .margin-view-overlays .codicon-folding-manual-expanded,
+.monaco-shell .monaco-editor .margin-view-overlays .codicon-folding-expanded,
+.monaco-shell .monaco-editor .margin-view-overlays .codicon-folding-collapsed {
+  font-size: 1em;
+  line-height: 1;
+}
+
+.monaco-shell .monaco-editor {
+  --vscode-editorStickyScroll-background: var(--editor-workspace-surface);
+  --vscode-editorStickyScrollGutter-background: var(--editor-workspace-surface);
+}
+
+.monaco-shell .monaco-editor .sticky-widget,
+.monaco-shell .monaco-editor .sticky-widget .sticky-widget-line-numbers,
+.monaco-shell .monaco-editor .sticky-widget .sticky-widget-lines,
+.monaco-shell .monaco-editor .sticky-widget .sticky-widget-lines-scrollable,
+.monaco-shell .monaco-editor .sticky-widget .sticky-line-number,
+.monaco-shell .monaco-editor .sticky-widget .sticky-line-content {
+  background-color: var(--editor-workspace-surface);
 }

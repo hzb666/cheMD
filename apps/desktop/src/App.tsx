@@ -66,9 +66,11 @@ export const isWorkspaceSaveShortcut = (
   && event.key.toLowerCase() === "s";
 
 export const App = () => {
-  const workspaceController = useWorkspaceFileController();
   const settingsController = useSettings();
-  const { settings, updateSettings, resetSettings } = settingsController;
+  const { settings, resolvedTheme, updateSettings, resetSettings } = settingsController;
+  const workspaceController = useWorkspaceFileController({
+    workspaceIgnoreNames: settings.workspaceIgnoreNames,
+  });
   const [agentRun, setAgentRun] = useState<AgentRun | null>(null);
   const [agentMessage, setAgentMessage] = useState<AgentMessage | null>(null);
   const editorRef = useRef<MonacoChemdEditorHandle | null>(null);
@@ -457,6 +459,9 @@ export const App = () => {
         output={output}
         compileError={compileError}
         files={workspaceController.files}
+        loadedDirectoryPaths={workspaceController.loadedDirectoryPaths}
+        loadingDirectoryPaths={workspaceController.loadingDirectoryPaths}
+        failedDirectoryMessages={workspaceController.failedDirectoryMessages}
         openedTabs={workspaceController.openedTabs}
         dirtyFileIds={workspaceController.dirtyFileIds}
         selectedFile={workspaceController.selectedFile}
@@ -474,6 +479,7 @@ export const App = () => {
         agentCurrentBeforeHash={createEditorSourceHash(workspaceController.source)}
         editorRef={editorRef}
         settings={settings}
+        resolvedTheme={resolvedTheme}
         onSettingsChange={updateSettings}
         onResetSettings={resetSettings}
         onRootPathChange={workspaceController.setRootPath}
@@ -481,6 +487,7 @@ export const App = () => {
         onSave={saveWorkspaceFile}
         onOpenWorkspace={openWorkspace}
         onSelectFile={handleSelectFile}
+        onLoadDirectory={workspaceController.loadDirectoryChildren}
         onCloseFileTab={closeFileTab}
         onCloseAllFileTabs={closeAllFileTabs}
         onReorderFileTabs={workspaceController.reorderFileTabs}

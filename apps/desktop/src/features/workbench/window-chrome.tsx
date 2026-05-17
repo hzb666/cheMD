@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import logoUrl from "../../../../../vision/logo-01.svg?url";
+import darkLogoUrl from "../../../../../vision/logo-02.svg?url";
 import type { ActivityTool, WorkbenchProps } from "../../types";
 import { EditorTabs } from "../editor-tabs/editor-tabs";
 import { referenceActivityItems } from "../activity-tools/activity-tools";
@@ -57,7 +58,13 @@ export function ReferenceBrandLogo() {
       <img
         src={logoUrl}
         alt="Chemd"
-        className="h-[42px] w-20 object-contain"
+        className="h-[42px] w-20 object-contain dark:hidden"
+        draggable={false}
+      />
+      <img
+        src={darkLogoUrl}
+        alt="Chemd"
+        className="hidden h-[42px] w-20 object-contain dark:block"
         draggable={false}
       />
     </div>

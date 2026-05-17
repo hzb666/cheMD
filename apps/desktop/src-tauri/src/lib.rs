@@ -105,9 +105,9 @@ use sidecar::{
 use windows_snap_layout::{set_window_maximize_button_rect, WindowsSnapLayoutState};
 #[cfg(not(test))]
 use workspace::{
-    build_workspace_ingest_plan, list_workspace_files, open_workspace, open_workspace_path,
-    query_workspace_documents, query_workspace_index, read_workspace_file, write_workspace_file,
-    WorkspaceRegistry,
+    build_workspace_ingest_plan, list_workspace_children, list_workspace_files, open_workspace,
+    open_workspace_path, query_workspace_documents, query_workspace_index, read_workspace_file,
+    write_workspace_file, WorkspaceRegistry,
 };
 
 #[cfg(not(test))]
@@ -122,6 +122,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             open_workspace,
             open_workspace_path,
+            list_workspace_children,
             list_workspace_files,
             query_workspace_documents,
             query_workspace_index,

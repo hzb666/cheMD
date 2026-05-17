@@ -125,7 +125,22 @@
   .reference-editor-tab-menu :is(.reference-editor-tab-menu-item, .reference-editor-tab-menu-action)[data-active="true"] {
     background: var(--reference-tab-menu-active);
     color: var(--reference-tab-menu-active-fg);
-    box-shadow: inset 0 0 0 1px var(--reference-tab-menu-active-ring);
+  }
+
+  .dark .reference-editor-tab-menu {
+    --reference-tab-menu-border: oklch(38% 0 0 / 0.58);
+    --reference-tab-menu-field: oklch(24% 0 0 / 0.9);
+    --reference-tab-menu-hover: oklch(31% 0 0 / 0.86);
+    --reference-tab-menu-active: color-mix(in oklch, var(--primary) 22%, transparent);
+    --reference-tab-menu-active-ring: color-mix(in oklch, var(--primary) 24%, transparent);
+    --reference-tab-menu-fg: color-mix(in oklch, var(--foreground) 78%, transparent);
+    --reference-tab-menu-active-fg: var(--primary);
+    --reference-tab-menu-focus: color-mix(in oklch, var(--primary) 30%, transparent);
+    --reference-tab-menu-focus-bg: color-mix(in oklch, var(--primary) 12%, var(--popover));
+    background: oklch(21% 0 0 / 0.98);
+    box-shadow:
+      4px 18px 46px oklch(0% 0 0 / 0.42),
+      1px 4px 12px oklch(0% 0 0 / 0.3);
   }
 
   .reference-editor-tab-menu svg {
@@ -215,15 +230,23 @@
     will-change: transform;
   }
 
+  .dark .reference-editor-tab {
+    --reference-tab-border: oklch(38% 0 0 / 0.7);
+  }
+
   .reference-editor-tab:hover {
     background: oklch(100% 0 0 / 0.25);
+  }
+
+  .dark .reference-editor-tab:hover {
+    background: color-mix(in oklch, var(--foreground) 8%, transparent);
   }
 
   .reference-editor-tab[data-active="true"] {
     z-index: 6;
     margin-bottom: -1px;
     border-radius: var(--reference-tab-radius) var(--reference-tab-radius) 0 0;
-    background: var(--reference-surface-bg);
+    background: var(--editor-workspace-surface);
   }
 
   .reference-editor-tab[data-dragging="true"] {
@@ -258,12 +281,12 @@
 
   .reference-editor-tab[data-active="true"]::before {
     left: calc(var(--reference-tab-radius) * -1);
-    background: radial-gradient(circle at 0 0, transparent 0 7px, var(--reference-tab-border) 7px 8px, var(--reference-surface-bg) 8.5px);
+    background: radial-gradient(circle at 0 0, transparent 0 7px, var(--reference-tab-border) 7px 8px, var(--editor-workspace-surface) 8.5px);
   }
 
   .reference-editor-tab[data-active="true"]::after {
     right: calc(var(--reference-tab-radius) * -1);
-    background: radial-gradient(circle at 100% 0, transparent 0 7px, var(--reference-tab-border) 7px 8px, var(--reference-surface-bg) 8.5px);
+    background: radial-gradient(circle at 100% 0, transparent 0 7px, var(--reference-tab-border) 7px 8px, var(--editor-workspace-surface) 8.5px);
   }
 
   .reference-editor-tab > * {
@@ -277,7 +300,7 @@
     z-index: 1;
     display: none;
     height: 2px;
-    background: var(--reference-surface-bg);
+    background: var(--editor-workspace-surface);
     pointer-events: none;
   }
 

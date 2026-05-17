@@ -5,7 +5,7 @@ import { cva } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const inputVariants = cva(
-  "h-8 min-w-0 rounded-md border border-slate-300/75 bg-white/80 px-2 text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.04)] outline-none transition hover:border-slate-400 hover:bg-white focus-visible:border-primary/45 focus-visible:ring-2 focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-60",
+  "h-8 min-w-0 rounded-md border border-transparent bg-transparent px-2 text-foreground shadow-none outline-none transition hover:border-border/35 hover:bg-foreground/[0.055] focus-visible:border-border/55 focus-visible:ring-2 focus-visible:ring-ring/35 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-foreground/[0.07]",
   {
     variants: {
       size: {

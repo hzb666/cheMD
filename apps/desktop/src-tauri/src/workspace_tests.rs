@@ -1,15 +1,16 @@
 use crate::{
     workspace::{
-        WorkspaceDocumentQueryOptions, WorkspaceIndexQueryOptions, WorkspaceIngestKnownRevision,
-        WorkspaceIngestPlanOptions,
+        WorkspaceChildrenOptions, WorkspaceDocumentQueryOptions, WorkspaceIndexQueryOptions,
+        WorkspaceIngestKnownRevision, WorkspaceIngestPlanOptions,
     },
     workspace_file_io::{
         content_hash, read_workspace_file_impl, set_before_workspace_commit_hook_for_test,
         write_workspace_file_impl, MAX_WORKSPACE_FILE_BYTES,
     },
     workspace_io::{
-        build_workspace_ingest_plan_impl, canonical_workspace_root, list_workspace_files_impl,
-        query_workspace_documents_impl, query_workspace_index_impl, workspace_handle,
+        build_workspace_ingest_plan_impl, canonical_workspace_root, list_workspace_children_impl,
+        list_workspace_files_impl, query_workspace_documents_impl, query_workspace_index_impl,
+        workspace_handle,
     },
 };
 use std::{
@@ -93,14 +94,14 @@ fn rejects_parent_path_traversal_for_read_and_write() {
 }
 
 #[test]
-fn lists_workspace_tree_entries_without_expanding_heavy_dirs() {
+fn lists_workspace_tree_entries_with_default_heavy_directory_ignores() {
     let workspace = TestWorkspace::new("list");
     workspace.write("experiments/screen.chemd", "doc");
     workspace.write("experiments/legacy.chemd.md", "legacy doc");
     workspace.write("notes.md", "note");
     workspace.write("ignore.txt", "listed");
-    workspace.write(".hidden/secret.chemd", "hidden");
-    workspace.write(".env", "DATABASE_URL=postgres://secret");
+    workspace.write(".github/workflows/ci.yml", "name: ci");
+    workspace.write(".vscode/settings.json", "{}");
     workspace.write(".git/config", "heavy");
     workspace.write(".venv/bin/python", "heavy");
     workspace.write(".next/cache/chunk", "heavy");
@@ -119,6 +120,11 @@ fn lists_workspace_tree_entries_without_expanding_heavy_dirs() {
     assert_eq!(
         paths,
         vec![
+            ".github",
+            ".github/workflows",
+            ".github/workflows/ci.yml",
+            ".vscode",
+            ".vscode/settings.json",
             "experiments",
             "experiments/legacy.chemd.md",
             "experiments/screen.chemd",
@@ -143,30 +149,118 @@ fn lists_workspace_tree_entries_without_expanding_heavy_dirs() {
         .find(|entry| entry.path == "ignore.txt")
         .expect("plain file should be listed");
     assert_eq!(asset.chemd_kind.as_deref(), Some("asset"));
+    let is_ignored_path =
+        |path: &str, name: &str| path == name || path.starts_with(&format!("{name}/"));
     assert!(
         !entries.iter().any(|entry| {
-            entry.path.starts_with('.')
-                || entry.path.starts_with("coverage")
-                || entry.path.starts_with("build")
-                || entry.path.starts_with("__pycache__")
+            is_ignored_path(&entry.path, ".git")
+                || is_ignored_path(&entry.path, ".next")
+                || is_ignored_path(&entry.path, ".venv")
+                || is_ignored_path(&entry.path, "__pycache__")
+                || is_ignored_path(&entry.path, "build")
+                || is_ignored_path(&entry.path, "coverage")
         }),
-        "hidden and heavy metadata entries should be filtered"
+        "default heavy workspace directories should be ignored"
     );
 }
 
 #[test]
-fn lists_visible_entries_after_filtering_ignored_children() {
-    let workspace = TestWorkspace::new("list-filtered-limit");
+fn lists_large_and_deep_workspace_trees_without_silent_caps() {
+    let workspace = TestWorkspace::new("list-large-deep");
     for index in 0..300 {
-        workspace.write(&format!(".ignored-{index}/secret.chemd"), "hidden");
+        workspace.write(&format!("many/file-{index:03}.txt"), "data");
     }
-    workspace.write("visible.chemd", "doc");
+    for index in 0..1_050 {
+        workspace.write(&format!("wide/file-{index:04}.txt"), "data");
+    }
+    workspace.write("deep/a/b/c/d/e/f/g/doc.chemd", "deep");
 
     let entries = list_workspace_files_impl("workspace-test", &workspace.canonical_root())
         .expect("workspace should list");
 
-    assert!(entries.iter().any(|entry| entry.path == "visible.chemd"));
-    assert!(!entries.iter().any(|entry| entry.path.starts_with('.')));
+    assert!(entries
+        .iter()
+        .any(|entry| entry.path == "many/file-299.txt"));
+    assert!(entries
+        .iter()
+        .any(|entry| entry.path == "wide/file-1049.txt"));
+    assert!(entries
+        .iter()
+        .any(|entry| entry.path == "deep/a/b/c/d/e/f/g/doc.chemd"));
+    assert!(entries.len() > 1_350);
+}
+
+#[test]
+fn lists_workspace_children_without_recursing_into_subdirectories() {
+    let workspace = TestWorkspace::new("list-children");
+    workspace.write("root.chemd", "root");
+    workspace.write("src/nested.chemd", "nested");
+    workspace.write("src/deep/hidden.chemd", "deep");
+    workspace.write("docs/readme.md", "readme");
+
+    let root_entries = list_workspace_children_impl(
+        "workspace-test",
+        &workspace.canonical_root(),
+        &WorkspaceChildrenOptions {
+            depth: Some(1),
+            ignore_names: Some(vec!["docs".into()]),
+            ..WorkspaceChildrenOptions::default()
+        },
+    )
+    .expect("root children should list");
+    let src_entries = list_workspace_children_impl(
+        "workspace-test",
+        &workspace.canonical_root(),
+        &WorkspaceChildrenOptions {
+            path: Some("src".into()),
+            depth: Some(1),
+            ..WorkspaceChildrenOptions::default()
+        },
+    )
+    .expect("src children should list");
+
+    assert_eq!(
+        root_entries
+            .iter()
+            .map(|entry| entry.path.as_str())
+            .collect::<Vec<_>>(),
+        vec!["root.chemd", "src"]
+    );
+    assert_eq!(
+        src_entries
+            .iter()
+            .map(|entry| entry.path.as_str())
+            .collect::<Vec<_>>(),
+        vec!["src/deep", "src/nested.chemd"]
+    );
+}
+
+#[test]
+fn lists_workspace_children_with_configured_initial_depth() {
+    let workspace = TestWorkspace::new("list-children-depth");
+    workspace.write("src/nested.chemd", "nested");
+    workspace.write("src/deep/doc.chemd", "deep");
+
+    let entries = list_workspace_children_impl(
+        "workspace-test",
+        &workspace.canonical_root(),
+        &WorkspaceChildrenOptions {
+            depth: Some(2),
+            ..WorkspaceChildrenOptions::default()
+        },
+    )
+    .expect("root children should list two levels");
+
+    assert_eq!(
+        entries
+            .iter()
+            .map(|entry| entry.path.as_str())
+            .collect::<Vec<_>>(),
+        vec!["src", "src/deep", "src/nested.chemd"]
+    );
+    assert!(!entries
+        .iter()
+        .any(|entry| entry.path == "src/deep/doc.chemd"));
 }
 
 #[test]
@@ -393,19 +487,18 @@ fn build_workspace_ingest_plan_marks_known_revisions_unchanged() {
 }
 
 #[test]
-fn read_and_write_reject_ignored_workspace_paths() {
-    let workspace = TestWorkspace::new("ignored-read-write");
+fn read_and_write_allow_metadata_paths_inside_workspace() {
+    let workspace = TestWorkspace::new("metadata-read-write");
     workspace.write(".env", "DATABASE_URL=postgres://secret");
     workspace.write(".git/config", "secret");
     let root = workspace.canonical_root();
 
-    let read_error =
-        read_workspace_file_impl(&root, ".env").expect_err("sensitive file should not be readable");
-    let write_error = write_workspace_file_impl(&root, ".git/config", "unsafe", None)
-        .expect_err("vcs config should not be writable");
+    let read = read_workspace_file_impl(&root, ".env").expect("metadata file should be readable");
+    let write = write_workspace_file_impl(&root, ".git/config", "updated", None)
+        .expect("metadata file should be writable");
 
-    assert_eq!(read_error.code, "workspace_path_ignored");
-    assert_eq!(write_error.code, "workspace_path_ignored");
+    assert_eq!(read.content, "DATABASE_URL=postgres://secret");
+    assert_eq!(write.path, ".git/config");
 }
 
 #[test]

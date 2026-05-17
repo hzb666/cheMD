@@ -1,7 +1,12 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { defaultSettings, type AppSettings, useSettings } from "./settings";
+import {
+  defaultSettings,
+  resolveThemePreference,
+  type AppSettings,
+  useSettings
+} from "./settings";
 
 const storageKey = "chemd.desktop.settings.v1";
 
@@ -58,7 +63,8 @@ describe("useSettings", () => {
       restoreLastWorkspace: true,
       lastWorkspacePath: "D:/Code/chemd",
       compileDebounceMs: "80",
-      sidecarAutostart: true
+      sidecarAutostart: true,
+      workspaceIgnoreNames: "node_modules\n.git\nnode_modules\n  target  "
     });
 
     expect(readSettingsSnapshot()).toEqual({
@@ -69,7 +75,17 @@ describe("useSettings", () => {
       restoreLastWorkspace: true,
       lastWorkspacePath: "D:/Code/chemd",
       compileDebounceMs: 100,
-      sidecarAutostart: true
+      sidecarAutostart: true,
+      workspaceIgnoreNames: ["node_modules", ".git", "target"]
     });
+  });
+});
+
+describe("resolveThemePreference", () => {
+  it("resolves explicit and system theme preferences", () => {
+    expect(resolveThemePreference("light", true)).toBe("light");
+    expect(resolveThemePreference("dark", false)).toBe("dark");
+    expect(resolveThemePreference("system", true)).toBe("dark");
+    expect(resolveThemePreference("system", false)).toBe("light");
   });
 });

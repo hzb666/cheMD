@@ -7,9 +7,12 @@ import {
 export interface HorizontalResizeContext {
   containerSize: number;
   currentX: number;
+  currentY: number;
   deltaX: number;
+  deltaY: number;
   startValue: number;
   startX: number;
+  startY: number;
 }
 
 interface UseHorizontalResizeOptions<TElement extends HTMLElement> {
@@ -52,6 +55,7 @@ export const useHorizontalResize = <TElement extends HTMLElement>({
     }
 
     const startX = event.clientX;
+    const startY = event.clientY;
     const startValue = value;
     const containerSize = getContainerSize(container);
     if (containerSize <= 0) return;
@@ -71,9 +75,12 @@ export const useHorizontalResize = <TElement extends HTMLElement>({
       latestValue = resolveValue({
         containerSize,
         currentX: moveEvent.clientX,
+        currentY: moveEvent.clientY,
         deltaX: moveEvent.clientX - startX,
+        deltaY: moveEvent.clientY - startY,
         startValue,
-        startX
+        startX,
+        startY
       });
       scheduleResize();
     };

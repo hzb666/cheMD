@@ -16,7 +16,7 @@ export const PanelHeader: React.FC<PanelHeaderProps> = ({
   actions,
   separator,
 }) => (
-  <div className="flex flex-col gap-1.5 border-b border-white/35 bg-transparent px-4 py-3">
+  <div className="flex flex-col gap-1.5 border-b border-border/35 bg-transparent px-4 py-3">
     <div className="flex min-w-0 items-center gap-2">
       {eyebrow && (
         <Label className="shrink-0 text-xs uppercase text-muted-foreground">
