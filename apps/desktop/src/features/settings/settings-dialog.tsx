@@ -371,7 +371,7 @@ export function SettingsDialog({
               {activeCategory === "general" ? (
               <SettingsSection
                 title="General"
-                description="Control startup behavior and save policy for the local IDE session."
+                description="Control startup behavior for the local IDE session."
               >
                 <ToggleField
                   label="Restore last workspace"
@@ -384,17 +384,6 @@ export function SettingsDialog({
                   label="Last workspace"
                   value={settings.lastWorkspacePath || "No saved workspace"}
                   detail="This updates automatically after a workspace is opened."
-                />
-                <SelectField
-                  label="Auto save"
-                  description="Choose when file buffers should be saved back to disk."
-                  value={settings.autoSaveMode}
-                  options={[
-                    { value: "off", label: "Off" },
-                    { value: "afterDelay", label: "After delay" },
-                    { value: "onFocusLost", label: "On editor blur" },
-                  ]}
-                  onChange={(autoSaveMode) => onSettingsChange({ autoSaveMode })}
                 />
               </SettingsSection>
               ) : null}

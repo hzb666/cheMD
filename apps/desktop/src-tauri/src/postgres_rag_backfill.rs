@@ -2,7 +2,10 @@
 
 use crate::{
     postgres::connect,
-    postgres_config::{load_postgres_config, redact_config_detail, PostgresRuntimeConfig},
+    postgres_config::{
+        load_postgres_config, load_postgres_config_for_workspace, redact_config_detail,
+        PostgresRuntimeConfig,
+    },
     postgres_rag::vector_literal,
     postgres_rag_backfill_result::{
         all_items_failed_result, database_failure_result, offline_result, written_result,
@@ -53,7 +56,11 @@ pub(crate) fn backfill_postgres_rag_embeddings_impl(
         return all_items_failed_result(&validated);
     }
 
-    let config = load_postgres_config();
+    let config = validated
+        .workspace_id
+        .as_deref()
+        .map(|workspace_id| load_postgres_config_for_workspace(Some(workspace_id)))
+        .unwrap_or_else(load_postgres_config);
     if validated.dry_run {
         return dry_run_result(&validated, config.as_ref());
     }

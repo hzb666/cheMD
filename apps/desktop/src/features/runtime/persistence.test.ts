@@ -42,9 +42,9 @@ const workspace = {
 };
 
 const document = {
-  path: "experiments/desktop-persist.chemd.md",
+  path: "experiments/desktop-persist.chemd",
   documentId: "doc-desktop-persist",
-  documentUri: "file:///D:/labs/alpha/experiments/desktop-persist.chemd.md",
+  documentUri: "file:///D:/labs/alpha/experiments/desktop-persist.chemd",
   revisionId: "rev-desktop-persist-1"
 };
 
@@ -163,7 +163,7 @@ describe("desktop runtime persistence payload builder", () => {
       records: buildRecords(),
       source,
       workspace,
-      document: { ...document, path: "experiments/other.chemd.md" }
+      document: { ...document, path: "experiments/other.chemd" }
     });
 
     expect(second.graphSnapshot.graphSnapshotId).toBe(first.graphSnapshot.graphSnapshotId);

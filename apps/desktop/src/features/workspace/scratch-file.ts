@@ -1,15 +1,15 @@
 import type { WorkspaceFileEntry } from "../../contracts";
 
 const scratchFilePathPrefix = "untitled://";
-const scratchFileNamePattern = /^Untitled-(\d+)\.chemd\.md$/;
+const scratchFileNamePattern = /^Untitled-(\d+)\.chemd(?:\.md)?$/;
 
 export const isScratchFile = (file: WorkspaceFileEntry): boolean =>
   file.path.startsWith(scratchFilePathPrefix);
 
 export const createScratchFile = (index: number): WorkspaceFileEntry => ({
   id: `untitled-editor-tab-${index}`,
-  name: `Untitled-${index}.chemd.md`,
-  path: `${scratchFilePathPrefix}Untitled-${index}.chemd.md`,
+  name: `Untitled-${index}.chemd`,
+  path: `${scratchFilePathPrefix}Untitled-${index}.chemd`,
   kind: "file",
   chemdKind: "document",
 });

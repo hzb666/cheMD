@@ -2,7 +2,10 @@
 
 use crate::{
     postgres::connect,
-    postgres_config::{load_postgres_config, redact_config_detail, PostgresRuntimeConfig},
+    postgres_config::{
+        load_postgres_config, load_postgres_config_for_workspace, redact_config_detail,
+        PostgresRuntimeConfig,
+    },
     postgres_runtime_types::PostgresTargetSummary,
 };
 use postgres::{types::ToSql, Client, Row};
@@ -121,11 +124,24 @@ pub(crate) fn query_postgres_rag_impl(input: PostgresRagQueryInput) -> PostgresR
         Ok(query) => query,
         Err(detail) => return degraded_result("Postgres RAG query rejected", detail, None, 0),
     };
-    let Some(config) = load_postgres_config() else {
+    let config = query
+        .workspace_id
+        .as_deref()
+        .map(|workspace_id| load_postgres_config_for_workspace(Some(workspace_id)))
+        .unwrap_or_else(load_postgres_config);
+    let Some(config) = config else {
+        let detail = query.workspace_id.as_deref().map_or_else(
+            || "No active PostgreSQL target is configured for Desktop RAG query".to_string(),
+            |workspace_id| {
+                format!(
+                "No PostgreSQL profile is bound to workspace {workspace_id} for Desktop RAG query"
+            )
+            },
+        );
         return PostgresRagQueryResult {
             state: "offline".into(),
             label: "Postgres RAG offline".into(),
-            detail: "No active PostgreSQL target is configured for Desktop RAG query".into(),
+            detail,
             results: Vec::new(),
             blocked_count: 0,
             target: None,

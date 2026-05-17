@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import ForceGraph, { type GraphData, type LinkObject, type NodeObject } from "force-graph";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { GraphData, LinkObject, NodeObject } from "force-graph";
 import { ChevronDown, ChevronRight, Filter, GitGraph, LocateFixed } from "lucide-react";
 
 import type {
@@ -12,6 +12,7 @@ import type {
   SemanticFlowNode,
   SourceJumpIntent
 } from "./knowledge-map";
+import type { PostgresStatus } from "../contracts";
 import type { WorkspaceIndexViewModel } from "../workspace-index/workspace-index";
 import { filterKnowledgeMapNodes } from "./knowledge-map";
 
@@ -19,6 +20,7 @@ interface KnowledgeMapPanelProps {
   mode?: "compact" | "full";
   viewModel: KnowledgeMapViewModel;
   workspaceIndexViewModel: WorkspaceIndexViewModel;
+  postgresStatus: PostgresStatus;
   onSourceJump?: (intent: SourceJumpIntent) => void;
 }
 
@@ -51,10 +53,11 @@ export const KnowledgeMapPanel = ({
   mode = "full",
   viewModel,
   workspaceIndexViewModel,
+  postgresStatus,
   onSourceJump
 }: KnowledgeMapPanelProps) => (
   <div className={toolPanelClassName} data-mode={mode}>
-    <DocumentGraphSection mode={mode} viewModel={workspaceIndexViewModel} />
+    <DocumentGraphSection mode={mode} viewModel={workspaceIndexViewModel} postgresStatus={postgresStatus} />
     <CurrentDocumentGraphSection mode={mode} viewModel={viewModel} onSourceJump={onSourceJump} />
   </div>
 );
@@ -62,17 +65,36 @@ export const KnowledgeMapPanel = ({
 type DocumentGraphSectionProps = {
   mode: "compact" | "full";
   viewModel: WorkspaceIndexViewModel;
+  postgresStatus: PostgresStatus;
 };
 
 const DocumentGraphSection = ({
   mode,
-  viewModel
+  viewModel,
+  postgresStatus
 }: DocumentGraphSectionProps) => {
+  const postgresReady = postgresStatus.state === "ready"
+    && postgresStatus.configured
+    && postgresStatus.vectorInstalled === true
+    && postgresStatus.schemaReady === true;
   const documentGraph = useMemo(
-    () => buildDocumentGraph(viewModel),
-    [viewModel]
+    () => postgresReady ? buildDocumentGraph(viewModel) : { nodes: [], links: [] },
+    [postgresReady, viewModel]
   );
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
+  if (!postgresReady) {
+    return (
+      <section className={`${graphSectionClassName} ${mode === "full" ? "gap-4 pb-5" : ""}`} aria-label="Workspace document graph">
+        <div className={graphSectionHeadingClassName}>
+          <span className="text-sm font-semibold text-foreground">Document Graph</span>
+          <strong className="truncate font-mono text-xs text-muted-foreground">workspace PostgreSQL required</strong>
+        </div>
+        <p className={emptyCopyClassName}>
+          Bind this workspace to a ready PostgreSQL profile before generating the cross-document graph.
+        </p>
+      </section>
+    );
+  }
   const selectedDocument = documentGraph.nodes.find((node) =>
     node.id === selectedDocumentId
   ) ?? documentGraph.nodes[0] ?? null;
@@ -174,12 +196,20 @@ const CurrentDocumentGraphSection = ({
     () => filterEdgeEvidenceRows(viewModel.edgeEvidenceRows, selectedEdgeBasis),
     [selectedEdgeBasis, viewModel.edgeEvidenceRows]
   );
-  const selectedNode = graphNodes.find((node) =>
+  const selectedNode = useMemo(() => graphNodes.find((node) =>
     node.reaction_entity_id === selectedReactionId
-  ) ?? graphNodes[0];
-  const selectedCluster = viewModel.reactionMap.clusters.find((cluster) =>
+  ) ?? graphNodes[0], [graphNodes, selectedReactionId]);
+  const selectedCluster = useMemo(() => viewModel.reactionMap.clusters.find((cluster) =>
     cluster.cluster_id === selectedNode?.cluster_id
-  );
+  ), [viewModel.reactionMap.clusters, selectedNode?.cluster_id]);
+
+  const handleToggleRenderable = useCallback((nodeId: string) => {
+    setExpandedReactionIds((current) =>
+      current.includes(nodeId)
+        ? current.filter((item) => item !== nodeId)
+        : [...current, nodeId]
+    );
+  }, []);
 
   return (
     <section className={`${graphSectionClassName} ${mode === "full" ? "gap-4 pb-5" : ""}`} aria-label="Current document reaction graph">
@@ -279,13 +309,7 @@ const CurrentDocumentGraphSection = ({
           <ReactionRenderableList
             viewModel={viewModel}
             expandedReactionIds={expandedReactionIds}
-            onToggle={(nodeId) => {
-              setExpandedReactionIds((current) =>
-                current.includes(nodeId)
-                  ? current.filter((item) => item !== nodeId)
-                  : [...current, nodeId]
-              );
-            }}
+            onToggle={handleToggleRenderable}
             onSourceJump={onSourceJump}
           />
           <div className={resultListClassName} role="list" aria-label="Reaction clusters">
@@ -620,7 +644,7 @@ const SemanticFlowPanel = ({
   );
 };
 
-const ReactionRenderableList = ({
+const ReactionRenderableList = memo(({
   viewModel,
   expandedReactionIds,
   onToggle,
@@ -668,7 +692,7 @@ const ReactionRenderableList = ({
       </div>
     ))}
   </div>
-);
+));
 
 type SourceRefActionProps = {
   sourceRef: RenderableSourceRef | null;
@@ -948,7 +972,8 @@ const DocumentGraphCanvas = ({
   onSelectDocument
 }: DocumentGraphCanvasProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const graphRef = useRef<ForceGraph<DocumentForceGraphNode, DocumentForceGraphLink> | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const graphRef = useRef<any>(null);
   const graphData = useMemo<DocumentForceGraphData>(() => ({
     nodes: graph.nodes.map((node) => ({
       ...node,
@@ -958,32 +983,49 @@ const DocumentGraphCanvas = ({
     links: graph.links
   }), [graph, selectedDocumentId]);
 
+  const graphDataRef = useRef(graphData);
+  useEffect(() => {
+    graphDataRef.current = graphData;
+  }, [graphData]);
+
   useEffect(() => {
     if (!containerRef.current || graphRef.current) {
       return;
     }
 
-    const graphInstance = new ForceGraph<DocumentForceGraphNode, DocumentForceGraphLink>(containerRef.current)
-      .backgroundColor("rgba(255,255,255,0)")
-      .nodeId("id")
-      .nodeLabel(documentGraphLabel)
-      .nodeVal("val")
-      .nodeColor(documentNodeColor)
-      .linkLabel((link) => `${link.sourceLabel} -> ${link.targetLabel}`)
-      .linkColor(documentLinkColor)
-      .linkWidth((link) => Math.max(1, Math.min(4, link.referenceCount)))
-      .linkDirectionalArrowLength(4)
-      .linkDirectionalArrowRelPos(0.84)
-      .cooldownTicks(90)
-      .enableNodeDrag(true)
-      .onNodeClick((node) => onSelectDocument(node.id));
+    let isMounted = true;
+    import("force-graph").then((module) => {
+      if (!isMounted || !containerRef.current) return;
+      const ForceGraph = module.default;
+      const graphInstance = new ForceGraph(containerRef.current)
+        .backgroundColor("rgba(255,255,255,0)")
+        .nodeId("id")
+        .nodeLabel((node) => documentGraphLabel(node as DocumentForceGraphNode))
+        .nodeVal("val")
+        .nodeColor((node) => documentNodeColor(node as DocumentForceGraphNode))
+        .linkLabel((link) => {
+          const documentLink = link as DocumentForceGraphLink;
+          return `${documentLink.sourceLabel} -> ${documentLink.targetLabel}`;
+        })
+        .linkColor((link) => documentLinkColor(link as DocumentForceGraphLink))
+        .linkWidth((link) => Math.max(1, Math.min(4, (link as DocumentForceGraphLink).referenceCount)))
+        .linkDirectionalArrowLength(4)
+        .linkDirectionalArrowRelPos(0.84)
+        .cooldownTicks(90)
+        .enableNodeDrag(true)
+        .onNodeClick((node) => onSelectDocument((node as DocumentForceGraphNode).id));
 
-    graphRef.current = graphInstance;
+      graphRef.current = graphInstance;
+      graphInstance.graphData(graphDataRef.current).d3ReheatSimulation();
+    });
 
     return () => {
-      graphInstance.pauseAnimation();
-      graphInstance._destructor();
-      graphRef.current = null;
+      isMounted = false;
+      if (graphRef.current) {
+        graphRef.current.pauseAnimation();
+        graphRef.current._destructor();
+        graphRef.current = null;
+      }
     };
   }, [onSelectDocument]);
 
@@ -1108,37 +1150,55 @@ const ReactionLayoutCanvas = ({
   onSelectReaction
 }: ReactionLayoutCanvasProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const graphRef = useRef<ForceGraph<ReactionForceGraphNode, ReactionForceGraphLink> | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const graphRef = useRef<any>(null);
   const graphData = useMemo(
     () => buildForceGraphData(nodes, edges, selectedReactionId),
     [edges, nodes, selectedReactionId]
   );
+
+  const graphDataRef = useRef(graphData);
+  useEffect(() => {
+    graphDataRef.current = graphData;
+  }, [graphData]);
 
   useEffect(() => {
     if (!containerRef.current || graphRef.current) {
       return;
     }
 
-    const graph = new ForceGraph<ReactionForceGraphNode, ReactionForceGraphLink>(containerRef.current)
-      .backgroundColor("rgba(255,255,255,0)")
-      .nodeId("id")
-      .nodeLabel(forceGraphLabel)
-      .nodeVal("val")
-      .nodeColor(reactionNodeColor)
-      .linkColor(reactionLinkColor)
-      .linkWidth((link) => link.score ? Math.max(1, link.score * 2.4) : 1)
-      .linkDirectionalArrowLength(3.5)
-      .linkDirectionalArrowRelPos(0.86)
-      .cooldownTicks(80)
-      .enableNodeDrag(true)
-      .onNodeClick((node) => onSelectReaction(node.reactionId));
+    let isMounted = true;
+    import("force-graph").then((module) => {
+      if (!isMounted || !containerRef.current) return;
+      const ForceGraph = module.default;
+      const graph = new ForceGraph(containerRef.current)
+        .backgroundColor("rgba(255,255,255,0)")
+        .nodeId("id")
+        .nodeLabel((node) => forceGraphLabel(node as ReactionForceGraphNode))
+        .nodeVal("val")
+        .nodeColor((node) => reactionNodeColor(node as ReactionForceGraphNode))
+        .linkColor((link) => reactionLinkColor(link as ReactionForceGraphLink))
+        .linkWidth((link) => {
+          const reactionLink = link as ReactionForceGraphLink;
+          return reactionLink.score ? Math.max(1, reactionLink.score * 2.4) : 1;
+        })
+        .linkDirectionalArrowLength(3.5)
+        .linkDirectionalArrowRelPos(0.86)
+        .cooldownTicks(80)
+        .enableNodeDrag(true)
+        .onNodeClick((node) => onSelectReaction((node as ReactionForceGraphNode).reactionId));
 
-    graphRef.current = graph;
+      graphRef.current = graph;
+      graph.graphData(graphDataRef.current).d3ReheatSimulation();
+    });
 
     return () => {
-      graph.pauseAnimation();
-      graph._destructor();
-      graphRef.current = null;
+      isMounted = false;
+      if (graphRef.current) {
+        graphRef.current.pauseAnimation();
+        graphRef.current._destructor();
+        graphRef.current = null;
+      }
     };
   }, [onSelectReaction]);
 

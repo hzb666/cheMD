@@ -10,17 +10,28 @@ import {
   sampleSources,
 } from "../utils";
 import {
-  createScratchFile,
-  getNextScratchFileIndex,
   isScratchFile,
 } from "../features/workspace/scratch-file";
+import {
+  buildWorkspaceFileSaveRequest,
+  createDirtyWorkspaceFileSignature,
+  createWorkspaceSaveSingleFlight,
+} from "./workspace-save";
+import {
+  closeAllEditorSessionTabs,
+  closeEditorSessionTab,
+  createEditorSession,
+  getDirtyEditorSessionFileIds,
+  getDirtyWorkspaceEditorSessionFileIds,
+  getSelectedEditorSessionFile,
+  markEditorSessionFileSaved,
+  openScratchEditorSessionTab,
+  replaceEditorSessionFileContent,
+  reorderEditorSessionTabs,
+  selectEditorSessionFile,
+  updateEditorSessionSource,
+} from "./editor-session";
 import { useCallback, useMemo, useRef, useState } from "react";
-
-type OpenBuffer = {
-  source: string;
-  savedSource: string;
-  savedContentHash: string | null;
-};
 
 const getFileSelectedMessage = (file: WorkspaceFileEntry, mode: DocumentMode): string => {
   if (isScratchFile(file)) return `${file.name} selected.`;
@@ -35,45 +46,42 @@ export const useWorkspaceFileController = () => {
   const [workspaceState, setWorkspaceState] = useState<WorkspaceState>("empty");
   const [workspace, setWorkspace] = useState<WorkspaceHandle>(shellWorkspace);
   const [files, setFiles] = useState<WorkspaceFileEntry[]>(shellFiles);
-  const [selectedFileId, setSelectedFileId] = useState(shellFiles[0].id);
-  const [openedTabs, setOpenedTabs] = useState<WorkspaceFileEntry[]>([shellFiles[0]]);
-  const [source, setSourceState] = useState(initialSource);
-  const [savedSource, setSavedSource] = useState(initialSource);
-  const [savedContentHash, setSavedContentHash] = useState<string | null>(null);
-  const [openBuffers, setOpenBuffers] = useState<Record<string, OpenBuffer>>({
-    [shellFiles[0].id]: {
-      source: initialSource,
-      savedSource: initialSource,
-      savedContentHash: null,
-    },
-  });
+  const [session, setSession] = useState(() =>
+    createEditorSession(shellFiles[0], { source: initialSource }));
   const [workspaceConflict, setWorkspaceConflict] = useState<WorkspaceConflictState | null>(null);
   const [mode, setMode] = useState<DocumentMode>("sample");
   const [rootPath, setRootPath] = useState("");
   const [message, setMessage] = useState("No workspace is open. Editing bundled sample content.");
-  const selectedFileIdRef = useRef(selectedFileId);
+  const selectedFileIdRef = useRef(session.selectedFileId);
   const selectFileRequestRef = useRef(0);
+  const saveSingleFlightRef = useRef<ReturnType<typeof createWorkspaceSaveSingleFlight> | null>(null);
+  if (!saveSingleFlightRef.current) {
+    saveSingleFlightRef.current = createWorkspaceSaveSingleFlight();
+  }
+  const {
+    selectedFileId,
+    openedTabs,
+    source,
+    savedSource,
+    savedAt,
+    openBuffers,
+  } = session;
   selectedFileIdRef.current = selectedFileId;
-  const selectedFile = openedTabs.find((file) => file.id === selectedFileId)
-    ?? files.find((file) => file.id === selectedFileId)
-    ?? shellFiles[0];
+  const selectedFile = getSelectedEditorSessionFile(session, files, shellFiles[0]);
   const selectedBuffer = openBuffers[selectedFileId];
   const dirtyFileIds = useMemo(
-    () => Object.entries(openBuffers)
-      .filter(([, buffer]) => buffer.source !== buffer.savedSource)
-      .map(([fileId]) => fileId),
-    [openBuffers],
+    () => getDirtyEditorSessionFileIds(session),
+    [session],
   );
   const dirtyWorkspaceFileIds = useMemo(
-    () => {
-      if (mode !== "workspace" || !workspace.writable) return [];
-      return dirtyFileIds.filter((fileId) => {
-        const file = openedTabs.find((entry) => entry.id === fileId)
-          ?? files.find((entry) => entry.id === fileId);
-        return file?.kind === "file" && !isScratchFile(file);
-      });
-    },
-    [dirtyFileIds, files, mode, openedTabs, workspace.writable],
+    () => mode === "workspace"
+      ? getDirtyWorkspaceEditorSessionFileIds(session, files, workspace.writable)
+      : [],
+    [files, mode, session, workspace.writable],
+  );
+  const dirtyWorkspaceFileSignature = useMemo(
+    () => createDirtyWorkspaceFileSignature(dirtyWorkspaceFileIds, openBuffers),
+    [dirtyWorkspaceFileIds, openBuffers],
   );
   const canSave = mode === "workspace"
     && selectedFile.kind === "file"
@@ -101,18 +109,10 @@ export const useWorkspaceFileController = () => {
     const nextContentHash = nextContent?.contentHash ?? null;
     setWorkspace(nextWorkspace);
     setFiles(usableFiles);
-    setSelectedFileId(firstFile.id);
-    setOpenedTabs([firstFile]);
-    setSourceState(nextSource);
-    setSavedSource(nextSource);
-    setSavedContentHash(nextContentHash);
-    setOpenBuffers({
-      [firstFile.id]: {
-        source: nextSource,
-        savedSource: nextSource,
-        savedContentHash: nextContentHash,
-      },
-    });
+    setSession(createEditorSession(firstFile, {
+      source: nextSource,
+      savedContentHash: nextContentHash,
+    }));
     setWorkspaceConflict(null);
     setRootPath(nextWorkspace.rootPath);
     setMode("workspace");
@@ -148,18 +148,7 @@ export const useWorkspaceFileController = () => {
     } catch (error: unknown) {
       setWorkspace(shellWorkspace);
       setFiles(shellFiles);
-      setSelectedFileId(shellFiles[0].id);
-      setOpenedTabs([shellFiles[0]]);
-      setSourceState(initialSource);
-      setSavedSource(initialSource);
-      setSavedContentHash(null);
-      setOpenBuffers({
-        [shellFiles[0].id]: {
-          source: initialSource,
-          savedSource: initialSource,
-          savedContentHash: null,
-        },
-      });
+      setSession(createEditorSession(shellFiles[0], { source: initialSource }));
       setMode("sample");
       setMessage(`Workspace open failed: ${getDisplayableError(error)}. Using bundled sample content.`);
       setWorkspaceState("error");
@@ -181,26 +170,12 @@ export const useWorkspaceFileController = () => {
       if (selectFileRequestRef.current !== requestId) {
         return;
       }
-      const nextSource = existingBuffer?.source ?? nextContent?.content ?? getSampleSource(file);
-      const nextSavedSource = existingBuffer?.savedSource ?? nextSource;
-      const nextSavedContentHash = existingBuffer?.savedContentHash ?? nextContent?.contentHash ?? null;
-      setSelectedFileId(file.id);
-      setOpenedTabs((current) =>
-        current.some((tab) => tab.id === file.id) ? current : [...current, file],
-      );
-      setSourceState(nextSource);
-      setSavedSource(nextSavedSource);
-      setSavedContentHash(nextSavedContentHash);
-      setOpenBuffers((current) => (current[file.id]
-        ? current
-        : {
-          ...current,
-          [file.id]: {
-            source: nextSource,
-            savedSource: nextSavedSource,
-            savedContentHash: nextSavedContentHash,
-          },
-        }));
+      const nextSource = nextContent?.content ?? getSampleSource(file);
+      const nextSavedContentHash = nextContent?.contentHash ?? null;
+      setSession((current) => selectEditorSessionFile(current, file, {
+        source: nextSource,
+        savedContentHash: nextSavedContentHash,
+      }));
       setWorkspaceConflict(null);
       setMessage(getFileSelectedMessage(file, mode));
     } catch (error: unknown) {
@@ -209,64 +184,47 @@ export const useWorkspaceFileController = () => {
   };
 
   const closeFileTab = async (fileId: string) => {
-    const nextTabs = openedTabs.filter((tab) => tab.id !== fileId);
-    if (nextTabs.length === openedTabs.length) return;
-    if (nextTabs.length === 0) {
+    const closingResult = closeEditorSessionTab(session, fileId);
+    if (!closingResult.closed && !closingResult.blockedTab) {
       setMessage("At least one editor tab must remain open.");
       return;
     }
-    const closingTab = openedTabs.find((tab) => tab.id === fileId);
-    const closingBuffer = openBuffers[fileId];
-    if (closingTab && closingBuffer && closingBuffer.source !== closingBuffer.savedSource) {
-      setMessage(`Save or discard changes in ${closingTab.name} before closing this tab.`);
+    if (closingResult.blockedTab) {
+      setMessage(`Save or discard changes in ${closingResult.blockedTab.name} before closing this tab.`);
       if (selectedFileId !== fileId) {
-        await selectFile(closingTab);
+        await selectFile(closingResult.blockedTab);
       }
       return;
     }
 
-    const closingIndex = openedTabs.findIndex((tab) => tab.id === fileId);
-    setOpenedTabs(nextTabs);
-    setOpenBuffers((current) => {
-      const remaining = { ...current };
-      delete remaining[fileId];
-      return remaining;
-    });
+    setSession(closingResult.session);
+  };
 
-    if (selectedFileId !== fileId) return;
-    const nextSelected = nextTabs[Math.min(closingIndex, nextTabs.length - 1)];
-    await selectFile(nextSelected);
+  const closeAllFileTabs = async () => {
+    const closingResult = closeAllEditorSessionTabs(session);
+    if (closingResult.blockedTab) {
+      setMessage(`Save or discard changes in ${closingResult.blockedTab.name} before closing all tabs.`);
+      if (selectedFileId !== closingResult.blockedTab.id) {
+        await selectFile(closingResult.blockedTab);
+      }
+      return;
+    }
+
+    setSession(closingResult.session);
+    setWorkspaceConflict(null);
+    setMessage("All editor tabs closed. New blank tab opened.");
   };
 
   const reorderFileTabs = (orderedFileIds: readonly string[]) => {
-    setOpenedTabs((current) => {
-      if (orderedFileIds.length !== current.length) return current;
-      if (new Set(orderedFileIds).size !== orderedFileIds.length) return current;
-      const tabById = new Map(current.map((tab) => [tab.id, tab]));
-      const next = orderedFileIds.map((fileId) => tabById.get(fileId));
-      if (next.some((tab) => !tab)) return current;
-      if (next.every((tab, index) => tab?.id === current[index].id)) return current;
-      return next as WorkspaceFileEntry[];
-    });
+    setSession((current) => reorderEditorSessionTabs(current, orderedFileIds));
   };
 
   const openNewTab = async () => {
-    const nextFile = createScratchFile(getNextScratchFileIndex(openedTabs));
-    setSelectedFileId(nextFile.id);
-    setOpenedTabs((current) => [...current, nextFile]);
-    setSourceState("");
-    setSavedSource("");
-    setSavedContentHash(null);
-    setOpenBuffers((current) => ({
-      ...current,
-      [nextFile.id]: {
-        source: "",
-        savedSource: "",
-        savedContentHash: null,
-      },
-    }));
+    const nextSession = openScratchEditorSessionTab(session);
+    const nextFileName = getSelectedEditorSessionFile(nextSession, files, shellFiles[0]).name;
+    setSession(nextSession);
     setWorkspaceConflict(null);
-    setMessage(`Created ${nextFile.name}.`);
+    setMessage(`Created ${nextFileName}.`);
   };
 
   const reloadWorkspaceConflict = async () => {
@@ -277,16 +235,9 @@ export const useWorkspaceFileController = () => {
         workspaceId: workspace.workspaceId,
         path: selectedFile.path,
       });
-      setSourceState(nextContent.content);
-      setSavedSource(nextContent.content);
-      setSavedContentHash(nextContent.contentHash);
-      setOpenBuffers((current) => ({
-        ...current,
-        [selectedFile.id]: {
-          source: nextContent.content,
-          savedSource: nextContent.content,
-          savedContentHash: nextContent.contentHash,
-        },
+      setSession((current) => replaceEditorSessionFileContent(current, selectedFile.id, {
+        source: nextContent.content,
+        savedContentHash: nextContent.contentHash,
       }));
       setWorkspaceConflict(null);
       setMessage(`Reloaded ${nextContent.path} from disk.`);
@@ -305,7 +256,7 @@ export const useWorkspaceFileController = () => {
     setMessage("Kept local editor changes. Save remains guarded by the last saved file hash.");
   };
 
-  const saveWorkspaceFile = useCallback(async (fileId = selectedFileId) => {
+  const saveWorkspaceFileUnlocked = useCallback(async (fileId = selectedFileId) => {
     const targetFile = files.find((file) => file.id === fileId);
     const targetBuffer = openBuffers[fileId];
     if (
@@ -321,28 +272,18 @@ export const useWorkspaceFileController = () => {
     }
 
     try {
-      const result = await invokeCommand("write_workspace_file", {
+      const saveRequest = buildWorkspaceFileSaveRequest({
         workspaceId: workspace.workspaceId,
         path: targetFile.path,
         content: targetBuffer.source,
-        baseHash: targetBuffer.savedContentHash ?? undefined,
+        baseHash: targetBuffer.savedContentHash,
       });
-      if (fileId === selectedFileIdRef.current) {
-        setSavedSource(targetBuffer.source);
-        setSavedContentHash(result.contentHash);
-      }
-      setOpenBuffers((current) => {
-        const currentBuffer = current[fileId];
-        if (!currentBuffer) return current;
-        return {
-          ...current,
-          [fileId]: {
-            source: currentBuffer.source,
-            savedSource: targetBuffer.source,
-            savedContentHash: result.contentHash,
-          },
-        };
-      });
+      const result = await invokeCommand(saveRequest.command, saveRequest.input);
+      const nextSavedAt = new Date().toISOString();
+      setSession((current) => markEditorSessionFileSaved(current, fileId, {
+        contentHash: result.contentHash,
+        savedAt: nextSavedAt,
+      }));
       if (fileId === selectedFileIdRef.current) {
         setWorkspaceConflict(null);
       }
@@ -364,28 +305,22 @@ export const useWorkspaceFileController = () => {
     }
   }, [files, mode, openBuffers, selectedFileId, workspace.workspaceId, workspace.writable]);
 
+  const saveWorkspaceFile = useCallback(
+    (fileId = selectedFileId) =>
+      saveSingleFlightRef.current!.run(() => saveWorkspaceFileUnlocked(fileId)),
+    [saveWorkspaceFileUnlocked, selectedFileId],
+  );
+
   const saveDirtyWorkspaceFiles = useCallback(async () => {
-    for (const fileId of dirtyWorkspaceFileIds) {
-      await saveWorkspaceFile(fileId);
-    }
-  }, [dirtyWorkspaceFileIds, saveWorkspaceFile]);
+    await saveSingleFlightRef.current!.run(async () => {
+      for (const fileId of dirtyWorkspaceFileIds) {
+        await saveWorkspaceFileUnlocked(fileId);
+      }
+    });
+  }, [dirtyWorkspaceFileIds, saveWorkspaceFileUnlocked]);
 
   const setSource = (nextSource: string) => {
-    setSourceState(nextSource);
-    setOpenBuffers((current) => {
-      const currentBuffer = current[selectedFileId] ?? {
-        source,
-        savedSource,
-        savedContentHash,
-      };
-      return {
-        ...current,
-        [selectedFileId]: {
-          ...currentBuffer,
-          source: nextSource,
-        },
-      };
-    });
+    setSession((current) => updateEditorSessionSource(current, nextSource));
   };
 
   return {
@@ -395,10 +330,12 @@ export const useWorkspaceFileController = () => {
     openedTabs,
     dirtyFileIds,
     dirtyWorkspaceFileIds,
+    dirtyWorkspaceFileSignature,
     selectedFile,
     selectedFileId,
     source,
     savedSource,
+    savedAt,
     workspaceConflict,
     mode,
     rootPath,
@@ -411,6 +348,7 @@ export const useWorkspaceFileController = () => {
     openWorkspacePath,
     selectFile,
     closeFileTab,
+    closeAllFileTabs,
     reorderFileTabs,
     openNewTab,
     saveWorkspaceFile,

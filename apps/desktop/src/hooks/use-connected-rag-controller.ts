@@ -215,6 +215,7 @@ export const useConnectedRagQueryController = ({
         input: { items: plan.embeddingItems }
       });
       const requestBuild = buildPostgresRagBackfillRequest({
+        workspaceId: workspace.workspaceId,
         plan,
         embeddingResult: embeddingBatch,
         embeddingModel: embeddingBatch.model ?? model,

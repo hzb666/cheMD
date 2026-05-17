@@ -22,6 +22,7 @@ pub(crate) const UPSERT_CHUNK_EMBEDDING_SQL: &str = "INSERT INTO chemd_rag_chunk
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PostgresRagEmbeddingBackfillRequest {
+    pub(crate) workspace_id: Option<String>,
     #[serde(default)]
     pub(crate) embedding_model: String,
     pub(crate) embedding_dim: Option<i64>,
@@ -69,6 +70,7 @@ pub(crate) struct PostgresRagEmbeddingBackfillItemSummary {
 
 #[derive(Debug, Clone)]
 pub(crate) struct ValidatedPostgresRagEmbeddingBackfill {
+    pub(crate) workspace_id: Option<String>,
     pub(crate) embedding_model: String,
     pub(crate) embedding_dim: usize,
     pub(crate) distance_metric: String,

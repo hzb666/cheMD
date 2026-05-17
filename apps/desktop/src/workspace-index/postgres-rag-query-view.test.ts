@@ -36,10 +36,10 @@ const queryItem = (
     sourceRange: sourceRange(),
     citation: {
       citationId: "citation-query-1",
-      documentUri: "chemd-workspace://workspace/experiments/query.chemd.md"
+      documentUri: "chemd-workspace://workspace/experiments/query.chemd"
     },
     quality: { score: 0.87 },
-    sourceUri: "chemd-workspace://workspace/experiments/query.chemd.md",
+    sourceUri: "chemd-workspace://workspace/experiments/query.chemd",
     entityId: "rxn::query::1",
     blockId: "rxn-query-1"
   },
@@ -81,9 +81,9 @@ describe("desktop Postgres RAG query view adapter", () => {
         revisionId: "revision-query-1",
         chunkId: "chunk-query-1",
         sourceRange: sourceRange(),
-        documentPath: "chemd-workspace://workspace/experiments/query.chemd.md",
-        documentUri: "chemd-workspace://workspace/experiments/query.chemd.md",
-        sourceUri: "chemd-workspace://workspace/experiments/query.chemd.md",
+        documentPath: "chemd-workspace://workspace/experiments/query.chemd",
+        documentUri: "chemd-workspace://workspace/experiments/query.chemd",
+        sourceUri: "chemd-workspace://workspace/experiments/query.chemd",
         text: "Connected Postgres evidence about solvent selection.",
         score: 0.91,
         distance: 0.12

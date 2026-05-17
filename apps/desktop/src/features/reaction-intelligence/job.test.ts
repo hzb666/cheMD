@@ -28,12 +28,12 @@ conditions: air
 
 describe("desktop reaction intelligence job builder", () => {
   it("builds a worker job from reactions with resolved participant SMILES", () => {
-    const output = compileChemdForEditor({ source: sourceWithSmiles, documentUri: "fixture.chemd.md" });
+    const output = compileChemdForEditor({ source: sourceWithSmiles, documentUri: "fixture.chemd" });
 
     const result = buildReactionIntelligenceJob({
       compileOutput: output,
       source: sourceWithSmiles,
-      documentUri: "fixture.chemd.md"
+      documentUri: "fixture.chemd"
     });
 
     expect(result.state).toBe("ready");
@@ -53,12 +53,12 @@ reactants: substrate
 products: product
 :::
 `;
-    const output = compileChemdForEditor({ source, documentUri: "missing.chemd.md" });
+    const output = compileChemdForEditor({ source, documentUri: "missing.chemd" });
 
     const result = buildReactionIntelligenceJob({
       compileOutput: output,
       source,
-      documentUri: "missing.chemd.md"
+      documentUri: "missing.chemd"
     });
 
     expect(result.state).toBe("skipped");

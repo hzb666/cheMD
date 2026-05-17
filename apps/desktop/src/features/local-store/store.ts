@@ -182,7 +182,7 @@ const buildSavedStep = (input: DeriveLocalAuthoringStatusInput): LocalAuthoringS
     return {
       state: "saved",
       label: "Saved",
-      detail: "Local .chemd.md document is saved.",
+      detail: "Local .chemd document is saved.",
       at: input.documentSavedAt ?? null,
       error: null
     };

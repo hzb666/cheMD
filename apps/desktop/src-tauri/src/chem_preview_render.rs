@@ -1,15 +1,13 @@
 #![cfg_attr(test, allow(dead_code))]
 
 #[cfg(not(test))]
-use crate::{sidecar::SidecarManager, workspace::CommandError};
+use crate::sidecar::SidecarManager;
+use crate::workspace::CommandError;
 use serde::Deserialize;
-#[cfg(not(test))]
-use serde_json::json;
-use serde_json::Value;
+use serde_json::{json, Value};
 #[cfg(not(test))]
 use std::time::Duration;
 
-#[cfg(not(test))]
 const CHEM_SERVICE_BASE_URL: &str = "http://127.0.0.1:18081";
 
 #[derive(Debug, Clone, Deserialize)]
@@ -43,15 +41,13 @@ pub async fn render_chem_preview(
     }
 }
 
-#[cfg(not(test))]
-enum RenderRequestFailure {
+pub(crate) enum RenderRequestFailure {
     Connection(String),
     Service(String),
 }
 
-#[cfg(not(test))]
 impl RenderRequestFailure {
-    fn into_error(self) -> CommandError {
+    pub(crate) fn into_error(self) -> CommandError {
         match self {
             Self::Connection(detail) => CommandError::new(
                 "chem_preview_render_unreachable",
@@ -102,8 +98,9 @@ async fn request_render_payload(
     Ok(payload)
 }
 
-#[cfg(not(test))]
-fn render_endpoint(input: &ChemPreviewRenderInput) -> Result<String, RenderRequestFailure> {
+pub(crate) fn render_endpoint(
+    input: &ChemPreviewRenderInput,
+) -> Result<String, RenderRequestFailure> {
     match input.render_type.as_str() {
         "molecule" => Ok(format!("{CHEM_SERVICE_BASE_URL}/render")),
         "reaction" => Ok(format!("{CHEM_SERVICE_BASE_URL}/reaction/render")),
@@ -113,8 +110,7 @@ fn render_endpoint(input: &ChemPreviewRenderInput) -> Result<String, RenderReque
     }
 }
 
-#[cfg(not(test))]
-fn render_request_body(input: &ChemPreviewRenderInput) -> Value {
+pub(crate) fn render_request_body(input: &ChemPreviewRenderInput) -> Value {
     match input.render_type.as_str() {
         "reaction" => json!({
             "reactants": input.reactants.clone().unwrap_or_default(),
@@ -130,8 +126,7 @@ fn render_request_body(input: &ChemPreviewRenderInput) -> Value {
     }
 }
 
-#[cfg(not(test))]
-fn read_service_error(payload: Value, status: u16) -> String {
+pub(crate) fn read_service_error(payload: Value, status: u16) -> String {
     payload
         .get("message")
         .and_then(Value::as_str)

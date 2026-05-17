@@ -3,16 +3,43 @@ use crate::workspace_io::should_ignore_workspace_path;
 use crate::workspace_path::{
     chemd_kind_for_path, clean_relative_path, outside_root, relative_to_string,
 };
+#[cfg(test)]
+use std::cell::RefCell;
 use std::{
     fs::{self, File},
-    io::Write,
+    io::{Read, Write},
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
 
-const MAX_READ_BYTES: u64 = 2 * 1024 * 1024;
+pub(crate) const MAX_WORKSPACE_FILE_BYTES: u64 = 5 * 1024 * 1024;
 const HASH_OFFSET: u64 = 0xcbf29ce484222325;
 const HASH_PRIME: u64 = 0x100000001b3;
+
+#[cfg(test)]
+thread_local! {
+    static BEFORE_WORKSPACE_COMMIT_HOOK: RefCell<Option<Box<dyn FnOnce()>>> =
+        RefCell::new(None);
+}
+
+#[cfg(test)]
+pub(crate) fn set_before_workspace_commit_hook_for_test(hook: impl FnOnce() + 'static) {
+    BEFORE_WORKSPACE_COMMIT_HOOK.with(|slot| {
+        *slot.borrow_mut() = Some(Box::new(hook));
+    });
+}
+
+#[cfg(test)]
+fn run_before_workspace_commit_hook_for_test() {
+    BEFORE_WORKSPACE_COMMIT_HOOK.with(|slot| {
+        if let Some(hook) = slot.borrow_mut().take() {
+            hook();
+        }
+    });
+}
+
+#[cfg(not(test))]
+fn run_before_workspace_commit_hook_for_test() {}
 
 pub(crate) fn read_workspace_file_impl(
     root: &Path,
@@ -28,12 +55,8 @@ pub(crate) fn read_workspace_file_impl(
             err,
         )
     })?;
-    if metadata.len() > MAX_READ_BYTES {
-        return Err(CommandError::new(
-            "workspace_file_too_large",
-            "Workspace file is too large to read safely",
-            Some(relative_to_string(&relative)),
-        ));
+    if metadata.len() > MAX_WORKSPACE_FILE_BYTES {
+        return Err(file_too_large(&relative));
     }
     let content = fs::read_to_string(&target).map_err(|err| {
         CommandError::io(
@@ -61,23 +84,10 @@ pub(crate) fn write_workspace_file_impl(
 ) -> Result<WorkspaceWriteResult, CommandError> {
     let relative = clean_relative_path(path)?;
     ensure_workspace_path_allowed(&relative)?;
+    ensure_content_within_limit(&relative, content.as_bytes())?;
     let target = root.join(&relative);
-    ensure_write_target_inside_root(root, &target)?;
-    if let Some(parent) = target.parent() {
-        fs::create_dir_all(parent).map_err(|err| {
-            CommandError::io(
-                "workspace_write_failed",
-                "Workspace directory cannot be created",
-                err,
-            )
-        })?;
-    }
-    let tmp_path = write_temp_file(&target, content.as_bytes())?;
-    if let Err(err) = ensure_base_hash(&target, base_hash) {
-        let _ = fs::remove_file(&tmp_path);
-        return Err(err);
-    }
-    commit_temp_file(&tmp_path, &target)?;
+    let tmp_path = write_checked_temp_file(root, &target, content.as_bytes())?;
+    commit_checked_temp_file(root, &tmp_path, &target, &relative, base_hash)?;
     let metadata = fs::metadata(&target).map_err(|err| {
         CommandError::io(
             "workspace_write_failed",
@@ -169,7 +179,73 @@ fn ensure_write_target_inside_root(root: &Path, target: &Path) -> Result<(), Com
     Err(outside_root(target))
 }
 
-fn ensure_base_hash(target: &Path, base_hash: Option<&str>) -> Result<(), CommandError> {
+fn ensure_temp_file_inside_root(root: &Path, tmp_path: &Path) -> Result<(), CommandError> {
+    let canonical = fs::canonicalize(tmp_path).map_err(|err| {
+        CommandError::io(
+            "workspace_write_failed",
+            "Workspace temp file cannot be checked",
+            err,
+        )
+    })?;
+    if canonical.starts_with(root) && canonical.is_file() {
+        Ok(())
+    } else {
+        Err(outside_root(tmp_path))
+    }
+}
+
+fn create_workspace_parent(target: &Path) -> Result<(), CommandError> {
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent).map_err(|err| {
+            CommandError::io(
+                "workspace_write_failed",
+                "Workspace directory cannot be created",
+                err,
+            )
+        })?;
+    }
+    Ok(())
+}
+
+fn write_checked_temp_file(
+    root: &Path,
+    target: &Path,
+    content: &[u8],
+) -> Result<PathBuf, CommandError> {
+    ensure_write_target_inside_root(root, target)?;
+    create_workspace_parent(target)?;
+    ensure_write_target_inside_root(root, target)?;
+    let tmp_path = write_temp_file(target, content)?;
+    if let Err(err) = ensure_temp_file_inside_root(root, &tmp_path) {
+        let _ = fs::remove_file(&tmp_path);
+        return Err(err);
+    }
+    Ok(tmp_path)
+}
+
+fn commit_checked_temp_file(
+    root: &Path,
+    tmp_path: &Path,
+    target: &Path,
+    relative: &Path,
+    base_hash: Option<&str>,
+) -> Result<(), CommandError> {
+    run_before_workspace_commit_hook_for_test();
+    if let Err(err) = ensure_write_target_inside_root(root, target)
+        .and_then(|_| ensure_temp_file_inside_root(root, tmp_path))
+        .and_then(|_| ensure_base_hash(target, relative, base_hash))
+    {
+        let _ = fs::remove_file(tmp_path);
+        return Err(err);
+    }
+    commit_temp_file(tmp_path, target)
+}
+
+fn ensure_base_hash(
+    target: &Path,
+    relative: &Path,
+    base_hash: Option<&str>,
+) -> Result<(), CommandError> {
     let Some(expected) = normalized_base_hash(base_hash) else {
         return Ok(());
     };
@@ -180,14 +256,41 @@ fn ensure_base_hash(target: &Path, base_hash: Option<&str>) -> Result<(), Comman
             None,
         ));
     }
-    let current = fs::read(target).map_err(|err| {
+    let current = read_file_bytes_with_limit(target, relative)?;
+    ensure_base_hash_for_content(&current, base_hash)
+}
+
+fn read_file_bytes_with_limit(target: &Path, relative: &Path) -> Result<Vec<u8>, CommandError> {
+    let file = File::open(target).map_err(|err| {
         CommandError::io(
             "workspace_read_failed",
             "Workspace file cannot be checked before save",
             err,
         )
     })?;
-    let actual = content_hash(&current);
+    let mut reader = file.take(MAX_WORKSPACE_FILE_BYTES + 1);
+    let mut content = Vec::new();
+    reader.read_to_end(&mut content).map_err(|err| {
+        CommandError::io(
+            "workspace_read_failed",
+            "Workspace file cannot be checked before save",
+            err,
+        )
+    })?;
+    if (content.len() as u64) > MAX_WORKSPACE_FILE_BYTES {
+        return Err(file_too_large(relative));
+    }
+    Ok(content)
+}
+
+fn ensure_base_hash_for_content(
+    content: &[u8],
+    base_hash: Option<&str>,
+) -> Result<(), CommandError> {
+    let Some(expected) = normalized_base_hash(base_hash) else {
+        return Ok(());
+    };
+    let actual = content_hash(content);
     if actual == expected {
         return Ok(());
     }
@@ -196,6 +299,21 @@ fn ensure_base_hash(target: &Path, base_hash: Option<&str>) -> Result<(), Comman
         Some(expected.to_string()),
         Some(actual),
     ))
+}
+
+fn file_too_large(path: &Path) -> CommandError {
+    CommandError::new(
+        "workspace_file_too_large",
+        "Workspace file is too large to read safely",
+        Some(relative_to_string(path)),
+    )
+}
+
+fn ensure_content_within_limit(relative: &Path, content: &[u8]) -> Result<(), CommandError> {
+    if (content.len() as u64) <= MAX_WORKSPACE_FILE_BYTES {
+        return Ok(());
+    }
+    Err(file_too_large(relative))
 }
 
 fn normalized_base_hash(base_hash: Option<&str>) -> Option<&str> {

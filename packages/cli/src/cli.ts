@@ -886,11 +886,11 @@ const formatChangedFileText = (file: ChangedFileReport): string => {
 
 const formatChangedText = (report: ChangedReport): string => {
   if (report.files.length === 0) {
-    return "No changed .chemd.md files.";
+    return "No changed Chemd files.";
   }
 
   return [
-    `Changed .chemd.md files against ${report.base}:`,
+    `Changed Chemd files against ${report.base}:`,
     ...report.files.map((file) => formatChangedFileText(file))
   ].join("\n");
 };

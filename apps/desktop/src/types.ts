@@ -266,6 +266,8 @@ export type WorkspaceSymbolIndexControllerState = {
 export type PostgresProfilePanelController = {
   state: CommandMap["list_postgres_profiles"]["output"];
   rows: PostgresProfileRow[];
+  currentWorkspaceId: string | null;
+  currentWorkspaceProfileId: string | null;
   form: PostgresProfileForm;
   operation: PostgresProfileOperation | null;
   error: PostgresProfileCommandError | null;
@@ -275,6 +277,8 @@ export type PostgresProfilePanelController = {
   onEditProfile: (profileId: string) => void;
   onSaveProfile: () => void;
   onActivateProfile: (profileId: string) => void;
+  onBindWorkspaceProfile: (profileId: string) => void;
+  onClearWorkspaceProfile: () => void;
   onDeleteProfile: (profileId: string) => void;
   onRefreshProfiles: () => void;
 };
@@ -321,6 +325,7 @@ export type WorkbenchProps = {
   message: string;
   source: string;
   savedSource: string;
+  savedAt: string | null;
   workspaceConflict: WorkspaceConflictState | null;
   rootPath: string;
   canSave: boolean;
@@ -336,6 +341,7 @@ export type WorkbenchProps = {
   onOpenWorkspace: () => void;
   onSelectFile: (file: WorkspaceFileEntry) => void;
   onCloseFileTab: (fileId: string) => void;
+  onCloseAllFileTabs: () => void;
   onReorderFileTabs: (orderedFileIds: readonly string[]) => void;
   onOpenNewTab: () => void;
   onSourceChange: (nextSource: string) => void;

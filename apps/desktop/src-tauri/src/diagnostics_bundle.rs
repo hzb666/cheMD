@@ -12,10 +12,11 @@ const SCHEMA_VERSION: u8 = 1;
 const DEFAULT_OUTPUT_DIR: &str = "chemd-desktop-diagnostics-bundle";
 const SKIP: &str = "SKIP";
 
-const KNOWN_TAURI_COMMANDS: [&str; 37] = [
+const KNOWN_TAURI_COMMANDS: [&str; 40] = [
     "open_workspace",
     "open_workspace_path",
     "list_workspace_files",
+    "query_workspace_documents",
     "read_workspace_file",
     "write_workspace_file",
     "start_sidecar",
@@ -23,6 +24,7 @@ const KNOWN_TAURI_COMMANDS: [&str; 37] = [
     "read_sidecar_status",
     "read_sidecar_logs",
     "read_postgres_status",
+    "read_workspace_postgres_status",
     "read_embedding_provider_status",
     "create_embedding_vector",
     "create_embedding_vectors",
@@ -30,6 +32,7 @@ const KNOWN_TAURI_COMMANDS: [&str; 37] = [
     "save_postgres_profile",
     "activate_postgres_profile",
     "delete_postgres_profile",
+    "bind_workspace_postgres_profile",
     "read_managed_postgres_status",
     "initialize_managed_postgres",
     "start_managed_postgres",

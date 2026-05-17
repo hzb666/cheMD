@@ -68,13 +68,13 @@ products: mol-c
 
 const workspaceDocuments: WorkspaceDocumentInput[] = [
   {
-    uri: "file:///workspace/route-a.chemd.md",
-    path: "experiments/route-a.chemd.md",
+    uri: "file:///workspace/route-a.chemd",
+    path: "experiments/route-a.chemd",
     source: sourceA
   },
   {
-    uri: "file:///workspace/route-b.chemd.md",
-    path: "experiments/route-b.chemd.md",
+    uri: "file:///workspace/route-b.chemd",
+    path: "experiments/route-b.chemd",
     source: sourceB
   }
 ];
@@ -98,7 +98,7 @@ describe("buildWorkspaceSymbolIndex", () => {
 
     expect(findSymbolDefinitions(index, { localId: "rxn-b" })).toEqual([
       expect.objectContaining({
-        documentUri: "file:///workspace/route-b.chemd.md",
+        documentUri: "file:///workspace/route-b.chemd",
         localId: "rxn-b",
         kind: "reaction"
       })
@@ -106,10 +106,59 @@ describe("buildWorkspaceSymbolIndex", () => {
 
     expect(findReferences(index, { localId: "rxn-b" })).toEqual([
       expect.objectContaining({
-        documentUri: "file:///workspace/route-a.chemd.md",
+        documentUri: "file:///workspace/route-a.chemd",
         field: "prev",
         targetText: "route-b#rxn-b",
         status: "resolved"
+      })
+    ]);
+  });
+
+  it("resolves legacy .chemd.md document aliases against renamed .chemd files", () => {
+    const index = buildWorkspaceSymbolIndex([
+      {
+        uri: "file:///workspace/route-a.chemd",
+        path: "experiments/route-a.chemd",
+        source: sourceA.replace("prev: route-b#rxn-b", "prev: route-b.chemd.md#rxn-b")
+      },
+      {
+        uri: "file:///workspace/route-b.chemd",
+        path: "experiments/route-b.chemd",
+        source: sourceB
+      }
+    ]);
+
+    expect(findReferences(index, { localId: "rxn-b" })).toEqual([
+      expect.objectContaining({
+        documentUri: "file:///workspace/route-a.chemd",
+        targetText: "route-b.chemd.md#rxn-b",
+        status: "resolved"
+      })
+    ]);
+  });
+
+  it("does not resolve unknown document extensions as chemd aliases", () => {
+    const index = buildWorkspaceSymbolIndex([
+      {
+        uri: "file:///workspace/route-a.chemd",
+        path: "experiments/route-a.chemd",
+        source: sourceA.replace("prev: route-b#rxn-b", "prev: route-b.txt#rxn-b")
+      },
+      {
+        uri: "file:///workspace/route-b.chemd",
+        path: "experiments/route-b.chemd",
+        source: sourceB
+      }
+    ]);
+
+    expect(index.references.filter((reference) =>
+      reference.targetText === "route-b.txt#rxn-b"
+    )).toEqual([
+      expect.objectContaining({
+        documentUri: "file:///workspace/route-a.chemd",
+        targetText: "route-b.txt#rxn-b",
+        status: "unresolved",
+        targetSymbolIds: []
       })
     ]);
   });
@@ -126,7 +175,7 @@ describe("buildWorkspaceSymbolIndex", () => {
     });
     expect(index.diagnostics).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        documentUri: "file:///workspace/route-a.chemd.md",
+        documentUri: "file:///workspace/route-a.chemd",
         diagnostic: expect.objectContaining({
           code: "W_WORKSPACE_REFERENCE_UNRESOLVED",
           message: expect.stringContaining("missing-product")
@@ -142,7 +191,7 @@ describe("buildWorkspaceSymbolIndex", () => {
         { id: "dup", label: "dup", kind: "reaction", range: range(2) }
       ]);
     const index = buildWorkspaceSymbolIndex([{
-      uri: "file:///dup.chemd.md",
+      uri: "file:///dup.chemd",
       source: "ref: dup"
     }], compile);
 
@@ -150,15 +199,15 @@ describe("buildWorkspaceSymbolIndex", () => {
     expect(index.references[0]).toMatchObject({
       status: "ambiguous",
       targetSymbolIds: [
-        "file:///dup.chemd.md#dup",
-        "file:///dup.chemd.md#dup~2"
+        "file:///dup.chemd#dup",
+        "file:///dup.chemd#dup~2"
       ]
     });
   });
 
   it("isolates compile failures to the failing document", () => {
     const compile: WorkspaceIndexCompileFn = (input) => {
-      if (input.documentUri.endsWith("bad.chemd.md")) {
+      if (input.documentUri.endsWith("bad.chemd")) {
         throw new Error("compile failed for bad document");
       }
       return fakeCompileOutput(input.documentUri, [
@@ -166,18 +215,18 @@ describe("buildWorkspaceSymbolIndex", () => {
       ]);
     };
     const index = buildWorkspaceSymbolIndex([
-      { uri: "file:///bad.chemd.md", source: "ref: missing" },
-      { uri: "file:///good.chemd.md", source: "ref: ok-symbol" }
+      { uri: "file:///bad.chemd", source: "ref: missing" },
+      { uri: "file:///good.chemd", source: "ref: ok-symbol" }
     ], compile);
 
     expect(index.documents).toEqual([
-      expect.objectContaining({ uri: "file:///bad.chemd.md", status: "failed" }),
-      expect.objectContaining({ uri: "file:///good.chemd.md", status: "ok" })
+      expect.objectContaining({ uri: "file:///bad.chemd", status: "failed" }),
+      expect.objectContaining({ uri: "file:///good.chemd", status: "ok" })
     ]);
     expect(findSymbolDefinitions(index, { localId: "ok-symbol" })).toHaveLength(1);
     expect(index.diagnostics).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        documentUri: "file:///bad.chemd.md",
+        documentUri: "file:///bad.chemd",
         diagnostic: expect.objectContaining({
           code: "E_WORKSPACE_COMPILE_FAILED",
           message: "compile failed for bad document"
@@ -194,8 +243,8 @@ describe("buildWorkspaceSymbolIndex", () => {
       ]);
     };
     const index = buildWorkspaceSymbolIndex([
-      { uri: "file:///b.chemd.md", source: "ref: a-symbol" },
-      { uri: "file:///a.chemd.md", source: "ref: b-symbol" }
+      { uri: "file:///b.chemd", source: "ref: a-symbol" },
+      { uri: "file:///a.chemd", source: "ref: b-symbol" }
     ], compile);
 
     expect(listWorkspaceSymbols(index).map((symbol) => symbol.localId)).toEqual([

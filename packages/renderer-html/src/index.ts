@@ -9,6 +9,7 @@ export {
   PREVIEW_THEME_SYNC_ACK_MESSAGE_TYPE,
   PREVIEW_THEME_SYNC_MESSAGE_TYPE,
   toSandboxedPreviewDocument,
+  type PreviewDocumentOptions,
   type PreviewTheme
 } from "./preview-document";
 

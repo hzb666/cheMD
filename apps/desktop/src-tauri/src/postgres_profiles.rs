@@ -21,6 +21,8 @@ const KEYRING_SERVICE: &str = "dev.chemd.desktop.postgres";
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PostgresProfilesFile {
     pub(crate) active_profile_id: Option<String>,
+    #[serde(default)]
+    pub(crate) workspace_profile_bindings: BTreeMap<String, String>,
     pub(crate) profiles: Vec<PostgresProfileRecord>,
 }
 
@@ -79,7 +81,15 @@ pub(crate) struct PostgresProfileSummary {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PostgresProfilesState {
     pub(crate) active_profile_id: Option<String>,
+    pub(crate) workspace_profile_bindings: BTreeMap<String, String>,
     pub(crate) profiles: Vec<PostgresProfileSummary>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BindWorkspacePostgresProfileInput {
+    pub(crate) workspace_id: String,
+    pub(crate) profile_id: Option<String>,
 }
 
 #[cfg(not(test))]
@@ -115,6 +125,15 @@ pub fn delete_postgres_profile(
     profile_id: String,
 ) -> Result<PostgresProfilesState, CommandError> {
     delete_postgres_profile_impl(&profile_root(command_root(&app)?), &profile_id)
+}
+
+#[cfg(not(test))]
+#[tauri::command]
+pub fn bind_workspace_postgres_profile(
+    app: tauri::AppHandle,
+    input: BindWorkspacePostgresProfileInput,
+) -> Result<PostgresProfilesState, CommandError> {
+    bind_workspace_postgres_profile_impl(&profile_root(command_root(&app)?), input)
 }
 
 pub(crate) fn profile_root(app_data_dir: PathBuf) -> PathBuf {
@@ -186,30 +205,37 @@ pub(crate) fn postgres_profile_env_source_with_store(
 ) -> Option<EnvSource> {
     let file = read_profiles_file(root).ok()?;
     let active_id = file.active_profile_id.as_deref()?;
-    let profile = file
-        .profiles
-        .iter()
-        .find(|item| item.profile_id == active_id)?;
-    let password = secret_store.read(&profile.secret_ref).ok()?;
-    let mut vars = BTreeMap::new();
-    vars.insert(
-        "CHEMD_POSTGRES_DATABASE_URL".into(),
-        profile_database_url(profile, &password),
-    );
-    vars.insert(
-        "CHEMD_POSTGRES_CONNECTION_TIMEOUT_MS".into(),
-        profile.timeout_ms.to_string(),
-    );
-    if let Some(pool) = &profile.pool {
-        vars.insert("CHEMD_POSTGRES_POOL".into(), pool.clone());
-    }
-    Some(EnvSource {
-        label: format!(
-            "postgres profile:{}",
-            root.join(POSTGRES_PROFILES_FILE).display()
-        ),
-        vars,
-    })
+    env_source_for_profile(root, &file, active_id, secret_store, None)
+}
+
+pub(crate) fn postgres_profile_env_source_for_workspace(
+    root: &Path,
+    workspace_id: &str,
+) -> Option<EnvSource> {
+    postgres_profile_env_source_for_workspace_with_store(
+        root,
+        workspace_id,
+        &KeyringPostgresProfileSecretStore,
+    )
+}
+
+pub(crate) fn postgres_profile_env_source_for_workspace_with_store(
+    root: &Path,
+    workspace_id: &str,
+    secret_store: &dyn PostgresProfileSecretStore,
+) -> Option<EnvSource> {
+    let file = read_profiles_file(root).ok()?;
+    let normalized_workspace_id = normalize_workspace_id(workspace_id);
+    let profile_id = file
+        .workspace_profile_bindings
+        .get(&normalized_workspace_id)?;
+    env_source_for_profile(
+        root,
+        &file,
+        profile_id,
+        secret_store,
+        Some(&normalized_workspace_id),
+    )
 }
 
 pub(crate) fn list_postgres_profiles_impl(
@@ -319,11 +345,50 @@ pub(crate) fn delete_postgres_profile_with_store(
     if file.profiles.len() == before {
         return Err(invalid_input("Postgres profile was not found"));
     }
+    file.workspace_profile_bindings
+        .retain(|_, bound_profile_id| bound_profile_id != &id);
     if file.active_profile_id.as_deref() == Some(&id) {
         file.active_profile_id = file
             .profiles
             .first()
             .map(|profile| profile.profile_id.clone());
+    }
+    write_profiles_file(root, &file)?;
+    Ok(to_state(file, secret_store))
+}
+
+pub(crate) fn bind_workspace_postgres_profile_impl(
+    root: &Path,
+    input: BindWorkspacePostgresProfileInput,
+) -> Result<PostgresProfilesState, CommandError> {
+    bind_workspace_postgres_profile_with_store(root, input, &KeyringPostgresProfileSecretStore)
+}
+
+pub(crate) fn bind_workspace_postgres_profile_with_store(
+    root: &Path,
+    input: BindWorkspacePostgresProfileInput,
+    secret_store: &dyn PostgresProfileSecretStore,
+) -> Result<PostgresProfilesState, CommandError> {
+    let mut file = read_profiles_file(root)?;
+    let workspace_id = normalize_workspace_id(&input.workspace_id);
+    if workspace_id.is_empty() {
+        return Err(invalid_input("workspaceId is required"));
+    }
+    match input.profile_id.as_deref().map(normalize_profile_id) {
+        Some(profile_id) if !profile_id.is_empty() => {
+            if !file
+                .profiles
+                .iter()
+                .any(|profile| profile.profile_id == profile_id)
+            {
+                return Err(invalid_input("Postgres profile was not found"));
+            }
+            file.workspace_profile_bindings
+                .insert(workspace_id, profile_id);
+        }
+        _ => {
+            file.workspace_profile_bindings.remove(&workspace_id);
+        }
     }
     write_profiles_file(root, &file)?;
     Ok(to_state(file, secret_store))
@@ -430,6 +495,7 @@ fn to_state(
     let active = file.active_profile_id.clone();
     PostgresProfilesState {
         active_profile_id: active.clone(),
+        workspace_profile_bindings: file.workspace_profile_bindings,
         profiles: file
             .profiles
             .into_iter()
@@ -457,6 +523,43 @@ fn profile_password_saved(
     secret_store: &dyn PostgresProfileSecretStore,
 ) -> bool {
     secret_store.read(&profile.secret_ref).is_ok()
+}
+
+fn env_source_for_profile(
+    root: &Path,
+    file: &PostgresProfilesFile,
+    profile_id: &str,
+    secret_store: &dyn PostgresProfileSecretStore,
+    workspace_id: Option<&str>,
+) -> Option<EnvSource> {
+    let profile = file
+        .profiles
+        .iter()
+        .find(|item| item.profile_id == profile_id)?;
+    let password = secret_store.read(&profile.secret_ref).ok()?;
+    let mut vars = BTreeMap::new();
+    vars.insert(
+        "CHEMD_POSTGRES_DATABASE_URL".into(),
+        profile_database_url(profile, &password),
+    );
+    vars.insert(
+        "CHEMD_POSTGRES_CONNECTION_TIMEOUT_MS".into(),
+        profile.timeout_ms.to_string(),
+    );
+    if let Some(pool) = &profile.pool {
+        vars.insert("CHEMD_POSTGRES_POOL".into(), pool.clone());
+    }
+    let label = match workspace_id {
+        Some(id) => format!(
+            "workspace postgres binding:{id}:{}",
+            root.join(POSTGRES_PROFILES_FILE).display()
+        ),
+        None => format!(
+            "postgres profile:{}",
+            root.join(POSTGRES_PROFILES_FILE).display()
+        ),
+    };
+    Some(EnvSource { label, vars })
 }
 
 fn profile_database_url(profile: &PostgresProfileRecord, password: &str) -> String {
@@ -514,6 +617,10 @@ fn normalize_profile_id(value: &str) -> String {
     } else {
         normalized
     }
+}
+
+fn normalize_workspace_id(value: &str) -> String {
+    value.trim().to_string()
 }
 
 fn encode_url_part(value: &str) -> String {

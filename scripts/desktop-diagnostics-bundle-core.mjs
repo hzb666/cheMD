@@ -25,6 +25,7 @@ const DESKTOP_DIST_INDEX_PATH = path.join("apps", "desktop", "dist", "index.html
 export const KNOWN_DESKTOP_COMMAND_NAMES = [
   "open_workspace",
   "list_workspace_files",
+  "query_workspace_documents",
   "read_workspace_file",
   "write_workspace_file",
   "start_sidecar",

@@ -24,7 +24,7 @@ import {
 } from "./hooks/use-local-store-controller";
 import { useAgentPatchController } from "./hooks/use-agent-patch-controller";
 import { useConnectedRagQueryController, useEmbeddingProviderController } from "./hooks/use-connected-rag-controller";
-import { useSettings } from "./features/settings/settings";
+import { useSettings, type AutoSaveMode } from "./features/settings/settings";
 
 import type { AgentMessage } from "./types";
 import type { WorkspaceFileEntry } from "./contracts";
@@ -40,6 +40,26 @@ const useDebouncedValue = <T,>(value: T, delayMs: number): T => {
   return debouncedValue;
 };
 
+export const shouldScheduleDelayedAutoSave = (
+  autoSaveMode: AutoSaveMode,
+  dirtyWorkspaceFileSignature: string,
+): boolean =>
+  autoSaveMode === "afterDelay" && dirtyWorkspaceFileSignature.length > 0;
+
+export const shouldRunImmediateWorkspaceAutoSave = (
+  autoSaveMode: AutoSaveMode,
+  dirtyWorkspaceFileSignature: string,
+): boolean =>
+  autoSaveMode !== "off" && dirtyWorkspaceFileSignature.length > 0;
+
+export const isWorkspaceSaveShortcut = (
+  event: Pick<KeyboardEvent, "key" | "ctrlKey" | "metaKey" | "altKey" | "shiftKey">,
+): boolean =>
+  (event.ctrlKey || event.metaKey)
+  && !event.altKey
+  && !event.shiftKey
+  && event.key.toLowerCase() === "s";
+
 export const App = () => {
   const workspaceController = useWorkspaceFileController();
   const settingsController = useSettings();
@@ -51,7 +71,10 @@ export const App = () => {
   const restoreWorkspaceAttemptedRef = useRef(false);
 
   const sidecarController = useSidecarController();
-  const postgresController = usePostgresController();
+  const postgresController = usePostgresController({
+    workspaceId: workspaceController.workspace.workspaceId,
+    workspaceMode: workspaceController.mode
+  });
   const compileInput = useMemo(
     () => ({
       fileId: workspaceController.selectedFileId,
@@ -79,6 +102,17 @@ export const App = () => {
         modifiedAtMs: result.modifiedAtMs,
       })),
     [workspaceController.workspace.workspaceId],
+  );
+
+  const queryWorkspaceIndexDocuments = useCallback(
+    (input: {
+      workspaceId?: string;
+      query?: string;
+      excludePath?: string;
+      cursor?: number;
+      limit?: number;
+    }) => invokeCommand("query_workspace_documents", input),
+    [],
   );
 
   const output = useMemo(
@@ -109,6 +143,7 @@ export const App = () => {
     selectedFile: workspaceController.selectedFile,
     source: workspaceController.source,
     readFile: readWorkspaceIndexFile,
+    queryDocuments: queryWorkspaceIndexDocuments,
   });
 
   const workspaceIndexViewModel = workspaceIndexController.viewModel;
@@ -234,17 +269,61 @@ export const App = () => {
   }, [settings.sidecarAutostart, sidecarController]);
 
   const dirtyWorkspaceFileSignature = useMemo(
-    () => workspaceController.dirtyWorkspaceFileIds.join("\u001f"),
-    [workspaceController.dirtyWorkspaceFileIds],
+    () => workspaceController.dirtyWorkspaceFileSignature,
+    [workspaceController.dirtyWorkspaceFileSignature],
   );
 
   useEffect(() => {
-    if (settings.autoSaveMode !== "afterDelay" || !dirtyWorkspaceFileSignature) return;
+    if (!shouldScheduleDelayedAutoSave(settings.autoSaveMode, dirtyWorkspaceFileSignature)) {
+      return;
+    }
     const timeoutId = window.setTimeout(() => {
       void workspaceController.saveDirtyWorkspaceFiles();
-    }, 1200);
+    }, 3000);
     return () => window.clearTimeout(timeoutId);
-  }, [dirtyWorkspaceFileSignature, settings.autoSaveMode, workspaceController.saveDirtyWorkspaceFiles]);
+  }, [
+    dirtyWorkspaceFileSignature,
+    settings.autoSaveMode,
+    workspaceController.saveDirtyWorkspaceFiles,
+  ]);
+
+  const runImmediateWorkspaceAutoSave = useCallback(() => {
+    if (!shouldRunImmediateWorkspaceAutoSave(settings.autoSaveMode, dirtyWorkspaceFileSignature)) {
+      return;
+    }
+    void workspaceController.saveDirtyWorkspaceFiles();
+  }, [
+    dirtyWorkspaceFileSignature,
+    settings.autoSaveMode,
+    workspaceController.saveDirtyWorkspaceFiles,
+  ]);
+
+  useEffect(() => {
+    window.addEventListener("blur", runImmediateWorkspaceAutoSave);
+    return () => window.removeEventListener("blur", runImmediateWorkspaceAutoSave);
+  }, [runImmediateWorkspaceAutoSave]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!isWorkspaceSaveShortcut(event)) return;
+      event.preventDefault();
+      void workspaceController.saveWorkspaceFile();
+    };
+
+    window.addEventListener("keydown", onKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
+  }, [workspaceController.saveWorkspaceFile]);
+
+  const handleSelectFile = useCallback((file: WorkspaceFileEntry) => {
+    if (file.id !== workspaceController.selectedFileId) {
+      runImmediateWorkspaceAutoSave();
+    }
+    void workspaceController.selectFile(file);
+  }, [
+    runImmediateWorkspaceAutoSave,
+    workspaceController.selectFile,
+    workspaceController.selectedFileId,
+  ]);
 
   const handleKnowledgeMapSourceJump = useCallback(
     (intent: SourceJumpIntent) => {
@@ -307,6 +386,7 @@ export const App = () => {
         message={workspaceController.message}
         source={workspaceController.source}
         savedSource={workspaceController.savedSource}
+        savedAt={workspaceController.savedAt}
         workspaceConflict={workspaceController.workspaceConflict}
         rootPath={workspaceController.rootPath}
         canSave={workspaceController.canSave}
@@ -321,8 +401,9 @@ export const App = () => {
         onSourceChange={updateEditorSource}
         onSave={() => void workspaceController.saveWorkspaceFile()}
         onOpenWorkspace={() => void workspaceController.openWorkspace()}
-        onSelectFile={(file) => void workspaceController.selectFile(file)}
+        onSelectFile={handleSelectFile}
         onCloseFileTab={(fileId) => void workspaceController.closeFileTab(fileId)}
+        onCloseAllFileTabs={() => void workspaceController.closeAllFileTabs()}
         onReorderFileTabs={workspaceController.reorderFileTabs}
         onOpenNewTab={() => void workspaceController.openNewTab()}
         onReloadWorkspaceConflict={() => void workspaceController.reloadWorkspaceConflict()}

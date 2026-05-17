@@ -5,7 +5,6 @@ import {
   type CSSProperties,
 } from "react";
 import {
-  Eye,
   GitGraph,
   PanelRightClose,
 } from "lucide-react";
@@ -15,7 +14,6 @@ import type {
   WorkbenchProps,
   InsightPaneProps,
 } from "../../types";
-import { HtmlPreview } from "../preview/html-preview";
 import { SettingsDialog } from "../settings/settings-dialog";
 import { buildInsightPaneProps } from "../dock-panels/insight-props";
 import { ReferenceBottomPanel, type ReferenceBottomPanelId } from "./bottom-panel";
@@ -77,7 +75,7 @@ export const Workbench = (props: WorkbenchProps) => {
   return (
     <main
       ref={shellRef}
-      className="shell-window relative flex h-full min-h-[640px] overflow-hidden border-0 bg-[var(--shell-background)] text-sm text-foreground shadow-none [backdrop-filter:none]"
+      className="shell-window relative flex h-full min-h-[640px] overflow-hidden border-0 bg-muted/60 text-sm text-foreground shadow-none [backdrop-filter:none]"
       style={{ "--reference-sidebar-width": `${sidebarWidth}px` } as CSSProperties}
     >
       <ReferenceBrandLogo />
@@ -116,6 +114,7 @@ export const Workbench = (props: WorkbenchProps) => {
           onToggleTerminal={toggleTerminalPanel}
           onSelectFile={props.onSelectFile}
           onCloseFileTab={props.onCloseFileTab}
+          onCloseAllFileTabs={props.onCloseAllFileTabs}
           onReorderFileTabs={props.onReorderFileTabs}
           onOpenNewTab={props.onOpenNewTab}
         />
@@ -138,6 +137,7 @@ export const Workbench = (props: WorkbenchProps) => {
               <ReferenceDocumentSurface
                 file={props.selectedFile}
                 source={props.source}
+                savedAt={props.savedAt}
                 compileOutput={props.output}
                 workspaceSymbolIndex={props.workspaceSymbolIndexController.index}
                 workspaceConflict={props.workspaceConflict}
@@ -156,12 +156,6 @@ export const Workbench = (props: WorkbenchProps) => {
                 onKeepLocalWorkspaceConflict={props.onKeepLocalWorkspaceConflict}
                 onSidebarResize={beginResize}
               />
-              {previewVisible ? (
-                <ReferencePreviewPane
-                  output={props.output}
-                  onClose={() => setPreviewVisible(false)}
-                />
-              ) : null}
               {!previewVisible && activeTool === "graph" ? (
                 <ReferenceGraphPane
                   props={insightProps}
@@ -186,37 +180,6 @@ export const Workbench = (props: WorkbenchProps) => {
   );
 };
 
-function ReferencePreviewPane({
-  output,
-  onClose,
-}: {
-  output: WorkbenchProps["output"];
-  onClose: () => void;
-}) {
-  return (
-    <aside className="flex min-h-0 w-[min(420px,34vw)] shrink-0 flex-col overflow-hidden border-l border-[var(--shell-border)] bg-transparent" aria-label="Chemd HTML preview">
-      <div className="flex h-10 shrink-0 items-center gap-2 border-b border-[var(--shell-border-muted)] bg-[var(--shell-panel-header)] px-3">
-        <Eye size={14} className="text-muted-foreground" />
-        <span className="reference-dock-caption text-xs uppercase tracking-wider text-muted-foreground">Preview</span>
-        <strong className="reference-dock-label min-w-0 flex-1 truncate text-sm font-medium">Chemd HTML</strong>
-        <Button
-          type="button"
-          variant="window"
-          size="window-icon"
-          aria-label="Close preview"
-          title="Close preview"
-          onClick={onClose}
-        >
-          <PanelRightClose size={14} aria-hidden="true" />
-        </Button>
-      </div>
-      <div className="min-h-0 flex-1 bg-[var(--shell-preview-host)]">
-        <HtmlPreview output={output} />
-      </div>
-    </aside>
-  );
-}
-
 function ReferenceGraphPane({
   props,
   onClose,
@@ -225,8 +188,8 @@ function ReferenceGraphPane({
   onClose: () => void;
 }) {
   return (
-    <aside className="flex min-h-0 w-[clamp(520px,44vw,760px)] shrink-0 flex-col overflow-hidden border-l border-[var(--shell-border)] bg-transparent" aria-label="Knowledge graph workspace">
-      <div className="flex h-10 shrink-0 items-center gap-2 border-b border-[var(--shell-border-muted)] bg-[var(--shell-panel-header)] px-3">
+    <aside className="flex min-h-0 w-[clamp(520px,44vw,760px)] shrink-0 flex-col overflow-hidden border-l border-border/60 bg-transparent" aria-label="Knowledge graph workspace">
+      <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border/50 bg-card/20 px-3">
         <GitGraph size={14} className="text-muted-foreground" />
         <span className="reference-dock-caption text-xs uppercase tracking-wider text-muted-foreground">Graph</span>
         <strong className="reference-dock-label min-w-0 flex-1 truncate text-sm font-medium">Workspace and Document Graphs</strong>
@@ -241,12 +204,13 @@ function ReferenceGraphPane({
           <PanelRightClose size={14} aria-hidden="true" />
         </Button>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto bg-[var(--shell-graph-body)] p-3">
+      <div className="min-h-0 flex-1 overflow-y-auto bg-background/45 p-3">
         <Suspense fallback={<p className="m-0 text-xs leading-relaxed text-muted-foreground">Loading graph workspace...</p>}>
           <KnowledgeMapPanel
             mode="full"
             viewModel={props.knowledgeMapViewModel}
             workspaceIndexViewModel={props.workspaceIndexViewModel}
+            postgresStatus={props.postgresStatus}
             onSourceJump={props.onKnowledgeMapSourceJump}
           />
         </Suspense>

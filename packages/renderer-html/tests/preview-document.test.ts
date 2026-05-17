@@ -12,6 +12,7 @@ describe("preview document shell", () => {
 
     expect(PREVIEW_DOCUMENT_STYLE).toContain(".chemd-tlc-plate");
     expect(PREVIEW_DOCUMENT_STYLE).toContain(".chemd-graphic");
+    expect(PREVIEW_DOCUMENT_STYLE).toContain("--preview-background: #f8fafc;");
     expect(document).toContain('data-theme="dark"');
     expect(document).toContain(PREVIEW_THEME_SYNC_MESSAGE_TYPE);
     expect(document).toContain("<article>Preview</article>");
@@ -24,5 +25,14 @@ describe("preview document shell", () => {
     expect(document).not.toContain("script-src 'unsafe-inline'");
     expect(document).toMatch(/<script nonce="[a-z0-9]+">\(\(\) => \{/);
     expect(document).toContain("<script>alert('user html')</script>");
+  });
+
+  it("allows the host app to align the preview iframe background", () => {
+    const document = toSandboxedPreviewDocument("<article>Preview</article>", "light", {
+      backgroundColor: "oklch(97.2% 0.004 247 / 0.96)"
+    });
+
+    expect(document).toContain("--preview-background: oklch(97.2% 0.004 247 / 0.96);");
+    expect(document).toContain("--preview-background-soft: oklch(97.2% 0.004 247 / 0.96);");
   });
 });

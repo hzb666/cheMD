@@ -97,6 +97,7 @@ describe("desktop Postgres profile UI state", () => {
   it("builds rows that expose active and passwordSaved without password values", () => {
     const state: PostgresProfilesState = {
       activeProfileId: "backup",
+      workspaceProfileBindings: {},
       profiles: [
         profile({ profileId: "remote-postgres", active: false }),
         profile({

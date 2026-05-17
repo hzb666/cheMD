@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type {
   CommandMap,
   ManagedPostgresStatus,
@@ -39,6 +39,8 @@ type ManagedPostgresCommand = keyof Pick<
   "initialize_managed_postgres" | "start_managed_postgres" | "stop_managed_postgres" | "migrate_managed_postgres" | "read_managed_postgres_status"
 >;
 
+type PostgresProfilesState = CommandMap["list_postgres_profiles"]["output"];
+
 const managedPostgresCommandByOperation: Record<ManagedPostgresOperation, ManagedPostgresCommand> = {
   init: "initialize_managed_postgres",
   start: "start_managed_postgres",
@@ -47,10 +49,76 @@ const managedPostgresCommandByOperation: Record<ManagedPostgresOperation, Manage
   refresh: "read_managed_postgres_status"
 };
 
+const buildPostgresProfilePanel = ({
+  activateProfile,
+  bindWorkspaceProfile,
+  deleteProfile,
+  editProfile,
+  profileError,
+  profileForm,
+  profileMessage,
+  profileOperation,
+  profilesState,
+  refreshProfiles,
+  saveProfile,
+  setProfileError,
+  setProfileForm,
+  setProfileMessage,
+  workspaceId,
+}: {
+  activateProfile: (profileId: string) => Promise<void>;
+  bindWorkspaceProfile: (profileId: string | null) => Promise<void>;
+  deleteProfile: (profileId: string) => Promise<void>;
+  editProfile: (profileId: string) => void;
+  profileError: PostgresProfileCommandError | null;
+  profileForm: PostgresProfileForm;
+  profileMessage: string | null;
+  profileOperation: PostgresProfileOperation | null;
+  profilesState: PostgresProfilesState;
+  refreshProfiles: () => Promise<void>;
+  saveProfile: () => Promise<void>;
+  setProfileError: (error: PostgresProfileCommandError | null) => void;
+  setProfileForm: Dispatch<SetStateAction<PostgresProfileForm>>;
+  setProfileMessage: (message: string | null) => void;
+  workspaceId?: string | null;
+}): PostgresProfilePanelController => {
+  const normalizedWorkspaceId = workspaceId?.trim() || null;
+
+  return {
+    state: profilesState,
+    rows: buildPostgresProfileRows(profilesState),
+    currentWorkspaceId: normalizedWorkspaceId,
+    currentWorkspaceProfileId: normalizedWorkspaceId
+      ? profilesState.workspaceProfileBindings[normalizedWorkspaceId] ?? null
+      : null,
+    form: profileForm,
+    operation: profileOperation,
+    error: profileError,
+    message: profileMessage,
+    onFormChange: (patch: Partial<PostgresProfileForm>) => setProfileForm((current) => ({
+      ...current,
+      ...patch
+    })),
+    onResetForm: () => {
+      setProfileForm(createInitialPostgresProfileForm());
+      setProfileError(null);
+      setProfileMessage("New Postgres profile form is ready. Password remains empty until entered.");
+    },
+    onEditProfile: editProfile,
+    onSaveProfile: () => void saveProfile(),
+    onActivateProfile: (profileId: string) => void activateProfile(profileId),
+    onBindWorkspaceProfile: (profileId: string) => void bindWorkspaceProfile(profileId),
+    onClearWorkspaceProfile: () => void bindWorkspaceProfile(null),
+    onDeleteProfile: (profileId: string) => void deleteProfile(profileId),
+    onRefreshProfiles: () => void refreshProfiles()
+  };
+};
+
 
 export const usePostgresProfileController = (
-  onRuntimeStatusChange: () => Promise<void>
-): { panel: PostgresProfilePanelController; readProfiles: () => Promise<CommandMap["list_postgres_profiles"]["output"] | null> } => {
+  onRuntimeStatusChange: () => Promise<void>,
+  workspaceId?: string | null
+): { panel: PostgresProfilePanelController; readProfiles: () => Promise<PostgresProfilesState | null> } => {
   const [profilesState, setProfilesState] = useState(initialPostgresProfilesState);
   const [profileForm, setProfileForm] = useState(createInitialPostgresProfileForm);
   const [profileOperation, setProfileOperation] = useState<PostgresProfileOperation | null>(null);
@@ -131,6 +199,31 @@ export const usePostgresProfileController = (
     }
   };
 
+  const bindWorkspaceProfile = async (profileId: string | null) => {
+    const normalizedWorkspaceId = workspaceId?.trim();
+    if (profileOperationRef.current || !normalizedWorkspaceId) return;
+    profileOperationRef.current = "bind";
+    setProfileOperation("bind");
+    setProfileMessage(null);
+    try {
+      const nextProfiles = await invokeCommand("bind_workspace_postgres_profile", {
+        input: {
+          workspaceId: normalizedWorkspaceId,
+          profileId
+        }
+      });
+      setProfilesState(nextProfiles);
+      setProfileError(null);
+      setProfileMessage(profileId ? "Workspace Postgres profile bound." : "Workspace Postgres profile binding cleared.");
+      await onRuntimeStatusChange();
+    } catch (nextError: unknown) {
+      setProfileError(toPostgresProfileCommandError("bind", nextError, "Workspace Postgres binding failed"));
+    } finally {
+      profileOperationRef.current = null;
+      setProfileOperation(null);
+    }
+  };
+
   const deleteProfile = async (profileId: string) => {
     if (profileOperationRef.current) return;
     profileOperationRef.current = "delete";
@@ -139,9 +232,7 @@ export const usePostgresProfileController = (
     try {
       const nextProfiles = await invokeCommand("delete_postgres_profile", { profileId });
       setProfilesState(nextProfiles);
-      setProfileForm((current) =>
-        current.profileId === profileId ? createInitialPostgresProfileForm() : current
-      );
+      setProfileForm((current) => current.profileId === profileId ? createInitialPostgresProfileForm() : current);
       setProfileError(null);
       setProfileMessage("Postgres profile deleted. Active profile state was refreshed.");
       await onRuntimeStatusChange();
@@ -163,33 +254,23 @@ export const usePostgresProfileController = (
 
   return {
     readProfiles,
-    panel: {
-      state: profilesState,
-      rows: buildPostgresProfileRows(profilesState),
-      form: profileForm,
-      operation: profileOperation,
-      error: profileError,
-      message: profileMessage,
-      onFormChange: (patch: Partial<PostgresProfileForm>) => setProfileForm((current) => ({
-        ...current,
-        ...patch
-      })),
-      onResetForm: () => {
-        setProfileForm(createInitialPostgresProfileForm());
-        setProfileError(null);
-        setProfileMessage("New Postgres profile form is ready. Password remains empty until entered.");
-      },
-      onEditProfile: editProfile,
-      onSaveProfile: () => void saveProfile(),
-      onActivateProfile: (profileId: string) => void activateProfile(profileId),
-      onDeleteProfile: (profileId: string) => void deleteProfile(profileId),
-      onRefreshProfiles: () => void refreshProfiles()
-    }
+    panel: buildPostgresProfilePanel({
+      activateProfile, bindWorkspaceProfile, deleteProfile, editProfile,
+      profileError, profileForm, profileMessage, profileOperation,
+      profilesState, refreshProfiles, saveProfile,
+      setProfileError, setProfileForm, setProfileMessage, workspaceId,
+    })
   };
 };
 
 
-export const usePostgresController = () => {
+export const usePostgresController = ({
+  workspaceId,
+  workspaceMode
+}: {
+  workspaceId?: string | null;
+  workspaceMode?: string;
+} = {}) => {
   const [status, setStatus] = useState<PostgresStatus>(shellPostgresStatus);
   const [managedStatus, setManagedStatus] = useState<ManagedPostgresStatus>(initialManagedPostgresStatus);
   const [loading, setLoading] = useState(false);
@@ -202,7 +283,10 @@ export const usePostgresController = () => {
 
   const readRuntimeStatus = async () => {
     try {
-      const nextStatus = await invokeCommand("read_postgres_status", undefined);
+      const normalizedWorkspaceId = workspaceMode === "workspace" ? workspaceId?.trim() : "";
+      const nextStatus = normalizedWorkspaceId
+        ? await invokeCommand("read_workspace_postgres_status", { workspaceId: normalizedWorkspaceId })
+        : await invokeCommand("read_postgres_status", undefined);
       setStatus(nextStatus);
       setError(null);
     } catch (nextError: unknown) {
@@ -222,7 +306,7 @@ export const usePostgresController = () => {
     }
   };
 
-  const profileController = usePostgresProfileController(readRuntimeStatus);
+  const profileController = usePostgresProfileController(readRuntimeStatus, workspaceId);
 
   const refresh = async () => {
     if (loadingRef.current || managedOperationRef.current) return;
@@ -265,7 +349,7 @@ export const usePostgresController = () => {
 
   useEffect(() => {
     void refresh();
-  }, []);
+  }, [workspaceId, workspaceMode]);
 
   return {
     status,

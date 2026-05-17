@@ -1,8 +1,10 @@
 use crate::{
     postgres_profiles::{
-        activate_postgres_profile_with_store, delete_postgres_profile_with_store,
-        list_postgres_profiles_with_store, postgres_profile_env_source_with_store,
-        save_postgres_profile_with_store, PostgresProfileSecretStore, SavePostgresProfileInput,
+        activate_postgres_profile_with_store, bind_workspace_postgres_profile_with_store,
+        delete_postgres_profile_with_store, list_postgres_profiles_with_store,
+        postgres_profile_env_source_for_workspace_with_store,
+        postgres_profile_env_source_with_store, save_postgres_profile_with_store,
+        BindWorkspacePostgresProfileInput, PostgresProfileSecretStore, SavePostgresProfileInput,
     },
     workspace::CommandError,
 };
@@ -214,6 +216,59 @@ fn activate_and_delete_profile_updates_state() {
     assert_eq!(listed.profiles.len(), 1);
     assert!(!profiles.profile_file_content().contains("first-password"));
     assert!(!profiles.profile_file_content().contains("second-password"));
+}
+
+#[test]
+fn workspace_binding_exports_workspace_specific_profile() {
+    let profiles = TestProfiles::new("workspace-binding");
+    save_postgres_profile_with_store(
+        &profiles.root,
+        profile_input("First", Some("first-password"), true),
+        &profiles.secrets,
+    )
+    .expect("first profile should save");
+    save_postgres_profile_with_store(
+        &profiles.root,
+        SavePostgresProfileInput {
+            database: "workspace_db".into(),
+            password: Some("second-password".into()),
+            ..profile_input("Second", None, false)
+        },
+        &profiles.secrets,
+    )
+    .expect("second profile should save");
+
+    let state = bind_workspace_postgres_profile_with_store(
+        &profiles.root,
+        BindWorkspacePostgresProfileInput {
+            workspace_id: "workspace-alpha".into(),
+            profile_id: Some("second".into()),
+        },
+        &profiles.secrets,
+    )
+    .expect("workspace should bind");
+
+    assert_eq!(
+        state
+            .workspace_profile_bindings
+            .get("workspace-alpha")
+            .map(String::as_str),
+        Some("second")
+    );
+    let source = postgres_profile_env_source_for_workspace_with_store(
+        &profiles.root,
+        "workspace-alpha",
+        &profiles.secrets,
+    )
+    .expect("workspace binding should export env source");
+    assert!(source
+        .label
+        .contains("workspace postgres binding:workspace-alpha"));
+    assert!(source
+        .vars
+        .get("CHEMD_POSTGRES_DATABASE_URL")
+        .expect("database url should be present")
+        .contains("workspace_db"));
 }
 
 fn profile_input(

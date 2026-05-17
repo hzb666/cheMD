@@ -1,6 +1,9 @@
 #![cfg_attr(test, allow(dead_code))]
 
-use crate::postgres_config::{load_postgres_config, redact_config_detail, PostgresRuntimeConfig};
+use crate::postgres_config::{
+    load_postgres_config, load_postgres_config_for_workspace, redact_config_detail,
+    PostgresRuntimeConfig,
+};
 use native_tls::TlsConnector;
 use postgres::{Client, Config as PgConfig};
 use postgres_native_tls::MakeTlsConnector;
@@ -74,11 +77,60 @@ pub async fn read_postgres_status() -> PostgresStatus {
     }
 }
 
+#[cfg(not(test))]
+#[tauri::command]
+pub async fn read_workspace_postgres_status(workspace_id: String) -> PostgresStatus {
+    match tauri::async_runtime::spawn_blocking(move || {
+        read_workspace_postgres_status_impl(&workspace_id)
+    })
+    .await
+    {
+        Ok(status) => status,
+        Err(error) => PostgresStatus {
+            state: "degraded".into(),
+            label: "Workspace Postgres status failed".into(),
+            detail: format!("Workspace Postgres status task failed: {error}"),
+            configured: false,
+            source: None,
+            host: None,
+            database: None,
+            user: None,
+            ssl: "unknown".into(),
+            vector_installed: None,
+            schema_ready: None,
+            migration_state: POSTGRES_MIGRATION_UNKNOWN.into(),
+            migration_reason:
+                "Workspace Postgres status task failed before migration readiness could be inspected".into(),
+            core_tables_found: None,
+            timeout_ms: 0,
+            pool: None,
+        },
+    }
+}
+
 pub(crate) fn read_postgres_status_impl() -> PostgresStatus {
     let Some(config) = load_postgres_config() else {
         return status_without_config();
     };
 
+    read_postgres_status_for_config(&config)
+}
+
+pub(crate) fn read_workspace_postgres_status_impl(workspace_id: &str) -> PostgresStatus {
+    let workspace_id = workspace_id.trim();
+    if workspace_id.is_empty() {
+        return workspace_status_without_binding("Workspace id is empty");
+    }
+    let Some(config) = load_postgres_config_for_workspace(Some(workspace_id)) else {
+        return workspace_status_without_binding(
+            "Bind this workspace to a Postgres profile before using workspace Graph/RAG",
+        );
+    };
+
+    read_postgres_status_for_config(&config)
+}
+
+fn read_postgres_status_for_config(config: &PostgresRuntimeConfig) -> PostgresStatus {
     match probe_database(&config) {
         Ok(probe) => status_from_probe(&config, probe),
         Err(detail) => configured_status(
@@ -108,6 +160,28 @@ pub(crate) fn status_without_config() -> PostgresStatus {
         schema_ready: None,
         migration_state: POSTGRES_MIGRATION_UNKNOWN.into(),
         migration_reason: "No Postgres target is configured; Offline Core remains available".into(),
+        core_tables_found: None,
+        timeout_ms: 0,
+        pool: None,
+    }
+}
+
+fn workspace_status_without_binding(detail: &str) -> PostgresStatus {
+    PostgresStatus {
+        state: "placeholder".into(),
+        label: "Workspace Postgres not bound".into(),
+        detail: detail.into(),
+        configured: false,
+        source: None,
+        host: None,
+        database: None,
+        user: None,
+        ssl: "not configured".into(),
+        vector_installed: None,
+        schema_ready: None,
+        migration_state: POSTGRES_MIGRATION_UNKNOWN.into(),
+        migration_reason:
+            "No workspace Postgres profile is bound; workspace Graph/RAG remains disabled".into(),
         core_tables_found: None,
         timeout_ms: 0,
         pool: None,

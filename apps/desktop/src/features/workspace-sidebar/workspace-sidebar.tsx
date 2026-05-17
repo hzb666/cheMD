@@ -1,4 +1,6 @@
 import {
+  memo,
+  useCallback,
   useMemo,
   useState,
   type CSSProperties,
@@ -104,6 +106,7 @@ function WorkspacePickerControl({
     <Button
       type="button"
       disabled={opening}
+      aria-busy={opening || undefined}
       onClick={onOpenWorkspace}
     >
       <FolderOpen size={16} />
@@ -128,14 +131,15 @@ function WorkspaceTree({
   );
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
 
-  const toggleExpanded = (path: string) => {
+  // Performance: wrap in useCallback so we don't break child memoization
+  const toggleExpanded = useCallback((path: string) => {
     setExpanded((current) => {
       const next = new Set(current);
       if (next.has(path)) next.delete(path);
       else next.add(path);
       return next;
     });
-  };
+  }, []);
 
   return (
     <div className="mt-3 flex flex-col gap-0.5" role="tree" aria-label="Workspace files">
@@ -155,6 +159,61 @@ function WorkspaceTree({
   );
 }
 
+// Performance: Isolate the expensive DOM structure into a memoized component.
+// It will only re-render if the primitive props (like `isExpanded`) change.
+const TreeRowButton = memo(function TreeRowButton({
+  node,
+  depth,
+  isFile,
+  isExpanded,
+  selected,
+  onToggle,
+  onSelectFile,
+}: {
+  node: WorkspaceTreeNode;
+  depth: number;
+  isFile: boolean;
+  isExpanded: boolean;
+  selected: boolean;
+  onToggle: (path: string) => void;
+  onSelectFile: WorkbenchProps["onSelectFile"];
+}) {
+  const Icon = isFile ? FileText : Folder;
+
+  return (
+    <button
+      type="button"
+      className="grid h-7 grid-cols-[1rem_1.15rem_minmax(0,1fr)] items-center gap-1 rounded-lg border-0 bg-transparent py-0 pl-[calc(0.5rem+var(--tree-depth,0)*1rem)] pr-2 text-left text-sm font-semibold text-muted-foreground transition-colors duration-150 hover:bg-muted/70 hover:text-foreground data-[selected=true]:bg-chemd-background data-[selected=true]:text-foreground"
+      data-selected={selected ? "true" : undefined}
+      role="treeitem"
+      aria-level={depth + 1}
+      aria-expanded={isFile ? undefined : isExpanded}
+      aria-selected={selected}
+      style={{ "--tree-depth": depth } as CSSProperties}
+      onClick={() => {
+        if (!isFile) {
+          onToggle(node.path);
+          return;
+        }
+        if (node.entry) onSelectFile(node.entry);
+      }}
+    >
+      {isFile ? (
+        <span className="reference-tree-spacer block h-4 w-4" aria-hidden="true" />
+      ) : (
+        <ChevronRight
+          size={14}
+          className="text-muted-foreground transition-transform duration-150 ease-in-out data-[expanded=true]:rotate-90"
+          data-expanded={isExpanded ? "true" : undefined}
+          aria-hidden="true"
+        />
+      )}
+      <Icon size={16} className="text-muted-foreground" />
+      <span className="min-w-0 flex-1 truncate">{node.name}</span>
+    </button>
+  );
+});
+
 function WorkspaceTreeRow({
   node,
   depth,
@@ -173,41 +232,21 @@ function WorkspaceTreeRow({
   onSelectFile: WorkbenchProps["onSelectFile"];
 }) {
   const isFile = node.entry?.kind === "file";
+  // The boolean evaluation stays fast in this lightweight wrapper container
   const isExpanded = !isFile && (expanded.has(node.path) || selectedAncestors.has(node.path));
   const selected = node.entry?.id === selectedFileId;
-  const Icon = isFile ? FileText : Folder;
 
   return (
     <>
-      <button
-        type="button"
-        className="grid h-7 grid-cols-[1rem_1.15rem_minmax(0,1fr)] items-center gap-1 rounded-lg border-0 bg-transparent py-0 pl-[calc(0.5rem+var(--tree-depth,0)*1rem)] pr-2 text-left text-sm font-semibold text-muted-foreground transition-colors duration-150 hover:bg-[var(--shell-tree-hover-bg)] hover:text-foreground data-[selected=true]:bg-[var(--shell-tree-selected-bg)] data-[selected=true]:text-foreground"
-        data-selected={selected ? "true" : undefined}
-        role="treeitem"
-        aria-expanded={isFile ? undefined : isExpanded}
-        aria-selected={selected}
-        style={{ "--tree-depth": depth } as CSSProperties}
-        onClick={() => {
-          if (!isFile) {
-            onToggle(node.path);
-            return;
-          }
-          if (node.entry) onSelectFile(node.entry);
-        }}
-      >
-        {isFile ? (
-          <span className="reference-tree-spacer block h-4 w-4" aria-hidden="true" />
-        ) : (
-          <ChevronRight
-            size={14}
-            className="text-muted-foreground transition-transform duration-150 ease-in-out data-[expanded=true]:rotate-90"
-            data-expanded={isExpanded ? "true" : undefined}
-            aria-hidden="true"
-          />
-        )}
-        <Icon size={16} className="text-muted-foreground" />
-        <span className="min-w-0 flex-1 truncate">{node.name}</span>
-      </button>
+      <TreeRowButton
+        node={node}
+        depth={depth}
+        isFile={isFile}
+        isExpanded={isExpanded}
+        selected={selected}
+        onToggle={onToggle}
+        onSelectFile={onSelectFile}
+      />
       {isExpanded
         ? node.children.map((child) => (
           <WorkspaceTreeRow

@@ -68,12 +68,15 @@ export interface BuildWorkspaceSymbolIndexResult {
 const isMarkdownFile = (file: WorkspaceFileEntry): boolean =>
   file.kind === "file" && file.path.toLowerCase().endsWith(".md");
 
-const isChemdMarkdownFile = (file: WorkspaceFileEntry): boolean =>
-  isMarkdownFile(file)
-  && (
-    file.path.toLowerCase().endsWith(".chemd.md")
-    || file.chemdKind === "document"
-  );
+const isChemdDocumentFile = (file: WorkspaceFileEntry): boolean => {
+  const path = file.path.toLowerCase();
+  return file.kind === "file"
+    && (
+      path.endsWith(".chemd")
+      || path.endsWith(".chemd.md")
+      || file.chemdKind === "document"
+    );
+};
 
 const getSkipReason = (
   file: WorkspaceFileEntry
@@ -140,7 +143,7 @@ export const buildWorkspaceSymbolIndex = async (
   const dependencies = input.languageServiceDependencies ?? {};
 
   for (const file of input.files) {
-    if (!isChemdMarkdownFile(file)) {
+    if (!isChemdDocumentFile(file)) {
       const reason = getSkipReason(file);
       if (reason) skipped.push({ documentPath: file.path, reason });
       continue;

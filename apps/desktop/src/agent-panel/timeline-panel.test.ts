@@ -9,8 +9,8 @@ const citedEvidence: AgentEvidence = {
   summary: "Yield optimization record from the local knowledge base.",
   citation: {
     citationId: "citation-1",
-    sourceLabel: "experiment.chemd.md",
-    filePath: "experiments/experiment.chemd.md"
+    sourceLabel: "experiment.chemd",
+    filePath: "experiments/experiment.chemd"
   }
 };
 
@@ -23,7 +23,7 @@ const baseRun = (overrides: Partial<AgentRun> = {}): AgentRun => ({
   agentRunId: "run-1",
   workspaceId: "workspace-1",
   goal: "Prepare a safe desktop patch",
-  targetFiles: ["experiments/experiment.chemd.md"],
+  targetFiles: ["experiments/experiment.chemd"],
   status: "running",
   toolCalls: [],
   evidence: [],
@@ -163,7 +163,7 @@ describe("buildAgentTimelinePanel", () => {
         agentRunId: "run-1",
         workspaceId: "workspace-1",
         toolName: "compile_current_file",
-        payload: { filePath: "experiments/broken.chemd.md" },
+        payload: { filePath: "experiments/broken.chemd" },
         status: "failed",
         result: {
           toolCallId: "tool-failed",

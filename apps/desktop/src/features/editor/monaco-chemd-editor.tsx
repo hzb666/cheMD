@@ -32,6 +32,7 @@ import {
   toChemdModelUri,
   type MonacoChemdEditorHandle,
   type MonacoCursorPosition,
+  type MonacoUndoRedoState,
   type MonacoSourceJumpIntent
 } from "./source-path";
 
@@ -40,6 +41,7 @@ export {
   toChemdModelUri,
   type MonacoChemdEditorHandle,
   type MonacoCursorPosition,
+  type MonacoUndoRedoState,
   type MonacoSourceJumpIntent
 } from "./source-path";
 
@@ -75,37 +77,13 @@ type MonacoTypography = {
   lineHeight: number;
 };
 
-const DEFAULT_EDITOR_FONT_SIZE = 13;
+const DEFAULT_EDITOR_FONT_SIZE = 14;
 const DEFAULT_EDITOR_LINE_HEIGHT_RATIO = 1.54;
-
-const parseCssNumber = (value: string, fallback: number): number => {
-  const parsed = Number.parseFloat(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-};
 
 const createDefaultMonacoTypography = (): MonacoTypography => ({
   fontSize: DEFAULT_EDITOR_FONT_SIZE,
   lineHeight: Math.round(DEFAULT_EDITOR_FONT_SIZE * DEFAULT_EDITOR_LINE_HEIGHT_RATIO)
 });
-
-const readMonacoTypography = (element: HTMLElement | null): MonacoTypography => {
-  if (!element) return createDefaultMonacoTypography();
-
-  const styles = window.getComputedStyle(element);
-  const fontSize = parseCssNumber(
-    styles.getPropertyValue("--reference-editor-font-size"),
-    DEFAULT_EDITOR_FONT_SIZE
-  );
-  const lineHeightRatio = parseCssNumber(
-    styles.getPropertyValue("--reference-editor-line-height-ratio"),
-    DEFAULT_EDITOR_LINE_HEIGHT_RATIO
-  );
-
-  return {
-    fontSize,
-    lineHeight: Math.round(fontSize * lineHeightRatio)
-  };
-};
 
 type MonacoChemdEditorProps = {
   value: string;
@@ -117,6 +95,20 @@ type MonacoChemdEditorProps = {
   onSave: () => void;
   onBlurSave?: () => void;
   onCursorPositionChange?: (position: MonacoCursorPosition) => void;
+  onUndoRedoStateChange?: (state: MonacoUndoRedoState) => void;
+};
+
+type UndoRedoModel = {
+  canRedo?: () => boolean;
+  canUndo?: () => boolean;
+};
+
+const readUndoRedoState = (editorInstance: MonacoEditor | null): MonacoUndoRedoState => {
+  const model = editorInstance?.getModel() as UndoRedoModel | null | undefined;
+  return {
+    canRedo: model?.canRedo?.() ?? false,
+    canUndo: model?.canUndo?.() ?? false
+  };
 };
 
 type SourceJumpModel = {
@@ -274,16 +266,20 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
   onChange,
   onSave,
   onBlurSave,
-  onCursorPositionChange
+  onCursorPositionChange,
+  onUndoRedoStateChange
 }: MonacoChemdEditorProps, ref) {
   const editorRef = useRef<MonacoEditor | null>(null);
-  const monacoRef = useRef<Monaco | null>(null);
   const shellRef = useRef<HTMLDivElement | null>(null);
+  const monacoRef = useRef<Monaco | null>(null);
   const cursorDisposableRef = useRef<{ dispose: () => void } | null>(null);
   const blurDisposableRef = useRef<{ dispose: () => void } | null>(null);
+  const contentDisposableRef = useRef<{ dispose: () => void } | null>(null);
   const onSaveRef = useRef(onSave);
   const onBlurSaveRef = useRef(onBlurSave);
+  const onUndoRedoStateChangeRef = useRef(onUndoRedoStateChange);
   const [typography, setTypography] = useState<MonacoTypography>(createDefaultMonacoTypography);
+  const [scrollBottomPadding, setScrollBottomPadding] = useState(0);
   const markers = useMemo(
     () => toMonacoLanguageServiceModel(compileOutput).markers.map(toEditorMarker),
     [compileOutput]
@@ -322,14 +318,14 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
   }, [onBlurSave]);
 
   useEffect(() => {
-    const nextTypography = readMonacoTypography(shellRef.current);
-    const settingsTypography = {
+    onUndoRedoStateChangeRef.current = onUndoRedoStateChange;
+  }, [onUndoRedoStateChange]);
+
+  useEffect(() => {
+    const resolvedTypography = {
       fontSize: editorSettings.editorFontSize,
       lineHeight: Math.round(editorSettings.editorFontSize * DEFAULT_EDITOR_LINE_HEIGHT_RATIO)
     };
-    const resolvedTypography = nextTypography.fontSize === DEFAULT_EDITOR_FONT_SIZE
-      ? settingsTypography
-      : nextTypography;
     setTypography((current) => (
       current.fontSize === resolvedTypography.fontSize && current.lineHeight === resolvedTypography.lineHeight
         ? current
@@ -340,6 +336,25 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
   useEffect(() => () => {
     cursorDisposableRef.current?.dispose();
     blurDisposableRef.current?.dispose();
+    contentDisposableRef.current?.dispose();
+  }, []);
+
+  useEffect(() => {
+    const shellElement = shellRef.current;
+    if (!shellElement) return;
+
+    const updateScrollPadding = () => {
+      setScrollBottomPadding(Math.round(shellElement.clientHeight / 2));
+    };
+
+    updateScrollPadding();
+    const resizeObserver = new ResizeObserver(updateScrollPadding);
+    resizeObserver.observe(shellElement);
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  const notifyUndoRedoState = useCallback(() => {
+    onUndoRedoStateChangeRef.current?.(readUndoRedoState(editorRef.current));
   }, []);
 
   const syncMarkers = useCallback(() => {
@@ -368,8 +383,24 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
       editorInstance.revealRangeInCenterIfOutsideViewport(selection);
       editorInstance.focus();
       return true;
+    },
+    redo: () => {
+      const editorInstance = editorRef.current;
+      if (!editorInstance) return false;
+      editorInstance.trigger("keyboard", "redo", null);
+      editorInstance.focus();
+      window.setTimeout(notifyUndoRedoState, 0);
+      return true;
+    },
+    undo: () => {
+      const editorInstance = editorRef.current;
+      if (!editorInstance) return false;
+      editorInstance.trigger("keyboard", "undo", null);
+      editorInstance.focus();
+      window.setTimeout(notifyUndoRedoState, 0);
+      return true;
     }
-  }), []);
+  }), [notifyUndoRedoState]);
 
   const handleBeforeMount = useCallback<BeforeMount>((monaco) => {
     registerChemdLanguage(monaco);
@@ -380,6 +411,7 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
     monacoRef.current = monaco;
     cursorDisposableRef.current?.dispose();
     blurDisposableRef.current?.dispose();
+    contentDisposableRef.current?.dispose();
     cursorDisposableRef.current = editorInstance.onDidChangeCursorPosition((event) => {
       onCursorPositionChange?.({
         lineNumber: event.position.lineNumber,
@@ -399,15 +431,19 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
     blurDisposableRef.current = editorInstance.onDidBlurEditorText(() => {
       onBlurSaveRef.current?.();
     });
+    contentDisposableRef.current = editorInstance.onDidChangeModelContent(() => {
+      window.setTimeout(notifyUndoRedoState, 0);
+    });
+    notifyUndoRedoState();
     syncMarkers();
-  }, [onCursorPositionChange, syncMarkers]);
+  }, [notifyUndoRedoState, onCursorPositionChange, syncMarkers]);
 
   const handleChange = useCallback<OnChange>((nextValue) => {
     onChange(nextValue ?? "");
   }, [onChange]);
 
   return (
-    <div ref={shellRef} className="monaco-shell min-h-0 flex-1 overflow-hidden rounded-b-xl bg-[var(--reference-surface-bg)]" data-language={CHEMD_LANGUAGE_ID}>
+    <div ref={shellRef} className="monaco-shell min-h-0 flex-1 overflow-hidden bg-[var(--reference-surface-bg)]" data-language={CHEMD_LANGUAGE_ID}>
       <Editor
         height="100%"
         width="100%"
@@ -418,7 +454,7 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
         beforeMount={handleBeforeMount}
         onMount={handleMount}
         onChange={handleChange}
-        loading={<div className="monaco-loading flex h-full items-center justify-center text-sm text-muted-foreground">Loading Monaco editor...</div>}
+        loading={<div className="monaco-loading flex h-full w-full items-center justify-center text-sm text-muted-foreground">Loading Monaco editor...</div>}
         options={{
           automaticLayout: true,
           fixedOverflowWidgets: true,
@@ -435,10 +471,12 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
           minimap: { enabled: editorSettings.minimap },
           renderLineHighlight: "line",
           renderWhitespace: "selection",
+          padding: { bottom: scrollBottomPadding },
           scrollBeyondLastLine: false,
           smoothScrolling: true,
           tabSize: 2,
-          wordWrap: editorSettings.wordWrap ? "on" : "off"
+          wordWrap: editorSettings.wordWrap ? "on" : "off",
+          wrappingStrategy: "advanced"
         }}
       />
     </div>

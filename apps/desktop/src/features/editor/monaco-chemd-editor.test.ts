@@ -41,19 +41,19 @@ const model = {
 describe("MonacoChemdEditor source jump helpers", () => {
   it("matches current document paths across workspace-relative source refs", () => {
     expect(isSameChemdDocumentPath(
-      "experiments/map.chemd.md",
-      "/workspace/experiments/map.chemd.md"
+      "experiments/map.chemd",
+      "/workspace/experiments/map.chemd"
     )).toBe(true);
     expect(isSameChemdDocumentPath(
-      "chemd://desktop/experiments/map.chemd.md",
-      "experiments/map.chemd.md"
+      "chemd://desktop/experiments/map.chemd",
+      "experiments/map.chemd"
     )).toBe(true);
   });
 
   it("rejects source refs that point to another document", () => {
     expect(isSameChemdDocumentPath(
-      "experiments/other.chemd.md",
-      "/workspace/experiments/map.chemd.md"
+      "experiments/other.chemd",
+      "/workspace/experiments/map.chemd"
     )).toBe(false);
   });
 

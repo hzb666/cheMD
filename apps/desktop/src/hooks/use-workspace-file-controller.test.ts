@@ -21,8 +21,8 @@ describe("scratch editor tabs", () => {
 
     expect(file).toEqual({
       id: "untitled-editor-tab-4",
-      name: "Untitled-4.chemd.md",
-      path: "untitled://Untitled-4.chemd.md",
+      name: "Untitled-4.chemd",
+      path: "untitled://Untitled-4.chemd",
       kind: "file",
       chemdKind: "document",
     });
@@ -31,9 +31,9 @@ describe("scratch editor tabs", () => {
 
   it("increments from the highest open untitled tab without counting workspace files", () => {
     const tabs = [
-      workspaceFile("exp-001", "suzuki-screen.chemd.md"),
+      workspaceFile("exp-001", "suzuki-screen.chemd"),
       createScratchFile(1),
-      workspaceFile("exp-003", "calibration.chemd.md"),
+      workspaceFile("exp-003", "calibration.chemd"),
       createScratchFile(7),
     ];
 

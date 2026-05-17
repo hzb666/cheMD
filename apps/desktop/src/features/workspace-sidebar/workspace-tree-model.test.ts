@@ -23,30 +23,30 @@ const directoryEntry = (path: string, name = path.split("/").at(-1) ?? path): Wo
 describe("desktop workspace tree model", () => {
   it("builds nested nodes with directories before files and names sorted case-insensitively", () => {
     const tree = buildWorkspaceTree([
-      fileEntry("zeta.chemd.md"),
-      fileEntry("src/beta.chemd.md"),
-      fileEntry("Alpha.chemd.md"),
+      fileEntry("zeta.chemd"),
+      fileEntry("src/beta.chemd"),
+      fileEntry("Alpha.chemd"),
       directoryEntry("docs"),
-      fileEntry("docs/readme.chemd.md"),
+      fileEntry("docs/readme.chemd"),
     ]);
 
     expect(tree.map((node) => node.name)).toEqual([
       "docs",
       "src",
-      "Alpha.chemd.md",
-      "zeta.chemd.md",
+      "Alpha.chemd",
+      "zeta.chemd",
     ]);
-    expect(tree[0].children.map((node) => node.name)).toEqual(["readme.chemd.md"]);
-    expect(tree[1].children.map((node) => node.name)).toEqual(["beta.chemd.md"]);
+    expect(tree[0].children.map((node) => node.name)).toEqual(["readme.chemd"]);
+    expect(tree[1].children.map((node) => node.name)).toEqual(["beta.chemd"]);
   });
 
   it("returns selected ancestor folder paths for nested files", () => {
     const tree = buildWorkspaceTree([
-      fileEntry("src/reactions/suzuki.chemd.md"),
-      fileEntry("src/readme.chemd.md"),
+      fileEntry("src/reactions/suzuki.chemd"),
+      fileEntry("src/readme.chemd"),
     ]);
 
-    expect([...getSelectedAncestorPaths(tree, "file:src/reactions/suzuki.chemd.md")]).toEqual([
+    expect([...getSelectedAncestorPaths(tree, "file:src/reactions/suzuki.chemd")]).toEqual([
       "src",
       "src/reactions",
     ]);

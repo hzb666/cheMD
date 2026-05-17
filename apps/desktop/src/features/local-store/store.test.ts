@@ -50,7 +50,7 @@ const buildPayload = (
   metadata: {
     workspaceId: "workspace-local",
     documentId: "doc-local",
-    documentPath: "experiments/local.chemd.md",
+    documentPath: "experiments/local.chemd",
     revisionId,
     graphSnapshotId
   },
@@ -160,7 +160,7 @@ describe("desktop local store contract builder", () => {
       metadata: {
         graphSnapshotId: "snapshot-local-1",
         revisionId: "rev-local-1",
-        documentPath: "experiments/local.chemd.md",
+        documentPath: "experiments/local.chemd",
         documentId: "doc-local",
         workspaceId: "workspace-local"
       }
@@ -193,7 +193,7 @@ describe("desktop local store contract builder", () => {
         localStoreKind: "runtime_graph_rag_snapshot",
         workspaceId: "workspace-local",
         documentId: "doc-local",
-        documentPath: "experiments/local.chemd.md",
+        documentPath: "experiments/local.chemd",
         revisionId: "rev-local-1",
         graphSnapshotId: "snapshot-local-1"
       }

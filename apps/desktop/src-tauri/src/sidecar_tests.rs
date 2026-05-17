@@ -219,8 +219,7 @@ fn status_reports_degraded_after_owned_child_exits() {
         .expect("quick command should spawn");
     assert_eq!(json_field(&started, "state"), "degraded");
 
-    thread::sleep(Duration::from_millis(150));
-    let status = manager.status().expect("status should be readable");
+    let status = wait_for_exited_status(&manager);
 
     assert_eq!(json_field(&status, "state"), "degraded");
     assert!(json_field(&status, "detail").contains("exited"));
@@ -257,6 +256,17 @@ fn assert_not_ready_contains(outcome: HealthProbeOutcome, expected: &str) {
         HealthProbeOutcome::Ready => panic!("health probe unexpectedly reported ready"),
         HealthProbeOutcome::NotReady(detail) => assert!(detail.contains(expected)),
     }
+}
+
+fn wait_for_exited_status(manager: &SidecarManager) -> crate::sidecar::SidecarStatus {
+    for _ in 0..20 {
+        let status = manager.status().expect("status should be readable");
+        if json_field(&status, "detail").contains("exited") {
+            return status;
+        }
+        thread::sleep(Duration::from_millis(25));
+    }
+    manager.status().expect("final status should be readable")
 }
 
 struct TestHttpServer {

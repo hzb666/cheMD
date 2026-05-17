@@ -1,5 +1,5 @@
 import { ChangeEvent as ReactChangeEvent } from "react";
-import { CheckCircle2, FileCode2, PlayCircle, RefreshCw, Settings, ShieldCheck, Square, UploadCloud, Wrench, XCircle } from "lucide-react";
+import { CheckCircle2, FileCode2, Link2, PlayCircle, RefreshCw, Settings, ShieldCheck, Square, UploadCloud, Wrench, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/common/status-badge";
 import { PanelHeader } from "@/components/common/panel-header";
@@ -101,6 +101,10 @@ export const PostgresFieldGrid = ({ fields }: { fields: PostgresField[] }) => (
   <FieldGrid fields={fields} />
 );
 
+type PostgresProfileFieldHandler = (
+  field: keyof PostgresProfileForm
+) => (event: ReactChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
+
 // ---------------------------------------------------------------------------
 // PostgresReadinessList
 // ---------------------------------------------------------------------------
@@ -195,6 +199,150 @@ export const ManagedPostgresSection = ({
 // PostgresProfileManagerSection
 // ---------------------------------------------------------------------------
 
+const WorkspacePostgresBindingSection = ({
+  busy,
+  profiles,
+}: {
+  busy: boolean;
+  profiles: PostgresProfilePanelController;
+}) => {
+  const currentWorkspaceProfile = profiles.currentWorkspaceProfileId
+    ? profiles.rows.find((profile) => profile.profileId === profiles.currentWorkspaceProfileId)
+    : null;
+
+  return (
+    <div className={cardClassName}>
+      <div className={subheadClassName}>
+        <span className={subheadTitleClassName}>Workspace binding</span>
+        <small className={subheadMetaClassName}>{profiles.currentWorkspaceId ?? "no workspace"}</small>
+      </div>
+      <p className={emptyCopyClassName}>
+        {currentWorkspaceProfile
+          ? `Workspace Graph/RAG uses ${currentWorkspaceProfile.label}.`
+          : "Bind a profile before workspace Graph/RAG can use PostgreSQL."}
+      </p>
+      <div className={actionRowClassName}>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={busy || profiles.currentWorkspaceProfileId === null}
+          onClick={profiles.onClearWorkspaceProfile}
+        >
+          <XCircle size={13} />
+          <span>Clear binding</span>
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+const PostgresProfileFormSection = ({
+  profiles,
+  updateField,
+}: {
+  profiles: PostgresProfilePanelController;
+  updateField: PostgresProfileFieldHandler;
+}) => (
+  <div className={profileFormClassName}>
+    <label className={profileLabelClassName}>
+      <span>Label</span>
+      <input className={profileInputClassName} value={profiles.form.label} onChange={updateField("label")} />
+    </label>
+    <label className={profileLabelClassName}>
+      <span>Host</span>
+      <input className={profileInputClassName} value={profiles.form.host} onChange={updateField("host")} />
+    </label>
+    <label className={profileLabelClassName}>
+      <span>Port</span>
+      <input className={profileInputClassName} inputMode="numeric" value={profiles.form.port} onChange={updateField("port")} />
+    </label>
+    <label className={profileLabelClassName}>
+      <span>Database</span>
+      <input className={profileInputClassName} value={profiles.form.database} onChange={updateField("database")} />
+    </label>
+    <label className={profileLabelClassName}>
+      <span>User</span>
+      <input className={profileInputClassName} value={profiles.form.user} onChange={updateField("user")} />
+    </label>
+    <label className={profileLabelClassName}>
+      <span>Password</span>
+      <input className={profileInputClassName} type="password" value={profiles.form.password} autoComplete="new-password" onChange={updateField("password")} />
+    </label>
+    <label className={profileLabelClassName}>
+      <span>SSL mode</span>
+      <select className={profileInputClassName} value={profiles.form.sslmode} onChange={updateField("sslmode")}>
+        <option value="require">require</option>
+        <option value="prefer">prefer</option>
+        <option value="disable">disable</option>
+        <option value="verify-ca">verify-ca</option>
+        <option value="verify-full">verify-full</option>
+      </select>
+    </label>
+    <label className={profileLabelClassName}>
+      <span>Timeout</span>
+      <input className={profileInputClassName} inputMode="numeric" value={profiles.form.timeoutMs} onChange={updateField("timeoutMs")} />
+    </label>
+    <label className={profileLabelClassName}>
+      <span>Pool</span>
+      <input className={profileInputClassName} value={profiles.form.pool} placeholder="default" onChange={updateField("pool")} />
+    </label>
+    <label className={profileCheckClassName}>
+      <input type="checkbox" checked={profiles.form.setActive} onChange={updateField("setActive")} />
+      <span>Set active</span>
+    </label>
+  </div>
+);
+
+const PostgresProfileListSection = ({
+  busy,
+  profiles,
+}: {
+  busy: boolean;
+  profiles: PostgresProfilePanelController;
+}) => (
+  <div className={listClassName} aria-label="Saved Postgres profiles">
+    {profiles.rows.length > 0 ? profiles.rows.map((profile) => (
+      <div key={profile.profileId} className={profileRowClassName} data-active={profile.active}>
+        <div className={profileMainClassName}>
+          <strong className="truncate">{profile.label}</strong>
+          <span className="min-w-0 truncate text-muted-foreground">{profile.target} / {profile.userDatabase}</span>
+        </div>
+        <div className={profileMainClassName}>
+          <span className={badgeClassName} data-tone={profile.active ? "success" : "muted"}>{profile.active ? "active" : "inactive"}</span>
+          <span className={badgeClassName} data-tone={profile.passwordSaved ? "success" : "warning"}>
+            {profile.passwordSaved ? "passwordSaved" : "no password"}
+          </span>
+          <span className={badgeClassName}>{profile.sslmode}</span>
+          <span className={badgeClassName}>{profile.timeout}</span>
+        </div>
+        <div className={actionRowClassName}>
+          <Button variant="outline" size="sm" disabled={busy} onClick={() => profiles.onEditProfile(profile.profileId)}>
+            <Settings size={13} />
+            <span>Edit</span>
+          </Button>
+          <Button variant="outline" size="sm" disabled={busy || profile.active} onClick={() => profiles.onActivateProfile(profile.profileId)}>
+            <CheckCircle2 size={13} />
+            <span>Activate</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busy || !profiles.currentWorkspaceId || profile.profileId === profiles.currentWorkspaceProfileId}
+            onClick={() => profiles.onBindWorkspaceProfile(profile.profileId)}
+          >
+            <Link2 size={13} />
+            <span>{profile.profileId === profiles.currentWorkspaceProfileId ? "Bound" : "Bind workspace"}</span>
+          </Button>
+          <Button variant="outline" size="sm" disabled={busy} onClick={() => profiles.onDeleteProfile(profile.profileId)}>
+            <XCircle size={13} />
+            <span>Delete</span>
+          </Button>
+        </div>
+      </div>
+    )) : <p className={emptyCopyClassName}>No Postgres profiles saved. Offline Core authoring remains available.</p>}
+  </div>
+);
+
 export const PostgresProfileManagerSection = ({ profiles }: { profiles: PostgresProfilePanelController }) => {
   const busy = profiles.operation !== null;
   const updateField = (field: keyof PostgresProfileForm) => (
@@ -237,86 +385,9 @@ export const PostgresProfileManagerSection = ({ profiles }: { profiles: Postgres
         </div>
       ) : null}
       {profiles.message ? <p className={messageClassName} data-tone="info">{profiles.message}</p> : null}
-      <div className={profileFormClassName}>
-        <label className={profileLabelClassName}>
-          <span>Label</span>
-          <input className={profileInputClassName} value={profiles.form.label} onChange={updateField("label")} />
-        </label>
-        <label className={profileLabelClassName}>
-          <span>Host</span>
-          <input className={profileInputClassName} value={profiles.form.host} onChange={updateField("host")} />
-        </label>
-        <label className={profileLabelClassName}>
-          <span>Port</span>
-          <input className={profileInputClassName} inputMode="numeric" value={profiles.form.port} onChange={updateField("port")} />
-        </label>
-        <label className={profileLabelClassName}>
-          <span>Database</span>
-          <input className={profileInputClassName} value={profiles.form.database} onChange={updateField("database")} />
-        </label>
-        <label className={profileLabelClassName}>
-          <span>User</span>
-          <input className={profileInputClassName} value={profiles.form.user} onChange={updateField("user")} />
-        </label>
-        <label className={profileLabelClassName}>
-          <span>Password</span>
-          <input className={profileInputClassName} type="password" value={profiles.form.password} autoComplete="new-password" onChange={updateField("password")} />
-        </label>
-        <label className={profileLabelClassName}>
-          <span>SSL mode</span>
-          <select className={profileInputClassName} value={profiles.form.sslmode} onChange={updateField("sslmode")}>
-            <option value="require">require</option>
-            <option value="prefer">prefer</option>
-            <option value="disable">disable</option>
-            <option value="verify-ca">verify-ca</option>
-            <option value="verify-full">verify-full</option>
-          </select>
-        </label>
-        <label className={profileLabelClassName}>
-          <span>Timeout</span>
-          <input className={profileInputClassName} inputMode="numeric" value={profiles.form.timeoutMs} onChange={updateField("timeoutMs")} />
-        </label>
-        <label className={profileLabelClassName}>
-          <span>Pool</span>
-          <input className={profileInputClassName} value={profiles.form.pool} placeholder="default" onChange={updateField("pool")} />
-        </label>
-        <label className={profileCheckClassName}>
-          <input type="checkbox" checked={profiles.form.setActive} onChange={updateField("setActive")} />
-          <span>Set active</span>
-        </label>
-      </div>
-      <div className={listClassName} aria-label="Saved Postgres profiles">
-        {profiles.rows.length > 0 ? profiles.rows.map((profile) => (
-          <div key={profile.profileId} className={profileRowClassName} data-active={profile.active}>
-            <div className={profileMainClassName}>
-              <strong className="truncate">{profile.label}</strong>
-              <span className="min-w-0 truncate text-muted-foreground">{profile.target} / {profile.userDatabase}</span>
-            </div>
-            <div className={profileMainClassName}>
-              <span className={badgeClassName} data-tone={profile.active ? "success" : "muted"}>{profile.active ? "active" : "inactive"}</span>
-              <span className={badgeClassName} data-tone={profile.passwordSaved ? "success" : "warning"}>
-                {profile.passwordSaved ? "passwordSaved" : "no password"}
-              </span>
-              <span className={badgeClassName}>{profile.sslmode}</span>
-              <span className={badgeClassName}>{profile.timeout}</span>
-            </div>
-            <div className={actionRowClassName}>
-              <Button variant="outline" size="sm" disabled={busy} onClick={() => profiles.onEditProfile(profile.profileId)}>
-                <Settings size={13} />
-                <span>Edit</span>
-              </Button>
-              <Button variant="outline" size="sm" disabled={busy || profile.active} onClick={() => profiles.onActivateProfile(profile.profileId)}>
-                <CheckCircle2 size={13} />
-                <span>Activate</span>
-              </Button>
-              <Button variant="outline" size="sm" disabled={busy} onClick={() => profiles.onDeleteProfile(profile.profileId)}>
-                <XCircle size={13} />
-                <span>Delete</span>
-              </Button>
-            </div>
-          </div>
-        )) : <p className={emptyCopyClassName}>No Postgres profiles saved. Offline Core authoring remains available.</p>}
-      </div>
+      <WorkspacePostgresBindingSection busy={busy} profiles={profiles} />
+      <PostgresProfileFormSection profiles={profiles} updateField={updateField} />
+      <PostgresProfileListSection busy={busy} profiles={profiles} />
     </div>
   );
 };

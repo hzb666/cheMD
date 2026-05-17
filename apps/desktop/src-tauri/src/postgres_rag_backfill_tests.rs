@@ -157,6 +157,7 @@ fn request(
     dry_run: bool,
 ) -> PostgresRagEmbeddingBackfillRequest {
     PostgresRagEmbeddingBackfillRequest {
+        workspace_id: None,
         embedding_model: embedding_model.into(),
         embedding_dim,
         distance_metric: None,

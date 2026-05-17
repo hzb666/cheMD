@@ -5,7 +5,7 @@ import type {
   SavePostgresProfileInput
 } from "../../contracts";
 
-export type PostgresProfileOperation = "list" | "save" | "activate" | "delete";
+export type PostgresProfileOperation = "list" | "save" | "activate" | "delete" | "bind";
 
 export type PostgresProfileForm = {
   profileId: string | null;
@@ -47,6 +47,7 @@ type SaveInputBuildResult =
 
 export const initialPostgresProfilesState: PostgresProfilesState = {
   activeProfileId: null,
+  workspaceProfileBindings: {},
   profiles: []
 };
 

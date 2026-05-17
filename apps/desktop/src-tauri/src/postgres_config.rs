@@ -3,7 +3,10 @@
 use crate::managed_postgres_config::{
     managed_config_candidate_roots, managed_env_source, ManagedPostgresPaths,
 };
-use crate::postgres_profiles::{postgres_profile_candidate_roots, postgres_profile_env_source};
+use crate::postgres_profiles::{
+    postgres_profile_candidate_roots, postgres_profile_env_source,
+    postgres_profile_env_source_for_workspace,
+};
 use std::{collections::BTreeMap, env, fs, path::Path};
 use url::Url;
 
@@ -46,6 +49,15 @@ pub(crate) fn load_postgres_config() -> Option<PostgresRuntimeConfig> {
         .ok()
         .and_then(|current_dir| find_repo_root(&current_dir));
     load_postgres_config_from_repo(repo_root.as_deref())
+}
+
+pub(crate) fn load_postgres_config_for_workspace(
+    workspace_id: Option<&str>,
+) -> Option<PostgresRuntimeConfig> {
+    let workspace_id = workspace_id
+        .map(str::trim)
+        .filter(|value| !value.is_empty())?;
+    select_postgres_config(workspace_config_sources(workspace_id))
 }
 
 pub(crate) fn load_postgres_config_from_repo(
@@ -182,6 +194,13 @@ fn config_sources(repo_root: Option<&Path>) -> Vec<EnvSource> {
             .filter_map(|root| managed_env_source(&ManagedPostgresPaths::for_root(&root))),
     );
     sources
+}
+
+fn workspace_config_sources(workspace_id: &str) -> Vec<EnvSource> {
+    postgres_profile_candidate_roots()
+        .into_iter()
+        .filter_map(|root| postgres_profile_env_source_for_workspace(&root, workspace_id))
+        .collect()
 }
 
 fn process_source() -> EnvSource {

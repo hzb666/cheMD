@@ -37,6 +37,8 @@ mod workspace_io;
 mod workspace_path;
 
 #[cfg(test)]
+mod chem_preview_render_tests;
+#[cfg(test)]
 mod diagnostics_bundle_tests;
 #[cfg(test)]
 mod embedding_provider_client_tests;
@@ -81,11 +83,11 @@ use managed_postgres::{
     start_managed_postgres, stop_managed_postgres, ManagedPostgresManager,
 };
 #[cfg(not(test))]
-use postgres::read_postgres_status;
+use postgres::{read_postgres_status, read_workspace_postgres_status};
 #[cfg(not(test))]
 use postgres_profiles::{
-    activate_postgres_profile, delete_postgres_profile, list_postgres_profiles,
-    save_postgres_profile,
+    activate_postgres_profile, bind_workspace_postgres_profile, delete_postgres_profile,
+    list_postgres_profiles, save_postgres_profile,
 };
 #[cfg(not(test))]
 use postgres_rag::query_postgres_rag;
@@ -103,8 +105,8 @@ use sidecar::{
 use windows_snap_layout::{set_window_maximize_button_rect, WindowsSnapLayoutState};
 #[cfg(not(test))]
 use workspace::{
-    list_workspace_files, open_workspace, open_workspace_path, read_workspace_file,
-    write_workspace_file, WorkspaceRegistry,
+    list_workspace_files, open_workspace, open_workspace_path, query_workspace_documents,
+    read_workspace_file, write_workspace_file, WorkspaceRegistry,
 };
 
 #[cfg(not(test))]
@@ -120,6 +122,7 @@ pub fn run() {
             open_workspace,
             open_workspace_path,
             list_workspace_files,
+            query_workspace_documents,
             read_workspace_file,
             write_workspace_file,
             start_sidecar,
@@ -127,6 +130,7 @@ pub fn run() {
             read_sidecar_status,
             read_sidecar_logs,
             read_postgres_status,
+            read_workspace_postgres_status,
             read_embedding_provider_status,
             create_embedding_vector,
             create_embedding_vectors,
@@ -134,6 +138,7 @@ pub fn run() {
             save_postgres_profile,
             activate_postgres_profile,
             delete_postgres_profile,
+            bind_workspace_postgres_profile,
             read_managed_postgres_status,
             initialize_managed_postgres,
             start_managed_postgres,

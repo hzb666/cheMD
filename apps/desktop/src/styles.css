@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "./features/workbench/shell.css";
 @import "./features/editor-tabs/editor-tabs.css";
 
 @custom-variant dark (&:is(.dark *));
@@ -11,6 +10,7 @@
   --card: oklch(100% 0 0 / 0.82);
   --card-foreground: var(--foreground);
   --editor-surface: #f8fafc;
+  --reference-surface-bg: oklch(97.2% 0.004 247 / 0.96);
   --popover: oklch(100% 0 0 / 0.94);
   --popover-foreground: var(--foreground);
   --primary: oklch(59.8% 0.17 251.8);
@@ -114,7 +114,8 @@
   }
 
   body[data-desktop-resize-panel="sidebar"],
-  body[data-desktop-resize-panel="insight"] {
+  body[data-desktop-resize-panel="insight"],
+  body[data-desktop-resize-panel="preview"] {
     cursor: col-resize;
   }
 
@@ -125,23 +126,6 @@
 }
 
 @layer components {
-  .reference-sidebar-resize-handle::after {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 4px;
-    width: 4px;
-    border-radius: 999px;
-    background: transparent;
-    content: "";
-    transition: background-color 160ms ease;
-  }
-
-  .reference-sidebar-resize-handle:hover::after,
-  body[data-desktop-resize-panel="sidebar"] .reference-sidebar-resize-handle::after {
-    background: var(--shell-resize-handle);
-  }
-
   .shell-window ::-webkit-scrollbar,
   .dialog-content ::-webkit-scrollbar {
     width: 0.44rem;
@@ -193,6 +177,10 @@
   body[data-desktop-resize-panel="sidebar"] .reference-sidebar,
   body[data-desktop-resize-panel="sidebar"] .reference-sidebar-spacer {
     transition: none;
+  }
+
+  body[data-desktop-resize-panel="preview"] .reference-html-preview-frame {
+    pointer-events: none;
   }
 }
 

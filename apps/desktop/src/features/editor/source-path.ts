@@ -11,8 +11,12 @@ export type MonacoSourceJumpIntent = {
 
 export type MonacoCursorPosition = { lineNumber: number; column: number };
 
+export type MonacoUndoRedoState = { canUndo: boolean; canRedo: boolean };
+
 export type MonacoChemdEditorHandle = {
   jumpToSource: (intent: MonacoSourceJumpIntent) => boolean;
+  redo: () => boolean;
+  undo: () => boolean;
 };
 
 const encodeModelPathSegment = (segment: string): string =>
@@ -22,7 +26,7 @@ export const toChemdModelUri = (documentPath: string): string => {
   const normalizedPath = documentPath.trim().replace(/\\/g, "/");
   const encodedPath = normalizedPath
     ? normalizedPath.split("/").filter(Boolean).map(encodeModelPathSegment).join("/")
-    : "untitled.chemd.md";
+    : "untitled.chemd";
 
   return `chemd://desktop/${encodedPath}`;
 };

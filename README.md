@@ -25,7 +25,7 @@ playground, and a local Flask/RDKit chemistry service.
 
 ## Product Scope
 
-- Code-like chemistry Markdown authoring with frontmatter, inline chemistry,
+- Code-like Chemd authoring with frontmatter, Markdown-style prose, inline chemistry,
   references, molecules, reactions, results, analyses, samples, procedures,
   observations, templates, and column layouts.
 - Experiment-logic enrichment that connects raw records to typed entities,
@@ -170,12 +170,12 @@ poetry run python -m unittest discover
 The package CLI is available through the root `chemd` script:
 
 ```bash
-pnpm chemd validate examples/report.chemd.md
-pnpm chemd export examples/report.chemd.md --format training-full
-pnpm chemd diff before.chemd.md after.chemd.md --format json
-pnpm chemd graph reports/*.chemd.md --format json
-pnpm chemd repair draft.chemd.md --format text
-pnpm chemd agent-loop draft.chemd.md --format json --max-iterations 3
+pnpm chemd validate examples/report.chemd
+pnpm chemd export examples/report.chemd --format training-full
+pnpm chemd diff before.chemd after.chemd --format json
+pnpm chemd graph reports/*.chemd --format json
+pnpm chemd repair draft.chemd --format text
+pnpm chemd agent-loop draft.chemd --format json --max-iterations 3
 ```
 
 Important commands:
@@ -199,7 +199,7 @@ instead of presenting semantic similarity as RDKit/Tanimoto similarity.
 
 ## Document Language
 
-`chemd` documents are Markdown files with required frontmatter:
+`chemd` documents are dedicated Chemd source files with required frontmatter:
 
 - `id`
 - `title`

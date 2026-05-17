@@ -58,19 +58,19 @@ path: data/tlc/spec-main.png
 `;
 
 const goldenSource = readFileSync(
-  new URL("../fixtures/golden-experiment-record.chemd.md", import.meta.url),
+  new URL("../fixtures/golden-experiment-record.chemd", import.meta.url),
   "utf8"
 );
 const totalSynthesisSource = readFileSync(
-  new URL("../fixtures/best-practice-total-synthesis.chemd.md", import.meta.url),
+  new URL("../fixtures/best-practice-total-synthesis.chemd", import.meta.url),
   "utf8"
 );
 const oneStepSynthesisSource = readFileSync(
-  new URL("../fixtures/best-practice-one-step-synthesis.chemd.md", import.meta.url),
+  new URL("../fixtures/best-practice-one-step-synthesis.chemd", import.meta.url),
   "utf8"
 );
 const conditionScreenSource = readFileSync(
-  new URL("../fixtures/best-practice-condition-screen.chemd.md", import.meta.url),
+  new URL("../fixtures/best-practice-condition-screen.chemd", import.meta.url),
   "utf8"
 );
 

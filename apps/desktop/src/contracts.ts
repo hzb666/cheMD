@@ -24,6 +24,12 @@ export interface WorkspaceFileEntry {
   chemdKind?: "document" | "asset" | "unknown";
 }
 
+export interface WorkspaceDocumentQueryResult {
+  files: WorkspaceFileEntry[];
+  totalCount: number;
+  nextCursor: number | null;
+}
+
 export interface SidecarStatus {
   state: RuntimeState;
   label: string;
@@ -121,7 +127,13 @@ export interface PostgresProfileSummary {
 
 export interface PostgresProfilesState {
   activeProfileId: string | null;
+  workspaceProfileBindings: Record<string, string>;
   profiles: PostgresProfileSummary[];
+}
+
+export interface BindWorkspacePostgresProfileInput {
+  workspaceId: string;
+  profileId?: string | null;
 }
 
 export type ManagedPostgresMigrationState = "not_initialized" | "pending" | "applied" | "failed";
@@ -372,6 +384,7 @@ export interface PostgresRagEmbeddingBackfillItem {
 }
 
 export interface PostgresRagEmbeddingBackfillRequest {
+  workspaceId?: string;
   embeddingModel: string;
   embeddingDim?: number;
   distanceMetric?: PgvectorDistanceMetric;
@@ -662,6 +675,16 @@ export interface CommandMap {
     };
     output: WorkspaceFileEntry[];
   };
+  query_workspace_documents: {
+    input: {
+      workspaceId?: string;
+      query?: string;
+      excludePath?: string;
+      cursor?: number;
+      limit?: number;
+    };
+    output: WorkspaceDocumentQueryResult;
+  };
   read_workspace_file: {
     input: {
       workspaceId?: string;
@@ -710,6 +733,12 @@ export interface CommandMap {
     input: void;
     output: PostgresStatus;
   };
+  read_workspace_postgres_status: {
+    input: {
+      workspaceId: string;
+    };
+    output: PostgresStatus;
+  };
   read_embedding_provider_status: {
     input: void;
     output: EmbeddingProviderStatus;
@@ -745,6 +774,12 @@ export interface CommandMap {
   delete_postgres_profile: {
     input: {
       profileId: string;
+    };
+    output: PostgresProfilesState;
+  };
+  bind_workspace_postgres_profile: {
+    input: {
+      input: BindWorkspacePostgresProfileInput;
     };
     output: PostgresProfilesState;
   };
@@ -848,15 +883,15 @@ export const shellWorkspace: WorkspaceHandle = {
 export const shellFiles: WorkspaceFileEntry[] = [
   {
     id: "exp-playground-default",
-    name: "ethanol-oxidation.chemd.md",
-    path: "/workspace/experiments/ethanol-oxidation.chemd.md",
+    name: "ethanol-oxidation.chemd",
+    path: "/workspace/experiments/ethanol-oxidation.chemd",
     kind: "file",
     chemdKind: "document"
   },
   {
     id: "exp-001",
-    name: "suzuki-screen.chemd.md",
-    path: "/workspace/experiments/suzuki-screen.chemd.md",
+    name: "suzuki-screen.chemd",
+    path: "/workspace/experiments/suzuki-screen.chemd",
     kind: "file",
     chemdKind: "document"
   },
@@ -868,8 +903,8 @@ export const shellFiles: WorkspaceFileEntry[] = [
   },
   {
     id: "exp-003",
-    name: "calibration.chemd.md",
-    path: "/workspace/experiments/calibration.chemd.md",
+    name: "calibration.chemd",
+    path: "/workspace/experiments/calibration.chemd",
     kind: "file",
     chemdKind: "document"
   }
@@ -910,7 +945,7 @@ export const shellDiagnosticsBundleResult: DiagnosticsBundleExportResult = {
   outputPath: "",
   summary: {
     generatedAt: "",
-    commandCount: 37,
+    commandCount: 38,
     boundarySkipCount: 8,
     supportCommandCount: 7
   }

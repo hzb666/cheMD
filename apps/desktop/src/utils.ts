@@ -38,12 +38,12 @@ import { isScratchFile } from "./features/workspace/scratch-file";
 // Sample sources
 // ---------------------------------------------------------------------------
 
-export const DEFAULT_SAMPLE_SOURCE_NAME = "ethanol-oxidation.chemd.md";
+export const DEFAULT_SAMPLE_SOURCE_NAME = "ethanol-oxidation.chemd";
 
 export const sampleSources: Record<string, string> = {
   [DEFAULT_SAMPLE_SOURCE_NAME]: playgroundSampleSource,
-  "suzuki-screen.chemd.md": "---\nid: exp-desktop-suzuki\ntitle: Suzuki coupling condition screen\ndate: 2026-05-12\n---\n\n:::chemd #mol-aryl-bromide\nsmiles: Cc1ccc(Br)cc1\n:::\n\n:::chemd #mol-boronic-acid\nsmiles: OB(O)c1ccccc1\n:::\n\n:::chemd #mol-biaryl-product\nsmiles: Cc1ccc(-c2ccccc2)cc1\n:::\n\n:::chemd #rxn-screen\nkind: reaction\nreactants: @mol-aryl-bromide | @mol-boronic-acid\nproducts: @mol-biaryl-product\nconditions:\n  catalyst: Pd(PPh3)4\n  base: K2CO3\n  solvent: dioxane/water\n:::\n\n:::result #screen-result\nstatus: pending\nyield: 78%\n:::\n",
-  "calibration.chemd.md": "---\nid: exp-desktop-calibration\ntitle: HPLC calibration record\ndate: 2026-05-12\n---\n\n:::sample #std-a\nname: caffeine standard\namount: 2.0 mg\n:::\n\n:::analysis #calibration\nmethod: HPLC-UV\ntarget: caffeine\nresult: linear fit accepted\n:::\n"
+  "suzuki-screen.chemd": "---\nid: exp-desktop-suzuki\ntitle: Suzuki coupling condition screen\ndate: 2026-05-12\n---\n\n:::chemd #mol-aryl-bromide\nsmiles: Cc1ccc(Br)cc1\n:::\n\n:::chemd #mol-boronic-acid\nsmiles: OB(O)c1ccccc1\n:::\n\n:::chemd #mol-biaryl-product\nsmiles: Cc1ccc(-c2ccccc2)cc1\n:::\n\n:::chemd #rxn-screen\nkind: reaction\nreactants: @mol-aryl-bromide | @mol-boronic-acid\nproducts: @mol-biaryl-product\nconditions:\n  catalyst: Pd(PPh3)4\n  base: K2CO3\n  solvent: dioxane/water\n:::\n\n:::result #screen-result\nstatus: pending\nyield: 78%\n:::\n",
+  "calibration.chemd": "---\nid: exp-desktop-calibration\ntitle: HPLC calibration record\ndate: 2026-05-12\n---\n\n:::sample #std-a\nname: caffeine standard\namount: 2.0 mg\n:::\n\n:::analysis #calibration\nmethod: HPLC-UV\ntarget: caffeine\nresult: linear fit accepted\n:::\n"
 };
 
 // ---------------------------------------------------------------------------
@@ -486,8 +486,12 @@ export const getWorkspaceIngestDisabledReason = ({
   files: WorkspaceFileEntry[];
 }): string | null => {
   if (mode !== "workspace" || workspaceState !== "open") return "Open a local workspace before scanning workspace ingest.";
-  if (!files.some((file) => file.kind === "file" && file.path.toLowerCase().endsWith(".md"))) {
-    return "No Markdown files are visible in the current workspace.";
+  if (!files.some((file) => {
+    const path = file.path.toLowerCase();
+    return file.kind === "file"
+      && (path.endsWith(".chemd") || path.endsWith(".chemd.md") || file.chemdKind === "document");
+  })) {
+    return "No Chemd documents are visible in the current workspace.";
   }
   return null;
 };

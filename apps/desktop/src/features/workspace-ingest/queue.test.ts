@@ -18,7 +18,7 @@ const createdAt = "2026-05-13T09:00:00.000Z";
 const document = {
   workspaceId: "workspace-alpha",
   documentId: "doc-alpha",
-  documentPath: "experiments/alpha.chemd.md",
+  documentPath: "experiments/alpha.chemd",
   documentHash: "fnv1a:doc-alpha-v1",
   revisionId: "rev-alpha-1",
   revisionHash: "fnv1a:revision-alpha-v1",
@@ -297,13 +297,13 @@ const fileEntry = (path: string, kind: WorkspaceFileEntry["kind"] = "file"): Wor
 });
 
 describe("desktop workspace ingest runner", () => {
-  it("processes .chemd.md files, skips plain markdown, and excludes other entries", async () => {
+  it("processes .chemd files, skips plain markdown, and excludes other entries", async () => {
     const readPaths: string[] = [];
     const compileSources: string[] = [];
     const result = await runWorkspaceIngest({
       workspaceId: "workspace-alpha",
       files: [
-        fileEntry("experiments/a.chemd.md"),
+        fileEntry("experiments/a.chemd"),
         fileEntry("notes/readme.md"),
         fileEntry("assets/table.csv"),
         fileEntry("experiments", "directory")
@@ -319,18 +319,33 @@ describe("desktop workspace ingest runner", () => {
       createdAt
     });
 
-    expect(readPaths).toEqual(["experiments/a.chemd.md"]);
-    expect(compileSources).toEqual(["source:experiments/a.chemd.md"]);
+    expect(readPaths).toEqual(["experiments/a.chemd"]);
+    expect(compileSources).toEqual(["source:experiments/a.chemd"]);
     expect(result.items.map((item) => [item.documentPath, item.status])).toEqual([
-      ["experiments/a.chemd.md", "pending"],
+      ["experiments/a.chemd", "pending"],
       ["notes/readme.md", "skipped"]
     ]);
     expect(result.items[1].metadata.skipReason).toBe("non_chemd_markdown");
     expect(result.summary).toMatchObject({ pendingCount: 1, skippedCount: 1, totalCount: 2 });
   });
 
+  it("keeps legacy .chemd.md files eligible for ingest", async () => {
+    const result = await runWorkspaceIngest({
+      workspaceId: "workspace-alpha",
+      files: [fileEntry("experiments/legacy.chemd.md")],
+      readFile: (file) => `source:${file.path}`,
+      compile: (source) => ({ status: "ok", source }),
+      createdAt
+    });
+
+    expect(result.items.map((item) => item.documentPath)).toEqual([
+      "experiments/legacy.chemd.md"
+    ]);
+    expect(result.summary).toMatchObject({ pendingCount: 1, totalCount: 1 });
+  });
+
   it("keeps ingest running when one file fails and redacts bounded failure summaries", async () => {
-    const files = [fileEntry("experiments/fail.chemd.md"), fileEntry("experiments/pass.chemd.md")];
+    const files = [fileEntry("experiments/fail.chemd"), fileEntry("experiments/pass.chemd")];
     const firstRun = await runWorkspaceIngest({
       workspaceId: "workspace-alpha",
       files,
@@ -366,7 +381,7 @@ describe("desktop workspace ingest runner", () => {
   });
 
   it("keeps source hashes and idempotency keys stable until file content changes", async () => {
-    const file = fileEntry("experiments/stable.chemd.md");
+    const file = fileEntry("experiments/stable.chemd");
     const runWithSource = (source: string) => runWorkspaceIngest({
       workspaceId: "workspace-alpha",
       files: [file],
@@ -390,7 +405,7 @@ describe("desktop workspace ingest runner", () => {
   });
 
   it("reuses an unchanged pending item without creating another pending revision", async () => {
-    const file = fileEntry("experiments/pending.chemd.md");
+    const file = fileEntry("experiments/pending.chemd");
     const initial = await runWorkspaceIngest({
       workspaceId: "workspace-alpha",
       files: [file],
@@ -415,7 +430,7 @@ describe("desktop workspace ingest runner", () => {
   });
 
   it("reuses an unchanged synced item without compiling it again", async () => {
-    const file = fileEntry("experiments/synced.chemd.md");
+    const file = fileEntry("experiments/synced.chemd");
     const initial = await runWorkspaceIngest({
       workspaceId: "workspace-alpha",
       files: [file],
@@ -440,7 +455,7 @@ describe("desktop workspace ingest runner", () => {
   });
 
   it("creates a new revision for changed content without overwriting existing items", async () => {
-    const file = fileEntry("experiments/changed.chemd.md");
+    const file = fileEntry("experiments/changed.chemd");
     const initial = await runWorkspaceIngest({
       workspaceId: "workspace-alpha",
       files: [file],
@@ -469,7 +484,7 @@ describe("desktop workspace ingest runner", () => {
   });
 
   it("keeps failed items over the retry limit failed instead of making them pending", async () => {
-    const file = fileEntry("experiments/exhausted.chemd.md");
+    const file = fileEntry("experiments/exhausted.chemd");
     const failedRun = await runWorkspaceIngest({
       workspaceId: "workspace-alpha",
       files: [file],

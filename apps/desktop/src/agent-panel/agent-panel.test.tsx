@@ -12,7 +12,7 @@ const basePanel = (overrides: Partial<AgentTimelinePanel> = {}): AgentTimelinePa
     workspaceId: "workspace-1",
     goal: "Prepare a safe desktop patch",
     statusLabel: "Running",
-    targetFiles: ["experiments/experiment.chemd.md"],
+    targetFiles: ["experiments/experiment.chemd"],
     counts: {
       timelineRows: 1,
       toolCalls: 1,

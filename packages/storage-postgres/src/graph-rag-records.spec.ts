@@ -53,7 +53,7 @@ const buildRecords = () => {
       schema_version: "chemd-training-graph-index/v0.1",
       index_scope: {
         document_ids: ["exp-desktop"],
-        sources: [{ document_id: "exp-desktop", file_path: "experiments/graph.chemd.md" }]
+        sources: [{ document_id: "exp-desktop", file_path: "experiments/graph.chemd" }]
       },
       nodes: [],
       edges: [

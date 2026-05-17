@@ -19,13 +19,13 @@ import {
 const compile = (source: string): ChemdLanguageCompileOutput =>
   compileChemdForEditor({
     source,
-    documentUri: "experiments/map.chemd.md",
+    documentUri: "experiments/map.chemd",
     options: { strictChemdKind: true, procedureMode: "auto" }
   });
 
 const outputWithReaction = (): ChemdLanguageCompileSuccess => ({
   status: "ok",
-  documentUri: "experiments/map.chemd.md",
+  documentUri: "experiments/map.chemd",
   compiledAt: "2026-05-13T00:00:00.000Z",
   diagnostics: [],
   outline: [
@@ -367,7 +367,7 @@ describe("desktop knowledge map view model", () => {
     const row = viewModel.edgeEvidenceRows[0];
 
     expect(row.from.sourceRef).toMatchObject({
-      label: "map.chemd.md L1-L1",
+      label: "map.chemd L1-L1",
       startLine: 1,
       endLine: 1
     });
@@ -376,7 +376,7 @@ describe("desktop knowledge map view model", () => {
       nodeId: "reaction::rxn-1",
       semanticId: "rxn-1",
       sourceKind: "chemd",
-      sourceUri: "experiments/map.chemd.md",
+      sourceUri: "experiments/map.chemd",
       range: {
         startLine: 1,
         endLine: 1,
@@ -385,7 +385,7 @@ describe("desktop knowledge map view model", () => {
       }
     });
     expect(row.to.sourceRef).toMatchObject({
-      label: "map.chemd.md L2-L2",
+      label: "map.chemd L2-L2",
       startLine: 2,
       endLine: 2
     });
@@ -437,7 +437,7 @@ describe("desktop knowledge map view model", () => {
       component: "ReactionBlock",
       hydration: "visible",
       sourceRef: {
-        label: "map.chemd.md L12-L16",
+        label: "map.chemd L12-L16",
         startLine: 12,
         endLine: 16
       }
@@ -454,7 +454,7 @@ describe("desktop knowledge map view model", () => {
       nodeId: "reaction::rxn-a",
       semanticId: "rxn-a",
       sourceKind: "chemd",
-      sourceUri: "experiments/map.chemd.md",
+      sourceUri: "experiments/map.chemd",
       range: {
         startLine: 12,
         endLine: 16,
@@ -471,7 +471,7 @@ describe("desktop knowledge map view model", () => {
   it("returns null source jump intent when a source ref has no line", () => {
     expect(createKnowledgeMapSourceJumpIntent("node-a", "rxn-a", {
       source_kind: "chemd",
-      source_uri: "experiments/map.chemd.md"
+      source_uri: "experiments/map.chemd"
     })).toBeNull();
   });
 
@@ -520,7 +520,7 @@ describe("desktop knowledge map view model", () => {
   it("returns failed state when compile output failed", () => {
     const failed = {
       status: "failed",
-      documentUri: "experiments/bad.chemd.md",
+      documentUri: "experiments/bad.chemd",
       compiledAt: "2026-05-13T00:00:00.000Z",
       diagnostics: [],
       outline: [],

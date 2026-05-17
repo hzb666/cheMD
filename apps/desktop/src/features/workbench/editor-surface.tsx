@@ -1,8 +1,10 @@
 import {
   lazy,
   Suspense,
+  useEffect,
   useMemo,
   useState,
+  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import {
@@ -12,15 +14,19 @@ import {
   CheckCircle2,
   CircleDot,
   Eye,
-  FileCode2,
   PanelBottom,
+  Redo2,
+  Save,
+  Undo2,
 } from "lucide-react";
 import type { ChemdLanguageCompileOutput } from "@chemd/language-service";
 import { Button } from "@/components/ui/button";
 import type { WorkbenchProps } from "../../types";
 import { getDiagnosticStats } from "../../utils";
-import type { MonacoCursorPosition } from "../editor/source-path";
+import type { MonacoCursorPosition, MonacoUndoRedoState } from "../editor/source-path";
+import { HtmlPreview } from "../preview/html-preview";
 import type { ReferenceBottomPanelId } from "./bottom-panel";
+import { useHorizontalResize } from "./use-horizontal-resize";
 
 const MonacoChemdEditor = lazy(() =>
   import("../editor/monaco-chemd-editor").then((module) => ({
@@ -28,8 +34,63 @@ const MonacoChemdEditor = lazy(() =>
   }))
 );
 
-const tabActionClassName = "reference-tab-action rounded-lg px-2 py-1 text-xs text-muted-foreground hover:bg-white/35 data-[active=true]:bg-[var(--shell-tab-action-active)] data-[active=true]:text-foreground";
-const statusItemClassName = "inline-flex min-w-0 shrink-0 items-center gap-1 border-l border-[var(--shell-border-strong)] pl-1.5 whitespace-nowrap";
+const tabActionClassName = "reference-tab-action text-muted-foreground hover:bg-muted-foreground/15 hover:text-foreground data-[active=true]:bg-chemd-background data-[active=true]:text-chemd-foreground data-[active=true]:ring-1 data-[active=true]:ring-inset data-[active=true]:ring-chemd-foreground/30";
+const saveActionClassName = `${tabActionClassName} data-[autosaved=true]:bg-success/15 data-[autosaved=true]:text-success data-[autosaved=true]:ring-1 data-[autosaved=true]:ring-inset data-[autosaved=true]:ring-success/30 data-[autosaved=true]:hover:bg-success/30`;
+const statusItemClassName = "inline-flex min-w-0 shrink-0 items-center gap-1 border-l border-border/65 pl-1.5 whitespace-nowrap";
+const DEFAULT_PREVIEW_WIDTH_PERCENT = 40;
+const MIN_PREVIEW_WIDTH_PERCENT = 28;
+const MAX_PREVIEW_WIDTH_PERCENT = 62;
+
+export const getDelayUntilNextMinute = (now = new Date()): number => {
+  const elapsedInMinute = now.getSeconds() * 1000 + now.getMilliseconds();
+  return elapsedInMinute === 0 ? 60_000 : 60_000 - elapsedInMinute;
+};
+
+export const formatStatusClockTime = (date: Date): string =>
+  date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+
+export const clampPreviewWidthPercent = (value: number): number =>
+  Math.min(MAX_PREVIEW_WIDTH_PERCENT, Math.max(MIN_PREVIEW_WIDTH_PERCENT, value));
+
+const useCurrentMinute = (): Date => {
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+
+  useEffect(() => {
+    let intervalId: number | null = null;
+    const timeoutId = window.setTimeout(() => {
+      setCurrentTime(new Date());
+      intervalId = window.setInterval(() => setCurrentTime(new Date()), 60_000);
+    }, getDelayUntilNextMinute());
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      if (intervalId !== null) window.clearInterval(intervalId);
+    };
+  }, []);
+
+  return currentTime;
+};
+
+const formatSaveStatusLabel = (savedAt: string | null): string => {
+  if (!savedAt) return "Save";
+  const savedDate = new Date(savedAt);
+  if (Number.isNaN(savedDate.getTime())) return "Last saved";
+
+  const now = new Date();
+  const savedDay = new Date(savedDate.getFullYear(), savedDate.getMonth(), savedDate.getDate()).getTime();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const dayDelta = Math.max(0, Math.floor((today - savedDay) / 86_400_000));
+
+  if (dayDelta > 0) return `${dayDelta} ${dayDelta === 1 ? "day" : "days"}`;
+
+  return `Last saved: ${savedDate.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit"
+  })}`;
+};
 
 export function ReferenceSidebarResizeHandle({
   onPointerDown,
@@ -38,7 +99,7 @@ export function ReferenceSidebarResizeHandle({
 }) {
   return (
     <div
-      className="reference-sidebar-resize-handle absolute bottom-2 left-0.5 top-0 z-20 w-3 cursor-col-resize bg-transparent"
+      className="reference-sidebar-resize-handle absolute bottom-2 left-0.5 top-0 z-20 w-3 cursor-col-resize bg-transparent after:absolute after:bottom-0.5 after:left-1/2 after:top-0.5 after:w-1 after:-translate-x-1/2 after:rounded-full after:bg-primary/70 after:opacity-0 after:transition-opacity hover:after:opacity-100"
       role="separator"
       aria-label="Resize left sidebar"
       aria-orientation="vertical"
@@ -50,10 +111,10 @@ export function ReferenceSidebarResizeHandle({
 export function ReferenceDocumentSurface({
   file,
   source,
+  savedAt,
   compileOutput,
   workspaceSymbolIndex,
   workspaceConflict,
-  canSave,
   dirty,
   editorRef,
   settings,
@@ -70,6 +131,7 @@ export function ReferenceDocumentSurface({
 }: {
   file: WorkbenchProps["selectedFile"];
   source: WorkbenchProps["source"];
+  savedAt: WorkbenchProps["savedAt"];
   compileOutput: WorkbenchProps["output"];
   workspaceSymbolIndex: WorkbenchProps["workspaceSymbolIndexController"]["index"];
   workspaceConflict: WorkbenchProps["workspaceConflict"];
@@ -92,65 +154,132 @@ export function ReferenceDocumentSurface({
     lineNumber: 1,
     column: 1
   });
+  const [undoRedoState, setUndoRedoState] = useState<MonacoUndoRedoState>({
+    canRedo: false,
+    canUndo: false
+  });
+  const [previewWidthPercent, setPreviewWidthPercent] = useState(DEFAULT_PREVIEW_WIDTH_PERCENT);
+  const { beginResize: beginPreviewResize, containerRef: editorBodyRef } = useHorizontalResize<HTMLDivElement>({
+    disabled: !previewVisible,
+    onResize: (width, editorBody) => {
+      editorBody.style.setProperty("--reference-preview-width", `${width}%`);
+    },
+    onResizeEnd: (width) => setPreviewWidthPercent(width),
+    panelId: "preview",
+    resolveValue: ({ containerSize, deltaX, startValue }) => {
+      const startPreviewWidth = containerSize * startValue / 100;
+      return clampPreviewWidthPercent((startPreviewWidth - deltaX) / containerSize * 100);
+    },
+    value: previewWidthPercent
+  });
   const diagnostics = compileOutput.diagnostics;
   const diagnosticStats = getDiagnosticStats(diagnostics);
   const lineCount = useMemo(() => source.split(/\r?\n/).length, [source]);
+  const autoSaveEnabled = settings.autoSaveMode !== "off";
+  const autoSaved = autoSaveEnabled && !dirty && Boolean(savedAt);
+  const saveStatusLabel = autoSaved ? formatSaveStatusLabel(savedAt) : "Save";
+  const handleRedo = () => {
+    editorRef.current?.redo();
+  };
+  const handleUndo = () => {
+    editorRef.current?.undo();
+  };
 
   return (
     <section className="relative z-10 min-w-0 flex-1 overflow-visible bg-transparent pb-2 pl-2 pr-2">
       {sidebarVisible ? <ReferenceSidebarResizeHandle onPointerDown={onSidebarResize} /> : null}
-      <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-[var(--shell-card-border)] bg-[var(--reference-surface-bg)] shadow-[var(--shell-card-shadow)]">
-        <div className="flex h-[50px] shrink-0 items-center bg-[var(--reference-surface-bg)] px-6">
-          <div className="flex w-32 items-center gap-4 text-muted-foreground">
-            <ChevronLeft size={19} />
-            <ChevronRight size={19} />
-          </div>
-          <div className="min-w-0 flex-1 text-center text-xl font-semibold text-foreground">{file.name}</div>
-          <div className="flex w-72 items-center justify-end gap-2 text-muted-foreground" aria-label="Editor view controls">
+      <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-sm border border-border/50 bg-[var(--reference-surface-bg)] shadow-[0_2px_14px] shadow-foreground/5">
+        <div className="grid h-[50px] shrink-0 grid-cols-[8.5rem_minmax(0,1fr)_8.5rem] items-center gap-3 bg-[var(--reference-surface-bg)] px-6 max-[880px]:grid-cols-[8.25rem_minmax(0,1fr)_8.25rem] max-[720px]:px-3">
+          <div className="flex min-w-0 items-center gap-1 text-muted-foreground" aria-label="Editor history controls">
             <Button
               type="button"
               variant="ghost"
-              size="sm"
+              size="icon-sm"
               className={tabActionClassName}
-              disabled={!canSave}
+              title="Back"
+              aria-label="Back"
+            >
+              <ChevronLeft size={15} />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className={tabActionClassName}
+              title="Forward"
+              aria-label="Forward"
+            >
+              <ChevronRight size={15} />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className={tabActionClassName}
+              title="Undo"
+              aria-label="Undo"
+              disabled={!undoRedoState.canUndo}
+              onClick={handleUndo}
+            >
+              <Undo2 size={15} />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className={tabActionClassName}
+              title="Redo"
+              aria-label="Redo"
+              disabled={!undoRedoState.canRedo}
+              onClick={handleRedo}
+            >
+              <Redo2 size={15} />
+            </Button>
+          </div>
+          <div className="min-w-0 truncate whitespace-nowrap text-center text-base font-semibold text-foreground" title={file.name}>{file.name}</div>
+          <div className="flex min-w-0 items-center justify-end gap-1 text-muted-foreground" aria-label="Editor view controls">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className={saveActionClassName}
+              data-autosaved={autoSaved ? "true" : undefined}
+              title={autoSaved ? saveStatusLabel : "Save current file"}
+              aria-label={autoSaved ? saveStatusLabel : "Save current file"}
               onClick={onSave}
             >
-              {dirty ? "Save" : "Saved"}
+              {autoSaved ? <CheckCircle2 size={15} /> : <Save size={15} />}
             </Button>
             <Button
               type="button"
               variant="ghost"
-              size="sm"
-              className={tabActionClassName}
-              data-active={previewVisible ? "true" : undefined}
-              aria-pressed={previewVisible}
-              title={previewVisible ? "Hide Chemd preview" : "Show Chemd preview"}
-              onClick={onTogglePreview}
-            >
-              <Eye size={14} />
-              <span>Preview</span>
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
+              size="icon-sm"
               className={tabActionClassName}
               data-active={bottomPanel === "diagnostics" ? "true" : undefined}
               aria-pressed={bottomPanel === "diagnostics"}
+              aria-label="Toggle diagnostics panel"
               title="Toggle diagnostics panel"
               onClick={onToggleDiagnostics}
             >
               <PanelBottom size={14} />
-              <span>Diagnose</span>
             </Button>
-            <span className="rounded-md bg-[#eeeaff] p-1 text-violet-600" title="Chemd editor active">
-              <FileCode2 size={18} />
-            </span>
-            <span className="text-xs font-semibold text-muted-foreground">Source</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className={tabActionClassName}
+              data-active={previewVisible ? "true" : undefined}
+              aria-pressed={previewVisible}
+              aria-label={previewVisible ? "Hide Chemd preview" : "Show Chemd preview"}
+              title={previewVisible ? "Hide Chemd preview" : "Show Chemd preview"}
+              onClick={onTogglePreview}
+            >
+              <Eye size={14} />
+            </Button>
           </div>
         </div>
         {workspaceConflict ? (
-          <div className="flex shrink-0 items-center gap-2 border-y border-[var(--shell-conflict-border)] bg-[var(--shell-conflict-bg)] px-3 py-2 text-xs text-[var(--shell-conflict-fg)]" role="alert">
+          <div className="flex shrink-0 items-center gap-2 border-y border-warning/40 bg-warning/15 px-3 py-2 text-xs text-warning" role="alert">
             <AlertTriangle size={15} aria-hidden="true" />
             <div className="min-w-0 flex-1">
               <strong>Workspace file changed on disk</strong>
@@ -176,21 +305,40 @@ export function ReferenceDocumentSurface({
             </Button>
           </div>
         ) : null}
-        <div className="flex min-h-0 flex-1 overflow-hidden bg-editor-surface">
-          <Suspense fallback={<div className="monaco-loading flex h-full items-center justify-center text-sm text-muted-foreground">Loading Monaco editor...</div>}>
-            <MonacoChemdEditor
-              ref={editorRef}
-              value={source}
-              documentPath={file.path}
-              compileOutput={compileOutput}
-              workspaceSymbolIndex={workspaceSymbolIndex}
-              editorSettings={settings}
-              onChange={onChange}
-              onSave={onSave}
-              onBlurSave={settings.autoSaveMode === "onFocusLost" ? onSave : undefined}
-              onCursorPositionChange={setCursorPosition}
-            />
-          </Suspense>
+        <div ref={editorBodyRef} className="flex min-h-0 flex-1 overflow-hidden bg-editor-surface">
+          <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+            <Suspense fallback={<div className="monaco-loading flex min-h-0 flex-1 items-center justify-center text-sm text-muted-foreground">Loading Monaco editor...</div>}>
+              <MonacoChemdEditor
+                ref={editorRef}
+                value={source}
+                documentPath={file.path}
+                compileOutput={compileOutput}
+                workspaceSymbolIndex={workspaceSymbolIndex}
+                editorSettings={settings}
+                onChange={onChange}
+                onSave={onSave}
+                onBlurSave={settings.autoSaveMode === "onFocusLost" ? onSave : undefined}
+                onCursorPositionChange={setCursorPosition}
+                onUndoRedoStateChange={setUndoRedoState}
+              />
+            </Suspense>
+          </div>
+          {previewVisible ? (
+            <section
+              className="relative min-h-0 shrink-0 overflow-hidden border-l border-border/65 bg-[var(--reference-surface-bg)] pl-1"
+              style={{ width: `var(--reference-preview-width, ${previewWidthPercent}%)` } as CSSProperties}
+              aria-label="Chemd HTML preview"
+            >
+              <div
+                className="absolute bottom-0 left-0 top-0 z-10 w-3 cursor-col-resize bg-transparent after:absolute after:bottom-0 after:left-0 after:top-0 after:w-1 after:bg-primary/70 after:opacity-0 after:transition-opacity hover:after:opacity-100"
+                role="separator"
+                aria-label="Resize HTML preview"
+                aria-orientation="vertical"
+                onPointerDown={beginPreviewResize}
+              />
+              <HtmlPreview output={compileOutput} />
+            </section>
+          ) : null}
         </div>
         <ReferenceEditorStatusBar
           status={compileOutput.status}
@@ -198,7 +346,6 @@ export function ReferenceDocumentSurface({
           diagnosticCount={diagnostics.length}
           cursorPosition={cursorPosition}
           lineCount={lineCount}
-          compiledAt={compileOutput.compiledAt}
         />
       </div>
     </section>
@@ -211,20 +358,19 @@ function ReferenceEditorStatusBar({
   diagnosticCount,
   cursorPosition,
   lineCount,
-  compiledAt,
 }: {
   status: ChemdLanguageCompileOutput["status"];
   diagnostics: ReturnType<typeof getDiagnosticStats>;
   diagnosticCount: number;
   cursorPosition: MonacoCursorPosition;
   lineCount: number;
-  compiledAt: string;
 }) {
   const StatusIcon = status === "ok" ? CheckCircle2 : CircleDot;
   const statusLabel = status === "ok" ? "Compiled" : "Compile failed";
+  const currentTime = useCurrentMinute();
 
   return (
-    <footer className="flex min-h-7 shrink-0 items-center justify-between gap-3 overflow-hidden border-t border-[var(--shell-border-strong)] bg-[var(--reference-surface-bg)] px-3.5 text-xs font-semibold text-muted-foreground" aria-label="Editor status">
+    <footer className="flex min-h-7 shrink-0 items-center justify-between gap-3 overflow-hidden border-t border-border/65 bg-[var(--reference-surface-bg)] px-3.5 text-xs font-semibold text-muted-foreground" aria-label="Editor status">
       <div className="reference-status-group reference-status-group-left flex min-w-0 flex-[1_1_auto] items-center gap-2 overflow-hidden">
         <span className={`${statusItemClassName} border-l-0 pl-0 ${status === "ok" ? "text-success" : "text-destructive"}`}>
           <StatusIcon size={13} />
@@ -247,7 +393,7 @@ function ReferenceEditorStatusBar({
         <span className={`${statusItemClassName} max-[900px]:hidden`}>LF</span>
         <span className={statusItemClassName}>Chemd</span>
         <span className={`${statusItemClassName} max-[1040px]:hidden`}>
-          {new Date(compiledAt).toLocaleTimeString()}
+          {formatStatusClockTime(currentTime)}
         </span>
       </div>
     </footer>

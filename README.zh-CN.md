@@ -19,7 +19,7 @@
 
 ## 产品范围
 
-- 接近代码的化学 Markdown 写作模型，覆盖 frontmatter、行内化学、引用、分子、反应、结果、分析、样品、步骤、观察、模板和列布局。
+- 接近代码的 Chemd 专用文档写作模型，覆盖 frontmatter、Markdown 风格正文、行内化学、引用、分子、反应、结果、分析、样品、步骤、观察、模板和列布局。
 - 实验逻辑增强：将原始记录连接到 typed entities、resolved references、procedure steps、observations、field evidence、normalization facts 和 knowledge-graph edges。
 - 浏览器工作台，支持源码编辑、渲染预览、diagnostics、结构化输出、导出动作、OCR 入口和 chemistry editor 集成。
 - 编译输出覆盖 HTML 预览、规范化 JSON、DOCX bridge Markdown、canonical LNF、runtime preflight、RAG 检索数据、training understanding 数据和 full audit 数据。
@@ -151,12 +151,12 @@ poetry run python -m unittest discover
 根目录通过 `chemd` script 调用 CLI：
 
 ```bash
-pnpm chemd validate examples/report.chemd.md
-pnpm chemd export examples/report.chemd.md --format training-full
-pnpm chemd diff before.chemd.md after.chemd.md --format json
-pnpm chemd graph reports/*.chemd.md --format json
-pnpm chemd repair draft.chemd.md --format text
-pnpm chemd agent-loop draft.chemd.md --format json --max-iterations 3
+pnpm chemd validate examples/report.chemd
+pnpm chemd export examples/report.chemd --format training-full
+pnpm chemd diff before.chemd after.chemd --format json
+pnpm chemd graph reports/*.chemd --format json
+pnpm chemd repair draft.chemd --format text
+pnpm chemd agent-loop draft.chemd --format json --max-iterations 3
 ```
 
 常用命令：
@@ -175,7 +175,7 @@ pnpm chemd agent-loop draft.chemd.md --format json --max-iterations 3
 
 ## 文档语言
 
-`chemd` 文档是带必需 frontmatter 的 Markdown 文件：
+`chemd` 文档是带必需 frontmatter 的 Chemd 专用源码文件：
 
 - `id`
 - `title`
@@ -257,9 +257,9 @@ Yield: @res-main.yield
 更完整的写作规范与 companion fixture 示例见：
 
 - `docs/chemd-syntax-best-practices.zh-CN.md`
-- `packages/compiler/fixtures/best-practice-total-synthesis.chemd.md`
-- `packages/compiler/fixtures/best-practice-one-step-synthesis.chemd.md`
-- `packages/compiler/fixtures/best-practice-condition-screen.chemd.md`
+- `packages/compiler/fixtures/best-practice-total-synthesis.chemd`
+- `packages/compiler/fixtures/best-practice-one-step-synthesis.chemd`
+- `packages/compiler/fixtures/best-practice-condition-screen.chemd`
 
 ## 编译流水线
 

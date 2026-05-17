@@ -268,18 +268,18 @@ describe("chemd cli help validation export and repair", () => {
   });
 
   it("validates a valid chemd document", async () => {
-    const result = await runInTempDir(["validate", "valid.chemd.md"], {
-      "valid.chemd.md": validSource
+    const result = await runInTempDir(["validate", "valid.chemd"], {
+      "valid.chemd": validSource
     });
 
     expect(result.exitCode).toBe(EXIT_OK);
-    expect(result.stdout).toMatch(/valid\.chemd\.md: ok/);
+    expect(result.stdout).toMatch(/valid\.chemd: ok/);
     expect(result.stderr).toBe("");
   }, 10000);
 
   it("exits 1 when compiler diagnostics include an error", async () => {
-    const result = await runInTempDir(["validate", "invalid.chemd.md"], {
-      "invalid.chemd.md": invalidKindSource
+    const result = await runInTempDir(["validate", "invalid.chemd"], {
+      "invalid.chemd": invalidKindSource
     });
 
     expect(result.exitCode).toBe(EXIT_VALIDATION_FAILED);
@@ -288,8 +288,8 @@ describe("chemd cli help validation export and repair", () => {
   });
 
   it("repairs deterministic safe fixes and prints the clean source in text mode", async () => {
-    const result = await runInTempDir(["repair", "repair.chemd.md"], {
-      "repair.chemd.md": repairableSource
+    const result = await runInTempDir(["repair", "repair.chemd"], {
+      "repair.chemd": repairableSource
     });
 
     expect(result.exitCode).toBe(EXIT_OK);
@@ -301,12 +301,12 @@ describe("chemd cli help validation export and repair", () => {
 
   it("writes the repaired source back to disk when --write is set", async () =>
     withTempDir(async (dir) => {
-      const filePath = path.join(dir, "repair.chemd.md");
+      const filePath = path.join(dir, "repair.chemd");
       writeFileSync(filePath, repairableSource);
 
       const stdout = createWriter();
       const stderr = createWriter();
-      const exitCode = await runChemdCli(["repair", "repair.chemd.md", "--write"], {
+      const exitCode = await runChemdCli(["repair", "repair.chemd", "--write"], {
         cwd: dir,
         stderr,
         stdout
@@ -320,8 +320,8 @@ describe("chemd cli help validation export and repair", () => {
 
   it("emits a structured non-clean repair report when authored facts are still required", async () => {
     const result = await runInTempDir(
-      ["repair", "repair-input.chemd.md", "--format", "json"],
-      { "repair-input.chemd.md": repairNeedsInputSource }
+      ["repair", "repair-input.chemd", "--format", "json"],
+      { "repair-input.chemd": repairNeedsInputSource }
     );
     const payload = JSON.parse(result.stdout);
 
@@ -339,8 +339,8 @@ describe("chemd cli help validation export and repair", () => {
 
   it("rejects invalid repair iteration limits", async () => {
     const result = await runInTempDir(
-      ["repair", "repair.chemd.md", "--max-iterations", "0"],
-      { "repair.chemd.md": repairableSource }
+      ["repair", "repair.chemd", "--max-iterations", "0"],
+      { "repair.chemd": repairableSource }
     );
 
     expect(result.exitCode).toBe(EXIT_USAGE);
@@ -348,8 +348,8 @@ describe("chemd cli help validation export and repair", () => {
   });
 
   it("exports JSON renderer output", async () => {
-    const result = await runInTempDir(["export", "valid.chemd.md", "--format", "json"], {
-      "valid.chemd.md": validSource
+    const result = await runInTempDir(["export", "valid.chemd", "--format", "json"], {
+      "valid.chemd": validSource
     });
     const payload = JSON.parse(result.stdout);
 
@@ -359,8 +359,8 @@ describe("chemd cli help validation export and repair", () => {
   });
 
   it("exits 1 and suppresses payload output when export input has errors", async () => {
-    const result = await runInTempDir(["export", "invalid.chemd.md", "--format", "json"], {
-      "invalid.chemd.md": invalidKindSource
+    const result = await runInTempDir(["export", "invalid.chemd", "--format", "json"], {
+      "invalid.chemd": invalidKindSource
     });
 
     expect(result.exitCode).toBe(EXIT_VALIDATION_FAILED);
@@ -369,8 +369,8 @@ describe("chemd cli help validation export and repair", () => {
   });
 
   it("exports canonical LNF output", async () => {
-    const result = await runInTempDir(["export", "valid.chemd.md", "--format=lnf"], {
-      "valid.chemd.md": validSource
+    const result = await runInTempDir(["export", "valid.chemd", "--format=lnf"], {
+      "valid.chemd": validSource
     });
     const payload = JSON.parse(result.stdout);
 
@@ -379,8 +379,8 @@ describe("chemd cli help validation export and repair", () => {
   });
 
   it("exports training output", async () => {
-    const result = await runInTempDir(["export", "valid.chemd.md", "--format", "training"], {
-      "valid.chemd.md": validSource
+    const result = await runInTempDir(["export", "valid.chemd", "--format", "training"], {
+      "valid.chemd": validSource
     });
     const payload = JSON.parse(result.stdout);
 
@@ -390,8 +390,8 @@ describe("chemd cli help validation export and repair", () => {
   });
 
   it("exports RAG output", async () => {
-    const result = await runInTempDir(["export", "valid.chemd.md", "--format", "rag"], {
-      "valid.chemd.md": validSource
+    const result = await runInTempDir(["export", "valid.chemd", "--format", "rag"], {
+      "valid.chemd": validSource
     });
     const payload = JSON.parse(result.stdout);
 
@@ -402,8 +402,8 @@ describe("chemd cli help validation export and repair", () => {
   });
 
   it("exports full training audit output", async () => {
-    const result = await runInTempDir(["export", "valid.chemd.md", "--format", "training-full"], {
-      "valid.chemd.md": validSource
+    const result = await runInTempDir(["export", "valid.chemd", "--format", "training-full"], {
+      "valid.chemd": validSource
     });
     const payload = JSON.parse(result.stdout);
 
@@ -413,8 +413,8 @@ describe("chemd cli help validation export and repair", () => {
   });
 
   it("rejects unsupported export formats", async () => {
-    const result = await runInTempDir(["export", "valid.chemd.md", "--format", "xml"], {
-      "valid.chemd.md": validSource
+    const result = await runInTempDir(["export", "valid.chemd", "--format", "xml"], {
+      "valid.chemd": validSource
     });
 
     expect(result.exitCode).toBe(EXIT_USAGE);
@@ -423,8 +423,8 @@ describe("chemd cli help validation export and repair", () => {
 
   it("rejects base options on export", async () => {
     const result = await runInTempDir(
-      ["export", "valid.chemd.md", "--base", "main", "--format", "json"],
-      { "valid.chemd.md": validSource }
+      ["export", "valid.chemd", "--base", "main", "--format", "json"],
+      { "valid.chemd": validSource }
     );
 
     expect(result.exitCode).toBe(EXIT_USAGE);
@@ -433,10 +433,10 @@ describe("chemd cli help validation export and repair", () => {
 
   it("exports a graph index for multiple chemd files", async () => {
     const result = await runInTempDir(
-      ["graph", "graph-a.chemd.md", "graph-b.chemd.md", "--format", "json"],
+      ["graph", "graph-a.chemd", "graph-b.chemd", "--format", "json"],
       {
-        "graph-a.chemd.md": graphFamilyASource,
-        "graph-b.chemd.md": graphFamilyBSource
+        "graph-a.chemd": graphFamilyASource,
+        "graph-b.chemd": graphFamilyBSource
       }
     );
     const payload = JSON.parse(result.stdout);
@@ -444,8 +444,8 @@ describe("chemd cli help validation export and repair", () => {
     expect(result.exitCode).toBe(EXIT_OK);
     expect(payload.schema_version).toBe("chemd-training-graph-index/v0.1");
     expect(payload.index_scope.sources).toEqual(expect.arrayContaining([
-      expect.objectContaining({ document_id: "exp-cli-graph-a", file_path: "graph-a.chemd.md" }),
-      expect.objectContaining({ document_id: "exp-cli-graph-b", file_path: "graph-b.chemd.md" })
+      expect.objectContaining({ document_id: "exp-cli-graph-a", file_path: "graph-a.chemd" }),
+      expect.objectContaining({ document_id: "exp-cli-graph-b", file_path: "graph-b.chemd" })
     ]));
     expect(payload.reaction_clusters).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -468,7 +468,7 @@ describe("chemd cli help validation export and repair", () => {
   });
 
   it("reports missing files", async () => {
-    const result = await runInTempDir(["validate", "missing.chemd.md"], {});
+    const result = await runInTempDir(["validate", "missing.chemd"], {});
 
     expect(result.exitCode).toBe(EXIT_USAGE);
     expect(result.stderr).toMatch(/Unable to read file/);
@@ -478,14 +478,14 @@ describe("chemd cli help validation export and repair", () => {
 describe("chemd cli agent loop", () => {
   it("runs agent-loop through an external driver and emits a clean JSON report", async () =>
     withTempDir(async (dir) => {
-      const filePath = path.join(dir, "agent.chemd.md");
+      const filePath = path.join(dir, "agent.chemd");
       writeFileSync(filePath, repairNeedsInputSource);
 
       const stdout = createWriter();
       const stderr = createWriter();
       const exitCode = await runChemdCli([
         "agent-loop",
-        "agent.chemd.md",
+        "agent.chemd",
         "--driver",
         process.execPath,
         "--driver-arg",
@@ -513,14 +513,14 @@ describe("chemd cli agent loop", () => {
 
   it("writes the final clean source back to disk when agent-loop uses --write", async () =>
     withTempDir(async (dir) => {
-      const filePath = path.join(dir, "agent-write.chemd.md");
+      const filePath = path.join(dir, "agent-write.chemd");
       writeFileSync(filePath, repairNeedsInputSource);
 
       const stdout = createWriter();
       const stderr = createWriter();
       const exitCode = await runChemdCli([
         "agent-loop",
-        "agent-write.chemd.md",
+        "agent-write.chemd",
         "--driver",
         process.execPath,
         "--driver-arg",
@@ -540,14 +540,14 @@ describe("chemd cli agent loop", () => {
 
   it("returns unresolved diagnosis when the external driver declines to rewrite", async () =>
     withTempDir(async (dir) => {
-      const filePath = path.join(dir, "agent-stop.chemd.md");
+      const filePath = path.join(dir, "agent-stop.chemd");
       writeFileSync(filePath, repairNeedsInputSource);
 
       const stdout = createWriter();
       const stderr = createWriter();
       const exitCode = await runChemdCli([
         "agent-loop",
-        "agent-stop.chemd.md",
+        "agent-stop.chemd",
         "--driver",
         process.execPath,
         "--driver-arg",
@@ -576,14 +576,14 @@ describe("chemd cli agent loop", () => {
 
   it("passes dash-prefixed arguments to the external agent-loop driver", async () =>
     withTempDir(async (dir) => {
-      const filePath = path.join(dir, "agent-dash.chemd.md");
+      const filePath = path.join(dir, "agent-dash.chemd");
       writeFileSync(filePath, repairNeedsInputSource);
 
       const stdout = createWriter();
       const stderr = createWriter();
       const exitCode = await runChemdCli([
         "agent-loop",
-        "agent-dash.chemd.md",
+        "agent-dash.chemd",
         "--driver",
         process.execPath,
         "--driver-arg",
@@ -610,8 +610,8 @@ describe("chemd cli agent loop", () => {
 
   it("rejects agent-loop invocations without a driver", async () => {
     const result = await runInTempDir(
-      ["agent-loop", "agent.chemd.md"],
-      { "agent.chemd.md": repairNeedsInputSource }
+      ["agent-loop", "agent.chemd"],
+      { "agent.chemd": repairNeedsInputSource }
     );
 
     expect(result.exitCode).toBe(EXIT_USAGE);
@@ -621,9 +621,9 @@ describe("chemd cli agent loop", () => {
 
 describe("chemd cli diff", () => {
   it("writes human-readable semantic diff changes", async () => {
-    const result = await runInTempDir(["diff", "before.chemd.md", "after.chemd.md"], {
-      "after.chemd.md": afterDiffSource,
-      "before.chemd.md": beforeDiffSource
+    const result = await runInTempDir(["diff", "before.chemd", "after.chemd"], {
+      "after.chemd": afterDiffSource,
+      "before.chemd": beforeDiffSource
     });
 
     expect(result.exitCode).toBe(EXIT_OK);
@@ -637,10 +637,10 @@ describe("chemd cli diff", () => {
 
   it("writes JSON semantic diff changes", async () => {
     const result = await runInTempDir(
-      ["diff", "before.chemd.md", "after.chemd.md", "--format", "json"],
+      ["diff", "before.chemd", "after.chemd", "--format", "json"],
       {
-        "after.chemd.md": afterDiffSource,
-        "before.chemd.md": beforeDiffSource
+        "after.chemd": afterDiffSource,
+        "before.chemd": beforeDiffSource
       }
     );
     const payload = JSON.parse(result.stdout);
@@ -659,9 +659,9 @@ describe("chemd cli diff", () => {
   });
 
   it("ignores objects without explicit IDs in semantic diff", async () => {
-    const result = await runInTempDir(["diff", "before.chemd.md", "after.chemd.md"], {
-      "after.chemd.md": noExplicitIdAfterSource,
-      "before.chemd.md": noExplicitIdBeforeSource
+    const result = await runInTempDir(["diff", "before.chemd", "after.chemd"], {
+      "after.chemd": noExplicitIdAfterSource,
+      "before.chemd": noExplicitIdBeforeSource
     });
 
     expect(result.exitCode).toBe(EXIT_OK);
@@ -669,9 +669,9 @@ describe("chemd cli diff", () => {
   });
 
   it("reports no semantic changes", async () => {
-    const result = await runInTempDir(["diff", "before.chemd.md", "same.chemd.md"], {
-      "before.chemd.md": beforeDiffSource,
-      "same.chemd.md": beforeDiffSource
+    const result = await runInTempDir(["diff", "before.chemd", "same.chemd"], {
+      "before.chemd": beforeDiffSource,
+      "same.chemd": beforeDiffSource
     });
 
     expect(result.exitCode).toBe(EXIT_OK);
@@ -680,10 +680,10 @@ describe("chemd cli diff", () => {
 
   it("rejects unsupported diff formats", async () => {
     const result = await runInTempDir(
-      ["diff", "before.chemd.md", "after.chemd.md", "--format", "xml"],
+      ["diff", "before.chemd", "after.chemd", "--format", "xml"],
       {
-        "after.chemd.md": afterDiffSource,
-        "before.chemd.md": beforeDiffSource
+        "after.chemd": afterDiffSource,
+        "before.chemd": beforeDiffSource
       }
     );
 
@@ -692,9 +692,9 @@ describe("chemd cli diff", () => {
   });
 
   it("rejects missing option values", async () => {
-    const diffResult = await runInTempDir(["diff", "before.chemd.md", "after.chemd.md", "--format"], {
-      "after.chemd.md": afterDiffSource,
-      "before.chemd.md": beforeDiffSource
+    const diffResult = await runInTempDir(["diff", "before.chemd", "after.chemd", "--format"], {
+      "after.chemd": afterDiffSource,
+      "before.chemd": beforeDiffSource
     });
     const changedResult = await runInTempDir(["changed", "--base"], {});
 
@@ -705,15 +705,15 @@ describe("chemd cli diff", () => {
   });
 
   it("exits 1 when diff inputs have error diagnostics", async () => {
-    const result = await runInTempDir(["diff", "before.chemd.md", "after.chemd.md"], {
-      "after.chemd.md": invalidKindSource,
-      "before.chemd.md": invalidKindSource
+    const result = await runInTempDir(["diff", "before.chemd", "after.chemd"], {
+      "after.chemd": invalidKindSource,
+      "before.chemd": invalidKindSource
     });
 
     expect(result.exitCode).toBe(EXIT_VALIDATION_FAILED);
     expect(result.stdout).toBe("");
-    expect(result.stderr).toMatch(/before\.chemd\.md/);
-    expect(result.stderr).toMatch(/after\.chemd\.md/);
+    expect(result.stderr).toMatch(/before\.chemd/);
+    expect(result.stderr).toMatch(/after\.chemd/);
     expect(result.stderr).toContain("E_CHEMD_KIND_CONFLICT");
   });
 });
@@ -721,16 +721,16 @@ describe("chemd cli diff", () => {
 describe("chemd cli changed", () => {
   it("validates and diffs modified tracked chemd files", async () => {
     const gitRunner = createGitRunner({
-      show: { "HEAD:tracked.chemd.md": beforeDiffSource },
-      tracked: "M\0tracked.chemd.md\0"
+      show: { "HEAD:tracked.chemd": beforeDiffSource },
+      tracked: "M\0tracked.chemd\0"
     });
     const result = await runInTempDir(["changed"], {
-      "tracked.chemd.md": afterDiffSource
+      "tracked.chemd": afterDiffSource
     }, { gitRunner });
 
     expect(result.exitCode).toBe(EXIT_OK);
-    expect(result.stdout).toMatch(/Changed \.chemd\.md files against HEAD:/);
-    expect(result.stdout).toMatch(/M tracked\.chemd\.md/);
+    expect(result.stdout).toMatch(/Changed Chemd files against HEAD:/);
+    expect(result.stdout).toMatch(/M tracked\.chemd/);
     expect(result.stdout).toMatch(/validation: 0 error\(s\)/);
     expect(result.stdout).toMatch(/semantic diff:/);
     expect(result.stdout).toMatch(/~ temperature: "25 C" -> "80 C"/);
@@ -738,12 +738,12 @@ describe("chemd cli changed", () => {
 
   it("writes JSON for modified tracked chemd files", async () => {
     const gitRunner = createGitRunner({
-      show: { "main:tracked.chemd.md": beforeDiffSource },
-      tracked: "M\0tracked.chemd.md\0"
+      show: { "main:tracked.chemd": beforeDiffSource },
+      tracked: "M\0tracked.chemd\0"
     });
     const result = await runInTempDir(
       ["changed", "--base", "main", "--format", "json"],
-      { "tracked.chemd.md": afterDiffSource },
+      { "tracked.chemd": afterDiffSource },
       { gitRunner }
     );
     const payload = JSON.parse(result.stdout);
@@ -751,74 +751,74 @@ describe("chemd cli changed", () => {
     expect(result.exitCode).toBe(EXIT_OK);
     expect(payload.schemaVersion).toBe("chemd-changed/v0.1");
     expect(payload.base).toBe("main");
-    expect(payload.files[0].path).toBe("tracked.chemd.md");
+    expect(payload.files[0].path).toBe("tracked.chemd");
     expect(payload.files[0].validation.counts.error).toBe(0);
     expect(payload.files[0].diff.schemaVersion).toBe("chemd-semantic-diff/v0.1");
   });
 
   it("validates tracked added chemd files without base diff", async () => {
-    const gitRunner = createGitRunner({ tracked: "A\0added.chemd.md\0" });
+    const gitRunner = createGitRunner({ tracked: "A\0added.chemd\0" });
     const result = await runInTempDir(["changed", "--format", "json"], {
-      "added.chemd.md": validSource
+      "added.chemd": validSource
     }, { gitRunner });
     const payload = JSON.parse(result.stdout);
 
     expect(result.exitCode).toBe(EXIT_OK);
     expect(payload.files[0].status).toBe("A");
-    expect(payload.files[0].path).toBe("added.chemd.md");
+    expect(payload.files[0].path).toBe("added.chemd");
     expect(payload.files[0].validation.counts.error).toBe(0);
     expect(payload.files[0].diff).toBeUndefined();
   });
 
   it("prints tracked added chemd files as new files", async () => {
-    const gitRunner = createGitRunner({ tracked: "A\0added.chemd.md\0" });
+    const gitRunner = createGitRunner({ tracked: "A\0added.chemd\0" });
     const result = await runInTempDir(["changed"], {
-      "added.chemd.md": validSource
+      "added.chemd": validSource
     }, { gitRunner });
 
     expect(result.exitCode).toBe(EXIT_OK);
-    expect(result.stdout).toMatch(/A added\.chemd\.md/);
+    expect(result.stdout).toMatch(/A added\.chemd/);
     expect(result.stdout).toMatch(/semantic diff: new file/);
   });
 
   it("diffs renamed tracked chemd files from the previous path", async () => {
     const gitRunner = createGitRunner({
-      show: { "HEAD:old.chemd.md": beforeDiffSource },
-      tracked: "R100\0old.chemd.md\0renamed.chemd.md\0"
+      show: { "HEAD:old.chemd": beforeDiffSource },
+      tracked: "R100\0old.chemd\0renamed.chemd\0"
     });
     const result = await runInTempDir(["changed", "--format", "json"], {
-      "renamed.chemd.md": afterDiffSource
+      "renamed.chemd": afterDiffSource
     }, { gitRunner });
     const payload = JSON.parse(result.stdout);
 
     expect(result.exitCode).toBe(EXIT_OK);
     expect(payload.files[0].status).toBe("R");
-    expect(payload.files[0].previousPath).toBe("old.chemd.md");
+    expect(payload.files[0].previousPath).toBe("old.chemd");
     expect(payload.files[0].diff.changes.length).toBeGreaterThan(0);
   });
 
   it("validates untracked chemd files without base diff", async () => {
-    const gitRunner = createGitRunner({ untracked: "new.chemd.md\0" });
+    const gitRunner = createGitRunner({ untracked: "new.chemd\0" });
     const result = await runInTempDir(["changed"], {
-      "new.chemd.md": validSource
+      "new.chemd": validSource
     }, { gitRunner });
 
     expect(result.exitCode).toBe(EXIT_OK);
-    expect(result.stdout).toMatch(/\? new\.chemd\.md/);
+    expect(result.stdout).toMatch(/\? new\.chemd/);
     expect(result.stdout).toMatch(/semantic diff: new file/);
   });
 
   it("exits 1 when a changed file has error diagnostics", async () => {
     const gitRunner = createGitRunner({
-      show: { "HEAD:invalid.chemd.md": validSource },
-      tracked: "M\0invalid.chemd.md\0"
+      show: { "HEAD:invalid.chemd": validSource },
+      tracked: "M\0invalid.chemd\0"
     });
     const result = await runInTempDir(["changed"], {
-      "invalid.chemd.md": invalidKindSource
+      "invalid.chemd": invalidKindSource
     }, { gitRunner });
 
     expect(result.exitCode).toBe(EXIT_VALIDATION_FAILED);
-    expect(result.stdout).toMatch(/M invalid\.chemd\.md/);
+    expect(result.stdout).toMatch(/M invalid\.chemd/);
     expect(result.stdout).toMatch(/validation: 1 error\(s\)/);
   });
 
@@ -848,6 +848,17 @@ describe("chemd cli changed", () => {
     });
 
     expect(result.exitCode).toBe(EXIT_OK);
-    expect(result.stdout.trim()).toBe("No changed .chemd.md files.");
+    expect(result.stdout.trim()).toBe("No changed Chemd files.");
+  });
+
+  it("keeps legacy .chemd.md files in changed-file discovery", async () => {
+    const gitRunner = createGitRunner({ tracked: "A\0legacy.chemd.md\0" });
+    const result = await runInTempDir(["changed", "--format", "json"], {
+      "legacy.chemd.md": validSource
+    }, { gitRunner });
+    const payload = JSON.parse(result.stdout);
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(payload.files[0].path).toBe("legacy.chemd.md");
   });
 });

@@ -31,8 +31,8 @@ const graphIndexFixture = (): ChemdTrainingGraphIndexV1 => ({
   index_scope: {
     document_ids: ["doc-ester", "doc-suzuki"],
     sources: [
-      { document_id: "doc-ester", file_path: "ester.chemd.md", content_hash: "hash-doc-ester" },
-      { document_id: "doc-suzuki", file_path: "suzuki.chemd.md", content_hash: "hash-doc-suzuki" }
+      { document_id: "doc-ester", file_path: "ester.chemd", content_hash: "hash-doc-ester" },
+      { document_id: "doc-suzuki", file_path: "suzuki.chemd", content_hash: "hash-doc-suzuki" }
     ]
   },
   nodes: [],

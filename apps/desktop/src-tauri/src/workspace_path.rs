@@ -39,7 +39,7 @@ pub(crate) fn relative_to_string(path: &Path) -> String {
 
 pub(crate) fn chemd_kind_for_path(path: &Path) -> Option<String> {
     let name = path.file_name()?.to_str()?.to_ascii_lowercase();
-    if name.ends_with(".chemd.md") {
+    if name.ends_with(".chemd") || name.ends_with(".chemd.md") {
         Some("document".into())
     } else if name.ends_with(".md") {
         Some("unknown".into())

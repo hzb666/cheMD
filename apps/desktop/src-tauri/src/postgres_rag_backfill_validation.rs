@@ -26,6 +26,10 @@ pub(crate) fn validate_postgres_rag_embedding_backfill(
     let (embedding_dim, valid_items, failed_items) =
         validate_backfill_items(input.items, explicit_dim);
     Ok(ValidatedPostgresRagEmbeddingBackfill {
+        workspace_id: input
+            .workspace_id
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty()),
         embedding_model,
         embedding_dim: embedding_dim.unwrap_or_else(|| explicit_dim.unwrap_or(0)),
         distance_metric,

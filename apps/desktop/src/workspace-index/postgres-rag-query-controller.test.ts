@@ -73,11 +73,11 @@ const localResult = (
   revisionId: "revision-local-1",
   chunkId: "chunk-local-1",
   sourceRange: range(3),
-  documentPath: "experiments/local.chemd.md",
-  documentUri: "chemd-workspace://workspace/experiments/local.chemd.md",
+  documentPath: "experiments/local.chemd",
+  documentUri: "chemd-workspace://workspace/experiments/local.chemd",
   text: "Local evidence about reaction yield.",
   label: "Local evidence about reaction yield.",
-  detail: "experiments/local.chemd.md citation-local-1 L3",
+  detail: "experiments/local.chemd citation-local-1 L3",
   locator: "citation-local-1 L3",
   ...patch
 });
@@ -98,10 +98,10 @@ const queryItem = (
     sourceRange: sourceRangeJson(),
     citation: {
       citationId: "citation-connected-1",
-      documentUri: "chemd-workspace://workspace/experiments/connected.chemd.md"
+      documentUri: "chemd-workspace://workspace/experiments/connected.chemd"
     },
     quality: { score: 0.87 },
-    sourceUri: "chemd-workspace://workspace/experiments/connected.chemd.md",
+    sourceUri: "chemd-workspace://workspace/experiments/connected.chemd",
     entityId: "rxn::connected::1",
     blockId: "rxn-connected-1"
   },

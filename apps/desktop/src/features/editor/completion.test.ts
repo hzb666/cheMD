@@ -71,7 +71,7 @@ const createModel = (
   documentUri: string
 ): editor.ITextModel => ({
   uri: {
-    path: "/completion.chemd.md",
+    path: "/completion.chemd",
     toString: () => documentUri
   },
   getValue: () => text,
@@ -143,8 +143,8 @@ describe("chemd Monaco completion provider", () => {
   it("registers once and merges local completions with cached workspace references", async () => {
     const providers: languages.CompletionItemProvider[] = [];
     const monaco = createMonaco(providers);
-    const documentUri = "chemd://desktop/current.chemd.md";
-    const libraryUri = "chemd://desktop/library.chemd.md";
+    const documentUri = "chemd://desktop/current.chemd";
+    const libraryUri = "chemd://desktop/library.chemd";
     const marked = withCursor(currentSource);
     const model = createModel(marked.source, documentUri);
     const compileOutput = compileChemdForEditor({
@@ -189,7 +189,7 @@ describe("chemd Monaco completion provider", () => {
     );
     const localOnlySuggestions = await getSuggestions(
       providers[0],
-      createModel("", "chemd://desktop/empty.chemd.md"),
+      createModel("", "chemd://desktop/empty.chemd"),
       { lineNumber: 1, column: 1 } as Position,
       createContext(monaco)
     );

@@ -21,6 +21,7 @@ export interface EditorTabsProps {
   menuActions?: readonly EditorTabMenuAction[];
   onSelectFile: (file: WorkspaceFileEntry) => void;
   onCloseFileTab: (fileId: string) => void;
+  onCloseAllFileTabs: () => void;
   onReorderFileTabs: (orderedFileIds: readonly string[]) => void;
   onOpenNewTab: () => void;
 }
@@ -30,7 +31,7 @@ const tabScrollClassName = "reference-editor-tab-scroll";
 const tabIconClassName = "reference-editor-tab-icon text-muted-foreground";
 const tabLabelClassName = "reference-editor-tab-label min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap";
 const tabDirtyClassName = "reference-editor-tab-dirty w-1.5 text-center opacity-0";
-const minTabWidth = 88;
+const minTabWidth = 86;
 
 const getNaturalTabWidth = () => {
   if (typeof window === "undefined") return 152;
@@ -56,6 +57,96 @@ type EditorTabStripProps = {
   onShouldSuppressClick: (fileId: string) => boolean;
 };
 
+type EditorTabProps = {
+  tab: WorkspaceFileEntry;
+  active: boolean;
+  tabDirty: boolean;
+  translateX: number;
+  isDragging: boolean;
+  onSelectFile: (file: WorkspaceFileEntry) => void;
+  onCloseFileTab: (fileId: string) => void;
+  onBeginTabDrag: (tabId: string, event: ReactPointerEvent<HTMLDivElement>) => boolean;
+  onUpdateTabDrag: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onFinishTabDrag: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onResetDragState: () => void;
+  onShouldSuppressClick: (fileId: string) => boolean;
+};
+
+function EditorTab({
+  tab,
+  active,
+  tabDirty,
+  translateX,
+  isDragging,
+  onSelectFile,
+  onCloseFileTab,
+  onBeginTabDrag,
+  onUpdateTabDrag,
+  onFinishTabDrag,
+  onResetDragState,
+  onShouldSuppressClick,
+}: EditorTabProps) {
+  return (
+    <div
+      className="reference-editor-tab"
+      data-active={active ? "true" : undefined}
+      data-dragging={isDragging ? "true" : undefined}
+      data-editor-tab-id={tab.id}
+      role="presentation"
+      style={{ transform: translateX ? `translate3d(${translateX}px, 0, 0)` : undefined }}
+      title={tab.path}
+      onMouseDown={(event) => event.stopPropagation()}
+      onPointerDown={(event) => {
+        if (onBeginTabDrag(tab.id, event)) {
+          onSelectFile(tab);
+        }
+      }}
+      onPointerMove={onUpdateTabDrag}
+      onPointerUp={onFinishTabDrag}
+      onPointerCancel={onResetDragState}
+      onLostPointerCapture={onResetDragState}
+    >
+      <span className="reference-editor-tab-bridge" aria-hidden="true" />
+      <button
+        type="button"
+        className="reference-editor-tab-trigger"
+        role="tab"
+        aria-selected={active}
+        tabIndex={active ? 0 : -1}
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={(event) => {
+          if (onShouldSuppressClick(tab.id)) {
+            event.preventDefault();
+            return;
+          }
+          onSelectFile(tab);
+        }}
+      >
+        <FileCode2 className={tabIconClassName} size={16} aria-hidden="true" />
+        <span className={tabLabelClassName} title={tab.name}>{tab.name}</span>
+        <span
+          className={tabDirtyClassName}
+          data-visible={tabDirty ? "true" : undefined}
+          aria-label={tabDirty ? "Unsaved changes" : undefined}
+        >
+          •
+        </span>
+      </button>
+      <button
+        type="button"
+        className="reference-editor-tab-close"
+        aria-label={`Close ${tab.name}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          onCloseFileTab(tab.id);
+        }}
+      >
+        <X size={13} aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
 function EditorTabStrip({
   tabs,
   selectedFileId,
@@ -75,42 +166,59 @@ function EditorTabStrip({
 }: EditorTabStripProps) {
   const [tabsOverflow, setTabsOverflow] = useState(false);
   const [tabWidth, setTabWidth] = useState(() => getNaturalTabWidth());
+  const prevTabsLength = useRef(tabs.length);
+  const pendingScroll = useRef(false);
+
+  useLayoutEffect(() => {
+    if (tabs.length > prevTabsLength.current) {
+      pendingScroll.current = true;
+    }
+    prevTabsLength.current = tabs.length;
+  }, [tabs.length]);
 
   useLayoutEffect(() => {
     const strip = stripRef.current;
     const scrollArea = strip?.querySelector<HTMLElement>(".reference-editor-tab-scroll");
-    const newButton = strip?.querySelector<HTMLElement>(".reference-editor-tab-new");
-    if (!strip || !scrollArea || !newButton) return undefined;
+    if (!strip || !scrollArea) return undefined;
 
-    const measureOverflow = () => {
+    const measureLayout = () => {
       const tabCount = tabs.length;
       const naturalTabWidth = getNaturalTabWidth();
-      const buttonStyle = window.getComputedStyle(newButton);
-      const buttonWidth = newButton.offsetWidth
-        + Number.parseFloat(buttonStyle.marginLeft || "0")
-        + Number.parseFloat(buttonStyle.marginRight || "0");
-      const scrollStyle = window.getComputedStyle(scrollArea);
-      const scrollPadding = Number.parseFloat(scrollStyle.paddingLeft || "0")
-        + Number.parseFloat(scrollStyle.paddingRight || "0");
-      const firstTab = scrollArea.querySelector<HTMLElement>("[data-editor-tab-id]");
-      const firstTabStyle = firstTab ? window.getComputedStyle(firstTab) : null;
-      const tabMargin = firstTabStyle
-        ? Number.parseFloat(firstTabStyle.marginLeft || "0") + Number.parseFloat(firstTabStyle.marginRight || "0")
-        : 0;
+
+      // Use exact CSS constants to eliminate expensive synchronous getComputedStyle reflows
+      const buttonWidth = 32; // .reference-editor-tab-new (2rem = 32px)
+      const scrollPadding = 14; // .reference-editor-tab-scroll padding-left (8px) + padding-right (6px)
+      const tabMargin = 2; // .reference-editor-tab margin-right (0.125rem = 2px)
+
       const availableWidth = Math.max(0, strip.clientWidth - buttonWidth - scrollPadding);
       const nextTabWidth = tabCount > 0
         ? Math.max(minTabWidth, Math.min(naturalTabWidth, (availableWidth / tabCount) - tabMargin))
         : naturalTabWidth;
-      const tabsWidth = tabCount * (nextTabWidth + tabMargin);
-      setTabWidth(nextTabWidth);
-      setTabsOverflow(tabsWidth + scrollPadding + buttonWidth > strip.clientWidth + 0.5);
+
+      const totalTabsWidth = tabCount * (nextTabWidth + tabMargin);
+      const isOverflowing = totalTabsWidth + scrollPadding + buttonWidth > strip.clientWidth;
+
+      if (nextTabWidth !== tabWidth || isOverflowing !== tabsOverflow) {
+        setTabWidth(nextTabWidth);
+        setTabsOverflow(isOverflowing);
+      } else if (pendingScroll.current) {
+        scrollArea.scrollLeft = scrollArea.scrollWidth;
+        pendingScroll.current = false;
+      } else {
+        // Intentionally empty to satisfy sonarjs/elseif-without-else
+      }
     };
 
-    measureOverflow();
-    const observer = new ResizeObserver(measureOverflow);
+    measureLayout();
+
+    const observer = new ResizeObserver(() => {
+      pendingScroll.current = false; // Do not trigger auto-scroll to end on manual window resizes
+      measureLayout();
+    });
+
     observer.observe(strip);
     return () => observer.disconnect();
-  }, [stripRef, tabs]);
+  }, [stripRef, tabs.length, tabWidth, tabsOverflow]);
 
   const scrollTabs = (event: ReactWheelEvent<HTMLDivElement>) => {
     const scrollArea = event.currentTarget.querySelector<HTMLElement>(".reference-editor-tab-scroll");
@@ -134,71 +242,23 @@ function EditorTabStrip({
       onWheel={scrollTabs}
     >
       <div className={tabScrollClassName}>
-        {tabs.map((tab) => {
-          const active = tab.id === selectedFileId;
-          const tabDirty = dirtyFileIds.includes(tab.id);
-          const translateX = onGetTabDragTranslateX(tab.id);
-          const isDragging = dragState?.started && dragState.sourceFileId === tab.id;
-          return (
-            <div
-              key={tab.id}
-              className="reference-editor-tab"
-              data-active={active ? "true" : undefined}
-              data-dragging={isDragging ? "true" : undefined}
-              data-editor-tab-id={tab.id}
-              role="presentation"
-              style={{ transform: translateX ? `translate3d(${translateX}px, 0, 0)` : undefined }}
-              title={tab.path}
-              onPointerDown={(event) => {
-                if (onBeginTabDrag(tab.id, event)) {
-                  onSelectFile(tab);
-                }
-              }}
-              onPointerMove={onUpdateTabDrag}
-              onPointerUp={onFinishTabDrag}
-              onPointerCancel={onResetDragState}
-              onLostPointerCapture={onResetDragState}
-            >
-              <span className="reference-editor-tab-bridge" aria-hidden="true" />
-              <button
-                type="button"
-                className="reference-editor-tab-trigger"
-                role="tab"
-                aria-selected={active}
-                tabIndex={active ? 0 : -1}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={(event) => {
-                  if (onShouldSuppressClick(tab.id)) {
-                    event.preventDefault();
-                    return;
-                  }
-                  onSelectFile(tab);
-                }}
-              >
-                <FileCode2 className={tabIconClassName} size={16} aria-hidden="true" />
-                <span className={tabLabelClassName} title={tab.name}>{tab.name}</span>
-                <span
-                  className={tabDirtyClassName}
-                  data-visible={tabDirty ? "true" : undefined}
-                  aria-label={tabDirty ? "Unsaved changes" : undefined}
-                >
-                  •
-                </span>
-              </button>
-              <button
-                type="button"
-                className="reference-editor-tab-close"
-                aria-label={`Close ${tab.name}`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onCloseFileTab(tab.id);
-                }}
-              >
-                <X size={13} aria-hidden="true" />
-              </button>
-            </div>
-          );
-        })}
+        {tabs.map((tab) => (
+          <EditorTab
+            key={tab.id}
+            tab={tab}
+            active={tab.id === selectedFileId}
+            tabDirty={dirtyFileIds.includes(tab.id)}
+            translateX={onGetTabDragTranslateX(tab.id)}
+            isDragging={Boolean(dragState?.started && dragState.sourceFileId === tab.id)}
+            onSelectFile={onSelectFile}
+            onCloseFileTab={onCloseFileTab}
+            onBeginTabDrag={onBeginTabDrag}
+            onUpdateTabDrag={onUpdateTabDrag}
+            onFinishTabDrag={onFinishTabDrag}
+            onResetDragState={onResetDragState}
+            onShouldSuppressClick={onShouldSuppressClick}
+          />
+        ))}
       </div>
       <Button
         type="button"
@@ -222,6 +282,7 @@ export function EditorTabs({
   menuActions = [],
   onSelectFile,
   onCloseFileTab,
+  onCloseAllFileTabs,
   onReorderFileTabs,
   onOpenNewTab,
 }: EditorTabsProps) {
@@ -274,6 +335,7 @@ export function EditorTabs({
             onTabQueryChange={setTabQuery}
             onSelectFile={onSelectFile}
             onCloseFileTab={onCloseFileTab}
+            onCloseAllFileTabs={onCloseAllFileTabs}
             onClose={() => setMenuOpen(false)}
           />
         ) : null}

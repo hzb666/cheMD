@@ -1,4 +1,7 @@
-use crate::workspace::{not_selected, CommandError, WorkspaceFileEntry, WorkspaceHandle};
+use crate::workspace::{
+    not_selected, CommandError, WorkspaceDocumentQueryOptions, WorkspaceDocumentQueryResult,
+    WorkspaceFileEntry, WorkspaceHandle,
+};
 use crate::workspace_path::{chemd_kind_for_path, relative_path};
 use std::{
     fs,
@@ -8,6 +11,8 @@ use std::{
 const MAX_DEPTH: usize = 6;
 const MAX_ENTRIES: usize = 1_000;
 const MAX_CHILDREN_PER_DIR: usize = 256;
+const DEFAULT_DOCUMENT_QUERY_LIMIT: usize = 100;
+const MAX_DOCUMENT_QUERY_LIMIT: usize = 250;
 const IGNORED_DIRS: &[&str] = &[
     ".git",
     ".hg",
@@ -83,6 +88,56 @@ pub(crate) fn list_workspace_files_impl(
     visit_directory(workspace_id, root, root, 0, &mut entries)?;
     entries.sort_by(|left, right| left.path.cmp(&right.path));
     Ok(entries)
+}
+
+pub(crate) fn query_workspace_documents_impl(
+    workspace_id: &str,
+    root: &Path,
+    options: &WorkspaceDocumentQueryOptions,
+) -> Result<WorkspaceDocumentQueryResult, CommandError> {
+    let query = options
+        .query
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_ascii_lowercase);
+    let exclude_path = options
+        .exclude_path
+        .as_deref()
+        .map(normalize_workspace_path)
+        .filter(|value| !value.is_empty());
+    let cursor = options.cursor.unwrap_or(0);
+    let limit = options
+        .limit
+        .unwrap_or(DEFAULT_DOCUMENT_QUERY_LIMIT)
+        .clamp(1, MAX_DOCUMENT_QUERY_LIMIT);
+    let files = list_workspace_files_impl(workspace_id, root)?;
+    let matches = files
+        .into_iter()
+        .filter(is_chemd_document_entry)
+        .filter(|entry| {
+            exclude_path.as_deref().map_or(true, |excluded| {
+                normalize_workspace_path(&entry.path) != excluded
+            })
+        })
+        .filter(|entry| {
+            query
+                .as_deref()
+                .map_or(true, |value| document_matches_query(entry, value))
+        })
+        .collect::<Vec<_>>();
+    let total_count = matches.len();
+    let files = matches
+        .into_iter()
+        .skip(cursor)
+        .take(limit)
+        .collect::<Vec<_>>();
+    let next_cursor = (cursor + files.len() < total_count).then_some(cursor + files.len());
+    Ok(WorkspaceDocumentQueryResult {
+        files,
+        total_count,
+        next_cursor,
+    })
 }
 
 fn visit_directory(
@@ -171,6 +226,22 @@ fn read_workspace_children(dir: &Path) -> Result<Vec<fs::DirEntry>, CommandError
     }
     children.sort_by_key(|entry| entry.file_name());
     Ok(children)
+}
+
+fn is_chemd_document_entry(entry: &WorkspaceFileEntry) -> bool {
+    entry.kind == "file"
+        && (entry.chemd_kind.as_deref() == Some("document")
+            || entry.path.ends_with(".chemd")
+            || entry.path.ends_with(".chemd.md"))
+}
+
+fn document_matches_query(entry: &WorkspaceFileEntry, normalized_query: &str) -> bool {
+    entry.name.to_ascii_lowercase().contains(normalized_query)
+        || entry.path.to_ascii_lowercase().contains(normalized_query)
+}
+
+fn normalize_workspace_path(path: &str) -> String {
+    path.replace('\\', "/").trim_start_matches('/').to_string()
 }
 
 pub(crate) fn should_ignore_workspace_path(path: &Path) -> bool {

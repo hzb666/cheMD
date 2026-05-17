@@ -12,8 +12,8 @@ const basename = (value: string): string => {
 const trimKnownExtensions = (value: string): string =>
   value
     .replace(/\.chemd\.md$/i, "")
-    .replace(/\.md$/i, "")
-    .replace(/\.[^.]+$/i, "");
+    .replace(/\.chemd$/i, "")
+    .replace(/\.md$/i, "");
 
 const documentAliases = (symbol: WorkspaceSymbol): Set<string> => {
   const aliases = new Set([symbol.documentUri, basename(symbol.documentUri)]);
@@ -21,6 +21,14 @@ const documentAliases = (symbol: WorkspaceSymbol): Set<string> => {
     aliases.add(symbol.documentPath);
     aliases.add(basename(symbol.documentPath));
   }
+  for (const alias of [...aliases]) {
+    aliases.add(trimKnownExtensions(alias));
+  }
+  return aliases;
+};
+
+const referenceDocumentAliases = (value: string): Set<string> => {
+  const aliases = new Set([value, basename(value)]);
   for (const alias of [...aliases]) {
     aliases.add(trimKnownExtensions(alias));
   }
@@ -40,9 +48,11 @@ const findMatches = (
     symbol.localId === reference.targetLocalId
   );
   if (reference.targetDocumentAlias) {
-    return localMatches.filter((symbol) =>
-      documentAliases(symbol).has(reference.targetDocumentAlias ?? "")
-    );
+    const targetAliases = referenceDocumentAliases(reference.targetDocumentAlias);
+    return localMatches.filter((symbol) => {
+      const aliases = documentAliases(symbol);
+      return [...targetAliases].some((alias) => aliases.has(alias));
+    });
   }
 
   const sameDocumentMatches = localMatches.filter((symbol) =>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useDeferredValue, useMemo, useState } from "react";
 
 import { Label } from "../../../components/ui/label";
 import { Textarea } from "../../../components/ui/textarea";
@@ -22,7 +22,10 @@ const getMirrorLine = (line: string) => (line.length > 0 ? line : "\u00a0");
 export const EditorSurface = ({ source, onSourceChange }: EditorSurfaceProps) => {
   const [isFocused, setIsFocused] = useState(false);
   const [scrollTop, setScrollTop] = useState(0);
-  const lines = useMemo(() => source.split(/\r?\n/), [source]);
+
+  // Performance: Decouple heavy line splitting from urgent keystroke updates
+  const deferredSource = useDeferredValue(source);
+  const lines = useMemo(() => deferredSource.split(/\r?\n/), [deferredSource]);
 
   return (
     <div
@@ -42,7 +45,8 @@ export const EditorSurface = ({ source, onSourceChange }: EditorSurfaceProps) =>
         >
           {lines.map((line, index) => (
             <div
-              key={`${index}-${line.length}`}
+              // Performance: Use stable index. Length changes shouldn't unmount the node.
+              key={index}
               className={cn(
                 "grid min-w-0 transition-[grid-template-columns]",
                 SURFACE_TRANSITION_CLASS,

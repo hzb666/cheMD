@@ -531,8 +531,8 @@ export const buildMinimalDesktopRuntimePersistencePayload = ({
     metadata: {
       workspaceId: "desktop-runtime-smoke-workspace",
       documentId: "desktop-runtime-smoke-document",
-      documentPath: "experiments/desktop-runtime-smoke.chemd.md",
-      documentName: "desktop-runtime-smoke.chemd.md",
+      documentPath: "experiments/desktop-runtime-smoke.chemd",
+      documentName: "desktop-runtime-smoke.chemd",
       documentUri: "chemd://desktop-runtime-smoke",
       revisionId,
       graphSnapshotId,

@@ -61,7 +61,7 @@ const createModel = (
   documentUri: string
 ): editor.ITextModel => ({
   uri: {
-    path: "/hover-definition.chemd.md",
+    path: "/hover-definition.chemd",
     toString: () => documentUri
   },
   getValue: () => text,
@@ -151,7 +151,7 @@ describe("chemd Monaco navigation providers", () => {
     const hoverProviders: languages.HoverProvider[] = [];
     const definitionProviders: languages.DefinitionProvider[] = [];
     const monaco = createMonaco(hoverProviders, definitionProviders);
-    const documentUri = "chemd://desktop/hover-definition.chemd.md";
+    const documentUri = "chemd://desktop/hover-definition.chemd";
     const marked = withCursor(source.replace("@mol-main", "@mol|-main"));
     const model = createModel(marked.source, documentUri);
     const compileOutput = compileChemdForEditor({

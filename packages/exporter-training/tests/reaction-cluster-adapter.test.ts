@@ -67,8 +67,8 @@ const graphIndex = (
   index_scope: {
     document_ids: ["doc-a", "doc-b"],
     sources: [
-      { document_id: "doc-a", file_path: "a.chemd.md", content_hash: "hash-a" },
-      { document_id: "doc-b", file_path: "b.chemd.md", content_hash: "hash-b" }
+      { document_id: "doc-a", file_path: "a.chemd", content_hash: "hash-a" },
+      { document_id: "doc-b", file_path: "b.chemd", content_hash: "hash-b" }
     ]
   },
   nodes: [],

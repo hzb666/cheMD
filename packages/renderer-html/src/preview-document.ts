@@ -3,6 +3,10 @@ const PREVIEW_FONT_STACK =
 
 export type PreviewTheme = "light" | "dark";
 
+export interface PreviewDocumentOptions {
+  backgroundColor?: string;
+}
+
 export const PREVIEW_THEME_SYNC_MESSAGE_TYPE = "chemd:theme-sync";
 
 export const PREVIEW_THEME_SYNC_ACK_MESSAGE_TYPE = "chemd:theme-sync-applied";
@@ -79,7 +83,7 @@ export const PREVIEW_DOCUMENT_STYLE = `
   :root {
     color-scheme: light;
     font-family: ${PREVIEW_FONT_STACK};
-    --preview-background: #ffffff;
+    --preview-background: #f8fafc;
     --preview-background-soft: #f8fafc;
     --preview-foreground: #1e293b;
     --preview-muted: #64748b;
@@ -268,7 +272,7 @@ export const PREVIEW_DOCUMENT_STYLE = `
   body {
     font-family: inherit;
     color: var(--preview-foreground);
-    background: linear-gradient(180deg, var(--preview-background) 0%, var(--preview-background-soft) 100%);
+    background: var(--preview-background);
     line-height: 1.68;
   }
 
@@ -887,6 +891,24 @@ export const PREVIEW_DOCUMENT_STYLE = `
   }
 `;
 
+const toCssColorOverride = (value: string | undefined): string | null => {
+  const color = value?.trim();
+  if (!color || /[;{}<>]/.test(color) || /\/\*/.test(color)) return null;
+  return color;
+};
+
+const buildPreviewDocumentStyle = (options: PreviewDocumentOptions | undefined): string => {
+  const backgroundColor = toCssColorOverride(options?.backgroundColor);
+  if (!backgroundColor) return PREVIEW_DOCUMENT_STYLE;
+
+  return `${PREVIEW_DOCUMENT_STYLE}
+  :root {
+    --preview-background: ${backgroundColor};
+    --preview-background-soft: ${backgroundColor};
+  }
+`;
+};
+
 const buildPreviewDocumentCsp = (scriptNonce: string): string => [
   "default-src 'none'",
   "img-src data: blob: https: http:",
@@ -898,7 +920,11 @@ const buildPreviewDocumentCsp = (scriptNonce: string): string => [
 const getPreviewDocumentRootAttributes = (theme: PreviewTheme): string =>
   theme === "dark" ? ' class="dark" data-theme="dark"' : ' data-theme="light"';
 
-export const toSandboxedPreviewDocument = (html: string, theme: PreviewTheme = "light") => {
+export const toSandboxedPreviewDocument = (
+  html: string,
+  theme: PreviewTheme = "light",
+  options?: PreviewDocumentOptions
+) => {
   const scriptNonce = createPreviewScriptNonce();
-  return `<!doctype html><html${getPreviewDocumentRootAttributes(theme)}><head><meta charset="utf-8" /><meta http-equiv="Content-Security-Policy" content="${buildPreviewDocumentCsp(scriptNonce)}" /><style>${PREVIEW_DOCUMENT_STYLE}</style></head><body>${buildPreviewThemeSyncScriptTag(scriptNonce)}${html}</body></html>`;
+  return `<!doctype html><html${getPreviewDocumentRootAttributes(theme)}><head><meta charset="utf-8" /><meta http-equiv="Content-Security-Policy" content="${buildPreviewDocumentCsp(scriptNonce)}" /><style>${buildPreviewDocumentStyle(options)}</style></head><body>${buildPreviewThemeSyncScriptTag(scriptNonce)}${html}</body></html>`;
 };

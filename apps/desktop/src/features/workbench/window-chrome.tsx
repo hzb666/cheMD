@@ -12,7 +12,10 @@ import logoUrl from "../../../../../vision/logo-01.svg?url";
 import type { ActivityTool, WorkbenchProps } from "../../types";
 import { EditorTabs } from "../editor-tabs/editor-tabs";
 import { referenceActivityItems } from "../activity-tools/activity-tools";
-import type { ReferenceBottomPanelId } from "./bottom-panel";
+import {
+  referenceBottomPanelDomId,
+  type ReferenceBottomPanelId,
+} from "./bottom-panel";
 import {
   beginReferenceWindowDrag,
   runReferenceWindowCommand,
@@ -77,6 +80,7 @@ export function ReferenceGlobalHeaderActions({
         className="reference-editor-tab-menu-trigger"
         data-active={bottomPanel === "terminal" ? "true" : undefined}
         aria-pressed={bottomPanel === "terminal"}
+        aria-controls={referenceBottomPanelDomId}
         aria-label="Toggle terminal panel"
         title="Toggle terminal panel"
         onClick={onToggleTerminal}
@@ -122,6 +126,7 @@ export function ReferenceTabBar({
   onToggleTerminal,
   onSelectFile,
   onCloseFileTab,
+  onCloseAllFileTabs,
   onReorderFileTabs,
   onOpenNewTab,
 }: {
@@ -133,6 +138,7 @@ export function ReferenceTabBar({
   onToggleTerminal: () => void;
   onSelectFile: WorkbenchProps["onSelectFile"];
   onCloseFileTab: WorkbenchProps["onCloseFileTab"];
+  onCloseAllFileTabs: WorkbenchProps["onCloseAllFileTabs"];
   onReorderFileTabs: WorkbenchProps["onReorderFileTabs"];
   onOpenNewTab: WorkbenchProps["onOpenNewTab"];
 }) {
@@ -158,6 +164,7 @@ export function ReferenceTabBar({
           dirtyFileIds={dirtyFileIds}
           onSelectFile={onSelectFile}
           onCloseFileTab={onCloseFileTab}
+          onCloseAllFileTabs={onCloseAllFileTabs}
           onReorderFileTabs={onReorderFileTabs}
           onOpenNewTab={onOpenNewTab}
           menuActions={sidebarVisible ? [] : [{

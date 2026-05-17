@@ -28,7 +28,7 @@ const createModel = (
   documentUri: string
 ): editor.ITextModel => ({
   uri: {
-    path: "/code-actions.chemd.md",
+    path: "/code-actions.chemd",
     toString: () => documentUri
   },
   getValue: () => text,
@@ -82,7 +82,7 @@ describe("chemd Monaco code action provider", () => {
     const providers: languages.CodeActionProvider[] = [];
     const providedKinds: string[][] = [];
     const monaco = createMonaco(providers, providedKinds);
-    const documentUri = "chemd://desktop/code-actions.chemd.md";
+    const documentUri = "chemd://desktop/code-actions.chemd";
     const model = createModel(source, documentUri);
     const requestRange = new monaco.Range(1, 1, 20, 1);
 

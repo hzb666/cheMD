@@ -72,31 +72,33 @@ const DialogContent = React.forwardRef<
 >(({ className, children, showCloseButton = true, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
-    <DialogPrimitive.Popup
-      ref={ref}
-      data-slot="dialog-content"
-      className={cn(
-        "dialog-content fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 transform-gpu scale-100 gap-4 rounded-lg border border-white/45 bg-background/95 p-6 text-foreground opacity-100 shadow-[0_8px_24px_rgba(15,23,42,0.07)] outline-none transition-[opacity,scale] duration-[220ms] ease-out will-change-[opacity,scale] data-[starting-style]:scale-[0.985] data-[starting-style]:opacity-0 data-[ending-style]:scale-[0.985] data-[ending-style]:opacity-0 data-[ending-style]:duration-[180ms] data-[ending-style]:ease-in motion-reduce:transition-none",
-        className,
-      )}
-      {...props}
-    >
-      {children}
-      {showCloseButton ? (
-        <DialogPrimitive.Close
-          className={cn(
-            buttonVariants({ variant: "window", size: "icon-sm" }),
-            "absolute right-3 top-3",
-          )}
-          data-control="close"
-          aria-label="Close dialog"
-          title="Close"
-        >
-          <X size={16} strokeWidth={2} />
-          <span className="sr-only">Close</span>
-        </DialogPrimitive.Close>
-      ) : null}
-    </DialogPrimitive.Popup>
+    <div className="fixed inset-0 z-50 grid place-items-center p-4 pointer-events-none">
+      <DialogPrimitive.Popup
+        ref={ref}
+        data-slot="dialog-content"
+        className={cn(
+          "dialog-content pointer-events-auto relative grid max-h-full w-full max-w-lg gap-4 rounded-lg border border-white/45 bg-background/95 p-6 text-foreground opacity-100 shadow-[0_8px_24px_rgba(15,23,42,0.07)] outline-none transition-opacity duration-[220ms] ease-out will-change-[opacity] data-[starting-style]:opacity-0 data-[ending-style]:opacity-0 data-[ending-style]:duration-[180ms] data-[ending-style]:ease-in motion-reduce:transition-none",
+          className,
+        )}
+        {...props}
+      >
+        {children}
+        {showCloseButton ? (
+          <DialogPrimitive.Close
+            className={cn(
+              buttonVariants({ variant: "window", size: "icon-sm" }),
+              "absolute right-3 top-3",
+            )}
+            data-control="close"
+            aria-label="Close dialog"
+            title="Close"
+          >
+            <X size={16} strokeWidth={2} />
+            <span className="sr-only">Close</span>
+          </DialogPrimitive.Close>
+        ) : null}
+      </DialogPrimitive.Popup>
+    </div>
   </DialogPortal>
 ))
 DialogContent.displayName = "DialogContent"

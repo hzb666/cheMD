@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 
-const CHEMD_GLOB = "*.chemd.md";
+const CHEMD_GLOBS = ["*.chemd", "*.chemd.md"] as const;
 
 export interface GitChangedFile {
   status: string;
@@ -127,13 +127,13 @@ export const discoverChangedChemdFiles = ({
       "--diff-filter=ACMRTD",
       base,
       "--",
-      CHEMD_GLOB
+      ...CHEMD_GLOBS
     ],
     cwd
   );
   const untracked = runGitChecked(
     gitRunner,
-    ["ls-files", "--others", "--exclude-standard", "-z", "--", CHEMD_GLOB],
+    ["ls-files", "--others", "--exclude-standard", "-z", "--", ...CHEMD_GLOBS],
     cwd
   );
 

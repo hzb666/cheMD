@@ -58,7 +58,7 @@ const graphIndex = (
   schema_version: "chemd-training-graph-index/v0.1",
   index_scope: {
     sources: [
-      { document_id: "doc-a", file_path: "a.chemd.md", content_hash: "hash-a" }
+      { document_id: "doc-a", file_path: "a.chemd", content_hash: "hash-a" }
     ]
   },
   reaction_features: features,
@@ -79,7 +79,7 @@ describe("buildReactionClusterPanel", () => {
       ),
       selectedClusterId: "cluster-family",
       compiledAt: "2026-05-13T00:00:00.000Z",
-      documentUri: "file:///D:/labs/a.chemd.md"
+      documentUri: "file:///D:/labs/a.chemd"
     });
 
     expect(panel.state).toBe("ready");

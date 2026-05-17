@@ -2,7 +2,10 @@
 
 use crate::{
     postgres::connect,
-    postgres_config::{load_postgres_config, redact_config_detail, PostgresRuntimeConfig},
+    postgres_config::{
+        load_postgres_config, load_postgres_config_for_workspace, redact_config_detail,
+        PostgresRuntimeConfig,
+    },
     postgres_runtime_sql::persist_runtime_graph_rag_records,
     postgres_runtime_types::{
         PersistRuntimeGraphRagCounts, PersistRuntimeGraphRagInput, PersistRuntimeGraphRagResult,
@@ -34,7 +37,12 @@ pub(crate) fn persist_runtime_graph_rag_impl(
     records: PersistRuntimeGraphRagInput,
 ) -> Result<PersistRuntimeGraphRagResult, CommandError> {
     validate_runtime_graph_rag_input(&records)?;
-    let config = load_postgres_config().ok_or_else(missing_config_error)?;
+    let workspace_id = runtime_workspace_id(&records);
+    let config = match workspace_id.as_deref() {
+        Some(id) => load_postgres_config_for_workspace(Some(id))
+            .ok_or_else(|| missing_workspace_config_error(id))?,
+        None => load_postgres_config().ok_or_else(missing_config_error)?,
+    };
     let mut client = connect(&config).map_err(|detail| {
         CommandError::new(
             "postgres_connect_failed",
@@ -52,6 +60,17 @@ pub(crate) fn persist_runtime_graph_rag_impl(
     })?;
 
     Ok(success_result(records, &config))
+}
+
+fn runtime_workspace_id(records: &PersistRuntimeGraphRagInput) -> Option<String> {
+    records
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get("workspaceId"))
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
 }
 
 pub(crate) fn validate_runtime_graph_rag_input(
@@ -232,6 +251,16 @@ fn missing_config_error() -> CommandError {
             "Set CHEMD_POSTGRES_DATABASE_URL or DATABASE_URL before persisting runtime records"
                 .into(),
         ),
+    )
+}
+
+fn missing_workspace_config_error(workspace_id: &str) -> CommandError {
+    CommandError::new(
+        "workspace_postgres_config_missing",
+        "Workspace Postgres profile is missing",
+        Some(format!(
+            "Bind workspace {workspace_id} to a Postgres profile before persisting runtime records"
+        )),
     )
 }
 

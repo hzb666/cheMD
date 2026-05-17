@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { WorkspaceFileEntry, WorkspaceHandle } from "../contracts";
+import type { WorkspaceDocumentQueryResult, WorkspaceFileEntry, WorkspaceHandle } from "../contracts";
 import {
   buildWorkspaceIndexViewModel,
   isChemdDocumentPath,
@@ -14,6 +14,16 @@ export type WorkspaceIndexReadFile = (
   file: WorkspaceFileEntry
 ) => Promise<{ content: string; modifiedAtMs?: number | null }>;
 
+export type WorkspaceIndexQueryDocuments = (
+  input: {
+    workspaceId?: string;
+    query?: string;
+    excludePath?: string;
+    cursor?: number;
+    limit?: number;
+  }
+) => Promise<WorkspaceDocumentQueryResult>;
+
 export interface UseWorkspaceIndexInput {
   mode: "sample" | "workspace";
   workspaceState: "empty" | "opening" | "open" | "error";
@@ -22,6 +32,7 @@ export interface UseWorkspaceIndexInput {
   selectedFile: WorkspaceFileEntry;
   source: string;
   readFile: WorkspaceIndexReadFile;
+  queryDocuments?: WorkspaceIndexQueryDocuments;
 }
 
 export interface WorkspaceIndexController {
@@ -60,6 +71,8 @@ const replaceCurrentDocument = (
 const errorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
+const DEFAULT_WORKSPACE_INDEX_DOCUMENT_LIMIT = 200;
+
 export const useWorkspaceIndexController = ({
   mode,
   workspaceState,
@@ -67,7 +80,8 @@ export const useWorkspaceIndexController = ({
   files,
   selectedFile,
   source,
-  readFile
+  readFile,
+  queryDocuments
 }: UseWorkspaceIndexInput): WorkspaceIndexController => {
   const [loadedDocuments, setLoadedDocuments] = useState<WorkspaceDocumentSource[]>([]);
   const [loadState, setLoadState] = useState<WorkspaceIndexLoadState>("idle");
@@ -78,32 +92,38 @@ export const useWorkspaceIndexController = ({
       ? toDocumentSource(selectedFile, source)
       : undefined,
   [selectedFile, source]);
+  const currentDocumentPath = currentDocument?.path;
+  const hasCurrentDocument = currentDocument !== undefined;
 
   useEffect(() => {
     let cancelled = false;
-    const filesToRead = mode === "workspace" && workspaceState === "open"
-      ? visibleChemdFiles(files).filter((file) => file.path !== currentDocument?.path)
-      : [];
 
-    if (filesToRead.length === 0) {
-      setLoadedDocuments([]);
-      setLoadState(currentDocument ? "ready" : "idle");
-      setError(null);
-      return;
-    }
+    const loadDocuments = async (): Promise<WorkspaceDocumentSource[]> => {
+      if (mode !== "workspace" || workspaceState !== "open") {
+        return [];
+      }
+      const filesToRead = queryDocuments
+        ? (await queryDocuments({
+          workspaceId: workspace.workspaceId,
+          excludePath: currentDocumentPath,
+          limit: DEFAULT_WORKSPACE_INDEX_DOCUMENT_LIMIT
+        })).files
+        : visibleChemdFiles(files).filter((file) => file.path !== currentDocumentPath);
+      return Promise.all(filesToRead.map(async (file) => {
+        const result = await readFile(file);
+        return toDocumentSource(file, result.content, result.modifiedAtMs);
+      }));
+    };
 
-    setLoadState("loading");
+    setLoadState(hasCurrentDocument ? "loading" : "idle");
     setError(null);
-    void Promise.all(filesToRead.map(async (file) => {
-      const result = await readFile(file);
-      return toDocumentSource(file, result.content, result.modifiedAtMs);
-    }))
+    void loadDocuments()
       .then((documents) => {
         if (cancelled) {
           return;
         }
         setLoadedDocuments(documents);
-        setLoadState("ready");
+        setLoadState(documents.length > 0 || hasCurrentDocument ? "ready" : "idle");
       })
       .catch((loadError) => {
         if (cancelled) {
@@ -116,7 +136,17 @@ export const useWorkspaceIndexController = ({
     return () => {
       cancelled = true;
     };
-  }, [currentDocument?.path, files, mode, readFile, refreshToken, workspaceState]);
+  }, [
+    currentDocumentPath,
+    files,
+    hasCurrentDocument,
+    mode,
+    queryDocuments,
+    readFile,
+    refreshToken,
+    workspace.workspaceId,
+    workspaceState
+  ]);
 
   const documents = currentDocument
     ? replaceCurrentDocument(loadedDocuments, currentDocument)

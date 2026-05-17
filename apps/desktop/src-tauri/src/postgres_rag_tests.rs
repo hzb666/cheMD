@@ -73,11 +73,11 @@ fn postgres_rag_query_sql_joins_embeddings_chunks_citations_and_sources() {
 fn postgres_rag_query_blocks_rows_without_citation_locator_source() {
     let (results, blocked_count) = map_postgres_rag_rows(vec![
         candidate_row(
-            Some(r#"{"citationId":"citation-1","documentUri":"file:///workspace/a.chemd.md"}"#),
+            Some(r#"{"citationId":"citation-1","documentUri":"file:///workspace/a.chemd"}"#),
             Some(r#"{"startLine":12,"endLine":14}"#),
         ),
         candidate_row(
-            Some(r#"{"documentUri":"file:///workspace/no-id.chemd.md"}"#),
+            Some(r#"{"documentUri":"file:///workspace/no-id.chemd"}"#),
             Some(r#"{"startLine":12,"endLine":14}"#),
         ),
         candidate_row(Some(r#"{"citationId":"citation-no-range"}"#), Some("{}")),
@@ -89,7 +89,7 @@ fn postgres_rag_query_blocks_rows_without_citation_locator_source() {
     assert_eq!(results[0].chunk_id, "chunk-1");
     assert_eq!(
         results[0].citation.locator,
-        "file:///workspace/a.chemd.md#citation-1:L12-L14"
+        "file:///workspace/a.chemd#citation-1:L12-L14"
     );
 }
 
@@ -139,7 +139,7 @@ fn candidate_row(
         text: "reaction evidence".into(),
         metadata_json: r#"{"workspaceId":"workspace-1"}"#.into(),
         distance: 0.12,
-        source_uri: Some("file:///workspace/fallback.chemd.md".into()),
+        source_uri: Some("file:///workspace/fallback.chemd".into()),
         citation_source_range_json: citation_source_range_json.map(str::to_string),
         citation_json: citation_json.map(str::to_string),
         citation_quality_json: Some(r#"{"score":0.9}"#.into()),

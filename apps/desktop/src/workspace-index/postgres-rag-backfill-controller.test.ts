@@ -65,11 +65,11 @@ const localResult = (
   revisionId: "revision-local-1",
   chunkId: "chunk-local-1",
   sourceRange: range(3),
-  documentPath: "experiments/local.chemd.md",
-  documentUri: "chemd-workspace://workspace/experiments/local.chemd.md",
+  documentPath: "experiments/local.chemd",
+  documentUri: "chemd-workspace://workspace/experiments/local.chemd",
   text: "Local evidence about reaction yield.",
   label: "Local evidence about reaction yield.",
-  detail: "experiments/local.chemd.md citation-local-1 L3",
+  detail: "experiments/local.chemd citation-local-1 L3",
   locator: "citation-local-1 L3",
   ...patch
 });
@@ -146,6 +146,7 @@ describe("desktop Postgres RAG backfill controller helpers", () => {
   it("builds a Postgres backfill request from ready embedding items", () => {
     const plan = buildPostgresRagBackfillEmbeddingPlan([localResult()]);
     const result = buildPostgresRagBackfillRequest({
+      workspaceId: "workspace-alpha",
       plan,
       embeddingResult: embeddingResult(),
       embeddingModel: "text-embedding-3-small",
@@ -154,6 +155,7 @@ describe("desktop Postgres RAG backfill controller helpers", () => {
     });
 
     expect(result.request).toEqual({
+      workspaceId: "workspace-alpha",
       embeddingModel: "text-embedding-3-small",
       embeddingDim: 3,
       distanceMetric: "cosine",

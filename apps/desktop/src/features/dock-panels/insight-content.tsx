@@ -105,6 +105,7 @@ export const InsightDockContent = ({
           mode="compact"
           viewModel={props.knowledgeMapViewModel}
           workspaceIndexViewModel={props.workspaceIndexViewModel}
+          postgresStatus={props.postgresStatus}
           onSourceJump={props.onKnowledgeMapSourceJump}
         />
       </Suspense>

@@ -24,11 +24,11 @@ export type AppSettingsPatch = Partial<AppSettings>
 export const defaultSettings: AppSettings = {
   theme: "system",
   density: "comfortable",
-  editorFontSize: 13,
+  editorFontSize: 14,
   wordWrap: false,
   minimap: false,
   lineNumbers: "on",
-  autoSaveMode: "off",
+  autoSaveMode: "afterDelay",
   restoreLastWorkspace: false,
   lastWorkspacePath: "",
   compileDebounceMs: 300,

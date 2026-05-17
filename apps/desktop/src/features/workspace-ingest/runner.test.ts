@@ -20,7 +20,7 @@ const fileEntry = (path: string): WorkspaceFileEntry => ({
 });
 
 const buildPayload = (
-  documentPath = "experiments/alpha.chemd.md",
+  documentPath = "experiments/alpha.chemd",
   revisionId = "rev-alpha-1",
   graphSnapshotId = "snapshot-alpha-1"
 ): PersistRuntimeGraphRagPayload => ({
@@ -74,8 +74,8 @@ const buildSaveResult = (
 describe("desktop workspace ingest outbox save runner", () => {
   it("scans workspace files, builds outbox inputs, and saves every eligible snapshot", async () => {
     const files = [
-      fileEntry("experiments/alpha.chemd.md"),
-      fileEntry("experiments/beta.chemd.md")
+      fileEntry("experiments/alpha.chemd"),
+      fileEntry("experiments/beta.chemd")
     ];
     const saveSnapshot = vi.fn((input: LocalRuntimeSnapshotInput) => buildSaveResult(input, 2));
 
@@ -104,8 +104,8 @@ describe("desktop workspace ingest outbox save runner", () => {
 
   it("continues saving after a failed save and redacts the failure summary", async () => {
     const files = [
-      fileEntry("experiments/alpha.chemd.md"),
-      fileEntry("experiments/beta.chemd.md")
+      fileEntry("experiments/alpha.chemd"),
+      fileEntry("experiments/beta.chemd")
     ];
     const saveSnapshot = vi
       .fn()
@@ -168,7 +168,7 @@ describe("desktop workspace ingest outbox save runner", () => {
       document: {
         workspaceId: "workspace-alpha",
         documentId: "doc-alpha",
-        documentPath: "experiments/alpha.chemd.md",
+        documentPath: "experiments/alpha.chemd",
         documentHash: "fnv1a:doc-alpha",
         revisionHash: "fnv1a:rev-alpha"
       },
@@ -203,7 +203,7 @@ describe("desktop workspace ingest outbox save runner", () => {
 
     await runWorkspaceIngestOutboxSave({
       workspaceId: "workspace-alpha",
-      files: [fileEntry("experiments/alpha.chemd.md")],
+      files: [fileEntry("experiments/alpha.chemd")],
       readFile: () => "source:alpha",
       compile: () => ({
         compileOutput: { status: "ok", graphSnapshot: payload.graphSnapshot },

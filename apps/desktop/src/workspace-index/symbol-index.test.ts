@@ -45,10 +45,10 @@ products: product-main
 `;
 
 describe("buildWorkspaceSymbolIndex", () => {
-  it("builds a workspace symbol index from readable Chemd markdown files", async () => {
+  it("builds a workspace symbol index from readable Chemd files", async () => {
     const files = [
-      fileEntry("experiments/a.chemd.md"),
-      fileEntry("experiments/b.chemd.md")
+      fileEntry("experiments/a.chemd"),
+      fileEntry("experiments/b.chemd")
     ];
     const result = await buildWorkspaceSymbolIndex({
       workspace,
@@ -71,15 +71,34 @@ describe("buildWorkspaceSymbolIndex", () => {
     expect(result.index.symbols).toEqual(expect.arrayContaining([
       expect.objectContaining({
         localId: "rxn-a",
-        documentUri: "workspace://workspace-alpha/experiments/a.chemd.md"
+        documentUri: "workspace://workspace-alpha/experiments/a.chemd"
       }),
       expect.objectContaining({
         localId: "rxn-b",
-        documentUri: "workspace://workspace-alpha/experiments/b.chemd.md"
+        documentUri: "workspace://workspace-alpha/experiments/b.chemd"
       })
     ]));
     expect(result.index.symbolsByKind.reaction.map((symbol) => symbol.localId))
       .toEqual(["rxn-a", "rxn-b"]);
+  });
+
+  it("keeps legacy .chemd.md files eligible for symbol indexing", async () => {
+    const result = await buildWorkspaceSymbolIndex({
+      workspace,
+      files: [fileEntry("experiments/legacy.chemd.md")],
+      readFile: () => createSource("rxn-legacy"),
+      languageServiceDependencies: {
+        now: () => new Date("2026-05-13T00:00:00.000Z")
+      }
+    });
+
+    expect(result.summary.scannedFiles).toBe(1);
+    expect(result.index.symbols).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        localId: "rxn-legacy",
+        documentUri: "workspace://workspace-alpha/experiments/legacy.chemd.md"
+      })
+    ]));
   });
 
   it("skips plain markdown and unsupported workspace entries without reading them", async () => {
@@ -87,7 +106,7 @@ describe("buildWorkspaceSymbolIndex", () => {
     const result = await buildWorkspaceSymbolIndex({
       workspace,
       files: [
-        fileEntry("experiments/a.chemd.md"),
+        fileEntry("experiments/a.chemd"),
         fileEntry("notes/readme.md"),
         fileEntry("assets/table.csv"),
         fileEntry("experiments", { kind: "directory" })
@@ -97,7 +116,7 @@ describe("buildWorkspaceSymbolIndex", () => {
 
     expect(readFile).toHaveBeenCalledTimes(1);
     expect(readFile).toHaveBeenCalledWith(expect.objectContaining({
-      path: "experiments/a.chemd.md"
+      path: "experiments/a.chemd"
     }));
     expect(result.summary).toMatchObject({
       totalFiles: 4,
@@ -134,9 +153,9 @@ describe("buildWorkspaceSymbolIndex", () => {
     const result = await buildWorkspaceSymbolIndex({
       workspace,
       files: [
-        fileEntry("experiments/read-fail.chemd.md"),
-        fileEntry("experiments/compile-fail.chemd.md"),
-        fileEntry("experiments/pass.chemd.md")
+        fileEntry("experiments/read-fail.chemd"),
+        fileEntry("experiments/compile-fail.chemd"),
+        fileEntry("experiments/pass.chemd")
       ],
       readFile: (file) => {
         if (file.path.includes("read-fail")) {
@@ -172,17 +191,17 @@ describe("buildWorkspaceSymbolIndex", () => {
       error.stage,
       error.message
     ])).toEqual([
-      ["experiments/read-fail.chemd.md", "read", "cannot read file"],
-      ["experiments/compile-fail.chemd.md", "compile", "compiler unavailable"]
+      ["experiments/read-fail.chemd", "read", "cannot read file"],
+      ["experiments/compile-fail.chemd", "compile", "compiler unavailable"]
     ]);
     expect(result.index.documents).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        documentUri: "workspace://workspace-alpha/experiments/compile-fail.chemd.md",
+        documentUri: "workspace://workspace-alpha/experiments/compile-fail.chemd",
         status: "failed",
         symbolCount: 0
       }),
       expect.objectContaining({
-        documentUri: "workspace://workspace-alpha/experiments/pass.chemd.md",
+        documentUri: "workspace://workspace-alpha/experiments/pass.chemd",
         status: "ok",
         symbolCount: 2
       })
@@ -193,7 +212,7 @@ describe("buildWorkspaceSymbolIndex", () => {
   it("records failed compile outputs returned by an injected compiler", async () => {
     const result = await buildWorkspaceSymbolIndex({
       workspace,
-      files: [fileEntry("experiments/failed-output.chemd.md")],
+      files: [fileEntry("experiments/failed-output.chemd")],
       readFile: () => createSource("rxn-failed-output"),
       compile: (input: WorkspaceSymbolCompileInput) =>
         compileChemdForEditor({
@@ -213,7 +232,7 @@ describe("buildWorkspaceSymbolIndex", () => {
       failedFiles: 1
     });
     expect(result.summary.errors).toEqual([{
-      documentPath: "experiments/failed-output.chemd.md",
+      documentPath: "experiments/failed-output.chemd",
       stage: "compile",
       message: "returned failed compile output"
     }]);
@@ -229,18 +248,18 @@ describe("buildWorkspaceSymbolIndex", () => {
       }));
     const result = await buildWorkspaceSymbolIndex({
       workspace,
-      files: [fileEntry("nested/space name.chemd.md")],
+      files: [fileEntry("nested/space name.chemd")],
       readFile: () => createSource("rxn-custom"),
       compile,
       createDocumentUri: (file) => `file:///workspace/${file.path}`
     });
 
     expect(compile).toHaveBeenCalledWith(expect.objectContaining({
-      documentUri: "file:///workspace/nested/space name.chemd.md",
+      documentUri: "file:///workspace/nested/space name.chemd",
       source: expect.stringContaining("rxn-custom")
     }));
     expect(result.index.documents[0]).toMatchObject({
-      documentUri: "file:///workspace/nested/space name.chemd.md",
+      documentUri: "file:///workspace/nested/space name.chemd",
       status: "ok"
     });
   });

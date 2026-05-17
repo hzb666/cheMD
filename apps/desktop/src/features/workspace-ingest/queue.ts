@@ -137,8 +137,15 @@ const stableStringify = (value: unknown): string => {
 const stableHash = (value: unknown): string =>
   `${HASH_PREFIX}:${hashString(stableStringify(value))}`;
 
-const isChemdMarkdown = (file: WorkspaceFileEntry): boolean =>
-  file.kind === "file" && file.path.toLowerCase().endsWith(".chemd.md");
+const isChemdDocument = (file: WorkspaceFileEntry): boolean => {
+  const path = file.path.toLowerCase();
+  return file.kind === "file"
+    && (
+      path.endsWith(".chemd")
+      || path.endsWith(".chemd.md")
+      || file.chemdKind === "document"
+    );
+};
 const isPlainMarkdown = (file: WorkspaceFileEntry): boolean =>
   file.kind === "file" && file.path.toLowerCase().endsWith(".md");
 const toSourceText = (content: WorkspaceIngestFileContent): string =>
@@ -500,7 +507,7 @@ export const runWorkspaceIngest = async (
   const normalizedInput = { ...input, workspaceId };
   const items: WorkspaceIngestQueueItem[] = [];
   for (const file of normalizedInput.files) {
-    if (isChemdMarkdown(file)) {
+    if (isChemdDocument(file)) {
       items.push(await processChemdFile(normalizedInput, file));
     } else if (isPlainMarkdown(file)) {
       items.push(buildSkippedMarkdownItem(normalizedInput, file));

@@ -51,6 +51,7 @@ export interface PostgresRagBackfillEmbeddingPlan {
 }
 
 export interface PostgresRagBackfillRequestBuildInput {
+  workspaceId?: string;
   plan: PostgresRagBackfillEmbeddingPlan;
   embeddingResult: CreateEmbeddingVectorsResult;
   embeddingModel: string;
@@ -159,6 +160,7 @@ export const buildPostgresRagBackfillEmbeddingPlan = (
 
 export const buildPostgresRagBackfillRequest = ({
   plan,
+  workspaceId,
   embeddingResult,
   embeddingModel,
   fallbackEmbeddingDim,
@@ -194,6 +196,7 @@ export const buildPostgresRagBackfillRequest = ({
 
   return {
     request: {
+      ...(workspaceId === undefined ? {} : { workspaceId }),
       embeddingModel,
       ...(embeddingDim === undefined ? {} : { embeddingDim }),
       ...(distanceMetric === undefined ? {} : { distanceMetric }),

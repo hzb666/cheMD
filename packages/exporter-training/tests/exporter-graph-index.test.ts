@@ -95,9 +95,9 @@ describe("training graph index projection", () => {
     const familyB = buildUnderstanding(familySourceB);
     const index = buildTrainingGraphIndexFromUnderstandings([route, familyA, familyB], {
       document_sources: [
-        { document_id: "exp-graph-route", file_path: "route.chemd.md" },
-        { document_id: "exp-graph-family-a", file_path: "family-a.chemd.md" },
-        { document_id: "exp-graph-family-b", file_path: "family-b.chemd.md" }
+        { document_id: "exp-graph-route", file_path: "route.chemd" },
+        { document_id: "exp-graph-family-a", file_path: "family-a.chemd" },
+        { document_id: "exp-graph-family-b", file_path: "family-b.chemd" }
       ]
     });
 
@@ -115,7 +115,7 @@ describe("training graph index projection", () => {
     expect(index.schema_version).toBe("chemd-training-graph-index/v0.1");
     expect(index.index_scope.sources).toContainEqual({
       document_id: "exp-graph-route",
-      file_path: "route.chemd.md"
+      file_path: "route.chemd"
     });
     expect(routeCluster).toMatchObject({
       member_reaction_entity_ids: [

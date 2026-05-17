@@ -20,7 +20,6 @@
     display: grid;
     align-items: center;
     height: 2.5rem;
-    margin-right: 0.25rem;
   }
 
   .reference-editor-tab-strip {
@@ -46,6 +45,7 @@
     overflow: hidden;
     padding-bottom: 0.75rem;
     padding-left: 0.5rem;
+    padding-right: 0.375rem;
     scroll-padding-inline: 0.5rem;
     scrollbar-width: none;
   }
@@ -63,50 +63,127 @@
     width: 2rem;
     height: 2rem;
     margin-bottom: 0.25rem;
-    margin-left: 0.375rem;
   }
 
   .reference-editor-tab-menu {
-    --reference-tab-menu-hover: color-mix(in oklch, var(--chemd-background) 72%, white);
-    --reference-tab-menu-active: color-mix(in oklch, var(--chemd-background) 78%, var(--chemd-foreground) 12%);
-    border: 1px solid oklch(87% 0.012 248 / 0.62);
-    background: oklch(99% 0.004 247 / 0.98);
-    box-shadow: 0 14px 34px oklch(52% 0.025 252 / 0.2);
+    --reference-tab-menu-border: oklch(84% 0.014 248 / 0.72);
+    --reference-tab-menu-field: oklch(93% 0.012 247 / 0.86);
+    --reference-tab-menu-hover: oklch(91.5% 0.018 247 / 0.9);
+    --reference-tab-menu-active: color-mix(in oklch, var(--chemd-background) 74%, var(--chemd-foreground) 16%);
+    --reference-tab-menu-active-ring: color-mix(in oklch, var(--chemd-foreground) 18%, transparent);
+    --reference-tab-menu-fg: var(--muted-foreground);
+    --reference-tab-menu-active-fg: var(--chemd-foreground);
+    --reference-tab-menu-focus: color-mix(in oklch, var(--chemd-foreground) 34%, transparent);
+    --reference-tab-menu-focus-bg: color-mix(in oklch, var(--chemd-background) 82%, white);
+    --reference-tab-menu-danger-bg: color-mix(in oklch, var(--destructive) 12%, transparent);
+    --reference-tab-menu-danger-hover: color-mix(in oklch, var(--destructive) 20%, transparent);
+    --reference-tab-menu-danger-confirm: color-mix(in oklch, var(--destructive) 88%, transparent);
+    --reference-tab-menu-danger-confirm-hover: color-mix(in oklch, var(--destructive) 76%, transparent);
+    border: 1px solid var(--reference-tab-menu-border);
+    background: oklch(96.6% 0.009 247 / 0.98);
+    color: var(--reference-tab-menu-fg);
+    box-shadow:
+      4px 18px 46px oklch(37% 0.035 252 / 0.28),
+      1px 4px 12px oklch(37% 0.035 252 / 0.18);
   }
 
   .reference-editor-tab-search {
-    background: oklch(94.5% 0.008 247 / 0.72);
+    border: 1px solid var(--reference-tab-menu-border);
+    background: var(--reference-tab-menu-field);
+    font-size: 0.875rem;
+    transition:
+      border-color 180ms ease,
+      background-color 180ms ease,
+      box-shadow 180ms ease;
+  }
+
+  .reference-editor-tab-search:focus-within {
+    border-color: color-mix(in oklch, var(--chemd-foreground) 42%, transparent);
+    background: var(--reference-tab-menu-focus-bg);
+    box-shadow:
+      0 0 0 2px var(--reference-tab-menu-focus),
+      0 8px 18px color-mix(in oklch, var(--chemd-foreground) 12%, transparent);
   }
 
   .reference-editor-tab-menu-section {
     border-top-color: oklch(87% 0.012 248 / 0.55);
   }
 
-  .reference-editor-tab-menu :is(.reference-editor-tab-menu-item, .reference-editor-tab-menu-action):is(:hover, [data-active="true"]) {
+  .reference-editor-tab-menu :is(
+    .reference-editor-tab-menu-tab-select,
+    .reference-editor-tab-menu-action,
+    .reference-editor-tab-menu-close
+  ) {
+    color: inherit;
+  }
+
+  .reference-editor-tab-menu :is(.reference-editor-tab-menu-item, .reference-editor-tab-menu-action):is(:hover, :focus-within) {
     background: var(--reference-tab-menu-hover);
-    color: var(--chemd-foreground);
+    color: var(--reference-tab-menu-active-fg);
   }
 
   .reference-editor-tab-menu :is(.reference-editor-tab-menu-item, .reference-editor-tab-menu-action)[data-active="true"] {
     background: var(--reference-tab-menu-active);
-    box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--chemd-foreground) 18%, transparent);
+    color: var(--reference-tab-menu-active-fg);
+    box-shadow: inset 0 0 0 1px var(--reference-tab-menu-active-ring);
   }
 
-  .reference-editor-tab-menu :is(.reference-editor-tab-menu-item, .reference-editor-tab-menu-action):is(:hover, [data-active="true"]) svg {
-    color: var(--chemd-foreground);
+  .reference-editor-tab-menu svg {
+    color: currentColor;
     stroke: currentColor;
   }
 
-  .reference-editor-tab-menu-command:hover {
-    background: color-mix(in oklch, var(--destructive) 88%, black);
+  .reference-editor-tab-menu-close {
+    width: 1.375rem;
+    height: 1.375rem;
+    opacity: 0;
+  }
+
+  .reference-editor-tab-menu-item:is(:hover, :focus-within) .reference-editor-tab-menu-close {
+    opacity: 1;
+  }
+
+  .reference-editor-tab-menu-close:hover {
+    background: var(--destructive);
     color: white;
+    box-shadow: none;
+  }
+
+  .reference-editor-tab-menu-command {
+    background: var(--reference-tab-menu-danger-bg);
+    color: var(--destructive);
+  }
+
+  .reference-editor-tab-menu-command:hover {
+    background: var(--reference-tab-menu-danger-hover);
+    color: color-mix(in oklch, var(--destructive) 78%, black);
+  }
+
+  .reference-editor-tab-menu-command[data-confirming="true"] {
+    background: var(--reference-tab-menu-danger-confirm);
+    color: white;
+  }
+
+  .reference-editor-tab-menu-command[data-confirming="true"]:hover {
+    background: var(--reference-tab-menu-danger-confirm-hover);
+    color: white;
+  }
+
+  .reference-editor-tab-menu-command:not([data-confirming="true"]):hover {
+    transition:
+      background-color 150ms ease,
+      color 150ms ease;
   }
 
   .reference-editor-tab-menu-command:disabled {
     cursor: not-allowed;
-    background: color-mix(in oklch, var(--destructive) 38%, transparent);
-    color: oklch(100% 0 0 / 0.82);
+    background: color-mix(in oklch, var(--destructive) 8%, transparent);
+    color: color-mix(in oklch, var(--destructive) 44%, transparent);
     opacity: 1;
+  }
+
+  .reference-editor-tab-menu button:focus-visible {
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary) 24%, transparent);
   }
 
   .reference-editor-tab {
@@ -121,7 +198,7 @@
     align-items: center;
     gap: 0.25rem;
     width: var(--reference-tab-width, var(--reference-tab-default-width));
-    min-width: 5.5rem;
+    min-width: 5.375rem;
     height: 2.5rem;
     flex: 0 0 var(--reference-tab-width, var(--reference-tab-default-width));
     margin-right: 0.125rem;
@@ -287,17 +364,22 @@
     }
   }
 
+  @container (max-width: 7.25rem) {
+    .reference-editor-tab-trigger {
+      grid-template-columns: minmax(0, 1fr) 0.375rem;
+    }
+
+    .reference-editor-tab-icon {
+      display: none;
+    }
+  }
+
   :is(
     .reference-editor-tab-trigger,
     .reference-editor-tab-close,
     .reference-editor-tab-new,
-    .reference-editor-tab-menu-trigger,
-    .reference-editor-tab-menu-item,
-    .reference-editor-tab-menu-action,
-    .reference-editor-tab-menu-command,
-    .reference-editor-tab-search
-  ):focus-visible,
-  .reference-editor-tab-search:focus-within {
+    .reference-editor-tab-menu-trigger
+  ):focus-visible {
     box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary) 24%, transparent);
   }
 }

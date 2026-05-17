@@ -1,6 +1,13 @@
 use crate::{
-    workspace_file_io::{content_hash, read_workspace_file_impl, write_workspace_file_impl},
-    workspace_io::{canonical_workspace_root, list_workspace_files_impl, workspace_handle},
+    workspace::WorkspaceDocumentQueryOptions,
+    workspace_file_io::{
+        content_hash, read_workspace_file_impl, set_before_workspace_commit_hook_for_test,
+        write_workspace_file_impl, MAX_WORKSPACE_FILE_BYTES,
+    },
+    workspace_io::{
+        canonical_workspace_root, list_workspace_files_impl, query_workspace_documents_impl,
+        workspace_handle,
+    },
 };
 use std::{
     fs,
@@ -70,7 +77,7 @@ fn open_workspace_without_path_returns_displayable_error() {
 #[test]
 fn rejects_parent_path_traversal_for_read_and_write() {
     let workspace = TestWorkspace::new("traversal");
-    workspace.write("inside.chemd.md", "safe");
+    workspace.write("inside.chemd", "safe");
     let root = workspace.canonical_root();
 
     let read_error = read_workspace_file_impl(&root, "../outside.md")
@@ -85,10 +92,11 @@ fn rejects_parent_path_traversal_for_read_and_write() {
 #[test]
 fn lists_workspace_tree_entries_without_expanding_heavy_dirs() {
     let workspace = TestWorkspace::new("list");
-    workspace.write("experiments/screen.chemd.md", "doc");
+    workspace.write("experiments/screen.chemd", "doc");
+    workspace.write("experiments/legacy.chemd.md", "legacy doc");
     workspace.write("notes.md", "note");
     workspace.write("ignore.txt", "listed");
-    workspace.write(".hidden/secret.chemd.md", "hidden");
+    workspace.write(".hidden/secret.chemd", "hidden");
     workspace.write(".env", "DATABASE_URL=postgres://secret");
     workspace.write(".git/config", "heavy");
     workspace.write(".venv/bin/python", "heavy");
@@ -109,7 +117,8 @@ fn lists_workspace_tree_entries_without_expanding_heavy_dirs() {
         paths,
         vec![
             "experiments",
-            "experiments/screen.chemd.md",
+            "experiments/legacy.chemd.md",
+            "experiments/screen.chemd",
             "ignore.txt",
             "materials",
             "notes.md"
@@ -117,10 +126,15 @@ fn lists_workspace_tree_entries_without_expanding_heavy_dirs() {
     );
     let screen = entries
         .iter()
-        .find(|entry| entry.path == "experiments/screen.chemd.md")
+        .find(|entry| entry.path == "experiments/screen.chemd")
         .expect("chemd file should be listed");
     assert_eq!(screen.kind, "file");
     assert_eq!(screen.chemd_kind.as_deref(), Some("document"));
+    let legacy = entries
+        .iter()
+        .find(|entry| entry.path == "experiments/legacy.chemd.md")
+        .expect("legacy chemd file should be listed");
+    assert_eq!(legacy.chemd_kind.as_deref(), Some("document"));
     let asset = entries
         .iter()
         .find(|entry| entry.path == "ignore.txt")
@@ -141,15 +155,82 @@ fn lists_workspace_tree_entries_without_expanding_heavy_dirs() {
 fn lists_visible_entries_after_filtering_ignored_children() {
     let workspace = TestWorkspace::new("list-filtered-limit");
     for index in 0..300 {
-        workspace.write(&format!(".ignored-{index}/secret.chemd.md"), "hidden");
+        workspace.write(&format!(".ignored-{index}/secret.chemd"), "hidden");
     }
-    workspace.write("visible.chemd.md", "doc");
+    workspace.write("visible.chemd", "doc");
 
     let entries = list_workspace_files_impl("workspace-test", &workspace.canonical_root())
         .expect("workspace should list");
 
-    assert!(entries.iter().any(|entry| entry.path == "visible.chemd.md"));
+    assert!(entries.iter().any(|entry| entry.path == "visible.chemd"));
     assert!(!entries.iter().any(|entry| entry.path.starts_with('.')));
+}
+
+#[test]
+fn query_workspace_documents_filters_chemd_files_and_excludes_current_path() {
+    let workspace = TestWorkspace::new("query-documents");
+    workspace.write("experiments/alpha.chemd", "alpha");
+    workspace.write("experiments/beta.chemd.md", "beta");
+    workspace.write("notes.md", "note");
+    workspace.write("assets/image.txt", "asset");
+
+    let result = query_workspace_documents_impl(
+        "workspace-test",
+        &workspace.canonical_root(),
+        &WorkspaceDocumentQueryOptions {
+            exclude_path: Some("experiments/alpha.chemd".into()),
+            ..WorkspaceDocumentQueryOptions::default()
+        },
+    )
+    .expect("workspace documents should query");
+
+    assert_eq!(
+        result
+            .files
+            .iter()
+            .map(|entry| entry.path.as_str())
+            .collect::<Vec<_>>(),
+        vec!["experiments/beta.chemd.md"]
+    );
+}
+
+#[test]
+fn query_workspace_documents_returns_limited_pages_with_next_cursor() {
+    let workspace = TestWorkspace::new("query-documents-page");
+    workspace.write("a.chemd", "a");
+    workspace.write("b.chemd", "b");
+    workspace.write("c.chemd", "c");
+
+    let first_page = query_workspace_documents_impl(
+        "workspace-test",
+        &workspace.canonical_root(),
+        &WorkspaceDocumentQueryOptions {
+            limit: Some(2),
+            ..WorkspaceDocumentQueryOptions::default()
+        },
+    )
+    .expect("first page should query");
+    let second_page = query_workspace_documents_impl(
+        "workspace-test",
+        &workspace.canonical_root(),
+        &WorkspaceDocumentQueryOptions {
+            cursor: first_page.next_cursor,
+            limit: Some(2),
+            ..WorkspaceDocumentQueryOptions::default()
+        },
+    )
+    .expect("second page should query");
+
+    assert_eq!(first_page.total_count, 3);
+    assert_eq!(first_page.next_cursor, Some(2));
+    assert_eq!(
+        second_page
+            .files
+            .iter()
+            .map(|entry| entry.path.as_str())
+            .collect::<Vec<_>>(),
+        vec!["c.chemd"]
+    );
 }
 
 #[test]
@@ -173,12 +254,11 @@ fn read_and_write_round_trip_inside_workspace() {
     let workspace = TestWorkspace::new("round-trip");
     let root = workspace.canonical_root();
 
-    let write = write_workspace_file_impl(&root, "nested/result.chemd.md", "content", None)
+    let write = write_workspace_file_impl(&root, "nested/result.chemd", "content", None)
         .expect("write should succeed");
-    let read =
-        read_workspace_file_impl(&root, "nested/result.chemd.md").expect("read should succeed");
+    let read = read_workspace_file_impl(&root, "nested/result.chemd").expect("read should succeed");
 
-    assert_eq!(write.path, "nested/result.chemd.md");
+    assert_eq!(write.path, "nested/result.chemd");
     assert_eq!(write.bytes, "content".len());
     assert_eq!(write.content_hash, content_hash(b"content"));
     assert!(write.modified_at_ms.is_some());
@@ -191,13 +271,13 @@ fn read_and_write_round_trip_inside_workspace() {
 #[test]
 fn write_accepts_matching_base_hash() {
     let workspace = TestWorkspace::new("base-match");
-    workspace.write("doc.chemd.md", "old");
+    workspace.write("doc.chemd", "old");
     let root = workspace.canonical_root();
     let base_hash = content_hash(b"old");
 
-    let write = write_workspace_file_impl(&root, "doc.chemd.md", "new", Some(&base_hash))
+    let write = write_workspace_file_impl(&root, "doc.chemd", "new", Some(&base_hash))
         .expect("matching base hash should save");
-    let read = read_workspace_file_impl(&root, "doc.chemd.md").expect("read should succeed");
+    let read = read_workspace_file_impl(&root, "doc.chemd").expect("read should succeed");
 
     assert_eq!(write.content_hash, content_hash(b"new"));
     assert_eq!(read.content, "new");
@@ -205,16 +285,94 @@ fn write_accepts_matching_base_hash() {
 }
 
 #[test]
+fn write_rechecks_base_hash_immediately_before_commit() {
+    let workspace = TestWorkspace::new("write-precommit-conflict");
+    workspace.write("doc.chemd", "old");
+    let root = workspace.canonical_root();
+    let target = workspace.root.join("doc.chemd");
+    let base_hash = content_hash(b"old");
+    set_before_workspace_commit_hook_for_test(move || {
+        fs::write(&target, "external").expect("external write should succeed");
+    });
+
+    let error = write_workspace_file_impl(&root, "doc.chemd", "local", Some(&base_hash))
+        .expect_err("pre-commit external write should fail");
+    let read = read_workspace_file_impl(&root, "doc.chemd").expect("read should succeed");
+    let leaked_temp_files = fs::read_dir(&workspace.root)
+        .expect("workspace root should be readable")
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_name().to_string_lossy().contains(".tmp-"))
+        .count();
+
+    assert_eq!(error.code, "workspace_file_conflict");
+    assert_eq!(read.content, "external");
+    assert_eq!(leaked_temp_files, 0);
+}
+
+#[test]
+fn write_rejects_oversized_external_file_before_base_hash() {
+    let workspace = TestWorkspace::new("write-precommit-large-conflict");
+    workspace.write("doc.chemd", "old");
+    let root = workspace.canonical_root();
+    let target = workspace.root.join("doc.chemd");
+    let base_hash = content_hash(b"old");
+    set_before_workspace_commit_hook_for_test(move || {
+        fs::write(&target, "x".repeat(oversized_workspace_file_bytes()))
+            .expect("external oversized write should succeed");
+    });
+
+    let error = write_workspace_file_impl(&root, "doc.chemd", "local", Some(&base_hash))
+        .expect_err("oversized external file should fail before hashing");
+    let leaked_temp_files = fs::read_dir(&workspace.root)
+        .expect("workspace root should be readable")
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_name().to_string_lossy().contains(".tmp-"))
+        .count();
+
+    assert_eq!(error.code, "workspace_file_too_large");
+    assert_eq!(leaked_temp_files, 0);
+}
+
+#[test]
+fn read_rejects_large_workspace_file() {
+    let workspace = TestWorkspace::new("read-large");
+    workspace.write("large.chemd", &"x".repeat(oversized_workspace_file_bytes()));
+    let root = workspace.canonical_root();
+
+    let error = read_workspace_file_impl(&root, "large.chemd")
+        .expect_err("oversized files should not be read into the IDE");
+
+    assert_eq!(error.code, "workspace_file_too_large");
+}
+
+#[test]
+fn write_rejects_oversized_workspace_content() {
+    let workspace = TestWorkspace::new("write-large");
+    let root = workspace.canonical_root();
+
+    let error = write_workspace_file_impl(
+        &root,
+        "large.chemd",
+        &"x".repeat(oversized_workspace_file_bytes()),
+        None,
+    )
+    .expect_err("oversized files should not be saved through the IDE");
+
+    assert_eq!(error.code, "workspace_file_too_large");
+    assert_eq!(error.detail.as_deref(), Some("large.chemd"));
+}
+
+#[test]
 fn write_rejects_external_modification_conflict() {
     let workspace = TestWorkspace::new("base-conflict");
-    workspace.write("doc.chemd.md", "old");
+    workspace.write("doc.chemd", "old");
     let root = workspace.canonical_root();
     let base_hash = content_hash(b"old");
-    workspace.write("doc.chemd.md", "external");
+    workspace.write("doc.chemd", "external");
 
-    let error = write_workspace_file_impl(&root, "doc.chemd.md", "local", Some(&base_hash))
+    let error = write_workspace_file_impl(&root, "doc.chemd", "local", Some(&base_hash))
         .expect_err("stale base hash should fail");
-    let read = read_workspace_file_impl(&root, "doc.chemd.md").expect("read should succeed");
+    let read = read_workspace_file_impl(&root, "doc.chemd").expect("read should succeed");
 
     assert_eq!(error.code, "workspace_file_conflict");
     assert!(error
@@ -226,18 +384,42 @@ fn write_rejects_external_modification_conflict() {
 }
 
 #[test]
-fn write_rejects_deleted_file_with_base_hash() {
-    let workspace = TestWorkspace::new("base-deleted");
-    workspace.write("doc.chemd.md", "old");
+fn write_conflict_cleans_temporary_file() {
+    let workspace = TestWorkspace::new("base-conflict-cleanup");
+    workspace.write("doc.chemd", "old");
     let root = workspace.canonical_root();
     let base_hash = content_hash(b"old");
-    fs::remove_file(workspace.root.join("doc.chemd.md")).expect("file should be removed");
+    workspace.write("doc.chemd", "external");
 
-    let error = write_workspace_file_impl(&root, "doc.chemd.md", "local", Some(&base_hash))
+    let error = write_workspace_file_impl(&root, "doc.chemd", "local", Some(&base_hash))
+        .expect_err("stale base hash should fail");
+    let leaked_temp_files = fs::read_dir(&workspace.root)
+        .expect("workspace root should be readable")
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_name().to_string_lossy().contains(".tmp-"))
+        .count();
+
+    assert_eq!(error.code, "workspace_file_conflict");
+    assert_eq!(leaked_temp_files, 0);
+}
+
+#[test]
+fn write_rejects_deleted_file_with_base_hash() {
+    let workspace = TestWorkspace::new("base-deleted");
+    workspace.write("doc.chemd", "old");
+    let root = workspace.canonical_root();
+    let base_hash = content_hash(b"old");
+    fs::remove_file(workspace.root.join("doc.chemd")).expect("file should be removed");
+
+    let error = write_workspace_file_impl(&root, "doc.chemd", "local", Some(&base_hash))
         .expect_err("deleted base file should fail");
 
     assert_eq!(error.code, "workspace_file_conflict");
-    assert!(!workspace.root.join("doc.chemd.md").exists());
+    assert!(!workspace.root.join("doc.chemd").exists());
+}
+
+fn oversized_workspace_file_bytes() -> usize {
+    usize::try_from(MAX_WORKSPACE_FILE_BYTES).expect("workspace file limit should fit usize") + 1
 }
 
 fn path_str(path: &Path) -> &str {
