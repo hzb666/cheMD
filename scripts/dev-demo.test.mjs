@@ -5,6 +5,8 @@ import {
   createDevDemoProcesses,
   resolveChemServiceCommand,
   resolveCommand,
+  resolvePnpmEntrypoint,
+  resolvePnpmInvocation,
   resolveSpawnInvocation
 } from "./dev-demo.mjs";
 
@@ -16,28 +18,51 @@ test("resolveCommand uses poetry.exe on Windows", () => {
   assert.equal(resolveCommand("poetry", "win32"), "poetry.exe");
 });
 
-test("resolveChemServiceCommand uses in-project virtualenv python", () => {
+test("resolveChemServiceCommand uses Poetry without shell wrapping", () => {
+  assert.equal(resolveChemServiceCommand("win32"), "poetry.exe");
+  assert.equal(resolveChemServiceCommand("linux"), "poetry");
+});
+
+test("resolvePnpmEntrypoint prefers pnpm npm_execpath on Windows", () => {
   assert.equal(
-    resolveChemServiceCommand("D:\\Code\\chemd", "win32"),
-    "D:\\Code\\chemd\\services\\chem-service\\.venv\\Scripts\\python.exe"
-  );
-  assert.equal(
-    resolveChemServiceCommand("/repo/chemd", "linux"),
-    "/repo/chemd/services/chem-service/.venv/bin/python"
+    resolvePnpmEntrypoint(
+      {
+        npm_execpath: "C:\\Users\\dev\\AppData\\Roaming\\npm\\node_modules\\pnpm\\bin\\pnpm.cjs",
+        APPDATA: "C:\\Users\\dev\\AppData\\Roaming"
+      },
+      "win32"
+    ),
+    "C:\\Users\\dev\\AppData\\Roaming\\npm\\node_modules\\pnpm\\bin\\pnpm.cjs"
   );
 });
 
-test("resolveSpawnInvocation wraps cmd launchers with cmd.exe on Windows", () => {
+test("resolvePnpmEntrypoint falls back to APPDATA on Windows", () => {
+  assert.equal(
+    resolvePnpmEntrypoint(
+      {
+        APPDATA: "C:\\Users\\dev\\AppData\\Roaming"
+      },
+      "win32"
+    ),
+    "C:\\Users\\dev\\AppData\\Roaming\\npm\\node_modules\\pnpm\\bin\\pnpm.cjs"
+  );
+});
+
+test("resolvePnpmInvocation runs pnpm through node on Windows", () => {
   assert.deepEqual(
-    resolveSpawnInvocation("pnpm.cmd", ["--filter", "@chemd/web", "dev"], "win32"),
+    resolvePnpmInvocation("win32", {
+      APPDATA: "C:\\Users\\dev\\AppData\\Roaming"
+    }),
     {
-      command: "cmd.exe",
-      args: ["/d", "/s", "/c", "pnpm.cmd", "--filter", "@chemd/web", "dev"]
+      command: "node",
+      args: ["C:\\Users\\dev\\AppData\\Roaming\\npm\\node_modules\\pnpm\\bin\\pnpm.cjs"]
     }
   );
+});
 
+test("resolveSpawnInvocation passes command and args without shell wrapping", () => {
   assert.deepEqual(
-    resolveSpawnInvocation("poetry.exe", ["--version"], "win32"),
+    resolveSpawnInvocation("poetry.exe", ["--version"]),
     {
       command: "poetry.exe",
       args: ["--version"]
@@ -50,9 +75,9 @@ test("resolveSpawnInvocation ignores ComSpec environment values", () => {
   process.env.ComSpec = "attacker-controlled.cmd";
 
   try {
-    assert.deepEqual(resolveSpawnInvocation("pnpm.cmd", ["dev"], "win32"), {
-      command: "cmd.exe",
-      args: ["/d", "/s", "/c", "pnpm.cmd", "dev"]
+    assert.deepEqual(resolveSpawnInvocation("node", ["pnpm.cjs", "dev"]), {
+      command: "node",
+      args: ["pnpm.cjs", "dev"]
     });
   } finally {
     if (previousComSpec === undefined) {
@@ -65,20 +90,27 @@ test("resolveSpawnInvocation ignores ComSpec environment values", () => {
 
 test("createDevDemoProcesses builds web and chem-service processes", () => {
   const rootDir = "D:\\Code\\chemd";
-  const processes = createDevDemoProcesses(rootDir, "win32");
+  const processes = createDevDemoProcesses(rootDir, "win32", {
+    APPDATA: "C:\\Users\\dev\\AppData\\Roaming"
+  });
 
   assert.deepEqual(processes, [
     {
       name: "web",
-      command: "pnpm.cmd",
-      args: ["--filter", "@chemd/web", "dev"],
+      command: "node",
+      args: [
+        "C:\\Users\\dev\\AppData\\Roaming\\npm\\node_modules\\pnpm\\bin\\pnpm.cjs",
+        "--filter",
+        "@chemd/web",
+        "dev"
+      ],
       cwd: rootDir,
       url: "http://127.0.0.1:2436"
     },
     {
       name: "chem-service",
-      command: "D:\\Code\\chemd\\services\\chem-service\\.venv\\Scripts\\python.exe",
-      args: ["app.py"],
+      command: "poetry.exe",
+      args: ["run", "python", "app.py"],
       cwd: "D:\\Code\\chemd\\services\\chem-service",
       url: "http://127.0.0.1:18081"
     }

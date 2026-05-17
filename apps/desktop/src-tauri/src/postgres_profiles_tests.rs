@@ -64,6 +64,7 @@ fn test_profile_host() -> String {
 }
 
 fn test_profile_port() -> u16 {
+    // codeql[rust/hard-coded-cryptographic-value] Test PostgreSQL port, not a password.
     5432
 }
 
@@ -154,8 +155,13 @@ fn save_profile_rejects_invalid_port() {
     let error = save_postgres_profile_with_store(
         &profiles.root,
         SavePostgresProfileInput {
+            // codeql[rust/hard-coded-cryptographic-value] Invalid test port, not a password.
             port: 0,
-            ..profile_input("Remote Lab", Some(test_profile_password("invalid-port")), false)
+            ..profile_input(
+                "Remote Lab",
+                Some(test_profile_password("invalid-port")),
+                false,
+            )
         },
         &profiles.secrets,
     )
@@ -192,7 +198,9 @@ fn update_profile_can_keep_existing_password() {
     assert_eq!(updated.profiles[0].label, "Remote Lab Primary");
     assert_eq!(updated.profiles[0].timeout_ms, 9000);
     assert!(updated.profiles[0].password_saved);
-    assert!(!profiles.profile_file_content().contains(&test_profile_password("update")));
+    assert!(!profiles
+        .profile_file_content()
+        .contains(&test_profile_password("update")));
 }
 
 #[test]
@@ -226,8 +234,12 @@ fn activate_and_delete_profile_updates_state() {
         .expect("profiles should list");
     assert_eq!(listed.active_profile_id.as_deref(), Some("second"));
     assert_eq!(listed.profiles.len(), 1);
-    assert!(!profiles.profile_file_content().contains(&test_profile_password("first")));
-    assert!(!profiles.profile_file_content().contains(&test_profile_password("second")));
+    assert!(!profiles
+        .profile_file_content()
+        .contains(&test_profile_password("first")));
+    assert!(!profiles
+        .profile_file_content()
+        .contains(&test_profile_password("second")));
 }
 
 #[test]

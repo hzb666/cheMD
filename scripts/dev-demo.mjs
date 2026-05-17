@@ -17,29 +17,58 @@ export const resolveCommand = (command, platform = process.platform) => {
   return command;
 };
 
-export const resolveChemServiceCommand = (
-  rootDir,
+export const resolvePnpmEntrypoint = (
+  env = process.env,
   platform = process.platform
 ) => {
-  const pathModule = platform === "win32" ? path.win32 : path.posix;
+  if (platform !== "win32") {
+    return null;
+  }
 
-  return platform === "win32"
-    ? pathModule.join(rootDir, "services", "chem-service", ".venv", "Scripts", "python.exe")
-    : pathModule.join(rootDir, "services", "chem-service", ".venv", "bin", "python");
+  const pathModule = path.win32;
+  const npmExecPath = env.npm_execpath;
+  if (
+    npmExecPath &&
+    pathModule.basename(npmExecPath).toLowerCase() === "pnpm.cjs"
+  ) {
+    return npmExecPath;
+  }
+
+  const appData = env.APPDATA;
+  if (appData) {
+    return pathModule.join(appData, "npm", "node_modules", "pnpm", "bin", "pnpm.cjs");
+  }
+
+  throw new Error("Unable to resolve pnpm.cjs for Windows dev startup.");
+};
+
+export const resolvePnpmInvocation = (
+  platform = process.platform,
+  env = process.env
+) => {
+  if (platform === "win32") {
+    return {
+      command: "node",
+      args: [resolvePnpmEntrypoint(env, platform)]
+    };
+  }
+
+  return {
+    command: "pnpm",
+    args: []
+  };
+};
+
+export const resolveChemServiceCommand = (
+  platform = process.platform
+) => {
+  return resolveCommand("poetry", platform);
 };
 
 export const resolveSpawnInvocation = (
   command,
-  args,
-  platform = process.platform
+  args
 ) => {
-  if (platform === "win32" && command.endsWith(".cmd")) {
-    return {
-      command: "cmd.exe",
-      args: ["/d", "/s", "/c", command, ...args]
-    };
-  }
-
   return {
     command,
     args
@@ -50,23 +79,28 @@ const resolveRootDir = () => path.resolve(path.dirname(fileURLToPath(import.meta
 
 export const createDevDemoProcesses = (
   rootDir = resolveRootDir(),
-  platform = process.platform
-) => [
-  {
-    name: "web",
-    command: resolveCommand("pnpm", platform),
-    args: ["--filter", "@chemd/web", "dev"],
-    cwd: rootDir,
-    url: "http://127.0.0.1:2436"
-  },
-  {
-    name: "chem-service",
-    command: resolveChemServiceCommand(rootDir, platform),
-    args: ["app.py"],
-    cwd: path.join(rootDir, "services", "chem-service"),
-    url: "http://127.0.0.1:18081"
-  }
-];
+  platform = process.platform,
+  env = process.env
+) => {
+  const pnpmInvocation = resolvePnpmInvocation(platform, env);
+
+  return [
+    {
+      name: "web",
+      command: pnpmInvocation.command,
+      args: [...pnpmInvocation.args, "--filter", "@chemd/web", "dev"],
+      cwd: rootDir,
+      url: "http://127.0.0.1:2436"
+    },
+    {
+      name: "chem-service",
+      command: resolveChemServiceCommand(platform),
+      args: ["run", "python", "app.py"],
+      cwd: path.join(rootDir, "services", "chem-service"),
+      url: "http://127.0.0.1:18081"
+    }
+  ];
+};
 
 const childProcesses = [];
 let shuttingDown = false;

@@ -113,16 +113,25 @@ app.config["MAX_CONTENT_LENGTH"] = _read_int_env(
 )
 _RDKIT_MODULES: tuple[Any, Any, Any] | None = None
 _RDKIT_IMPORT_FAILED = False
+_IMAGE_BASE64_ERRORS = {
+    "required": ("imageBase64 is required", 400),
+    "too_large": ("imageBase64 is too large", 413),
+}
 
 
-def _extract_image_base64(payload: dict[str, Any]) -> tuple[str | None, str | None, int]:
+def _extract_image_base64(payload: dict[str, Any]) -> tuple[str | None, str | None]:
     image_base64 = payload.get("imageBase64")
     if not isinstance(image_base64, str) or not image_base64.strip():
-        return None, "imageBase64 is required", 400
+        return None, "required"
     if len(image_base64) > _MAX_IMAGE_BASE64_LENGTH:
-        return None, "imageBase64 is too large", 413
+        return None, "too_large"
 
-    return image_base64, None, 200
+    return image_base64, None
+
+
+def _image_base64_error_response(error_code: str) -> Any:
+    message, status = _IMAGE_BASE64_ERRORS.get(error_code, ("imageBase64 is invalid", 400))
+    return jsonify({"message": message}), status
 
 
 def _decode_image_bytes(image_base64: str) -> bytes | None:
@@ -656,9 +665,9 @@ def ocr() -> Any:
         return ("", 204)
 
     payload = request.get_json(silent=True) or {}
-    image_base64, error_message, error_status = _extract_image_base64(payload)
-    if error_message:
-        return jsonify({"message": error_message}), error_status
+    image_base64, error_code = _extract_image_base64(payload)
+    if error_code:
+        return _image_base64_error_response(error_code)
 
     image_bytes = _decode_image_bytes(image_base64)
     if image_bytes is None:
@@ -788,9 +797,9 @@ def reaction_ocr() -> Any:
         return ("", 204)
 
     payload = request.get_json(silent=True) or {}
-    image_base64, error_message, error_status = _extract_image_base64(payload)
-    if error_message:
-        return jsonify({"message": error_message}), error_status
+    image_base64, error_code = _extract_image_base64(payload)
+    if error_code:
+        return _image_base64_error_response(error_code)
 
     if _REACTION_OCR_PROVIDER not in {"", "placeholder", "disabled"}:
         image_bytes = _decode_image_bytes(image_base64)

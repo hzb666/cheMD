@@ -84,6 +84,17 @@ class ChemServiceRoutesTest(ChemServiceAppTestCase):
         self.assertEqual(response.get_json(), {"message": "imageBase64 is invalid"})
         self.assertNotIn("<script>", response.get_data(as_text=True))
 
+    def test_reaction_ocr_size_error_response_does_not_reflect_payload(self) -> None:
+        oversized_payload = "<script>" + ("a" * self.module._MAX_IMAGE_BASE64_LENGTH)
+        response = self.client.post(
+            "/reaction/ocr",
+            json={"imageBase64": oversized_payload},
+        )
+
+        self.assertEqual(response.status_code, 413)
+        self.assertEqual(response.get_json(), {"message": "imageBase64 is too large"})
+        self.assertNotIn("<script>", response.get_data(as_text=True))
+
     def test_cors_only_reflects_allowed_origin(self) -> None:
         allowed = self.client.options("/ocr", headers={"Origin": "http://127.0.0.1:2436"})
         blocked = self.client.options("/ocr", headers={"Origin": "https://evil.example"})
