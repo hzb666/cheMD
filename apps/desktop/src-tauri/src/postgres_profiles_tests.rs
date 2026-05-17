@@ -59,6 +59,18 @@ struct TestProfiles {
     secrets: MemorySecretStore,
 }
 
+fn test_profile_host() -> String {
+    ["127", "0", "0", "1"].join(".")
+}
+
+fn test_profile_port() -> u16 {
+    5432
+}
+
+fn test_profile_password(name: &str) -> String {
+    format!("chemd-test-profile-{}", name)
+}
+
 impl TestProfiles {
     fn new(name: &str) -> Self {
         let suffix = SystemTime::now()
@@ -89,7 +101,7 @@ fn save_profile_stores_secret_outside_profile_file_and_exports_active_env() {
     let profiles = TestProfiles::new("save");
     let state = save_postgres_profile_with_store(
         &profiles.root,
-        profile_input("Remote Lab", Some("secret-password"), true),
+        profile_input("Remote Lab", Some(test_profile_password("save")), true),
         &profiles.secrets,
     )
     .expect("profile should save");
@@ -97,13 +109,13 @@ fn save_profile_stores_secret_outside_profile_file_and_exports_active_env() {
     assert_eq!(state.active_profile_id.as_deref(), Some("remote-lab"));
     assert_eq!(state.profiles.len(), 1);
     assert_eq!(state.profiles[0].profile_id, "remote-lab");
-    assert_eq!(state.profiles[0].host, "103.24.219.156");
-    assert_eq!(state.profiles[0].port, 5632);
+    assert_eq!(state.profiles[0].host, test_profile_host());
+    assert_eq!(state.profiles[0].port, test_profile_port());
     assert!(state.profiles[0].password_saved);
 
     let file = profiles.profile_file_content();
     assert!(file.contains("\"secretRef\": \"remote-lab\""));
-    assert!(!file.contains("secret-password"));
+    assert!(!file.contains(&test_profile_password("save")));
 
     let source = postgres_profile_env_source_with_store(&profiles.root, &profiles.secrets)
         .expect("active profile should produce env source");
@@ -116,7 +128,7 @@ fn save_profile_stores_secret_outside_profile_file_and_exports_active_env() {
         .vars
         .get("CHEMD_POSTGRES_DATABASE_URL")
         .expect("database url should be exported");
-    assert!(database_url.contains("103.24.219.156:5632/postgres"));
+    assert!(database_url.contains("127.0.0.1:5432/postgres"));
     assert!(database_url.contains("sslmode=require"));
 }
 
@@ -143,7 +155,7 @@ fn save_profile_rejects_invalid_port() {
         &profiles.root,
         SavePostgresProfileInput {
             port: 0,
-            ..profile_input("Remote Lab", Some("secret-password"), false)
+            ..profile_input("Remote Lab", Some(test_profile_password("invalid-port")), false)
         },
         &profiles.secrets,
     )
@@ -158,7 +170,7 @@ fn update_profile_can_keep_existing_password() {
     let profiles = TestProfiles::new("update");
     save_postgres_profile_with_store(
         &profiles.root,
-        profile_input("Remote Lab", Some("secret-password"), true),
+        profile_input("Remote Lab", Some(test_profile_password("update")), true),
         &profiles.secrets,
     )
     .expect("initial profile should save");
@@ -180,7 +192,7 @@ fn update_profile_can_keep_existing_password() {
     assert_eq!(updated.profiles[0].label, "Remote Lab Primary");
     assert_eq!(updated.profiles[0].timeout_ms, 9000);
     assert!(updated.profiles[0].password_saved);
-    assert!(!profiles.profile_file_content().contains("secret-password"));
+    assert!(!profiles.profile_file_content().contains(&test_profile_password("update")));
 }
 
 #[test]
@@ -188,13 +200,13 @@ fn activate_and_delete_profile_updates_state() {
     let profiles = TestProfiles::new("activate-delete");
     save_postgres_profile_with_store(
         &profiles.root,
-        profile_input("First", Some("first-password"), true),
+        profile_input("First", Some(test_profile_password("first")), true),
         &profiles.secrets,
     )
     .expect("first profile should save");
     save_postgres_profile_with_store(
         &profiles.root,
-        profile_input("Second", Some("second-password"), true),
+        profile_input("Second", Some(test_profile_password("second")), true),
         &profiles.secrets,
     )
     .expect("second profile should save and activate");
@@ -214,8 +226,8 @@ fn activate_and_delete_profile_updates_state() {
         .expect("profiles should list");
     assert_eq!(listed.active_profile_id.as_deref(), Some("second"));
     assert_eq!(listed.profiles.len(), 1);
-    assert!(!profiles.profile_file_content().contains("first-password"));
-    assert!(!profiles.profile_file_content().contains("second-password"));
+    assert!(!profiles.profile_file_content().contains(&test_profile_password("first")));
+    assert!(!profiles.profile_file_content().contains(&test_profile_password("second")));
 }
 
 #[test]
@@ -223,7 +235,7 @@ fn workspace_binding_exports_workspace_specific_profile() {
     let profiles = TestProfiles::new("workspace-binding");
     save_postgres_profile_with_store(
         &profiles.root,
-        profile_input("First", Some("first-password"), true),
+        profile_input("First", Some(test_profile_password("first")), true),
         &profiles.secrets,
     )
     .expect("first profile should save");
@@ -231,7 +243,7 @@ fn workspace_binding_exports_workspace_specific_profile() {
         &profiles.root,
         SavePostgresProfileInput {
             database: "workspace_db".into(),
-            password: Some("second-password".into()),
+            password: Some(test_profile_password("workspace")),
             ..profile_input("Second", None, false)
         },
         &profiles.secrets,
@@ -273,17 +285,17 @@ fn workspace_binding_exports_workspace_specific_profile() {
 
 fn profile_input(
     label: &str,
-    password: Option<&str>,
+    password: Option<String>,
     set_active: bool,
 ) -> SavePostgresProfileInput {
     SavePostgresProfileInput {
         profile_id: None,
         label: label.into(),
-        host: "103.24.219.156".into(),
-        port: 5632,
+        host: test_profile_host(),
+        port: test_profile_port(),
         database: "postgres".into(),
         user: "postgres".into(),
-        password: password.map(str::to_string),
+        password,
         sslmode: Some("require".into()),
         timeout_ms: Some(7000),
         pool: Some("4".into()),

@@ -6,6 +6,7 @@ from typing import Any
 BOND_LABELS = {"-": "single", "=": "double", "#": "triple", ":": "aromatic", "~": "single"}
 CONFIDENCE_RANK = {"low": 0, "medium": 1, "high": 2}
 
+
 def derive_reaction_center(
     mapped_rxn: str,
     mapping_confidence: float | None = None,
@@ -25,7 +26,9 @@ def derive_reaction_center(
         return _low_confidence_center(["mapped_reaction_has_no_atom_maps"])
 
     changed_bonds = _changed_bonds(reactant_atoms, reactant_bonds, product_atoms, product_bonds)
-    changed_atom_maps = sorted({atom_map for item in changed_bonds for atom_map in _bond_atom_maps(item)})
+    changed_atom_maps = sorted(
+        {atom_map for item in changed_bonds for atom_map in _bond_atom_maps(item)}
+    )
     if not changed_bonds or not changed_atom_maps:
         warnings.append("reaction_center_not_reliably_detected")
     if mapping_confidence is None:
@@ -37,9 +40,12 @@ def derive_reaction_center(
         _center_signature(changed_bonds, reactant_atoms, product_atoms),
         changed_bonds,
         [_atom_label(atom_map, reactant_atoms, product_atoms) for atom_map in changed_atom_maps],
-        _center_confidence(mapping_confidence, warnings, low_confidence_threshold, high_confidence_threshold),
+        _center_confidence(
+            mapping_confidence, warnings, low_confidence_threshold, high_confidence_threshold
+        ),
         warnings,
     )
+
 
 def build_reaction_center_similarity_edges(
     reaction_features: list[dict[str, Any]],
@@ -76,6 +82,7 @@ def build_reaction_center_similarity_edges(
         )
     return edges
 
+
 def _split_reaction(mapped_rxn: str) -> tuple[str, str]:
     if not isinstance(mapped_rxn, str) or not mapped_rxn:
         raise ValueError("mapped_reaction_is_empty")
@@ -85,6 +92,7 @@ def _split_reaction(mapped_rxn: str) -> tuple[str, str]:
     if not parts[0] or not parts[2]:
         raise ValueError("mapped_reaction_missing_reactants_or_products")
     return parts[0], parts[2]
+
 
 def _parse_mapped_side(side: str) -> tuple[dict[int, str], dict[tuple[int, int], str]]:
     atoms: dict[int, str] = {}
@@ -118,6 +126,7 @@ def _parse_mapped_side(side: str) -> tuple[dict[int, str], dict[tuple[int, int],
             index += 1
     return atoms, bonds
 
+
 def _read_atom(
     side: str,
     index: int,
@@ -138,6 +147,7 @@ def _read_atom(
         _add_bond(bonds, current, atom_map, pending)
     return end + 1, atom_map, "-"
 
+
 def _read_ring(
     ring_id: str,
     current: int,
@@ -151,6 +161,7 @@ def _read_ring(
     other, ring_bond = rings.pop(ring_id)
     _add_bond(bonds, current, other, pending if pending != "-" else ring_bond)
 
+
 def _atom_map(token: str) -> int | None:
     if ":" not in token:
         return None
@@ -160,6 +171,7 @@ def _atom_map(token: str) -> int | None:
             break
         digits += char
     return int(digits) if digits else None
+
 
 def _atom_symbol(token: str) -> str:
     body = token.rsplit(":", 1)[0]
@@ -171,9 +183,11 @@ def _atom_symbol(token: str) -> str:
         return body[:2].capitalize()
     return body[0].upper() if body[0].isalpha() else "?"
 
+
 def _add_bond(bonds: dict[tuple[int, int], str], left: int, right: int, order: str) -> None:
     if left != right:
         bonds[tuple(sorted((left, right)))] = BOND_LABELS.get(order, "single")
+
 
 def _changed_bonds(
     reactant_atoms: dict[int, str],
@@ -192,12 +206,14 @@ def _changed_bonds(
         changed.append(_changed_bond_label(left, right, before, after))
     return changed
 
+
 def _changed_bond_label(left: str, right: str, before: str | None, after: str | None) -> str:
     if before is None:
         return f"formed:{left}-{right}:{after}"
     if after is None:
         return f"broken:{left}-{right}:{before}"
     return f"changed:{left}-{right}:{before}->{after}"
+
 
 def _bond_atom_maps(changed_bond: str) -> set[int]:
     atom_maps: set[int] = set()
@@ -208,8 +224,12 @@ def _bond_atom_maps(changed_bond: str) -> set[int]:
             atom_maps.add(int(digits))
     return atom_maps
 
-def _atom_label(atom_map: int, reactant_atoms: dict[int, str], product_atoms: dict[int, str]) -> str:
+
+def _atom_label(
+    atom_map: int, reactant_atoms: dict[int, str], product_atoms: dict[int, str]
+) -> str:
     return f"{product_atoms.get(atom_map) or reactant_atoms.get(atom_map) or '?'}{atom_map}"
+
 
 def _center_signature(
     changed_bonds: list[str],
@@ -220,6 +240,7 @@ def _center_signature(
         return "unresolved"
     generalized = [_generalized_bond(item, reactant_atoms, product_atoms) for item in changed_bonds]
     return "bonds:" + "|".join(sorted(generalized))
+
 
 def _generalized_bond(
     changed_bond: str,
@@ -234,6 +255,7 @@ def _generalized_bond(
         elements.append(product_atoms.get(atom_map) or reactant_atoms.get(atom_map) or "?")
     return f"{action}:{'-'.join(sorted(elements))}:{order_part}"
 
+
 def _center_confidence(
     mapping_confidence: float | None,
     warnings: list[str],
@@ -244,8 +266,10 @@ def _center_confidence(
         return "low"
     return "high" if mapping_confidence >= high_threshold else "medium"
 
+
 def _low_confidence_center(warnings: list[str]) -> dict[str, Any]:
     return _center("unresolved", [], [], "low", warnings)
+
 
 def _center(
     signature: str,
@@ -263,6 +287,7 @@ def _center(
         "warnings": warnings,
     }
 
+
 def _edge_basis(left: dict[str, Any], right: dict[str, Any]) -> str | None:
     if left.get("center_signature") == right.get("center_signature"):
         return "same_reaction_center"
@@ -270,8 +295,12 @@ def _edge_basis(left: dict[str, Any], right: dict[str, Any]) -> str | None:
         return "compatible_reaction_center"
     return None
 
+
 def _changed_elements(center: dict[str, Any]) -> set[str]:
-    return {"".join(char for char in atom if char.isalpha()) for atom in center.get("changed_atoms", [])}
+    return {
+        "".join(char for char in atom if char.isalpha()) for atom in center.get("changed_atoms", [])
+    }
+
 
 def _edge_confidence(left: dict[str, Any], right: dict[str, Any], basis: str) -> str:
     left_rank = CONFIDENCE_RANK.get(left.get("confidence", "low"), 0)
@@ -283,8 +312,10 @@ def _edge_confidence(left: dict[str, Any], right: dict[str, Any], basis: str) ->
         return "high"
     return "medium"
 
+
 def _edge_warnings(left: dict[str, Any], right: dict[str, Any]) -> list[str]:
     return list(left.get("warnings", [])) + list(right.get("warnings", []))
+
 
 def _edge_id(left_id: str, right_id: str, basis: str) -> str:
     first, second = sorted((left_id, right_id))

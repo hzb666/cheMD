@@ -7,11 +7,8 @@ import type { AuthoringPatch } from "./authoring-types";
 export type DiagnosticQuickFix = QuickFix | CoreDiagnosticQuickFix;
 export type DiagnosticWithQuickFixes = Diagnostic;
 
-const CHEMD_HEADER_RE = /^\s*:::chemd(?:\s+(.*))?\s*$/;
-const LEGACY_HEADER_RE = /^\s*:::(molecule|reaction)(?:\s+(.*))?\s*$/;
-const CHEMD_CLOSE_RE = /^\s*:::\s*$/;
-const KIND_FIELD_RE = /^\s*kind\s*:/i;
-const REACTION_FIELD_RE = /^\s*(reac|reactant|reactants|prod|product|products)\s*:/i;
+const LEGACY_BLOCK_KINDS = new Set(["molecule", "reaction"]);
+const REACTION_FIELD_KEYS = new Set(["reac", "reactant", "reactants", "prod", "product", "products"]);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
@@ -55,8 +52,46 @@ const readHeaderId = (headerArg: string | undefined): string | undefined => {
   return trimmed.startsWith("#") ? trimmed.slice(1) : undefined;
 };
 
+const splitSourceLines = (source: string): string[] =>
+  source.split("\n").map((line) => (line.endsWith("\r") ? line.slice(0, -1) : line));
+
+const isBlockTypeChar = (char: string): boolean =>
+  (char >= "A" && char <= "Z")
+  || (char >= "a" && char <= "z")
+  || (char >= "0" && char <= "9")
+  || char === "_"
+  || char === "-";
+
+const readBlockHeader = (line: string): { type: string; arg?: string } | undefined => {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith(":::")) return undefined;
+  let index = 3;
+  const first = trimmed[index] ?? "";
+  if (!((first >= "A" && first <= "Z") || (first >= "a" && first <= "z"))) {
+    return undefined;
+  }
+  index += 1;
+  while (isBlockTypeChar(trimmed[index] ?? "")) index += 1;
+  const type = trimmed.slice(3, index);
+  if (index >= trimmed.length) return { type };
+  if (trimmed[index] !== " " && trimmed[index] !== "\t") return undefined;
+  return { type, arg: trimmed.slice(index).trim() };
+};
+
+const readFieldKey = (line: string): string | undefined => {
+  const trimmed = line.trimStart();
+  const colonIndex = trimmed.indexOf(":");
+  if (colonIndex <= 0) return undefined;
+  return trimmed.slice(0, colonIndex).trim();
+};
+
+const isChemdClose = (line: string): boolean => line.trim() === ":::";
+
 const inferChemdKindFromBlock = (blockLines: string[]): "molecule" | "reaction" =>
-  blockLines.some((line) => REACTION_FIELD_RE.test(line)) ? "reaction" : "molecule";
+  blockLines.some((line) => {
+    const field = readFieldKey(line);
+    return Boolean(field && REACTION_FIELD_KEYS.has(field.toLowerCase()));
+  }) ? "reaction" : "molecule";
 
 const readInsertKind = (
   diagnostic: DiagnosticWithQuickFixes,
@@ -99,18 +134,18 @@ const findChemdBlock = (
   targetNodeId: string | undefined
 ): { headerIndex: number; endIndex: number } | undefined => {
   for (let index = 0; index < lines.length; index += 1) {
-    const match = lines[index].match(CHEMD_HEADER_RE);
-    if (!match) {
+    const header = readBlockHeader(lines[index]);
+    if (header?.type !== "chemd") {
       continue;
     }
 
-    const headerId = readHeaderId(match[1]);
+    const headerId = readHeaderId(header.arg);
     if (targetNodeId && headerId !== targetNodeId) {
       continue;
     }
 
     let endIndex = index + 1;
-    while (endIndex < lines.length && !CHEMD_CLOSE_RE.test(lines[endIndex])) {
+    while (endIndex < lines.length && !isChemdClose(lines[endIndex])) {
       endIndex += 1;
     }
 
@@ -130,18 +165,18 @@ const findLegacyBlock = (
   }
 
   for (let index = 0; index < lines.length; index += 1) {
-    const match = lines[index].match(LEGACY_HEADER_RE);
-    if (!match || match[1] !== targetKind) {
+    const header = readBlockHeader(lines[index]);
+    if (!header || header.type !== targetKind || !LEGACY_BLOCK_KINDS.has(header.type)) {
       continue;
     }
 
-    const headerArg = match[2];
+    const headerArg = header.arg;
     if (readHeaderId(headerArg) !== targetNodeId) {
       continue;
     }
 
     let endIndex = index + 1;
-    while (endIndex < lines.length && !CHEMD_CLOSE_RE.test(lines[endIndex])) {
+    while (endIndex < lines.length && !isChemdClose(lines[endIndex])) {
       endIndex += 1;
     }
 
@@ -157,7 +192,7 @@ const applyInsertChemdKind = (
   quickFix: DiagnosticQuickFix
 ): string => {
   const eol = source.includes("\r\n") ? "\r\n" : "\n";
-  const lines = source.split(/\r?\n/);
+  const lines = splitSourceLines(source);
   const targetNodeId = readTargetNodeId(diagnostic, quickFix);
   if (!targetNodeId) {
     return source;
@@ -169,7 +204,7 @@ const applyInsertChemdKind = (
   }
 
   const bodyLines = lines.slice(block.headerIndex + 1, block.endIndex);
-  if (bodyLines.some((line) => KIND_FIELD_RE.test(line))) {
+  if (bodyLines.some((line) => readFieldKey(line)?.toLowerCase() === "kind")) {
     return source;
   }
 
@@ -195,7 +230,7 @@ const applyConvertLegacyBlock = (
   }
 
   const eol = source.includes("\r\n") ? "\r\n" : "\n";
-  const lines = source.split(/\r?\n/);
+  const lines = splitSourceLines(source);
   const block = findLegacyBlock(lines, targetNodeId, legacyKind);
   if (!block) {
     return source;
@@ -206,7 +241,7 @@ const applyConvertLegacyBlock = (
   nextLines[block.headerIndex] = block.headerArg?.trim()
     ? `:::chemd ${block.headerArg.trim()}`
     : ":::chemd";
-  if (!bodyLines.some((line) => KIND_FIELD_RE.test(line))) {
+  if (!bodyLines.some((line) => readFieldKey(line)?.toLowerCase() === "kind")) {
     nextLines.splice(block.headerIndex + 1, 0, `kind: ${legacyKind}`);
   }
 

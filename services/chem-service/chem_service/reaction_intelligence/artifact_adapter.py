@@ -118,10 +118,15 @@ def _put_reaction_center_result(
 ) -> None:
     center = mapping.get("reaction_center")
     if isinstance(center, Mapping):
-        _put_provider_result(normalized, "reaction_center", center | {
-            "reaction_id": mapping.get("reaction_id"),
-            "provider": "reaction_center",
-        })
+        _put_provider_result(
+            normalized,
+            "reaction_center",
+            center
+            | {
+                "reaction_id": mapping.get("reaction_id"),
+                "provider": "reaction_center",
+            },
+        )
 
 
 def _normalize_provider_result(provider: str, result: Mapping[str, Any]) -> ProviderResult:

@@ -106,9 +106,7 @@ class ReactionIntelligenceCliTest(unittest.TestCase):
                     {
                         "jobId": "job-1",
                         "reactionIds": ["rxn-a", "rxn-b"],
-                        "similarityEdges": [
-                            {"source": "rxn-a", "target": "rxn-b", "score": 0.9}
-                        ],
+                        "similarityEdges": [{"source": "rxn-a", "target": "rxn-b", "score": 0.9}],
                     }
                 ),
                 encoding="utf-8",

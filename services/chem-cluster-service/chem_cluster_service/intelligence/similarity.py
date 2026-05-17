@@ -6,7 +6,6 @@ from typing import Any
 
 from chem_cluster_service.intelligence.contracts import ComputedSimilarityEdge
 
-
 SEMANTIC_ONLY_WARNING = "semantic_similarity_without_computed_fingerprint"
 HYBRID_PROVIDER_ID = "provider::hybrid-graph"
 
@@ -68,7 +67,10 @@ def build_hybrid_similarity_edges(
         _merge_edge(aggregates, edge, source_kind="semantic")
     for edge in _iter_edges(computed_sources):
         _merge_edge(aggregates, edge, source_kind="computed")
-    return [_to_edge(item, provider_id) for item in sorted(aggregates.values(), key=lambda item: (item.first, item.second))]
+    return [
+        _to_edge(item, provider_id)
+        for item in sorted(aggregates.values(), key=lambda item: (item.first, item.second))
+    ]
 
 
 def _merge_edge(
@@ -97,7 +99,9 @@ def _merge_edge(
         aggregate.scores[component] = max(score, aggregate.scores.get(component, 0.0))
 
 
-def _edge_basis_components(edge: Mapping[str, Any], source_kind: str) -> tuple[set[str], set[str], set[str]]:
+def _edge_basis_components(
+    edge: Mapping[str, Any], source_kind: str
+) -> tuple[set[str], set[str], set[str]]:
     basis: set[str] = set()
     components: set[str] = set()
     warnings: set[str] = set()
@@ -152,7 +156,9 @@ def _weighted_score(scores: Mapping[str, float]) -> float:
     weight_total = sum(COMPONENT_WEIGHTS[item] for item in scores if item in COMPONENT_WEIGHTS)
     if weight_total == 0:
         return 0.0
-    weighted = sum(scores[item] * COMPONENT_WEIGHTS[item] for item in scores if item in COMPONENT_WEIGHTS)
+    weighted = sum(
+        scores[item] * COMPONENT_WEIGHTS[item] for item in scores if item in COMPONENT_WEIGHTS
+    )
     return round(weighted / weight_total, 6)
 
 

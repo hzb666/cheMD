@@ -15,6 +15,34 @@ describe("renderHtml", () => {
     expect(renderHtml(document, resolveRenderProfile())).toContain("HTML test");
   });
 
+  it("renders markdown markers through bounded scanners", () => {
+    const document = createDocument(
+      { id: "exp-html-markdown", title: "HTML markdown", date: "2026-05-17" },
+      {
+        children: [createMarkdownNode([
+          "# Heading",
+          "",
+          "- [x] done",
+          "1. ordered",
+          "> quote",
+          "",
+          "[safe](https://example.test/path(a)) and `code`",
+          "",
+          "---"
+        ].join("\n"))]
+      }
+    );
+    const html = renderHtml(document, resolveRenderProfile());
+
+    expect(html).toContain("chemd-markdown--h1");
+    expect(html).toContain("chemd-task-checkbox");
+    expect(html).toContain("<ol");
+    expect(html).toContain("chemd-markdown-quote");
+    expect(html).toContain('href="https://example.test/path(a)"');
+    expect(html).toContain("chemd-inline-code");
+    expect(html).toContain("chemd-markdown-hr");
+  });
+
   it("keeps machine metadata out of visible fields and renders readable procedure steps", () => {
     const document = createDocument(
       { id: "exp-html-origin", title: "HTML origin test", date: "2026-04-17" },

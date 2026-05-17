@@ -13,14 +13,12 @@ from chem_cluster_service.intelligence.reaction_center import (
     derive_reaction_center,
 )
 
-
 PROVIDER_ID = "provider::rxnmapper"
 LOW_CONFIDENCE_THRESHOLD = 0.65
 
 
 class MapperAdapter(Protocol):
-    def map_reactions(self, reaction_smiles: list[str]) -> list[Any]:
-        ...
+    def map_reactions(self, reaction_smiles: list[str]) -> list[Any]: ...
 
 
 @dataclass(frozen=True)
@@ -161,7 +159,9 @@ class RXNMapperProvider:
         return ProviderResult(
             provider=provider,
             reaction_features=features,
-            similarity_edges=build_reaction_center_similarity_edges(features, provider_id=PROVIDER_ID),
+            similarity_edges=build_reaction_center_similarity_edges(
+                features, provider_id=PROVIDER_ID
+            ),
             warnings=[],
         )
 
@@ -177,7 +177,7 @@ class RXNMapperProvider:
             smiles = [item["canonical_rxn_smiles"] for _, item in indexed]
             try:
                 batch_results = _normalize_results(adapter.map_reactions(smiles))
-                for (index, _), result in zip(indexed, batch_results):
+                for (index, _), result in zip(indexed, batch_results, strict=False):
                     mapped[index] = result
                 if len(batch_results) < len(indexed):
                     for index, _ in indexed[len(batch_results) :]:
@@ -188,9 +188,13 @@ class RXNMapperProvider:
 
             for index, reaction in indexed:
                 try:
-                    result = _normalize_results(adapter.map_reactions([reaction["canonical_rxn_smiles"]]))
+                    result = _normalize_results(
+                        adapter.map_reactions([reaction["canonical_rxn_smiles"]])
+                    )
                 except Exception as exc:  # noqa: BLE001 - one reaction must not fail the batch.
-                    warnings.setdefault(index, []).append(f"rxnmapper_reaction_failed:{type(exc).__name__}")
+                    warnings.setdefault(index, []).append(
+                        f"rxnmapper_reaction_failed:{type(exc).__name__}"
+                    )
                     continue
                 if result:
                     mapped[index] = result[0]
@@ -217,7 +221,11 @@ def _mapped_rxn(mapping: Any) -> str | None:
 
 
 def _confidence(mapping: Any) -> float | None:
-    value = mapping.get("confidence") if isinstance(mapping, dict) else getattr(mapping, "confidence", None)
+    value = (
+        mapping.get("confidence")
+        if isinstance(mapping, dict)
+        else getattr(mapping, "confidence", None)
+    )
     if isinstance(value, (int, float)):
         return float(value)
     return None

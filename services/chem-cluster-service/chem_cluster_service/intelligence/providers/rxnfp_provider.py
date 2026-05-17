@@ -5,9 +5,10 @@ import importlib.metadata
 import importlib.util
 import json
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import combinations
-from typing import Any, Protocol, Sequence
+from typing import Any, Protocol
 
 from chem_cluster_service.intelligence.contracts import (
     ComputedFeature,
@@ -24,6 +25,7 @@ DEFAULT_DEVICE = "cpu"
 DEFAULT_BATCH_SIZE = 32
 DEFAULT_TOP_K = 10
 
+
 @dataclass(frozen=True)
 class RxnfpAdapterInspection:
     available: bool
@@ -33,34 +35,47 @@ class RxnfpAdapterInspection:
     device: str = DEFAULT_DEVICE
     batch_size: int = DEFAULT_BATCH_SIZE
     warning: str | None = None
+
+
 class RxnfpEmbeddingAdapter(Protocol):
-    def inspect(self) -> RxnfpAdapterInspection:
-        ...
-    def embed_reactions(self, canonical_rxn_smiles: list[str], batch_size: int) -> list[Sequence[float]]:
-        ...
+    def inspect(self) -> RxnfpAdapterInspection: ...
+    def embed_reactions(
+        self, canonical_rxn_smiles: list[str], batch_size: int
+    ) -> list[Sequence[float]]: ...
+
+
 @dataclass
 class RealRxnfpEmbeddingAdapter:
     model_id: str = DEFAULT_MODEL_ID
     device: str = DEFAULT_DEVICE
     batch_size: int = DEFAULT_BATCH_SIZE
     _generator: Any | None = None
+
     def inspect(self) -> RxnfpAdapterInspection:
         if importlib.util.find_spec("rxnfp") is None:
             return RxnfpAdapterInspection(
                 False,
-                model_id=self.model_id, device=self.device, batch_size=self.batch_size,
+                model_id=self.model_id,
+                device=self.device,
+                batch_size=self.batch_size,
                 warning="dependency_not_installed",
             )
         return RxnfpAdapterInspection(
             True,
             package_version=_package_version("rxnfp") or "unknown",
-            model_id=self.model_id, device=self.device, batch_size=self.batch_size,
+            model_id=self.model_id,
+            device=self.device,
+            batch_size=self.batch_size,
         )
-    def embed_reactions(self, canonical_rxn_smiles: list[str], batch_size: int) -> list[Sequence[float]]:
+
+    def embed_reactions(
+        self, canonical_rxn_smiles: list[str], batch_size: int
+    ) -> list[Sequence[float]]:
         generator = self._load_generator()
         if hasattr(generator, "convert_batch"):
             return list(generator.convert_batch(canonical_rxn_smiles))
         return [generator.convert(smiles) for smiles in canonical_rxn_smiles]
+
     def _load_generator(self) -> Any:
         if self._generator is not None:
             return self._generator
@@ -74,18 +89,24 @@ class RealRxnfpEmbeddingAdapter:
             model = model.to(self.device)
         self._generator = RXNBERTFingerprintGenerator(model, tokenizer)
         return self._generator
+
+
 @dataclass(frozen=True)
 class ProviderResult:
     provider: ProviderReport
     reaction_features: list[ComputedFeature]
     similarity_edges: list[ComputedSimilarityEdge]
     warnings: list[str]
+
+
 @dataclass(frozen=True)
 class _EmbeddingRecord:
     reaction_entity_id: str
     source_hash: str
     embedding: tuple[float, ...]
     warnings: list[str]
+
+
 class RxnfpProvider:
     provider_id = PROVIDER_ID
     kind = PROVIDER_KIND
@@ -112,6 +133,7 @@ class RxnfpProvider:
         self.batch_size = batch_size
         self.top_k = top_k
         self.storage = storage
+
     def inspect(self) -> ProviderReport:
         inspection = self._adapter().inspect()
         report: ProviderReport = {
@@ -129,6 +151,7 @@ class RxnfpProvider:
         report["device"] = inspection.device
         report["batch_size"] = inspection.batch_size
         return report
+
     def run(self, reactions: list[ReactionInput]) -> ProviderResult:
         provider = self.inspect()
         if provider["status"] == "SKIP":
@@ -143,10 +166,14 @@ class RxnfpProvider:
         provider["warnings"] = list(dict.fromkeys(list(provider.get("warnings", [])) + warnings))
         edges = [] if provider["status"] == "ERROR" else self._similarity_edges(records)
         return ProviderResult(provider, features, edges, list(provider["warnings"]))
+
     def _adapter(self) -> RxnfpEmbeddingAdapter:
         return self.adapter or RealRxnfpEmbeddingAdapter(
-            model_id=self.model_id, device=self.device, batch_size=self.batch_size,
+            model_id=self.model_id,
+            device=self.device,
+            batch_size=self.batch_size,
         )
+
     def _embed_reactions(
         self,
         reactions: list[ReactionInput],
@@ -162,8 +189,10 @@ class RxnfpProvider:
             return [_feature(reaction, [], [warning]) for reaction in reactions], [], [warning]
         features: list[ComputedFeature] = []
         records: list[_EmbeddingRecord] = []
-        warnings = ["rxnfp_batch_result_count_mismatch"] if len(embeddings) != len(reactions) else []
-        for reaction, raw_embedding in zip(reactions, embeddings):
+        warnings = (
+            ["rxnfp_batch_result_count_mismatch"] if len(embeddings) != len(reactions) else []
+        )
+        for reaction, raw_embedding in zip(reactions, embeddings, strict=False):
             feature, record = self._feature_for_embedding(reaction, raw_embedding, model_id)
             features.append(feature)
             if record is not None:
@@ -217,6 +246,7 @@ class RxnfpProvider:
         edges.sort(key=lambda item: item["score"], reverse=True)
         return edges[: self.top_k]
 
+
 def run_rxnfp_provider(
     reactions: list[ReactionInput],
     *,
@@ -236,7 +266,10 @@ def run_rxnfp_provider(
         storage=storage,
     ).run(reactions)
 
-def _feature(reaction: ReactionInput, refs: list[dict[str, Any]], warnings: list[str]) -> ComputedFeature:
+
+def _feature(
+    reaction: ReactionInput, refs: list[dict[str, Any]], warnings: list[str]
+) -> ComputedFeature:
     return {
         "reaction_entity_id": reaction.get("reaction_entity_id", ""),
         "source_hash": reaction.get("source_hash", ""),
@@ -245,10 +278,12 @@ def _feature(reaction: ReactionInput, refs: list[dict[str, Any]], warnings: list
         "warnings": warnings,
     }
 
+
 def _edge(left: _EmbeddingRecord, right: _EmbeddingRecord, score: float) -> ComputedSimilarityEdge:
     pair_warnings = left.warnings + right.warnings
+    edge_id = f"computed-edge::{left.reaction_entity_id}::{right.reaction_entity_id}::rxnfp-cosine"
     return {
-        "edge_id": f"computed-edge::{left.reaction_entity_id}::{right.reaction_entity_id}::rxnfp-cosine",
+        "edge_id": edge_id,
         "from_reaction_entity_id": left.reaction_entity_id,
         "to_reaction_entity_id": right.reaction_entity_id,
         "score": round(score, 6),
@@ -259,6 +294,7 @@ def _edge(left: _EmbeddingRecord, right: _EmbeddingRecord, score: float) -> Comp
         "warnings": pair_warnings,
     }
 
+
 def _to_float_tuple(value: Sequence[float]) -> tuple[float, ...]:
     try:
         embedding = tuple(float(item) for item in value)
@@ -266,17 +302,22 @@ def _to_float_tuple(value: Sequence[float]) -> tuple[float, ...]:
         return ()
     return embedding if embedding and all(math.isfinite(item) for item in embedding) else ()
 
+
 def _dimension_mismatch(records: list[_EmbeddingRecord]) -> str | None:
     dimensions = {len(record.embedding) for record in records}
     if len(dimensions) <= 1:
         return None
     return "rxnfp_embedding_dimension_mismatch:" + ",".join(map(str, sorted(dimensions)))
 
+
 def _cosine(left: tuple[float, ...], right: tuple[float, ...]) -> float:
-    numerator = sum(left_item * right_item for left_item, right_item in zip(left, right))
+    numerator = sum(
+        left_item * right_item for left_item, right_item in zip(left, right, strict=False)
+    )
     left_norm = math.sqrt(sum(item * item for item in left))
     right_norm = math.sqrt(sum(item * item for item in right))
     return 0.0 if left_norm == 0.0 or right_norm == 0.0 else numerator / (left_norm * right_norm)
+
 
 def _embedding_hash(embedding: tuple[float, ...], model_id: str) -> str:
     payload = json.dumps(
@@ -285,12 +326,14 @@ def _embedding_hash(embedding: tuple[float, ...], model_id: str) -> str:
     )
     return "sha256:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
+
 def _confidence_for_score(score: float, warnings: list[str]) -> str:
     if warnings:
         return "low"
     if score >= 0.9:
         return "high"
     return "medium" if score >= 0.7 else "low"
+
 
 def _package_version(package_name: str) -> str | None:
     try:

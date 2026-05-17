@@ -29,20 +29,38 @@ test("resolveChemServiceCommand uses in-project virtualenv python", () => {
 
 test("resolveSpawnInvocation wraps cmd launchers with cmd.exe on Windows", () => {
   assert.deepEqual(
-    resolveSpawnInvocation("pnpm.cmd", ["--filter", "@chemd/web", "dev"], "win32", "cmd.exe"),
+    resolveSpawnInvocation("pnpm.cmd", ["--filter", "@chemd/web", "dev"], "win32"),
     {
       command: "cmd.exe",
-      args: ["/d", "/s", "/c", "pnpm.cmd --filter @chemd/web dev"]
+      args: ["/d", "/s", "/c", "pnpm.cmd", "--filter", "@chemd/web", "dev"]
     }
   );
 
   assert.deepEqual(
-    resolveSpawnInvocation("poetry.exe", ["--version"], "win32", "cmd.exe"),
+    resolveSpawnInvocation("poetry.exe", ["--version"], "win32"),
     {
       command: "poetry.exe",
       args: ["--version"]
     }
   );
+});
+
+test("resolveSpawnInvocation ignores ComSpec environment values", () => {
+  const previousComSpec = process.env.ComSpec;
+  process.env.ComSpec = "attacker-controlled.cmd";
+
+  try {
+    assert.deepEqual(resolveSpawnInvocation("pnpm.cmd", ["dev"], "win32"), {
+      command: "cmd.exe",
+      args: ["/d", "/s", "/c", "pnpm.cmd", "dev"]
+    });
+  } finally {
+    if (previousComSpec === undefined) {
+      delete process.env.ComSpec;
+    } else {
+      process.env.ComSpec = previousComSpec;
+    }
+  }
 });
 
 test("createDevDemoProcesses builds web and chem-service processes", () => {

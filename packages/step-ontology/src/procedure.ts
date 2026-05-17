@@ -14,7 +14,6 @@ import {
   cleanExtractedText,
   detectStructureHint,
   extractDuration,
-  extractFirst,
   extractRepeatCount,
   extractTemperature,
   splitProcedureSentences
@@ -75,14 +74,63 @@ const createProcedureSource = (
 const hasAny = (text: string, patterns: RegExp[]): boolean =>
   patterns.some((pattern) => pattern.test(text));
 
+const textAfterAny = (sentence: string, markers: readonly string[]): string | undefined => {
+  const lower = sentence.toLowerCase();
+  const marker = markers
+    .map((candidate) => ({ marker: candidate, index: lower.indexOf(candidate.toLowerCase()) }))
+    .filter((candidate) => candidate.index >= 0)
+    .sort((left, right) => left.index - right.index)[0];
+  return marker ? sentence.slice(marker.index + marker.marker.length) : undefined;
+};
+
+const textBeforeAny = (sentence: string, markers: readonly string[]): string | undefined => {
+  const lower = sentence.toLowerCase();
+  const index = markers
+    .map((candidate) => lower.indexOf(candidate.toLowerCase()))
+    .filter((candidate) => candidate >= 0)
+    .sort((left, right) => left - right)[0];
+  return index === undefined ? undefined : sentence.slice(0, index);
+};
+
+const stopAtAny = (text: string, markers: readonly string[]): string => {
+  const lower = text.toLowerCase();
+  const index = markers
+    .map((candidate) => lower.indexOf(candidate.toLowerCase()))
+    .filter((candidate) => candidate >= 0)
+    .sort((left, right) => left - right)[0];
+  return index === undefined ? text : text.slice(0, index);
+};
+
+const readTokenAfterAny = (sentence: string, markers: readonly string[]): string | undefined => {
+  const after = textAfterAny(sentence, markers)?.trimStart();
+  if (!after) return undefined;
+  let end = 0;
+  while (end < after.length && isSolventTokenChar(after[end])) {
+    end += 1;
+  }
+  return end > 0 ? cleanExtractedText(after.slice(0, end)) : undefined;
+};
+
+const isSolventTokenChar = (char: string): boolean =>
+  (char >= "A" && char <= "Z")
+  || (char >= "a" && char <= "z")
+  || (char >= "0" && char <= "9")
+  || ["（", "）", "(", ")", "/", "_", "-"].includes(char);
+
+const isInitialChineseChargeAddition = (sentence: string): boolean => {
+  const chargeIndex = sentence.indexOf("将");
+  const addIndex = sentence.indexOf("加入");
+  return chargeIndex >= 0 && addIndex > chargeIndex;
+};
+
 const getAddMaterial = (sentence: string): string | undefined =>
-  extractFirst(sentence, /(?:滴加|加入|added(?:\s+dropwise)?|add(?:ed)?)(.+?)(?:后|到|至|$)/i);
+  cleanExtractedText(stopAtAny(textAfterAny(sentence, ["滴加", "加入", "added dropwise", "added", "add"]) ?? "", ["后", "到", "至"])) || undefined;
 
 const getChargeMaterial = (sentence: string): string | undefined =>
-  extractFirst(sentence, /将(.+?)(?:加入|置于|溶于|charged|charge)/i);
+  cleanExtractedText(stopAtAny(textAfterAny(sentence, ["将"]) ?? textBeforeAny(sentence, ["charged", "charge"]) ?? "", ["加入", "置于", "溶于", "charged", "charge"])) || undefined;
 
 const getSolvent = (sentence: string): string | undefined =>
-  extractFirst(sentence, /(?:溶于|in|into)\s*([A-Za-z0-9（）()/_-]+)/i);
+  readTokenAfterAny(sentence, ["溶于", "into", "in"]);
 
 const lowerCharge = (context: SentenceContext): CanonicalStepNode[] => {
   const isInitialCharge = context.sentenceIndex === 0
@@ -153,14 +201,15 @@ const lowerProcess = (context: SentenceContext): CanonicalStepNode[] => {
 
 const lowerWorkup = (context: SentenceContext): CanonicalStepNode[] => {
   if (hasAny(context.sentence, [/萃取/, /\bextract(?:ed)?\b/i])) {
+    const extractionSolvent = textBeforeAny(context.sentence, ["萃取"]);
     return [createStep(context, "extract", {
-      ...(extractFirst(context.sentence, /([A-Za-z]+)\s*萃取/i) ? { solvent: extractFirst(context.sentence, /([A-Za-z]+)\s*萃取/i) } : {}),
+      ...(extractionSolvent ? { solvent: cleanExtractedText(extractionSolvent) } : {}),
       ...(extractRepeatCount(context.sentence) ? { repeats: extractRepeatCount(context.sentence) } : {})
     }, 0.84, ["creates_biphasic_system"])];
   }
 
   if (hasAny(context.sentence, [/干燥/, /\bdried?\b/i])) {
-    return [createStep(context, "dry", { agent: extractFirst(context.sentence, /([A-Za-z0-9]+)\s*干燥/i) }, 0.82)];
+    return [createStep(context, "dry", { agent: cleanExtractedText(textBeforeAny(context.sentence, ["干燥"]) ?? "") || undefined }, 0.82)];
   }
 
   return lowerMechanicalWorkup(context);
@@ -209,7 +258,9 @@ const lowerSentence = (context: SentenceContext): CanonicalStepNode[] => [
   ...lowerProcess(context),
   ...lowerAnalysis(context),
   ...lowerWorkup(context)
-].filter((step) => !(step.family === "add" && context.sentenceIndex === 0 && /将.+加入/.test(context.sentence)));
+].filter((step) =>
+  !(step.family === "add" && context.sentenceIndex === 0 && isInitialChineseChargeAddition(context.sentence))
+);
 
 const createAmbiguousStep = (context: SentenceContext): CanonicalStepNode =>
   createStep(context, "observe", { raw: cleanExtractedText(context.sentence) }, 0.35);

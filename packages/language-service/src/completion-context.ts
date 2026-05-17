@@ -5,17 +5,18 @@ import type {
   ChemdEditorPosition
 } from "./completion-types";
 
-const blockHeaderPattern = /^\s*:::([a-zA-Z][a-zA-Z0-9_-]*)(?:\s+(.*))?\s*$/;
-const fieldPattern = /^\s*([A-Za-z_][A-Za-z0-9_-]*)\s*:\s*(.*)$/;
 const reactionFields = new Set(["reactants", "products", "route", "prev", "reagents"]);
 const moleculeFields = new Set(["smiles", "cas", "formula", "amount", "equivalents"]);
+
+const splitSourceLines = (source: string): string[] =>
+  source.split("\n").map((line) => (line.endsWith("\r") ? line.slice(0, -1) : line));
 
 export const getChemdCompletionContext = (
   request: ChemdCompletionRequest
 ): ChemdCompletionContext => {
   const offset = resolveOffset(request);
   const position = offsetToPosition(request.source, offset);
-  const lines = request.source.split(/\r?\n/);
+  const lines = splitSourceLines(request.source);
   const lineText = lines[position.line - 1] ?? "";
   const linePrefix = lineText.slice(0, Math.max(position.column - 1, 0));
   const tokenPrefix = readTokenPrefix(linePrefix);
@@ -33,10 +34,10 @@ export const getChemdCompletionContext = (
     range,
     isFrontmatter: isInsideFrontmatter(lines, position.line),
     isChemdBlock: block?.type === "chemd",
-    isUseHeaderPosition: /^\s*:::use\s+\S*$/.test(linePrefix),
+    isUseHeaderPosition: isUseHeaderPrefix(linePrefix),
     isReferencePosition: tokenPrefix.startsWith("@") ||
       (request.triggerCharacter === "@" && linePrefix.endsWith("@")),
-    isStepFamilyPosition: /^\s*step\s*:\s*[^|]*$/.test(linePrefix),
+    isStepFamilyPosition: isStepFamilyPrefix(linePrefix),
     isFieldKeyPosition: Boolean(block) && !field.hasColon && !linePrefix.trim().startsWith(":::"),
     isFieldValuePosition: Boolean(block) && field.hasColon,
     fieldKey: field.key,
@@ -57,7 +58,7 @@ const resolveOffset = (request: ChemdCompletionRequest): number => {
 };
 
 const positionToOffset = (source: string, position: ChemdEditorPosition): number => {
-  const lines = source.split(/\r?\n/);
+  const lines = splitSourceLines(source);
   let offset = 0;
   for (let index = 0; index < Math.max(position.line - 1, 0); index += 1) {
     offset += (lines[index]?.length ?? 0) + 1;
@@ -68,7 +69,7 @@ const positionToOffset = (source: string, position: ChemdEditorPosition): number
 
 const offsetToPosition = (source: string, offset: number): ChemdEditorPosition => {
   const before = source.slice(0, clamp(offset, 0, source.length));
-  const lines = before.split(/\r?\n/);
+  const lines = splitSourceLines(before);
   return {
     line: lines.length,
     column: (lines[lines.length - 1]?.length ?? 0) + 1
@@ -95,23 +96,23 @@ const findOpenBlock = (
 
   for (let index = 0; index < cursorLine; index += 1) {
     const line = lines[index] ?? "";
-    const header = line.match(blockHeaderPattern);
+    const header = readBlockHeader(line);
     if (line.trim() === ":::" && open) {
       open = undefined;
       continue;
     }
     if (header) {
       open = {
-        type: normalizeBlockType(header[1] ?? ""),
-        id: readBlockId(header[2]),
+        type: normalizeBlockType(header.type),
+        id: readBlockId(header.arg),
         startLine: index + 1,
         fields: new Map()
       };
       continue;
     }
-    const field = line.match(fieldPattern);
+    const field = readFieldLine(line);
     if (open && field) {
-      open.fields.set(field[1] ?? "", field[2]?.trim() ?? "");
+      open.fields.set(field.key, field.value.trim());
     }
   }
 
@@ -169,15 +170,70 @@ const readFieldAtCursor = (linePrefix: string): { hasColon: boolean; key?: strin
   };
 };
 
+const isNameStart = (char: string): boolean =>
+  (char >= "A" && char <= "Z") || (char >= "a" && char <= "z") || char === "_";
+
+const isNameChar = (char: string): boolean =>
+  isNameStart(char) || (char >= "0" && char <= "9") || char === "-";
+
+const readBlockHeader = (line: string): { type: string; arg?: string } | undefined => {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith(":::")) return undefined;
+  let index = 3;
+  if (!isNameStart(trimmed[index] ?? "")) return undefined;
+  index += 1;
+  while (isNameChar(trimmed[index] ?? "")) index += 1;
+  const type = trimmed.slice(3, index);
+  if (index >= trimmed.length) return { type };
+  if (trimmed[index] !== " " && trimmed[index] !== "\t") return undefined;
+  return { type, arg: trimmed.slice(index).trim() };
+};
+
+const readFieldLine = (line: string): { key: string; value: string } | undefined => {
+  let index = 0;
+  while (line[index] === " " || line[index] === "\t") index += 1;
+  const start = index;
+  if (!isNameStart(line[index] ?? "")) return undefined;
+  index += 1;
+  while (isNameChar(line[index] ?? "")) index += 1;
+  const key = line.slice(start, index);
+  while (line[index] === " " || line[index] === "\t") index += 1;
+  if (line[index] !== ":") return undefined;
+  return { key, value: line.slice(index + 1) };
+};
+
+const isUseHeaderPrefix = (linePrefix: string): boolean => {
+  const trimmed = linePrefix.trimStart();
+  if (!trimmed.startsWith(":::use")) return false;
+  const rest = trimmed.slice(":::use".length);
+  return rest.length > 0 && rest.trim().length > 0 && !rest.trim().includes(" ");
+};
+
+const isStepFamilyPrefix = (linePrefix: string): boolean => {
+  const field = readFieldLine(linePrefix);
+  return field?.key === "step" && !field.value.includes("|");
+};
+
 const readBlockId = (headerArg: string | undefined): string | undefined => {
-  const token = headerArg?.trim().split(/\s+/, 1)[0] ?? "";
+  const trimmed = headerArg?.trim() ?? "";
+  const end = Array.from(trimmed).findIndex((char) => char === " " || char === "\t");
+  const token = end >= 0 ? trimmed.slice(0, end) : trimmed;
   return token.startsWith("#") ? token.slice(1) : undefined;
 };
 
 const readTokenPrefix = (linePrefix: string): string => {
-  const match = linePrefix.match(/[A-Za-z0-9_@#./:-]*$/);
-  return match?.[0] ?? "";
+  let start = linePrefix.length;
+  while (start > 0 && isTokenPrefixChar(linePrefix[start - 1])) {
+    start -= 1;
+  }
+  return linePrefix.slice(start);
 };
+
+const isTokenPrefixChar = (char: string): boolean =>
+  (char >= "A" && char <= "Z")
+  || (char >= "a" && char <= "z")
+  || (char >= "0" && char <= "9")
+  || ["_", "@", "#", ".", "/", ":", "-"].includes(char);
 
 const isInsideFrontmatter = (lines: string[], cursorLine: number): boolean => {
   if (lines[0]?.trim() !== "---") {

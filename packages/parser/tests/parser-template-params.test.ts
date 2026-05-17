@@ -72,4 +72,31 @@ body:
       ]
     });
   });
+
+  it("stops list params at the next field without regex backtracking", () => {
+    const document = parseChemd(`---
+id: exp-template-list-boundary
+title: Template list boundary
+date: 2026-05-17
+---
+
+:::template charge_pair
+params:
+  - reagent_a: ref<molecule>
+  - amount: quantity<amount>
+body:
+not_a_param: true
+:::
+`);
+    const template = document.children.find((node) => node.type === "template");
+
+    expect(template).toMatchObject({
+      type: "template",
+      params: ["reagent_a", "amount"],
+      paramSpecs: [
+        { name: "reagent_a", type: { kind: "ref", targetKind: "molecule" } },
+        { name: "amount", type: { kind: "quantity", quantityClass: "amount" } }
+      ]
+    });
+  });
 });

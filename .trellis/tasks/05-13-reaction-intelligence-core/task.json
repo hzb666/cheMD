@@ -3,7 +3,7 @@
   "name": "reaction-intelligence-core",
   "title": "Reaction intelligence kernel",
   "description": "",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": "backend",
   "scope": "packages/exporter-training, services/chem-service/chem_service/reaction_intelligence, docs",
   "package": "exporter-training",

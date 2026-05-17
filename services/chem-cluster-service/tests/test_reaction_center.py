@@ -1,3 +1,5 @@
+# ruff: noqa: E402
+
 import sys
 import unittest
 from pathlib import Path
@@ -10,14 +12,11 @@ from chem_cluster_service.intelligence.reaction_center import (
     derive_reaction_center,
 )
 
-
 ESTER_MAPPED = (
-    "[CH3:1][C:2](=[O:3])[OH:4].[CH3:5][CH2:6][OH:7]"
-    ">>[CH3:1][C:2](=[O:3])[O:7][CH2:6][CH3:5]"
+    "[CH3:1][C:2](=[O:3])[OH:4].[CH3:5][CH2:6][OH:7]>>[CH3:1][C:2](=[O:3])[O:7][CH2:6][CH3:5]"
 )
 ESTER_MAPPED_ALT = (
-    "[CH3:10][C:11](=[O:12])[OH:13].[CH3:14][OH:15]"
-    ">>[CH3:10][C:11](=[O:12])[O:15][CH3:14]"
+    "[CH3:10][C:11](=[O:12])[OH:13].[CH3:14][OH:15]>>[CH3:10][C:11](=[O:12])[O:15][CH3:14]"
 )
 SUBSTITUTION_MAPPED = "[Cl:1][CH3:2].[OH:3]>>[OH:3][CH3:2].[Cl:1]"
 

@@ -74,22 +74,65 @@ const applyUnpositionedInlineTokens = (escapedValue: string, node: MarkdownNode)
   return rendered;
 };
 
+const findClosingBracket = (value: string, start: number): number => {
+  for (let index = start; index < value.length; index += 1) {
+    if (value[index] === "]") return index;
+  }
+  return -1;
+};
+
+const findClosingParen = (value: string, start: number): number => {
+  let depth = 0;
+  for (let index = start; index < value.length; index += 1) {
+    const char = value[index];
+    if (char === "\r" || char === "\n") return -1;
+    if (char === "(") {
+      depth += 1;
+      continue;
+    }
+    if (char === ")") {
+      if (depth === 0) return index;
+      depth -= 1;
+    }
+  }
+  return -1;
+};
+
+const findMarkdownLink = (
+  value: string,
+  start: number
+): { index: number; end: number; label: string; rawHref: string } | undefined => {
+  for (let index = start; index < value.length; index += 1) {
+    if (value[index] !== "[") continue;
+    const labelEnd = findClosingBracket(value, index + 1);
+    if (labelEnd <= index + 1 || value[labelEnd + 1] !== "(") continue;
+    const hrefStart = labelEnd + 2;
+    const hrefEnd = findClosingParen(value, hrefStart);
+    if (hrefEnd < 0 || hrefEnd === hrefStart) continue;
+    return {
+      index,
+      end: hrefEnd + 1,
+      label: value.slice(index + 1, labelEnd),
+      rawHref: value.slice(hrefStart, hrefEnd)
+    };
+  }
+  return undefined;
+};
+
 const renderTextSegmentByRegex = (value: string, node: MarkdownNode): string => {
-  const linkPattern = /\[([^\]\r\n]+)\]\(((?:[^()\r\n]|\([^()\r\n]*\))+?)\)/g;
   let rendered = "";
   let cursor = 0;
-  let match: RegExpExecArray | null;
 
-  while ((match = linkPattern.exec(value)) !== null) {
-    const fullMatch = match[0];
-    const label = match[1];
-    const rawHref = match[2];
+  while (cursor < value.length) {
+    const link = findMarkdownLink(value, cursor);
+    if (!link) break;
+    const fullMatch = value.slice(link.index, link.end);
 
     rendered += applyMarkdownInlineStylesInHtmlText(
-      applyInlineTokens(escapeHtml(value.slice(cursor, match.index)), node)
+      applyInlineTokens(escapeHtml(value.slice(cursor, link.index)), node)
     );
 
-    const safeHref = sanitizeHref(rawHref);
+    const safeHref = sanitizeHref(link.rawHref);
 
     if (!safeHref) {
       rendered += applyMarkdownInlineStylesInHtmlText(
@@ -97,12 +140,12 @@ const renderTextSegmentByRegex = (value: string, node: MarkdownNode): string => 
       );
     } else {
       const labelHtml = applyMarkdownInlineStylesInHtmlText(
-        applyInlineTokens(escapeHtml(label), node)
+        applyInlineTokens(escapeHtml(link.label), node)
       );
       rendered += `<a class="chemd-link" href="${escapeHtml(safeHref)}" target="_blank" rel="noreferrer noopener">${labelHtml}</a>`;
     }
 
-    cursor = match.index + fullMatch.length;
+    cursor = link.end;
   }
 
   rendered += applyMarkdownInlineStylesInHtmlText(
@@ -113,15 +156,19 @@ const renderTextSegmentByRegex = (value: string, node: MarkdownNode): string => 
 };
 
 const renderInlineTextByRegex = (value: string, node: MarkdownNode): string => {
-  const codePattern = /`([^`\r\n]+)`/g;
   let rendered = "";
   let cursor = 0;
-  let match: RegExpExecArray | null;
 
-  while ((match = codePattern.exec(value)) !== null) {
-    rendered += renderTextSegmentByRegex(value.slice(cursor, match.index), node);
-    rendered += `<code class="chemd-inline-code">${escapeHtml(match[1])}</code>`;
-    cursor = match.index + match[0].length;
+  while (cursor < value.length) {
+    const open = value.indexOf("`", cursor);
+    if (open < 0) break;
+    const close = value.indexOf("`", open + 1);
+    if (close < 0 || value.slice(open + 1, close).includes("\n") || value.slice(open + 1, close).includes("\r")) {
+      break;
+    }
+    rendered += renderTextSegmentByRegex(value.slice(cursor, open), node);
+    rendered += `<code class="chemd-inline-code">${escapeHtml(value.slice(open + 1, close))}</code>`;
+    cursor = close + 1;
   }
 
   rendered += renderTextSegmentByRegex(value.slice(cursor), node);

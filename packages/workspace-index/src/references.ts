@@ -20,11 +20,43 @@ interface ReferenceCandidate {
   range: ChemdSourceRange;
 }
 
+const isTargetChar = (char: string): boolean =>
+  (char >= "A" && char <= "Z")
+  || (char >= "a" && char <= "z")
+  || (char >= "0" && char <= "9")
+  || char === "_"
+  || char === "."
+  || char === "-";
+
+const isFieldStartChar = (char: string): boolean =>
+  (char >= "A" && char <= "Z") || (char >= "a" && char <= "z");
+
+const isFieldChar = (char: string): boolean =>
+  isFieldStartChar(char) || (char >= "0" && char <= "9") || char === "_" || char === "-";
+
+const stripReferenceDecorators = (rawText: string): string => {
+  let trimmed = rawText.trim();
+  if (trimmed.startsWith("@")) {
+    trimmed = trimmed.slice(1);
+  }
+  while (trimmed.endsWith(";")) {
+    trimmed = trimmed.slice(0, -1);
+  }
+  return trimmed;
+};
+
+const isReferenceTarget = (value: string): boolean => {
+  if (!value) return false;
+  const parts = value.split("#");
+  if (parts.length > 2) return false;
+  return parts.every((part) => part.length > 0 && Array.from(part).every(isTargetChar));
+};
+
 const splitTarget = (
   rawText: string
 ): Pick<ReferenceCandidate, "targetText" | "targetDocumentAlias" | "targetLocalId"> | null => {
-  const trimmed = rawText.trim().replace(/^@/, "").replace(/[;]+$/, "");
-  if (!/^[A-Za-z0-9_.-]+(?:#[A-Za-z0-9_.-]+)?$/.test(trimmed)) {
+  const trimmed = stripReferenceDecorators(rawText);
+  if (!isReferenceTarget(trimmed)) {
     return null;
   }
 
@@ -33,6 +65,36 @@ const splitTarget = (
     : [undefined, trimmed];
   if (!targetLocalId) return null;
   return { targetText: trimmed, targetDocumentAlias, targetLocalId };
+};
+
+const parseReferenceFieldLine = (
+  line: string
+): { field: string; value: string; valueOffset: number } | undefined => {
+  let index = 0;
+  while (line[index] === " " || line[index] === "\t") index += 1;
+  const fieldStart = index;
+  if (!isFieldStartChar(line[index] ?? "")) return undefined;
+  index += 1;
+  while (isFieldChar(line[index] ?? "")) index += 1;
+  const field = line.slice(fieldStart, index);
+  while (line[index] === " " || line[index] === "\t") index += 1;
+  if (line[index] !== ":") return undefined;
+  index += 1;
+  while (line[index] === " " || line[index] === "\t") index += 1;
+  return { field, value: line.slice(index), valueOffset: index };
+};
+
+const splitReferenceTokens = (value: string): Array<{ token: string; start: number }> => {
+  const tokens: Array<{ token: string; start: number }> = [];
+  let start = 0;
+  for (let index = 0; index <= value.length; index += 1) {
+    const char = value[index];
+    if (index === value.length || char === "|" || char === "," || char === "[" || char === "]") {
+      tokens.push({ token: value.slice(start, index), start });
+      start = index + 1;
+    }
+  }
+  return tokens;
 };
 
 const toRange = (
@@ -50,25 +112,20 @@ const extractFieldCandidates = (
   line: string,
   lineIndex: number
 ): ReferenceCandidate[] => {
-  const match = line.match(/^(\s*)([A-Za-z][A-Za-z0-9_-]*)\s*:\s*(.*)$/);
-  if (!match || !REFERENCE_FIELDS.has(match[2])) return [];
+  const parsed = parseReferenceFieldLine(line);
+  if (!parsed || !REFERENCE_FIELDS.has(parsed.field)) return [];
 
-  const prefixLength = match[1].length + match[2].length + 1;
-  const valueOffset = prefixLength + (match[0].length - match[3].length - prefixLength);
   const candidates: ReferenceCandidate[] = [];
-  let tokenStart = 0;
-  for (const token of match[3].split(/[|,[\]]/)) {
-    const relativeStart = match[3].indexOf(token, tokenStart);
+  for (const { token, start } of splitReferenceTokens(parsed.value)) {
     const rawText = token.trim();
-    tokenStart = relativeStart + token.length;
     const target = splitTarget(rawText);
-    if (!target || relativeStart < 0) continue;
+    if (!target) continue;
     const leadingSpaces = token.length - token.trimStart().length;
     candidates.push({
-      field: match[2],
+      field: parsed.field,
       rawText,
       ...target,
-      range: toRange(lineIndex, valueOffset + relativeStart + leadingSpaces + 1, rawText.length)
+      range: toRange(lineIndex, parsed.valueOffset + start + leadingSpaces + 1, rawText.length)
     });
   }
   return candidates;
@@ -76,17 +133,20 @@ const extractFieldCandidates = (
 
 const extractAtCandidates = (line: string, lineIndex: number): ReferenceCandidate[] => {
   const candidates: ReferenceCandidate[] = [];
-  const pattern = /@([A-Za-z0-9_.-]+(?:#[A-Za-z0-9_.-]+)?)/g;
-  for (const match of line.matchAll(pattern)) {
-    const rawText = match[0];
+  for (let index = 0; index < line.length; index += 1) {
+    if (line[index] !== "@") continue;
+    let end = index + 1;
+    while (isTargetChar(line[end] ?? "") || line[end] === "#") end += 1;
+    const rawText = line.slice(index, end);
     const target = splitTarget(rawText);
-    if (!target || match.index === undefined) continue;
+    if (!target) continue;
     candidates.push({
       field: "@",
       rawText,
       ...target,
-      range: toRange(lineIndex, match.index + 1, rawText.length)
+      range: toRange(lineIndex, index + 1, rawText.length)
     });
+    index = end - 1;
   }
   return candidates;
 };
@@ -98,7 +158,8 @@ export const extractReferenceCandidates = (
   document: WorkspaceDocumentInput
 ): WorkspaceReference[] => {
   const seen = new Set<string>();
-  return document.source.split(/\r?\n/).flatMap((line, lineIndex) => {
+  return document.source.split("\n").flatMap((rawLine, lineIndex) => {
+    const line = rawLine.endsWith("\r") ? rawLine.slice(0, -1) : rawLine;
     const candidates = [
       ...extractFieldCandidates(line, lineIndex),
       ...extractAtCandidates(line, lineIndex)

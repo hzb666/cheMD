@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from pathlib import Path
 
 from .layout import ClusterWorkerError, read_json, run_layout_worker, write_json
@@ -21,20 +20,20 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-      payload = read_json(Path(args.input))
-      result = run_layout_worker(payload, engine=args.engine, missing_tmap=args.missing_tmap)
+        payload = read_json(Path(args.input))
+        result = run_layout_worker(payload, engine=args.engine, missing_tmap=args.missing_tmap)
     except ClusterWorkerError as error:
-      result_payload = {
-          "status": "ERROR",
-          "code": "invalid_input",
-          "message": str(error),
-          "artifact": None,
-      }
-      if args.output:
-          write_json(Path(args.output), result_payload, args.pretty)
-      else:
-          print(json.dumps(result_payload, indent=2 if args.pretty else None, sort_keys=True))
-      return 2
+        result_payload = {
+            "status": "ERROR",
+            "code": "invalid_input",
+            "message": str(error),
+            "artifact": None,
+        }
+        if args.output:
+            write_json(Path(args.output), result_payload, args.pretty)
+        else:
+            print(json.dumps(result_payload, indent=2 if args.pretty else None, sort_keys=True))
+        return 2
 
     if args.output:
         write_json(Path(args.output), result.payload, args.pretty)

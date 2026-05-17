@@ -3,10 +3,10 @@ from __future__ import annotations
 import importlib.util
 import json
 import math
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Literal, TypedDict
-
+from typing import Any, Literal, TypedDict
 
 MissingTmapPolicy = Literal["skip", "error", "fallback"]
 LayoutEngine = Literal["auto", "fallback", "tmap"]
@@ -106,7 +106,11 @@ def _from_layout_artifact(payload: dict[str, Any]) -> WorkerInput:
 
 def _from_training_graph(payload: dict[str, Any]) -> WorkerInput:
     return {
-        "layout_id": str(payload.get("layout_id") or payload.get("graph_index_id") or "reaction-layout::training-graph"),
+        "layout_id": str(
+            payload.get("layout_id")
+            or payload.get("graph_index_id")
+            or "reaction-layout::training-graph"
+        ),
         "reactions": _string_list(
             [
                 item.get("reaction_entity_id")
@@ -115,7 +119,9 @@ def _from_training_graph(payload: dict[str, Any]) -> WorkerInput:
             ],
             "reaction_features.reaction_entity_id",
         ),
-        "edges": _edge_list(payload.get("reaction_similarity_edges", payload.get("explicit_edges", []))),
+        "edges": _edge_list(
+            payload.get("reaction_similarity_edges", payload.get("explicit_edges", []))
+        ),
     }
 
 
@@ -207,7 +213,9 @@ def read_json(path: Path) -> dict[str, Any]:
     return value
 
 
-def write_json(path: Path, payload: WorkerOutput | ClassifiedEnvelope, pretty: bool = False) -> None:
+def write_json(
+    path: Path, payload: WorkerOutput | ClassifiedEnvelope, pretty: bool = False
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         json.dumps(payload, indent=2 if pretty else None, sort_keys=True) + "\n",

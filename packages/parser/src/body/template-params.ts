@@ -6,10 +6,6 @@ import type {
 
 import { parseKeyValueLine } from "./parse-body-shared";
 
-const TEMPLATE_PARAM_ITEM_RE = /^\s*-\s+(.+)$/;
-const TEMPLATE_PARAM_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
-const TEMPLATE_REF_TYPE_RE = /^ref<\s*([a-z_]+)\s*>$/i;
-const TEMPLATE_QUANTITY_TYPE_RE = /^quantity(?:<\s*([a-z_]+)\s*>)?$/i;
 const TEMPLATE_REF_TARGETS = new Set<ObjectSemanticKind>([
   "molecule",
   "reaction",
@@ -21,6 +17,31 @@ const TEMPLATE_REF_TARGETS = new Set<ObjectSemanticKind>([
   "artifact",
   "condition_varies"
 ]);
+
+const isParamNameStart = (char: string): boolean =>
+  (char >= "A" && char <= "Z") || (char >= "a" && char <= "z") || char === "_";
+
+const isParamNameChar = (char: string): boolean =>
+  isParamNameStart(char) || (char >= "0" && char <= "9");
+
+const isTemplateParamName = (value: string): boolean =>
+  value.length > 0 && isParamNameStart(value[0]) && Array.from(value).every(isParamNameChar);
+
+const readTemplateParamItem = (line: string): string | undefined => {
+  const trimmedStart = line.trimStart();
+  if (!trimmedStart.startsWith("-")) return undefined;
+  const value = trimmedStart.slice(1);
+  if (!value.startsWith(" ") && !value.startsWith("\t")) return undefined;
+  return value.trim();
+};
+
+const readGenericTypeArg = (value: string, keyword: string): string | undefined | null => {
+  const normalized = value.trim();
+  if (normalized.toLowerCase() === keyword) return undefined;
+  if (!normalized.toLowerCase().startsWith(`${keyword}<`) || !normalized.endsWith(">")) return null;
+  const inner = normalized.slice(keyword.length + 1, -1).trim();
+  return inner || null;
+};
 
 export const collectTemplateHeaderLines = (
   lines: string[],
@@ -59,12 +80,12 @@ const collectTemplateParamItems = (
   let index = startIndex;
 
   while (index < lines.length) {
-    const itemMatch = lines[index].match(TEMPLATE_PARAM_ITEM_RE);
-    if (!itemMatch) {
+    const item = readTemplateParamItem(lines[index]);
+    if (item === undefined) {
       break;
     }
 
-    values.push(itemMatch[1].trim());
+    values.push(item);
     index += 1;
   }
 
@@ -78,16 +99,16 @@ const parseTemplateParamType = (rawType: string | undefined): TemplateParamType 
     return { kind: "string" };
   }
 
-  const refMatch = normalizedType.match(TEMPLATE_REF_TYPE_RE);
-  if (refMatch) {
-    return parseTemplateRefType(refMatch[1]);
+  const refTarget = readGenericTypeArg(normalizedType, "ref");
+  if (refTarget) {
+    return parseTemplateRefType(refTarget);
   }
 
-  const quantityMatch = normalizedType.match(TEMPLATE_QUANTITY_TYPE_RE);
-  if (quantityMatch) {
+  const quantityClass = readGenericTypeArg(normalizedType, "quantity");
+  if (quantityClass !== null) {
     return {
       kind: "quantity",
-      ...(quantityMatch[1] ? { quantityClass: quantityMatch[1].toLowerCase() } : {})
+      ...(quantityClass ? { quantityClass: quantityClass.toLowerCase() } : {})
     };
   }
 
@@ -110,7 +131,7 @@ const parseTemplateParam = (raw: string): TemplateParamSpec | undefined => {
   const separatorIndex = raw.indexOf(":");
   const name = (separatorIndex >= 0 ? raw.slice(0, separatorIndex) : raw).trim();
 
-  if (!TEMPLATE_PARAM_NAME_RE.test(name)) {
+  if (!isTemplateParamName(name)) {
     return undefined;
   }
 

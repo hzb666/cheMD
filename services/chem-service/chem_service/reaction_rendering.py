@@ -64,8 +64,10 @@ def _build_reaction_fallback_svg(
     arrow_start_x = layout.arrow_start_x
     arrow_center_x = layout.arrow_center_x
     products_x = layout.products_x
-    arrow_notch_x = arrow_start_x + rendered_arrow_length - (
-        _REACTION_ARROW_HEAD_LENGTH * _REACTION_ARROW_HEAD_NOTCH_RATIO
+    arrow_notch_x = (
+        arrow_start_x
+        + rendered_arrow_length
+        - (_REACTION_ARROW_HEAD_LENGTH * _REACTION_ARROW_HEAD_NOTCH_RATIO)
     )
     arrow_head_path = _build_reaction_arrow_head_path_data(
         ReactionArrowHeadGeometry(

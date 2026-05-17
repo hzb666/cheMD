@@ -2,8 +2,6 @@ import type { MarkdownNode } from "@chemd/core";
 import { renderInlineText } from "./inline-render";
 import { escapeHtml, normalizeWhitespace } from "./shared";
 
-const MARKDOWN_HR_PATTERN = /^([-*_])(?:\s*\1){2,}\s*$/;
-
 const getMarkdownIndentLevel = (indent: string): number => {
   let width = 0;
 
@@ -12,6 +10,87 @@ const getMarkdownIndentLevel = (indent: string): number => {
   }
 
   return Math.floor(width / 2);
+};
+
+const isWhitespace = (char: string): boolean =>
+  char === " " || char === "\t" || char === "\r" || char === "\n";
+
+const readMarkdownTaskItem = (content: string): MarkdownTaskItem | undefined => {
+  if (
+    content.length < 5
+    || content[0] !== "["
+    || content[2] !== "]"
+    || !isWhitespace(content[3])
+  ) {
+    return undefined;
+  }
+  const marker = content[1];
+  if (marker !== " " && marker !== "x" && marker !== "X") {
+    return undefined;
+  }
+  return {
+    checked: marker.toLowerCase() === "x",
+    text: content.slice(4).trimStart()
+  };
+};
+
+const isMarkdownHr = (trimmed: string): boolean => {
+  const marker = trimmed[0];
+  if (marker !== "-" && marker !== "*" && marker !== "_") return false;
+  let count = 0;
+  for (const char of trimmed) {
+    if (char === marker) {
+      count += 1;
+      continue;
+    }
+    if (!isWhitespace(char)) return false;
+  }
+  return count >= 3;
+};
+
+const readHeading = (trimmed: string): { level: number; text: string } | undefined => {
+  let level = 0;
+  while (trimmed[level] === "#" && level < 6) level += 1;
+  if (level === 0 || !isWhitespace(trimmed[level] ?? "")) return undefined;
+  const text = trimmed.slice(level).trimStart();
+  return text ? { level, text } : undefined;
+};
+
+const readCodeFenceLanguage = (trimmed: string): string | undefined | null => {
+  if (!trimmed.startsWith("```")) return null;
+  const language = trimmed.slice(3).trim();
+  if (!language) return undefined;
+  const valid = Array.from(language).every((char) =>
+    (char >= "A" && char <= "Z")
+    || (char >= "a" && char <= "z")
+    || (char >= "0" && char <= "9")
+    || char === "_"
+    || char === "-"
+  );
+  return valid ? language : null;
+};
+
+const readUnorderedListEntry = (line: string): { indent: string; content: string } | undefined => {
+  let index = 0;
+  while (line[index] === " " || line[index] === "\t") index += 1;
+  if (line[index] !== "-" && line[index] !== "*") return undefined;
+  if (!isWhitespace(line[index + 1] ?? "")) return undefined;
+  return { indent: line.slice(0, index), content: line.slice(index + 2) };
+};
+
+const readOrderedListEntry = (line: string): { indent: string; order: number; content: string } | undefined => {
+  let index = 0;
+  while (line[index] === " " || line[index] === "\t") index += 1;
+  const start = index;
+  while (line[index] >= "0" && line[index] <= "9") index += 1;
+  if (index === start || line[index] !== "." || !isWhitespace(line[index + 1] ?? "")) {
+    return undefined;
+  }
+  return {
+    indent: line.slice(0, start),
+    order: Number(line.slice(start, index)),
+    content: line.slice(index + 2)
+  };
 };
 
 interface MarkdownTaskItem {
@@ -36,21 +115,15 @@ export interface RenderMarkdownNodeOptions {
 }
 
 const parseMarkdownTaskItem = (content: string): MarkdownTaskItem | undefined => {
-  const taskMatch = content.match(/^\[( |x|X)\]\s+(.+)$/);
-
-  if (!taskMatch) {
-    return undefined;
-  }
-
-  return {
-    checked: taskMatch[1].toLowerCase() === "x",
-    text: taskMatch[2]
-  };
+  return readMarkdownTaskItem(content);
 };
 
 const splitMarkdownTableCells = (line: string): string[] => {
   const trimmed = line.trim();
-  const body = trimmed.replace(/^\|/, "").replace(/\|$/, "");
+  const withoutLeadingPipe = trimmed.startsWith("|") ? trimmed.slice(1) : trimmed;
+  const body = withoutLeadingPipe.endsWith("|")
+    ? withoutLeadingPipe.slice(0, -1)
+    : withoutLeadingPipe;
   return body.split("|").map((cell) => cell.trim());
 };
 
@@ -61,7 +134,14 @@ const isMarkdownTableSeparatorLine = (line: string): boolean => {
     return false;
   }
 
-  return cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+  return cells.every(isMarkdownTableSeparatorCell);
+};
+
+const isMarkdownTableSeparatorCell = (cell: string): boolean => {
+  const trimmed = cell.trim();
+  const body = trimmed.startsWith(":") ? trimmed.slice(1) : trimmed;
+  const withoutRightAlign = body.endsWith(":") ? body.slice(0, -1) : body;
+  return withoutRightAlign.length >= 3 && Array.from(withoutRightAlign).every((char) => char === "-");
 };
 
 const isMarkdownTableHeaderCandidate = (line: string): boolean => {
@@ -316,7 +396,7 @@ const handleCodeFenceContent = (
     return false;
   }
 
-  if (/^```/.test(trimmed)) {
+  if (trimmed.startsWith("```")) {
     flushCodeFence(state);
   } else {
     state.codeFenceLines.push(line);
@@ -330,16 +410,16 @@ const handleCodeFenceStart = (
   node: MarkdownNode,
   state: MarkdownRenderState
 ): boolean => {
-  const match = trimmed.match(/^```([a-zA-Z0-9_-]+)?\s*$/);
+  const language = readCodeFenceLanguage(trimmed);
 
-  if (!match) {
+  if (language === null) {
     return false;
   }
 
   state.canSuppressLeadingHeading = false;
   flushParagraphContext(state, node);
   state.inCodeFence = true;
-  state.codeFenceLanguage = match[1];
+  state.codeFenceLanguage = language;
   return true;
 };
 
@@ -393,7 +473,7 @@ const handleHorizontalRule = (
   node: MarkdownNode,
   state: MarkdownRenderState
 ): boolean => {
-  if (!MARKDOWN_HR_PATTERN.test(trimmed)) {
+  if (!isMarkdownHr(trimmed)) {
     return false;
   }
 
@@ -409,20 +489,20 @@ const handleHeading = (
   state: MarkdownRenderState,
   suppressLeadingHeadingText?: string
 ): boolean => {
-  const headingMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
+  const heading = readHeading(trimmed);
 
-  if (!headingMatch) {
+  if (!heading) {
     return false;
   }
 
   flushParagraphContext(state, node);
 
-  const level = headingMatch[1].length;
+  const level = heading.level;
   if (
     state.canSuppressLeadingHeading &&
     level === 1 &&
     suppressLeadingHeadingText &&
-    normalizeWhitespace(headingMatch[2]) === normalizeWhitespace(suppressLeadingHeadingText)
+    normalizeWhitespace(heading.text) === normalizeWhitespace(suppressLeadingHeadingText)
   ) {
     state.canSuppressLeadingHeading = false;
     return true;
@@ -430,7 +510,7 @@ const handleHeading = (
 
   state.canSuppressLeadingHeading = false;
   state.blocks.push(
-    `<h${level} class="chemd-markdown chemd-markdown--h${level}">${renderInlineText(headingMatch[2], node)}</h${level}>`
+    `<h${level} class="chemd-markdown chemd-markdown--h${level}">${renderInlineText(heading.text, node)}</h${level}>`
   );
   return true;
 };
@@ -440,19 +520,19 @@ const handleUnorderedList = (
   node: MarkdownNode,
   state: MarkdownRenderState
 ): boolean => {
-  const unorderedMatch = line.match(/^(\s*)[-*]\s+(.+)$/);
+  const unordered = readUnorderedListEntry(line);
 
-  if (!unorderedMatch) {
+  if (!unordered) {
     return false;
   }
 
   state.canSuppressLeadingHeading = false;
   flushListContext(state, node);
 
-  const content = unorderedMatch[2];
+  const content = unordered.content;
   state.listEntries.push({
     type: "ul",
-    depth: getMarkdownIndentLevel(unorderedMatch[1]),
+    depth: getMarkdownIndentLevel(unordered.indent),
     content,
     task: parseMarkdownTaskItem(content)
   });
@@ -464,9 +544,9 @@ const handleOrderedList = (
   node: MarkdownNode,
   state: MarkdownRenderState
 ): boolean => {
-  const orderedMatch = line.match(/^(\s*)(\d+)\.\s+(.+)$/);
+  const ordered = readOrderedListEntry(line);
 
-  if (!orderedMatch) {
+  if (!ordered) {
     return false;
   }
 
@@ -474,9 +554,9 @@ const handleOrderedList = (
   flushListContext(state, node);
   state.listEntries.push({
     type: "ol",
-    depth: getMarkdownIndentLevel(orderedMatch[1]),
-    order: Number(orderedMatch[2]),
-    content: orderedMatch[3]
+    depth: getMarkdownIndentLevel(ordered.indent),
+    order: ordered.order,
+    content: ordered.content
   });
   return true;
 };
@@ -486,9 +566,7 @@ const handleQuote = (
   node: MarkdownNode,
   state: MarkdownRenderState
 ): boolean => {
-  const quoteMatch = trimmed.match(/^>\s?(.*)$/);
-
-  if (!quoteMatch) {
+  if (!trimmed.startsWith(">")) {
     return false;
   }
 
@@ -496,7 +574,8 @@ const handleQuote = (
   flushParagraph(state, node);
   flushList(state, node);
   flushTable(state, node);
-  state.quoteLines.push(quoteMatch[1]);
+  const quoteText = trimmed[1] === " " ? trimmed.slice(2) : trimmed.slice(1);
+  state.quoteLines.push(quoteText);
   return true;
 };
 
@@ -569,7 +648,7 @@ export const renderMarkdownNode = (
   options: RenderMarkdownNodeOptions = {}
 ): string => {
   const { suppressLeadingHeadingText } = options;
-  const lines = node.value.split(/\r?\n/);
+  const lines = node.value.split("\n").map((line) => (line.endsWith("\r") ? line.slice(0, -1) : line));
   const state = createMarkdownRenderState();
 
   for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {

@@ -1,3 +1,5 @@
+# ruff: noqa: E402
+
 import sys
 import unittest
 from dataclasses import dataclass
@@ -24,9 +26,17 @@ class HybridSimilarityTests(unittest.TestCase):
                 ],
             },
             [
-                {"similarity_edges": [computed_edge("rxn-a", "rxn-b", 0.8, "rdkit_fingerprint_tanimoto")]},
+                {
+                    "similarity_edges": [
+                        computed_edge("rxn-a", "rxn-b", 0.8, "rdkit_fingerprint_tanimoto")
+                    ]
+                },
                 ProviderResult([computed_edge("rxn-b", "rxn-a", 0.95, "rxnfp_cosine")]),
-                {"similarity_edges": [computed_edge("rxn-a", "rxn-b", 1.0, "same_reaction_center")]},
+                {
+                    "similarity_edges": [
+                        computed_edge("rxn-a", "rxn-b", 1.0, "same_reaction_center")
+                    ]
+                },
             ],
         )
 
@@ -92,7 +102,9 @@ class HybridSimilarityTests(unittest.TestCase):
                     "rxn-b",
                     0.99,
                     "rdkit_fingerprint_tanimoto",
-                    warnings=["rdkit_fingerprint_invalid_reaction:reaction_smiles_contains_invalid_molecule"],
+                    warnings=[
+                        "rdkit_fingerprint_invalid_reaction:reaction_smiles_contains_invalid_molecule"
+                    ],
                 )
             ],
         )
@@ -114,10 +126,13 @@ class HybridSimilarityTests(unittest.TestCase):
             [computed_edge("rxn-c", "rxn-a", 0.9, "compatible_reaction_center")],
         )
 
-        self.assertEqual([item["edge_id"] for item in edges], [
-            "computed-edge::rxn-a::rxn-b::hybrid-similarity",
-            "computed-edge::rxn-a::rxn-c::hybrid-similarity",
-        ])
+        self.assertEqual(
+            [item["edge_id"] for item in edges],
+            [
+                "computed-edge::rxn-a::rxn-b::hybrid-similarity",
+                "computed-edge::rxn-a::rxn-c::hybrid-similarity",
+            ],
+        )
         self.assertEqual(edges[1]["score"], 0.81)
         self.assertEqual(edges[1]["from_reaction_entity_id"], "rxn-a")
         self.assertEqual(edges[1]["to_reaction_entity_id"], "rxn-c")
@@ -126,7 +141,11 @@ class HybridSimilarityTests(unittest.TestCase):
         edges = build_hybrid_similarity_edges(
             [
                 semantic_edge("rxn-a", "rxn-b", 0.8, ["legacy_unknown_basis"]),
-                {"from_reaction_entity_id": "rxn-a", "to_reaction_entity_id": "rxn-c", "basis": ["same_route"]},
+                {
+                    "from_reaction_entity_id": "rxn-a",
+                    "to_reaction_entity_id": "rxn-c",
+                    "basis": ["same_route"],
+                },
                 semantic_edge("rxn-b", "rxn-b", 0.9, ["same_reaction_family"]),
             ],
             [

@@ -114,6 +114,29 @@ describe("buildWorkspaceSymbolIndex", () => {
     ]);
   });
 
+  it("extracts reference fields and at tokens without regex backtracking", () => {
+    const index = buildWorkspaceSymbolIndex([
+      {
+        uri: "file:///workspace/route-a.chemd",
+        path: "experiments/route-a.chemd",
+        source: "reactants: [ @mol-a, route-b#rxn-b; ]\nnotes: @rxn-b"
+      },
+      {
+        uri: "file:///workspace/route-b.chemd",
+        path: "experiments/route-b.chemd",
+        source: sourceB
+      }
+    ]);
+
+    expect(index.references
+      .filter((reference) => reference.documentUri === "file:///workspace/route-a.chemd")
+      .map((reference) => reference.targetText)).toEqual([
+        "mol-a",
+        "route-b#rxn-b",
+        "rxn-b"
+      ]);
+  });
+
   it("resolves legacy .chemd.md document aliases against renamed .chemd files", () => {
     const index = buildWorkspaceSymbolIndex([
       {

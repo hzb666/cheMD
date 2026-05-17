@@ -1,10 +1,14 @@
 import type { Diagnostic } from "@chemd/core";
 
-const BLOCK_START_PATTERN = /^:::([a-z][a-z0-9_]*(?:-[a-z][a-z0-9_]*)*)(?:-\d+)?(?:\s+.*)?$/;
 const NESTED_CHILD_BLOCKS: Record<string, Set<string>> = {
   procedure: new Set(["step"]),
   observation: new Set(["event"])
 };
+
+const isBlockTypeStart = (char: string): boolean => char >= "a" && char <= "z";
+
+const isBlockTypePart = (char: string): boolean =>
+  isBlockTypeStart(char) || (char >= "0" && char <= "9") || char === "_";
 
 const readColBraceState = (trimmed: string): "open" | "close" | "none" => {
   if (trimmed === "}" || trimmed === ":::}") {
@@ -23,9 +27,56 @@ const readColBraceState = (trimmed: string): "open" | "close" | "none" => {
   return value.endsWith("}") && value.length > 1 ? "none" : "open";
 };
 
+const readBlockTypeName = (trimmed: string): { blockType: string; index: number } | undefined => {
+  let index = 3;
+  if (!isBlockTypeStart(trimmed[index] ?? "")) return undefined;
+  let blockType = "";
+
+  while (index < trimmed.length) {
+    const char = trimmed[index];
+    if (isBlockTypePart(char)) {
+      blockType += char;
+      index += 1;
+      continue;
+    }
+    if (char === "-" && isBlockTypeStart(trimmed[index + 1] ?? "")) {
+      blockType += char;
+      index += 1;
+      continue;
+    }
+    break;
+  }
+
+  return { blockType, index };
+};
+
+const readNumericBlockSuffixEnd = (trimmed: string, index: number): number | undefined => {
+  if (trimmed[index] === "-") {
+    index += 1;
+    let digitCount = 0;
+    while (trimmed[index] >= "0" && trimmed[index] <= "9") {
+      index += 1;
+      digitCount += 1;
+    }
+    if (digitCount === 0) return undefined;
+  }
+
+  return index;
+};
+
 const readBlockType = (trimmed: string): string | undefined => {
-  const match = trimmed.match(BLOCK_START_PATTERN);
-  return match?.[1];
+  if (!trimmed.startsWith(":::")) return undefined;
+
+  const blockName = readBlockTypeName(trimmed);
+  if (!blockName) return undefined;
+
+  const index = readNumericBlockSuffixEnd(trimmed, blockName.index);
+  if (index === undefined) return undefined;
+
+  if (index < trimmed.length && trimmed[index] !== " " && trimmed[index] !== "\t") {
+    return undefined;
+  }
+  return blockName.blockType;
 };
 
 const startsNestedChildBlock = (parentBlockType: string, trimmed: string): boolean => {

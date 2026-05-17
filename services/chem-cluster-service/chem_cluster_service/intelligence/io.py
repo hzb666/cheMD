@@ -25,7 +25,9 @@ class IntelligenceIOError(ValueError):
         return validation_envelope(self.code, str(self), self.errors)
 
 
-def validation_envelope(code: str, message: str, errors: list[str] | None = None) -> ClassifiedEnvelope:
+def validation_envelope(
+    code: str, message: str, errors: list[str] | None = None
+) -> ClassifiedEnvelope:
     envelope: ClassifiedEnvelope = {
         "status": "ERROR",
         "code": code,

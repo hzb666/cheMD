@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any, Literal, TypedDict
 
-
 REACTION_INTELLIGENCE_JOB_SCHEMA_VERSION = "chemd-reaction-intelligence-job/v0.1"
 REACTION_INTELLIGENCE_ARTIFACT_SCHEMA_VERSION = "chemd-reaction-intelligence-artifact/v0.1"
 
@@ -232,7 +231,9 @@ def _validate_computed_edge(value: Any, index: int, errors: list[str]) -> None:
     for field in ("basis", "provider_ids", "source_hashes", "warnings"):
         if not _is_string_list(value.get(field)):
             errors.append(f"similarity_edges[{index}].{field} must be strings")
-    if _is_string_list(value.get("basis")) and any(item not in COMPUTED_SIMILARITY_BASIS for item in value["basis"]):
+    if _is_string_list(value.get("basis")) and any(
+        item not in COMPUTED_SIMILARITY_BASIS for item in value["basis"]
+    ):
         errors.append(f"similarity_edges[{index}].basis contains invalid basis")
 
 

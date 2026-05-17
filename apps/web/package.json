@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
-    "@types/pg": "^8.20.0"
+    "@types/pg": "^8.20.0",
+    "babel-plugin-react-compiler": "^1.0.0"
   },
   "dependencies": {
     "@chemd/compiler": "workspace:*",

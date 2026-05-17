@@ -1,3 +1,5 @@
+# ruff: noqa: E402
+
 import json
 import sys
 import unittest
@@ -13,7 +15,6 @@ from chem_cluster_service.intelligence.contracts import (
     validate_artifact,
     validate_job_input,
 )
-
 
 FIXTURE_ROOT = Path(__file__).resolve().parent / "fixtures"
 
@@ -55,7 +56,9 @@ class ReactionIntelligenceContractTests(unittest.TestCase):
             [provider["status"] for provider in round_tripped["providers"]],
             ["SKIP", "SKIP", "PASS"],
         )
-        self.assertEqual(round_tripped["reaction_features"][0]["fingerprint_refs"][0]["provider"], "rdkit")
+        self.assertEqual(
+            round_tripped["reaction_features"][0]["fingerprint_refs"][0]["provider"], "rdkit"
+        )
         self.assertEqual(round_tripped["similarity_edges"][0]["basis"][1], "hybrid_consensus")
 
     def test_require_helpers_raise_classified_contract_error(self):
@@ -65,7 +68,10 @@ class ReactionIntelligenceContractTests(unittest.TestCase):
             require_valid_job_input(payload)
 
         artifact = read_fixture("reaction_intelligence_artifact.valid.json")
-        self.assertEqual(require_valid_artifact(artifact)["artifact_id"], "reaction-intelligence-artifact::fixture")
+        self.assertEqual(
+            require_valid_artifact(artifact)["artifact_id"],
+            "reaction-intelligence-artifact::fixture",
+        )
 
 
 if __name__ == "__main__":

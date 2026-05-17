@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import re
-
 from chem_service.reaction_models import ReactionCanvasLayout, ReactionRenderConfig
 
 _SOLVENT_ALIASES = {
@@ -37,9 +35,6 @@ _ELECTRO_PATTERNS = (
     "cell",
     "voltage",
 )
-_TEMPERATURE_RE = re.compile(r"^-?\d+(?:\.\d+)?\s*(?:c|°c|k|f)$", re.IGNORECASE)
-_TIME_RE = re.compile(r"^-?\d+(?:\.\d+)?\s*(?:h|hr|hrs|min|mins)$", re.IGNORECASE)
-_PRESSURE_RE = re.compile(r"^-?\d+(?:\.\d+)?\s*(?:bar|atm|psi)$", re.IGNORECASE)
 _REACTION_ANNOTATION_FONT_SIZE = 16.0
 _REACTION_ANNOTATION_LINE_HEIGHT = 20.0
 _REACTION_TOP_ANNOTATION_GAP = 10.0
@@ -59,20 +54,64 @@ _REACTION_BASELINE_Y = 74.0
 _REACTION_BOTTOM_PADDING = 28.0
 
 
+def _parse_numeric_annotation(
+    value: str,
+    units: set[str],
+    *,
+    allow_degree: bool = False,
+) -> tuple[str, str] | None:
+    index = 0
+    if value.startswith("-"):
+        index = 1
+
+    digit_start = index
+    while index < len(value) and value[index].isdigit():
+        index += 1
+    if index == digit_start:
+        return None
+
+    if index < len(value) and value[index] == ".":
+        index += 1
+        decimal_start = index
+        while index < len(value) and value[index].isdigit():
+            index += 1
+        if index == decimal_start:
+            return None
+
+    number = value[:index]
+    while index < len(value) and value[index].isspace():
+        index += 1
+
+    if allow_degree and index < len(value) and value[index] == "°":
+        index += 1
+        while index < len(value) and value[index].isspace():
+            index += 1
+
+    unit = value[index:].lower()
+    if unit not in units:
+        return None
+    return number, unit
+
+
+def _is_numeric_annotation(value: str, units: set[str], *, allow_degree: bool = False) -> bool:
+    return _parse_numeric_annotation(value, units, allow_degree=allow_degree) is not None
+
+
 def _normalize_reaction_annotation_token(value: str) -> str:
     normalized = " ".join(value.strip().split())
-    temperature_match = re.fullmatch(
-        r"(?P<value>-?\d+(?:\.\d+)?)\s*°?\s*(?P<unit>[cCfFkK])",
+    temperature = _parse_numeric_annotation(
         normalized,
+        {"c", "f", "k"},
+        allow_degree=True,
     )
-    if temperature_match is None:
+    if temperature is None:
         return normalized
 
-    unit = temperature_match.group("unit").upper()
-    value = temperature_match.group("value")
+    number, raw_unit = temperature
+    unit = raw_unit.upper()
     if unit == "C":
-        return f"{value} °C"
-    return f"{value} {unit}"
+        return f"{number} °C"
+    return f"{number} {unit}"
 
 
 def _is_reaction_bottom_annotation(value: str) -> bool:
@@ -81,9 +120,9 @@ def _is_reaction_bottom_annotation(value: str) -> bool:
     if lowered in _SOLVENT_ALIASES:
         return True
     if (
-        _TEMPERATURE_RE.fullmatch(normalized)
-        or _TIME_RE.fullmatch(normalized)
-        or _PRESSURE_RE.fullmatch(normalized)
+        _is_numeric_annotation(normalized, {"c", "f", "k"}, allow_degree=True)
+        or _is_numeric_annotation(normalized, {"h", "hr", "hrs", "min", "mins"})
+        or _is_numeric_annotation(normalized, {"bar", "atm", "psi"})
     ):
         return True
     if any(pattern in lowered for pattern in _LIGHT_PATTERNS):
@@ -96,7 +135,10 @@ def _is_reaction_bottom_annotation(value: str) -> bool:
 def _is_reaction_compactable_bottom_annotation(value: str) -> bool:
     normalized = _normalize_reaction_annotation_token(value)
     return bool(
-        (_TEMPERATURE_RE.fullmatch(normalized) or _TIME_RE.fullmatch(normalized))
+        (
+            _is_numeric_annotation(normalized, {"c", "f", "k"}, allow_degree=True)
+            or _is_numeric_annotation(normalized, {"h", "hr", "hrs", "min", "mins"})
+        )
         and len(normalized) <= _REACTION_COMPACT_BOTTOM_ANNOTATION_MAX_LENGTH
     )
 

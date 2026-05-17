@@ -12,15 +12,23 @@ import type {
 } from "./types";
 
 const detectEventType = (text: string): ObservationEventType | undefined => {
-  if (/颜色|变.*色|color|colour|red|yellow/i.test(text)) {
+  const lower = text.toLowerCase();
+  if (
+    text.includes("颜色")
+    || (text.includes("变") && text.includes("色"))
+    || lower.includes("color")
+    || lower.includes("colour")
+    || lower.includes("red")
+    || lower.includes("yellow")
+  ) {
     return "color_change";
   }
 
-  if (/沉淀|precipitat/i.test(text)) {
+  if (text.includes("沉淀") || lower.includes("precipitat")) {
     return "precipitation";
   }
 
-  if (/气泡|放气|gas|bubble/i.test(text)) {
+  if (text.includes("气泡") || text.includes("放气") || lower.includes("gas") || lower.includes("bubble")) {
     return "gas_evolution";
   }
 
@@ -28,15 +36,21 @@ const detectEventType = (text: string): ObservationEventType | undefined => {
 };
 
 const detectLinkedStepFamily = (text: string): StepFamily | undefined => {
-  if (/加入|滴加|after\s+add|after\s+adding/i.test(text)) {
+  const lower = text.toLowerCase();
+  if (
+    text.includes("加入")
+    || text.includes("滴加")
+    || lower.includes("after add")
+    || lower.includes("after adding")
+  ) {
     return "add";
   }
 
-  if (/加热|heated|warming/i.test(text)) {
+  if (text.includes("加热") || lower.includes("heated") || lower.includes("warming")) {
     return "heat";
   }
 
-  if (/冷却|cooled|cooling/i.test(text)) {
+  if (text.includes("冷却") || lower.includes("cooled") || lower.includes("cooling")) {
     return "cool";
   }
 
@@ -44,11 +58,12 @@ const detectLinkedStepFamily = (text: string): StepFamily | undefined => {
 };
 
 const detectColorValue = (text: string): string | undefined => {
-  if (/深红|deep\s+red/i.test(text)) {
+  const lower = text.toLowerCase();
+  if (text.includes("深红") || lower.includes("deep red")) {
     return "deep_red";
   }
 
-  if (/黄色|yellow/i.test(text)) {
+  if (text.includes("黄色") || lower.includes("yellow")) {
     return "yellow";
   }
 

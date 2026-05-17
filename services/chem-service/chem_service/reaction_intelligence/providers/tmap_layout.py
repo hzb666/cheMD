@@ -8,6 +8,7 @@ PROVIDER_NAME = "tmap"
 STATUS_COMPUTED = "computed"
 STATUS_SKIPPED = "skipped"
 
+
 def build_tmap_layout(job: Mapping[str, Any], *, tmap_module: Any | None = None) -> dict[str, Any]:
     reaction_ids = _collect_reaction_ids(job)
     edges, edge_warnings = _collect_tmap_edges(job, reaction_ids)

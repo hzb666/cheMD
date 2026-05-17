@@ -14,7 +14,6 @@ from chem_cluster_service.intelligence.contracts import (
     ReactionInput,
 )
 
-
 PROVIDER_ID = "provider::rdkit-fingerprint"
 PROVIDER_KIND = "rdkit_fingerprint"
 EDGE_BASIS = "rdkit_fingerprint_tanimoto"
@@ -34,11 +33,9 @@ class RdkitAdapterInspection:
 
 
 class RdkitFingerprintAdapter(Protocol):
-    def inspect(self) -> RdkitAdapterInspection:
-        ...
+    def inspect(self) -> RdkitAdapterInspection: ...
 
-    def fingerprint_reaction(self, canonical_rxn_smiles: str, dimension: int) -> set[int]:
-        ...
+    def fingerprint_reaction(self, canonical_rxn_smiles: str, dimension: int) -> set[int]: ...
 
 
 class RealRdkitFingerprintAdapter:
@@ -164,7 +161,7 @@ class RdkitFingerprintProvider:
     def _feature_for_reaction(
         self,
         reaction: ReactionInput,
-    ) -> tuple[ComputedFeature, "_FingerprintFeatureRecord | None"]:
+    ) -> tuple[ComputedFeature, _FingerprintFeatureRecord | None]:
         reaction_id = reaction.get("reaction_entity_id", "")
         source_hash = reaction.get("source_hash", "")
         canonical_rxn_smiles = reaction.get("canonical_rxn_smiles", "")
@@ -210,7 +207,7 @@ class RdkitFingerprintProvider:
 
     def _similarity_edges(
         self,
-        features: list["_FingerprintFeatureRecord"],
+        features: list[_FingerprintFeatureRecord],
     ) -> list[ComputedSimilarityEdge]:
         edges: list[ComputedSimilarityEdge] = []
         for left, right in combinations(features, 2):

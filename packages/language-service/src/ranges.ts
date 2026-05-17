@@ -1,7 +1,10 @@
 import type { ChemdSourceRange } from "./types";
 
+const splitSourceLines = (source: string): string[] =>
+  source.split("\n").map((line) => (line.endsWith("\r") ? line.slice(0, -1) : line));
+
 export const createDocumentRange = (source: string): ChemdSourceRange => {
-  const lines = source.split(/\r?\n/);
+  const lines = splitSourceLines(source);
   const lastLine = Math.max(lines.length, 1);
   const lastColumn = (lines[lastLine - 1]?.length ?? 0) + 1;
 
@@ -22,11 +25,14 @@ export const createStartRange = (): ChemdSourceRange => ({
 
 const readHeaderId = (headerArg: string | undefined): string | undefined => {
   const trimmed = headerArg?.trim() ?? "";
-  return trimmed.startsWith("#") ? trimmed.slice(1).split(/\s+/, 1)[0] : undefined;
+  if (!trimmed.startsWith("#")) return undefined;
+  const id = trimmed.slice(1);
+  const end = Array.from(id).findIndex((char) => char === " " || char === "\t");
+  return end >= 0 ? id.slice(0, end) : id;
 };
 
 export const createMetadataRange = (source: string): ChemdSourceRange => {
-  const lines = source.split(/\r?\n/);
+  const lines = splitSourceLines(source);
   if (lines[0]?.trim() !== "---") {
     return createStartRange();
   }
@@ -52,14 +58,13 @@ export const createSourceHash = (source: string): string => {
 
 export const buildBlockRangeMap = (source: string): Map<string, ChemdSourceRange> => {
   const ranges = new Map<string, ChemdSourceRange>();
-  const lines = source.split(/\r?\n/);
-  const headerPattern = /^\s*:::([a-zA-Z][a-zA-Z0-9_-]*)(?:\s+(.*))?\s*$/;
+  const lines = splitSourceLines(source);
   let index = 0;
 
   while (index < lines.length) {
-    const match = lines[index].match(headerPattern);
-    const id = match ? readHeaderId(match[2]) : undefined;
-    if (!match || !id) {
+    const header = readBlockHeader(lines[index]);
+    const id = header ? readHeaderId(header.arg) : undefined;
+    if (!header || !id) {
       index += 1;
       continue;
     }
@@ -81,3 +86,22 @@ export const buildBlockRangeMap = (source: string): Map<string, ChemdSourceRange
 
   return ranges;
 };
+
+const readBlockHeader = (line: string): { type: string; arg?: string } | undefined => {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith(":::")) return undefined;
+  let index = 3;
+  const first = trimmed[index] ?? "";
+  if (!isBlockTypeChar(first, true)) return undefined;
+  index += 1;
+  while (isBlockTypeChar(trimmed[index] ?? "", false)) index += 1;
+  const type = trimmed.slice(3, index);
+  if (index >= trimmed.length) return { type };
+  if (trimmed[index] !== " " && trimmed[index] !== "\t") return undefined;
+  return { type, arg: trimmed.slice(index).trim() };
+};
+
+const isBlockTypeChar = (char: string, first: boolean): boolean =>
+  (char >= "A" && char <= "Z")
+  || (char >= "a" && char <= "z")
+  || (!first && ((char >= "0" && char <= "9") || char === "_" || char === "-"));

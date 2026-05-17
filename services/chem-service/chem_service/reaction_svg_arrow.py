@@ -216,7 +216,6 @@ def _render_reaction_arrow_paths(arrow: ReactionArrowGeometry, *, arrow_end_x: f
         f"style='{escape(_serialize_svg_style(shaft_style), quote=True)}' />"
     )
     head = (
-        f"<path d='{head_path}' "
-        f"style='{escape(_serialize_svg_style(head_style), quote=True)}' />"
+        f"<path d='{head_path}' style='{escape(_serialize_svg_style(head_style), quote=True)}' />"
     )
     return f"{shaft}{head}"

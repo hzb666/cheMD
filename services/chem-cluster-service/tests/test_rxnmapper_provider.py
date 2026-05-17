@@ -1,3 +1,5 @@
+# ruff: noqa: E402
+
 import sys
 import unittest
 from pathlib import Path
@@ -134,12 +136,10 @@ def _reaction(reaction_id, smiles, source_hash):
 
 
 _MAPPED_RXN = (
-    "[CH3:1][C:2](=[O:3])[OH:4].[CH3:5][CH2:6][OH:7]"
-    ">>[CH3:1][C:2](=[O:3])[O:7][CH2:6][CH3:5]"
+    "[CH3:1][C:2](=[O:3])[OH:4].[CH3:5][CH2:6][OH:7]>>[CH3:1][C:2](=[O:3])[O:7][CH2:6][CH3:5]"
 )
 _MAPPED_RXN_ALT = (
-    "[CH3:10][C:11](=[O:12])[OH:13].[CH3:14][OH:15]"
-    ">>[CH3:10][C:11](=[O:12])[O:15][CH3:14]"
+    "[CH3:10][C:11](=[O:12])[OH:13].[CH3:14][OH:15]>>[CH3:10][C:11](=[O:12])[O:15][CH3:14]"
 )
 
 

@@ -31,13 +31,12 @@ export const resolveChemServiceCommand = (
 export const resolveSpawnInvocation = (
   command,
   args,
-  platform = process.platform,
-  comspec = process.env.ComSpec ?? "cmd.exe"
+  platform = process.platform
 ) => {
   if (platform === "win32" && command.endsWith(".cmd")) {
     return {
-      command: comspec,
-      args: ["/d", "/s", "/c", [command, ...args].join(" ")]
+      command: "cmd.exe",
+      args: ["/d", "/s", "/c", command, ...args]
     };
   }
 

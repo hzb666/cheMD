@@ -34,7 +34,9 @@ class ChemServiceRoutesTest(ChemServiceAppTestCase):
         with patch.object(self.module, "_MOLECULE_OCR_PROVIDER", "molnextr"):
             with patch.object(self.module, "_MOLNEXTR_API_URL", "http://127.0.0.1:18083/predict"):
                 with patch.object(self.module, "_REACTION_OCR_PROVIDER", "rxnim"):
-                    with patch.object(self.module, "_RXNIM_API_URL", "http://127.0.0.1:18084/predict"):
+                    with patch.object(
+                        self.module, "_RXNIM_API_URL", "http://127.0.0.1:18084/predict"
+                    ):
                         response = self.client.get("/healthz")
 
         self.assertEqual(response.status_code, 200)
@@ -74,6 +76,13 @@ class ChemServiceRoutesTest(ChemServiceAppTestCase):
 
         self.assertEqual(response.status_code, 413)
         self.assertEqual(response.get_json()["message"], "imageBase64 is too large")
+
+    def test_ocr_error_response_does_not_reflect_payload(self) -> None:
+        response = self.client.post("/ocr", json={"imageBase64": "<script>alert(1)</script>"})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json(), {"message": "imageBase64 is invalid"})
+        self.assertNotIn("<script>", response.get_data(as_text=True))
 
     def test_cors_only_reflects_allowed_origin(self) -> None:
         allowed = self.client.options("/ocr", headers={"Origin": "http://127.0.0.1:2436"})

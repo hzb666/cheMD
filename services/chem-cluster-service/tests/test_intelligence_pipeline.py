@@ -1,3 +1,5 @@
+# ruff: noqa: E402
+
 import json
 import sys
 import unittest
@@ -10,7 +12,6 @@ sys.path.insert(0, str(SERVICE_ROOT))
 
 from chem_cluster_service.intelligence.contracts import validate_artifact
 from chem_cluster_service.intelligence.pipeline import run_reaction_intelligence_pipeline
-
 
 FIXTURE_ROOT = Path(__file__).resolve().parent / "fixtures"
 
@@ -77,13 +78,19 @@ class ReactionIntelligencePipelineTests(unittest.TestCase):
         )
 
         self.assertEqual(result.exit_code, 0)
-        self.assertEqual([item["kind"] for item in result.payload["providers"]], ["rdkit_fingerprint", "hybrid_graph"])
+        self.assertEqual(
+            [item["kind"] for item in result.payload["providers"]],
+            ["rdkit_fingerprint", "hybrid_graph"],
+        )
         self.assertEqual(len(result.payload["reaction_features"]), 2)
-        self.assertEqual(result.payload["similarity_edges"][-1]["basis"], [
-            "semantic_family_support",
-            "rdkit_fingerprint_tanimoto",
-            "hybrid_consensus",
-        ])
+        self.assertEqual(
+            result.payload["similarity_edges"][-1]["basis"],
+            [
+                "semantic_family_support",
+                "rdkit_fingerprint_tanimoto",
+                "hybrid_consensus",
+            ],
+        )
         self.assertEqual(validate_artifact(result.payload), [])
 
     def test_tmap_layout_is_classified_without_dependency(self):

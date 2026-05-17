@@ -2,13 +2,20 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from pathlib import Path
 from typing import Any
 
 from chem_cluster_service.intelligence.contracts import PROVIDER_KINDS, ProviderKind
-from chem_cluster_service.intelligence.io import IntelligenceIOError, read_json, validation_envelope, write_json
-from chem_cluster_service.intelligence.pipeline import ProviderFactory, run_reaction_intelligence_pipeline
+from chem_cluster_service.intelligence.io import (
+    IntelligenceIOError,
+    read_json,
+    validation_envelope,
+    write_json,
+)
+from chem_cluster_service.intelligence.pipeline import (
+    ProviderFactory,
+    run_reaction_intelligence_pipeline,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -16,7 +23,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--input", required=True, help="Reaction intelligence job JSON path")
     parser.add_argument("--output", help="Output artifact JSON path. Defaults to stdout")
     parser.add_argument("--providers", nargs="+", help="Provider list, comma or space separated")
-    parser.add_argument("--missing-dependency", choices=["skip", "error", "fallback"], help="Missing dependency policy")
+    parser.add_argument(
+        "--missing-dependency",
+        choices=["skip", "error", "fallback"],
+        help="Missing dependency policy",
+    )
     parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON")
     return parser
 

@@ -14,8 +14,7 @@ REACTION_INTELLIGENCE_SCHEMA_VERSION = "chemd-reaction-intelligence-artifact/v0.
 class ReactionIntelligenceProvider(Protocol):
     provider_key: str
 
-    def run(self, job: ReactionIntelligenceJob) -> ReactionIntelligenceArtifact:
-        ...
+    def run(self, job: ReactionIntelligenceJob) -> ReactionIntelligenceArtifact: ...
 
 
 def empty_artifact(job_id: str) -> ReactionIntelligenceArtifact:

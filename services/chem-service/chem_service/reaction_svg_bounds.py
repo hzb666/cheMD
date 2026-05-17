@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import re
-import xml.etree.ElementTree as ET
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from html.parser import HTMLParser
 
 from chem_service.reaction_layout import (
     _REACTION_PARTICIPANT_FONT_SIZE,
@@ -34,6 +34,66 @@ _PATH_COMMAND_X_INDEXES = {
     "Z": set(),
 }
 _REACTION_TIGHT_CROP_PADDING = 6.0
+
+
+class _SvgElement:
+    def __init__(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self.tag = tag
+        self.attrib = {key: value or "" for key, value in attrs}
+        self.children: list[_SvgElement] = []
+        self.text_parts: list[str] = []
+
+    def __iter__(self) -> Iterator[_SvgElement]:
+        return iter(self.children)
+
+    def itertext(self) -> Iterator[str]:
+        yield from self.text_parts
+        for child in self.children:
+            yield from child.itertext()
+
+
+class _SvgBoundsParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=False)
+        self.root: _SvgElement | None = None
+        self.stack: list[_SvgElement] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        element = _SvgElement(tag, attrs)
+        if self.stack:
+            self.stack[-1].children.append(element)
+        elif self.root is None:
+            self.root = element
+        self.stack.append(element)
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        element = _SvgElement(tag, attrs)
+        if self.stack:
+            self.stack[-1].children.append(element)
+        elif self.root is None:
+            self.root = element
+
+    def handle_endtag(self, tag: str) -> None:
+        while self.stack:
+            element = self.stack.pop()
+            if element.tag == tag:
+                break
+
+    def handle_data(self, data: str) -> None:
+        if self.stack:
+            self.stack[-1].text_parts.append(data)
+
+
+def _parse_svg_root(svg: str) -> _SvgElement | None:
+    if _contains_xml_entity_declaration(svg):
+        return None
+    parser = _SvgBoundsParser()
+    try:
+        parser.feed(svg)
+        parser.close()
+    except Exception:
+        return None
+    return parser.root
 
 
 def _extract_path_x_values(path_d: str) -> list[float]:
@@ -110,7 +170,7 @@ def _merge_horizontal_bounds(
 
 
 def _is_full_canvas_rect(
-    element: ET.Element,
+    element: _SvgElement,
     *,
     canvas_width: float,
     canvas_height: float,
@@ -126,8 +186,7 @@ def _is_full_canvas_rect(
         abs(width - canvas_width) <= 2.5 or abs(width - (canvas_width - 2.0)) <= 2.5
     )
     height_matches_canvas = (
-        abs(height - canvas_height) <= 2.5
-        or abs(height - (canvas_height - 2.0)) <= 2.5
+        abs(height - canvas_height) <= 2.5 or abs(height - (canvas_height - 2.0)) <= 2.5
     )
     return abs(x) <= 1.5 and abs(y) <= 1.5 and width_matches_canvas and height_matches_canvas
 
@@ -156,7 +215,7 @@ def _extract_svg_path_bounds(path_d: str, *, translate_x: float) -> tuple[float,
 
 
 def _extract_svg_line_bounds(
-    element: ET.Element,
+    element: _SvgElement,
     *,
     translate_x: float,
 ) -> tuple[float, float] | None:
@@ -168,7 +227,7 @@ def _extract_svg_line_bounds(
 
 
 def _extract_svg_rect_bounds(
-    element: ET.Element,
+    element: _SvgElement,
     *,
     translate_x: float,
     canvas_width: float,
@@ -188,7 +247,7 @@ def _extract_svg_rect_bounds(
 
 
 def _extract_svg_circle_bounds(
-    element: ET.Element,
+    element: _SvgElement,
     *,
     translate_x: float,
 ) -> tuple[float, float] | None:
@@ -200,7 +259,7 @@ def _extract_svg_circle_bounds(
 
 
 def _extract_svg_ellipse_bounds(
-    element: ET.Element,
+    element: _SvgElement,
     *,
     translate_x: float,
 ) -> tuple[float, float] | None:
@@ -212,7 +271,7 @@ def _extract_svg_ellipse_bounds(
 
 
 def _extract_svg_text_bounds_from_element(
-    element: ET.Element,
+    element: _SvgElement,
     *,
     translate_x: float,
 ) -> tuple[float, float] | None:
@@ -233,7 +292,7 @@ def _extract_svg_text_bounds_from_element(
 
 
 def _extract_svg_element_horizontal_bounds(
-    element: ET.Element,
+    element: _SvgElement,
     *,
     translate_x: float,
     canvas_width: float,
@@ -281,7 +340,7 @@ def _build_bounds_extractor(
 
 
 def _collect_svg_horizontal_bounds(
-    element: ET.Element,
+    element: _SvgElement,
     *,
     inherited_translate_x: float,
     canvas_width: float,
@@ -325,9 +384,8 @@ def _tighten_reaction_svg_horizontal_bounds(
     canvas_width = float(view_box_match.group(4))
     canvas_height = float(view_box_match.group(5))
 
-    try:
-        root = ET.fromstring(svg)
-    except ET.ParseError:
+    root = _parse_svg_root(svg)
+    if root is None:
         return svg
 
     content_bounds = _collect_svg_horizontal_bounds(
@@ -362,3 +420,8 @@ def _tighten_reaction_svg_horizontal_bounds(
         svg = f"{svg[: width_match.start()]}{replacement}{svg[width_match.end() :]}"
 
     return svg
+
+
+def _contains_xml_entity_declaration(svg: str) -> bool:
+    lowered = svg.lower()
+    return "<!doctype" in lowered or "<!entity" in lowered

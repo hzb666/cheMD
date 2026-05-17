@@ -5,8 +5,10 @@ import re
 import unittest
 from unittest.mock import patch
 
+import chem_service.reaction_layout as reaction_layout
 import chem_service.reaction_models as reaction_models
 import chem_service.reaction_rendering as reaction_rendering
+import chem_service.reaction_svg_bounds as reaction_svg_bounds
 import chem_service.reaction_svg_layout as reaction_svg_layout
 from tests.support import ChemServiceAppTestCase
 
@@ -263,6 +265,24 @@ class ChemServiceReactionRenderingRouteTest(ChemServiceAppTestCase):
 
 
 class ChemServiceReactionRenderingModuleTest(unittest.TestCase):
+    def test_reaction_annotation_numeric_tokens_keep_existing_classification(self) -> None:
+        self.assertEqual(
+            reaction_layout._normalize_reaction_annotation_token(" 80 C "),
+            "80 °C",
+        )
+        self.assertEqual(
+            reaction_layout._normalize_reaction_annotation_token("-10.5 f"),
+            "-10.5 F",
+        )
+
+        top, bottom = reaction_layout._split_reaction_annotation_lines(
+            ["NaBH4", "EtOH", "80 C", "4 h", "1.2 atm"],
+            show_conditions_below_arrow=True,
+        )
+
+        self.assertEqual(top, ["NaBH4"])
+        self.assertEqual(bottom, ["EtOH", "80 °C, 4 h", "1.2 atm"])
+
     def test_reaction_svg_annotations_split_reagents_and_render_conditions(self) -> None:
         svg = """<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 540 160'>
 <path d='M 279.0,80.0 L 367.0,80.0' style='fill:none;stroke:#000000;stroke-width:2.0px' />
@@ -382,7 +402,9 @@ class ChemServiceReactionRenderingModuleTest(unittest.TestCase):
             ),
         )
 
-        view_box_match = re.search(r"viewBox=['\"]([0-9.]+) ([0-9.]+) ([0-9.]+) ([0-9.]+)['\"]", decorated)
+        view_box_match = re.search(
+            r"viewBox=['\"]([0-9.]+) ([0-9.]+) ([0-9.]+) ([0-9.]+)['\"]", decorated
+        )
         width_match = re.search(r"width=['\"]([0-9.]+)(px)?['\"]", decorated)
         self.assertIsNotNone(view_box_match)
         self.assertIsNotNone(width_match)
@@ -392,6 +414,19 @@ class ChemServiceReactionRenderingModuleTest(unittest.TestCase):
         self.assertLess(float(view_box_match.group(3)), 540.0)
         self.assertEqual(float(view_box_match.group(4)), 160.0)
         self.assertEqual(float(width_match.group(1)), float(view_box_match.group(3)))
+
+    def test_reaction_svg_tight_crop_rejects_xml_entities(self) -> None:
+        svg = """<!DOCTYPE svg [
+<!ENTITY expand "expanded">
+]>
+<svg xmlns='http://www.w3.org/2000/svg' width='540px' height='160px' viewBox='0 0 540 160'>
+<text x='20' y='20'>&expand;</text>
+</svg>"""
+
+        self.assertEqual(
+            reaction_svg_bounds._tighten_reaction_svg_horizontal_bounds(svg),
+            svg,
+        )
 
     def test_reaction_fallback_svg_expands_canvas_for_long_reactions(self) -> None:
         svg = reaction_rendering._build_reaction_fallback_svg(

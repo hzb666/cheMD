@@ -6,21 +6,25 @@ from datetime import UTC, datetime
 from typing import Any
 
 from chem_cluster_service.intelligence.contracts import (
+    REACTION_INTELLIGENCE_ARTIFACT_SCHEMA_VERSION,
     ProviderKind,
     ProviderReport,
     ReactionInput,
     ReactionIntelligenceArtifact,
-    REACTION_INTELLIGENCE_ARTIFACT_SCHEMA_VERSION,
     require_valid_job_input,
     validate_job_input,
 )
 from chem_cluster_service.intelligence.io import ClassifiedEnvelope, validation_envelope
-from chem_cluster_service.intelligence.providers.rdkit_fingerprint import run_rdkit_fingerprint_provider
+from chem_cluster_service.intelligence.providers.rdkit_fingerprint import (
+    run_rdkit_fingerprint_provider,
+)
 from chem_cluster_service.intelligence.providers.rxnfp_provider import run_rxnfp_provider
 from chem_cluster_service.intelligence.providers.rxnmapper_provider import RXNMapperProvider
 from chem_cluster_service.intelligence.providers.tmap_layout import run_tmap_layout_provider
-from chem_cluster_service.intelligence.similarity import HYBRID_PROVIDER_ID, build_hybrid_similarity_edges
-
+from chem_cluster_service.intelligence.similarity import (
+    HYBRID_PROVIDER_ID,
+    build_hybrid_similarity_edges,
+)
 
 ProviderRunner = Callable[[list[ReactionInput]], Any]
 ProviderFactory = Callable[[ProviderKind], ProviderRunner | None]
@@ -52,7 +56,9 @@ def run_reaction_intelligence_pipeline(
     if errors:
         return PipelineRunResult(
             exit_code=1,
-            payload=validation_envelope("invalid_input", "Reaction intelligence job input is invalid.", errors),
+            payload=validation_envelope(
+                "invalid_input", "Reaction intelligence job input is invalid.", errors
+            ),
         )
 
     job = require_valid_job_input(payload)
@@ -72,7 +78,9 @@ def run_reaction_intelligence_pipeline(
             output = _run_tmap_layout_provider(job, provider_outputs)
         else:
             output = _run_baseline_provider(provider_kind, job["reactions"], factory)
-            output = _apply_missing_dependency_policy(output, job["provider_policy"]["missing_dependency"])
+            output = _apply_missing_dependency_policy(
+                output, job["provider_policy"]["missing_dependency"]
+            )
         if output.provider["status"] == "ERROR":
             exit_code = 2
         artifact_warnings.extend(output.warnings)
@@ -147,7 +155,9 @@ def _run_tmap_layout_provider(
         for item in job.get("reactions", [])
         if isinstance(item, Mapping) and isinstance(item.get("reaction_entity_id"), str)
     ]
-    edges = _object_list(job.get("reaction_similarity_edges")) + _collect_similarity_edges(provider_outputs)
+    edges = _object_list(job.get("reaction_similarity_edges")) + _collect_similarity_edges(
+        provider_outputs
+    )
     result = run_tmap_layout_provider(
         reaction_ids,
         edges,  # type: ignore[arg-type]
@@ -179,7 +189,12 @@ def _apply_missing_dependency_policy(output: _ProviderOutput, policy: str) -> _P
     elif policy == "fallback":
         warnings.append("fallback_policy_treated_as_skip")
     output.provider["warnings"] = _dedupe_strings(warnings)
-    return _ProviderOutput(output.provider, output.reaction_features, output.similarity_edges, list(output.provider["warnings"]))
+    return _ProviderOutput(
+        output.provider,
+        output.reaction_features,
+        output.similarity_edges,
+        list(output.provider["warnings"]),
+    )
 
 
 def _normalize_provider_output(value: Any, provider_kind: ProviderKind) -> _ProviderOutput:
@@ -209,7 +224,9 @@ def _provider_error(provider_kind: ProviderKind, warning: str) -> _ProviderOutpu
     return _ProviderOutput(report, [], [], list(report["warnings"]))
 
 
-def _provider_report(provider_kind: ProviderKind, status: str, warnings: list[str]) -> ProviderReport:
+def _provider_report(
+    provider_kind: ProviderKind, status: str, warnings: list[str]
+) -> ProviderReport:
     return {
         "provider_id": _provider_id(provider_kind),
         "kind": provider_kind,
@@ -241,7 +258,9 @@ def _merge_reaction_features(provider_outputs: list[_ProviderOutput]) -> list[di
                 order.append(reaction_id)
             target = merged[reaction_id]
             target["fingerprint_refs"].extend(_object_list(feature.get("fingerprint_refs")))
-            target["warnings"] = _dedupe_strings(target["warnings"] + _string_list(feature.get("warnings")))
+            target["warnings"] = _dedupe_strings(
+                target["warnings"] + _string_list(feature.get("warnings"))
+            )
             for field in ("atom_mapping", "reaction_center"):
                 if isinstance(feature.get(field), dict):
                     target[field] = dict(feature[field])

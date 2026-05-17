@@ -14,9 +14,23 @@ import type {
 
 const sanitizeDocumentIdPart = (value: string): string => {
   const trimmed = value.trim();
-  const normalized = trimmed.replace(/\\/g, "/");
+  const normalized = trimmed.replaceAll("\\", "/");
   const tail = normalized.split("/").filter(Boolean).at(-1) ?? trimmed;
-  const slug = tail.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  const slug = Array.from(tail)
+    .map((char) => (
+      (char >= "A" && char <= "Z")
+      || (char >= "a" && char <= "z")
+      || (char >= "0" && char <= "9")
+      || char === "."
+      || char === "_"
+      || char === "-"
+        ? char
+        : "-"
+    ))
+    .join("")
+    .split("-")
+    .filter(Boolean)
+    .join("-");
   return slug || "document";
 };
 
