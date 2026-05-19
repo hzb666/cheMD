@@ -1,0 +1,167 @@
+---
+title: 实验记录写作模式
+description: 一步反应、路线步骤、条件筛选、过程记录和观察记录的 Chemd 写法。
+---
+
+Chemd 的实验记录以对象关系为中心。正文可以承担叙述职责，稳定语义应写入字段。
+
+## 一步合成记录
+
+一步记录通常包含：
+
+- 三类 `:::chemd` 对象：底物、试剂或产物分子、主反应。
+- 一个 `:::result`，通过 `ref` 指向主反应。
+- 一个 `:::procedure`，通过 `reaction` 或 `ref` 指向主反应。
+- 一个或多个 `:::analysis`、`:::sample`、`:::artifact`。
+
+```md
+---
+id: exp-one-step-esterification
+title: Standard Fischer esterification
+date: 2026-04-24
+primary_reaction: rxn-main
+primary_result: res-main
+---
+
+:::chemd #mol-acid
+kind: molecule
+name: benzoic acid
+smiles: O=C(O)c1ccccc1
+role: substrate
+:::
+
+:::chemd #mol-product
+kind: molecule
+name: ethyl benzoate
+smiles: CCOC(=O)c1ccccc1
+role: product
+:::
+
+:::chemd #rxn-main
+kind: reaction
+name: Fischer esterification
+reactants: @mol-acid
+products: @mol-product
+catalyst: H2SO4
+solvent: ethanol
+temperature: 78 C
+time: 4 h
+:::
+
+:::result #res-main
+ref: rxn-main
+product: @mol-product
+status: success
+yield: 76%
+purity: 95%
+:::
+```
+
+## 路线步骤
+
+路线关系写在 reaction 字段中：
+
+- `route` 表示反应所属路线。
+- `prev` 表示当前反应依赖的上游反应。
+
+```md
+:::chemd #rxn-step-07
+kind: reaction
+name: C7 hydroxyl protection
+route: route-taxol-a
+prev: rxn-step-06
+reactants: @mol-step-06
+products: @mol-step-07
+reagents: TBSCl | imidazole
+solvent: DMF
+temperature: 25 C
+time: 3 h
+:::
+```
+
+该结构用于 graph export 和路线聚合。使用者只需声明当前节点的上游依赖。
+
+## 条件筛选
+
+`:::condition-varies` 表达标准条件、变化字段和每个 attempt。
+
+```md
+:::condition-varies #cv-screen
+standard: rxn-standard
+condition: solvent=THF | temperature=25 C | catalyst=Pd(PPh3)4
+varies: solvent | temperature | catalyst
+var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
+res1: res-var1
+note1: Higher conversion with the baseline catalyst.
+var2: reaction=rxn-var2 | mode=override | solvent=DMF | temperature=60 C | catalyst=Pd(dppf)Cl2
+res2: res-var2
+note2: Full override lowers conversion and purity.
+:::
+```
+
+解析规则：
+
+- `condition` 被解析为基线变量。
+- `varN` 被解析为 attempt。
+- `resN` 和 `noteN` 绑定到同编号 attempt。
+- `mode=override` 表示该 attempt 使用完整覆盖条件。
+- 未标记 override 的 attempt 会继承未变化的基线条件。
+
+## 过程步骤
+
+`:::procedure` 支持行内 step 语法。
+
+```md
+:::procedure #proc-var1
+ref: rxn-var1
+reaction: rxn-var1
+evidence: notebook-24,photo-var1
+step: charge | id=s-charge-var1 | stage=charging | inputs=@mol-aryl,@mol-boron | confidence=0.97
+step: heat | id=s-heat-var1 | stage=reaction | temperature=40 C | duration=2 h | dependsOn=s-charge-var1 | confidence=0.95
+step: sample | id=s-sample-var1 | stage=monitoring | outputs=@sample-aliquot-var1 | dependsOn=s-heat-var1 | confidence=0.93
+:::
+```
+
+step 字段采用 `|` 分段，分段内使用 `key=value`。结构字段包括 `id`、`family`、`inputs`、`outputs`、`dependsOn`、`stage`、`purpose`、`evidence`、`confidence`。
+
+## 观察事件
+
+`:::observation` 支持行内 event 语法。
+
+```md
+:::observation #obs-var1
+ref: @cv-screen.var1
+event: color_change | id=e-color-var1 | timepoint=30 min | severity=low | linkedStep=s-heat-var1 | evidence=photo-var1 | confidence=0.88
+event: precipitation | id=e-solid-var1 | timepoint=after quench | severity=low | linkedStep=s-quench-var1 | evidence=photo-var1b | confidence=0.74
+:::
+```
+
+event 字段采用 `|` 分段。结构字段包括 `id`、`type`、`eventType`、`event_type`、`stage`、`timepoint`、`severity`、`linkedStep`、`evidence`、`confidence`。
+
+## 推荐实践示例
+
+常规实验可使用一个主 reaction、一个主 result、显式 procedure step 和显式 observation event。只有实验确实需要时再加入 condition screening 或 route link。
+
+```md
+:::chemd #rxn-main
+kind: reaction
+reactants: @mol-substrate
+products: @mol-product
+solvent: MeCN
+temperature: 60 C
+:::
+
+:::result #res-main
+reaction: rxn-main
+product: mol-product
+status: success
+yield: 76%
+:::
+
+:::procedure #proc-main
+reaction: rxn-main
+step: charge | id=s-charge | inputs=@mol-substrate | outputs=mixture-a
+step: analyze | id=s-tlc | analysisType=tlc | dependsOn=s-charge
+:::
+```
+

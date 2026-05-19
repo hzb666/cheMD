@@ -1,0 +1,107 @@
+---
+title: 诊断码速查
+description: Chemd parser、resolver、typechecker、compiler 和 runtime 常见诊断码速查。
+---
+
+下列内容按来源和用途列出常见诊断码。你可以据此判断问题来自解析、引用解析、语义校验、编译还是运行准备。
+
+## 语法与 Frontmatter
+
+| 诊断码 | 含义 |
+| --- | --- |
+| `E_MISSING_REQUIRED_FRONTMATTER_KEY` | 缺少 `id`、`title` 或 `date` |
+| `E_INVALID_FRONTMATTER_VALUE` | frontmatter 值类型或结构非法 |
+| `W_DUPLICATE_FRONTMATTER_KEY` | frontmatter key 重复 |
+| `W_NON_ISO_FRONTMATTER_DATE` | 日期格式不匹配 `YYYY-MM-DD` |
+| `W_INVALID_FRONTMATTER_DATE_VALUE` | 日期格式匹配但日历值非法 |
+| `W_INVALID_FRONTMATTER_LINE` | frontmatter 行无法解析 |
+| `E_INVALID_ID` | 块 ID 不符合规则 |
+| `W_LEGACY_BLOCK_KIND` | 检测到旧式 `:::molecule` 或 `:::reaction` 输入表面 |
+| `W_UNKNOWN_BLOCK` | 块类型未实现 |
+| `W_UNTERMINATED_BLOCK` | 结构化块未闭合 |
+| `W_UNKNOWN_FIELD` | 字段不在块允许集合内 |
+| `E_INVALID_LIST_ITEM` | 列表字段包含空项 |
+| `W_UNSAFE_LINK_HREF` | Markdown 链接 href 未通过安全策略 |
+
+## `:::chemd`
+
+| 诊断码 | 含义 |
+| --- | --- |
+| `W_CHEMD_KIND_INFERRED` | 省略 `kind` 且 parser 已按字段推断类型 |
+| `W_CHEMD_KIND_AMBIGUOUS` | strict 模式下省略 `kind` |
+| `E_CHEMD_KIND_CONFLICT` | `kind` 非法，或显式类型与字段形状冲突 |
+| `W_INVALID_CHEMD_IMPLICIT_VALUE` | molecule 隐式 SMILES 行数非法 |
+
+## Resolver
+
+| 诊断码 | 含义 |
+| --- | --- |
+| `E_DUPLICATE_ID` | 对象 ID 重复 |
+| `E_DUPLICATE_TEMPLATE` | 模板名重复 |
+| `E_MISSING_REQUIRED_FIELD` | 对象缺失 resolver 必填字段 |
+| `W_UNRESOLVED_REFERENCE` | 引用目标或字段无法解析 |
+| `E_INVALID_PRIMARY_REFERENCE` | `primary_*` 指向不存在对象 |
+| `E_UNKNOWN_TEMPLATE` | `:::use` 找不到模板 |
+| `E_TEMPLATE_CYCLE` | 模板递归 |
+| `E_TEMPLATE_EXPANSION_LIMIT` | 模板展开超过深度或节点限制 |
+| `E_TEMPLATE_PARAM_MISSING` | 模板调用缺少参数 |
+| `E_TEMPLATE_PARAM_TYPE_MISMATCH` | 模板参数类型不匹配 |
+
+## Typechecker
+
+| 诊断码 | 含义 |
+| --- | --- |
+| `E306` | result `status` 值非法 |
+| `E401` | unit 不适用于目标数量类别 |
+| `E402` | percent 数量超出 0 到 100 |
+| `E403` | 数量无法按目标类别解析 |
+| `E301` | v0.3 缺失必填字段诊断 |
+| `E_TYPED_REFERENCE_MISMATCH` | 引用目标类型不匹配 |
+| `E_RESULT_REACTION_CONFLICT` | result 与 linked reaction 字段冲突 |
+| `E_DERIVED_EXPRESSION_INVALID` | 派生表达式非法 |
+| `W_REACTION_ROUTE_MISMATCH` | reaction route 前驱路线不一致 |
+| `E_REACTION_ROUTE_CYCLE` | reaction route 成环 |
+| `W_REACTION_ROUTE_ORPHAN` | route 中存在孤立 reaction |
+
+## Procedure 与 Observation
+
+| 诊断码 | 含义 |
+| --- | --- |
+| `E_STEP_INVALID_FAMILY` | step family 未实现 |
+| `E_STEP_MISSING_FIELD` | step 结构缺少必要字段 |
+| `E_STEP_PARAM_MISSING` | step family 必需参数缺失 |
+| `E_STEP_PARAM_INVALID` | step family 不允许该参数 |
+| `E_STEP_ID_DUPLICATE` | step ID 重复 |
+| `E_STEP_INVALID_REFERENCE` | `dependsOn` 指向不存在 step |
+| `E_STEP_DEPENDENCY_CYCLE` | step 依赖图成环 |
+| `E_OBSERVATION_EVENT_INVALID_TYPE` | event type 未实现 |
+| `E_OBSERVATION_LINKED_STEP_MISSING` | event 指向不存在 step |
+| `E501` | procedure lowering 失败 |
+| `E504` | analysis step 未绑定 |
+| `E505` | observation stage 存在歧义 |
+| `W_PROCEDURE_PROSE_LOWERED` | procedure prose 被启发式降低为步骤 |
+| `W_OBSERVATION_PROSE_LOWERED` | observation prose 被启发式降低为事件 |
+| `W805` | step extraction 置信度偏低 |
+| `W806` | observation prose 可以表达为结构化 event |
+| `I903` | procedure lowering 已成功完成 |
+
+## Layout、输入辅助与 Runtime
+
+| 诊断码 | 含义 |
+| --- | --- |
+| `W_INVALID_COL_COLUMNS` | `:::col` 列数非法 |
+| `W_COL_COUNT_MISMATCH` | `col:` 子项数量与列数不一致 |
+| `W_INVALID_COL_CHILD` | `:::col` 子项行非法 |
+| `W_UNTERMINATED_BRACE_BLOCK` | `col: { ... }` 内容未闭合 |
+| `W_AUTHORING_FIX_AVAILABLE` | compiler 可提供安全修复建议 |
+| `W_AUTHORING_INPUT_REQUIRED` | 修复需要使用者输入 |
+| `E605` | runtime 缺少必需 capability |
+| `E701` | run plan 构建失败 |
+| `E_RUNTIME_UNKNOWN_STEP` | runtime step 未识别 |
+| `E_RUNTIME_STEP_NOT_READY` | runtime step 尚未满足执行条件 |
+
+## 修复顺序
+
+优先修复 error，再处理 warning。推荐顺序为 frontmatter、块 ID、未知字段、必填字段、引用、模板参数、数量、步骤依赖、路线图。
+
+

@@ -1,0 +1,27 @@
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
+
+@theme inline {
+  --font-sans: var(--font-geist), var(--font-noto-sans-sc), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+}
+
+@theme {
+  --color-fd-primary: oklch(0.4401 0.0515 178.99);
+  --color-fd-primary-foreground: oklch(0.9929 0.0099 164.88);
+}
+
+.dark {
+  --color-fd-primary: oklch(0.8121 0.0656 178.69);
+  --color-fd-primary-foreground: oklch(0.2082 0.0274 178.70);
+}
+
+html {
+  scrollbar-gutter: stable;
+}
+
+html > body[data-scroll-locked] {
+  margin-right: 0px !important;
+  --removed-body-scroll-bar-size: 0px !important;
+}

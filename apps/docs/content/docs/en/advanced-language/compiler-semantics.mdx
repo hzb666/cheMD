@@ -1,0 +1,145 @@
+---
+title: Compiler Semantics and Implementation Logic
+description: Current implementation path from source to AST, resolver, semantic validation, and export data.
+---
+
+The Chemd compiler path consists of parsing, resolution, semantic validation, and export layers. The syntax rules in this manual follow these implementation boundaries.
+
+## Parsing Stage
+
+Parsing splits source into two parts:
+
+1. Frontmatter: produces `meta` and optional `renderSelection`.
+2. Body: produces `children`, including Markdown nodes and structured nodes.
+
+Markdown nodes keep the original text and attach four token lists:
+
+- `references`
+- `inlineChem`
+- `inlineCode`
+- `links`
+
+Structured nodes are dispatched through `parseRegisteredBlock` to a block parser.
+
+## Field Filtering and Diagnostics
+
+Each structured block declares an allowed field set. Unknown fields produce `W_UNKNOWN_FIELD` and are not copied into the node.
+
+```md
+:::result #res-main
+status: success
+yield: 76%
+unknown_metric: 1
+:::
+```
+
+`unknown_metric` is reported as an unknown field. It does not become a `ResultNode` property.
+
+## Resolution Stage
+
+The resolver performs these operations:
+
+- Assigns default IDs to object nodes without IDs.
+- Builds an object index.
+- Checks duplicate object IDs.
+- Builds a template index.
+- Expands `:::use`.
+- Resolves reference tokens in Markdown.
+- Validates required object fields.
+- Validates frontmatter primary references.
+
+## Default Object IDs
+
+Objects without explicit IDs receive default IDs in this format:
+
+```text
+<document-id>-<node-type>-<counter>
+```
+
+Users should provide explicit IDs. Explicit IDs improve cross-block references, diagnostic locations, and export stability.
+
+## Required Fields
+
+The resolver currently validates these objects:
+
+| Type | Required fields |
+| --- | --- |
+| molecule | `smiles` |
+| reaction | `reactants`, `products` |
+| analysis | `type_name`, `data` |
+| TLC analysis | `type_name` |
+| sample | `name` |
+| artifact | `kind`, `path` |
+
+result, procedure, observation, and condition-varies currently have no general required-field validation. Practical records should still include `ref` or `reaction` associations.
+
+## Primary Reference Validation
+
+The resolver checks whether `primary_reaction`, `primary_result`, `primary_product`, `primary_sample`, `primary_molecule`, and `primary_analysis` point to existing objects.
+
+```yaml
+---
+id: exp-invalid-primary
+title: Invalid primary reference
+date: 2026-04-24
+primary_reaction: rxn-missing
+---
+```
+
+If the document has no `#rxn-missing`, diagnostics include `E_INVALID_PRIMARY_REFERENCE`.
+
+## Output Semantics
+
+After resolution, the compiler aggregates several outputs. `CompileResult` exposes HTML, JSON, DOCX bridge, RAG export, training understanding export, and full training export. Graph index export is built by CLI/exporter tooling from one or more training understandings, not stored directly on `CompileResult`.
+
+Usage principles:
+
+- Write object relations in fields.
+- Keep narrative explanations in Markdown or `notes`.
+- `route`, `prev`, `condition-varies`, sample lineage, and artifact refs provide structured graph inputs for exporters.
+
+## Best Practice Example
+
+Use explicit IDs for objects that may be referenced later. Keep measured facts in fields and keep interpretation in prose or `notes`.
+
+```md
+---
+id: exp-compiler-semantics
+title: Compiler semantics example
+date: 2026-05-19
+primary_reaction: rxn-main
+primary_result: res-main
+---
+
+:::chemd #mol-substrate
+kind: molecule
+smiles: CCO
+name: ethanol
+:::
+
+:::chemd #mol-product
+kind: molecule
+smiles: CC=O
+name: acetaldehyde
+:::
+
+:::chemd #rxn-main
+kind: reaction
+reactants: @mol-substrate
+products: @mol-product
+solvent: MeCN
+temperature: 60 C
+time: 3 h
+:::
+
+:::result #res-main
+reaction: rxn-main
+product: mol-product
+status: success
+yield: 74%
+notes: isolated after chromatography
+:::
+
+The primary reaction used @reaction.solvent and gave @result.yield.
+```
+

@@ -1,0 +1,16 @@
+{
+  "title": "Advanced Language Features",
+  "pages": [
+    "references-and-aliases",
+    "templates",
+    "template-parameters",
+    "normalization-semantics",
+    "derived-expressions",
+    "layout-syntax",
+    "resolver-compiler",
+    "compiler-semantics",
+    "runtime-preflight",
+    "workspace-index",
+    "training-graph-reaction-map"
+  ]
+}

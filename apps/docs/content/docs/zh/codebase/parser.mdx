@@ -1,0 +1,90 @@
+---
+title: Parser 实现
+description: parseChemd、frontmatter parser、body parser、block parser 和 inline tokenizer 的实现导览。
+---
+
+Parser 实现位于 `packages/parser`。包入口为 `packages/parser/src/index.ts`。
+
+## 二级主题
+
+### `parseChemd`
+
+`parseChemd(source)` 是公开解析入口。该函数先调用 frontmatter parser，再调用 body parser，并通过 `createDocument` 生成 `ChemdDocument`。
+
+```ts
+import { parseChemd } from "@chemd/parser";
+
+const document = parseChemd(source);
+const reaction = document.children.find((node) => node.type === "reaction");
+```
+
+### Frontmatter parser
+
+相关路径：
+
+- `packages/parser/src/frontmatter/parse-frontmatter.ts`
+- `packages/parser/src/frontmatter/frontmatter-shared.ts`
+- `packages/parser/src/frontmatter/frontmatter-assigners.ts`
+- `packages/parser/src/frontmatter/frontmatter-root.ts`
+
+该层处理 YAML frontmatter、必需字段、日期格式、重复键、`tags`、`render_profile` 和 `render_overrides`。
+
+### Body parser
+
+相关路径：
+
+- `packages/parser/src/body/parse-children.ts`
+- `packages/parser/src/body/parse-body-shared.ts`
+- `packages/parser/src/body/parse-structured-block.ts`
+
+该层把正文拆分为 Markdown 节点和结构化块节点。
+
+### Block parser registry
+
+`packages/parser/src/body/block-parsers/index.ts` 注册当前可解析块：
+
+- `chemd`
+- `result`
+- `analysis`
+- `artifact`
+- `sample`
+- `condition-varies`
+- `procedure`
+- `observation`
+- `use`
+- `col`
+
+### Field parsing
+
+字段解析使用 `parseKeyValueLine` 和 `parseKeyValueLines`。未知字段由 `parseAllowedFields` 过滤并产生 `W_UNKNOWN_FIELD`。
+
+```md
+:::chemd #rxn-main
+kind: reaction ;; solvent: MeCN ;; temperature: 60 C
+reactants: @mol-a | @mol-b
+products: @mol-c
+:::
+```
+
+parser 会把 `;;` 拆成多个字段片段，并按块配置把 `reactants` 等列表字段用 `|` 拆分。
+
+### Inline tokenizers
+
+相关路径：
+
+- `packages/parser/src/inline/tokenize-references.ts`
+- `packages/parser/src/inline/tokenize-inline-chem.ts`
+- `packages/parser/src/inline/tokenize-inline-code.ts`
+- `packages/parser/src/inline/tokenize-markdown-links.ts`
+
+这些 tokenizer 不执行业务解析，只记录 token、原文和位置信息。
+
+## 实现细节清单
+
+`parseChildren` 是 body 解析主循环。它把连续普通行缓冲为 Markdown 节点，遇到 `:::` 块起始行时刷新 Markdown buffer，再分派到结构化块解析。`template` 由 `parseChildren` 直接处理；其他块进入 `parseStructuredBlock`，再通过 block parser registry 分派。
+
+`parse-body-shared.ts` 承载通用语法：块类型匹配、块行收集、字段行解析、列表值解析、`;;` 多字段拆分、`col:` 子项解析支撑和 Markdown 节点创建。字段 key 只接受小写字母开头的 key。列表项为空时产生 `E_INVALID_LIST_ITEM`。允许字段之外的 key 产生 `W_UNKNOWN_FIELD`。
+
+`parse-structured-block.ts` 对未知块产生 `W_UNKNOWN_BLOCK`。
+
+inline tokenizer 当前覆盖四类 token：reference、inline chem、inline code 和 Markdown link。reference tokenizer 识别 `@id` 与 `@id.field`；inline chem tokenizer 识别 `:chem[...]`；link tokenizer 对 href 做安全策略校验，并在不安全 href 上产生 `W_UNSAFE_LINK_HREF`。

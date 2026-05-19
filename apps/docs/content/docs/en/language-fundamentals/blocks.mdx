@@ -1,0 +1,167 @@
+---
+title: Structured Blocks and Fields
+description: Chemd structured block grammar, supported block forms, field sets, required fields, and diagnostics.
+---
+
+
+## Common Block Grammar
+
+A structured block starts with `:::block-type` and ends with a standalone `:::`. The opening line can include a header argument, usually an object ID such as `#res-main`.
+
+```md
+:::result #res-main
+status: success
+yield: 76%
+:::
+```
+
+Object IDs must match `[a-zA-Z][a-zA-Z0-9_-]*`. Invalid IDs produce `E_INVALID_ID`. Nodes without explicit IDs receive generated IDs in the form `<document-id>-<node-type>-<counter>`, but stable references should use explicit IDs.
+
+Field lines use `key: value`. Field keys start with a lowercase letter and then allow lowercase letters, digits, and underscores. Values are trimmed.
+
+```md
+solvent: MeCN ;; temperature: 40 C ;; time: 2 h
+```
+
+The parser also supports `;;` multi-field lines. Each segment is parsed as a field, while spans still point to the physical line.
+
+List fields use `|` separators. Default list fields are `reactants`, `products`, `reactant`, `product`, `reac`, `prod`, `conditions`, and `params`; `:::chemd` also treats `prev` as a list field. Empty list items produce `E_INVALID_LIST_ITEM`.
+
+Each block parser declares an allowed field set. Unknown fields produce `W_UNKNOWN_FIELD` and are omitted from the parsed node.
+
+## Supported Blocks
+
+The body parser currently supports these structured block forms. Most entries are registered block parsers; `:::template` is a parser special-case handled by `parseChildren`.
+
+| Block | AST Type | Purpose |
+| --- | --- | --- |
+| `:::chemd` | `molecule` or `reaction` | Unified usage surface for molecules and reactions |
+| `:::result` | `result` | Outcome, yield, purity, and status |
+| `:::analysis` | `analysis` | TLC, NMR, HPLC, and other analysis records |
+| `:::procedure` | `procedure` | Procedure steps and dependencies |
+| `:::observation` | `observation` | Observation events |
+| `:::sample` | `sample` | Samples, batches, and lineage |
+| `:::artifact` | `artifact` | Files, spectra, images, and external evidence |
+| `:::condition-varies` | `condition_varies` | Condition screens and variable comparison |
+| `:::template` | `template` | Reusable fragments; parser special-case |
+| `:::use` | `use` | Template invocation |
+| `:::col` | `col` | Multi-column layout node |
+
+Unknown blocks produce `W_UNKNOWN_BLOCK`.
+
+## `:::chemd`
+
+`:::chemd` is the unified block for molecules and reactions. `kind: molecule` creates a molecule node. `kind: reaction` creates a reaction node. When `kind` is omitted, the parser infers the node type from `reactants` or `products` and records an inference diagnostic.
+
+```md
+:::chemd #mol-aryl
+kind: molecule
+name: aryl bromide
+smiles: Brc1ccccc1
+role: substrate
+:::
+
+:::chemd #rxn-main
+kind: reaction
+name: Suzuki coupling
+reactants: @mol-aryl | @mol-boron
+products: @mol-product
+reagents: K3PO4
+catalyst: Pd(PPh3)4
+solvent: MeCN
+temperature: 40 C
+time: 2 h
+atmosphere: nitrogen
+:::
+```
+
+Molecule fields: `smiles`, `cas`, `name`, `role`, `caption`, `formula`, `amount`, `equivalents`, `chemistry_features`.
+
+Reaction fields: `reactants`, `products`, `reactant`, `product`, `reac`, `prod`, `conditions`, `route`, `prev`, `reagents`, `catalyst`, `solvent`, `temperature`, `time`, `pressure`, `atmosphere`, `yield`, `conversion`, `selectivity`, `caption`, `chemistry_features`.
+
+Resolver required-field validation:
+
+- A molecule requires `smiles`.
+- A reaction requires non-empty `reactants` and non-empty `products`.
+
+## `:::result`
+
+A result block records the experimental outcome. Both `ref` and `reaction` can carry the reaction association. Use one consistently within a record.
+
+```md
+:::result #res-main
+ref: rxn-main
+product: @mol-product
+status: success
+yield: 78%
+conversion: 96%
+selectivity: 93%
+purity: 97%
+notes: Best balance of conversion and purity.
+:::
+```
+
+Fields: `status`, `yield`, `conversion`, `selectivity`, `isolated_mass`, `product_state`, `purity`, `notes`, `ref`, `reaction`, `product`.
+
+## `:::analysis`
+
+An analysis block records instrument or observation-based analysis. The field `type` maps to AST field `type_name`. When `type: tlc` is used, the parser fills default TLC values for missing `plate` and `visualization`.
+
+```md
+:::analysis #ana-tlc-main
+type: tlc
+ref: rxn-main
+time: 2 h
+eluent: PE/EA = 4:1
+result: one major product spot with trace starting material
+data: TLC plate after 2 h.
+p1: sm 0.78
+p2: crude 0.52 | sm-trace(0.79)
+p3: product-std 0.50
+:::
+```
+
+Fields: `type`, `ref`, `time`, `eluent`, `plate`, `visualization`, `result`, `instrument`, `solvent`, `frequency`, `method`, `data`, `notes`, plus TLC lane fields such as `p1` and `p2`.
+
+Resolver required-field validation:
+
+- A general analysis requires `type` and `data`.
+- A TLC analysis requires `type`; `plate` and `visualization` can be supplied by defaults.
+
+## `:::sample`
+
+A sample block expresses sample identity, lineage, and linked artifacts.
+
+```md
+:::sample #sample-product-var1
+ref: res-var1
+name: purified product from var1
+derived_from: sample-batch-var1
+purity: 97%
+artifacts: art-nmr-var1
+:::
+```
+
+Fields: `name`, `sample_id`, `batch`, `purity`, `supplier`, `notes`, `ref`, `derived_from`, `aliquot_of`, `batch_of`, `artifacts`, `chemistry_features`.
+
+Resolver required-field validation: a sample requires `name`.
+
+## `:::artifact`
+
+An artifact block expresses spectra, images, reports, and other evidence files.
+
+```md
+:::artifact #art-nmr-var1
+kind: nmr_spectrum
+ref: res-var1
+path: data/nmr/var1.pdf
+checksum: sha256:var1nmr
+instrument: Bruker 400
+notes: Purified product spectrum.
+:::
+```
+
+Fields: `kind`, `ref`, `path`, `checksum`, `instrument`, `notes`, `chemistry_features`.
+
+Resolver required-field validation: an artifact requires `kind` and `path`.
+

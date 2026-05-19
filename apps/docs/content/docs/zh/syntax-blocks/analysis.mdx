@@ -1,0 +1,112 @@
+---
+title: '`:::analysis` 分析块'
+description: '`:::analysis` 记录 TLC、NMR、HPLC 等分析信息，支持 TLC lane 字段和默认 plate/visualization。'
+---
+
+`:::analysis` 记录分析证据，并生成 `analysis` 节点。
+
+## 语法
+
+```md
+:::analysis #ana-tlc-main
+type: tlc
+ref: rxn-main
+result: res-main
+eluent: petroleum ether/ethyl acetate 5:1
+p1: substrate, Rf 0.62
+p2: product, Rf 0.31
+data: product spot observed, starting material consumed
+:::
+```
+
+## 字段
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| `type` | 条件必填 | 写入 AST 的 `type_name`，普通 analysis 必填 |
+| `ref` | 否 | 分析目标，可指向 reaction、sample、result 或 condition variation |
+| `time` | 否 | 采样或分析时间 |
+| `eluent` | 否 | TLC 展开剂等分析条件 |
+| `plate` | 否 | TLC 板材 |
+| `visualization` | 否 | 可视化方式 |
+| `result` | 否 | 关联 result ID |
+| `instrument` | 否 | 仪器 |
+| `solvent` | 否 | NMR 等分析溶剂 |
+| `frequency` | 否 | NMR 频率 |
+| `method` | 否 | HPLC、LCMS 等方法说明 |
+| `data` | 条件必填 | 普通 analysis 必填；`type: tlc` 时可省略 |
+| `notes` | 否 | 分析说明 |
+| `p1`、`p2`、`pN` | 否 | TLC lane 字段，N 为数字 |
+
+## 必填与默认值
+
+resolver 对普通 analysis 要求 `type_name` 和 `data`。当 `type_name` 为 `tlc` 时，只要求 `type_name`。TLC 默认值由 parser 设置：
+
+| 字段 | 默认值 |
+| --- | --- |
+| `plate` | `silica gel GF254` |
+| `visualization` | `UV 254 nm` |
+
+## TLC Lane 语法
+
+TLC lane 字段名必须匹配 `p\d+`。core 归一化器按字段数字顺序读取 lane。lane 文本用 `|` 分隔。第一个片段通常包含 lane label 和第一个 spot，其余片段为 spot、baseline 或 mess region。
+
+```md
+p1: sm 0.62 | base
+p2: rxn 0.31 ^3(4) | mess(0.55) | sm 0.62 v1
+p3: product 0.30
+```
+
+lane label 支持 `sm`、`starting material`、`product`、`pd`、`int`、`intermediate`、`rxn`、`reaction` 和数字试验编号。未命中这些形态时归为 `custom`。
+
+spot 项支持：
+
+| 写法 | 说明 |
+| --- | --- |
+| `0.52` | Rf spot |
+| `0.52 ^3(4)` | 上箭头形状，size rank 3，intensity rank 4 |
+| `0.31 v2` | 下箭头形状，size rank 2 |
+| `base` | lane 含 baseline spot |
+| `none` | lane 无 spot |
+| `mess`、`mess(0.45)` | 拖尾或混乱区域 |
+
+rank 值会限制在 1 到 5。无法识别的 spot 项不会进入 normalized TLC 输出。
+
+## 诊断
+
+| 诊断码 | 条件 |
+| --- | --- |
+| `E_INVALID_ID` | 块 ID 非法 |
+| `W_UNKNOWN_FIELD` | 非允许字段且不匹配 `p\d+` |
+| `E_MISSING_REQUIRED_FIELD` | 普通 analysis 缺少 `type_name` 或 `data` |
+
+## 推荐实践案例
+
+TLC 分析应把 lane、展开剂、目标和结论写清楚。`ref` 保存分析目标，`result` 保存结果关联。
+
+```md
+:::analysis #ana-tlc-main
+type: tlc
+ref: rxn-main
+result: res-main
+time: 3 h
+eluent: petroleum ether/ethyl acetate 5:1
+p1: substrate standard, Rf 0.62
+p2: reaction mixture, product Rf 0.31, substrate absent
+data: TLC indicates full conversion to product
+notes: visualization under UV 254 nm
+:::
+```
+
+NMR 等通用分析应显式提供 `data`。
+
+```md
+:::analysis #ana-nmr-product
+type: nmr
+ref: sample-product
+instrument: Bruker 400
+solvent: CDCl3
+frequency: 400 MHz
+data: 1H NMR matches expected aromatic pattern
+:::
+```

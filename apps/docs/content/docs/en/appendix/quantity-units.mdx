@@ -1,0 +1,58 @@
+---
+title: Quantity Units
+description: Quantity classes, units, canonical units, and derived-expression conversions supported by Chemd typechecker and template parameter validation.
+---
+
+Chemd keeps the raw quantity text and computes canonical values for supported quantity classes during validation.
+
+## Quantity Classes
+
+| Class | Supported units | Canonical unit |
+| --- | --- | --- |
+| `amount` | `mmol`, `mol` | `mmol` |
+| `mass` | `mg`, `g`, `kg` | `mg` |
+| `volume` | `ml`, `mL`, `l`, `L` | `mL` |
+| `temperature` | `C`, `°C`, `℃`, `K`, `F` | preserved by input class |
+| `time` | `h`, `hr`, `hrs`, `min`, `mins`, `分钟`, `小时` | `h` |
+| `pressure` | `bar`, `atm`, `psi` | `bar` |
+| `concentration` | `M`, `mM` | `M` |
+| `equivalent` | `equiv`, `eq` | `equiv` |
+| `percent` | `%`, `percent` | `percent` |
+
+## Field Mapping
+
+| Object or syntax | Fields | Quantity class |
+| --- | --- | --- |
+| molecule | `amount` | `amount` |
+| molecule | `equivalents` | `equivalent` |
+| reaction | `temperature` | `temperature` |
+| reaction | `time` | `time` |
+| reaction | `pressure` | `pressure` |
+| result | `yield`, `conversion`, `selectivity`, `purity` | `percent` |
+| result | `isolated_mass` | `mass` |
+| sample | `purity` | `percent` |
+| step params | `amount`, `mass`, `volume`, `temperature`, `target_temperature`, `duration`, `time`, `pressure`, `concentration`, `equivalent`, `equivalents`, `percent` | matching class |
+
+## Template Parameters
+
+`quantity<class>` uses the resolver unit set for shape validation. Unclassified `quantity` accepts any supported quantity unit.
+
+```md
+params: amount: quantity<amount> | yield: quantity<percent>
+```
+
+## Derived-Expression Conversion
+
+The derived-expression function `to_unit(quantity, unit)` supports mass, amount, and volume conversions:
+
+- `mg`, `g`, `kg`
+- `mmol`, `mol`
+- `ml`, `l`
+
+```md
+isolated_mass: = to_unit(0.126 g, mg)
+```
+
+## Diagnostics
+
+Quantity text that cannot be parsed for the target class produces `E403`. Percent values below 0 or above 100 produce `E402`. Expression evaluation failures produce `E_DERIVED_EXPRESSION_INVALID`.

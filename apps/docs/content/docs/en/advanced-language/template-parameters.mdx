@@ -1,0 +1,124 @@
+---
+title: Template Parameter Types
+description: Chemd template parameter declarations, default types, reference parameters, quantity parameters, call validation, and expansion limits.
+---
+
+Template parameters apply only to `:::template` and `:::use`. They let a reusable template declare required arguments and validate references or quantities at call sites.
+
+## Declaration Syntax
+
+`params` supports inline lists and YAML-style lists. Both forms produce the same parameter specs.
+
+```md
+params: label: string | sample: ref<sample> | amount: quantity<amount>
+```
+
+```md
+params:
+  - label: string
+  - sample: ref<sample>
+  - amount: quantity<amount>
+```
+
+Parameter names must start with a letter or `_`, followed by letters, digits, or `_`. Invalid parameter names are ignored. Unknown parameter types fall back to `string`.
+
+## `string`
+
+`string` is the default type. When a type is omitted, the resolver treats the parameter as a string.
+
+```md
+:::template note-line
+params: label | method: string
+@param.label was checked by @param.method.
+:::
+```
+
+`string` does not check object existence or quantity units. Use `ref<kind>` for stable relationships.
+
+## `ref<kind>`
+
+`ref<kind>` requires the call value to point to an existing object with the expected object type. The call value may be a bare ID or `@id`. The resolver removes a leading `@` and ignores any `.field` suffix.
+
+Supported `kind` values:
+
+| kind | Target node |
+| --- | --- |
+| `molecule` | molecule |
+| `reaction` | reaction |
+| `result` | result |
+| `analysis` | analysis |
+| `procedure` | procedure |
+| `observation` | observation |
+| `sample` | sample |
+| `artifact` | artifact |
+| `condition_varies` | condition screen |
+
+```md
+:::template sample-analysis
+params: sample: ref<sample> | analysis: ref<analysis>
+Sample @param.sample is supported by analysis @param.analysis.
+:::
+
+:::use sample-analysis
+sample: @sample-main
+analysis: an-hplc
+:::
+```
+
+Missing targets or type mismatches produce `E_TEMPLATE_PARAM_TYPE_MISMATCH`.
+
+`ref<kind>` validation currently uses the local object index for the source document. Cross-document IDs and external targets can still be useful in route and workspace contexts, but they do not satisfy template parameter type checks today. Use a `string` parameter when a template intentionally accepts an external reference.
+
+## `quantity<class>`
+
+`quantity<class>` requires the call value to match quantity text. Supported classes and units come from the resolver unit set.
+
+| class | Units |
+| --- | --- |
+| `amount` | `mmol`, `mol` |
+| `mass` | `mg`, `g`, `kg` |
+| `volume` | `ml`, `mL`, `l`, `L` |
+| `temperature` | `C`, `°C`, `℃`, `K`, `F` |
+| `time` | `h`, `hr`, `hrs`, `min`, `mins`, `分钟`, `小时` |
+| `pressure` | `bar`, `atm`, `psi` |
+| `concentration` | `M`, `mM` |
+| `equivalent` | `equiv`, `eq` |
+| `percent` | `%`, `percent` |
+
+```md
+:::template charge
+params: reagent: ref<molecule> | amount: quantity<amount>
+:::procedure #charge-template
+step: charge | id=s-charge | inputs=@param.reagent | amount=@param.amount
+:::
+:::
+
+:::use charge
+reagent: mol-substrate
+amount: 1.00 mmol
+:::
+```
+
+The unclassified `quantity` type accepts any supported quantity unit.
+
+## Required Parameters and Expansion Limits
+
+Every declared parameter is required. A missing or empty value in `:::use` produces `E_TEMPLATE_PARAM_MISSING`.
+
+The resolver limits template expansion to depth 32 and 2000 expanded nodes. Recursive templates produce `E_TEMPLATE_CYCLE`. Expansion overflow produces `E_TEMPLATE_EXPANSION_LIMIT`.
+
+## Best Practice
+
+Templates are best suited for repeated experiment narrative and procedure structures. Use `ref<kind>` for object relationships, `quantity<class>` for normalized values, and `string` for free labels.
+
+```md
+:::template screen-result-row
+params:
+  - attempt: string
+  - reaction: ref<reaction>
+  - product: ref<molecule>
+  - yield: quantity<percent>
+
+Attempt @param.attempt used @param.reaction and assigned @param.yield to @param.product.
+:::
+```

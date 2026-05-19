@@ -1,0 +1,91 @@
+---
+title: Runtime Preflight
+description: How Chemd runtime-lab turns compiled steps into run plans, checks capabilities, and selects manual confirmation points.
+---
+
+The runtime layer does not change Chemd syntax. It consumes the canonical step graph produced by the language pipeline and prepares a run plan for dry runs, human runs, robot runs, or replay.
+
+## Runtime Inputs
+
+Runtime preflight starts from procedure steps. Keep step IDs stable when later observations, artifacts, or external run records need to point back to the same operation.
+
+```mdx
+:::procedure #proc-runtime
+step: cool | id=s-cool | target_temperature=-78 C
+step: add | id=s-add | dependsOn=s-cool | reagent=n-BuLi
+step: analyze | id=s-tlc | type=tlc | dependsOn=s-add
+:::
+```
+
+## Run Plans
+
+`@chemd/runtime-lab` exposes `buildRunPlan`. The plan ID is derived from the document ID and has the form `runplan::<documentId>`.
+
+```ts
+import { buildRunPlan, preflightRun } from "@chemd/runtime-lab";
+
+const plan = buildRunPlan({
+  documentId: "exp-runtime",
+  stepGraph
+});
+
+const preflight = preflightRun(plan, {
+  mode: "human-run",
+  capabilities: ["cooling", "analytical_tlc"]
+});
+```
+
+`preflight.blocking` becomes `true` when an error-level runtime diagnostic is emitted.
+
+## Modes
+
+The runtime mode is one of:
+
+- `dry-run`: plan and inspect execution without controlling a lab run.
+- `human-run`: keep manual execution in view and surface confirmation points.
+- `robot-run`: require every step family to be known to the runtime planner.
+- `replay-run`: replay a recorded run state or trace.
+
+## Capabilities
+
+Several step families imply capability requirements:
+
+| Step family | Capability |
+| --- | --- |
+| `cool` | `cooling` |
+| `heat` | `heating` |
+| `purge` | `inert_gas` |
+| `filter` | `filtration` |
+| `purify` | `chromatography` |
+| `dry`, `concentrate` | `vacuum` |
+| `analyze` with `type=tlc` | `analytical_tlc` |
+| `analyze` with `type=nmr` | `nmr` |
+| `analyze` with `type=hplc` | `hplc` |
+
+Missing capabilities produce runtime preflight diagnostics.
+
+## Confirmation Strategy
+
+The runtime planner selects one confirmation strategy per step:
+
+- `manual_required`: explicit high-touch actions such as `add`, `quench`, `purge`, `heat`, and `cool`.
+- `review_inferred`: lowered steps or steps with low lowering confidence.
+- `none`: steps that can proceed without a runtime confirmation gate.
+
+This strategy is runtime metadata. It does not change parser, resolver, or typechecker behavior.
+
+## Best Practice Example
+
+Runtime-ready procedure records use explicit step IDs, dependency links, and step families that the runtime planner recognizes.
+
+```md
+:::procedure #proc-runtime-ready
+reaction: rxn-main
+step: charge | id=s-charge | inputs=@mol-substrate | outputs=mixture-a
+step: cool | id=s-cool | target_temperature=-78 C | dependsOn=s-charge
+step: add | id=s-add | reagent=n-BuLi | dependsOn=s-cool
+step: analyze | id=s-tlc | type=tlc | dependsOn=s-add
+:::
+```
+
+For `human-run`, this source produces manual confirmation points for high-touch operations and capability checks for cooling and TLC analysis.

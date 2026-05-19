@@ -1,0 +1,82 @@
+---
+title: '`:::result` 结果块'
+description: '`:::result` 记录实验结果、产率、转化率、选择性、纯度和与 reaction/product 的关联。'
+---
+
+`:::result` 用于描述一次 reaction 或 product 的实验结论。
+
+## 语法
+
+```md
+:::result #res-main
+reaction: rxn-main
+product: mol-product
+status: success
+yield: 82%
+conversion: 95%
+selectivity: 91:9
+isolated_mass: 182 mg
+product_state: white solid
+purity: 98%
+notes: isolated after silica gel chromatography
+:::
+```
+
+## 字段
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| `status` | 否 | success、partial、failed 等使用者状态 |
+| `yield` | 否 | 产率原文 |
+| `conversion` | 否 | 转化率原文 |
+| `selectivity` | 否 | 选择性原文 |
+| `isolated_mass` | 否 | 分离质量原文 |
+| `product_state` | 否 | 产品外观或状态 |
+| `purity` | 否 | 纯度原文 |
+| `notes` | 否 | 结果说明 |
+| `ref` | 否 | 通用关联目标 |
+| `reaction` | 否 | reaction ID |
+| `product` | 否 | product molecule ID |
+
+## 必填与默认值
+
+`:::result` 没有 resolver 必填字段。parser 不设置默认值。推荐在可用时填写 `reaction` 和 `product`，便于导出层生成 outcome 和 evidence link。
+
+## 诊断
+
+| 诊断码 | 条件 |
+| --- | --- |
+| `E_INVALID_ID` | 块 ID 非法 |
+| `W_UNKNOWN_FIELD` | 出现未声明字段 |
+| `E_TYPED_REFERENCE_MISMATCH` | typechecker 中关联字段指向不匹配对象 |
+
+## 推荐实践案例
+
+将 reaction、product 和 result 显式连接，避免只在正文中写产率。
+
+```md
+:::result #res-main
+reaction: rxn-main
+product: mol-biaryl
+status: success
+yield: 82%
+conversion: 96%
+selectivity: 93:7
+isolated_mass: 210 mg
+product_state: off-white solid
+purity: 98%
+notes: product confirmed by NMR and HPLC
+:::
+```
+
+条件筛选中的 result 应使用稳定 ID，并在 `condition-varies` 的 `resN` 中引用。
+
+```md
+:::result #res-var1
+reaction: rxn-var1
+status: partial
+yield: 38%
+notes: starting material remained by TLC
+:::
+```
+

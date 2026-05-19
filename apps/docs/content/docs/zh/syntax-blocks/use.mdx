@@ -1,0 +1,37 @@
+---
+title: '`:::use` 模板调用块'
+description: '`:::use` 调用模板并传入参数，resolver 会展开模板体。'
+---
+
+`:::use` 由 block parser registry 解析。块头参数是模板名，块内字段全部作为 `values` 保存。
+
+## 语法
+
+```md
+:::use analytical-confirmation
+sample: sample-product
+method: 1H NMR
+:::
+```
+
+## 参数规则
+
+`:::use` 接受任意字段。字段值为字符串；列表值会以 ` | ` 拼接。resolver 使用目标模板的 `params` 进行校验。
+
+| 校验 | 诊断 |
+| --- | --- |
+| 缺少模板要求参数 | `E_TEMPLATE_PARAM_MISSING` |
+| `ref<kind>` 目标缺失或类型错误 | `E_TEMPLATE_PARAM_TYPE_MISMATCH` |
+| `quantity<class>` 格式或单位不匹配 | `E_TEMPLATE_PARAM_TYPE_MISMATCH` |
+| 模板名不存在 | `E_UNKNOWN_TEMPLATE` |
+
+## 推荐实践案例
+
+模板调用应紧跟使用上下文，参数名与模板定义保持一致。
+
+```md
+:::use analytical-confirmation
+sample: @sample-product
+method: HPLC
+:::
+```

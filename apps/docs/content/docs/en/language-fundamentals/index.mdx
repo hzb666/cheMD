@@ -1,0 +1,21 @@
+---
+title: Language Fundamentals
+description: Core Chemd source syntax, including frontmatter, Markdown prose, references, inline chemistry, and structured block rules.
+---
+
+These chapters describe the common syntax used by every Chemd source file. These rules form the input contract for the resolver, typechecker, and compiler.
+
+## Chapters
+
+- [Document Structure and Frontmatter](/en/docs/language-fundamentals/frontmatter): `id`, `title`, `date`, `primary_*`, `tags`, `render_profile`, and `render_overrides`.
+- [Markdown Prose and Inline Syntax](/en/docs/language-fundamentals/markdown-inline): Markdown prose, inline code, link safety, and `:chem[...]`.
+- [Reference Syntax](/en/docs/language-fundamentals/references): `@id`, `@id.field`, primary aliases, `@meta.field`, and `@param.field`.
+- [Structured Blocks and Fields](/en/docs/language-fundamentals/blocks): `:::` blocks, IDs, field lines, list fields, supported block forms, required fields, and diagnostics.
+
+## Usage Conventions
+
+- Use explicit IDs for objects that other blocks reference.
+- Store semantically checked values in structured fields.
+- Put explanatory text in Markdown prose, `notes`, or `caption`.
+- Avoid trailing list separators to prevent empty list item diagnostics.
+

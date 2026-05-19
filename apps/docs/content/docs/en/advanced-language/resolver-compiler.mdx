@@ -1,0 +1,228 @@
+---
+title: Resolver and Compiler Semantics
+description: Object indexes, duplicate IDs, references, primary validation, template expansion, and export flow.
+---
+
+
+## Object Index Construction
+
+The resolver walks children and `col.children`, collecting object nodes with IDs. Object types are molecule, reaction, result, analysis, procedure, observation, sample, artifact, and condition_varies.
+
+```md
+:::col 2
+col: {:::chemd #mol-a
+kind: molecule
+smiles: CCO
+:::
+:::}
+col: {:::result #res-a
+status: success
+:::
+:::}
+:::
+```
+
+`mol-a` and `res-a` are inside `col.children`, but they still enter the same object index. References such as `@mol-a` and `@res-a` can resolve from outside the layout block.
+
+## Duplicate ID Checks
+
+Duplicate object IDs produce `E_DUPLICATE_ID`. Duplicate template names produce `E_DUPLICATE_TEMPLATE`.
+
+```md
+:::chemd #dup
+kind: molecule
+smiles: CCO
+:::
+
+:::result #dup
+status: success
+:::
+```
+
+Object IDs share one namespace within a source file. This example produces `E_DUPLICATE_ID` because the molecule and result use the same ID.
+
+```md
+:::template row
+params: label: string
+@param.label
+:::
+
+:::template row
+params: value: string
+@param.value
+:::
+```
+
+Template names share a template namespace. Duplicate template names produce `E_DUPLICATE_TEMPLATE`.
+
+## Reference Resolution Flow
+
+Markdown reference tokens are resolved by the resolver. Object references use the object index, field references read object fields, primary aliases use frontmatter primary fields, and parameter references use template expansion context.
+
+```md
+---
+id: ref-flow
+title: Reference flow
+date: 2026-05-19
+primary_reaction: rxn-main
+---
+
+:::chemd #rxn-main
+kind: reaction
+reactants: mol-a
+products: mol-p
+temperature: 25 C
+:::
+
+Reaction object: @rxn-main
+Reaction temperature: @rxn-main.temperature
+Primary reaction temperature: @reaction.temperature
+Record title: @meta.title
+```
+
+Object references return target objects, field references return target fields, and primary aliases first resolve through frontmatter before reading fields. Unresolved references keep their raw token and emit diagnostics.
+
+## Primary Reference Validation
+
+The resolver validates that primary fields point to existing objects. Missing targets produce `E_INVALID_PRIMARY_REFERENCE`.
+
+```md
+---
+id: bad-primary
+title: Bad primary
+date: 2026-05-19
+primary_reaction: rxn-missing
+---
+
+Primary reaction: @reaction
+```
+
+When `rxn-missing` does not exist, the resolver emits `E_INVALID_PRIMARY_REFERENCE` for `primary_reaction`. `@reaction` cannot resolve to a valid object either.
+
+## Required Field Validation
+
+Current required fields are molecule `smiles`, reaction `reactants` and `products`, generic analysis `type_name` and `data`, TLC analysis `type_name`, sample `name`, and artifact `kind` plus `path`.
+
+```md
+:::chemd #mol-missing-smiles
+kind: molecule
+name: unnamed molecule
+:::
+
+:::chemd #rxn-missing-products
+kind: reaction
+reactants: mol-a
+:::
+
+:::artifact #art-missing-path
+kind: nmr
+:::
+```
+
+These blocks are syntactically accepted by the parser, then reported by the resolver as missing required fields. TLC analysis only requires `type`; other analysis blocks also require `data`.
+
+## Template Index and Expansion
+
+The resolver builds a template index before expanding `use` nodes. During expansion it validates parameters, detects cycles, and enforces depth and node-count limits.
+
+```md
+:::template result-line
+params: result: ref<result>
+
+Resolved result: @param.result
+:::
+
+:::result #res-main
+status: success
+:::
+
+:::use result-line
+result: res-main
+:::
+```
+
+During expansion, `@param.result` reads the `result` field on `:::use` and validates the target as `ref<result>`.
+
+## Diagnostic Layers
+
+The parser emits syntax and field diagnostics. The resolver emits ID, reference, template, and required-field diagnostics. The compiler adds typechecker, render profile, and input-assistance diagnostics.
+
+```md
+:::unknown #x
+field: value
+:::
+
+:::chemd #mol-a
+kind: molecule
+smiles: CCO
+unknown_field: value
+:::
+
+Reference to missing object: @not-found
+```
+
+Unregistered blocks and unknown fields come from the parser. `@not-found` comes from resolver reference handling. Quantity units, typed reference mismatches, and normalization errors come from the typechecker.
+
+## Semantic Path from AST to Exports
+
+`compileChemd` runs parse, resolve, typecheck, render profile resolution, runtime plan, LNF, training export, RAG export, input assistance, diagnosis, HTML, JSON, and DOCX bridge construction.
+
+```text
+source
+  -> parseChemd
+  -> resolveChemd
+  -> typecheck
+  -> render profile resolution
+  -> LNF / RAG / training / HTML / JSON / DOCX bridge
+```
+
+The source stores language facts. Export formats select the structures they need from the compile result, without requiring renderer-specific data inside source text.
+
+## Typechecker Semantic Stages
+
+The typechecker creates a local object index and an external target index. Local objects support both bare IDs and `documentId#id` scoped IDs. External targets come from `referenceContext.externalTargets` and `reactionRouteContext.externalReactions`.
+
+The typed semantic graph contains molecule, reaction, result, analysis, sample, artifact, condition_varies, procedure_narrative, and observation_narrative nodes. The step graph contains canonical steps, procedure records, observation records, and diagnostics. Export layers can materialize additional relations, such as event-to-step links.
+
+## Compiler Output Inventory
+
+`CompileResult` contains the resolved document, diagnostics, renderOptions, renderAdapterPayload, typedSemanticGraph, stepGraph, runPlan, runtimePreflight, lnf, ragExport, trainingUnderstanding, trainingExport, authoringAssistance, diagnosis, html, json, and docxBridge. Graph index output is built later from one or more training understandings. CLI export, web APIs, desktop preview, and storage/RAG integrations select data from these outputs.
+
+## Best Practice Example
+
+A stable source record gives the resolver one explicit ID per semantic object, uses typed relationships in fields, and uses prose references for readable summaries.
+
+```md
+---
+id: exp-resolver-best-practice
+title: Resolver best practice
+date: 2026-05-19
+primary_reaction: rxn-main
+primary_result: res-main
+---
+
+:::chemd #mol-a
+kind: molecule
+smiles: CCO
+:::
+
+:::chemd #mol-p
+kind: molecule
+smiles: CC=O
+:::
+
+:::chemd #rxn-main
+kind: reaction
+reactants: @mol-a
+products: @mol-p
+:::
+
+:::result #res-main
+reaction: rxn-main
+product: mol-p
+status: success
+yield: 80%
+:::
+
+Resolved summary: @rxn-main.products gave @result.yield.
+```

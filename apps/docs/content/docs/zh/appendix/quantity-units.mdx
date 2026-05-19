@@ -1,0 +1,58 @@
+---
+title: 数量单位
+description: Chemd typechecker 与模板参数校验支持的数量类别、单位、规范单位和派生表达式单位转换。
+---
+
+Chemd 会保留原始数量文本，并在校验时为支持的数量类别计算规范值。
+
+## 数量类别
+
+| 类别 | 支持单位 | 规范单位 |
+| --- | --- | --- |
+| `amount` | `mmol`、`mol` | `mmol` |
+| `mass` | `mg`、`g`、`kg` | `mg` |
+| `volume` | `ml`、`mL`、`l`、`L` | `mL` |
+| `temperature` | `C`、`°C`、`℃`、`K`、`F` | 按输入类别保留 |
+| `time` | `h`、`hr`、`hrs`、`min`、`mins`、`分钟`、`小时` | `h` |
+| `pressure` | `bar`、`atm`、`psi` | `bar` |
+| `concentration` | `M`、`mM` | `M` |
+| `equivalent` | `equiv`、`eq` | `equiv` |
+| `percent` | `%`、`percent` | `percent` |
+
+## 字段映射
+
+| 对象或语法 | 字段 | 数量类别 |
+| --- | --- | --- |
+| molecule | `amount` | `amount` |
+| molecule | `equivalents` | `equivalent` |
+| reaction | `temperature` | `temperature` |
+| reaction | `time` | `time` |
+| reaction | `pressure` | `pressure` |
+| result | `yield`、`conversion`、`selectivity`、`purity` | `percent` |
+| result | `isolated_mass` | `mass` |
+| sample | `purity` | `percent` |
+| step params | `amount`、`mass`、`volume`、`temperature`、`target_temperature`、`duration`、`time`、`pressure`、`concentration`、`equivalent`、`equivalents`、`percent` | 对应类别 |
+
+## 模板参数
+
+`quantity<class>` 使用 resolver 单位集合执行形态检查。`quantity` 不带类别时，接受任意实现支持的数量单位。
+
+```md
+params: amount: quantity<amount> | yield: quantity<percent>
+```
+
+## 派生表达式单位转换
+
+派生表达式的 `to_unit(quantity, unit)` 支持质量、物质的量和体积转换：
+
+- `mg`、`g`、`kg`
+- `mmol`、`mol`
+- `ml`、`l`
+
+```md
+isolated_mass: = to_unit(0.126 g, mg)
+```
+
+## 诊断
+
+数量文本无法匹配目标类别时产生 `E403`。percent 数量小于 0 或大于 100 时产生 `E402`。表达式求值失败时产生 `E_DERIVED_EXPRESSION_INVALID`。

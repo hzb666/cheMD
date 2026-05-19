@@ -1,0 +1,78 @@
+---
+title: Resolver 实现
+description: 对象索引、引用解析、模板展开、默认 ID 和必填字段校验。
+---
+
+Resolver 实现位于 `packages/resolver/src/index.ts`。该包依赖 `@chemd/core` 和 `@chemd/parser`。
+
+## 二级主题
+
+### Object index
+
+resolver 遍历 `document.children`，把带 ID 的对象节点加入索引。对象类型包括 molecule、reaction、result、analysis、procedure、observation、sample、artifact 和 condition-varies。
+
+### Duplicate ID
+
+同一 ID 多次出现时，resolver 记录 `E_DUPLICATE_ID`。
+
+### Primary aliases
+
+`PRIMARY_ALIAS_FIELDS` 将 `reaction`、`result`、`product`、`sample`、`molecule`、`analysis` 映射到 frontmatter 的 `primary_*` 字段。
+
+### Reference resolution
+
+resolver 处理以下引用类别：
+
+- `@meta.field`
+- `@param.field`
+- `@alias.field`
+- `@id`
+- `@id.field`
+
+```ts
+import { parseChemd } from "@chemd/parser";
+import { resolveChemd } from "@chemd/resolver";
+
+const resolved = resolveChemd(parseChemd(source));
+const diagnostics = resolved.diagnostics;
+```
+
+### condition-varies attempt
+
+读取 `condition_varies` 字段时，resolver 会在 `attempts` 中查找同名 attempt。
+
+### Default IDs
+
+无 ID 的对象节点会获得默认 ID，格式为 `<document-id>-<node-type>-<counter>`。
+
+### Template expansion
+
+resolver 构建 template index，展开 `:::use`，校验参数，并限制最大深度 32 和最大展开节点数 2000。
+
+```md
+:::template result-line
+params: result_ref: ref<result>
+The result yield was @result.yield.
+:::
+
+:::use result-line
+result_ref: @res-main
+result: res-main
+:::
+```
+
+`@param.*` 从 `:::use` 读取值。bind alias 与 primary alias 会先解析到对象 ID，再读取目标对象字段。
+
+### Required fields
+
+resolver 校验 molecule、reaction、analysis、sample 和 artifact 的必填字段。
+
+## 实现细节清单
+
+resolver 的第一步是收集对象节点。对象来源包含顶层 children、`col.children` 和模板 body 中可展开的对象。无显式 ID 的对象会被分配默认 ID，格式使用文档 ID、节点类型和计数器。
+
+引用解析覆盖 Markdown inline token 和结构化字段。`@meta.field` 从 `document.meta` 读取；`@param.field` 从模板调用参数读取；`@alias.field` 先通过 `PRIMARY_ALIAS_FIELDS` 找到 frontmatter 的 `primary_*`，再读取目标对象字段；`@id` 与 `@id.field` 通过对象索引读取。
+
+模板展开分三步：构建 template index，校验 `:::use` 参数，替换模板 body 中的参数引用。限制包含最大深度 32 和最大展开节点数 2000。重复模板名、未知模板、缺少参数、类型不匹配、循环和展开超限均产生诊断。
+
+condition-varies attempt 具有特殊字段读取逻辑。`@cv-screen.var1` 这类引用会先定位父级 condition-varies 对象，再在 `attempts` 中查找 attempt ID。

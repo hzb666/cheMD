@@ -1,0 +1,144 @@
+---
+title: Normalization Semantics
+description: Typechecker and core-helper normalization rules for reaction conditions, TLC lanes, status, analysis type, atmosphere, and relationships.
+---
+
+The Chemd parser preserves source input. The typechecker and core helpers build normalized semantics in later stages. Normalized data is used by HTML, DOCX bridge, LNF, RAG, training export, and graph index outputs.
+
+## Reaction Conditions
+
+Chemd normalizes reaction conditions from `conditions`, `reagents`, `catalyst`, `solvent`, `temperature`, `time`, `pressure`, and `atmosphere`.
+
+| Field | Normalization behavior |
+| --- | --- |
+| `conditions` | Preserved as `conditions_text` and used as a candidate condition pool |
+| `solvent` | Recognizes aliases such as EtOH, MeOH, H2O, DCM, THF, MeCN, DMF, DMSO, toluene, and EtOAc |
+| `catalyst` | Explicit field has priority; otherwise text containing catalyst is matched from `conditions` |
+| `atmosphere` | Recognizes N2, nitrogen, Ar, argon, air, O2, and oxygen |
+| `temperature` | Parses `C`, `°C`, `K`, and `F` |
+| `time` | Parses `h`, `hr`, `hrs`, `min`, and `mins` |
+| `pressure` | Parses `bar`, `atm`, and `psi` |
+| `reagents` | Splits explicit `reagents` by `|` and appends unconsumed `conditions` entries |
+
+```md
+:::chemd #rxn-main
+kind: reaction
+reactants: @mol-a
+products: @mol-b
+conditions: MeCN | 60 C | 3 h | N2 | Pd catalyst | K2CO3
+solvent: MeCN
+temperature: 60 C
+time: 3 h
+atmosphere: N2
+:::
+```
+
+Best practice is to fill structured condition fields explicitly and use `conditions` for supplementary free text. Explicit fields have higher priority and produce more stable normalized output.
+
+## Result Status
+
+Result `status` is normalized by `normalizeStatus` to `success`, `partial`, `failed`, or `unknown`.
+
+| Input | Normalized |
+| --- | --- |
+| `success`, `complete`, `completed`, `done` | `success` |
+| `partial`, `partial_conversion` | `partial` |
+| `failed`, `fail` | `failed` |
+| `unknown` | `unknown` |
+
+Other values produce `E306` and normalize to `unknown`.
+
+## Analysis Type
+
+Analysis `type` is stored in the AST as `type_name`. The typechecker recognizes these aliases:
+
+| Input | Normalized |
+| --- | --- |
+| `tlc` | `tlc` |
+| `nmr` | `nmr` |
+| `hplc` | `hplc` |
+| `lcms`, `lc-ms` | `lcms` |
+| `gcms`, `gc-ms` | `gcms` |
+
+Values outside this alias set are preserved as extensions, allowing project-specific analytical methods.
+
+## Reaction Atmosphere
+
+Reaction `atmosphere` is normalized as a known value or extension.
+
+| Input | Normalized |
+| --- | --- |
+| `n2`, `nitrogen` | `nitrogen` |
+| `ar`, `argon` | `argon` |
+| `air` | `air` |
+| `o2`, `oxygen` | `oxygen` |
+| `inert` | `inert` |
+
+Other values are preserved as extensions without diagnostics.
+
+## TLC Lane
+
+TLC normalization reads fields such as `p1`, `p2`, and `p3` in numeric order. Lane text is split by `|` into a lane label and spot items.
+
+Supported lane labels:
+
+| Label shape | lane_role |
+| --- | --- |
+| `sm`, `starting material` | `starting_material` |
+| `pd`, `product` | `product` |
+| `int`, `intermediate` | `intermediate` |
+| `rxn`, `reaction` | `reaction` |
+| number | `trial` |
+| other | `custom` |
+
+Supported spots and regions:
+
+| Syntax | Semantics |
+| --- | --- |
+| `0.52` | Rf spot |
+| `0.52 ^3(4)` | up shape, size rank 3, intensity rank 4 |
+| `0.31 v2` | down shape, size rank 2 |
+| `base` | lane has a baseline spot |
+| `none` | lane has no spots |
+| `mess`, `mess(0.45)` | tailing or messy region |
+
+Rank values are clamped to 1 through 5. Unrecognized spot items are ignored.
+
+```md
+:::analysis #ana-tlc
+type: tlc
+ref: rxn-main
+time: 2 h
+eluent: petroleum ether/ethyl acetate 5:1
+p1: sm 0.62 | base
+p2: rxn 0.31 ^3(4) | mess(0.55) | sm 0.62 v1
+p3: product 0.30
+:::
+```
+
+## Result and Reaction Relationships
+
+The typechecker uses result `reaction`; when it is absent, it uses `ref`. The target must be a reaction. `product` must point to a molecule.
+
+After a result is linked to a reaction, the typechecker checks:
+
+- Whether `product` appears in the linked reaction `products` list.
+- Whether result `yield`, `conversion`, and `selectivity` match same-name fields on the linked reaction.
+
+A product outside the reaction products produces `E_TYPED_REFERENCE_MISMATCH`. Metric disagreement produces `E_RESULT_REACTION_CONFLICT`.
+
+## Sample Relationships
+
+Sample relationship fields include `ref`, `derived_from`, `aliquot_of`, and `batch_of`. `aliquot_of` and `batch_of` must point to samples. `derived_from` and `ref` can resolve to object references or remain literals.
+
+```md
+:::sample #sample-aliquot-a
+name: aliquot A
+aliquot_of: @sample-parent
+purity: 97%
+:::
+```
+
+## Best Practice
+
+Normalization depends on structured fields. Put checkable facts in fields, and put narrative additions in `notes`, `caption`, or Markdown prose.

@@ -26,15 +26,15 @@
     "@radix-ui/react-tabs": "^1.1.13",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "ketcher-react": "^3.5.0",
-    "ketcher-standalone": "^3.5.0",
-    "lucide-react": "^1.7.0",
-    "next": "^15.5.18",
+    "ketcher-react": "^3.12.0",
+    "ketcher-standalone": "^3.12.0",
+    "lucide-react": "^1.16.0",
+    "next": "^16.2.6",
     "next-themes": "^0.4.6",
-    "pg": "^8.20.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "tailwind-merge": "^3.5.0",
+    "pg": "^8.21.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "tailwind-merge": "^3.6.0",
     "tailwindcss-animate": "^1.0.7"
   }
 }

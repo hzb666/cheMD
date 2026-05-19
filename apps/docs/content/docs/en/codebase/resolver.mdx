@@ -1,0 +1,78 @@
+---
+title: Resolver Implementation
+description: Object index, reference resolution, template expansion, default IDs, and required-field validation.
+---
+
+Resolver implementation lives in `packages/resolver/src/index.ts`. The package depends on `@chemd/core` and `@chemd/parser`.
+
+## Secondary Topics
+
+### Object Index
+
+The resolver traverses `document.children` and adds ID-bearing object nodes to an index. Object types include molecule, reaction, result, analysis, procedure, observation, sample, artifact, and condition-varies.
+
+### Duplicate ID
+
+When the same ID appears multiple times, the resolver records `E_DUPLICATE_ID`.
+
+### Primary Aliases
+
+`PRIMARY_ALIAS_FIELDS` maps `reaction`, `result`, `product`, `sample`, `molecule`, and `analysis` to frontmatter `primary_*` fields.
+
+### Reference Resolution
+
+The resolver handles these reference classes:
+
+- `@meta.field`
+- `@param.field`
+- `@alias.field`
+- `@id`
+- `@id.field`
+
+```ts
+import { parseChemd } from "@chemd/parser";
+import { resolveChemd } from "@chemd/resolver";
+
+const resolved = resolveChemd(parseChemd(source));
+const diagnostics = resolved.diagnostics;
+```
+
+### condition-varies Attempt
+
+When reading a field from `condition_varies`, the resolver searches `attempts` for an attempt with the same ID.
+
+### Default IDs
+
+Object nodes without IDs receive a default ID in the format `<document-id>-<node-type>-<counter>`.
+
+### Template Expansion
+
+The resolver builds a template index, expands `:::use`, validates parameters, and enforces maximum depth 32 and maximum expanded node count 2000.
+
+```md
+:::template result-line
+params: result_ref: ref<result>
+The result yield was @result.yield.
+:::
+
+:::use result-line
+result_ref: @res-main
+result: res-main
+:::
+```
+
+`@param.*` reads values from `:::use`. Bound aliases and primary aliases are resolved through object IDs, then field access reads the target object.
+
+### Required Fields
+
+The resolver validates required fields for molecule, reaction, analysis, sample, and artifact nodes.
+
+## Implementation Detail Inventory
+
+The resolver first collects object nodes. Sources include top-level children, `col.children`, and expandable objects inside template body. Objects without explicit IDs receive default IDs using document ID, node type, and a counter.
+
+Reference resolution covers Markdown inline tokens and structured fields. `@meta.field` reads `document.meta`; `@param.field` reads template call parameters; `@alias.field` maps through `PRIMARY_ALIAS_FIELDS` to the matching frontmatter `primary_*` field, then reads the target object field; `@id` and `@id.field` read through the object index.
+
+Template expansion has three stages: build the template index, validate `:::use` arguments, and substitute parameter references in template body. Limits include maximum depth 32 and maximum expanded node count 2000. Duplicate template names, unknown templates, missing parameters, type mismatches, cycles, and expansion limits all produce diagnostics.
+
+Condition-varies attempts have specialized field access. References such as `@cv-screen.var1` locate the parent condition-varies object, then look up the attempt ID in `attempts`.

@@ -1,0 +1,8 @@
+{
+  "title": "Validation, Diagnostics, and Tooling",
+  "pages": [
+    "cli-workflows",
+    "error-checking",
+    "diagnostics-repair"
+  ]
+}

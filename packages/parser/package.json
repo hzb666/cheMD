@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "@chemd/core": "workspace:*",
-    "yaml": "^2.8.3"
+    "yaml": "^2.9.0"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json --noEmit",

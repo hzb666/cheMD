@@ -1,0 +1,87 @@
+---
+title: 训练图谱与反应地图
+description: training export、graph index 和 reaction map 如何把 Chemd 源记录表示为下游学习与可视化结构。
+---
+
+Training 与 graph 输出是下游投影。它们不增加新的输入语法，稳定 ID、reaction link、step、observation 和 condition attempt 会直接影响下游结构质量。
+
+## Training Export Layer
+
+training exporter 构建 `ChemdTrainingExportV2`。记录分为四层：
+
+- `source_layer`：文档身份、source span 和解析源上下文。
+- `semantic_layer`：molecule、reaction、result、analysis、sample、artifact、condition、procedure、observation 和 route。
+- `learning_layer`：retrieval chunk、resolved reference、任务导向投影，以及 procedure 或 observation logic。
+- `quality_layer`：diagnostic、missing logic、conflict、confidence 和导出质量信号。
+
+```bash
+pnpm chemd export ./examples/example.chemd --format training
+pnpm chemd export ./examples/example.chemd --format training-full
+pnpm chemd export ./examples/example.chemd --format rag
+```
+
+当下游只需要紧凑 training understanding 时使用 `training`。当下游需要完整分层记录时使用 `training-full`。
+
+## Graph Index
+
+graph 命令会编译多个文档，并构建 schema version 为 `chemd-training-graph-index/v0.1` 的 graph index。
+
+```bash
+pnpm chemd graph ./corpus --out ./graph-index.json
+```
+
+graph index 来自编译后的 training understanding。它不是 compiler `CompileResult` 的一部分。
+
+## Reaction Map
+
+`@chemd/reaction-map` 会把 graph index 中的 reaction feature 和 similarity edge 转为确定性的 layout。
+
+```ts
+import { buildReactionMapFromGraphIndex } from "@chemd/reaction-map";
+
+const layout = buildReactionMapFromGraphIndex(graphIndex);
+```
+
+layout schema 为 `chemd-reaction-cluster-layout/v0.1`，包含：
+
+- `nodes`：带有 position、quality tier、feature ref、evidence 和 warning 的 reaction node。
+- `edges`：带有 score、confidence、basis、evidence 和 warning 的 reaction similarity edge。
+- `clusters`：按 reaction signature、procedure signature、condition signature 或 reaction family 生成的确定性 reaction cluster。
+- `input_summary`：reaction、edge、cluster 和 singleton 计数。
+
+当前 layout 生成使用 deterministic fallback engine。即使没有外部 embedding 或 TMAP layout，也能保持测试和编辑器预览输出稳定。
+
+## 输入建议
+
+建议为 reaction、step、observation、artifact 和 condition attempt 显式写 ID。result 通过 `reaction` 或 reaction 形态的 `ref` 连接 reaction，observation 连接 step，并保留 route reference。这些链接会成为 graph evidence，而不是孤立文本。
+
+## 推荐实践示例
+
+适合 graph 输出的记录通过 ID 串联 route、result、procedure、observation、sample 和 artifact evidence。
+
+```md
+:::chemd #rxn-step-1
+kind: reaction
+route: route-a
+reactants: @mol-a
+products: @mol-b
+:::
+
+:::chemd #rxn-step-2
+kind: reaction
+route: route-a
+prev: @rxn-step-1
+reactants: @mol-b
+products: @mol-c
+:::
+
+:::procedure #proc-step-2
+reaction: rxn-step-2
+step: add | id=s-add | inputs=@mol-b | outputs=mixture-step-2
+:::
+
+:::observation #obs-step-2
+ref: rxn-step-2
+event: color_change | id=e-color | linkedStep=s-add | color=yellow
+:::
+```

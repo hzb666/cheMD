@@ -1,0 +1,89 @@
+---
+title: 错误检查模型
+description: Chemd 从 frontmatter、块语法、引用、模板、数量、步骤、观察到路线图的错误检查规则。
+---
+
+Chemd 的错误检查分布在 parser、resolver、typechecker 和 compiler。使用者看到的诊断来自这些阶段的合并结果。
+
+## 检查阶段
+
+| 阶段 | 主要职责 | 使用者可见输出 |
+| --- | --- | --- |
+| parser | frontmatter、行内 token、结构化块字段和列表语法 | 语法与字段诊断 |
+| resolver | 对象索引、重复 ID、引用、primary、模板展开、必填字段 | 未解析引用与缺失字段诊断 |
+| typechecker | 数量、状态、引用类型、步骤图、观察事件、路线图 | 语义与关系诊断 |
+| compiler | 编译入口、quick fix、repair loop、agent loop | diagnosis 摘要与修复动作 |
+
+## Frontmatter 检查
+
+`id`、`title`、`date` 是必需字段。缺失字段产生 `E_MISSING_REQUIRED_FRONTMATTER_KEY`。这些字段和 `primary_*` 字段必须是非空字符串。
+
+`date` 推荐使用 `YYYY-MM-DD`。格式不匹配产生 `W_NON_ISO_FRONTMATTER_DATE`，日历值无效产生 `W_INVALID_FRONTMATTER_DATE_VALUE`。
+
+`tags` 必须是字符串数组。`render_profile` 必须是非空字符串。`render_overrides` 只支持一层对象和标量值。
+
+## 块语法检查
+
+结构化块必须使用 `:::type` 起始行和 `:::` 结束行。未闭合块产生 `W_UNTERMINATED_BLOCK`。未知块产生 `W_UNKNOWN_BLOCK`。
+
+块 ID 必须匹配 `^[a-zA-Z][a-zA-Z0-9_-]*$`。非法 ID 产生 `E_INVALID_ID`。字段名必须以小写字母开头，后续允许小写字母、数字和下划线。
+
+字段不在当前块允许集合内时产生 `W_UNKNOWN_FIELD`。列表字段中的空项产生 `E_INVALID_LIST_ITEM`。
+
+## 引用检查
+
+resolver 对 `@id`、`@id.field`、primary alias、`@meta.field`、`@param.field` 和 condition-screen attempt 引用执行解析。目标缺失或字段缺失时产生 `W_UNRESOLVED_REFERENCE`。
+
+typechecker 对语义字段执行类型检查。reaction 的 `reactants` 与 `products` 必须指向 molecule。result 的 `reaction` 必须指向 reaction。sample 的 `artifacts` 必须指向 artifact。类型不匹配产生 `E_TYPED_REFERENCE_MISMATCH`。
+
+## 必填字段检查
+
+resolver 当前检查的对象必填字段如下：
+
+| 对象 | 必填字段 |
+| --- | --- |
+| molecule | `smiles` |
+| reaction | `reactants`、`products` |
+| analysis | `type_name`、`data` |
+| TLC analysis | `type_name` |
+| sample | `name` |
+| artifact | `kind`、`path` |
+
+TLC analysis 由 `type: tlc` 识别，并在 parser 阶段补入 `plate: silica gel GF254` 与 `visualization: UV 254 nm` 默认值。resolver 对 TLC analysis 放宽 `data` 要求。
+
+## 数量与状态检查
+
+typechecker 解析 molecule、reaction、result、sample 和 step 中的数量字段。无法按字段类别解析时产生 `E403`。percent 字段超出 0 到 100 时产生 `E402`。
+
+result `status` 支持 `success`、`complete`、`completed`、`done`、`partial`、`partial_conversion`、`failed`、`fail`、`unknown` 等别名。非法状态产生 `E306`，并归一化为 `unknown`。
+
+## 模板检查
+
+resolver 建立模板索引。重复模板名产生 `E_DUPLICATE_TEMPLATE`。未知模板调用产生 `E_UNKNOWN_TEMPLATE`。
+
+模板参数全部为必填。缺少参数产生 `E_TEMPLATE_PARAM_MISSING`。`ref<kind>` 与 `quantity<class>` 校验失败产生 `E_TEMPLATE_PARAM_TYPE_MISMATCH`。
+
+模板递归产生 `E_TEMPLATE_CYCLE`。展开深度超过 32 或展开节点超过 2000 产生 `E_TEMPLATE_EXPANSION_LIMIT`。
+
+## Step 与 Event 检查
+
+step family 必须在实现集合内。未知 family 产生 `E_STEP_INVALID_FAMILY`。`heat` 需要 temperature、target_temperature 或 duration。`cool` 需要 temperature、target_temperature 或 method。`analyze` 需要 analysisType、analysis_type 或 type。`extract` 需要 solvent。
+
+step ID 重复产生 `E_STEP_ID_DUPLICATE`。`dependsOn` 指向不存在 step 时产生 `E_STEP_INVALID_REFERENCE`。依赖图成环产生 `E_STEP_DEPENDENCY_CYCLE`。
+
+event type 支持 `color_change`、`precipitation`、`gas_evolution`、`phase_change`。非法 event type 产生 `E_OBSERVATION_EVENT_INVALID_TYPE`。`linkedStep` 指向不存在 step 时产生 `E_OBSERVATION_LINKED_STEP_MISSING`。
+
+## 路线检查
+
+reaction 的 `route` 与 `prev` 会参与路线图扩展。前驱引用类型不匹配产生 `E_TYPED_REFERENCE_MISMATCH`。路线不一致产生 `W_REACTION_ROUTE_MISMATCH`。路线成环产生 `E_REACTION_ROUTE_CYCLE`。路线内孤立 reaction 产生 `W_REACTION_ROUTE_ORPHAN`。
+
+## 推荐校验顺序
+
+```powershell
+pnpm chemd validate .\path\to\record.chemd
+pnpm chemd export .\path\to\record.chemd --format json
+pnpm chemd graph .\path\to\record.chemd
+```
+
+先清理 parser 与 resolver 诊断，再处理 typechecker 诊断。引用、数量和模板问题解决后，导出与图谱结果更稳定。
+

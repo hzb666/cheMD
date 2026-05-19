@@ -1,0 +1,69 @@
+---
+title: Workspace Symbol Index
+description: How Chemd builds a multi-document symbol and reference index for editor and workspace tooling.
+---
+
+The workspace index is a tooling layer over compiled documents. It is useful for editor features, cross-file reference diagnostics, navigation, and workspace-level symbol lists.
+
+## Input Model
+
+Each workspace document supplies a URI, source text, and optional path or metadata. The default compiler is `compileChemdForEditor` with `strictChemdKind: true`.
+
+```ts
+import { buildWorkspaceSymbolIndex } from "@chemd/workspace-index";
+
+const index = buildWorkspaceSymbolIndex([
+  {
+    uri: "file:///workspace/a.chemd",
+    path: "a.chemd",
+    source
+  }
+]);
+```
+
+The output version is `chemd-workspace-symbol-index/v0.1`.
+
+## Symbol IDs
+
+Local Chemd object IDs are scoped to a document. The workspace index makes them globally addressable as:
+
+```text
+<documentUri>#<localId>
+```
+
+If multiple symbols would produce the same workspace symbol ID, later entries receive a `~N` suffix. The symbol also carries `duplicateLocalId` so editor surfaces can warn without guessing from the string shape.
+
+## References
+
+The index extracts reference candidates from each source document and resolves them against collected symbols. Compile failures do not stop extraction; the failed document is marked `status: "failed"` and a diagnostic is attached.
+
+This makes the index suitable for partially invalid workspaces. Editors can still show available symbols and unresolved reference diagnostics while the author is repairing a file.
+
+## Determinism
+
+Documents, symbols, and diagnostics are sorted before output. The index also hashes source content per document, so callers can compare whether a document changed without parsing the raw source again.
+
+## Best Practice Example
+
+Workspace tooling should pass every open `.chemd` or compatible `.chemd.md` source with a stable URI. Local IDs can repeat across files because the workspace index scopes them by document URI.
+
+```ts
+import { buildWorkspaceSymbolIndex } from "@chemd/workspace-index";
+
+const index = buildWorkspaceSymbolIndex([
+  {
+    uri: "file:///workspace/route-a/step-1.chemd",
+    path: "route-a/step-1.chemd",
+    source: stepOneSource
+  },
+  {
+    uri: "file:///workspace/route-a/step-2.chemd",
+    path: "route-a/step-2.chemd",
+    source: stepTwoSource
+  }
+]);
+
+const unresolved = index.references.filter((reference) => reference.status === "unresolved");
+```
+
+Keep URI generation deterministic. Editor navigation, duplicate-ID reporting, and unresolved-reference diagnostics all depend on stable document identities.

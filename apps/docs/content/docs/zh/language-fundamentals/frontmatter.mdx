@@ -1,0 +1,113 @@
+---
+title: 文档结构与 Frontmatter
+description: frontmatter 必需键、primary 声明、元数据扩展、渲染选择和诊断规则。
+---
+
+
+## `id`、`title`、`date` 必需字段
+
+frontmatter 使用 YAML mapping。`ChemdMeta` 的核心字段为 `id`、`title` 和 `date`。frontmatter 存在时，解析器逐项检查这三个 key；缺失字段产生 `E_MISSING_REQUIRED_FRONTMATTER_KEY`。frontmatter 缺失时，parser 使用默认 meta：`draft-document`、`Untitled chemd document` 和 `1970-01-01`。
+
+```yaml
+---
+id: exp-suzuki-screen
+title: Suzuki coupling solvent screen
+date: 2026-04-24
+---
+```
+
+`date` 推荐 ISO 日历日期。格式未匹配 `YYYY-MM-DD` 时产生 `W_NON_ISO_FRONTMATTER_DATE`。格式正确但日历值无效时产生 `W_INVALID_FRONTMATTER_DATE_VALUE`。该校验在 frontmatter assigner 执行，诊断保留源码 span。
+
+## `primary_*` 主对象声明
+
+resolver 识别六个主对象字段：`primary_reaction`、`primary_result`、`primary_product`、`primary_sample`、`primary_molecule` 和 `primary_analysis`。这些字段必须为非空字符串，目标 ID 在 resolver 阶段校验。目标不存在时产生 `E_INVALID_PRIMARY_REFERENCE`。
+
+primary 字段服务于行内 alias 引用。例如 `primary_reaction: rxn-main` 允许正文使用 `@reaction.yield`、`@reaction.solvent` 等字段引用。alias 名称和 frontmatter 字段映射如下：
+
+| alias | frontmatter 字段 |
+| --- | --- |
+| `reaction` | `primary_reaction` |
+| `result` | `primary_result` |
+| `product` | `primary_product` |
+| `sample` | `primary_sample` |
+| `molecule` | `primary_molecule` |
+| `analysis` | `primary_analysis` |
+
+## `tags`、状态、项目、使用者等元数据
+
+`tags` 接受字符串数组。数组中非字符串项会产生 frontmatter value 诊断。除保留字段外，frontmatter 允许额外标量字段进入 `meta`，可用于 `project`、`author`、`status`、`notebook`、`campaign` 等项目元数据。额外字段通过 `@meta.field` 行内引用读取。
+
+```yaml
+---
+id: exp-route-step-03
+title: Route step 03
+date: 2026-04-24
+tags:
+  - total-synthesis
+  - route-a
+project: CHEMD-ROUTE
+author: A. Chemist
+status: reviewed
+---
+```
+
+frontmatter key 语法要求以小写字母开头，后续为小写字母、数字或下划线。重复 key 产生 `W_DUPLICATE_FRONTMATTER_KEY`，后出现的值覆盖先出现的值。
+
+## `render_profile` 与 `render_overrides`
+
+`render_profile` 必须为非空字符串。内建 profile 为 `base`、`eln-default`、`publication-acs` 和 `slides-large`。缺省 profile 为 `eln-default`。未知 profile 产生 `W_UNKNOWN_RENDER_PROFILE`，并回退到 base 选项。
+
+`render_overrides` 必须为单层 mapping，path 必须匹配 `section.field`。已实现 section 为 `structure`、`reaction` 和 `export`。编译阶段通过 `resolveRenderProfileWithDiagnostics` 合并 frontmatter selection 与 compile options，再通过 `mapRenderOptionsToAdapterPayload` 生成渲染适配 payload。
+
+```yaml
+render_profile: publication-acs
+render_overrides:
+  structure.bondLineWidth: 2.1
+  structure.monochrome: true
+  reaction.showConditionsBelowArrow: true
+  export.imageFormat: svg
+  export.dpi: 300
+```
+
+已实现 override path 与值约束：
+
+| path | 值约束 |
+| --- | --- |
+| `structure.bondLength` | number 大于 0 |
+| `structure.bondLineWidth` | number 大于 0 |
+| `structure.multipleBondOffset` | number 大于等于 0 |
+| `structure.hashSpacing` | number 大于等于 0 |
+| `structure.fontSize` | number 大于 0 |
+| `structure.atomLabelPadding` | number 大于等于 0 |
+| `structure.monochrome` | boolean |
+| `structure.backgroundColor` | hex color string |
+| `reaction.arrowLength` | number 大于 0 |
+| `reaction.componentGap` | number 大于等于 0 |
+| `reaction.plusGap` | number 大于等于 0 |
+| `reaction.showConditionsBelowArrow` | boolean |
+| `export.imageFormat` | `svg` 或 `png` |
+| `export.margin` | number 大于等于 0 |
+| `export.dpi` | number 大于 0 |
+| `export.transparentBackground` | boolean |
+
+profile 还会执行跨字段约束：`structure.bondLineWidth` 必须小于 `structure.bondLength`，`reaction.plusGap` 必须小于等于 `reaction.componentGap`，`structure.atomLabelPadding` 必须小于等于 `structure.fontSize * 0.5`。PNG 导出要求 `export.dpi` 大于等于 150。
+
+## frontmatter 解析与诊断规则
+
+frontmatter root 必须为 YAML mapping。顶层非 mapping、非法 YAML 行、block scalar、隐式多行 scalar、非法 key、非法 tags 数组、非法 `render_overrides` path、未知 render override path 和非法 override 值都会进入诊断集合。
+
+常见诊断：
+
+| 诊断码 | 触发条件 |
+| --- | --- |
+| `E_MISSING_REQUIRED_FRONTMATTER_KEY` | 缺少 `id`、`title` 或 `date` |
+| `W_DUPLICATE_FRONTMATTER_KEY` | 同一 key 重复出现 |
+| `W_INVALID_FRONTMATTER_LINE` | YAML sanitizer 识别到非法行 |
+| `E_INVALID_FRONTMATTER_VALUE` | 值类型、嵌套形状或 block scalar 无效 |
+| `W_NON_ISO_FRONTMATTER_DATE` | 日期格式未匹配 ISO 日期 |
+| `W_INVALID_FRONTMATTER_DATE_VALUE` | 日期格式正确但日历值无效 |
+| `E_INVALID_PRIMARY_REFERENCE` | primary 字段目标对象不存在 |
+
+诊断位置从 frontmatter 起始 `---` 后计算，并携带源码行列 span。下游工具可用 span 定位到原文 key 或 value。
+
+

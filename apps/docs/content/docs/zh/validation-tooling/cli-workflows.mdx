@@ -1,0 +1,126 @@
+---
+title: CLI 与验证工作流
+description: validate、export、graph、diff、changed、repair 和 agent-loop 的实现级说明。
+---
+
+
+仓库根目录通过 `pnpm chemd` 暴露 CLI。常用命令直接作用于 `.chemd` 源文件。
+
+## `pnpm chemd validate`
+
+`validate` 接收一个或多个 `.chemd` 文件。每个文件通过 `compileChemd` 编译，并传入 `strictChemdKind: true`。无 error 时输出 `file: ok`；存在 error 时返回退出码 1。CLI 退出码约定为：0 成功，1 validation failed，2 usage error。
+
+```text
+pnpm chemd validate experiment.chemd
+pnpm chemd validate experiments/*.chemd
+```
+
+strict 模式会把省略 `kind` 的 `:::chemd` 标记为 `W_CHEMD_KIND_AMBIGUOUS`，便于使用者显式确认 molecule 或 reaction。
+
+为了获得高质量下游导出，建议显式维护这些关系：
+
+- `primary_reaction` 和 `primary_result`。
+- `result.reaction`，或 reaction 形态的 `result.ref`。
+- `analysis.ref`、`procedure.ref`、`sample.derived_from` 和 `artifact.ref`。
+- 条件筛选中的 `condition`、`varN` 和 `resN`。
+
+## `pnpm chemd export --format json`
+
+`export` 接收单个文件，并要求显式传入 `--format`。如果编译结果包含 error，CLI 不输出 payload，并以 validation failed 退出。`json` 格式来自 `result.json`，也就是 renderer JSON 输出，包含解析后的文档和 typed graph。
+
+```text
+pnpm chemd export experiment.chemd --format json
+```
+
+## `--format rag`
+
+`rag` 输出 `ChemdRagExportV1`。compiler 先构建 training full export，再调用 `buildRagExportFromTrainingRecord` 生成 retrieval chunks。该格式面向检索、问答和 workspace RAG backfill。
+
+```text
+pnpm chemd export experiment.chemd --format rag
+```
+
+## `--format training`
+
+`training` 输出 training understanding。`training-full` 输出 `ChemdTrainingExportV2`。`lnf` 输出 canonical LNF。三者对应的用途不同：
+
+| format | 输出来源 | 用途 |
+| --- | --- | --- |
+| `lnf` | `result.lnf` | 规范化中间表示 |
+| `training` | `result.trainingUnderstanding` | 训练与图索引摘要 |
+| `training-full` | `result.trainingExport` | 完整训练记录与 audit 数据 |
+
+## `pnpm chemd graph`
+
+`graph` 接收多个文件。CLI 逐个编译文件，提取 training understanding，然后调用 `buildTrainingGraphIndexFromUnderstandings`。至少需要一个输入文件。输出格式支持 `text` 与 `json`。
+
+```text
+pnpm chemd graph exp-a.chemd exp-b.chemd --format json
+```
+
+graph index schema version 为 `chemd-training-graph-index/v0.1`。输出包含 document sources、entity、relation、route、evidence 和 warning 相关索引数据。
+
+## `pnpm chemd diff`
+
+`diff` 接收 before 与 after 两个文件。两侧文件先编译，再由 semantic diff 比较显式 ID 对象。生成 ID 对象不参与比较。比较排除内部字段 `type`、`id`、`syntaxOrigin` 和 `declaredKind`。输出 schema version 为 `chemd-semantic-diff/v0.1`。
+
+```text
+pnpm chemd diff before.chemd after.chemd --format json
+```
+
+diff 会遍历顶层对象、`col.children` 和 template body，适合审阅反应字段、结果字段、样品字段和过程结构变化。
+
+## `pnpm chemd repair`
+
+`repair` 运行 deterministic repair loop。默认最大迭代次数为 5，可通过 `--max-iterations` 调整。输出 schema version 为 `chemd-repair/v0.1`。`--write` 只在修复后 diagnosis 为 clean 且源码变化时写回原文件。
+
+```text
+pnpm chemd repair experiment.chemd --format json
+pnpm chemd repair experiment.chemd --write
+```
+
+repair loop 仅应用 safe fixes，主要覆盖 `insert_chemd_kind` 和 `apply_authoring_patch`。需要使用者补充事实的诊断会保留为 required input 或 manual review。
+
+## `pnpm chemd agent-loop`
+
+`agent-loop` 要求 `--driver <cmd>`。CLI 先运行 repair loop，再将源码、diagnosis 和迭代历史交给外部 driver。driver 可返回 `rewrite` 或 `stop`。输出 schema version 为 `chemd-agent-loop/v0.1`。
+
+```text
+pnpm chemd agent-loop experiment.chemd --driver node --driver-arg ./repair-driver.mjs --format json
+```
+
+可用选项包含 `--max-iterations`、`--max-repair-iterations`、`--driver-arg`、`--format` 和 `--write`。停止原因覆盖 clean、max iterations、repair max iterations、repair stalled、agent stalled 和 diagnosis status。
+
+## 推荐本地校验顺序
+
+单使用者工作流：
+
+1. `pnpm chemd validate file.chemd`
+2. `pnpm chemd export file.chemd --format json`
+3. `pnpm chemd export file.chemd --format rag`
+
+多文档路线工作流：
+
+1. `pnpm chemd validate file-a.chemd file-b.chemd`
+2. `pnpm chemd graph file-a.chemd file-b.chemd --format json`
+3. `pnpm chemd diff before.chemd after.chemd --format json`
+
+自动修复工作流：
+
+1. `pnpm chemd repair file.chemd --format json`
+2. 审阅 safe fixes 与 manual review items
+3. `pnpm chemd repair file.chemd --write`
+4. `pnpm chemd validate file.chemd`
+
+## `pnpm chemd changed`
+
+`changed` 根据 git diff 与 untracked 文件列出变更的 Chemd 文件，面向 `.chemd` 源文件。默认 base 为 `HEAD`，可通过 `--base <ref>` 修改。输出 schema version 为 `chemd-changed/v0.1`，格式支持 `text` 与 `json`。
+
+```text
+pnpm chemd changed --format json
+pnpm chemd changed --base origin/main --format text
+```
+
+已删除文件跳过验证。新增文件和 untracked 文件只输出验证结果，语义 diff 标记为 new file。已修改文件会读取 base ref 中的旧版本，并生成 semantic diff。该命令用于 CI、pre-commit 和批量验证入口。
+
+

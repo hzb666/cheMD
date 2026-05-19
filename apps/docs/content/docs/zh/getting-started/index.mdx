@@ -1,0 +1,54 @@
+---
+title: 入门
+description: Chemd 使用手册的起点，覆盖文档模型、文件扩展名、最小可验证文档和当前语言面。
+---
+
+这一组章节建立 Chemd 源文件的基本模型。使用者应先确认文档边界、frontmatter 职责、正文与结构化块关系，再进入字段和诊断细节。
+
+## 章节
+
+- [Chemd 语言总览](/zh/docs/getting-started/language-overview)：文件扩展名、使用者输入层、AST 层、编译输出层和实现支持范围。
+- [Chemd 源文件模型](/zh/docs/getting-started/document-model)：记录级元数据、对象节点、行内引用、模板节点和编译结果之间的关系。
+
+## 推荐起始样例
+
+```md validate
+---
+id: exp-minimal
+title: Minimal Chemd experiment
+date: 2026-04-24
+primary_reaction: rxn-main
+primary_result: res-main
+---
+
+:::chemd #mol-a
+kind: molecule
+name: substrate A
+smiles: CCO
+:::
+
+:::chemd #mol-b
+kind: molecule
+name: product B
+smiles: CC=O
+:::
+
+:::chemd #rxn-main
+kind: reaction
+reactants: @mol-a
+products: @mol-b
+temperature: 25 C
+time: 1 h
+:::
+
+:::result #res-main
+ref: rxn-main
+product: @mol-b
+status: success
+yield: 65%
+:::
+```
+
+该样例覆盖当前 resolver 的核心必填项：文档 `id`、`title`、`date`，molecule 的 `smiles`，reaction 的 `reactants` 与 `products`。
+
+

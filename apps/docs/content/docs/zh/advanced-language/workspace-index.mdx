@@ -1,0 +1,69 @@
+---
+title: 工作区符号索引
+description: Chemd 如何为编辑器和工作区工具构建多文档符号、引用索引。
+---
+
+工作区索引是编译结果之上的工具层，适用于编辑器功能、跨文件引用诊断、跳转导航和工作区级符号列表。
+
+## 输入模型
+
+每个 workspace document 提供 URI、source 文本，以及可选的 path 或 metadata。默认编译器是带有 `strictChemdKind: true` 的 `compileChemdForEditor`。
+
+```ts
+import { buildWorkspaceSymbolIndex } from "@chemd/workspace-index";
+
+const index = buildWorkspaceSymbolIndex([
+  {
+    uri: "file:///workspace/a.chemd",
+    path: "a.chemd",
+    source
+  }
+]);
+```
+
+输出版本为 `chemd-workspace-symbol-index/v0.1`。
+
+## Symbol ID
+
+Chemd 本地对象 ID 只在单个文档内有作用域。workspace index 会把它们扩展为全局可寻址形式：
+
+```text
+<documentUri>#<localId>
+```
+
+如果多个 symbol 会生成同一个 workspace symbol ID，后续项会追加 `~N` 后缀。symbol 同时带有 `duplicateLocalId`，编辑器界面可据此提示重复 ID，而不用从字符串形态推断。
+
+## 引用解析
+
+索引会从每个 source document 提取引用候选，并根据收集到的 symbols 解析引用。编译失败不会阻止候选提取；失败文档会标记为 `status: "failed"`，并附带诊断。
+
+这让索引适合不完全有效的工作区。使用者修复文件时，编辑器仍可展示已有 symbol 和未解析引用诊断。
+
+## 确定性
+
+输出前会对 documents、symbols 和 diagnostics 排序。索引还会为每个文档记录 source hash，调用方可在不重新读取原文的情况下判断文档是否变化。
+
+## 推荐实践示例
+
+workspace tooling 应为每个打开的 `.chemd` 或兼容 `.chemd.md` 源文件提供稳定 URI。局部 ID 可以跨文件重复，因为 workspace index 会按 document URI 建立作用域。
+
+```ts
+import { buildWorkspaceSymbolIndex } from "@chemd/workspace-index";
+
+const index = buildWorkspaceSymbolIndex([
+  {
+    uri: "file:///workspace/route-a/step-1.chemd",
+    path: "route-a/step-1.chemd",
+    source: stepOneSource
+  },
+  {
+    uri: "file:///workspace/route-a/step-2.chemd",
+    path: "route-a/step-2.chemd",
+    source: stepTwoSource
+  }
+]);
+
+const unresolved = index.references.filter((reference) => reference.status === "unresolved");
+```
+
+URI 生成应保持确定性。编辑器跳转、重复 ID 提示和 unresolved reference 诊断都依赖稳定的 document identity。

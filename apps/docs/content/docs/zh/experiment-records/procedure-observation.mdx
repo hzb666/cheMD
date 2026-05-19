@@ -1,0 +1,130 @@
+---
+title: 实验过程与观察
+description: '`:::procedure`、显式 step、过程 lowering、`:::observation` 和事件链接。'
+---
+
+
+## `:::procedure` 过程块
+
+`:::procedure` 生成 `ProcedureNode`。块头 ID 作为 procedure ID。顶层字段包括 `ref`、`reaction` 和 `evidence`。普通正文保存在 `body`，显式步骤保存在 `steps`，嵌套 Markdown 或结构化内容保存在 `children`。
+
+```md
+:::procedure #proc-main
+reaction: @rxn-main
+evidence: labnote-page-12
+
+step: charge | id=s-charge | inputs=@mol-aryl,@mol-boron | outputs=mixture-a
+step: heat | id=s-heat | temperature=90 C | duration=12 h | dependsOn=s-charge
+step: analyze | id=s-tlc | analysisType=tlc | dependsOn=s-heat
+:::
+```
+
+编译选项 `procedureMode` 控制语义化路径：`auto` 优先使用显式 step，缺少显式 step 时对正文做 lowering；`explicit` 要求存在显式 step；`lowered` 总是从正文 lowering。
+
+## 行内 `step:` 语法
+
+行内 step 使用 `step: family | key=value`。第一个非参数段作为 `family`。`id` 或 `step_id` 设置 `stepId`。结构键包括 `id`、`step_id`、`family`、`inputs`、`outputs`、`depends_on`、`dependsOn`、`stage`、`purpose`、`evidence` 和 `confidence`。
+
+非结构键全部写入 `params`，随后由 typechecker 按 step family 做数量解析、引用解析和参数校验。`inputs`、`outputs`、`dependsOn` 与 `evidence` 使用逗号分隔。`confidence` 仅在可解析为有限数字时写入。
+
+## nested `:::step` 语法
+
+procedure 内部支持嵌套 `:::step`。块头 `#id` 可作为 step ID，字段 `family` 必须提供。嵌套 step 的结构键与行内 step 相同，普通字段进入 `params`。
+
+```md
+:::procedure #proc-workup
+reaction: @rxn-main
+
+:::step #s-quench
+family: quench
+stage: workup
+reagent: NH4Cl(aq)
+temperature: 0 C
+:::
+:::
+```
+
+显式 step 生成 canonical step 时会附带 provenance：source node type 为 `procedure`，source type 为 `explicit_step`，raw text 保留原始 step 片段或块字段。
+
+## step 的 `inputs`、`outputs`、`dependsOn`
+
+`inputs` 与 `outputs` 通过 `step-references` 解析。若 object index 可用，局部对象或 external target 可被解析为 typed reference；无法解析的 bare value 保留 raw 值。`dependsOn` 要求目标 step ID 存在，并参与循环检测。
+
+显式 step family 集合：
+
+`charge`、`add`、`transfer`、`mix`、`cool`、`heat`、`hold`、`purge`、`quench`、`extract`、`wash`、`separate_layers`、`filter`、`dry`、`concentrate`、`purify`、`sample`、`analyze`、`observe`、`store`。
+
+参数校验规则：
+
+| family | 规则 |
+| --- | --- |
+| `heat` | 需要 `temperature`、`target_temperature` 或 `duration` |
+| `cool` | 需要 `temperature`、`target_temperature` 或 `method` |
+| `analyze` | 需要 `analysisType`、`analysis_type` 或 `type` |
+| `extract` | 需要 `solvent` |
+| `filter` | 只允许 `medium` 与 `wash` |
+| `purge` | 缺少 `atmosphere` 时默认写入 `nitrogen` |
+
+## `evidence` 与 `confidence`
+
+procedure 顶层 `evidence` 表达过程块的证据来源。step 级 `evidence` 保存为字符串数组，用于 step graph 的证据边。`confidence` 表达显式 step 的使用者置信度；缺省时 typechecker 对显式 step 使用 1。
+
+step 参数中的数量字段会进入统一数量解析：`amount`、`mass`、`volume`、`temperature`、`target_temperature`、`duration`、`time`、`pressure`、`concentration`、`equivalent`、`equivalents` 和 `percent`。
+
+## `:::observation` 观察块
+
+`:::observation` 生成 `ObservationNode`。顶层字段当前为 `ref`。普通正文保存在 `body`，显式事件保存在 `events`，嵌套 Markdown 或结构化内容保存在 `children`。
+
+```md
+:::observation #obs-main
+ref: @proc-main
+event: color_change | id=e-color | value=yellow | linkedStep=s-heat | confidence=0.8
+event: gas_evolution | id=e-gas | severity=moderate | linked_step=s-quench
+:::
+```
+
+## 行内 `event:` 语法
+
+事件使用 `event: event_type | key=value`。结构键包括 `id`、`event_id`、`type`、`eventType`、`event_type`、`stage`、`timepoint`、`severity`、`linked_step`、`linkedStep`、`evidence` 和 `confidence`。非结构键进入 `params`。
+
+已实现显式 event type：
+
+| event type | 用途 |
+| --- | --- |
+| `color_change` | 颜色变化 |
+| `precipitation` | 沉淀出现 |
+| `gas_evolution` | 气体产生 |
+| `phase_change` | 相态变化 |
+
+显式 event 的 `value`、`color` 或 `state` 会写入 normalized value。未知 event type 产生 `E_OBSERVATION_EVENT_INVALID_TYPE`。
+
+## event 与 step 的关联
+
+event 通过 `linkedStep` 或 `linked_step` 写入 `linkedStepId`。typechecker 在所有 procedure step 完成后校验链接目标。目标不存在时产生 `E_OBSERVATION_LINKED_STEP_MISSING`。公开 step graph 保存 observation records 和 diagnostics；export/training 层可基于已校验事件链接物化 `event_observed_step` 关系。
+
+正文 lowering 由 `@chemd/step-ontology` 执行。procedure lowering 可识别 charge、purge、cool、heat、quench、add、hold、extract、dry、concentrate、separate_layers、filter、sample、analyze 和 observe 等句式；observation lowering 可识别 color change、precipitation 和 gas evolution 等事件。lowering 会产生 warning，用于提示该语义来自正文推断。
+
+## 推荐实践示例
+
+需要稳定 graph、runtime preflight 或 evidence export 时，procedure 使用显式 step，observation 使用显式 event，并通过 `linkedStep` 连接。
+
+```md
+:::procedure #proc-main
+reaction: rxn-main
+evidence: notebook-p12
+step: charge | id=s-charge | inputs=@mol-substrate | outputs=mixture-a
+step: heat | id=s-heat | temperature=60 C | duration=3 h | dependsOn=s-charge
+step: analyze | id=s-tlc | analysisType=tlc | dependsOn=s-heat
+:::
+
+:::observation #obs-main
+ref: rxn-main
+event: color_change | id=e-color | stage=reaction | linkedStep=s-heat | color=yellow | evidence=photo-1
+event: gas_evolution | id=e-gas | severity=low | linkedStep=s-charge
+Mixture became yellow during heating.
+:::
+```
+
+正文可保留实验叙述。需要被工具稳定消费的步骤、依赖和观察事件应写成结构化字段。
+
+

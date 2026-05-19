@@ -1,0 +1,106 @@
+---
+title: Diagnostic Code Reference
+description: Quick reference for common Chemd parser, resolver, typechecker, compiler, and runtime diagnostics.
+---
+
+The following reference lists common diagnostics by source and purpose. Use it to identify whether a problem comes from parsing, reference resolution, semantic validation, compilation, or runtime preparation.
+
+## Syntax and Frontmatter
+
+| Code | Meaning |
+| --- | --- |
+| `E_MISSING_REQUIRED_FRONTMATTER_KEY` | Missing `id`, `title`, or `date` |
+| `E_INVALID_FRONTMATTER_VALUE` | Invalid frontmatter value type or structure |
+| `W_DUPLICATE_FRONTMATTER_KEY` | Duplicate frontmatter key |
+| `W_NON_ISO_FRONTMATTER_DATE` | Date does not match `YYYY-MM-DD` |
+| `W_INVALID_FRONTMATTER_DATE_VALUE` | Date shape is valid but calendar value is invalid |
+| `W_INVALID_FRONTMATTER_LINE` | Frontmatter line cannot be parsed |
+| `E_INVALID_ID` | Block ID violates the ID rule |
+| `W_LEGACY_BLOCK_KIND` | Legacy `:::molecule` or `:::reaction` surface is detected |
+| `W_UNKNOWN_BLOCK` | Block type is not implemented |
+| `W_UNTERMINATED_BLOCK` | Structured block is not closed |
+| `W_UNKNOWN_FIELD` | Field is outside the allowed set for the block |
+| `E_INVALID_LIST_ITEM` | List field contains an empty item |
+| `W_UNSAFE_LINK_HREF` | Markdown link href fails the safe-href policy |
+
+## `:::chemd`
+
+| Code | Meaning |
+| --- | --- |
+| `W_CHEMD_KIND_INFERRED` | `kind` omitted and inferred from fields |
+| `W_CHEMD_KIND_AMBIGUOUS` | `kind` omitted under strict mode |
+| `E_CHEMD_KIND_CONFLICT` | Invalid `kind` or conflict between declared kind and field shape |
+| `W_INVALID_CHEMD_IMPLICIT_VALUE` | Invalid implicit molecule SMILES body |
+
+## Resolver
+
+| Code | Meaning |
+| --- | --- |
+| `E_DUPLICATE_ID` | Duplicate object ID |
+| `E_DUPLICATE_TEMPLATE` | Duplicate template name |
+| `E_MISSING_REQUIRED_FIELD` | Missing resolver-required object field |
+| `W_UNRESOLVED_REFERENCE` | Reference target or field cannot be resolved |
+| `E_INVALID_PRIMARY_REFERENCE` | `primary_*` points to a missing object |
+| `E_UNKNOWN_TEMPLATE` | `:::use` references a missing template |
+| `E_TEMPLATE_CYCLE` | Recursive template expansion |
+| `E_TEMPLATE_EXPANSION_LIMIT` | Template expansion exceeds depth or node limits |
+| `E_TEMPLATE_PARAM_MISSING` | Template call is missing a parameter |
+| `E_TEMPLATE_PARAM_TYPE_MISMATCH` | Template parameter type mismatch |
+
+## Typechecker
+
+| Code | Meaning |
+| --- | --- |
+| `E306` | Invalid result `status` value |
+| `E401` | Unit is invalid for the target quantity class |
+| `E402` | Percent quantity is outside 0 to 100 |
+| `E403` | Quantity cannot be parsed for the target class |
+| `E301` | v0.3 missing required field diagnostic |
+| `E_TYPED_REFERENCE_MISMATCH` | Reference target type mismatch |
+| `E_RESULT_REACTION_CONFLICT` | Result conflicts with linked reaction fields |
+| `E_DERIVED_EXPRESSION_INVALID` | Invalid derived expression |
+| `W_REACTION_ROUTE_MISMATCH` | Previous reaction route mismatch |
+| `E_REACTION_ROUTE_CYCLE` | Reaction route cycle |
+| `W_REACTION_ROUTE_ORPHAN` | Isolated reaction inside a route |
+
+## Procedure and Observation
+
+| Code | Meaning |
+| --- | --- |
+| `E_STEP_INVALID_FAMILY` | Step family is not implemented |
+| `E_STEP_MISSING_FIELD` | Required step structure field is missing |
+| `E_STEP_PARAM_MISSING` | Required step family parameter is missing |
+| `E_STEP_PARAM_INVALID` | Step family rejects the parameter |
+| `E_STEP_ID_DUPLICATE` | Duplicate step ID |
+| `E_STEP_INVALID_REFERENCE` | `dependsOn` points to a missing step |
+| `E_STEP_DEPENDENCY_CYCLE` | Step dependency graph contains a cycle |
+| `E_OBSERVATION_EVENT_INVALID_TYPE` | Event type is not implemented |
+| `E_OBSERVATION_LINKED_STEP_MISSING` | Event points to a missing step |
+| `E501` | Procedure lowering failed |
+| `E504` | Analysis step is unbound |
+| `E505` | Observation stage is ambiguous |
+| `W_PROCEDURE_PROSE_LOWERED` | Procedure prose lowered heuristically into steps |
+| `W_OBSERVATION_PROSE_LOWERED` | Observation prose lowered heuristically into events |
+| `W805` | Low-confidence step extraction |
+| `W806` | Observation prose could be represented as structured events |
+| `I903` | Procedure lowering completed successfully |
+
+## Layout, Input Assistance, and Runtime
+
+| Code | Meaning |
+| --- | --- |
+| `W_INVALID_COL_COLUMNS` | Invalid `:::col` column count |
+| `W_COL_COUNT_MISMATCH` | `col:` child count differs from column count |
+| `W_INVALID_COL_CHILD` | Invalid child line inside `:::col` |
+| `W_UNTERMINATED_BRACE_BLOCK` | `col: { ... }` content is not closed |
+| `W_AUTHORING_FIX_AVAILABLE` | Compiler can provide a safe repair suggestion |
+| `W_AUTHORING_INPUT_REQUIRED` | Repair requires user input |
+| `E605` | Runtime capability is required but missing |
+| `E701` | Run plan build failed |
+| `E_RUNTIME_UNKNOWN_STEP` | Runtime step is unknown |
+| `E_RUNTIME_STEP_NOT_READY` | Runtime step is not ready to execute |
+
+## Repair Order
+
+Fix errors before warnings. A stable order is frontmatter, block IDs, unknown fields, required fields, references, template parameters, quantities, step dependencies, and route graph diagnostics.
+

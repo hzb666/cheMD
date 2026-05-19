@@ -1,0 +1,110 @@
+---
+title: 语法别名对照
+description: Chemd 字段别名、行内别名和可接受的简写字段。
+---
+
+本页列出当前 Chemd parser 与 resolver 接受的字段别名和简写。新文档建议优先使用规范字段；紧凑写作场景可使用已实现的简写。
+
+## Reaction 字段别名
+
+| 别名或简写 | 规范字段 | 适用位置 | 说明 |
+| --- | --- | --- | --- |
+| `reactants` | `reactants` | `:::chemd` reaction | 反应物列表规范字段。 |
+| `reactant` | `reactants` | `:::chemd` reaction | 反应物列表的单数简写。 |
+| `reac` | `reactants` | `:::chemd` reaction | 紧凑简写。读取优先级高于 `reactant` 和 `reactants`。 |
+| `products` | `products` | `:::chemd` reaction | 产物列表规范字段。 |
+| `product` | `products` | `:::chemd` reaction | 产物列表的单数简写。 |
+| `prod` | `products` | `:::chemd` reaction | 紧凑简写。读取优先级高于 `product` 和 `products`。 |
+
+```md
+:::chemd #rxn-main
+kind: reaction
+reac: @mol-a | @mol-b
+prod: @mol-c
+:::
+```
+
+## Primary 行内别名
+
+Primary 行内别名通过 frontmatter 的 `primary_*` 字段解析。它们只在带字段名时有效。
+
+| 行内别名 | Frontmatter 来源 | 示例 |
+| --- | --- | --- |
+| `@reaction.field` | `primary_reaction` | `@reaction.solvent` |
+| `@result.field` | `primary_result` | `@result.yield` |
+| `@product.field` | `primary_product` | `@product.name` |
+| `@sample.field` | `primary_sample` | `@sample.purity` |
+| `@molecule.field` | `primary_molecule` | `@molecule.smiles` |
+| `@analysis.field` | `primary_analysis` | `@analysis.data` |
+
+```md
+---
+primary_reaction: rxn-main
+primary_result: res-main
+---
+
+The primary reaction used @reaction.solvent and gave @result.yield.
+```
+
+## Result 与条件筛选别名
+
+| 别名或简写 | 规范含义 | 适用位置 | 说明 |
+| --- | --- | --- | --- |
+| `ref` | reaction association | `:::result` | 当 `reaction` 缺省时，作为 reaction link 处理。 |
+| `reaction` | reaction association | `:::result` | 显式 reaction link；需要关系清晰时推荐使用。 |
+| `ref` | attempt reaction | `:::condition-varies` 的 `varN` | 在 attempt 片段中等价于 `reaction`。 |
+| 第一个裸 segment | attempt reaction | `:::condition-varies` 的 `varN` | `var1: rxn-a | solvent=MeCN` 会把 `var1` 关联到 `rxn-a`。 |
+| `res` | attempt result | `:::condition-varies` 的 `varN` | 在 attempt 片段中等价于 `result`。 |
+| `resN` | attempt result | `:::condition-varies` 顶层字段 | `res1` 会把 result 关联到 `var1`。 |
+| `note` / `notes` | attempt note | `:::condition-varies` 的 `varN` | 两种写法都会写入 attempt note。 |
+| `noteN` | attempt note | `:::condition-varies` 顶层字段 | `note1` 会把 note 关联到 `var1`。 |
+| `full` / `replace` | `override` mode | `:::condition-varies` 的 `varN` | 这些 mode 值会归一化为 override 行为。 |
+
+```md
+:::condition-varies #screen-main
+standard: rxn-standard
+condition: solvent=MeCN | temperature=40 C
+var1: rxn-var1 | solvent=DMF | res=res-var1 | note=cleaner profile
+res2: res-var2
+note2: trace product by TLC
+var2: reaction=rxn-var2 | mode=replace | temperature=60 C
+:::
+```
+
+## Procedure 与 Observation 别名
+
+| 别名 | 规范字段 | 适用位置 | 说明 |
+| --- | --- | --- | --- |
+| `step_id` | `id` | `step:` 与嵌套 `:::step` | 设置显式 step ID。 |
+| `depends_on` | `dependsOn` | `step:` 与嵌套 `:::step` | 接受逗号分隔的依赖 step ID。 |
+| `event_id` | `id` | `event:` 与嵌套 `:::event` | 设置显式 event ID。 |
+| `event_type` / `type` | `eventType` | `event:` 与嵌套 `:::event` | 设置 event type。 |
+| `linked_step` | `linkedStep` | `event:` 与嵌套 `:::event` | 把 event 关联到 step ID。 |
+
+```md
+:::procedure #proc-main
+step: add | step_id=s-add | inputs=@mol-a | outputs=@mol-b
+step: analyze | id=s-tlc | depends_on=s-add
+:::
+
+:::observation #obs-main
+event: color-change | event_id=e-color | linked_step=s-add
+event: event_type=tlc-check | id=e-tlc | linkedStep=s-tlc
+:::
+```
+
+## Template Bind 别名
+
+模板 `bind` 是使用者自定义别名。它可以指向对象 ID 或 primary frontmatter 字段，`:::use` 可通过同名字段覆盖绑定值。
+
+```md
+:::template reaction-summary
+bind: rxn=primary_reaction | res=primary_result
+Reaction @rxn.name gave @res.yield.
+:::
+
+:::use reaction-summary
+rxn: rxn-variant
+res: res-variant
+:::
+```

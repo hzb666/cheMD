@@ -1,0 +1,77 @@
+---
+title: '`:::condition-varies` Condition Screening Block'
+description: '`:::condition-varies` represents standard conditions, varied fields, candidate attempts, results, and notes.'
+---
+
+`:::condition-varies` accepts arbitrary condition fields. Fixed meta fields are `reaction`, `standard`, `condition`, `varies`, and `notes`.
+
+## Single Delta Form
+
+```md
+:::condition-varies #cv-solvent
+reaction: rxn-variant
+standard: rxn-standard
+solvent: THF -> MeCN
+temperature: 25 C -> 40 C
+notes: solvent and temperature screen
+:::
+```
+
+`field: A -> B` and `field: A => B` produce deltas. A field without an arrow stores only the raw value.
+
+## Parallel Attempt Form
+
+```md
+:::condition-varies #cv-screen
+standard: rxn-standard
+condition: solvent=THF | temperature=25 C | catalyst=Pd
+varies: solvent | temperature
+var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
+res1: res-var1
+note1: higher yield, minor impurity
+var2: reaction=rxn-var2 | mode=override | solvent=DMSO | temperature=60 C | catalyst=Ni
+res2: res-var2
+note2: trace product by TLC
+:::
+```
+
+## Fields
+
+| field | notes |
+| --- | --- |
+| `reaction` | reaction linked to the variation |
+| `standard` | standard reaction |
+| `condition` | baseline condition, `field=value | field=value` |
+| `varies` | varied field list |
+| `notes` | notes |
+| `varN` | attempt N, where N is numeric |
+| `resN` | result for attempt N |
+| `noteN` | note for attempt N |
+| other fields | top-level condition deltas |
+
+Inside `varN`, supported meta fields are `id`, `reaction`, `ref`, `result`, `res`, `note`, `notes`, and `mode`; other assignments become condition changes. `mode=override`, `mode=full`, and `mode=replace` normalize to `override`; other modes are `partial`. A `partial` attempt inherits unchanged baseline fields from `condition`.
+
+## Required Fields and Defaults
+
+The block has no resolver-required fields. Attempt ID defaults to `varN`. A `partial` attempt expands unchanged baseline fields into attempt condition with candidate equal to baseline.
+
+## Recommended Practice
+
+Condition screens should declare the standard reaction, each variation reaction, and each result explicitly. `varies` should contain only the dimensions compared in the screen.
+
+```md
+:::condition-varies #cv-base-screen
+standard: rxn-standard
+condition: solvent=THF | temperature=25 C | base=K2CO3 | catalyst=Pd(PPh3)4
+varies: solvent | temperature
+var1: id=screen-meCN-40 | reaction=rxn-meCN-40 | solvent=MeCN | temperature=40 C
+res1: res-meCN-40
+note1: best conversion in first pass
+var2: id=screen-dioxane-90 | reaction=rxn-dioxane-90 | solvent=dioxane/water | temperature=90 C
+res2: res-dioxane-90
+:::
+```
+
+## Diagnostics
+
+The parser accepts arbitrary condition fields in `condition-varies`, so condition names do not produce `W_UNKNOWN_FIELD`. Invalid IDs still produce `E_INVALID_ID`. Reference semantics are handled by the typechecker and export layers.

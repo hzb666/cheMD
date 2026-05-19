@@ -1,0 +1,92 @@
+---
+title: Chemd Language Manual
+description: English manual for Chemd users, tool developers, and data engineers.
+---
+
+Chemd source files use the `.chemd` extension. The source format is Markdown prose plus structured `:::` blocks for chemistry objects, results, procedures, observations, samples, artifacts, and condition screens.
+
+This manual describes the syntax and workflows available to Chemd users.
+
+## Reading Order
+
+The language manual serves Chemd users. The codebase guide serves contributors and integration developers.
+
+1. [Getting Started](/en/docs/getting-started)
+2. [Language Fundamentals](/en/docs/language-fundamentals)
+3. [Structured Block Reference](/en/docs/syntax-blocks)
+4. [Experiment Record Modeling](/en/docs/experiment-records)
+5. [Advanced Language Features](/en/docs/advanced-language)
+6. [Validation, Diagnostics, and Tooling](/en/docs/validation-tooling)
+7. [Codebase Guide](/en/docs/codebase)
+8. [Appendix](/en/docs/appendix)
+
+Users should read Getting Started and Language Fundamentals before using the block reference. Complete experiment records build on Experiment Record Modeling and Advanced Language Features. Tooling and language extension work belongs with Validation Tooling and the Codebase Guide.
+
+## Navigation Model
+
+| Goal | Read |
+| --- | --- |
+| Write the first valid source file | Getting Started, then Language Fundamentals |
+| Check a block field or default | Structured Block Reference |
+| Model a real experiment | Experiment Record Modeling |
+| Use templates, references, expressions, layout, or workspace semantics | Advanced Language Features |
+| Validate, export, repair, or inspect diagnostics | Validation, Diagnostics, and Tooling |
+| Extend the implementation or integrate tooling | Codebase Guide |
+| Look up aliases, units, and diagnostic codes | Appendix |
+
+The language chapters form the primary path. The codebase guide is a separate implementation path and should be read after the language behavior is clear.
+
+## Minimal Document
+
+```md
+---
+id: exp-one-step-esterification
+title: Standard Fischer esterification
+date: 2026-04-24
+primary_reaction: rxn-main
+primary_result: res-main
+---
+
+:::chemd #mol-acid
+kind: molecule
+name: benzoic acid
+smiles: O=C(O)c1ccccc1
+role: substrate
+:::
+
+:::chemd #mol-alcohol
+kind: molecule
+name: ethanol
+smiles: CCO
+role: coupling_partner
+:::
+
+:::chemd #mol-product
+kind: molecule
+name: ethyl benzoate
+smiles: CCOC(=O)c1ccccc1
+role: product
+:::
+
+:::chemd #rxn-main
+kind: reaction
+name: Fischer esterification
+reactants: @mol-acid | @mol-alcohol
+products: @mol-product
+catalyst: H2SO4
+solvent: ethanol
+temperature: 78 C
+time: 4 h
+:::
+
+:::result #res-main
+ref: rxn-main
+product: @mol-product
+status: success
+yield: 76%
+purity: 95%
+:::
+```
+
+The example covers the core input model: document metadata, molecule objects, a reaction object, a result object, and primary references.
+

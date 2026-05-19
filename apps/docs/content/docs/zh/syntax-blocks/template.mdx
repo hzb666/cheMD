@@ -1,0 +1,73 @@
+---
+title: '`:::template` 模板块'
+description: '`:::template` 定义可复用内容，支持 bind、params、类型化参数和模板体展开。'
+---
+
+`:::template` 声明可复用内容。模板不会直接变成对象节点；`:::use` 调用时展开模板体。
+
+## 语法
+
+```md
+:::template reaction-summary
+description: standard reaction summary paragraph
+bind: reaction=primary_reaction | result=primary_result
+params:
+  - label: string
+  - sample: ref<sample>
+  - amount: quantity<amount>
+
+Reaction @reaction.name used @param.amount of material. Result @result.yield was recorded for @param.label.
+:::
+```
+
+## 字段
+
+| 字段 | 说明 |
+| --- | --- |
+| `description` | 模板说明 |
+| `bind` | alias 绑定，格式为 `alias=source | alias=source` |
+| `params` | 参数列表，可写成 `params: a | b` 或 YAML 风格项目 |
+| `body` | 允许字段名，但当前实现模板体由后续块内容解析，不读取 `body` 字段值 |
+
+## 参数类型
+
+| 类型 | 说明 |
+| --- | --- |
+| `string` | 默认类型；省略类型时使用 |
+| `ref<kind>` | 引用类型，kind 支持 `molecule`、`reaction`、`result`、`analysis`、`procedure`、`observation`、`sample`、`artifact`、`condition_varies` |
+| `quantity<class>` | 数量类型，class 支持 amount、mass、volume、temperature、time、pressure、concentration、equivalent、percent 等 resolver 单位集合 |
+| `quantity` | 任意受支持数量 |
+
+未知参数类型按 `string` 处理。非法参数名会被忽略。参数名必须以字母或 `_` 开头，后续允许字母、数字和 `_`。
+
+## 绑定与引用
+
+模板体中可以使用：
+
+| 引用 | 语义 |
+| --- | --- |
+| `@param.name` | 当前 `:::use` 传入参数 |
+| `@reaction.field` | `bind` 或 primary alias 解析出的对象字段 |
+| `@result.field` | 同上 |
+| `@id.field` | 普通对象字段 |
+| `@meta.field` | frontmatter 元数据 |
+
+## 展开限制
+
+resolver 限制模板展开深度为 32，展开节点总数为 2000。循环调用产生 `E_TEMPLATE_CYCLE`，未知模板产生 `E_UNKNOWN_TEMPLATE`。
+
+## 推荐实践案例
+
+模板适合保存重复写作结构。参数使用类型约束，引用类参数传入对象 ID 或 `@id`。
+
+```md
+:::template analytical-confirmation
+description: reusable analytical confirmation sentence
+bind: reaction=primary_reaction | result=primary_result
+params:
+  - sample: ref<sample>
+  - method: string
+
+The sample @param.sample was analyzed by @param.method. The result @result.yield is assigned to @reaction.name.
+:::
+```

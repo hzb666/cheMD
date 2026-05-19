@@ -1,0 +1,18 @@
+{
+  "title": "Syntax Blocks",
+  "pages": [
+    "chemd",
+    "result",
+    "analysis",
+    "procedure",
+    "step",
+    "observation",
+    "event",
+    "sample",
+    "artifact",
+    "condition-varies",
+    "template",
+    "use",
+    "col"
+  ]
+}

@@ -1,0 +1,80 @@
+---
+title: '`:::step` and `step:` Step Syntax'
+description: '`step` is nested procedure syntax with family, structural fields, parameters, dependencies, evidence, and confidence.'
+---
+
+`step` is not a top-level registered block. It is recognized by the `procedure` parser and is valid only inside `:::procedure`.
+
+## Two Forms
+
+```md
+step: heat | id=s-heat | temperature=65 C | duration=4 h
+```
+
+```md
+:::step #s-heat
+family: heat
+temperature: 65 C
+duration: 4 h
+:::
+```
+
+## Structural Fields
+
+| field | notes |
+| --- | --- |
+| `id` / `step_id` | step ID; nested blocks can also read it from `#id` |
+| `family` | step family |
+| `inputs` | input list separated by `,` or `|` |
+| `outputs` | output list separated by `,` or `|` |
+| `depends_on` / `dependsOn` | dependency step ID list |
+| `stage` | stage |
+| `purpose` | purpose |
+| `evidence` | evidence ID list |
+| `confidence` | numeric confidence |
+
+Other `key=value` segments or field lines become `params`. Quantity fields include `amount`, `mass`, `volume`, `temperature`, `target_temperature`, `duration`, `time`, `pressure`, `concentration`, `equivalent`, `equivalents`, and `percent`.
+
+Nested `:::step` blocks can read the ID from `#id` or from a bare header value. If no ID is supplied, the parser assigns `<procedure-id>:sN`.
+
+```md
+:::procedure #proc-main
+:::step s-charge
+family: charge
+inputs: @mol-substrate
+:::
+
+:::step
+family: heat
+temperature: 65 C
+:::
+:::
+```
+
+## Families
+
+The typechecker currently supports:
+
+`charge`, `add`, `transfer`, `mix`, `cool`, `heat`, `hold`, `purge`, `quench`, `extract`, `wash`, `separate_layers`, `filter`, `dry`, `concentrate`, `purify`, `sample`, `analyze`, `observe`, and `store`.
+
+`purge` adds default `atmosphere: nitrogen` when missing. `heat` requires one of `temperature`, `target_temperature`, or `duration`. `cool` requires one of `temperature`, `target_temperature`, or `method`. `analyze` requires one of `analysisType`, `analysis_type`, or `type`. `extract` requires `solvent`. `filter` only allows `medium` and `wash`.
+
+## Recommended Practice
+
+```md
+:::step #s-extract
+family: extract
+stage: workup
+dependsOn: s-quench
+inputs: crude-mixture
+outputs: organic-layer
+solvent: ethyl acetate
+volume: 20 mL
+evidence: notebook-p14
+confidence: 0.9
+:::
+```
+
+```md
+step: analyze | id=s-tlc | analysisType=tlc | dependsOn=s-heat | evidence=ana-tlc-main
+```

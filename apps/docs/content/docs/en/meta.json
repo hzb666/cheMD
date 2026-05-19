@@ -1,0 +1,14 @@
+{
+  "title": "Chemd Language Manual",
+  "pages": [
+    "index",
+    "getting-started",
+    "language-fundamentals",
+    "syntax-blocks",
+    "experiment-records",
+    "advanced-language",
+    "validation-tooling",
+    "codebase",
+    "appendix"
+  ]
+}

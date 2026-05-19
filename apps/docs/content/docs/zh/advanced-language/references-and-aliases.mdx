@@ -1,0 +1,128 @@
+---
+title: 引用、别名与字段访问
+description: Chemd 引用语法的完整使用说明，覆盖对象引用、字段引用、primary alias、metadata、模板参数和条件筛选 attempt。
+---
+
+Chemd 引用可出现在 Markdown 正文、结构化字段、模板体和布局块文本中。引用支持对象引用、字段访问、primary alias、metadata 访问和模板参数访问。
+
+## 对象引用
+
+对象引用写作 `@id`。`id` 必须以字母开头，后续允许字母、数字、下划线和连字符。resolver 使用对象索引查找目标节点。
+
+```md
+The reaction @rxn-main produced @mol-product.
+```
+
+结构化字段中也可使用对象引用。需要参与类型检查的引用应使用 `@id`，尤其是 reaction 的 `reactants`、`products`，result 的 `reaction`、`product`，sample 的 `artifacts`。
+
+```md
+:::result #res-main
+reaction: @rxn-main
+product: @mol-product
+status: success
+yield: 81%
+:::
+```
+
+## 字段引用
+
+字段引用写作 `@id.field`。resolver 从目标对象读取真实 AST 字段。字段名必须以字母开头，后续允许字母、数字、下划线和连字符。
+
+```md
+The main reaction used @rxn-main.solvent at @rxn-main.temperature.
+```
+
+字段引用适合生成叙述性文字。字段缺失或对象不存在时产生未解析引用诊断。
+
+## Primary Alias
+
+frontmatter 中的 `primary_*` 字段可为正文提供别名。当前实现支持 `@reaction.field`、`@result.field`、`@product.field`、`@sample.field`、`@molecule.field` 和 `@analysis.field` 等来源名。alias 指向的目标由 `primary_reaction`、`primary_result`、`primary_product` 等字段提供。
+
+```md
+---
+id: exp-primary
+title: Primary aliases
+date: 2026-04-24
+primary_reaction: rxn-main
+primary_result: res-main
+primary_product: mol-product
+---
+
+The primary reaction used @reaction.solvent and gave @result.yield of @product.name.
+```
+
+推荐在面向读者的正文中使用 primary alias，在结构化字段中保留显式 `@id`。这样可保持正文稳定，同时使对象关系清晰可查。
+
+## Metadata 引用
+
+`@meta.field` 引用 frontmatter 字段。该语法适合在正文中复用标题、日期、项目、使用者或状态等记录级元数据。
+
+```md
+Document @meta.id was recorded on @meta.date.
+```
+
+`@meta.field` 只读取当前文档 metadata。复杂对象值不会展开为结构化子字段。
+
+## 模板参数引用
+
+模板体中使用 `@param.name` 引用 `:::use` 调用传入的参数。参数名来自模板的 `params` 声明。
+
+```md
+:::template result-note
+params: sample: ref<sample> | method: string
+Sample @param.sample was analyzed by @param.method.
+:::
+
+:::use result-note
+sample: @sample-main
+method: HPLC
+:::
+```
+
+模板展开后，参数值替换到模板体中。`ref<kind>` 与 `quantity<class>` 参数会先执行类型校验。
+
+## 条件筛选 Attempt 引用
+
+`:::condition-varies` 生成的 attempt 可通过 `@screen.var1` 形式引用。attempt 字段来自 `varN` 行，结果与备注来自 `resN`、`noteN` 行。
+
+```md
+:::condition-varies #screen-base
+reaction: @rxn-main
+condition: solvent=MeCN ;; temperature=60 C
+varies: solvent
+var1: solvent=DMF
+res1: yield=72%
+note1: cleaner TLC
+:::
+
+The first screen attempt is @screen-base.var1.
+```
+
+该引用用于叙述筛选矩阵。需要把筛选结果纳入结果图时，应同时建立 `:::result` 并在 attempt 中写 `result=@res-id`。
+
+## 最佳实践
+
+```md
+---
+id: exp-reference-best-practice
+title: Reference best practice
+date: 2026-04-24
+primary_reaction: rxn-main
+primary_result: res-main
+primary_product: mol-product
+---
+
+The primary reaction used @reaction.solvent at @reaction.temperature.
+The isolated product was @product.name with @result.yield yield.
+
+:::result #res-main
+reaction: @rxn-main
+product: @mol-product
+status: success
+yield: 84%
+:::
+```
+
+正文使用 primary alias 提高可读性。结构化字段使用显式对象引用，便于 resolver 和 typechecker 建立关系。
+
+

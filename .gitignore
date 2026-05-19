@@ -20,6 +20,11 @@ AGENTS.md
 .codex/
 .claude/
 docs/
-
+!apps/docs/
+!apps/docs/**
+apps/docs/.next/
+apps/docs/.source/
+apps/docs/node_modules/
+apps/docs/*.tsbuildinfo
 
 

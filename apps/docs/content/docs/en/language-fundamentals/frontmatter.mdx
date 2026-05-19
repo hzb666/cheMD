@@ -1,0 +1,112 @@
+---
+title: Document Structure and Frontmatter
+description: Required frontmatter keys, primary declarations, metadata extensions, render selection, and diagnostics.
+---
+
+
+## Required `id`, `title`, and `date`
+
+Frontmatter is parsed as a YAML mapping. `ChemdMeta` has the core fields `id`, `title`, and `date`. When frontmatter exists, the parser checks all three keys; missing fields produce `E_MISSING_REQUIRED_FRONTMATTER_KEY`. When frontmatter is absent, the parser uses the default meta values `draft-document`, `Untitled chemd document`, and `1970-01-01`.
+
+```yaml
+---
+id: exp-suzuki-screen
+title: Suzuki coupling solvent screen
+date: 2026-04-24
+---
+```
+
+`date` should use an ISO calendar date. Values outside `YYYY-MM-DD` produce `W_NON_ISO_FRONTMATTER_DATE`. Values with valid shape and invalid calendar content produce `W_INVALID_FRONTMATTER_DATE_VALUE`. The assigner records source spans for these diagnostics.
+
+## `primary_*` Declarations
+
+The resolver recognizes six primary fields: `primary_reaction`, `primary_result`, `primary_product`, `primary_sample`, `primary_molecule`, and `primary_analysis`. These fields must be non-empty strings, and target IDs are validated during resolution. Missing targets produce `E_INVALID_PRIMARY_REFERENCE`.
+
+Primary fields support inline alias references. For example, `primary_reaction: rxn-main` enables inline references such as `@reaction.yield` and `@reaction.solvent`.
+
+| alias | frontmatter field |
+| --- | --- |
+| `reaction` | `primary_reaction` |
+| `result` | `primary_result` |
+| `product` | `primary_product` |
+| `sample` | `primary_sample` |
+| `molecule` | `primary_molecule` |
+| `analysis` | `primary_analysis` |
+
+## `tags`, Status, Project, Author, and Metadata
+
+`tags` accepts a string array. Non-string array items produce a frontmatter value diagnostic. Extra scalar fields are retained in `meta`, which supports project metadata such as `project`, `author`, `status`, `notebook`, and `campaign`. Extra fields are readable through `@meta.field`.
+
+```yaml
+---
+id: exp-route-step-03
+title: Route step 03
+date: 2026-04-24
+tags:
+  - total-synthesis
+  - route-a
+project: CHEMD-ROUTE
+author: A. Chemist
+status: reviewed
+---
+```
+
+Frontmatter keys start with a lowercase letter and continue with lowercase letters, digits, or underscores. Duplicate keys produce `W_DUPLICATE_FRONTMATTER_KEY`, and the later value wins.
+
+## `render_profile` and `render_overrides`
+
+`render_profile` must be a non-empty string. Built-in profiles are `base`, `eln-default`, `publication-acs`, and `slides-large`. The default profile is `eln-default`. Unknown profiles produce `W_UNKNOWN_RENDER_PROFILE` and fall back to base options.
+
+`render_overrides` must be a single-level mapping whose paths match `section.field`. Implemented sections are `structure`, `reaction`, and `export`. The compiler combines frontmatter selection with compile options through `resolveRenderProfileWithDiagnostics`, then builds the render adapter payload with `mapRenderOptionsToAdapterPayload`.
+
+```yaml
+render_profile: publication-acs
+render_overrides:
+  structure.bondLineWidth: 2.1
+  structure.monochrome: true
+  reaction.showConditionsBelowArrow: true
+  export.imageFormat: svg
+  export.dpi: 300
+```
+
+Implemented override paths and value constraints:
+
+| path | value constraint |
+| --- | --- |
+| `structure.bondLength` | number greater than 0 |
+| `structure.bondLineWidth` | number greater than 0 |
+| `structure.multipleBondOffset` | number at least 0 |
+| `structure.hashSpacing` | number at least 0 |
+| `structure.fontSize` | number greater than 0 |
+| `structure.atomLabelPadding` | number at least 0 |
+| `structure.monochrome` | boolean |
+| `structure.backgroundColor` | hex color string |
+| `reaction.arrowLength` | number greater than 0 |
+| `reaction.componentGap` | number at least 0 |
+| `reaction.plusGap` | number at least 0 |
+| `reaction.showConditionsBelowArrow` | boolean |
+| `export.imageFormat` | `svg` or `png` |
+| `export.margin` | number at least 0 |
+| `export.dpi` | number greater than 0 |
+| `export.transparentBackground` | boolean |
+
+Profiles also enforce cross-field constraints: `structure.bondLineWidth` must be smaller than `structure.bondLength`, `reaction.plusGap` must be less than or equal to `reaction.componentGap`, and `structure.atomLabelPadding` must be less than or equal to `structure.fontSize * 0.5`. PNG export requires `export.dpi` of at least 150.
+
+## Frontmatter Parsing and Diagnostics
+
+The frontmatter root must be a YAML mapping. Top-level non-mapping values, invalid YAML lines, block scalars, implicit multiline scalars, invalid keys, invalid tags arrays, invalid `render_overrides` paths, unknown render override paths, and invalid override values enter the diagnostic collection.
+
+Common diagnostics:
+
+| code | trigger |
+| --- | --- |
+| `E_MISSING_REQUIRED_FRONTMATTER_KEY` | missing `id`, `title`, or `date` |
+| `W_DUPLICATE_FRONTMATTER_KEY` | duplicate key |
+| `W_INVALID_FRONTMATTER_LINE` | invalid line detected by the YAML sanitizer |
+| `E_INVALID_FRONTMATTER_VALUE` | invalid value type, nested shape, or block scalar |
+| `W_NON_ISO_FRONTMATTER_DATE` | date shape outside ISO date format |
+| `W_INVALID_FRONTMATTER_DATE_VALUE` | ISO-shaped date with invalid calendar value |
+| `E_INVALID_PRIMARY_REFERENCE` | primary field target cannot be resolved |
+
+Diagnostic positions are calculated from the line after the opening `---`, with source line and column spans retained for editor tooling.
+

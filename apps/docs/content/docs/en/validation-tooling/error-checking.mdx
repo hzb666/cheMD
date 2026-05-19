@@ -1,0 +1,88 @@
+---
+title: Error Checking Model
+description: Chemd error checking across frontmatter, block syntax, references, templates, quantities, steps, observations, and reaction routes.
+---
+
+Chemd error checking is distributed across parser, resolver, typechecker, and compiler stages. User-facing diagnostics are the merged result of those stages.
+
+## Checking Stages
+
+| Stage | Main responsibility | Typical user-visible output |
+| --- | --- | --- |
+| parser | frontmatter, inline tokens, structured block fields, list syntax | syntax and field diagnostics |
+| resolver | object index, duplicate IDs, references, primary aliases, template expansion, required fields | unresolved-reference and missing-field diagnostics |
+| typechecker | quantities, status, typed references, step graph, observation events, reaction routes | semantic and relationship diagnostics |
+| compiler | compile entry, quick fixes, repair loop, agent loop | diagnosis summaries and repair actions |
+
+## Frontmatter Checks
+
+`id`, `title`, and `date` are required. Missing fields produce `E_MISSING_REQUIRED_FRONTMATTER_KEY`. These fields and `primary_*` fields must be non-empty strings.
+
+`date` should use `YYYY-MM-DD`. A format mismatch produces `W_NON_ISO_FRONTMATTER_DATE`. An invalid calendar date produces `W_INVALID_FRONTMATTER_DATE_VALUE`.
+
+`tags` must be an array of strings. `render_profile` must be a non-empty string. `render_overrides` supports one-level objects with scalar values.
+
+## Block Syntax Checks
+
+Structured blocks use a `:::type` opening line and a `:::` closing line. Unterminated blocks produce `W_UNTERMINATED_BLOCK`. Unknown blocks produce `W_UNKNOWN_BLOCK`.
+
+Block IDs must match `^[a-zA-Z][a-zA-Z0-9_-]*$`. Invalid IDs produce `E_INVALID_ID`. Field names must start with a lowercase letter, followed by lowercase letters, digits, or underscores.
+
+Fields outside the allowed set for the block produce `W_UNKNOWN_FIELD`. Empty items in list fields produce `E_INVALID_LIST_ITEM`.
+
+## Reference Checks
+
+The resolver checks `@id`, `@id.field`, primary aliases, `@meta.field`, `@param.field`, and condition-screen attempt references. Missing targets or missing fields produce `W_UNRESOLVED_REFERENCE`.
+
+The typechecker validates semantic field types. Reaction `reactants` and `products` must point to molecules. Result `reaction` must point to a reaction. Sample `artifacts` must point to artifacts. Type mismatches produce `E_TYPED_REFERENCE_MISMATCH`.
+
+## Required Field Checks
+
+The resolver currently checks these object requirements:
+
+| Object | Required fields |
+| --- | --- |
+| molecule | `smiles` |
+| reaction | `reactants`, `products` |
+| analysis | `type_name`, `data` |
+| TLC analysis | `type_name` |
+| sample | `name` |
+| artifact | `kind`, `path` |
+
+TLC analysis is identified by `type: tlc`. The parser adds `plate: silica gel GF254` and `visualization: UV 254 nm` defaults. The resolver relaxes the `data` requirement for TLC analysis.
+
+## Quantity and Status Checks
+
+The typechecker parses quantity fields on molecules, reactions, results, samples, and steps. Values that cannot be parsed for the target field class produce `E403`. Percent values outside 0 to 100 produce `E402`.
+
+Result `status` supports aliases such as `success`, `complete`, `completed`, `done`, `partial`, `partial_conversion`, `failed`, `fail`, and `unknown`. Invalid status values produce `E306` and normalize to `unknown`.
+
+## Template Checks
+
+The resolver builds a template index. Duplicate template names produce `E_DUPLICATE_TEMPLATE`. Calls to missing templates produce `E_UNKNOWN_TEMPLATE`.
+
+Every template parameter is required. Missing parameters produce `E_TEMPLATE_PARAM_MISSING`. Failed `ref<kind>` or `quantity<class>` validation produces `E_TEMPLATE_PARAM_TYPE_MISMATCH`.
+
+Recursive templates produce `E_TEMPLATE_CYCLE`. Expansion depth over 32 or total expanded nodes over 2000 produces `E_TEMPLATE_EXPANSION_LIMIT`.
+
+## Step and Event Checks
+
+Step family must be implemented. Unknown family values produce `E_STEP_INVALID_FAMILY`. `heat` requires temperature, target_temperature, or duration. `cool` requires temperature, target_temperature, or method. `analyze` requires analysisType, analysis_type, or type. `extract` requires solvent.
+
+Duplicate step IDs produce `E_STEP_ID_DUPLICATE`. Missing `dependsOn` targets produce `E_STEP_INVALID_REFERENCE`. Dependency cycles produce `E_STEP_DEPENDENCY_CYCLE`.
+
+Event type supports `color_change`, `precipitation`, `gas_evolution`, and `phase_change`. Invalid event type produces `E_OBSERVATION_EVENT_INVALID_TYPE`. Missing `linkedStep` targets produce `E_OBSERVATION_LINKED_STEP_MISSING`.
+
+## Route Checks
+
+Reaction `route` and `prev` fields participate in route graph augmentation. Previous-reaction type mismatches produce `E_TYPED_REFERENCE_MISMATCH`. Route mismatches produce `W_REACTION_ROUTE_MISMATCH`. Route cycles produce `E_REACTION_ROUTE_CYCLE`. Isolated reactions inside a route produce `W_REACTION_ROUTE_ORPHAN`.
+
+## Recommended Validation Order
+
+```powershell
+pnpm chemd validate .\path\to\record.chemd
+pnpm chemd export .\path\to\record.chemd --format json
+pnpm chemd graph .\path\to\record.chemd
+```
+
+Resolve parser and resolver diagnostics first, then typechecker diagnostics. Exports and graph output become more stable after references, quantities, and templates are clean.

@@ -3,25 +3,27 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white" alt="TypeScript 5.9" />
-  <img src="https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white" alt="Next.js 15" />
-  <img src="https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white" alt="React 19" />
-  <img src="https://img.shields.io/badge/pnpm-10-F69220?logo=pnpm&logoColor=white" alt="pnpm 10" />
+  <img src="https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript&logoColor=white" alt="TypeScript 6.0" />
+  <img src="https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white" alt="Next.js 16" />
+  <img src="https://img.shields.io/badge/React-19.2-149ECA?logo=react&logoColor=white" alt="React 19.2" />
+  <img src="https://img.shields.io/badge/pnpm-10.33-F69220?logo=pnpm&logoColor=white" alt="pnpm 10.33" />
   <img src="https://img.shields.io/badge/Flask-3.1-111111?logo=flask&logoColor=white" alt="Flask 3.1" />
-  <img src="https://img.shields.io/badge/RDKit-2025.9-0B7285" alt="RDKit" />
+  <img src="https://img.shields.io/badge/RDKit-2026.3-0B7285" alt="RDKit 2026.3" />
 </p>
 
 # chemd
 
 [简体中文](./README.zh-CN.md) | [English](./README.md)
 
-`chemd` 将化学实验记录转成接近代码的、可由编译器检查的文档，同时保留研究人员可读的叙述，并为 LLM 系统提供结构化输入。它从实验记录中抽取实体、引用、步骤逻辑、观察、证据关系和知识图谱边，用于检索、训练和下游推理。系统由类型化化学文档语言、TypeScript 编译流水线、Next.js playground 和本地 Flask/RDKit chemistry service 组成。
+`chemd` 是基于 Markdown 的化学文档系统，用于书写、校验、渲染和运营化实验记录。研究人员可以保留实验叙述，编译器会抽取实体、引用、步骤逻辑、观察、证据关系和知识图谱边，用于检索、训练和下游推理。当前代码库包含 Chemd 类型化文档语言、TypeScript 编译包、浏览器 playground、Tauri Desktop IDE 和本地 chemistry service。
 
 ## 产品范围
 
 - 接近代码的 Chemd 专用文档写作模型，覆盖 frontmatter、Markdown 风格正文、行内化学、引用、分子、反应、结果、分析、样品、步骤、观察、模板和列布局。
+- 面向产品写作的 `.chemd` 源文件格式，并兼容已有 workspace 中的 `.chemd.md` 文件。
 - 实验逻辑增强：将原始记录连接到 typed entities、resolved references、procedure steps、observations、field evidence、normalization facts 和 knowledge-graph edges。
 - 浏览器工作台，支持源码编辑、渲染预览、diagnostics、结构化输出、导出动作、OCR 入口和 chemistry editor 集成。
+- Desktop IDE 支持本地 workspace、Monaco 编辑、文件标签、自动保存、冲突保护保存、diagnostics、语义预览、workspace index、Graph/RAG 视图、PostgreSQL profile 绑定和 Agent patch review。
 - 编译输出覆盖 HTML 预览、规范化 JSON、DOCX bridge Markdown、canonical LNF、runtime preflight、RAG 检索数据、training understanding 数据和 full audit 数据。
 - repo 级 graph index 与 reaction clustering：从现有实验事实推断路线、步骤复用、条件签名、campaign trajectory 和语义 reaction-similarity edges。
 - 面向 LLM 的导出边界：检索数据与训练理解数据分离，审计用 source detail 不进入模型训练输入。
@@ -33,11 +35,14 @@
 | 层级 | 技术 |
 | --- | --- |
 | Workspace | pnpm workspace、Turborepo |
-| Web | Next.js 15、React 19、Tailwind CSS 4 |
-| 语言包 | TypeScript 5.9 |
+| Web | Next.js 16、React 19.2、Tailwind CSS 4.3 |
+| Desktop | Tauri 2、Vite 8、React 19.2、Monaco Editor |
+| Native runtime | Rust、Tauri commands、managed PostgreSQL resources |
+| 语言包 | TypeScript 6.0 |
 | 化学编辑 | Ketcher React、Ketcher standalone |
-| Chemistry service | Python 3.14、Flask 3.1、RDKit 2025.9 |
-| 验证 | Vitest、TypeScript checks、ESLint、Ruff、Python unittest |
+| Chemistry service | Python 3.14、Flask 3.1、RDKit 2026.3 |
+| 持久化与知识库 | PostgreSQL、面向 pgvector 的 Graph/RAG records、local outbox |
+| 验证 | Vitest 4.1、TypeScript checks、ESLint 10.4、Ruff 0.15、Python unittest |
 | 文档转换 | Pandoc 生成最终 DOCX 文件 |
 
 ## 仓库布局
@@ -45,6 +50,7 @@
 ```text
 chemd/
 |-- apps/
+|   |-- desktop/            # Tauri Desktop IDE、Monaco workbench、native commands
 |   `-- web/                 # Playground UI、route handlers、server facade
 |-- deploy/
 |   `-- playground/          # Container、reverse proxy 与 service assets
@@ -54,8 +60,11 @@ chemd/
 |   |-- core/                # AST、diagnostics、共享原语
 |   |-- diagnostics/         # Diagnostic model 与 quick-fix metadata
 |   |-- exporter-training/   # RAG、training understanding、audit exports
+|   |-- agent-tools/         # Agent run、evidence、patch 与 audit primitives
+|   |-- language-service/    # Editor diagnostics、outline、completion、hover、Graph/RAG DTOs
 |   |-- lnf/                 # Canonical LNF builder
 |   |-- parser/              # Frontmatter、blocks、inline tokens、references
+|   |-- reaction-map/        # Reaction graph layout 与 intelligence contracts
 |   |-- render-profile/      # Render profiles 与 override validation
 |   |-- renderer-docx/       # DOCX bridge renderer
 |   |-- renderer-html/       # HTML preview renderer
@@ -65,6 +74,8 @@ chemd/
 |   |-- runtime-trace/       # Runtime trace events 与 replay helpers
 |   |-- step-ontology/       # Procedure、observation、analysis lowering
 |   |-- storage-postgres/    # PostgreSQL schema、records、RAG 与 memory tables
+|   |-- semantic-rendering/  # Semantic preview view models
+|   |-- workspace-index/     # Cross-document symbols 与 reference queries
 |   `-- typechecker/         # Typed semantic graph 与 value diagnostics
 |-- scripts/                 # 本地开发与迁移工具
 |-- services/
@@ -116,6 +127,18 @@ cd services/chem-service
 poetry run python app.py
 ```
 
+启动 Desktop IDE 前端：
+
+```bash
+pnpm --filter @chemd/desktop dev
+```
+
+启动 Tauri 桌面应用：
+
+```bash
+pnpm --filter @chemd/desktop tauri:dev
+```
+
 ## 命令
 
 | 命令 | 作用 |
@@ -130,11 +153,17 @@ poetry run python app.py
 | `pnpm test` | 运行验证套件 |
 | `pnpm lint:py` | 对 chemistry service 运行 Ruff |
 | `pnpm format:check:py` | 检查 Python 格式 |
+| `pnpm desktop:diagnostics-bundle` | 导出离线 desktop diagnostics bundle |
+| `pnpm desktop:offline-core-smoke` | 运行 desktop offline core smoke 脚本 |
+| `pnpm desktop:release-readiness` | 运行 desktop release-readiness 分类检查 |
+| `pnpm --filter @chemd/desktop tauri:dev` | 启动 Tauri 桌面应用 |
+| `pnpm --filter @chemd/desktop tauri:build` | 构建桌面发布产物 |
 
 包级命令示例：
 
 ```bash
 pnpm --filter @chemd/web test
+pnpm --filter @chemd/desktop test
 pnpm --filter @chemd/compiler typecheck
 pnpm --filter @chemd/exporter-training test
 ```
@@ -151,8 +180,8 @@ poetry run python -m unittest discover
 根目录通过 `chemd` script 调用 CLI：
 
 ```bash
-pnpm chemd validate examples/report.chemd
-pnpm chemd export examples/report.chemd --format training-full
+pnpm chemd validate packages/compiler/fixtures/golden-experiment-record.chemd
+pnpm chemd export packages/compiler/fixtures/golden-experiment-record.chemd --format training-full
 pnpm chemd diff before.chemd after.chemd --format json
 pnpm chemd graph reports/*.chemd --format json
 pnpm chemd repair draft.chemd --format text
@@ -175,7 +204,9 @@ pnpm chemd agent-loop draft.chemd --format json --max-iterations 3
 
 ## 文档语言
 
-`chemd` 文档是带必需 frontmatter 的 Chemd 专用源码文件：
+Chemd 文档使用 Markdown 兼容文本和结构化 chemistry blocks。主文件扩展名是 `.chemd`；编译器、workspace index 和 Desktop IDE 继续支持已有 `.chemd.md` 文件。
+
+必需 frontmatter：
 
 - `id`
 - `title`
@@ -261,6 +292,35 @@ Yield: @res-main.yield
 - `packages/compiler/fixtures/best-practice-one-step-synthesis.chemd`
 - `packages/compiler/fixtures/best-practice-condition-screen.chemd`
 
+## 常用使用流程
+
+创建或打开 Chemd 记录后，可以先运行校验：
+
+```bash
+pnpm chemd validate packages/compiler/fixtures/golden-experiment-record.chemd
+```
+
+导出应用与模型流水线需要的数据：
+
+```bash
+pnpm chemd export packages/compiler/fixtures/golden-experiment-record.chemd --format json
+pnpm chemd export packages/compiler/fixtures/golden-experiment-record.chemd --format rag
+pnpm chemd export packages/compiler/fixtures/golden-experiment-record.chemd --format training
+```
+
+查看 workspace 级 reaction graph：
+
+```bash
+pnpm chemd graph packages/compiler/fixtures/*.chemd --format json
+```
+
+对生成稿执行 compiler-guided repair：
+
+```bash
+pnpm chemd repair draft.chemd --write
+pnpm chemd agent-loop draft.chemd --write --max-iterations 3
+```
+
 ## 编译流水线
 
 `@chemd/compiler` 暴露 `compileChemd(source, options)`。
@@ -293,7 +353,7 @@ source markdown
 | Graph index export | repo/campaign graph indexing、reaction clustering 与 similarity traversal |
 | Full audit export | 检查、调试与可追溯性 |
 
-Graph index 是推断式导出。作者只需要写真实实验事实，例如 `reactants`、`products`、`result.ref`、`analysis.ref`、`sample.derived_from`、`route`、`prev` 和 `condition-varies`。导出层会从这些事实生成图索引和聚类视图，而不是要求报告里新增一套 graph 语言。
+Graph index 是推断式导出。作者只需要写真实实验事实，例如 `reactants`、`products`、`result.ref`、`analysis.ref`、`sample.derived_from`、`route`、`prev` 和 `condition-varies`。导出层会从这些事实生成图索引和聚类视图，报告本身保持实验事实写作。
 repo 级 graph index 会在一个或多个文档编译成 training understanding 后，通过 `buildTrainingGraphIndexFromUnderstandings()` 生成。
 
 ## Web Playground
@@ -310,9 +370,39 @@ Playground 提供：
 
 结构化输出 tabs 包括 semantic output、runtime output、LNF、RAG export、training understanding export 和 full audit export。
 
-## Desktop IDE 规划
+典型浏览器使用流程：
 
-生产版 Chemd Desktop IDE 规划以 Tauri 2、React、Monaco、PostgreSQL/pgvector 和受控 `chem-service` sidecar 为核心。桌面版不是 Web playground 的简单封装，而是本地 workspace、语言服务、反应 Graph、RAG 和 Agent 编排的生产级工作台。
+1. 运行 `pnpm dev`。
+2. 打开 `http://127.0.0.1:2436`。
+3. 编辑 Chemd source，或通过 OCR / chemistry editor 入口导入结构。
+4. 查看 diagnostics 和 rendered preview。
+5. 导出 JSON、DOCX、RAG、training understanding 或 audit payload。
+
+## Desktop IDE
+
+Chemd Desktop IDE 是面向本地 workspace 的日常写作产品。它基于 Tauri、React 和 Monaco，结合 Rust-backed workspace commands 提供本地文件、知识索引和 Agent review 能力。
+
+Desktop 功能：
+
+- 打开本地文件夹，浏览 Chemd 文档和关联 assets。
+- 在 Monaco 中编辑 `.chemd` 和 `.chemd.md` 文件，获得来自 `@chemd/language-service` 的 diagnostics、outline、hover、completion、source ranges 和 quick-fix proposals。
+- 使用文件标签、breadcrumbs、状态栏、自动保存、`Ctrl+S` / `Cmd+S` 和带冲突保护的保存流程。
+- 编辑时查看编译后的文档预览和 semantic tree。
+- 构建本地 workspace index，用于 symbols、references、document candidates 和 RAG citation candidates。
+- 将 workspace 绑定到 PostgreSQL profile，使用 managed PostgreSQL resources，持久化 Graph/RAG runtime snapshots，查询 connected RAG data，并在配置 provider 后回填 embeddings。
+- 运行 reaction intelligence jobs，查看 reaction graph layout、clusters、evidence rows 和 source-jump links。
+- 审阅 Agent patch proposals，查看 evidence 和 audit timeline，执行 approve / reject / apply。
+- 导出离线 diagnostics bundle，用于支持和发布检查。
+
+Desktop 开发命令：
+
+```bash
+pnpm --filter @chemd/desktop dev
+pnpm --filter @chemd/desktop tauri:dev
+pnpm --filter @chemd/desktop test
+pnpm --filter @chemd/desktop typecheck
+pnpm desktop:diagnostics-bundle
+```
 
 相关架构文档：
 
@@ -358,6 +448,7 @@ Chemistry service routes：
 | Package | 职责 |
 | --- | --- |
 | `@chemd/cli` | CLI validation、graph export、repair loop、semantic diff 与 agent-loop integration |
+| `@chemd/agent-tools` | Agent runs、cited evidence、patch decisions 与 audit timelines |
 | `@chemd/core` | 共享 AST、diagnostics、render overrides、chemistry primitives |
 | `@chemd/parser` | Frontmatter、Markdown、inline token、block、reference parsing |
 | `@chemd/resolver` | References、aliases、template expansion、semantic cleanup |
@@ -367,14 +458,19 @@ Chemistry service routes：
 | `@chemd/runtime-lab` | Runtime plans 与 preflight checks |
 | `@chemd/runtime-trace` | Runtime trace events 与 replay helpers |
 | `@chemd/lnf` | Canonical LNF payloads |
+| `@chemd/language-service` | Editor diagnostics、outline、symbols、completions、hover、quick fixes、Graph/RAG DTOs |
+| `@chemd/reaction-map` | Reaction map layout、cluster model 与 reaction intelligence contracts |
 | `@chemd/render-profile` | Built-in render profiles 与 override validation |
 | `@chemd/renderer-html` | HTML preview rendering |
 | `@chemd/renderer-json` | JSON rendering |
 | `@chemd/renderer-docx` | DOCX bridge rendering |
 | `@chemd/exporter-training` | Retrieval、training understanding、graph index、clustering、audit exports |
 | `@chemd/storage-postgres` | PostgreSQL schema、storage records、RAG chunks 与 training memory records |
+| `@chemd/semantic-rendering` | 面向 editor products 的 semantic preview view models |
+| `@chemd/workspace-index` | Cross-document symbol indexing、references 与 workspace query helpers |
 | `@chemd/compiler` | 公开 compile pipeline |
 | `@chemd/web` | Playground UI 与 server-side routes |
+| `@chemd/desktop` | Tauri Desktop IDE 与 native workspace runtime |
 
 ## 配置
 
@@ -437,8 +533,10 @@ Web service 是公网边界。Chemistry service 应位于 web app 后方或可�
 
 ## 运行说明
 
+- `.chemd` 是主写作扩展名。已有 `.chemd.md` 文件仍可用于旧 workspace 与 alias 兼容。
 - RDKit 渲染要求 Python runtime 能成功 import RDKit。
 - OCR 默认使用 placeholder providers；生产 OCR 需要配置 provider URLs 与 keys。
 - DOCX 文件生成依赖 Pandoc。没有 Pandoc 时 compiler 仍可生成 DOCX bridge Markdown。
 - Lab inventory lookup 需要凭证，并且运行环境需要能访问配置的 API。
 - Structure drafts 由 chemistry service 存储，用于当前 playground flow。
+- Desktop Graph/RAG 与 managed PostgreSQL 功能依赖 ready workspace profile。本地 Chemd 文件的编辑、保存、编译、预览和 diagnostics 可直接使用。

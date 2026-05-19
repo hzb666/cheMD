@@ -1,0 +1,90 @@
+---
+title: Results and Analysis
+description: '`:::result`, `:::analysis`, TLC lanes, generic analysis, and required fields.'
+---
+
+
+## `:::result`
+
+`:::result` produces a `ResultNode`. The resolver currently has no general required-field rule for result nodes. High-quality records usually include an ID, an association field, and at least one result metric.
+
+## `ref`, `reaction`, and `product`
+
+`ref`, `reaction`, and `product` are stored as string fields. In the current typechecker, `reaction` takes priority and `ref` is used as the fallback reaction reference. `product` points to a product molecule.
+
+## `yield`, `conversion`, `selectivity`, and `purity`
+
+These fields are stored as strings. The parser does not validate units or percent syntax. Export layers consume the preserved field values.
+
+## `:::analysis`
+
+`:::analysis` produces an `AnalysisNode`. The source field `type` maps to AST field `type_name`.
+
+```md
+:::analysis #ana-hplc-main
+type: hplc
+ref: res-main
+method: HPLC area normalization
+instrument: Agilent 1260
+result: 97% area product peak
+data: Main peak at 6.4 min with trace impurity.
+:::
+```
+
+## TLC Lanes: `p1`, `p2`, `p3`
+
+Fields matching `p` followed by digits are accepted by `LANE_FIELD_PATTERN`. TLC lane values are preserved as strings.
+
+## Generic NMR and HPLC Analysis
+
+Generic analysis records use `type`, `ref`, `time`, `instrument`, `solvent`, `frequency`, `method`, `result`, `data`, and `notes`. The parser does not restrict `type` to an enum.
+
+## Required Analysis Fields and TLC Defaults
+
+Generic analysis requires `type_name` and `data`. `type: tlc` requires only `type_name`. TLC records receive default `plate: silica gel GF254` and `visualization: UV 254 nm` when those fields are absent.
+
+## Result Typecheck Inventory
+
+The typechecker normalizes result `status` to success, partial, failed, or unknown; parses `yield`, `conversion`, `selectivity`, and `purity` as percent quantities; parses `isolated_mass` as a mass quantity; resolves `reaction` or fallback `ref` as a reaction reference; and resolves `product` as a molecule reference.
+
+Linked result validation has two checks. `product` must appear in the linked reaction products. Result `yield`, `conversion`, and `selectivity` are compared against the same fields on the linked reaction, with mismatches producing `E_RESULT_REACTION_CONFLICT`.
+
+## Analysis Typecheck Inventory
+
+The analysis `type` field is stored as `type_name` in the AST. The typechecker recognizes `tlc`, `nmr`, `hplc`, `lcms`, `lc-ms`, `gcms`, and `gc-ms` through `normalizeAnalysisType`. Unmatched values are retained as extensions.
+
+TLC analysis is classified through `classifyTlcAnalysis`. Lane fields such as `p1`, `p2`, and `p3` retain raw values and participate with `eluent`, `plate`, and `visualization` in normalized TLC output.
+
+## Best Practice Example
+
+Connect the result to the reaction and product, then connect analyses to the result or sample. Use TLC defaults only when they match the actual plate and visualization method.
+
+```md
+:::result #res-main
+reaction: rxn-main
+product: mol-product
+status: success
+yield: 82%
+purity: 98%
+notes: isolated after silica gel chromatography
+:::
+
+:::analysis #ana-tlc-main
+type: tlc
+ref: rxn-main
+result: res-main
+eluent: petroleum ether/ethyl acetate 5:1
+p1: substrate, Rf 0.62
+p2: product, Rf 0.31
+data: product spot observed, starting material consumed
+:::
+
+:::analysis #ana-hplc-product
+type: hplc
+ref: res-main
+instrument: Agilent 1260
+method: C18 gradient
+data: purity 98% by area normalization
+:::
+```
+

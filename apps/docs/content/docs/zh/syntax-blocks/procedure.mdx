@@ -1,0 +1,99 @@
+---
+title: '`:::procedure` 过程块'
+description: '`:::procedure` 记录实验过程正文、reaction/ref 关联、证据列表和结构化 step。'
+---
+
+`:::procedure` 支持普通正文、行内 `step:` 和嵌套 `:::step`。
+
+## 语法
+
+```md
+:::procedure #proc-main
+reaction: rxn-main
+evidence: notebook-p12 | batch-sheet
+step: charge | id=s-charge | inputs=@mol-substrate,@mol-base | solvent=MeCN
+step: heat | id=s-heat | temperature=60 C | duration=3 h | dependsOn=s-charge
+The reaction mixture was monitored by TLC.
+:::
+```
+
+## 字段
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| `ref` | 否 | 通用目标引用 |
+| `reaction` | 否 | reaction ID |
+| `evidence` | 否 | `|`、`,` 分隔的证据 ID 列表 |
+
+`procedure` 本身没有 resolver 必填字段。正文会保存到 `body`。当正文中包含 `step:` 或 `:::step` 时，parser 同时生成 `steps` 和 `children`。
+
+## 行内 `step:`
+
+行内步骤格式为 `step: family | key=value | key=value`。首段为普通文本时作为 `family`。首段为 `key=value` 时使用 `family=<value>`。
+
+```md
+step: add | id=s-add | material=n-BuLi | duration=30 min
+step: family=heat | id=s-heat | temperature=65 C | duration=4 h
+```
+
+## 嵌套 `:::step`
+
+复杂步骤建议使用嵌套块。嵌套块只能出现在 `:::procedure` 内部。
+
+```md
+:::step #s-purify
+family: purify
+method: column chromatography
+eluent: petroleum ether/ethyl acetate 10:1
+outputs: sample-product
+:::
+```
+
+嵌套 step header 也接受裸 ID，例如 `:::step s-purify`。如果 header 与字段都没有提供 ID，parser 会生成 `<procedure-id>:sN`。
+
+## 推荐实践案例
+
+过程记录应使用稳定 step ID，显式写出依赖和材料流。`inputs`、`outputs` 和 `dependsOn` 有助于生成 step graph 与训练导出。
+
+```md
+:::procedure #proc-main
+reaction: rxn-main
+evidence: notebook-p12 | balance-log
+
+:::step #s-charge
+family: charge
+stage: setup
+purpose: prepare substrate solution
+inputs: @mol-substrate, @mol-solvent
+outputs: solution-a
+solvent: MeCN
+volume: 5 mL
+:::
+
+:::step #s-heat
+family: heat
+stage: reaction
+dependsOn: s-charge
+inputs: solution-a
+outputs: mixture-heated
+temperature: 60 C
+duration: 3 h
+evidence: notebook-p12
+confidence: 0.95
+:::
+
+Reaction progress was checked by TLC before workup.
+:::
+```
+
+## 诊断
+
+| 诊断码 | 条件 |
+| --- | --- |
+| `E_INVALID_ID` | procedure ID 非法 |
+| `W_UNKNOWN_FIELD` | procedure 顶部字段不在 `ref`、`reaction`、`evidence` 内 |
+| `E_STEP_PARAM_MISSING` | `heat`、`cool`、`analyze`、`extract` 等步骤缺少要求参数 |
+| `E_STEP_PARAM_INVALID` | `filter` 使用不允许参数 |
+| `E_STEP_ID_DUPLICATE` | step ID 重复 |
+| `E_STEP_INVALID_REFERENCE` | `dependsOn` 指向缺失 step |
+| `E_STEP_DEPENDENCY_CYCLE` | step 依赖形成循环 |

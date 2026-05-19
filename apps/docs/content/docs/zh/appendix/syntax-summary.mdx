@@ -1,0 +1,135 @@
+---
+title: 语法摘要
+description: Chemd frontmatter、行内语法、结构化块、模板、步骤、观察和布局语法速查。
+---
+
+下列内容提供使用者速查。详细语义以各章节和当前代码实现为准。
+
+## 文件与 Frontmatter
+
+```md
+---
+id: exp-id
+title: Experiment title
+date: 2026-04-24
+primary_reaction: rxn-main
+primary_result: res-main
+tags:
+  - synthesis
+---
+```
+
+`id`、`title`、`date` 为必需字段。`primary_*` 用于正文 alias。`tags` 为字符串数组。
+
+## 行内语法
+
+| 语法 | 用途 |
+| --- | --- |
+| `@id` | 对象引用 |
+| `@id.field` | 对象字段引用 |
+| `@reaction.field` | primary reaction alias |
+| `@meta.field` | frontmatter 字段引用 |
+| `@param.name` | 模板参数引用 |
+| `:chem[...]` | 行内化学表达式 |
+| `` `code` `` | 行内代码 |
+| `[label](href)` | Markdown 链接，href 需通过安全策略 |
+
+## 结构化块
+
+```md
+:::block-type #optional-id
+field: value
+list_field: value-a | value-b
+multi: a ;; other: b
+:::
+```
+
+块类型使用小写字母、数字、下划线和连字符。字段名使用小写字母、数字和下划线。列表字段支持 `|` 与逗号分隔，空项会产生诊断。
+
+## 支持的块
+
+`:::template` 是 parser 特殊分支。除它以外，下表中的顶层块来自 block parser registry。
+
+| 块 | 语义 |
+| --- | --- |
+| `:::chemd` | molecule 或 reaction |
+| `:::result` | 实验结果 |
+| `:::analysis` | 分析数据 |
+| `:::procedure` | 实验过程 |
+| `:::observation` | 观察记录 |
+| `:::sample` | 样品 |
+| `:::artifact` | 附件 |
+| `:::condition-varies` | 条件筛选 |
+| `:::template` | 模板定义，parser 特殊分支 |
+| `:::use` | 模板调用 |
+| `:::col`、`:::col-2` | 列布局 |
+
+`:::step` 与 `:::event` 是嵌套在 procedure 与 observation 中的子语法。
+
+## Template
+
+```md
+:::template template-name
+bind: reaction=primary_reaction
+params:
+  - sample: ref<sample>
+  - amount: quantity<amount>
+
+Sample @param.sample used @param.amount in @reaction.name.
+:::
+
+:::use template-name
+sample: @sample-main
+amount: 1.00 mmol
+:::
+```
+
+## Step
+
+```md
+:::procedure #proc-main
+step: charge | id=s1 | inputs=@mol-a | amount=1.00 mmol
+step: heat | id=s2 | temperature=80 C | duration=2 h | dependsOn=s1
+:::
+```
+
+嵌套写法：
+
+```md
+:::procedure #proc-main
+:::step
+family: analyze
+id: s-analyze
+analysisType: HPLC
+:::
+:::
+```
+
+## Event
+
+```md
+:::observation #obs-main
+event: color_change | id=e1 | linkedStep=s2 | value=yellow
+:::
+```
+
+支持 event type：`color_change`、`precipitation`、`gas_evolution`、`phase_change`。
+
+## Column Layout
+
+```md
+:::col-2
+col: Left narrative with @reaction.solvent.
+col: {
+:::result #res-main
+status: success
+yield: 80%
+:::
+}
+:::
+```
+
+列数来自 `:::col-2` 或 `:::col 2`。实际子项数量与列数不一致时产生 `W_COL_COUNT_MISMATCH`。
+
+Chemd 源文件使用 `.chemd` 扩展名。
+

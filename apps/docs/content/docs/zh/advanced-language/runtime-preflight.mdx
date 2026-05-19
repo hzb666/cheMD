@@ -1,0 +1,91 @@
+---
+title: 运行预检
+description: Chemd runtime-lab 如何把编译后的步骤转成 run plan、检查能力要求并选择人工确认点。
+---
+
+运行层不改变 Chemd 语法。它消费语言流水线产出的 canonical step graph，并为 dry run、human run、robot run 或 replay 准备 run plan。
+
+## 运行输入
+
+运行预检从 procedure step 开始。若后续 observation、artifact 或外部运行记录需要回指同一个操作，应保持 step ID 稳定。
+
+```mdx
+:::procedure #proc-runtime
+step: cool | id=s-cool | target_temperature=-78 C
+step: add | id=s-add | dependsOn=s-cool | reagent=n-BuLi
+step: analyze | id=s-tlc | type=tlc | dependsOn=s-add
+:::
+```
+
+## Run Plan
+
+`@chemd/runtime-lab` 暴露 `buildRunPlan`。plan ID 由 document ID 派生，形式为 `runplan::<documentId>`。
+
+```ts
+import { buildRunPlan, preflightRun } from "@chemd/runtime-lab";
+
+const plan = buildRunPlan({
+  documentId: "exp-runtime",
+  stepGraph
+});
+
+const preflight = preflightRun(plan, {
+  mode: "human-run",
+  capabilities: ["cooling", "analytical_tlc"]
+});
+```
+
+当 runtime diagnostic 中存在 error 级别诊断时，`preflight.blocking` 为 `true`。
+
+## 运行模式
+
+运行模式有四种：
+
+- `dry-run`：只规划和检查执行，不控制真实实验运行。
+- `human-run`：面向人工执行，并暴露确认点。
+- `robot-run`：要求所有 step family 都能被 runtime planner 识别。
+- `replay-run`：回放已记录的运行状态或 trace。
+
+## 能力要求
+
+部分 step family 会引入能力要求：
+
+| Step family | Capability |
+| --- | --- |
+| `cool` | `cooling` |
+| `heat` | `heating` |
+| `purge` | `inert_gas` |
+| `filter` | `filtration` |
+| `purify` | `chromatography` |
+| `dry`, `concentrate` | `vacuum` |
+| `analyze` 且 `type=tlc` | `analytical_tlc` |
+| `analyze` 且 `type=nmr` | `nmr` |
+| `analyze` 且 `type=hplc` | `hplc` |
+
+缺失能力会生成 runtime preflight 诊断。
+
+## 确认策略
+
+runtime planner 会为每个 step 选择一种确认策略：
+
+- `manual_required`：`add`、`quench`、`purge`、`heat`、`cool` 等高触达操作。
+- `review_inferred`：由 lower 过程推断出的 step，或 lowering confidence 偏低的 step。
+- `none`：不需要 runtime 确认门禁的 step。
+
+这些策略属于运行时元数据，不改变 parser、resolver 或 typechecker 行为。
+
+## 推荐实践示例
+
+适合运行预检的 procedure 记录应使用显式 step ID、依赖链接，以及 runtime planner 已识别的 step family。
+
+```md
+:::procedure #proc-runtime-ready
+reaction: rxn-main
+step: charge | id=s-charge | inputs=@mol-substrate | outputs=mixture-a
+step: cool | id=s-cool | target_temperature=-78 C | dependsOn=s-charge
+step: add | id=s-add | reagent=n-BuLi | dependsOn=s-cool
+step: analyze | id=s-tlc | type=tlc | dependsOn=s-add
+:::
+```
+
+在 `human-run` 模式下，该记录会为高触达操作生成确认点，并检查 cooling 与 TLC analysis capability。

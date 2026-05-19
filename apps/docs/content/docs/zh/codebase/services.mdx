@@ -1,0 +1,62 @@
+---
+title: 服务层
+description: chem-service 和 chem-cluster-service 的职责、入口和测试。
+---
+
+`services` 目录当前包含 `chem-service` 和 `chem-cluster-service`。
+
+## `services/chem-service`
+
+`chem-service` 是 Flask 化学 HTTP 服务。`services/chem-service/README.md` 声明其由 `apps/web` 通过 `/api/chem/*` 使用。
+
+```bash
+cd services/chem-service
+poetry run flask --app app run --port 5001
+poetry run python -m unittest discover tests
+```
+
+### 二级主题
+
+- `GET /healthz`
+- `POST /ocr`
+- `POST /reaction/ocr`
+- `POST /normalize`
+- `POST /render`
+- `POST /reaction/render`
+- `GET|POST /structure`
+
+源码主题：
+
+- `chem_service/molecule_rendering.py`
+- `chem_service/reaction_rendering.py`
+- `chem_service/reaction_ocr.py`
+- `chem_service/remote_provider.py`
+- `chem_service/structure_store.py`
+- `chem_service/reaction_intelligence`
+
+测试路径为 `services/chem-service/tests`。
+
+## `services/chem-cluster-service`
+
+`chem-cluster-service` 包含 reaction intelligence、布局、fingerprint、similarity 和 provider 相关代码。
+
+```bash
+cd services/chem-service
+poetry run python -m unittest discover ../chem-cluster-service/tests
+```
+
+### 二级主题
+
+- `chem_cluster_service/layout.py`
+- `chem_cluster_service/reaction_center.py`
+- `chem_cluster_service/intelligence_*`
+- `chem_cluster_service/*provider*`
+- `tests/test_*`
+
+该服务目录包含 reaction intelligence artifact fixtures，用于测试 provider 与 artifact contract。
+
+## 服务边界
+
+`chem-service` 面向化学结构能力，提供 OCR、结构规范化、分子渲染、反应渲染和结构编辑接口。README 和源码显示其采用 RDKit 优先策略，缺少 RDKit 或 provider 时保留降级响应。服务支持 access key、内部访问保护、CORS 默认值和上传限制。
+
+`chem-cluster-service` 面向 reaction intelligence 与聚类能力，包含 layout、reaction center、fingerprint、similarity、provider 和 artifact contract 相关代码。该服务与 `@chemd/reaction-map`、training export、reaction intelligence artifact schema 形成数据协作关系。

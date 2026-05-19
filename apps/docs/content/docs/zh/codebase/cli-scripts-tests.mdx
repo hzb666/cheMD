@@ -1,0 +1,53 @@
+---
+title: CLI、脚本与测试
+description: 根级 CLI、scripts 目录、测试命令和质量门禁。
+---
+
+根级 `package.json` 暴露 CLI、开发、测试、lint 和 typecheck 命令。
+
+## CLI
+
+根级命令：
+
+```bash
+pnpm chemd
+```
+
+该命令运行 `node packages/cli/bin/chemd.mjs`。
+
+## Scripts
+
+`scripts` 目录包含以下类型：
+
+| 类型 | 示例 |
+| --- | --- |
+| 开发启动 | `dev-demo.mjs` |
+| PostgreSQL | `postgres-migrate.mjs`, `postgres-smoke.mjs`, `postgres-tools.mjs` |
+| 桌面 smoke | `desktop-runtime-smoke.mjs`, `desktop-offline-core-smoke.mjs`, `desktop-release-readiness.mjs` |
+| 诊断打包 | `desktop-diagnostics-bundle.mjs` |
+
+## 测试命令
+
+根级命令包括：
+
+```bash
+pnpm run test
+pnpm run test:scripts
+pnpm run test:py
+pnpm run lint
+pnpm run typecheck
+```
+
+## 测试分布
+
+| 区域 | 测试路径 |
+| --- | --- |
+| parser | `packages/parser/tests` |
+| resolver | `packages/resolver/tests` |
+| compiler | `packages/compiler/tests` |
+| web | `apps/web/tests` |
+| desktop frontend | `apps/desktop/src/**/*.test.ts` |
+| desktop Rust | `apps/desktop/src-tauri/src/*_tests.rs` |
+| scripts | `scripts/*.test.mjs` |
+| chem-service | `services/chem-service/tests` |
+| chem-cluster-service | `services/chem-cluster-service/tests` |

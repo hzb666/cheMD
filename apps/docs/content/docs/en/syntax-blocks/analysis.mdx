@@ -1,0 +1,112 @@
+---
+title: '`:::analysis` Analysis Block'
+description: '`:::analysis` records TLC, NMR, HPLC, and other analytical information, including TLC lane fields and TLC defaults.'
+---
+
+`:::analysis` records analysis evidence and produces an analysis node.
+
+## Syntax
+
+```md
+:::analysis #ana-tlc-main
+type: tlc
+ref: rxn-main
+result: res-main
+eluent: petroleum ether/ethyl acetate 5:1
+p1: substrate, Rf 0.62
+p2: product, Rf 0.31
+data: product spot observed, starting material consumed
+:::
+```
+
+## Fields
+
+| field | required | notes |
+| --- | --- | --- |
+| `type` | conditionally required | stored as `type_name`; required for all analysis nodes |
+| `ref` | no | analysis target, such as reaction, sample, result, or condition variation |
+| `time` | no | sampling or analysis time |
+| `eluent` | no | TLC eluent or other analytical condition |
+| `plate` | no | TLC plate |
+| `visualization` | no | visualization method |
+| `result` | no | linked result ID |
+| `instrument` | no | instrument |
+| `solvent` | no | NMR or analysis solvent |
+| `frequency` | no | NMR frequency |
+| `method` | no | HPLC, LCMS, or method description |
+| `data` | conditionally required | required for non-TLC analysis; optional for `type: tlc` |
+| `notes` | no | analysis notes |
+| `p1`, `p2`, `pN` | no | TLC lane fields where N is numeric |
+
+## Required Fields and Defaults
+
+The resolver requires `type_name` and `data` for ordinary analysis nodes. When `type_name` is `tlc`, only `type_name` is required. TLC defaults are applied by the parser:
+
+| field | default |
+| --- | --- |
+| `plate` | `silica gel GF254` |
+| `visualization` | `UV 254 nm` |
+
+## TLC Lane Syntax
+
+TLC lane field names must match `p\d+`. The core normalizer reads lanes in numeric field order. Lane text is split by `|`. The first segment usually contains the lane label and the first spot, while later segments represent spots, baseline flags, or messy regions.
+
+```md
+p1: sm 0.62 | base
+p2: rxn 0.31 ^3(4) | mess(0.55) | sm 0.62 v1
+p3: product 0.30
+```
+
+Lane labels support `sm`, `starting material`, `product`, `pd`, `int`, `intermediate`, `rxn`, `reaction`, and numeric trial labels. Other labels are classified as `custom`.
+
+Spot items support:
+
+| Syntax | Meaning |
+| --- | --- |
+| `0.52` | Rf spot |
+| `0.52 ^3(4)` | up shape, size rank 3, intensity rank 4 |
+| `0.31 v2` | down shape, size rank 2 |
+| `base` | lane has a baseline spot |
+| `none` | lane has no spot |
+| `mess`, `mess(0.45)` | tailing or messy region |
+
+Rank values are clamped to 1 through 5. Unrecognized spot items are excluded from normalized TLC output.
+
+## Diagnostics
+
+| code | condition |
+| --- | --- |
+| `E_INVALID_ID` | invalid block ID |
+| `W_UNKNOWN_FIELD` | field is not allowed and does not match `p\d+` |
+| `E_MISSING_REQUIRED_FIELD` | ordinary analysis is missing `type_name` or `data` |
+
+## Recommended Practice
+
+TLC analysis should record lanes, eluent, target, and interpretation. Use `ref` for the analysis target and `result` for the linked outcome.
+
+```md
+:::analysis #ana-tlc-main
+type: tlc
+ref: rxn-main
+result: res-main
+time: 3 h
+eluent: petroleum ether/ethyl acetate 5:1
+p1: substrate standard, Rf 0.62
+p2: reaction mixture, product Rf 0.31, substrate absent
+data: TLC indicates full conversion to product
+notes: visualization under UV 254 nm
+:::
+```
+
+For NMR and other general analyses, provide `data` explicitly.
+
+```md
+:::analysis #ana-nmr-product
+type: nmr
+ref: sample-product
+instrument: Bruker 400
+solvent: CDCl3
+frequency: 400 MHz
+data: 1H NMR matches expected aromatic pattern
+:::
+```

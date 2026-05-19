@@ -1,0 +1,54 @@
+---
+title: Getting Started
+description: Entry point for Chemd users, covering the document model, file extensions, minimal documents, and implemented language surface.
+---
+
+These chapters establish the basic Chemd source model. Users should understand source boundaries, frontmatter, prose, and structured blocks before using the field reference.
+
+## Chapters
+
+- [Chemd Language Overview](/en/docs/getting-started/language-overview): file extensions, user input, AST, compiler output, and implemented scope.
+- [Chemd Source Model](/en/docs/getting-started/document-model): document metadata, object nodes, inline references, template nodes, and compiler results.
+
+## Starting Example
+
+```md validate
+---
+id: exp-minimal
+title: Minimal Chemd experiment
+date: 2026-04-24
+primary_reaction: rxn-main
+primary_result: res-main
+---
+
+:::chemd #mol-a
+kind: molecule
+name: substrate A
+smiles: CCO
+:::
+
+:::chemd #mol-b
+kind: molecule
+name: product B
+smiles: CC=O
+:::
+
+:::chemd #rxn-main
+kind: reaction
+reactants: @mol-a
+products: @mol-b
+temperature: 25 C
+time: 1 h
+:::
+
+:::result #res-main
+ref: rxn-main
+product: @mol-b
+status: success
+yield: 65%
+:::
+```
+
+The example covers the resolver-required core fields: document `id`, `title`, `date`, molecule `smiles`, and reaction `reactants` plus `products`.
+
+

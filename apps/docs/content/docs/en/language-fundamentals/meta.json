@@ -1,0 +1,9 @@
+{
+  "title": "Language Fundamentals",
+  "pages": [
+    "frontmatter",
+    "markdown-inline",
+    "references",
+    "blocks"
+  ]
+}

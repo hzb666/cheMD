@@ -1,0 +1,176 @@
+---
+title: 'Chemical Objects: `:::chemd`'
+description: 'Molecules, reactions, inference, fields, quantities, and route relationships in `:::chemd`.'
+---
+
+
+## `kind: molecule`
+
+`kind: molecule` produces a `MoleculeNode`. A molecule is a chemical entity that reactions, samples, artifacts, analyses, and prose can reference. The resolver requires `smiles`; missing `smiles` produces `E_MISSING_REQUIRED_FIELD`. The typechecker parses `amount` and `equivalents` into typed quantities.
+
+```md
+:::chemd #mol-aryl
+kind: molecule
+name: aryl bromide
+smiles: Brc1ccccc1
+role: substrate
+formula: C6H5Br
+amount: 1.00 mmol
+equivalents: 1.0 equiv
+:::
+```
+
+Field reference:
+
+| field | semantics |
+| --- | --- |
+| `smiles` | required by the resolver and stored as the structure expression |
+| `cas` | CAS registry string, stored as raw text |
+| `name` | user-facing name |
+| `role` | user-defined role such as substrate, reagent, or product |
+| `caption` | render-layer caption |
+| `formula` | molecular formula text |
+| `amount` | amount quantity, supporting `mmol` and `mol` |
+| `equivalents` | equivalent quantity, supporting `equiv` and `eq` |
+| `chemistry_features` | extension feature reference list |
+
+## `kind: reaction`
+
+`kind: reaction` produces a `ReactionNode`. An explicit reaction must contain reaction-shaped fields, meaning at least one of `reactants`, `products`, `reactant`, `product`, `reac`, or `prod`. Missing reaction shape produces `E_CHEMD_KIND_CONFLICT`. The resolver requires both `reactants` and `products`.
+
+```md
+:::chemd #rxn-main
+kind: reaction
+name: Suzuki coupling
+reactants: @mol-aryl | @mol-boron
+products: @mol-product
+reagents: K2CO3
+catalyst: Pd(PPh3)4
+solvent: dioxane/water
+temperature: 90 C
+time: 12 h
+atmosphere: nitrogen
+yield: 82%
+:::
+```
+
+The typechecker performs four semantic passes for reactions: `reactants` and `products` become molecule reference lists, `prev` becomes reaction route references, `temperature`, `time`, and `pressure` become quantities, and `atmosphere` is normalized as a known value or extension.
+
+## Type Inference When `kind` Is Omitted
+
+The parser infers the `chemd` block type from field shape. The presence of `reactants`, `products`, or their aliases infers reaction; other valid chemd fields infer molecule. Non-strict mode emits `W_CHEMD_KIND_INFERRED` with an `insert_chemd_kind` quick fix. Strict mode emits `W_CHEMD_KIND_AMBIGUOUS`; CLI `validate` uses strict mode.
+
+Conflict matrix:
+
+| input shape | diagnostic |
+| --- | --- |
+| `kind: molecule` with reaction-shaped fields | `E_CHEMD_KIND_CONFLICT` |
+| `kind: reaction` without reaction-shaped fields | `E_CHEMD_KIND_CONFLICT` |
+| empty or invalid `kind` | `E_CHEMD_KIND_CONFLICT` |
+| omitted `kind` in strict mode | `W_CHEMD_KIND_AMBIGUOUS` |
+| omitted `kind` in non-strict mode | `W_CHEMD_KIND_INFERRED` |
+
+## Molecule Field Reference
+
+Molecule fields are limited by `MOLECULE_FIELDS`. Unknown fields produce `W_UNKNOWN_FIELD` and are omitted from the AST. Non-field body content can be read as an implicit `smiles` value; multiple implicit lines produce `W_INVALID_CHEMD_IMPLICIT_VALUE`.
+
+Quantity parsing:
+
+| field | quantity class | supported units | canonical unit |
+| --- | --- | --- | --- |
+| `amount` | amount | `mmol`, `mol` | `mmol` |
+| `equivalents` | equivalent | `equiv`, `eq` | `equiv` |
+
+Unparseable quantities are still retained as raw quantities in the typed graph, with `E403` emitted as a warning.
+
+## Reaction Field Reference
+
+Reaction fields are limited by `REACTION_FIELDS`. List fields include `reactants`, `products`, `reactant`, `product`, `reac`, `prod`, `conditions`, and `prev`. `reactant` and `reac` merge into `reactants`; `product` and `prod` merge into `products`.
+
+| field | parsing and semantics |
+| --- | --- |
+| `reactants` | molecule reference list, required by resolver |
+| `products` | molecule reference list, required by resolver |
+| `conditions` | string list used by rendering and export |
+| `route` | route label |
+| `prev` | predecessor reaction reference list |
+| `reagents` | raw text |
+| `catalyst` | raw text |
+| `solvent` | raw text and input to condition classification |
+| `temperature` | temperature quantity |
+| `time` | time quantity |
+| `pressure` | pressure quantity |
+| `atmosphere` | `nitrogen`, `argon`, `air`, `oxygen`, `inert`, or extension |
+| `yield` | AST string compared against linked result yield |
+| `conversion` | AST string compared against linked result conversion |
+| `selectivity` | AST string compared against linked result selectivity |
+
+## `reactants` and `products` References
+
+`reactants` and `products` support `|` and comma separators. References can use `@id` or bare IDs. The typechecker treats a bare ID as a reference when it resolves locally or through the external target index; unresolved bare values remain literals.
+
+```md
+reactants: @mol-aryl | mol-boron
+products: @mol-product
+```
+
+Invalid list example:
+
+```md
+reactants: @mol-a |
+```
+
+A trailing separator creates an empty list item and produces `E_INVALID_LIST_ITEM`.
+
+## `route` and `prev` Route Relationships
+
+`route` stores the route label or route ID. `prev` stores predecessor reaction references. The typechecker resolves `prev` through `resolveReactionPrevReferences`, with support for cross-document reactions through `reactionRouteContext`. Route validation includes typed-reference checks, route mismatch checks, cycle checks, and orphan checks.
+
+Related diagnostics:
+
+| code | trigger |
+| --- | --- |
+| `E_TYPED_REFERENCE_MISMATCH` | `prev` points to a non-reaction target |
+| `W_REACTION_ROUTE_MISMATCH` | predecessor route differs from current route |
+| `E_REACTION_ROUTE_CYCLE` | route graph contains a cycle |
+| `W_REACTION_ROUTE_ORPHAN` | route contains an unconnected reaction |
+
+## `chemistry_features` Extension References
+
+`chemistry_features` is converted by `readChemistryFeatureRefs` into `chemistryFeatureRefs`. Feature kind is `molecule` inside molecule nodes and `reaction` inside reaction nodes. The parser currently marks each feature as `status: "available"`. This field supports future chemistry feature enrichment, training export, and external graph integration.
+
+## Best Practice Example
+
+Declare molecule and reaction objects before downstream result, analysis, procedure, sample, and artifact blocks. Use `@id` for typed relationships and keep route links explicit.
+
+```md
+:::chemd #mol-substrate
+kind: molecule
+name: benzyl alcohol
+smiles: OCc1ccccc1
+role: substrate
+amount: 1.00 mmol
+equivalents: 1.0 equiv
+:::
+
+:::chemd #mol-product
+kind: molecule
+name: benzaldehyde
+smiles: O=Cc1ccccc1
+role: product
+:::
+
+:::chemd #rxn-oxidation
+kind: reaction
+name: benzyl alcohol oxidation
+route: route-oxidation
+reactants: @mol-substrate
+products: @mol-product
+reagents: MnO2
+solvent: CH2Cl2
+temperature: 25 C
+time: 4 h
+yield: 81%
+:::
+```
+

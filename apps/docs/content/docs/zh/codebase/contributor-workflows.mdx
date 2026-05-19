@@ -1,0 +1,52 @@
+---
+title: 贡献者工作流
+description: 基于当前包结构的语言变更、字段变更、诊断变更和测试更新流程。
+---
+
+贡献者工作流以当前代码路径为边界。语言面变更通常同时涉及 parser、core、resolver、compiler fixtures 和 tests。
+
+## 新增结构化块
+
+1. 在 `packages/core/src/ast.ts` 定义节点类型。
+2. 在 `packages/parser/src/body/block-parsers` 新增 block parser。
+3. 在 `packages/parser/src/body/block-parsers/index.ts` 注册 parser。
+4. 在 `packages/parser/tests` 添加解析测试。
+5. 在 `packages/compiler/fixtures` 添加使用样例。
+6. 在 `packages/compiler/tests` 添加编译或导出测试。
+7. 在 `apps/docs/content/docs` 更新语言手册。
+
+## 新增字段
+
+1. 更新 `packages/core/src/ast.ts` 中对应节点类型。
+2. 更新对应 block parser 的允许字段集合。
+3. 补充字段解析测试。
+4. 如果字段参与 resolver 逻辑，更新 `packages/resolver/src/index.ts`。
+5. 如果字段进入导出结果，更新对应 renderer 或 exporter 包。
+6. 补充 fixture 和文档。
+
+## 新增诊断
+
+1. 在产生问题的位置写入 `Diagnostic`。
+2. 保持 `code`、`severity`、`message`、`nodeId` 和 source metadata 一致。
+3. 为诊断添加测试。
+4. 如果有 quick fix，更新 compiler 输入辅助支撑文件。
+
+## 本地验证
+
+推荐顺序：
+
+```bash
+pnpm --filter @chemd/parser test
+pnpm --filter @chemd/resolver test
+pnpm --filter @chemd/compiler test
+pnpm run test:scripts
+pnpm run typecheck
+pnpm run lint
+```
+
+服务层变更需要补充 Python 测试：
+
+```bash
+pnpm run test:py
+```
+

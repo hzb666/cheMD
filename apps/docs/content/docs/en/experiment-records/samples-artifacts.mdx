@@ -1,0 +1,157 @@
+---
+title: Samples, Artifacts, and Evidence Chains
+description: Samples, artifacts, lineage fields, artifact fields, and evidence-chain organization.
+---
+
+
+## `:::sample`
+
+`:::sample` produces a `SampleNode`. The resolver requires `name`.
+
+```md
+:::sample #sample-crude-main
+ref: rxn-main
+name: Crude reaction mixture after aqueous workup
+sample_id: CR-2026-001
+batch: batch-main-001
+purity: 82 %
+notes: Brown oil before purification
+:::
+```
+
+`ref` can point to a reaction, result, or other object ID. `sample_id` and `batch` are stored as strings. `purity` enters the typechecker quantity parser and supports percent units.
+
+## `derived_from`, `aliquot_of`, and `batch_of`
+
+These fields are stored as strings. They express sample derivation, aliquot relationships, and batch relationships.
+
+```md
+:::sample #sample-batch-var1
+ref: rxn-var1
+name: Isolated product batch from var1
+batch: batch-var1
+:::
+
+:::sample #sample-aliquot-var1
+ref: rxn-var1
+name: TLC aliquot from var1
+aliquot_of: sample-batch-var1
+artifacts: art-tlc-var1
+:::
+
+:::sample #sample-nmr-var1
+ref: res-var1
+name: NMR tube sample from isolated product
+derived_from: sample-batch-var1
+batch_of: batch-var1
+artifacts: art-nmr-var1
+:::
+```
+
+`derived_from` records preparation lineage, `aliquot_of` records sampled material, and `batch_of` records batch membership. The current implementation stores these fields as strings; stable sample or batch IDs keep the chain inspectable.
+
+## `artifacts`
+
+`artifacts` is a sample list field and can use `|` or `,` separators. The parsed value is stored as `artifacts: string[]`.
+
+```md
+:::sample #sample-characterized
+name: Purified product for characterization
+artifacts: art-nmr-1h | art-nmr-13c | art-hplc-report
+:::
+```
+
+One-line lists are appropriate for short evidence sets. Larger evidence sets should keep each artifact as a separate block and only list artifact IDs on the sample.
+
+## `:::artifact`
+
+`:::artifact` produces an `ArtifactNode`. The resolver requires `kind` and `path`.
+
+```md
+:::artifact #art-nmr-1h
+kind: nmr
+ref: sample-characterized
+path: data/nmr/CR-2026-001-1H.jdx
+instrument: Bruker Avance 400
+notes: 1H NMR in CDCl3
+:::
+```
+
+`kind` describes the evidence type, `ref` connects the artifact to a sample, analysis, or result, and `path` stores the file path. The resolver only requires `kind` and `path`.
+
+## File Paths, `checksum`, and `instrument`
+
+Artifact fields include `kind`, `ref`, `path`, `checksum`, `instrument`, `notes`, and `chemistry_features`. The parser does not check file existence or checksum format.
+
+```md
+:::artifact #art-hplc-report
+kind: hplc
+ref: ana-hplc-main
+path: reports/hplc/main-product.pdf
+checksum: sha256:2b6f1c7f0d9e4c0a
+instrument: Agilent 1260 Infinity II
+notes: Exported integration report
+:::
+```
+
+Repository-relative paths are recommended. `checksum` can store any checksum string; the language layer does not restrict algorithm prefixes. `instrument` records the acquisition device or analysis platform.
+
+## Evidence Chains Across Samples, Results, Analyses, and Artifacts
+
+Use `sample.ref` for reaction or result association, `sample.artifacts` for attached evidence, and `artifact.ref` for sample, analysis, or result targets. The same pattern works for NMR, TLC, LCMS, image, and report evidence.
+
+```md
+:::result #res-main
+ref: rxn-main
+status: success
+yield: 68 %
+purity: 96 %
+:::
+
+:::sample #sample-main
+ref: res-main
+name: Purified main product
+derived_from: sample-crude-main
+artifacts: art-nmr-1h | art-hplc-report
+:::
+
+:::analysis #ana-hplc-main
+type: hplc
+ref: sample-main
+instrument: Agilent 1260 Infinity II
+method: C18 gradient 10-90% MeCN
+result: purity 96 %
+data: reports/hplc/main-product.pdf
+:::
+
+:::artifact #art-hplc-report
+kind: hplc
+ref: ana-hplc-main
+path: reports/hplc/main-product.pdf
+instrument: Agilent 1260 Infinity II
+:::
+```
+
+The chain is `result -> sample -> analysis -> artifact`. Result fields hold conclusions, sample fields hold material lineage, analysis fields hold method and data summaries, and artifact fields hold file locations.
+
+## Best Practice Example
+
+Use samples for material identity and lineage. Use artifacts for file evidence. Keep analytical interpretation in `:::analysis`.
+
+```md
+:::sample #sample-purified
+ref: res-main
+name: Purified product
+sample_id: P-2026-0519-01
+derived_from: rxn-main
+artifacts: art-nmr-1h | art-hplc-report
+:::
+
+:::artifact #art-nmr-1h
+kind: nmr
+ref: sample-purified
+path: data/nmr/product-1h.jdx
+checksum: sha256:9c8a7f1e
+instrument: Bruker Avance 400
+:::
+```

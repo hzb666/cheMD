@@ -1,0 +1,77 @@
+---
+title: '`:::condition-varies` 条件筛选块'
+description: '`:::condition-varies` 表达标准条件、变化字段、候选 attempt、结果和备注。'
+---
+
+`:::condition-varies` 允许任意条件字段，固定元字段包括 `reaction`、`standard`、`condition`、`varies` 和 `notes`。
+
+## 单一变化写法
+
+```md
+:::condition-varies #cv-solvent
+reaction: rxn-variant
+standard: rxn-standard
+solvent: THF -> MeCN
+temperature: 25 C -> 40 C
+notes: solvent and temperature screen
+:::
+```
+
+`field: A -> B` 或 `field: A => B` 会生成 delta。没有箭头时保存 raw 值。
+
+## 并行 attempt 写法
+
+```md
+:::condition-varies #cv-screen
+standard: rxn-standard
+condition: solvent=THF | temperature=25 C | catalyst=Pd
+varies: solvent | temperature
+var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
+res1: res-var1
+note1: higher yield, minor impurity
+var2: reaction=rxn-var2 | mode=override | solvent=DMSO | temperature=60 C | catalyst=Ni
+res2: res-var2
+note2: trace product by TLC
+:::
+```
+
+## 字段
+
+| 字段 | 说明 |
+| --- | --- |
+| `reaction` | 当前 variation 关联 reaction |
+| `standard` | 标准 reaction |
+| `condition` | 基线条件，格式为 `field=value | field=value` |
+| `varies` | 变化字段列表 |
+| `notes` | 备注 |
+| `varN` | 第 N 个 attempt，N 为数字 |
+| `resN` | 第 N 个 attempt 的 result |
+| `noteN` | 第 N 个 attempt 的备注 |
+| 其他字段 | 顶层变化 delta |
+
+`varN` 内部支持 `id`、`reaction`、`ref`、`result`、`res`、`note`、`notes`、`mode` 以及任意条件字段。`mode=override`、`mode=full` 和 `mode=replace` 都归一化为 `override`；其他 mode 为 `partial`。`partial` 会继承 `condition` 中未变化的基线条件。
+
+## 必填与默认值
+
+该块没有 resolver 必填字段。attempt ID 默认使用 `varN`。`partial` attempt 会把未变化的基线字段写入 attempt condition，candidate 等于 baseline。
+
+## 推荐实践案例
+
+条件筛选应显式声明 standard reaction、每个 variation reaction 和 result。`varies` 只列实际比较维度。
+
+```md
+:::condition-varies #cv-base-screen
+standard: rxn-standard
+condition: solvent=THF | temperature=25 C | base=K2CO3 | catalyst=Pd(PPh3)4
+varies: solvent | temperature
+var1: id=screen-meCN-40 | reaction=rxn-meCN-40 | solvent=MeCN | temperature=40 C
+res1: res-meCN-40
+note1: best conversion in first pass
+var2: id=screen-dioxane-90 | reaction=rxn-dioxane-90 | solvent=dioxane/water | temperature=90 C
+res2: res-dioxane-90
+:::
+```
+
+## 诊断
+
+`condition-varies` parser 接受任意条件字段，因此未知条件字段不会产生 `W_UNKNOWN_FIELD`。ID 非法仍产生 `E_INVALID_ID`。引用关系在 typechecker 和导出层中解析。

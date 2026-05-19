@@ -1,0 +1,51 @@
+---
+title: Contributor Workflows
+description: Workflows for language changes, field changes, diagnostics, and test updates based on the current package structure.
+---
+
+Contributor workflows use current code paths as boundaries. Language surface changes commonly touch parser, core, resolver, compiler fixtures, and tests.
+
+## Add a Structured Block
+
+1. Define the node type in `packages/core/src/ast.ts`.
+2. Add a block parser under `packages/parser/src/body/block-parsers`.
+3. Register the parser in `packages/parser/src/body/block-parsers/index.ts`.
+4. Add parser tests under `packages/parser/tests`.
+5. Add a language example under `packages/compiler/fixtures`.
+6. Add compile or export tests under `packages/compiler/tests`.
+7. Update the language manual under `apps/docs/content/docs`.
+
+## Add a Field
+
+1. Update the corresponding node type in `packages/core/src/ast.ts`.
+2. Update the allowed field set in the relevant block parser.
+3. Add field parsing tests.
+4. Update `packages/resolver/src/index.ts` when the field participates in resolver logic.
+5. Update the relevant renderer or exporter package when the field enters output data.
+6. Add fixtures and documentation.
+
+## Add a Diagnostic
+
+1. Write a `Diagnostic` at the location that detects the issue.
+2. Keep `code`, `severity`, `message`, `nodeId`, and source metadata consistent.
+3. Add tests for the diagnostic.
+4. Update compiler input-assistance support files when a quick fix exists.
+
+## Local Verification
+
+Recommended order:
+
+```bash
+pnpm --filter @chemd/parser test
+pnpm --filter @chemd/resolver test
+pnpm --filter @chemd/compiler test
+pnpm run test:scripts
+pnpm run typecheck
+pnpm run lint
+```
+
+Service-layer changes need Python tests:
+
+```bash
+pnpm run test:py
+```

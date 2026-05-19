@@ -1,0 +1,36 @@
+{
+  "name": "@chemd/docs",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/run-next.mjs build --webpack",
+    "dev": "node scripts/run-next.mjs dev --port 2437",
+    "start": "next start",
+    "typecheck": "node scripts/run-next.mjs typegen && tsc --noEmit",
+    "types:check": "pnpm typecheck",
+    "postinstall": "node scripts/generate-source.mjs",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "fumadocs-core": "16.8.11",
+    "fumadocs-mdx": "15.0.6",
+    "fumadocs-ui": "16.8.11",
+    "lucide-react": "^1.16.0",
+    "next": "16.2.6",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "tailwind-merge": "^3.6.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.0",
+    "@types/mdx": "^2.0.13",
+    "@types/node": "^25.7.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "postcss": "^8.5.14",
+    "tailwindcss": "^4.3.0",
+    "typescript": "^6.0.3",
+    "eslint-config-next": "16.2.6",
+    "eslint": "^10.3.0"
+  }
+}

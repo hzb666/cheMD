@@ -1,0 +1,205 @@
+---
+id: exp-docs-language-contract
+title: Documentation language contract
+date: 2026-05-19
+primary_reaction: rxn-main
+primary_result: res-main
+primary_sample: sample-product
+primary_analysis: ana-tlc
+---
+
+The source title is @meta.title. The primary reaction ran at @reaction.temperature.
+Inline chemistry is written as :chem[CCO] in Markdown prose.
+
+:::chemd #mol-substrate
+kind: molecule
+name: benzaldehyde
+smiles: O=Cc1ccccc1
+role: substrate
+:::
+
+:::chemd #mol-product
+kind: molecule
+name: benzyl alcohol
+smiles: OCc1ccccc1
+role: product
+:::
+
+:::chemd #rxn-main
+kind: reaction
+name: reduction
+reactants: @mol-substrate
+products: @mol-product
+reagents: NaBH4
+solvent: MeOH
+temperature: 25 C
+time: 1 h
+atmosphere: nitrogen
+yield: 82%
+:::
+
+:::chemd #rxn-var1
+kind: reaction
+name: lower temperature variant
+reactants: @mol-substrate
+products: @mol-product
+reagents: NaBH4
+solvent: MeOH
+temperature: 0 C
+time: 2 h
+atmosphere: nitrogen
+yield: 64%
+:::
+
+:::result #res-main
+reaction: rxn-main
+product: mol-product
+status: success
+yield: 82%
+conversion: 94%
+selectivity: 90%
+isolated_mass: 120 mg
+product_state: colorless oil
+purity: 98%
+notes: product isolated after extraction
+:::
+
+:::result #res-var1
+reaction: rxn-var1
+product: mol-product
+status: partial
+yield: 64%
+conversion: 75%
+purity: 92%
+notes: lower temperature slowed conversion
+:::
+
+:::analysis #ana-tlc
+type: tlc
+ref: rxn-main
+time: 1 h
+eluent: petroleum ether/ethyl acetate 3:1
+p1: sm 0.62
+p2: rxn 0.31 ^3(4) | sm 0.62 v1
+p3: product 0.30
+:::
+
+:::analysis #ana-hplc
+type: hplc
+ref: res-main
+method: area normalization
+instrument: Agilent 1260
+result: 98% area product peak
+data: Main peak at 6.2 min with trace impurity.
+:::
+
+:::sample #sample-crude
+name: crude reaction mixture
+ref: rxn-main
+derived_from: rxn-main
+artifacts: art-tlc
+:::
+
+:::sample #sample-product
+name: purified product
+ref: res-main
+derived_from: sample-crude
+purity: 98%
+artifacts: art-nmr | art-hplc
+:::
+
+:::artifact #art-tlc
+kind: tlc_image
+ref: ana-tlc
+path: data/tlc/main.png
+instrument: phone camera
+:::
+
+:::artifact #art-nmr
+kind: nmr_spectrum
+ref: sample-product
+path: data/nmr/product.pdf
+checksum: sha256:productnmr
+instrument: Bruker 400
+:::
+
+:::artifact #art-hplc
+kind: hplc_report
+ref: ana-hplc
+path: data/hplc/product.pdf
+instrument: Agilent 1260
+:::
+
+:::condition-varies #cv-temperature
+standard: rxn-main
+condition: solvent=MeOH | temperature=25 C | atmosphere=nitrogen
+varies: temperature | time
+var1: reaction=rxn-var1 | temperature=0 C | time=2 h
+res1: res-var1
+note1: lower temperature reduces conversion
+notes: one-variable temperature screen
+:::
+
+:::procedure #proc-main
+ref: rxn-main
+reaction: rxn-main
+evidence: notebook-page-12,art-tlc
+step: charge | id=s-charge | inputs=@mol-substrate | outputs=mixture-a | evidence=notebook-page-12 | confidence=0.98
+step: cool | id=s-cool | temperature=0 C | dependsOn=s-charge
+
+:::step #s-add
+family: add
+stage: reaction
+inputs: NaBH4
+outputs: mixture-b
+dependsOn: s-cool
+evidence: notebook-page-12
+confidence: 0.95
+:::
+
+step: heat | id=s-warm | temperature=25 C | duration=1 h | dependsOn=s-add
+step: sample | id=s-sample | outputs=@sample-crude | dependsOn=s-warm
+step: analyze | id=s-analyze | analysisType=tlc | dependsOn=s-sample
+:::
+
+:::observation #obs-main
+ref: proc-main
+event: color_change | id=e-color | value=pale-yellow | linkedStep=s-add | confidence=0.8
+
+:::event #e-gas
+type: gas_evolution
+severity: low
+linkedStep: s-add
+evidence: notebook-page-12
+confidence: 0.7
+:::
+:::
+
+:::template reaction-summary
+params: rxn: ref<reaction> | result: ref<result> | label: string | target: quantity<temperature>
+bind: reaction=rxn-main
+description: reusable reaction summary
+
+Template @param.label resolves @param.rxn and @param.result at @param.target.
+Bound reaction solvent is @reaction.solvent.
+:::
+
+:::use reaction-summary
+rxn: rxn-main
+result: res-main
+label: main reduction
+target: 25 C
+:::
+
+:::col 3
+col: Left column reads @reaction.solvent and @res-main.yield.
+col: {
+Middle column keeps Markdown content and :chem[NaBH4].
+}
+col: {:::analysis #ana-col
+type: tlc
+ref: res-main
+data: Column analysis content compiled through col child parsing.
+:::
+:::}
+:::

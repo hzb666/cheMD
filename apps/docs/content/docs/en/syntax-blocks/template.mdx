@@ -1,0 +1,73 @@
+---
+title: '`:::template` Template Block'
+description: '`:::template` defines reusable content with bind, params, typed parameters, and resolver expansion.'
+---
+
+`:::template` declares reusable content. A template does not directly become an object node; it is expanded when `:::use` invokes it.
+
+## Syntax
+
+```md
+:::template reaction-summary
+description: standard reaction summary paragraph
+bind: reaction=primary_reaction | result=primary_result
+params:
+  - label: string
+  - sample: ref<sample>
+  - amount: quantity<amount>
+
+Reaction @reaction.name used @param.amount of material. Result @result.yield was recorded for @param.label.
+:::
+```
+
+## Fields
+
+| field | notes |
+| --- | --- |
+| `description` | template description |
+| `bind` | alias binding, `alias=source | alias=source` |
+| `params` | parameter list, either `params: a | b` or YAML-style items |
+| `body` | accepted as a header field, but current implementation parses the following block content as template body |
+
+## Parameter Types
+
+| type | notes |
+| --- | --- |
+| `string` | default type |
+| `ref<kind>` | reference type; kind supports `molecule`, `reaction`, `result`, `analysis`, `procedure`, `observation`, `sample`, `artifact`, and `condition_varies` |
+| `quantity<class>` | quantity type; class supports the resolver quantity classes such as amount, mass, volume, temperature, time, pressure, concentration, equivalent, and percent |
+| `quantity` | any supported quantity |
+
+Unknown parameter types fall back to `string`. Invalid parameter names are ignored. Parameter names start with a letter or `_` and then allow letters, digits, and `_`.
+
+## Bindings and References
+
+Template bodies can use:
+
+| reference | semantics |
+| --- | --- |
+| `@param.name` | parameter value from the current `:::use` |
+| `@reaction.field` | object field resolved through `bind` or primary alias |
+| `@result.field` | same alias mechanism |
+| `@id.field` | normal object field |
+| `@meta.field` | frontmatter metadata |
+
+## Expansion Limits
+
+The resolver limits template expansion depth to 32 and expanded node count to 2000. Cycles produce `E_TEMPLATE_CYCLE`; unknown templates produce `E_UNKNOWN_TEMPLATE`.
+
+## Recommended Practice
+
+Templates are suitable for repeated prose structures. Use typed parameters, and pass object IDs or `@id` values for reference parameters.
+
+```md
+:::template analytical-confirmation
+description: reusable analytical confirmation sentence
+bind: reaction=primary_reaction | result=primary_result
+params:
+  - sample: ref<sample>
+  - method: string
+
+The sample @param.sample was analyzed by @param.method. The result @result.yield is assigned to @reaction.name.
+:::
+```

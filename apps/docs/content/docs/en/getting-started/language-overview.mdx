@@ -1,0 +1,43 @@
+---
+title: Chemd Language Overview
+description: Chemd source files, AST layers, compiler outputs, and the implemented language surface.
+---
+
+
+## Chemd Source Model
+
+A Chemd source consists of frontmatter, Markdown prose, and structured blocks. The parsed root node is `ChemdDocument`, with `meta`, `children`, `diagnostics`, optional `source`, and optional `renderSelection`.
+
+`children` can contain Markdown nodes and structured nodes. Structured nodes cover molecules, reactions, results, analyses, procedures, observations, samples, artifacts, condition screens, template calls, and column layout.
+
+## User Input, AST, and Compiler Output Layers
+
+The user input layer contains YAML frontmatter, Markdown text, and `:::` structured blocks. The AST layer is produced by parser and resolver, preserving fields, reference tokens, source spans, diagnostics, and generated object IDs. The compiler output layer is assembled by `compileChemd`, which currently returns HTML, JSON, DOCX bridge, LNF, RAG export, training understanding, full training export, typed semantic graph, step graph, run plan, and diagnosis.
+
+## Current Implemented Language Surface
+
+The body parser registers `chemd`, `result`, `analysis`, `artifact`, `sample`, `condition-varies`, `procedure`, `observation`, `use`, and `col`. Template blocks are recognized by the body parsing flow and produce `template` nodes.
+
+The current semantic usage surface uses `:::chemd` for both molecule and reaction records.
+
+## Minimal Validatable Document
+
+The `validate` command compiles with `strictChemdKind: true`. A minimal validatable document needs required frontmatter and an explicit `kind` in `:::chemd`.
+
+```md validate
+---
+id: exp-minimal
+title: Minimal Chemd source
+date: 2026-04-24
+---
+
+:::chemd #mol-main
+kind: molecule
+name: ethanol
+smiles: CCO
+:::
+```
+
+This example satisfies required frontmatter and the molecule `smiles` requirement.
+
+

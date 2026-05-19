@@ -1,0 +1,167 @@
+---
+title: Experiment Record Patterns
+description: Chemd patterns for one-step reactions, route steps, condition screens, procedures, and observations.
+---
+
+Chemd experiment records are centered on object relations. Prose can carry narrative content, while stable semantics belong in fields.
+
+## One-Step Synthesis Record
+
+A one-step record usually contains:
+
+- `:::chemd` objects for molecules and the main reaction.
+- One `:::result` that points to the main reaction through `ref`.
+- One `:::procedure` that points to the main reaction through `reaction` or `ref`.
+- One or more `:::analysis`, `:::sample`, and `:::artifact` blocks.
+
+```md
+---
+id: exp-one-step-esterification
+title: Standard Fischer esterification
+date: 2026-04-24
+primary_reaction: rxn-main
+primary_result: res-main
+---
+
+:::chemd #mol-acid
+kind: molecule
+name: benzoic acid
+smiles: O=C(O)c1ccccc1
+role: substrate
+:::
+
+:::chemd #mol-product
+kind: molecule
+name: ethyl benzoate
+smiles: CCOC(=O)c1ccccc1
+role: product
+:::
+
+:::chemd #rxn-main
+kind: reaction
+name: Fischer esterification
+reactants: @mol-acid
+products: @mol-product
+catalyst: H2SO4
+solvent: ethanol
+temperature: 78 C
+time: 4 h
+:::
+
+:::result #res-main
+ref: rxn-main
+product: @mol-product
+status: success
+yield: 76%
+purity: 95%
+:::
+```
+
+## Route Steps
+
+Route relations are written on reaction fields:
+
+- `route` identifies the route that contains the reaction.
+- `prev` identifies upstream reactions required by the current reaction.
+
+```md
+:::chemd #rxn-step-07
+kind: reaction
+name: C7 hydroxyl protection
+route: route-taxol-a
+prev: rxn-step-06
+reactants: @mol-step-06
+products: @mol-step-07
+reagents: TBSCl | imidazole
+solvent: DMF
+temperature: 25 C
+time: 3 h
+:::
+```
+
+This structure supports graph export and route aggregation. Users declare upstream dependencies on the current node.
+
+## Condition Screens
+
+`:::condition-varies` expresses the standard condition, varied fields, and attempts.
+
+```md
+:::condition-varies #cv-screen
+standard: rxn-standard
+condition: solvent=THF | temperature=25 C | catalyst=Pd(PPh3)4
+varies: solvent | temperature | catalyst
+var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
+res1: res-var1
+note1: Higher conversion with the baseline catalyst.
+var2: reaction=rxn-var2 | mode=override | solvent=DMF | temperature=60 C | catalyst=Pd(dppf)Cl2
+res2: res-var2
+note2: Full override lowers conversion and purity.
+:::
+```
+
+Parsing rules:
+
+- `condition` becomes baseline variables.
+- `varN` becomes an attempt.
+- `resN` and `noteN` bind to the attempt with the same number.
+- `mode=override` marks the attempt as a full condition override.
+- Attempts without override inherit unchanged baseline conditions.
+
+## Procedure Steps
+
+`:::procedure` supports inline step syntax.
+
+```md
+:::procedure #proc-var1
+ref: rxn-var1
+reaction: rxn-var1
+evidence: notebook-24,photo-var1
+step: charge | id=s-charge-var1 | stage=charging | inputs=@mol-aryl,@mol-boron | confidence=0.97
+step: heat | id=s-heat-var1 | stage=reaction | temperature=40 C | duration=2 h | dependsOn=s-charge-var1 | confidence=0.95
+step: sample | id=s-sample-var1 | stage=monitoring | outputs=@sample-aliquot-var1 | dependsOn=s-heat-var1 | confidence=0.93
+:::
+```
+
+A step line uses `|` segments. Each structured segment uses `key=value`. Structural fields include `id`, `family`, `inputs`, `outputs`, `dependsOn`, `stage`, `purpose`, `evidence`, and `confidence`.
+
+## Observation Events
+
+`:::observation` supports inline event syntax.
+
+```md
+:::observation #obs-var1
+ref: @cv-screen.var1
+event: color_change | id=e-color-var1 | timepoint=30 min | severity=low | linkedStep=s-heat-var1 | evidence=photo-var1 | confidence=0.88
+event: precipitation | id=e-solid-var1 | timepoint=after quench | severity=low | linkedStep=s-quench-var1 | evidence=photo-var1b | confidence=0.74
+:::
+```
+
+An event line uses `|` segments. Structural fields include `id`, `type`, `eventType`, `event_type`, `stage`, `timepoint`, `severity`, `linkedStep`, `evidence`, and `confidence`.
+
+## Best Practice Example
+
+For routine experiments, use one main reaction, one main result, explicit procedure steps, and explicit observation events. Add condition screening or route links only when the experiment actually needs those structures.
+
+```md
+:::chemd #rxn-main
+kind: reaction
+reactants: @mol-substrate
+products: @mol-product
+solvent: MeCN
+temperature: 60 C
+:::
+
+:::result #res-main
+reaction: rxn-main
+product: mol-product
+status: success
+yield: 76%
+:::
+
+:::procedure #proc-main
+reaction: rxn-main
+step: charge | id=s-charge | inputs=@mol-substrate | outputs=mixture-a
+step: analyze | id=s-tlc | analysisType=tlc | dependsOn=s-charge
+:::
+```
+

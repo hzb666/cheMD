@@ -1,0 +1,234 @@
+---
+title: 条件筛选
+description: '`:::condition-varies`、baseline、attempt、result pairing 和 attempt 引用。'
+---
+
+
+## `:::condition-varies` 模型
+
+`:::condition-varies` 生成 `ConditionVariesNode`，AST 类型为 `condition_varies`。字段集合开放，解析器把标准字段和 attempt 字段归一为结构化数组。
+
+```md
+:::condition-varies #cv-solvent
+reaction: rxn-screen
+standard: rxn-baseline
+condition: solvent=THF | temperature=25 C | base=K2CO3
+varies: solvent | temperature
+var1: id=attempt-mecn-40 | reaction=rxn-mecn-40 | solvent=MeCN | temperature=40 C
+res1: res-mecn-40
+note1: clean conversion by TLC
+:::
+```
+
+`reaction` 表示筛选所属的总体反应或筛选记录。`standard` 表示基线反应。`condition` 给出 baseline 条件。`varN`、`resN` 和 `noteN` 按数字后缀成对归入 attempt。
+
+## `standard` 标准反应
+
+`standard` 保存标准反应 ID。fixtures 使用它指向 baseline reaction。
+
+```md
+:::chemd #rxn-baseline
+kind: reaction
+reactants: mol-a | mol-b
+products: mol-p
+solvent: THF
+temperature: 25 C
+:::
+
+:::condition-varies #cv-base
+standard: rxn-baseline
+condition: solvent=THF | temperature=25 C
+varies: solvent
+:::
+```
+
+`standard` 由 typechecker 按 reaction 引用校验。目标缺失或目标类型不匹配时会产生 typed reference mismatch 诊断。
+
+## `condition` 基线条件
+
+`condition` 按 `field=value` 分段解析为 baseline 变量。分隔符支持 `|` 和 `,`。
+
+```md
+:::condition-varies #cv-base-condition
+condition: solvent=THF | temperature=25 C, base=K2CO3
+varies: solvent | base
+:::
+```
+
+推荐使用 `|` 分隔多项条件。逗号同样有效，但温度、溶剂体系或备注中出现逗号时，`|` 更稳定。
+
+## `varies` 变化字段
+
+`varies` 解析为 `varyFields`，用于声明筛选维度。
+
+```md
+:::condition-varies #cv-dimensions
+condition: solvent=THF | temperature=25 C | catalyst=none
+varies: solvent | temperature | catalyst
+var1: id=attempt-dmf | solvent=DMF
+var2: id=attempt-60c | temperature=60 C
+var3: id=attempt-pd | catalyst=Pd(PPh3)4
+:::
+```
+
+`varies` 是筛选维度清单。attempt 中仍可记录未列入 `varies` 的字段；该字段会作为 attempt 条件保存，但不会成为显式变化维度。
+
+## `varN` attempt 语法
+
+`var1`、`var2` 等字段生成 attempt。attempt 值支持 `reaction=rxn-var1`，也支持第一个裸值作为 reaction。
+
+```md
+:::condition-varies #cv-attempts
+condition: solvent=THF | temperature=25 C
+varies: solvent | temperature
+var1: rxn-mecn-40 | id=attempt-mecn-40 | solvent=MeCN | temperature=40 C
+var2: id=attempt-dmf-60 | reaction=rxn-dmf-60 | solvent=DMF | temperature=60 C
+:::
+```
+
+第一个 attempt 使用裸值 `rxn-mecn-40` 提供 reaction。第二个 attempt 使用显式 `reaction=rxn-dmf-60`。两种写法在 AST 中都会得到 attempt reaction。
+
+变化段还支持箭头写法：
+
+```md
+:::condition-varies #cv-arrow
+condition: solvent=THF | temperature=25 C
+varies: solvent | temperature
+var1: id=attempt-mecn | solvent: THF -> MeCN | temperature: 25 C => 40 C
+:::
+```
+
+箭头左侧为 baseline 值，右侧为 candidate 值。解析结果把 candidate 写入 attempt 条件。
+
+## `resN` 与 `noteN`
+
+`res1` 和 `note1` 会并入对应 attempt 的 `result` 与 `note`。attempt 内的 `result`、`res`、`note` 和 `notes` 也可提供同类信息。
+
+```md
+:::result #res-mecn-40
+status: success
+yield: 71 %
+conversion: 95 %
+:::
+
+:::condition-varies #cv-results
+condition: solvent=THF | temperature=25 C
+varies: solvent
+var1: id=attempt-mecn-40 | reaction=rxn-mecn-40 | solvent=MeCN
+res1: res-mecn-40
+note1: isolated after column chromatography
+var2: id=attempt-dmf | reaction=rxn-dmf | solvent=DMF | result=res-dmf | notes=slower conversion
+:::
+```
+
+`resN` 与 `noteN` 适合把 attempt 主体保持为条件变化；attempt 内联 `result` 与 `notes` 适合记录较短的筛选表。
+
+## `mode=override`
+
+attempt 的 `mode` 为 `override`、`full` 或 `replace` 时，AST 中保存为 `mode: "override"`。其他 mode 值按 partial 处理。partial 会继承 baseline 条件。
+
+```md
+:::condition-varies #cv-mode
+condition: solvent=THF | temperature=25 C | base=K2CO3
+varies: solvent | temperature | base
+var1: id=attempt-partial | solvent=MeCN
+var2: id=attempt-full | mode=override | solvent=DMF | temperature=80 C
+:::
+```
+
+`attempt-partial` 会继承 `temperature=25 C` 与 `base=K2CO3`。`attempt-full` 按完整候选条件保存，只保留 attempt 明确提供的条件字段。
+
+## `@cv-screen.var1` attempt 引用
+
+resolver 的字段读取逻辑对 `condition_varies` 做了专门处理。`@cv-screen.var1` 会返回 ID 为 `var1` 的 attempt。
+
+```md
+:::condition-varies #cv-screen
+condition: solvent=THF
+varies: solvent
+var1: id=attempt-mecn | reaction=rxn-mecn | solvent=MeCN
+:::
+
+Attempt summary: @cv-screen.var1
+```
+
+字段名必须匹配 attempt ID。使用显式 `id=attempt-mecn` 时，引用字段为 `@cv-screen.attempt-mecn`；未提供 `id` 时，默认字段名为 `var1`、`var2` 等序号键。
+
+## 条件筛选与 reaction/result 的组织模式
+
+推荐为 baseline 和每个 attempt 建立独立 reaction/result，再由 `condition-varies` 连接标准反应、变化字段、attempt reaction 和 result。该结构能让每个 attempt 作为条件变化数据导出。
+
+```md
+:::chemd #mol-a
+kind: molecule
+smiles: CCO
+name: alcohol substrate
+:::
+
+:::chemd #mol-p
+kind: molecule
+smiles: CC=O
+name: oxidized product
+:::
+
+:::chemd #rxn-baseline
+kind: reaction
+reactants: mol-a
+products: mol-p
+solvent: THF
+temperature: 25 C
+:::
+
+:::chemd #rxn-mecn-40
+kind: reaction
+reactants: mol-a
+products: mol-p
+solvent: MeCN
+temperature: 40 C
+:::
+
+:::result #res-mecn-40
+ref: rxn-mecn-40
+status: success
+yield: 71 %
+:::
+
+:::condition-varies #cv-oxidation
+reaction: rxn-baseline
+standard: rxn-baseline
+condition: solvent=THF | temperature=25 C
+varies: solvent | temperature
+var1: id=attempt-mecn-40 | reaction=rxn-mecn-40 | solvent=MeCN | temperature=40 C
+res1: res-mecn-40
+:::
+```
+
+这种组织方式让 reaction、result 和 condition attempt 各自拥有稳定 ID。graph export 可据此建立筛选表、结果节点和反应路线边。
+
+## attempt 解析清单
+
+`condition` 与 `varN` 的变化段支持两种写法：`field=value` 和 `baseline -> candidate` 或 `baseline => candidate`。`mode=override`、`mode=full` 与 `mode=replace` 都归一为 override；其他 mode 归一为 partial。partial attempt 会继承 baseline condition 值，并用变化字段覆盖对应 key。
+
+attempt meta 字段包括 `id`、`reaction`、`ref`、`result`、`res`、`note`、`notes` 和 `mode`。`reaction` 可来自 `reaction`、`ref` 或第一个 bare segment。`resN` 与 `noteN` 会并入对应序号的 attempt。
+
+typechecker 对 `reaction` 与 `standard` 要求 reaction 目标，对 attempt 的 `result` 要求 result 目标。target kind 不匹配时产生 `E_TYPED_REFERENCE_MISMATCH`。
+
+## 推荐实践示例
+
+条件筛选记录应把 baseline reaction 与 variation reaction 都声明为普通 `:::chemd` reaction。每个 attempt 的实验结果写入独立 `:::result`，再通过 `resN` 连接。
+
+```md
+:::condition-varies #cv-solvent-temperature
+standard: rxn-baseline
+condition: solvent=THF | temperature=25 C | base=K2CO3
+varies: solvent | temperature
+var1: id=screen-mecn-40 | reaction=rxn-mecn-40 | solvent=MeCN | temperature=40 C
+res1: res-mecn-40
+note1: best isolated yield in the first screen
+var2: id=screen-dmf-60 | reaction=rxn-dmf-60 | mode=override | solvent=DMF | temperature=60 C | base=Cs2CO3
+res2: res-dmf-60
+note2: full condition replacement
+:::
+```
+
+仅当 attempt 表示完整条件替换时使用 `mode=override`。局部变化省略 `mode`，由 parser 按 partial attempt 继承未变化的 baseline 字段。

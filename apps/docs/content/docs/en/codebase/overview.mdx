@@ -1,0 +1,86 @@
+---
+title: Repository Structure
+description: Chemd monorepo workspaces, applications, packages, services, and scripts.
+---
+
+Chemd uses a `pnpm` workspace. `pnpm-workspace.yaml` declares two workspace patterns:
+
+```yaml
+packages:
+  - apps/*
+  - packages/*
+```
+
+## Root Configuration
+
+| Path | Role |
+| --- | --- |
+| `package.json` | Root scripts, dependency overrides, and workspace tool entrypoints |
+| `pnpm-workspace.yaml` | Workspace package discovery |
+| `turbo.json` | `build`, `dev`, `test`, and `typecheck` task configuration |
+| `tsconfig.base.json` | Base TypeScript configuration and workspace path aliases |
+| `eslint.config.mjs` | TypeScript, React, script, and test lint configuration |
+| `vitest.workspace.ts` | Vitest workspace configuration |
+
+## Workspace Shape
+
+The workspace is intentionally split into applications and reusable packages:
+
+```text
+apps/*      Product surfaces and documentation
+packages/*  Reusable language, rendering, export, runtime, and integration packages
+services/*  Python service processes used by web or desktop integration
+scripts/*   Root-level automation, smoke checks, migration helpers, and release gates
+```
+
+The root package exposes high-level commands, while each workspace package keeps its own `build`, `test`, and `typecheck` scripts. `turbo.json` wires package-level tasks so dependency packages run before the packages that consume them.
+
+## Applications
+
+| Path | Package | Stack |
+| --- | --- | --- |
+| `apps/web` | `@chemd/web` | Next.js, React, server routes |
+| `apps/desktop` | `@chemd/desktop` | Vite, React, Tauri, Rust |
+| `apps/docs` | `@chemd/docs` | Next.js, Fumadocs |
+
+Applications should stay thin around product workflows. Shared language behavior, rendering, export, storage, and workspace logic belongs in `packages` unless it is truly app-specific.
+
+## Packages
+
+The `packages` directory contains language core, compiler, rendering, export, storage, desktop capability, and developer tooling packages. Packages depend on each other through `workspace:*`.
+
+## Main Data Flows
+
+| Flow | Sequence | Notes |
+| --- | --- | --- |
+| Language compilation | `parser` -> `resolver` -> `typechecker` -> `compiler` | Turns source text into diagnostics, typed graph, step graph, render data, and exports |
+| Render and export | `compiler` -> `render-profile` -> renderer packages -> `exporter-training` | Handles previews, JSON, DOCX bridge, LNF, RAG, and training data |
+| Editor support | apps -> `language-service` -> parser/resolver/compiler packages | Powers diagnostics and editor-facing language behavior |
+| Workspace indexing | apps -> `workspace-index` -> compiler/export packages | Builds workspace document indexes for search, graph, and RAG workflows |
+| Storage and graph | apps/services -> `storage-postgres`, `reaction-map`, `exporter-training` | Persists records, graph data, and reaction intelligence surfaces |
+
+When a behavior appears in both CLI and app surfaces, the shared package should own the behavior and the app or CLI should only adapt inputs and outputs.
+
+## Services
+
+| Path | Description |
+| --- | --- |
+| `services/chem-service` | Flask chemistry HTTP service, OCR providers, RDKit-first rendering and normalization |
+| `services/chem-cluster-service` | Reaction clustering, layout, and reaction intelligence service code |
+
+## Scripts
+
+The `scripts` directory contains development startup, PostgreSQL, desktop smoke, diagnostics bundle, and migration scripts. Root `package.json` exposes selected scripts as `pnpm` commands.
+
+## Change Orientation
+
+Use these boundaries before editing:
+
+| Change type | Primary owner | Common verification |
+| --- | --- | --- |
+| Syntax parsing | `packages/parser` | parser tests, compiler tests, docs build |
+| Semantic validation | `packages/resolver`, `packages/typechecker` | resolver/typechecker tests, CLI validation |
+| Output format | compiler, renderers, exporter-training | package tests, sample export checks |
+| Product UI | `apps/web`, `apps/desktop`, `apps/docs` | app typecheck, app tests, visual or smoke check |
+| Service integration | `services/*`, app API routes, desktop backend | Python tests, app route tests, smoke scripts |
+| Release or environment gate | `scripts/*`, root package scripts | targeted node test, release readiness command |

@@ -1,0 +1,51 @@
+---
+title: Codebase Guide
+description: Guide to the actual Chemd monorepo directories, packages, applications, services, scripts, and tests.
+---
+
+This volume documents modules that exist in the current codebase. Topics are organized from `apps`, `packages`, `services`, `scripts`, root package configuration, and test files.
+
+Use this section when you need implementation details. The user manual explains Chemd syntax and workflows from a user perspective; this codebase guide explains where those behaviors live in the repository and which files usually need to move together.
+
+## Top-Level Topics
+
+1. [Repository Structure](/en/docs/codebase/overview)
+2. [Core Packages](/en/docs/codebase/packages)
+3. [Parser Implementation](/en/docs/codebase/parser)
+4. [Resolver Implementation](/en/docs/codebase/resolver)
+5. [Compiler and Export Pipeline](/en/docs/codebase/compiler)
+6. [Application Layer](/en/docs/codebase/applications)
+7. [Service Layer](/en/docs/codebase/services)
+8. [CLI, Scripts, and Tests](/en/docs/codebase/cli-scripts-tests)
+9. [Contributor Workflows](/en/docs/codebase/contributor-workflows)
+
+## How to Read This Guide
+
+Start with [Repository Structure](/en/docs/codebase/overview) for the workspace map, then use the focused pages when you already know the area you need to change.
+
+| Task | Start here | Then check |
+| --- | --- | --- |
+| Add or change Chemd syntax | [Parser Implementation](/en/docs/codebase/parser) | `@chemd/core`, resolver, typechecker, compiler fixtures, CLI validation, docs |
+| Change references, templates, required fields, or validation semantics | [Resolver Implementation](/en/docs/codebase/resolver) | core reference types, typechecker diagnostics, validation docs |
+| Change derived quantities, routes, typed references, or step checks | [Core Packages](/en/docs/codebase/packages) | `@chemd/typechecker`, `@chemd/step-ontology`, compiler outputs |
+| Change HTML, JSON, DOCX, LNF, RAG, or training exports | [Compiler and Export Pipeline](/en/docs/codebase/compiler) | renderer packages, render profiles, exporter-training tests |
+| Change CLI commands or workflow validation | [CLI, Scripts, and Tests](/en/docs/codebase/cli-scripts-tests) | `@chemd/cli`, compiler repair, scripts, root package scripts |
+| Change web, desktop, or docs integration | [Application Layer](/en/docs/codebase/applications) | package dependencies, service APIs, app-specific tests |
+| Change chemistry services, OCR, clustering, or external service boundaries | [Service Layer](/en/docs/codebase/services) | web API proxies, desktop backend calls, Python tests |
+
+## Implementation Evidence Boundary
+
+The codebase guide is the place for source paths, package names, entrypoints, and implementation notes. User-facing pages should describe what users can write, what Chemd accepts, and what output or diagnostics they should expect, without requiring them to understand the repository layout.
+
+## Evidence Scope
+
+- `package.json`
+- `pnpm-workspace.yaml`
+- `turbo.json`
+- `apps/web`
+- `apps/desktop`
+- `apps/docs`
+- `packages/*`
+- `services/chem-service`
+- `services/chem-cluster-service`
+- `scripts/*`

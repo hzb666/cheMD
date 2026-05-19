@@ -1,0 +1,8 @@
+{
+  "title": "验证、诊断与工具链",
+  "pages": [
+    "cli-workflows",
+    "error-checking",
+    "diagnostics-repair"
+  ]
+}

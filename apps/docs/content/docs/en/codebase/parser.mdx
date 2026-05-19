@@ -1,0 +1,90 @@
+---
+title: Parser Implementation
+description: Implementation guide for parseChemd, frontmatter parser, body parser, block parsers, and inline tokenizers.
+---
+
+Parser implementation lives in `packages/parser`. The package entrypoint is `packages/parser/src/index.ts`.
+
+## Secondary Topics
+
+### `parseChemd`
+
+`parseChemd(source)` is the public parsing entrypoint. It calls the frontmatter parser, then the body parser, then creates a `ChemdDocument` through `createDocument`.
+
+```ts
+import { parseChemd } from "@chemd/parser";
+
+const document = parseChemd(source);
+const reaction = document.children.find((node) => node.type === "reaction");
+```
+
+### Frontmatter Parser
+
+Related paths:
+
+- `packages/parser/src/frontmatter/parse-frontmatter.ts`
+- `packages/parser/src/frontmatter/frontmatter-shared.ts`
+- `packages/parser/src/frontmatter/frontmatter-assigners.ts`
+- `packages/parser/src/frontmatter/frontmatter-root.ts`
+
+This layer handles YAML frontmatter, required fields, date format, duplicate keys, `tags`, `render_profile`, and `render_overrides`.
+
+### Body Parser
+
+Related paths:
+
+- `packages/parser/src/body/parse-children.ts`
+- `packages/parser/src/body/parse-body-shared.ts`
+- `packages/parser/src/body/parse-structured-block.ts`
+
+This layer splits body content into Markdown nodes and structured block nodes.
+
+### Block Parser Registry
+
+`packages/parser/src/body/block-parsers/index.ts` registers the currently parsed blocks:
+
+- `chemd`
+- `result`
+- `analysis`
+- `artifact`
+- `sample`
+- `condition-varies`
+- `procedure`
+- `observation`
+- `use`
+- `col`
+
+### Field Parsing
+
+Field parsing uses `parseKeyValueLine` and `parseKeyValueLines`. Unknown fields are filtered by `parseAllowedFields` and produce `W_UNKNOWN_FIELD`.
+
+```md
+:::chemd #rxn-main
+kind: reaction ;; solvent: MeCN ;; temperature: 60 C
+reactants: @mol-a | @mol-b
+products: @mol-c
+:::
+```
+
+The parser splits `;;` into separate field segments and splits configured list fields such as `reactants` with `|`.
+
+### Inline Tokenizers
+
+Related paths:
+
+- `packages/parser/src/inline/tokenize-references.ts`
+- `packages/parser/src/inline/tokenize-inline-chem.ts`
+- `packages/parser/src/inline/tokenize-inline-code.ts`
+- `packages/parser/src/inline/tokenize-markdown-links.ts`
+
+These tokenizers record token data, source text, and location. Business-level resolution runs later.
+
+## Implementation Detail Inventory
+
+`parseChildren` is the main body parsing loop. It buffers consecutive ordinary lines into Markdown nodes, flushes the Markdown buffer when it sees a `:::` block start, then dispatches structured blocks. `template` is handled directly by `parseChildren`; other blocks go through `parseStructuredBlock` and then the block parser registry.
+
+`parse-body-shared.ts` contains common syntax handling: block type matching, block line collection, field line parsing, list value parsing, `;;` multi-field splitting, `col:` child support, and Markdown node creation. Field keys start with a lowercase letter. Empty list items produce `E_INVALID_LIST_ITEM`. Keys outside the allowed field set produce `W_UNKNOWN_FIELD`.
+
+`parse-structured-block.ts` produces `W_UNKNOWN_BLOCK` for unknown blocks.
+
+Inline tokenizers currently cover references, inline chemistry, inline code, and Markdown links. The reference tokenizer recognizes `@id` and `@id.field`; the inline chemistry tokenizer recognizes `:chem[...]`; the link tokenizer validates href safety and emits `W_UNSAFE_LINK_HREF` for unsafe href values.

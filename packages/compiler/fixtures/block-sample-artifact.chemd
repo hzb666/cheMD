@@ -1,0 +1,77 @@
+---
+id: exp-block-sample-artifact
+title: Sample and artifact block contract
+date: 2026-05-19
+primary_reaction: rxn-main
+primary_result: res-main
+primary_sample: sample-product
+---
+
+:::chemd #mol-start
+kind: molecule
+name: substrate
+smiles: CCO
+:::
+
+:::chemd #mol-product
+kind: molecule
+name: product
+smiles: CC=O
+:::
+
+:::chemd #rxn-main
+kind: reaction
+reactants: @mol-start
+products: @mol-product
+solvent: DCM
+temperature: 25 C
+time: 30 min
+:::
+
+:::result #res-main
+reaction: rxn-main
+product: mol-product
+status: success
+yield: 70%
+:::
+
+:::sample #sample-crude
+name: crude reaction mixture
+ref: rxn-main
+derived_from: rxn-main
+batch: batch-a
+artifacts: art-tlc
+:::
+
+:::sample #sample-product
+name: purified product
+ref: res-main
+derived_from: sample-crude
+aliquot_of: sample-crude
+batch_of: sample-crude
+purity: 97%
+artifacts: art-nmr | art-hplc
+:::
+
+:::artifact #art-tlc
+kind: tlc_image
+ref: sample-crude
+path: data/tlc/crude.png
+instrument: phone camera
+notes: crude mixture TLC
+:::
+
+:::artifact #art-nmr
+kind: nmr_spectrum
+ref: sample-product
+path: data/nmr/product.pdf
+checksum: sha256:sampleproductnmr
+instrument: Bruker 400
+:::
+
+:::artifact #art-hplc
+kind: hplc_report
+ref: sample-product
+path: data/hplc/product.pdf
+instrument: Agilent 1260
+:::

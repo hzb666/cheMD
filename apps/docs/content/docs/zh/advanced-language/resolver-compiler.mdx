@@ -1,0 +1,228 @@
+---
+title: Resolver 与编译语义
+description: 对象索引、重复 ID、引用解析、primary 校验、模板展开和导出路径。
+---
+
+
+## 对象索引构建
+
+resolver 遍历 children 和 `col.children`，收集带 ID 的对象节点。对象类型包括 molecule、reaction、result、analysis、procedure、observation、sample、artifact 和 condition_varies。
+
+```md
+:::col 2
+col: {:::chemd #mol-a
+kind: molecule
+smiles: CCO
+:::
+:::}
+col: {:::result #res-a
+status: success
+:::
+:::}
+:::
+```
+
+`mol-a` 与 `res-a` 位于 `col.children` 中，仍会进入同一个对象索引。后续 `@mol-a`、`@res-a` 和 typed reference 校验都能读取这些对象。
+
+## 重复 ID 检查
+
+对象索引发现重复 ID 时产生 `E_DUPLICATE_ID`。模板索引发现重复模板名时产生 `E_DUPLICATE_TEMPLATE`。
+
+```md
+:::chemd #dup
+kind: molecule
+smiles: CCO
+:::
+
+:::result #dup
+status: success
+:::
+```
+
+同一源文件内对象 ID 共享命名空间。上例会产生 `E_DUPLICATE_ID`，因为 molecule 和 result 使用了相同 ID。
+
+```md
+:::template row
+params: label: string
+@param.label
+:::
+
+:::template row
+params: value: string
+@param.value
+:::
+```
+
+模板名也共享模板命名空间。重复模板名会产生 `E_DUPLICATE_TEMPLATE`。
+
+## 引用解析流程
+
+Markdown 引用 token 在 resolver 中解析。对象引用查 object index，字段引用读取对象字段，primary alias 通过 frontmatter primary 字段定位对象，param 引用通过模板上下文读取 use 值。
+
+```md
+---
+id: ref-flow
+title: Reference flow
+date: 2026-05-19
+primary_reaction: rxn-main
+---
+
+:::chemd #rxn-main
+kind: reaction
+reactants: mol-a
+products: mol-p
+temperature: 25 C
+:::
+
+Reaction object: @rxn-main
+Reaction temperature: @rxn-main.temperature
+Primary reaction temperature: @reaction.temperature
+Record title: @meta.title
+```
+
+对象引用返回目标对象，字段引用返回目标字段，primary alias 先由 frontmatter 指向对象后再读取字段。无法解析的引用会保留原 token 并产生诊断。
+
+## primary 引用校验
+
+resolver 检查 primary 字段值是否指向已存在对象。缺失目标产生 `E_INVALID_PRIMARY_REFERENCE`。
+
+```md
+---
+id: bad-primary
+title: Bad primary
+date: 2026-05-19
+primary_reaction: rxn-missing
+---
+
+Primary reaction: @reaction
+```
+
+`rxn-missing` 不存在时，resolver 对 `primary_reaction` 产生 `E_INVALID_PRIMARY_REFERENCE`。`@reaction` 也无法解析为有效对象。
+
+## 必填字段校验
+
+当前必填字段为 molecule `smiles`，reaction `reactants` 和 `products`，普通 analysis `type_name` 和 `data`，TLC analysis `type_name`，sample `name`，artifact `kind` 和 `path`。
+
+```md
+:::chemd #mol-missing-smiles
+kind: molecule
+name: unnamed molecule
+:::
+
+:::chemd #rxn-missing-products
+kind: reaction
+reactants: mol-a
+:::
+
+:::artifact #art-missing-path
+kind: nmr
+:::
+```
+
+这些块语法可被 parser 接受，但 resolver 会按对象类型产生缺失必填字段诊断。TLC analysis 只要求 `type`；其他 analysis 还要求 `data`。
+
+## 模板索引与展开
+
+resolver 先构建模板索引，再展开 `use` 节点。展开时验证模板参数、检测循环、限制深度和节点数。
+
+```md
+:::template result-line
+params: result: ref<result>
+
+Resolved result: @param.result
+:::
+
+:::result #res-main
+status: success
+:::
+
+:::use result-line
+result: res-main
+:::
+```
+
+模板展开时，`@param.result` 读取 `:::use` 的 `result` 字段，并按 `ref<result>` 校验目标类型。
+
+## diagnostics 分层
+
+parser 产生语法和字段诊断。resolver 产生 ID、引用、模板和必填字段诊断。compiler 叠加 typechecker、render profile 和输入辅助 diagnostics。
+
+```md
+:::unknown #x
+field: value
+:::
+
+:::chemd #mol-a
+kind: molecule
+smiles: CCO
+unknown_field: value
+:::
+
+Reference to missing object: @not-found
+```
+
+未注册块和未知字段来自 parser。`@not-found` 来自 resolver 引用解析。数量单位、typed reference mismatch 和归一化错误来自 typechecker。
+
+## AST 到导出结果的语义路径
+
+`compileChemd` 顺序执行 parse、resolve、typecheck、render profile resolution、runtime plan、LNF、training export、RAG export、input assistance、diagnosis、HTML、JSON 和 DOCX bridge 构建。
+
+```text
+source
+  -> parseChemd
+  -> resolveChemd
+  -> typecheck
+  -> render profile resolution
+  -> LNF / RAG / training / HTML / JSON / DOCX bridge
+```
+
+同一份源文件只维护语言事实。不同导出格式从编译结果中选择所需结构，避免在源文件中写入某个 renderer 专用配置。
+
+## typechecker 语义阶段
+
+typechecker 创建局部对象索引和 external target index。局部对象同时支持 bare ID 和 `documentId#id` scoped ID。external target 来自 `referenceContext.externalTargets` 与 `reactionRouteContext.externalReactions`。
+
+typed semantic graph 包含 molecule、reaction、result、analysis、sample、artifact、condition_varies、procedure_narrative 和 observation_narrative。step graph 包含 canonical steps、procedure records、observation records 和 diagnostics。导出层可继续物化 event-to-step 等附加关系。
+
+## compiler 输出清单
+
+`CompileResult` 包含 resolved document、diagnostics、renderOptions、renderAdapterPayload、typedSemanticGraph、stepGraph、runPlan、runtimePreflight、lnf、ragExport、trainingUnderstanding、trainingExport、authoringAssistance、diagnosis、html、json 和 docxBridge。graph index 会在之后基于一份或多份 training understanding 单独构建。CLI export、web API、desktop preview 和 storage/RAG 集成都从这些输出选择所需数据。
+
+## 推荐实践示例
+
+稳定源记录应为每个语义对象提供一个显式 ID，在字段中写类型化关系，并在正文中使用引用生成可读摘要。
+
+```md
+---
+id: exp-resolver-best-practice
+title: Resolver best practice
+date: 2026-05-19
+primary_reaction: rxn-main
+primary_result: res-main
+---
+
+:::chemd #mol-a
+kind: molecule
+smiles: CCO
+:::
+
+:::chemd #mol-p
+kind: molecule
+smiles: CC=O
+:::
+
+:::chemd #rxn-main
+kind: reaction
+reactants: @mol-a
+products: @mol-p
+:::
+
+:::result #res-main
+reaction: rxn-main
+product: mol-p
+status: success
+yield: 80%
+:::
+
+Resolved summary: @rxn-main.products gave @result.yield.
+```

@@ -1,0 +1,125 @@
+---
+title: CLI and Validation Workflows
+description: Implementation-level reference for validate, export, graph, diff, changed, repair, and agent-loop.
+---
+
+
+The repository root exposes the CLI through `pnpm chemd`. Common commands operate directly on `.chemd` source files.
+
+## `pnpm chemd validate`
+
+`validate` accepts one or more `.chemd` files. Each file is compiled through `compileChemd` with `strictChemdKind: true`. Files without errors print `file: ok`; files with errors return exit code 1. CLI exit codes are 0 for success, 1 for validation failed, and 2 for usage error.
+
+```text
+pnpm chemd validate experiment.chemd
+pnpm chemd validate experiments/*.chemd
+```
+
+Strict mode marks omitted `kind` in `:::chemd` as `W_CHEMD_KIND_AMBIGUOUS`, forcing users to confirm molecule or reaction identity.
+
+For high-quality downstream exports, keep these relationships explicit:
+
+- `primary_reaction` and `primary_result`.
+- `result.reaction` or a reaction-shaped `result.ref`.
+- `analysis.ref`, `procedure.ref`, `sample.derived_from`, and `artifact.ref`.
+- `condition`, `varN`, and `resN` in condition screens.
+
+## `pnpm chemd export --format json`
+
+`export` accepts a single file and requires an explicit `--format`. When compilation contains errors, the CLI suppresses payload output and exits with validation failed. `json` comes from `result.json`, the renderer JSON output containing the resolved document and typed graph.
+
+```text
+pnpm chemd export experiment.chemd --format json
+```
+
+## `--format rag`
+
+`rag` outputs `ChemdRagExportV1`. The compiler builds the full training export first, then calls `buildRagExportFromTrainingRecord` to create retrieval chunks. This format supports retrieval, question answering, and workspace RAG backfill.
+
+```text
+pnpm chemd export experiment.chemd --format rag
+```
+
+## `--format training`
+
+`training` outputs training understanding. `training-full` outputs `ChemdTrainingExportV2`. `lnf` outputs canonical LNF.
+
+| format | source | purpose |
+| --- | --- | --- |
+| `lnf` | `result.lnf` | canonical intermediate representation |
+| `training` | `result.trainingUnderstanding` | training and graph-index summary |
+| `training-full` | `result.trainingExport` | full training record and audit data |
+
+## `pnpm chemd graph`
+
+`graph` accepts multiple files. The CLI compiles each file, extracts training understanding, then calls `buildTrainingGraphIndexFromUnderstandings`. At least one input file is required. Output supports `text` and `json`.
+
+```text
+pnpm chemd graph exp-a.chemd exp-b.chemd --format json
+```
+
+The graph index schema version is `chemd-training-graph-index/v0.1`. Output includes document sources, entities, relations, routes, evidence, and warnings.
+
+## `pnpm chemd diff`
+
+`diff` accepts before and after files. Both files are compiled before semantic diff compares explicit-ID objects. Generated-ID objects are excluded. Internal fields `type`, `id`, `syntaxOrigin`, and `declaredKind` are excluded. The output schema version is `chemd-semantic-diff/v0.1`.
+
+```text
+pnpm chemd diff before.chemd after.chemd --format json
+```
+
+Diff traverses top-level objects, `col.children`, and template body, making it suitable for reviewing reaction, result, sample, and procedure structure changes.
+
+## `pnpm chemd repair`
+
+`repair` runs the deterministic repair loop. The default maximum iteration count is 5 and can be changed with `--max-iterations`. Output schema version is `chemd-repair/v0.1`. `--write` writes back only when the repaired diagnosis is clean and the source changed.
+
+```text
+pnpm chemd repair experiment.chemd --format json
+pnpm chemd repair experiment.chemd --write
+```
+
+The repair loop applies only safe fixes, mainly `insert_chemd_kind` and `apply_authoring_patch`. Diagnostics requiring user facts remain as required input or manual review.
+
+## `pnpm chemd agent-loop`
+
+`agent-loop` requires `--driver <cmd>`. The CLI runs the repair loop first, then sends source, diagnosis, and iteration history to the external driver. The driver can return `rewrite` or `stop`. Output schema version is `chemd-agent-loop/v0.1`.
+
+```text
+pnpm chemd agent-loop experiment.chemd --driver node --driver-arg ./repair-driver.mjs --format json
+```
+
+Options include `--max-iterations`, `--max-repair-iterations`, `--driver-arg`, `--format`, and `--write`. Stop reasons cover clean, max iterations, repair max iterations, repair stalled, agent stalled, and diagnosis status.
+
+## Recommended Local Validation Order
+
+Single-document user workflow:
+
+1. `pnpm chemd validate file.chemd`
+2. `pnpm chemd export file.chemd --format json`
+3. `pnpm chemd export file.chemd --format rag`
+
+Multi-document route workflow:
+
+1. `pnpm chemd validate file-a.chemd file-b.chemd`
+2. `pnpm chemd graph file-a.chemd file-b.chemd --format json`
+3. `pnpm chemd diff before.chemd after.chemd --format json`
+
+Automated repair workflow:
+
+1. `pnpm chemd repair file.chemd --format json`
+2. Review safe fixes and manual review items
+3. `pnpm chemd repair file.chemd --write`
+4. `pnpm chemd validate file.chemd`
+
+## `pnpm chemd changed`
+
+`changed` lists changed Chemd files from git diff and untracked files. It uses `.chemd` source files. The default base is `HEAD`, and `--base <ref>` changes it. Output schema version is `chemd-changed/v0.1`, with `text` and `json` formats.
+
+```text
+pnpm chemd changed --format json
+pnpm chemd changed --base origin/main --format text
+```
+
+Deleted files skip validation. Added and untracked files report validation only, with semantic diff marked as a new file. Modified files read the old source from the base ref and include a semantic diff. This command is intended for CI, pre-commit, and batch validation entry points.
+

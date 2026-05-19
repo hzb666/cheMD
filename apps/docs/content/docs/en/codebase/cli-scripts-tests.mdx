@@ -1,0 +1,53 @@
+---
+title: CLI, Scripts, and Tests
+description: Root CLI, scripts directory, test commands, and quality gates.
+---
+
+Root `package.json` exposes CLI, development, test, lint, and typecheck commands.
+
+## CLI
+
+Root command:
+
+```bash
+pnpm chemd
+```
+
+The command runs `node packages/cli/bin/chemd.mjs`.
+
+## Scripts
+
+The `scripts` directory contains these categories:
+
+| Category | Examples |
+| --- | --- |
+| Development startup | `dev-demo.mjs` |
+| PostgreSQL | `postgres-migrate.mjs`, `postgres-smoke.mjs`, `postgres-tools.mjs` |
+| Desktop smoke | `desktop-runtime-smoke.mjs`, `desktop-offline-core-smoke.mjs`, `desktop-release-readiness.mjs` |
+| Diagnostics bundle | `desktop-diagnostics-bundle.mjs` |
+
+## Test Commands
+
+Root commands include:
+
+```bash
+pnpm run test
+pnpm run test:scripts
+pnpm run test:py
+pnpm run lint
+pnpm run typecheck
+```
+
+## Test Distribution
+
+| Area | Test path |
+| --- | --- |
+| parser | `packages/parser/tests` |
+| resolver | `packages/resolver/tests` |
+| compiler | `packages/compiler/tests` |
+| web | `apps/web/tests` |
+| desktop frontend | `apps/desktop/src/**/*.test.ts` |
+| desktop Rust | `apps/desktop/src-tauri/src/*_tests.rs` |
+| scripts | `scripts/*.test.mjs` |
+| chem-service | `services/chem-service/tests` |
+| chem-cluster-service | `services/chem-cluster-service/tests` |

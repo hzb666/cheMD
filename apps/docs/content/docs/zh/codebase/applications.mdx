@@ -1,0 +1,66 @@
+---
+title: 应用层
+description: apps/web、apps/desktop 和 apps/docs 的真实职责和技术入口。
+---
+
+`apps` 目录当前包含三个应用：`web`、`desktop` 和 `docs`。
+
+## `apps/web`
+
+包名为 `@chemd/web`。主要技术栈为 Next.js、React 和 server routes。
+
+```bash
+pnpm --filter @chemd/web dev
+pnpm --filter @chemd/web test
+```
+
+### 二级主题
+
+- `apps/web/src/app`：Next.js App Router 入口。
+- `apps/web/src/app/api`：服务端 API routes。
+- `apps/web/src/features`：编辑器、预览、OCR、导出、结构编辑和 reaction editor 等功能区。
+- `apps/web/src/server`：服务端化学服务客户端和 route 支撑逻辑。
+- `apps/web/tests`：web 应用测试。
+
+## `apps/desktop`
+
+包名为 `@chemd/desktop`。主要技术栈为 Vite、React、Tauri 和 Rust。
+
+```bash
+pnpm --filter @chemd/desktop dev
+pnpm --filter @chemd/desktop tauri:dev
+pnpm --filter @chemd/desktop typecheck
+```
+
+### 二级主题
+
+- `apps/desktop/src`：桌面前端 UI、Monaco editor、workspace index 和控制器。
+- `apps/desktop/src-tauri/src`：Tauri Rust 命令、workspace IO、PostgreSQL、local store、diagnostics bundle 和 reaction intelligence worker。
+- `apps/desktop/src-tauri/Cargo.toml`：Rust 依赖和 crate 配置。
+- `apps/desktop/tests` 与 `apps/desktop/src/**/*.test.ts`：桌面前端测试。
+- `apps/desktop/src-tauri/src/*_tests.rs`：Rust 侧测试。
+
+## `apps/docs`
+
+包名为 `@chemd/docs`。主要技术栈为 Next.js 和 Fumadocs。
+
+```bash
+pnpm --filter @chemd/docs dev
+pnpm --filter @chemd/docs typecheck
+pnpm --filter @chemd/docs build
+```
+
+### 二级主题
+
+- `apps/docs/source.config.ts`：Fumadocs MDX collection 配置。
+- `apps/docs/content/docs`：中英文文档内容。
+- `apps/docs/src/app`：Next.js App Router 页面。
+- `apps/docs/src/lib/source.ts`：Fumadocs source loader。
+
+## 应用间数据流
+
+`apps/web` 直接依赖 compiler、core、render-profile、renderer、storage-postgres 等 packages，用于浏览器编辑、服务端导出和后端存储 API。`apps/web/src/app/api/export/json` 与 `api/export/docx` 走 compiler/render 链路，`apps/web/src/app/api/chem/*` 代理 `services/chem-service`。
+
+`apps/desktop` 前端使用 Monaco 与 Chemd language service，Tauri Rust 后端负责 workspace 文件、local store、PostgreSQL runtime、RAG backfill、diagnostics bundle、chem preview render 和 reaction intelligence worker。桌面端适合本地工作区、离线编辑和受控后端运行场景。
+
+`apps/docs` 是独立文档应用。它读取 `apps/docs/content/docs` 的 MDX，使用 Fumadocs source loader 生成中英文文档站点。

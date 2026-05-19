@@ -1,0 +1,14 @@
+{
+  "title": "代码库导览",
+  "pages": [
+    "overview",
+    "packages",
+    "parser",
+    "resolver",
+    "compiler",
+    "applications",
+    "services",
+    "cli-scripts-tests",
+    "contributor-workflows"
+  ]
+}

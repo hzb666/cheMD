@@ -1,0 +1,176 @@
+---
+title: '化学对象：`:::chemd`'
+description: '`:::chemd` 的 molecule、reaction、类型推断、字段、数量解析和路线关系。'
+---
+
+
+## `kind: molecule`
+
+`kind: molecule` 生成 `MoleculeNode`。molecule 表达可被 reaction、sample、artifact、analysis 和正文引用的化学实体。resolver 要求 molecule 具备 `smiles` 字段；缺失时产生 `E_MISSING_REQUIRED_FIELD`。typechecker 会解析 `amount` 与 `equivalents`，并把解析成功的值写入 typed semantic graph 的 quantity 集合。
+
+```md
+:::chemd #mol-aryl
+kind: molecule
+name: aryl bromide
+smiles: Brc1ccccc1
+role: substrate
+formula: C6H5Br
+amount: 1.00 mmol
+equivalents: 1.0 equiv
+:::
+```
+
+字段说明：
+
+| 字段 | 语义 |
+| --- | --- |
+| `smiles` | resolver 必填字段，作为结构表达式保存 |
+| `cas` | CAS registry string，当前实现只保存原值 |
+| `name` | 使用者可读名称 |
+| `role` | 使用者定义角色，如 substrate、reagent、product |
+| `caption` | 渲染层说明文本 |
+| `formula` | 分子式原文 |
+| `amount` | amount 数量，支持 `mmol` 与 `mol` |
+| `equivalents` | equivalent 数量，支持 `equiv` 与 `eq` |
+| `chemistry_features` | 扩展 feature 引用列表 |
+
+## `kind: reaction`
+
+`kind: reaction` 生成 `ReactionNode`。显式 reaction 必须包含 reaction 形状字段，即 `reactants`、`products`、`reactant`、`product`、`reac` 或 `prod` 中至少一类。显式 reaction 缺少这些字段时产生 `E_CHEMD_KIND_CONFLICT`。resolver 要求 reaction 同时具备 `reactants` 和 `products`。
+
+```md
+:::chemd #rxn-main
+kind: reaction
+name: Suzuki coupling
+reactants: @mol-aryl | @mol-boron
+products: @mol-product
+reagents: K2CO3
+catalyst: Pd(PPh3)4
+solvent: dioxane/water
+temperature: 90 C
+time: 12 h
+atmosphere: nitrogen
+yield: 82%
+:::
+```
+
+typechecker 对 reaction 执行四类语义处理：`reactants` 与 `products` 解析为目标类型为 molecule 的引用列表；`prev` 解析为目标类型为 reaction 的路线引用；`temperature`、`time` 与 `pressure` 解析为数量；`atmosphere` 归一化为 known 或 extension 值。
+
+## 省略 `kind` 时的类型推断
+
+parser 根据字段形状推断 `chemd` 块类型。出现 `reactants`、`products` 或它们的别名字段时推断为 reaction；其余有效 chemd 字段推断为 molecule。非 strict 模式会产生 `W_CHEMD_KIND_INFERRED`，并附带 `insert_chemd_kind` quick fix。strict 模式会产生 `W_CHEMD_KIND_AMBIGUOUS`，CLI `validate` 默认使用 strict 模式。
+
+冲突规则：
+
+| 输入形态 | 诊断 |
+| --- | --- |
+| `kind: molecule` 且存在 reaction 形状字段 | `E_CHEMD_KIND_CONFLICT` |
+| `kind: reaction` 且缺少 reaction 形状字段 | `E_CHEMD_KIND_CONFLICT` |
+| `kind` 为空字符串或非法字符串 | `E_CHEMD_KIND_CONFLICT` |
+| 省略 `kind` 且 strict 模式开启 | `W_CHEMD_KIND_AMBIGUOUS` |
+| 省略 `kind` 且 strict 模式关闭 | `W_CHEMD_KIND_INFERRED` |
+
+## molecule 字段手册
+
+molecule 字段集合固定在 `MOLECULE_FIELDS`。未知字段产生 `W_UNKNOWN_FIELD`，字段不会写入 AST。非字段正文可作为隐式 `smiles` 值读取；隐式值超过一行时产生 `W_INVALID_CHEMD_IMPLICIT_VALUE`。
+
+数量解析规则：
+
+| 字段 | quantity class | 支持单位 | canonical unit |
+| --- | --- | --- | --- |
+| `amount` | amount | `mmol`、`mol` | `mmol` |
+| `equivalents` | equivalent | `equiv`、`eq` | `equiv` |
+
+无法解析的数量仍以 raw quantity 写入 typed graph，同时产生 `E403` warning。该行为保留使用者原文，并让诊断面板提示单位或格式问题。
+
+## reaction 字段手册
+
+reaction 字段集合固定在 `REACTION_FIELDS`。列表字段包含 `reactants`、`products`、`reactant`、`product`、`reac`、`prod`、`conditions` 和 `prev`。其中 `reactant` 与 `reac` 合并到 `reactants`，`product` 与 `prod` 合并到 `products`。
+
+| 字段 | 解析与语义 |
+| --- | --- |
+| `reactants` | molecule 引用列表，resolver 必填 |
+| `products` | molecule 引用列表，resolver 必填 |
+| `conditions` | 字符串列表，供渲染和导出使用 |
+| `route` | 路线标签 |
+| `prev` | reaction 前驱引用列表 |
+| `reagents` | 原文字符串 |
+| `catalyst` | 原文字符串 |
+| `solvent` | 原文字符串，并参与 condition classifier |
+| `temperature` | temperature 数量 |
+| `time` | time 数量 |
+| `pressure` | pressure 数量 |
+| `atmosphere` | `nitrogen`、`argon`、`air`、`oxygen`、`inert` 或 extension |
+| `yield` | AST 字符串，result 关系校验会与 result yield 比对 |
+| `conversion` | AST 字符串，result 关系校验会与 result conversion 比对 |
+| `selectivity` | AST 字符串，result 关系校验会与 result selectivity 比对 |
+
+## `reactants` / `products` 引用写法
+
+`reactants` 和 `products` 支持 `|` 与逗号分隔。引用可写为 `@id`，也可写为 bare ID。typechecker 在本地对象索引或 external target index 中找到 bare ID 时会将其视为引用；未命中的 bare value 保留为 literal。
+
+```md
+reactants: @mol-aryl | mol-boron
+products: @mol-product
+```
+
+解析错误示例：
+
+```md
+reactants: @mol-a |
+```
+
+尾部分隔符产生空列表项，诊断码为 `E_INVALID_LIST_ITEM`。
+
+## `route` / `prev` 路线关系
+
+`route` 保存路线名或路线 ID。`prev` 保存当前 reaction 的前驱 reaction 引用。typechecker 通过 `resolveReactionPrevReferences` 解析 `prev`，并结合 `reactionRouteContext` 支持跨文档 reaction。路线校验包含引用类型检查、路线名不一致检查、循环检查和 orphan 检查。
+
+相关诊断：
+
+| 诊断码 | 触发条件 |
+| --- | --- |
+| `E_TYPED_REFERENCE_MISMATCH` | `prev` 指向非 reaction 目标 |
+| `W_REACTION_ROUTE_MISMATCH` | 前驱路线与当前路线不一致 |
+| `E_REACTION_ROUTE_CYCLE` | reaction route 存在循环 |
+| `W_REACTION_ROUTE_ORPHAN` | route 上存在无法连接的 reaction |
+
+## `chemistry_features` 扩展引用
+
+`chemistry_features` 由 `readChemistryFeatureRefs` 转换为 `chemistryFeatureRefs`。molecule 中的 feature kind 为 `molecule`，reaction 中的 feature kind 为 `reaction`。当前 parser 将这些 feature 标记为 `status: "available"`。该字段服务于后续扩展型化学特征、训练导出和外部知识图谱整合。
+
+## 推荐实践示例
+
+molecule 与 reaction 对象应写在下游 result、analysis、procedure、sample 和 artifact 之前。类型化关系使用 `@id`，路线关系显式写入 `route` 与 `prev`。
+
+```md
+:::chemd #mol-substrate
+kind: molecule
+name: benzyl alcohol
+smiles: OCc1ccccc1
+role: substrate
+amount: 1.00 mmol
+equivalents: 1.0 equiv
+:::
+
+:::chemd #mol-product
+kind: molecule
+name: benzaldehyde
+smiles: O=Cc1ccccc1
+role: product
+:::
+
+:::chemd #rxn-oxidation
+kind: reaction
+name: benzyl alcohol oxidation
+route: route-oxidation
+reactants: @mol-substrate
+products: @mol-product
+reagents: MnO2
+solvent: CH2Cl2
+temperature: 25 C
+time: 4 h
+yield: 81%
+:::
+```
+

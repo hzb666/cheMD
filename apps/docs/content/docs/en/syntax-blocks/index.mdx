@@ -1,0 +1,79 @@
+---
+title: Syntax Blocks
+description: A user-oriented block manual for Chemd users, with fields, constraints, defaults, diagnostics, and recommended examples.
+---
+
+
+## Block Inventory
+
+| block | purpose | primary node |
+| --- | --- | --- |
+| `:::chemd` | molecule and reaction objects | `molecule` or `reaction` |
+| `:::result` | experimental outcome | `result` |
+| `:::analysis` | analytical record | `analysis` |
+| `:::procedure` | experimental procedure | `procedure` |
+| `:::step` | nested procedure step | `step` |
+| `:::observation` | observation record | `observation` |
+| `:::event` | nested observation event | `event` |
+| `:::sample` | sample record | `sample` |
+| `:::artifact` | spectra, images, files, and attachments | `artifact` |
+| `:::condition-varies` | condition screening and deltas | `condition_varies` |
+| `:::template` | reusable usage template | `template` |
+| `:::use` | template invocation | `use` |
+| `:::col` | column layout | `col` |
+
+## Shared Rules
+
+A block starts with `:::block-name`. Object IDs are header arguments written as `#id`. IDs must match `[a-zA-Z][a-zA-Z0-9_-]*`. Fields use `key: value`; keys start with a lowercase letter and then allow lowercase letters, digits, and underscores. A physical line can contain multiple fields separated by `;;`.
+
+```md
+:::result #res-main
+status: success ;; yield: 82% ;; purity: 96%
+:::
+```
+
+List handling is block-specific. The default list fields are `reactants`, `products`, `reactant`, `product`, `reac`, `prod`, `conditions`, and `params`. Empty list items produce `E_INVALID_LIST_ITEM`.
+
+## Recommended Organization
+
+A typical experiment record declares molecules first, then reactions, followed by procedure, observation, analysis, result, sample, and artifact blocks. Condition screening records should organize standard and variation reactions around the screening block.
+
+```md validate
+---
+id: exp-user-guide
+title: User guide example
+date: 2026-05-19
+primary_reaction: rxn-main
+primary_result: res-main
+---
+
+:::chemd #mol-substrate
+kind: molecule
+name: substrate
+smiles: CCO
+amount: 1.00 mmol
+:::
+
+:::chemd #mol-product
+kind: molecule
+name: product
+smiles: CC=O
+:::
+
+:::chemd #rxn-main
+kind: reaction
+reactants: @mol-substrate
+products: @mol-product
+solvent: MeCN
+temperature: 60 C
+time: 3 h
+:::
+
+:::result #res-main
+reaction: rxn-main
+product: mol-product
+status: success
+yield: 74%
+:::
+```
+

@@ -208,7 +208,7 @@ export const lookupPubChemSmilesByCasRemote = async (
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown error";
-    throw new Error(message);
+    throw new Error(message, { cause: error });
   }
 
   // 404 表示 PubChem 明确认定没有该 RN；

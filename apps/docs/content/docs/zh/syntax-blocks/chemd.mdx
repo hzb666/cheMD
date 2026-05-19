@@ -1,0 +1,166 @@
+---
+title: '`:::chemd` 分子与反应块'
+description: '`:::chemd` 是 molecule 与 reaction 的统一使用者输入块，支持显式 kind、字段推断、引用列表和化学特征引用。'
+---
+
+`:::chemd` 根据 `kind` 和字段形状生成 `molecule` 或 `reaction` 节点。
+
+## 语法
+
+```md
+:::chemd #mol-substrate
+kind: molecule
+name: ethyl acetate
+smiles: CCOC(C)=O
+amount: 2.00 mmol
+equivalents: 1.0 equiv
+:::
+```
+
+```md
+:::chemd #rxn-main
+kind: reaction
+reactants: @mol-substrate | @mol-base
+products: @mol-product
+solvent: MeCN
+temperature: 60 C
+time: 3 h
+atmosphere: nitrogen
+:::
+```
+
+## 字段
+
+| 字段 | molecule | reaction | 说明 |
+| --- | --- | --- | --- |
+| `kind` | 可选 | 可选 | 支持 `molecule`、`reaction`。CLI strict 校验建议显式填写 |
+| `smiles` | 必填 | 不适用 | resolver 要求 molecule 具备该字段 |
+| `cas` | 可选 | 不适用 | 原样保存 |
+| `name` | 可选 | 可选 | 使用者可读名称 |
+| `role` | 可选 | 不适用 | substrate、reagent、product 等使用者角色 |
+| `caption` | 可选 | 可选 | 渲染说明 |
+| `formula` | 可选 | 不适用 | 分子式原文 |
+| `amount` | 可选 | 不适用 | 数量字段，支持 `mmol`、`mol` |
+| `equivalents` | 可选 | 不适用 | 数量字段，支持 `equiv`、`eq` |
+| `reactants` / `reactant` / `reac` | 不适用 | 必填 | molecule 引用列表 |
+| `products` / `product` / `prod` | 不适用 | 必填 | molecule 引用列表 |
+| `conditions` | 不适用 | 可选 | 字符串列表 |
+| `route` | 不适用 | 可选 | 路线 ID 或路线标签 |
+| `prev` | 不适用 | 可选 | 前驱 reaction 引用列表 |
+| `reagents` | 不适用 | 可选 | 原文字符串 |
+| `catalyst` | 不适用 | 可选 | 原文字符串 |
+| `solvent` | 不适用 | 可选 | 原文字符串 |
+| `temperature` | 不适用 | 可选 | 温度数量 |
+| `time` | 不适用 | 可选 | 时间数量 |
+| `pressure` | 不适用 | 可选 | 压力数量 |
+| `atmosphere` | 不适用 | 可选 | `nitrogen`、`argon`、`air`、`oxygen`、`inert` 或扩展值 |
+| `yield` | 不适用 | 可选 | 反应摘要产率 |
+| `conversion` | 不适用 | 可选 | 转化率 |
+| `selectivity` | 不适用 | 可选 | 选择性 |
+| `chemistry_features` | 可选 | 可选 | `|` 或 `,` 分隔的 feature ID 列表 |
+
+## 必填与默认值
+
+| 节点 | resolver 必填字段 | 默认值 |
+| --- | --- | --- |
+| molecule | `smiles` | 无 |
+| reaction | `reactants`、`products` | 无 |
+
+省略 `id` 时，resolver 生成 `<document-id>-<node-type>-<counter>`。需要跨块引用的对象应始终写显式 ID。
+
+## 隐式 Molecule SMILES
+
+对于 molecule 形状的 `:::chemd` 块，如果缺少 `smiles:` 字段，parser 可以把首个非字段正文行作为 `smiles`。
+
+```md
+:::chemd #mol-ethanol
+kind: molecule
+CCO
+:::
+```
+
+这种简写适合短 molecule 记录。若存在多行隐式正文，只有首行生效，并产生 `W_INVALID_CHEMD_IMPLICIT_VALUE`。
+
+## 类型推断
+
+存在 `reactants`、`products` 或别名字段时，parser 推断为 reaction。其余有效字段推断为 molecule。`strictChemdKind` 开启时，省略 `kind` 产生 `W_CHEMD_KIND_AMBIGUOUS`。非 strict 模式产生 `W_CHEMD_KIND_INFERRED`。
+
+## Route 与前驱链接
+
+`route` 用于把 reaction 归入同一合成路线。`prev` 记录前驱 reaction，列表解析规则与其他 reaction 引用列表一致。
+
+```md
+:::chemd #rxn-step-1
+kind: reaction
+route: route-total-synthesis
+reactants: @mol-a
+products: @mol-b
+:::
+
+:::chemd #rxn-step-2
+kind: reaction
+route: route-total-synthesis
+prev: @rxn-step-1
+reactants: @mol-b
+products: @mol-c
+:::
+```
+
+## 诊断
+
+| 诊断码 | 条件 |
+| --- | --- |
+| `E_INVALID_ID` | 块 ID 不符合 ID 规则 |
+| `W_UNKNOWN_FIELD` | 使用未声明字段 |
+| `E_INVALID_LIST_ITEM` | 列表字段出现空项 |
+| `W_INVALID_CHEMD_IMPLICIT_VALUE` | molecule 隐式 SMILES 多于一行 |
+| `E_CHEMD_KIND_CONFLICT` | `kind` 非法，或显式类型与字段形状冲突 |
+| `E_MISSING_REQUIRED_FIELD` | resolver 必填字段缺失 |
+| `E_TYPED_REFERENCE_MISMATCH` | reaction 引用目标类型不匹配 |
+
+## 推荐实践案例
+
+完整 reaction 记录应显式声明 molecule 和 reaction，引用使用 `@id`，条件字段保持可解析的单位。
+
+```md
+:::chemd #mol-bromide
+kind: molecule
+name: 4-bromoanisole
+smiles: COc1ccc(Br)cc1
+role: substrate
+amount: 1.00 mmol
+equivalents: 1.0 equiv
+:::
+
+:::chemd #mol-boronic
+kind: molecule
+name: phenylboronic acid
+smiles: OB(O)c1ccccc1
+role: coupling_partner
+amount: 1.20 mmol
+equivalents: 1.2 equiv
+:::
+
+:::chemd #mol-biaryl
+kind: molecule
+name: 4-methoxybiphenyl
+smiles: COc1ccc(-c2ccccc2)cc1
+role: product
+:::
+
+:::chemd #rxn-suzuki
+kind: reaction
+name: Suzuki coupling
+reactants: @mol-bromide | @mol-boronic
+products: @mol-biaryl
+reagents: K2CO3
+catalyst: Pd(PPh3)4
+solvent: dioxane/water
+temperature: 90 C
+time: 12 h
+atmosphere: nitrogen
+yield: 82%
+:::
+```
+
+

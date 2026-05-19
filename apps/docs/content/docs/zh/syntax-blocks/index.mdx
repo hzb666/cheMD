@@ -1,0 +1,79 @@
+---
+title: 语法块手册
+description: 面向 Chemd 使用者的结构化块使用手册，每一种块独立说明字段、约束、默认值、诊断和推荐案例。
+---
+
+
+## 块清单
+
+| 块 | 作用 | 主要输出节点 |
+| --- | --- | --- |
+| `:::chemd` | 分子与反应对象 | `molecule` 或 `reaction` |
+| `:::result` | 实验结果 | `result` |
+| `:::analysis` | 分析记录 | `analysis` |
+| `:::procedure` | 实验过程 | `procedure` |
+| `:::step` | `procedure` 内部步骤 | `step` |
+| `:::observation` | 观察记录 | `observation` |
+| `:::event` | `observation` 内部事件 | `event` |
+| `:::sample` | 样品记录 | `sample` |
+| `:::artifact` | 文件、谱图、图片等附件 | `artifact` |
+| `:::condition-varies` | 条件筛选与变量变化 | `condition_varies` |
+| `:::template` | 可复用模板 | `template` |
+| `:::use` | 模板调用 | `use` |
+| `:::col` | 多列布局 | `col` |
+
+## 通用规则
+
+块头使用 `:::block-name`。对象块 ID 写在块头参数中，格式为 `#id`。ID 必须匹配 `[a-zA-Z][a-zA-Z0-9_-]*`。字段写作 `key: value`，字段名必须以小写字母开头，后续允许小写字母、数字和下划线。同一行可使用 `;;` 写多个字段。
+
+```md
+:::result #res-main
+status: success ;; yield: 82% ;; purity: 96%
+:::
+```
+
+列表字段按块定义处理。通用列表字段包含 `reactants`、`products`、`reactant`、`product`、`reac`、`prod`、`conditions` 和 `params`。空列表项产生 `E_INVALID_LIST_ITEM`。
+
+## 推荐组织方式
+
+一份实验记录通常按对象依赖顺序编写：先声明 molecule，再声明 reaction，随后记录 procedure、observation、analysis、result、sample 和 artifact。条件筛选记录以 standard reaction 和 variation reaction 为中心组织。
+
+```md validate
+---
+id: exp-user-guide
+title: User guide example
+date: 2026-05-19
+primary_reaction: rxn-main
+primary_result: res-main
+---
+
+:::chemd #mol-substrate
+kind: molecule
+name: substrate
+smiles: CCO
+amount: 1.00 mmol
+:::
+
+:::chemd #mol-product
+kind: molecule
+name: product
+smiles: CC=O
+:::
+
+:::chemd #rxn-main
+kind: reaction
+reactants: @mol-substrate
+products: @mol-product
+solvent: MeCN
+temperature: 60 C
+time: 3 h
+:::
+
+:::result #res-main
+reaction: rxn-main
+product: mol-product
+status: success
+yield: 74%
+:::
+```
+

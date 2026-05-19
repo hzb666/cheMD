@@ -1,0 +1,117 @@
+---
+title: Core Packages
+description: Responsibility boundaries, entrypoints, data flow, and integration relationships for packages.
+---
+
+The following reference lists actual packages under `packages`. Responsibility notes are based on `package.json`, package exports, source entrypoints, and call chains.
+
+## Language Core Path
+
+| Package | Main entrypoint | Responsibility |
+| --- | --- | --- |
+| `@chemd/core` | `packages/core/src/index.ts` | AST, diagnostics, reference model, render overrides, shared types |
+| `@chemd/parser` | `packages/parser/src/index.ts` | Frontmatter, body, block, and inline token parsing |
+| `@chemd/resolver` | `packages/resolver/src/index.ts` | Object index, reference resolution, template expansion, primary validation, required-field validation |
+| `@chemd/typechecker` | `packages/typechecker/src/index.ts` | Typed semantic graph, quantity normalization, typed references, route checks, step checks |
+| `@chemd/compiler` | `packages/compiler/src/index.ts` | Aggregates parse, resolve, typecheck, render, export, and diagnosis |
+
+This path is the main Chemd language execution path. `parser` converts source into AST plus parser diagnostics; `resolver` adds cross-node semantics; `typechecker` produces the typed semantic graph and step graph; `compiler` composes all stages and emits HTML, JSON, DOCX bridge, LNF, RAG, and training data.
+
+```bash
+pnpm --filter @chemd/parser test
+pnpm --filter @chemd/resolver test
+pnpm --filter @chemd/compiler typecheck
+```
+
+### What Moves Together
+
+| If you change | Also inspect |
+| --- | --- |
+| AST node shape or diagnostic fields | `@chemd/core`, parser tests, resolver/typechecker consumers, compiler snapshots |
+| Block grammar or inline syntax | parser tests, resolver indexing, language-service diagnostics, user docs |
+| Reference or template behavior | resolver tests, typechecker typed-reference checks, CLI validation output |
+| Quantity or route semantics | typechecker tests, step ontology lowering, compiler LNF/export results |
+| Public compiler result shape | CLI command output, web/desktop callers, exporter-training consumers |
+
+## Semantic and Runtime Path
+
+| Package | Responsibility |
+| --- | --- |
+| `@chemd/step-ontology` | Procedure lowering, observation lowering, step graph types and edges |
+| `@chemd/runtime-lab` | Runtime run plan and preflight |
+| `@chemd/runtime-trace` | Runtime trace structures and replay helpers |
+| `@chemd/lnf` | Canonical intermediate representation |
+
+`@chemd/step-ontology` is tightly coupled with `@chemd/typechecker`. Explicit steps are converted into canonical steps by the typechecker, while prose procedures are lowered by step ontology. `runtime-lab` uses typed graph and step graph data to build run plans, which the compiler writes into LNF.
+
+```bash
+pnpm --filter @chemd/typechecker test
+pnpm --filter @chemd/step-ontology test
+pnpm --filter @chemd/runtime-lab test
+```
+
+The semantic packages should not parse raw source text directly. They consume AST, resolved document data, typed graph data, or step graph data produced earlier in the pipeline. This keeps syntax concerns in parser/resolver and keeps runtime planning focused on canonical semantic structures.
+
+## Rendering and Export Path
+
+| Package | Responsibility |
+| --- | --- |
+| `@chemd/render-profile` | Built-in render profiles, frontmatter selection, override merge, and diagnostics |
+| `@chemd/renderer-html` | HTML preview rendering |
+| `@chemd/renderer-json` | JSON rendering |
+| `@chemd/renderer-docx` | DOCX bridge rendering |
+| `@chemd/exporter-training` | Training export, RAG export, graph index, reaction intelligence contracts |
+
+Rendering consumes the resolved document, render options, and typed graph. Export consumes the resolved document, typed graph, step graph, and LNF. Training export is the upstream source for RAG export and training understanding.
+
+### Output Ownership
+
+| Output | Primary packages | Typical consumers |
+| --- | --- | --- |
+| HTML preview | `@chemd/compiler`, `@chemd/render-profile`, `@chemd/renderer-html` | web preview, desktop preview, docs examples |
+| JSON render | `@chemd/compiler`, `@chemd/renderer-json` | CLI export, app API routes, tests |
+| DOCX bridge | `@chemd/compiler`, `@chemd/renderer-docx` | export APIs and CLI workflows |
+| LNF | `@chemd/compiler`, `@chemd/lnf`, runtime packages | runtime-lab, downstream automation |
+| RAG and training data | `@chemd/exporter-training`, `@chemd/reaction-map` | graph export, search, reaction intelligence |
+
+## Application Support Path
+
+| Package | Responsibility |
+| --- | --- |
+| `@chemd/cli` | validate, export, graph, diff, changed, repair, and agent-loop |
+| `@chemd/language-service` | Editor language service |
+| `@chemd/workspace-index` | Workspace document indexing |
+| `@chemd/storage-postgres` | PostgreSQL schema, records, Graph/RAG storage |
+| `@chemd/reaction-map` | Reaction graph and intelligence contracts |
+| `@chemd/semantic-rendering` | Semantic rendering support |
+| `@chemd/agent-tools` | Agent tooling integration |
+| `@chemd/diagnostics` | v0.3 diagnostics construction and diagnostic data model |
+
+These packages serve CLI, web, desktop, and backend integration. `@chemd/diagnostics` is used by the typechecker, `@chemd/storage-postgres` serves web routes and desktop backend paths, and `@chemd/reaction-map` connects to reaction intelligence data surfaces.
+
+### Integration Responsibilities
+
+| Package | Common entrypoints | Verification focus |
+| --- | --- | --- |
+| `@chemd/cli` | command modules and `packages/cli/bin/chemd.mjs` | command output, exit codes, repair/agent-loop workflows |
+| `@chemd/language-service` | language service exports | editor diagnostics, completion-safe parsing, incremental feedback |
+| `@chemd/workspace-index` | workspace indexing APIs | multi-file discovery, graph input, changed-file behavior |
+| `@chemd/storage-postgres` | schema and repository helpers | migration compatibility, record shape, Graph/RAG persistence |
+| `@chemd/diagnostics` | diagnostic builders and data model | stable diagnostic codes, severity, locations, remediation text |
+
+## Package Boundaries
+
+Language behavior changes usually start with `core` types, then require synchronized updates in parser, resolver, typechecker, compiler fixtures, CLI validation, and docs. Rendering appearance changes usually stay inside render-profile and renderer packages. Workspace, PostgreSQL, RAG, and reaction intelligence changes should remain in application support packages or apps/services layers.
+
+## Package Change Checklist
+
+Before closing a package-level change, check the matching surfaces:
+
+| Area | Checklist |
+| --- | --- |
+| Language syntax | Update parser coverage, resolver/typechecker expectations, compiler outputs, CLI validation, and user docs examples |
+| Diagnostics | Keep code, severity, location, message, and remediation aligned across CLI, language service, web, and desktop |
+| Exports | Verify renderer output, compiler aggregate output, CLI export command, and any app API route that exposes the format |
+| Storage or graph | Check migration/schema shape, repository helpers, graph export contracts, and app/service callers |
+| App support | Keep shared behavior in packages; keep app code focused on UI, routing, permissions, and platform adaptation |
+

@@ -1,0 +1,110 @@
+---
+title: Syntax Aliases
+description: Chemd field aliases, inline aliases, and accepted shorthand fields.
+---
+
+This page lists aliases and shorthand fields accepted by the current Chemd parser and resolver. Prefer the canonical field when writing new documents unless the shorthand is already part of a compact pattern.
+
+## Reaction Fields
+
+| Alias or shorthand | Canonical field | Applies to | Notes |
+| --- | --- | --- | --- |
+| `reactants` | `reactants` | `:::chemd` reaction | Canonical reactant list. |
+| `reactant` | `reactants` | `:::chemd` reaction | Singular shorthand for the reactant list. |
+| `reac` | `reactants` | `:::chemd` reaction | Compact shorthand. It has read priority over `reactant` and `reactants`. |
+| `products` | `products` | `:::chemd` reaction | Canonical product list. |
+| `product` | `products` | `:::chemd` reaction | Singular shorthand for the product list. |
+| `prod` | `products` | `:::chemd` reaction | Compact shorthand. It has read priority over `product` and `products`. |
+
+```md
+:::chemd #rxn-main
+kind: reaction
+reac: @mol-a | @mol-b
+prod: @mol-c
+:::
+```
+
+## Primary Inline Aliases
+
+Primary inline aliases resolve through frontmatter `primary_*` fields. They are only valid when followed by a field name.
+
+| Inline alias | Frontmatter source | Example |
+| --- | --- | --- |
+| `@reaction.field` | `primary_reaction` | `@reaction.solvent` |
+| `@result.field` | `primary_result` | `@result.yield` |
+| `@product.field` | `primary_product` | `@product.name` |
+| `@sample.field` | `primary_sample` | `@sample.purity` |
+| `@molecule.field` | `primary_molecule` | `@molecule.smiles` |
+| `@analysis.field` | `primary_analysis` | `@analysis.data` |
+
+```md
+---
+primary_reaction: rxn-main
+primary_result: res-main
+---
+
+The primary reaction used @reaction.solvent and gave @result.yield.
+```
+
+## Result and Condition-Screen Aliases
+
+| Alias or shorthand | Canonical meaning | Applies to | Notes |
+| --- | --- | --- | --- |
+| `ref` | reaction association | `:::result` | Treated as the reaction link when `reaction` is absent. |
+| `reaction` | reaction association | `:::result` | Explicit reaction link; preferred when the relationship should be clear. |
+| `ref` | attempt reaction | `varN` in `:::condition-varies` | Equivalent to `reaction` inside an attempt segment. |
+| first bare segment | attempt reaction | `varN` in `:::condition-varies` | `var1: rxn-a | solvent=MeCN` links attempt `var1` to `rxn-a`. |
+| `res` | attempt result | `varN` in `:::condition-varies` | Equivalent to `result` inside an attempt segment. |
+| `resN` | attempt result | `:::condition-varies` top-level field | `res1` attaches a result to `var1`. |
+| `note` / `notes` | attempt note | `varN` in `:::condition-varies` | Both forms populate the attempt note. |
+| `noteN` | attempt note | `:::condition-varies` top-level field | `note1` attaches a note to `var1`. |
+| `full` / `replace` | `override` mode | `varN` in `:::condition-varies` | These mode values normalize to override behavior. |
+
+```md
+:::condition-varies #screen-main
+standard: rxn-standard
+condition: solvent=MeCN | temperature=40 C
+var1: rxn-var1 | solvent=DMF | res=res-var1 | note=cleaner profile
+res2: res-var2
+note2: trace product by TLC
+var2: reaction=rxn-var2 | mode=replace | temperature=60 C
+:::
+```
+
+## Procedure and Observation Aliases
+
+| Alias | Canonical field | Applies to | Notes |
+| --- | --- | --- | --- |
+| `step_id` | `id` | `step:` and nested `:::step` | Sets the authored step ID. |
+| `depends_on` | `dependsOn` | `step:` and nested `:::step` | Accepts comma-separated dependency step IDs. |
+| `event_id` | `id` | `event:` and nested `:::event` | Sets the authored event ID. |
+| `event_type` / `type` | `eventType` | `event:` and nested `:::event` | Sets the event type. |
+| `linked_step` | `linkedStep` | `event:` and nested `:::event` | Links the event to a step ID. |
+
+```md
+:::procedure #proc-main
+step: add | step_id=s-add | inputs=@mol-a | outputs=@mol-b
+step: analyze | id=s-tlc | depends_on=s-add
+:::
+
+:::observation #obs-main
+event: color-change | event_id=e-color | linked_step=s-add
+event: event_type=tlc-check | id=e-tlc | linkedStep=s-tlc
+:::
+```
+
+## Template Binding Aliases
+
+Template `bind` entries are user-defined aliases. They can point to object IDs or primary frontmatter fields, and `:::use` can override a bound alias by passing a field with the same name.
+
+```md
+:::template reaction-summary
+bind: rxn=primary_reaction | res=primary_result
+Reaction @rxn.name gave @res.yield.
+:::
+
+:::use reaction-summary
+rxn: rxn-variant
+res: res-variant
+:::
+```

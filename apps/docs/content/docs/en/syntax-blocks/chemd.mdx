@@ -1,0 +1,165 @@
+---
+title: '`:::chemd` Molecule and Reaction Block'
+description: '`:::chemd` is the unified usage block for molecules and reactions, with explicit kind, shape inference, reference lists, and chemistry feature refs.'
+---
+
+`:::chemd` produces either a `molecule` or `reaction` node according to `kind` and field shape.
+
+## Syntax
+
+```md
+:::chemd #mol-substrate
+kind: molecule
+name: ethyl acetate
+smiles: CCOC(C)=O
+amount: 2.00 mmol
+equivalents: 1.0 equiv
+:::
+```
+
+```md
+:::chemd #rxn-main
+kind: reaction
+reactants: @mol-substrate | @mol-base
+products: @mol-product
+solvent: MeCN
+temperature: 60 C
+time: 3 h
+atmosphere: nitrogen
+:::
+```
+
+## Fields
+
+| field | molecule | reaction | notes |
+| --- | --- | --- | --- |
+| `kind` | optional | optional | `molecule` or `reaction`; recommended for CLI strict validation |
+| `smiles` | required | not applicable | required by the resolver for molecule nodes |
+| `cas` | optional | not applicable | stored as raw text |
+| `name` | optional | optional | user-facing name |
+| `role` | optional | not applicable | user-defined role such as substrate, reagent, or product |
+| `caption` | optional | optional | render caption |
+| `formula` | optional | not applicable | formula text |
+| `amount` | optional | not applicable | quantity field supporting `mmol` and `mol` |
+| `equivalents` | optional | not applicable | quantity field supporting `equiv` and `eq` |
+| `reactants` / `reactant` / `reac` | not applicable | required | molecule reference list |
+| `products` / `product` / `prod` | not applicable | required | molecule reference list |
+| `conditions` | not applicable | optional | string list |
+| `route` | not applicable | optional | route ID or label |
+| `prev` | not applicable | optional | predecessor reaction reference list |
+| `reagents` | not applicable | optional | raw text |
+| `catalyst` | not applicable | optional | raw text |
+| `solvent` | not applicable | optional | raw text |
+| `temperature` | not applicable | optional | temperature quantity |
+| `time` | not applicable | optional | time quantity |
+| `pressure` | not applicable | optional | pressure quantity |
+| `atmosphere` | not applicable | optional | `nitrogen`, `argon`, `air`, `oxygen`, `inert`, or extension value |
+| `yield` | not applicable | optional | reaction-level yield summary |
+| `conversion` | not applicable | optional | conversion |
+| `selectivity` | not applicable | optional | selectivity |
+| `chemistry_features` | optional | optional | feature IDs separated by `|` or `,` |
+
+## Required Fields and Defaults
+
+| node | resolver-required fields | default |
+| --- | --- | --- |
+| molecule | `smiles` | none |
+| reaction | `reactants`, `products` | none |
+
+When `id` is omitted, the resolver assigns `<document-id>-<node-type>-<counter>`. Objects referenced by other blocks should use explicit IDs.
+
+## Implicit Molecule SMILES
+
+For molecule-shaped `:::chemd` blocks, the parser can use the first non-field body line as `smiles` when the `smiles:` field is absent.
+
+```md
+:::chemd #mol-ethanol
+kind: molecule
+CCO
+:::
+```
+
+This shorthand is useful for short molecule records. If more than one implicit body line is present, only the first line is used and `W_INVALID_CHEMD_IMPLICIT_VALUE` is emitted.
+
+## Type Inference
+
+The parser infers reaction when `reactants`, `products`, or their aliases are present. Other valid chemd fields infer molecule. With `strictChemdKind`, omitted `kind` produces `W_CHEMD_KIND_AMBIGUOUS`. Without strict mode, omitted `kind` produces `W_CHEMD_KIND_INFERRED`.
+
+## Route and Predecessor Links
+
+`route` groups reactions into a named synthesis path. `prev` lists predecessor reactions and supports the same list parsing as other reaction reference lists.
+
+```md
+:::chemd #rxn-step-1
+kind: reaction
+route: route-total-synthesis
+reactants: @mol-a
+products: @mol-b
+:::
+
+:::chemd #rxn-step-2
+kind: reaction
+route: route-total-synthesis
+prev: @rxn-step-1
+reactants: @mol-b
+products: @mol-c
+:::
+```
+
+## Diagnostics
+
+| code | condition |
+| --- | --- |
+| `E_INVALID_ID` | invalid block ID |
+| `W_UNKNOWN_FIELD` | undeclared field |
+| `E_INVALID_LIST_ITEM` | empty list item |
+| `W_INVALID_CHEMD_IMPLICIT_VALUE` | more than one implicit molecule value |
+| `E_CHEMD_KIND_CONFLICT` | invalid `kind`, or explicit kind conflicts with field shape |
+| `E_MISSING_REQUIRED_FIELD` | resolver-required field is missing |
+| `E_TYPED_REFERENCE_MISMATCH` | reaction reference target has the wrong type |
+
+## Recommended Practice
+
+A complete reaction record should declare molecules and reaction explicitly, use `@id` references, and keep condition values unit-bearing.
+
+```md
+:::chemd #mol-bromide
+kind: molecule
+name: 4-bromoanisole
+smiles: COc1ccc(Br)cc1
+role: substrate
+amount: 1.00 mmol
+equivalents: 1.0 equiv
+:::
+
+:::chemd #mol-boronic
+kind: molecule
+name: phenylboronic acid
+smiles: OB(O)c1ccccc1
+role: coupling_partner
+amount: 1.20 mmol
+equivalents: 1.2 equiv
+:::
+
+:::chemd #mol-biaryl
+kind: molecule
+name: 4-methoxybiphenyl
+smiles: COc1ccc(-c2ccccc2)cc1
+role: product
+:::
+
+:::chemd #rxn-suzuki
+kind: reaction
+name: Suzuki coupling
+reactants: @mol-bromide | @mol-boronic
+products: @mol-biaryl
+reagents: K2CO3
+catalyst: Pd(PPh3)4
+solvent: dioxane/water
+temperature: 90 C
+time: 12 h
+atmosphere: nitrogen
+yield: 82%
+:::
+```
+

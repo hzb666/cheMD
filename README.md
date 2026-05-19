@@ -3,37 +3,42 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white" alt="TypeScript 5.9" />
-  <img src="https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white" alt="Next.js 15" />
-  <img src="https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white" alt="React 19" />
-  <img src="https://img.shields.io/badge/pnpm-10-F69220?logo=pnpm&logoColor=white" alt="pnpm 10" />
+  <img src="https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript&logoColor=white" alt="TypeScript 6.0" />
+  <img src="https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white" alt="Next.js 16" />
+  <img src="https://img.shields.io/badge/React-19.2-149ECA?logo=react&logoColor=white" alt="React 19.2" />
+  <img src="https://img.shields.io/badge/pnpm-10.33-F69220?logo=pnpm&logoColor=white" alt="pnpm 10.33" />
   <img src="https://img.shields.io/badge/Flask-3.1-111111?logo=flask&logoColor=white" alt="Flask 3.1" />
-  <img src="https://img.shields.io/badge/RDKit-2025.9-0B7285" alt="RDKit" />
+  <img src="https://img.shields.io/badge/RDKit-2026.3-0B7285" alt="RDKit 2026.3" />
 </p>
 
 # chemd
 
 [简体中文](./README.zh-CN.md) | [English](./README.md)
 
-`chemd` turns chemistry experiment records into code-like, compiler-checked
-documents that remain readable to researchers and structured for LLM systems.
-It preserves the narrative of an experiment while extracting entities,
+`chemd` is a Markdown-based chemistry document system for writing, validating,
+rendering, and operationalizing experiment records. Researchers keep the
+readable narrative of an experiment, while the compiler extracts entities,
 references, procedure logic, observations, evidence links, and knowledge-graph
-relations for retrieval, training, and downstream reasoning. The system combines
-a typed chemistry document language, a TypeScript compiler pipeline, a Next.js
-playground, and a local Flask/RDKit chemistry service.
+relations for retrieval, training, and downstream reasoning. The workspace
+combines a typed Chemd language, TypeScript compiler packages, a browser
+playground, a Tauri desktop IDE, and local chemistry services.
 
 ## Product Scope
 
 - Code-like Chemd authoring with frontmatter, Markdown-style prose, inline chemistry,
   references, molecules, reactions, results, analyses, samples, procedures,
   observations, templates, and column layouts.
+- `.chemd` source files for product-facing authoring, with legacy `.chemd.md`
+  compatibility for existing workspaces.
 - Experiment-logic enrichment that connects raw records to typed entities,
   resolved references, procedure steps, observations, field evidence,
   normalization facts, and knowledge-graph edges.
 - Live browser workbench with source editing, rendered preview, diagnostics,
   structured outputs, export actions, OCR entry points, and chemistry editor
   integration.
+- Desktop IDE for local workspaces, Monaco editing, file tabs, autosave,
+  conflict-aware saves, diagnostics, semantic preview, workspace indexing,
+  Graph/RAG views, PostgreSQL profile binding, and agent patch review.
 - Compiler output for HTML preview, normalized JSON, DOCX bridge Markdown,
   canonical LNF, runtime preflight, RAG retrieval data, training understanding
   data, and full audit data.
@@ -52,11 +57,14 @@ playground, and a local Flask/RDKit chemistry service.
 | Layer | Technology |
 | --- | --- |
 | Workspace | pnpm workspace, Turborepo |
-| Web | Next.js 15, React 19, Tailwind CSS 4 |
-| Language packages | TypeScript 5.9 |
+| Web | Next.js 16, React 19.2, Tailwind CSS 4.3 |
+| Desktop | Tauri 2, Vite 8, React 19.2, Monaco Editor |
+| Native runtime | Rust, Tauri commands, managed PostgreSQL resources |
+| Language packages | TypeScript 6.0 |
 | Chemistry editing | Ketcher React, Ketcher standalone |
-| Chemistry service | Python 3.14, Flask 3.1, RDKit 2025.9 |
-| Validation | Vitest, TypeScript checks, ESLint, Ruff, Python unittest |
+| Chemistry service | Python 3.14, Flask 3.1, RDKit 2026.3 |
+| Persistence and knowledge | PostgreSQL, pgvector-oriented Graph/RAG records, local outbox |
+| Validation | Vitest 4.1, TypeScript checks, ESLint 10.4, Ruff 0.15, Python unittest |
 | Document conversion | Pandoc for final DOCX generation |
 
 ## Repository Layout
@@ -64,6 +72,7 @@ playground, and a local Flask/RDKit chemistry service.
 ```text
 chemd/
 |-- apps/
+|   |-- desktop/            # Tauri desktop IDE, Monaco workbench, native commands
 |   `-- web/                 # Playground UI, route handlers, server facade
 |-- deploy/
 |   `-- playground/          # Container, reverse proxy, and service assets
@@ -73,8 +82,11 @@ chemd/
 |   |-- core/                # AST, diagnostics, shared primitives
 |   |-- diagnostics/         # Diagnostic model and quick-fix metadata
 |   |-- exporter-training/   # RAG, training understanding, audit exports
+|   |-- agent-tools/         # Agent run, evidence, patch, and audit primitives
+|   |-- language-service/    # Editor diagnostics, outline, completion, hover, Graph/RAG DTOs
 |   |-- lnf/                 # Canonical LNF builder
 |   |-- parser/              # Frontmatter, blocks, inline tokens, references
+|   |-- reaction-map/        # Reaction graph layout and intelligence contracts
 |   |-- render-profile/      # Render profiles and override validation
 |   |-- renderer-docx/       # DOCX bridge renderer
 |   |-- renderer-html/       # HTML preview renderer
@@ -84,6 +96,8 @@ chemd/
 |   |-- runtime-trace/       # Runtime trace events and replay helpers
 |   |-- step-ontology/       # Procedure, observation, analysis lowering
 |   |-- storage-postgres/    # PostgreSQL schema, records, RAG, and memory tables
+|   |-- semantic-rendering/  # Semantic preview view models
+|   |-- workspace-index/     # Cross-document symbols and reference queries
 |   `-- typechecker/         # Typed semantic graph and value diagnostics
 |-- scripts/                 # Local development and migration utilities
 |-- services/
@@ -135,6 +149,18 @@ cd services/chem-service
 poetry run python app.py
 ```
 
+Start the desktop IDE frontend:
+
+```bash
+pnpm --filter @chemd/desktop dev
+```
+
+Run the Tauri desktop app during development:
+
+```bash
+pnpm --filter @chemd/desktop tauri:dev
+```
+
 ## Commands
 
 | Command | Purpose |
@@ -149,11 +175,17 @@ poetry run python app.py
 | `pnpm test` | Run the validation suite |
 | `pnpm lint:py` | Run Ruff for the chemistry service |
 | `pnpm format:check:py` | Check Python formatting |
+| `pnpm desktop:diagnostics-bundle` | Export an offline desktop diagnostics bundle |
+| `pnpm desktop:offline-core-smoke` | Run the offline desktop core smoke script |
+| `pnpm desktop:release-readiness` | Run desktop release-readiness classification |
+| `pnpm --filter @chemd/desktop tauri:dev` | Start the Tauri desktop app |
+| `pnpm --filter @chemd/desktop tauri:build` | Build desktop release artifacts |
 
 Package-scoped examples:
 
 ```bash
 pnpm --filter @chemd/web test
+pnpm --filter @chemd/desktop test
 pnpm --filter @chemd/compiler typecheck
 pnpm --filter @chemd/exporter-training test
 ```
@@ -170,8 +202,8 @@ poetry run python -m unittest discover
 The package CLI is available through the root `chemd` script:
 
 ```bash
-pnpm chemd validate examples/report.chemd
-pnpm chemd export examples/report.chemd --format training-full
+pnpm chemd validate packages/compiler/fixtures/golden-experiment-record.chemd
+pnpm chemd export packages/compiler/fixtures/golden-experiment-record.chemd --format training-full
 pnpm chemd diff before.chemd after.chemd --format json
 pnpm chemd graph reports/*.chemd --format json
 pnpm chemd repair draft.chemd --format text
@@ -195,11 +227,15 @@ one or more experiment reports, then derives document nodes, entity/relation
 edges, route clusters, family/procedure clusters, condition clusters,
 campaign trajectories, and semantic reaction-similarity edges. When computed
 chemical fingerprints are not available, the output marks this explicitly
-instead of presenting semantic similarity as RDKit/Tanimoto similarity.
+and keeps semantic similarity distinct from RDKit/Tanimoto similarity.
 
 ## Document Language
 
-`chemd` documents are dedicated Chemd source files with required frontmatter:
+Chemd documents use Markdown-compatible text with structured chemistry blocks.
+The primary file extension is `.chemd`; existing `.chemd.md` files remain
+supported by the compiler, workspace index, and desktop IDE.
+
+Required frontmatter:
 
 - `id`
 - `title`
@@ -280,6 +316,42 @@ purity: 91%
 Yield: @res-main.yield
 ```
 
+More authoring references:
+
+- `docs/chemd-syntax-best-practices.zh-CN.md`
+- `packages/compiler/fixtures/best-practice-total-synthesis.chemd`
+- `packages/compiler/fixtures/best-practice-one-step-synthesis.chemd`
+- `packages/compiler/fixtures/best-practice-condition-screen.chemd`
+
+## Common Workflows
+
+Create or open a Chemd record:
+
+```bash
+pnpm chemd validate packages/compiler/fixtures/golden-experiment-record.chemd
+```
+
+Export compiler data for applications and model pipelines:
+
+```bash
+pnpm chemd export packages/compiler/fixtures/golden-experiment-record.chemd --format json
+pnpm chemd export packages/compiler/fixtures/golden-experiment-record.chemd --format rag
+pnpm chemd export packages/compiler/fixtures/golden-experiment-record.chemd --format training
+```
+
+Inspect a workspace-level reaction graph:
+
+```bash
+pnpm chemd graph packages/compiler/fixtures/*.chemd --format json
+```
+
+Use compiler-guided repair on generated records:
+
+```bash
+pnpm chemd repair draft.chemd --write
+pnpm chemd agent-loop draft.chemd --write --max-iterations 3
+```
+
 ## Compiler Pipeline
 
 `@chemd/compiler` exposes `compileChemd(source, options)`.
@@ -319,7 +391,8 @@ Graph-index output is intentionally inference-driven. Authors write the
 strong experimental facts that belong in a report, such as `reactants`,
 `products`, `result.ref`, `analysis.ref`, `sample.derived_from`, `route`,
 `prev`, and `condition-varies`. The exporter derives the graph and clustering
-projection from those facts rather than adding a separate graph language.
+projection from those facts, so authors can keep reports focused on experiment
+evidence.
 Repo-level graph indexes are built after compiling one or more documents into
 training understandings, using `buildTrainingGraphIndexFromUnderstandings()`.
 
@@ -337,6 +410,50 @@ The playground provides:
 
 Structured output tabs include semantic output, runtime output, LNF, RAG export,
 training understanding export, and full audit export.
+
+Typical browser flow:
+
+1. Start `pnpm dev`.
+2. Open `http://127.0.0.1:2436`.
+3. Edit the Chemd source or import chemistry through OCR/editor entry points.
+4. Review diagnostics and rendered preview.
+5. Export JSON, DOCX, RAG, training understanding, or audit payloads.
+
+## Desktop IDE
+
+Chemd Desktop IDE is the local workspace product for day-to-day Chemd authoring.
+It runs as a Tauri app with a React/Monaco workbench and Rust-backed workspace
+commands.
+
+Desktop features:
+
+- Open local folders and browse Chemd documents alongside related assets.
+- Edit `.chemd` and `.chemd.md` files in Monaco with diagnostics, outline,
+  hover, completion, source ranges, and quick-fix proposals from
+  `@chemd/language-service`.
+- Use tabs, breadcrumbs, status bar metadata, autosave, `Ctrl+S`/`Cmd+S`, and
+  conflict-aware writes that protect externally changed files.
+- Preview the compiled document and semantic tree while editing.
+- Build local workspace indexes for symbols, references, document candidates,
+  and RAG citation candidates.
+- Bind a workspace to a PostgreSQL profile, use managed PostgreSQL resources,
+  persist Graph/RAG runtime snapshots, query connected RAG data, and backfill
+  embeddings when providers are configured.
+- Run reaction intelligence jobs and view reaction graph layouts, clusters,
+  evidence rows, and source-jump links.
+- Review agent patch proposals with evidence, audit timeline, approve/reject,
+  and apply states.
+- Export offline diagnostics bundles for support and release checks.
+
+Desktop development commands:
+
+```bash
+pnpm --filter @chemd/desktop dev
+pnpm --filter @chemd/desktop tauri:dev
+pnpm --filter @chemd/desktop test
+pnpm --filter @chemd/desktop typecheck
+pnpm desktop:diagnostics-bundle
+```
 
 ## API Surface
 
@@ -373,6 +490,7 @@ Chemistry service routes:
 | Package | Role |
 | --- | --- |
 | `@chemd/cli` | CLI validation, graph export, repair loop, semantic diff, and agent-loop integration |
+| `@chemd/agent-tools` | Agent runs, cited evidence, patch decisions, and audit timelines |
 | `@chemd/core` | Shared AST, diagnostics, render overrides, chemistry primitives |
 | `@chemd/parser` | Frontmatter, Markdown, inline token, block, reference parsing |
 | `@chemd/resolver` | References, aliases, template expansion, semantic cleanup |
@@ -382,14 +500,19 @@ Chemistry service routes:
 | `@chemd/runtime-lab` | Runtime plans and preflight checks |
 | `@chemd/runtime-trace` | Runtime trace events and replay helpers |
 | `@chemd/lnf` | Canonical LNF payloads |
+| `@chemd/language-service` | Editor diagnostics, outline, symbols, completions, hover, quick fixes, Graph/RAG DTOs |
+| `@chemd/reaction-map` | Reaction map layout, cluster model, and reaction intelligence contracts |
 | `@chemd/render-profile` | Built-in render profiles and override validation |
 | `@chemd/renderer-html` | HTML preview rendering |
 | `@chemd/renderer-json` | JSON rendering |
 | `@chemd/renderer-docx` | DOCX bridge rendering |
 | `@chemd/exporter-training` | Retrieval, training understanding, graph index, clustering, audit exports |
 | `@chemd/storage-postgres` | PostgreSQL schema, storage records, RAG chunks, and training memory records |
+| `@chemd/semantic-rendering` | Semantic preview view models for editor products |
+| `@chemd/workspace-index` | Cross-document symbol indexing, references, and workspace query helpers |
 | `@chemd/compiler` | Public compile pipeline |
 | `@chemd/web` | Playground UI and server-side routes |
+| `@chemd/desktop` | Tauri desktop IDE and native workspace runtime |
 
 ## Configuration
 
@@ -456,6 +579,8 @@ and TLS termination belong at the reverse proxy in front of the web service.
 
 ## Runtime Notes
 
+- `.chemd` is the primary authoring extension. `.chemd.md` remains accepted for
+  older workspaces and aliases.
 - RDKit-backed rendering requires the Python runtime to import RDKit
   successfully.
 - OCR defaults to placeholder providers; production OCR requires provider URLs
@@ -466,3 +591,6 @@ and TLS termination belong at the reverse proxy in front of the web service.
   API.
 - Structure drafts are stored by the chemistry service for the active playground
   flow.
+- Desktop Graph/RAG and managed PostgreSQL capabilities depend on a ready
+  workspace profile. Core local editing, saving, compiling, preview, and
+  diagnostics are available for local Chemd files.

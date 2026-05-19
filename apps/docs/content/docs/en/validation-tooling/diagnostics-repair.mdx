@@ -1,0 +1,110 @@
+---
+title: Diagnostics and Repair Manual
+description: Frontmatter, structured block, reference, typecheck, template, input assistance, and repair loop diagnostics.
+---
+
+
+## Missing Frontmatter Fields
+
+Missing `id`, `title`, or `date` produces `E_MISSING_REQUIRED_FRONTMATTER_KEY`. Empty strings in required fields produce invalid value diagnostics. Fixes should provide non-empty strings and preserve lowercase key syntax.
+
+```yaml
+---
+id: exp-main
+title: Main experiment
+date: 2026-04-24
+---
+```
+
+## Invalid Dates
+
+Date diagnostics have two layers. `W_NON_ISO_FRONTMATTER_DATE` indicates shape outside `YYYY-MM-DD`. `W_INVALID_FRONTMATTER_DATE_VALUE` indicates an ISO-shaped value with invalid calendar content. Full calendar dates are recommended, with free-text imported dates stored in extra metadata fields.
+
+## Invalid Block IDs
+
+Block IDs must match `^[a-zA-Z][a-zA-Z0-9_-]*$`. Invalid IDs produce `E_INVALID_ID`. The rule applies to `:::chemd #id`, `:::result #id`, `:::analysis #id`, `:::sample #id`, `:::artifact #id`, `:::procedure #id`, `:::observation #id`, and `:::condition-varies #id`.
+
+## Unknown Fields
+
+Fields outside the allowed set for a block produce `W_UNKNOWN_FIELD`. The parser drops unknown fields. Fixes should use implemented fields; supplemental information can use `notes`, `caption`, `conditions`, or scalar project metadata.
+
+Example: `:::result` accepts `isolated_mass`; it does not implement a `mass` field. Writing `mass: 30 mg` produces `W_UNKNOWN_FIELD`, and the result node does not store that value.
+
+## Empty List Items
+
+List fields support `|` and comma separators. Consecutive separators, trailing separators, and empty string items produce `E_INVALID_LIST_ITEM`. Common list fields include `reactants`, `products`, `conditions`, `prev`, `artifacts`, `chemistry_features`, step `inputs`, step `outputs`, step `dependsOn`, and event `evidence`.
+
+## Unresolved References
+
+The resolver handles inline references, object field references, primary aliases, template parameter references, and condition screen attempt references. Unresolved objects or fields produce `W_UNRESOLVED_REFERENCE`. The typechecker adds target-kind checks for semantic fields, with mismatches producing `E_TYPED_REFERENCE_MISMATCH`.
+
+Reference repair path:
+
+- Check that the target object ID exists.
+- Check that `@id.field` names a real AST field.
+- Check that `primary_*` points to an existing object.
+- Check whether a bare ID should be written as `@id`.
+- Cross-document references need external targets through `referenceContext` or `reactionRouteContext`.
+
+## Duplicate IDs
+
+Duplicate object IDs produce `E_DUPLICATE_ID`. Duplicate template names produce `E_DUPLICATE_TEMPLATE`. Semantic diff only compares explicit-ID objects, so duplicate IDs destabilize diff, graph, and export workflows. Each semantic object should have a unique ID.
+
+## Missing Required Fields
+
+Resolver required fields:
+
+| object | required fields |
+| --- | --- |
+| molecule | `smiles` |
+| reaction | `reactants`, `products` |
+| analysis | `type_name`, `data` |
+| TLC analysis | `type_name` |
+| sample | `name` |
+| artifact | `kind`, `path` |
+
+The analysis `type` field is stored as `type_name` in the AST. TLC analysis receives parser defaults for `plate` and `visualization`, and the resolver relaxes the `data` requirement for TLC.
+
+## Template Parameter Errors
+
+Template diagnostics cover indexing, expansion, and parameter types. `E_UNKNOWN_TEMPLATE` means `:::use` cannot find the template. `E_TEMPLATE_PARAM_MISSING` means a call omits a required argument. `E_TEMPLATE_PARAM_TYPE_MISMATCH` means `ref<kind>` or `quantity<class>` does not match the supplied value. `E_TEMPLATE_CYCLE` means recursive template expansion. `E_TEMPLATE_EXPANSION_LIMIT` means expansion depth exceeds 32 or expanded nodes exceed 2000.
+
+`ref<kind>` supports molecule, reaction, result, analysis, procedure, observation, sample, artifact, and condition_varies. `quantity<class>` supports amount, mass, volume, temperature, time, pressure, concentration, equivalent, and percent.
+
+## Primary Reference Errors
+
+Missing primary targets produce `E_INVALID_PRIMARY_REFERENCE`. Inline aliases such as `@reaction.field` depend on their corresponding `primary_*` field. Fixes can add the target object, correct the primary ID, or replace the alias with an explicit object reference such as `@id.field`.
+
+## Typecheck Diagnostics
+
+The typechecker emits v0.3 diagnostics. Common diagnostics:
+
+| code | trigger |
+| --- | --- |
+| `E402` | percent quantity outside 0 to 100 |
+| `E403` | value cannot be parsed as the target quantity class |
+| `E306` | result `status` outside success, partial, failed, unknown aliases |
+| `E_TYPED_REFERENCE_MISMATCH` | reference target kind differs from field expectation |
+| `E_RESULT_REACTION_CONFLICT` | result yield, conversion, or selectivity differs from the linked reaction |
+| `E_STEP_INVALID_FAMILY` | step family outside the implemented set |
+| `E_STEP_PARAM_MISSING` | required family parameter is missing |
+| `E_STEP_PARAM_INVALID` | family-disallowed parameter appears |
+| `E_STEP_ID_DUPLICATE` | duplicate explicit step ID |
+| `E_STEP_INVALID_REFERENCE` | `dependsOn` targets a missing step |
+| `E_STEP_DEPENDENCY_CYCLE` | step dependency graph contains a cycle |
+| `E_OBSERVATION_EVENT_INVALID_TYPE` | event type outside the implemented set |
+| `E_OBSERVATION_LINKED_STEP_MISSING` | event targets a missing step |
+| `W_REACTION_ROUTE_MISMATCH` | predecessor route differs from current route |
+| `E_REACTION_ROUTE_CYCLE` | reaction route graph contains a cycle |
+| `W_REACTION_ROUTE_ORPHAN` | route contains an isolated reaction |
+
+## Quick Fixes and Repair Loop
+
+Current quick fix kinds are `apply_authoring_patch` and `insert_chemd_kind`. `insert_chemd_kind` applies to `chemd` kind inference diagnostics. `apply_authoring_patch` carries safe repair suggestions produced by compiler input assistance.
+
+`runChemdRepairLoop` defaults to a maximum of 5 iterations. Each iteration compiles, builds diagnosis, applies safe fixes, and recompiles. Stop reasons include clean, max iterations, stalled, and diagnosis status. `--write` writes back only when the repaired source is clean and changed.
+
+## Agent Loop Diagnostic Closure
+
+`runChemdAgentLoop` invokes an external driver after the deterministic repair loop. The driver receives source, diagnostics, and iteration history, then returns `rewrite` or `stop`. Stop reasons include clean, max iterations, repair max iterations, repair stalled, agent stalled, and diagnosis status. This workflow covers input problems beyond standalone quick fixes.
+

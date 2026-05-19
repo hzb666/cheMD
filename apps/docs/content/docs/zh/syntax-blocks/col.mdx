@@ -1,0 +1,54 @@
+---
+title: '`:::col` 列布局块'
+description: '`:::col` 是表现层布局块，用于把 Markdown 或结构化块放入多列。'
+---
+
+`:::col` 由 block parser registry 解析。它影响渲染布局，不改变化学语义。
+
+## 语法
+
+```md
+:::col-2
+col: { Reaction summary }
+col: { Result summary }
+:::
+```
+
+`:::col-2` 会被解析为 `blockType=col`、`columns=2`。也可写作 `:::col 2`。
+
+## 子项
+
+每个子项必须以 `col:` 开头。子项支持三类内容：
+
+| 写法 | 说明 |
+| --- | --- |
+| `col: text` | 行内 Markdown |
+| `col: { text }` | 单行包裹内容 |
+| `col: {` | 多行包裹内容 |
+
+```md
+:::col-2
+col: {
+:::result #res-main
+status: success
+yield: 82%
+:::
+}
+col: The product was confirmed by NMR.
+:::
+```
+
+## 默认值与诊断
+
+列数必须为大于等于 1 的整数。非法列数产生 `W_INVALID_COL_COLUMNS`，并回退为 1。声明列数与 `col:` 子项数不一致产生 `W_COL_COUNT_MISMATCH`。非 `col:` 行产生 `W_INVALID_COL_CHILD`。括号内容未闭合产生 `W_UNTERMINATED_BRACE_BLOCK`。
+
+## 推荐实践案例
+
+`col` 适合并排展示摘要，不宜承载关键语义依赖。关键对象仍应使用普通结构化块声明。
+
+```md
+:::col-2
+col: Reaction @rxn-main.name reached @res-main.yield isolated yield.
+col: Analysis @ana-tlc-main.data supported completion.
+:::
+```

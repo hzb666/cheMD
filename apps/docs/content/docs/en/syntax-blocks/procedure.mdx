@@ -1,0 +1,99 @@
+---
+title: '`:::procedure` Procedure Block'
+description: '`:::procedure` records procedure prose, reaction/ref links, evidence lists, and structured steps.'
+---
+
+`:::procedure` supports prose, inline `step:` lines, and nested `:::step` blocks.
+
+## Syntax
+
+```md
+:::procedure #proc-main
+reaction: rxn-main
+evidence: notebook-p12 | batch-sheet
+step: charge | id=s-charge | inputs=@mol-substrate,@mol-base | solvent=MeCN
+step: heat | id=s-heat | temperature=60 C | duration=3 h | dependsOn=s-charge
+The reaction mixture was monitored by TLC.
+:::
+```
+
+## Fields
+
+| field | required | notes |
+| --- | --- | --- |
+| `ref` | no | generic target reference |
+| `reaction` | no | reaction ID |
+| `evidence` | no | evidence IDs separated by `|` or `,` |
+
+`procedure` has no resolver-required fields. Prose is stored as `body`. When the body contains `step:` or `:::step`, the parser also creates `steps` and `children`.
+
+## Inline `step:`
+
+Inline steps use `step: family | key=value | key=value`. If the first segment is not `key=value`, it is the `family`. If the first segment is `key=value`, `family=<value>` supplies the family.
+
+```md
+step: add | id=s-add | material=n-BuLi | duration=30 min
+step: family=heat | id=s-heat | temperature=65 C | duration=4 h
+```
+
+## Nested `:::step`
+
+Use nested blocks for complex steps. A nested `:::step` is valid only inside `:::procedure`.
+
+```md
+:::step #s-purify
+family: purify
+method: column chromatography
+eluent: petroleum ether/ethyl acetate 10:1
+outputs: sample-product
+:::
+```
+
+The nested step header also accepts a bare ID, such as `:::step s-purify`. If the header and fields do not provide an ID, the parser assigns `<procedure-id>:sN`.
+
+## Recommended Practice
+
+Procedure records should use stable step IDs and explicit material flow. `inputs`, `outputs`, and `dependsOn` support the generated step graph and training export.
+
+```md
+:::procedure #proc-main
+reaction: rxn-main
+evidence: notebook-p12 | balance-log
+
+:::step #s-charge
+family: charge
+stage: setup
+purpose: prepare substrate solution
+inputs: @mol-substrate, @mol-solvent
+outputs: solution-a
+solvent: MeCN
+volume: 5 mL
+:::
+
+:::step #s-heat
+family: heat
+stage: reaction
+dependsOn: s-charge
+inputs: solution-a
+outputs: mixture-heated
+temperature: 60 C
+duration: 3 h
+evidence: notebook-p12
+confidence: 0.95
+:::
+
+Reaction progress was checked by TLC before workup.
+:::
+```
+
+## Diagnostics
+
+| code | condition |
+| --- | --- |
+| `E_INVALID_ID` | invalid procedure ID |
+| `W_UNKNOWN_FIELD` | top-level procedure field outside `ref`, `reaction`, and `evidence` |
+| `E_STEP_PARAM_MISSING` | required parameters missing for `heat`, `cool`, `analyze`, or `extract` |
+| `E_STEP_PARAM_INVALID` | `filter` uses a disallowed parameter |
+| `E_STEP_ID_DUPLICATE` | duplicate step ID |
+| `E_STEP_INVALID_REFERENCE` | `dependsOn` references a missing step |
+| `E_STEP_DEPENDENCY_CYCLE` | step dependency cycle |

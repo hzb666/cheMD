@@ -1,0 +1,73 @@
+---
+title: Compiler and Export Pipeline
+description: Compiler package dependencies, entrypoints, fixtures, repair, and input-assistance support.
+---
+
+Compiler implementation lives in `packages/compiler`. Entrypoints include `packages/compiler/src/index.ts` and Node-specific entrypoint `packages/compiler/src/node.ts`.
+
+## Secondary Topics
+
+### Dependency Composition
+
+`@chemd/compiler` depends on parser, resolver, typechecker, render-profile, renderer-html, renderer-json, renderer-docx, exporter-training, runtime-lab, step-ontology, and lnf.
+
+### Compile Entrypoint
+
+`packages/compiler/src/index.ts` is the public compile entrypoint. It aggregates parsing, resolution, type checking, rendering, and export capabilities.
+
+```ts
+import { compileChemd } from "@chemd/compiler";
+
+const result = compileChemd(source, { strictChemdKind: true });
+
+if (result.diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
+  throw new Error("Chemd source did not compile cleanly");
+}
+```
+
+### Node Entrypoint
+
+`packages/compiler/src/node.ts` is exposed through package exports as `@chemd/compiler/node`.
+
+### Fixtures
+
+`packages/compiler/fixtures` contains examples for the current language surface:
+
+- `golden-experiment-record.chemd`
+- `best-practice-one-step-synthesis.chemd`
+- `best-practice-total-synthesis.chemd`
+- `best-practice-condition-screen.chemd`
+
+These fixtures are the primary example source for the language manual.
+
+### Input-Assistance Support
+
+Related source files include:
+
+- `authoring-diagnostics.ts`
+- `authoring-document.ts`
+- `authoring-minimal-sets.ts`
+- `authoring-templates.ts`
+- `quick-fix.ts`
+- `repair-loop.ts`
+
+These files carry diagnostics, template suggestions, quick fixes, and repair loop capabilities.
+
+## Compile Pipeline Order
+
+`compileChemd` executes a fixed sequence: `parseChemd`, `resolveChemd`, `typecheckDocument`, render profile resolution, runtime run plan, runtime preflight, canonical LNF, training export, RAG export, training understanding, input assistance, input-assistance diagnostics, compiler diagnosis, HTML, JSON, and DOCX bridge.
+
+`CompileResult` exposes document, diagnostics, renderOptions, renderAdapterPayload, typedSemanticGraph, stepGraph, runPlan, runtimePreflight, lnf, ragExport, trainingUnderstanding, trainingExport, authoringAssistance, diagnosis, html, json, and docxBridge.
+
+## Diagnostics and Repair Entrypoints
+
+`buildCompilerDiagnosis` partitions diagnostics into safe fixes, required inputs, and manual review items, then provides next actions. `applyCompilerDiagnosisSafeFixes` applies safe fixes in order. `runChemdRepairLoop` repeats local compilation and safe-fix application. `runChemdAgentLoop` calls an external agent driver after the repair loop.
+
+```bash
+pnpm chemd repair draft.chemd --format json
+pnpm chemd repair draft.chemd --write
+```
+
+## Export Entrypoints
+
+HTML comes from `@chemd/renderer-html`. JSON comes from `@chemd/renderer-json` and includes the typed graph. DOCX bridge comes from `@chemd/renderer-docx` and receives the render adapter payload. Training, RAG, and graph index exports come from `@chemd/exporter-training`.

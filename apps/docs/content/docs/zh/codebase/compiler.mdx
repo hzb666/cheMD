@@ -1,0 +1,73 @@
+---
+title: Compiler 与导出链路
+description: compiler 包的依赖、入口、fixtures、repair 和 input-assistance 支持。
+---
+
+Compiler 实现位于 `packages/compiler`。包入口包括 `packages/compiler/src/index.ts` 和 Node 专用入口 `packages/compiler/src/node.ts`。
+
+## 二级主题
+
+### 依赖组合
+
+`@chemd/compiler` 依赖 parser、resolver、typechecker、render-profile、renderer-html、renderer-json、renderer-docx、exporter-training、runtime-lab、step-ontology 和 lnf。
+
+### 编译入口
+
+`packages/compiler/src/index.ts` 是公共编译入口。该入口聚合解析、解析增强、类型检查、渲染和导出能力。
+
+```ts
+import { compileChemd } from "@chemd/compiler";
+
+const result = compileChemd(source, { strictChemdKind: true });
+
+if (result.diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
+  throw new Error("Chemd source did not compile cleanly");
+}
+```
+
+### Node 入口
+
+`packages/compiler/src/node.ts` 通过 package exports 暴露为 `@chemd/compiler/node`。
+
+### Fixtures
+
+`packages/compiler/fixtures` 包含当前语言面样例：
+
+- `golden-experiment-record.chemd`
+- `best-practice-one-step-synthesis.chemd`
+- `best-practice-total-synthesis.chemd`
+- `best-practice-condition-screen.chemd`
+
+这些 fixtures 是语言文档的主要示例来源。
+
+### 输入辅助支持
+
+相关源码包括：
+
+- `authoring-diagnostics.ts`
+- `authoring-document.ts`
+- `authoring-minimal-sets.ts`
+- `authoring-templates.ts`
+- `quick-fix.ts`
+- `repair-loop.ts`
+
+这些文件承载诊断、模板建议、quick fix 和 repair loop 能力。
+
+## 编译管线顺序
+
+`compileChemd` 的执行顺序固定：`parseChemd`、`resolveChemd`、`typecheckDocument`、render profile resolution、runtime run plan、runtime preflight、canonical LNF、training export、RAG export、training understanding、input assistance、input-assistance diagnostics、compiler diagnosis、HTML、JSON、DOCX bridge。
+
+`CompileResult` 暴露 document、diagnostics、renderOptions、renderAdapterPayload、typedSemanticGraph、stepGraph、runPlan、runtimePreflight、lnf、ragExport、trainingUnderstanding、trainingExport、authoringAssistance、diagnosis、html、json 和 docxBridge。
+
+## 诊断与修复入口
+
+`buildCompilerDiagnosis` 把 diagnostics 分成 safe fixes、required inputs 和 manual review items，并给出 next actions。`applyCompilerDiagnosisSafeFixes` 按顺序应用 safe fixes。`runChemdRepairLoop` 在本地重复编译和应用 safe fixes。`runChemdAgentLoop` 在 repair loop 之后调用外部 agent driver。
+
+```bash
+pnpm chemd repair draft.chemd --format json
+pnpm chemd repair draft.chemd --write
+```
+
+## 导出入口
+
+HTML 来自 `@chemd/renderer-html`。JSON 来自 `@chemd/renderer-json`，并带 typed graph。DOCX bridge 来自 `@chemd/renderer-docx`，并接收 render adapter payload。training、RAG 和 graph index 来自 `@chemd/exporter-training`。

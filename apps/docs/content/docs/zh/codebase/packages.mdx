@@ -1,0 +1,117 @@
+---
+title: 核心 packages
+description: packages 目录中已存在包的职责边界、入口、数据流和集成关系。
+---
+
+下列内容列出当前 `packages` 目录下的真实包。职责说明依据 `package.json`、package exports、源码入口和调用链。
+
+## 语言核心链路
+
+| 包 | 主要入口 | 职责 |
+| --- | --- | --- |
+| `@chemd/core` | `packages/core/src/index.ts` | AST、diagnostics、引用模型、render overrides、共享类型 |
+| `@chemd/parser` | `packages/parser/src/index.ts` | frontmatter、body、block、inline token 解析 |
+| `@chemd/resolver` | `packages/resolver/src/index.ts` | 对象索引、引用解析、模板展开、primary 校验、必填字段校验 |
+| `@chemd/typechecker` | `packages/typechecker/src/index.ts` | typed semantic graph、数量归一化、类型化引用、路线和 step 检查 |
+| `@chemd/compiler` | `packages/compiler/src/index.ts` | 聚合 parse、resolve、typecheck、render、export、diagnosis |
+
+这条链路是 Chemd 语言的主执行路径。`parser` 只负责把源码转成 AST 与 parser diagnostics；`resolver` 增加跨节点语义；`typechecker` 生成 typed semantic graph 和 step graph；`compiler` 负责组合所有阶段并产出 HTML、JSON、DOCX bridge、LNF、RAG 和 training 数据。
+
+```bash
+pnpm --filter @chemd/parser test
+pnpm --filter @chemd/resolver test
+pnpm --filter @chemd/compiler typecheck
+```
+
+### 需要同步修改的内容
+
+| 如果修改 | 同时检查 |
+| --- | --- |
+| AST 节点形状或 diagnostic 字段 | `@chemd/core`、parser tests、resolver/typechecker 消费方、compiler snapshots |
+| block grammar 或 inline syntax | parser tests、resolver indexing、language-service diagnostics、使用者文档 |
+| 引用或模板行为 | resolver tests、typechecker typed-reference checks、CLI validation output |
+| 数量或路线语义 | typechecker tests、step ontology lowering、compiler LNF/export results |
+| compiler 公共结果结构 | CLI command output、web/desktop callers、exporter-training consumers |
+
+## 语义与运行链路
+
+| 包 | 职责 |
+| --- | --- |
+| `@chemd/step-ontology` | procedure lowering、observation lowering、step graph 类型和边 |
+| `@chemd/runtime-lab` | runtime run plan 与 preflight |
+| `@chemd/runtime-trace` | runtime trace 数据结构和回放辅助 |
+| `@chemd/lnf` | 规范化中间表示 |
+
+`@chemd/step-ontology` 与 `@chemd/typechecker` 关系紧密。显式 step 由 typechecker 转为 canonical step，正文过程由 step ontology lowering。`runtime-lab` 使用 typed graph 和 step graph 生成运行计划，再由 compiler 写入 LNF。
+
+```bash
+pnpm --filter @chemd/typechecker test
+pnpm --filter @chemd/step-ontology test
+pnpm --filter @chemd/runtime-lab test
+```
+
+语义包不应直接解析原始源码文本。它们消费前序阶段产出的 AST、resolved document、typed graph 或 step graph。这样可以把语法关注点留在 parser/resolver，把运行计划集中在规范化语义结构上。
+
+## 渲染与导出链路
+
+| 包 | 职责 |
+| --- | --- |
+| `@chemd/render-profile` | 内置 render profile、frontmatter selection、override 合并和诊断 |
+| `@chemd/renderer-html` | HTML 预览渲染 |
+| `@chemd/renderer-json` | JSON 渲染 |
+| `@chemd/renderer-docx` | DOCX bridge 渲染 |
+| `@chemd/exporter-training` | training export、RAG export、graph index、reaction intelligence contract |
+
+渲染链路使用 resolved document、render options 和 typed graph。导出链路使用 resolved document、typed graph、step graph 和 LNF。training export 是 RAG export 与 training understanding 的上游。
+
+### 输出归属
+
+| 输出 | 主要 packages | 典型消费方 |
+| --- | --- | --- |
+| HTML 预览 | `@chemd/compiler`、`@chemd/render-profile`、`@chemd/renderer-html` | web preview、desktop preview、docs examples |
+| JSON render | `@chemd/compiler`、`@chemd/renderer-json` | CLI export、app API routes、tests |
+| DOCX bridge | `@chemd/compiler`、`@chemd/renderer-docx` | export APIs 与 CLI workflows |
+| LNF | `@chemd/compiler`、`@chemd/lnf`、runtime packages | runtime-lab、下游自动化 |
+| RAG 与 training data | `@chemd/exporter-training`、`@chemd/reaction-map` | graph export、search、reaction intelligence |
+
+## 应用支撑链路
+
+| 包 | 职责 |
+| --- | --- |
+| `@chemd/cli` | validate、export、graph、diff、changed、repair、agent-loop |
+| `@chemd/language-service` | 编辑器语言服务 |
+| `@chemd/workspace-index` | workspace 文档索引能力 |
+| `@chemd/storage-postgres` | PostgreSQL schema、records、Graph/RAG 存储 |
+| `@chemd/reaction-map` | reaction graph 与 intelligence contract |
+| `@chemd/semantic-rendering` | 语义渲染支撑能力 |
+| `@chemd/agent-tools` | agent 工具集成 |
+| `@chemd/diagnostics` | v0.3 diagnostics 构造与诊断数据模型 |
+
+这些包服务 CLI、web、desktop 和后端集成。`@chemd/diagnostics` 被 typechecker 使用，`@chemd/storage-postgres` 被 web routes 与 desktop Rust 后端相关路径使用，`@chemd/reaction-map` 与 reaction intelligence 数据面相连。
+
+### 集成职责
+
+| 包 | 常见入口 | 验证重点 |
+| --- | --- | --- |
+| `@chemd/cli` | command modules 与 `packages/cli/bin/chemd.mjs` | command output、exit codes、repair/agent-loop workflows |
+| `@chemd/language-service` | language service exports | editor diagnostics、completion-safe parsing、incremental feedback |
+| `@chemd/workspace-index` | workspace indexing APIs | 多文件发现、graph input、changed-file behavior |
+| `@chemd/storage-postgres` | schema 与 repository helpers | migration compatibility、record shape、Graph/RAG persistence |
+| `@chemd/diagnostics` | diagnostic builders 与 data model | stable diagnostic codes、severity、locations、remediation text |
+
+## 包间边界
+
+语言行为变更通常从 `core` 类型开始，随后同步 parser、resolver、typechecker、compiler fixtures、CLI 验证和 docs。渲染外观变更通常限制在 render-profile 与 renderer 包。workspace、PostgreSQL、RAG 和 reaction intelligence 相关变更应保持在 application support 包或 apps/services 层。
+
+## Package 修改检查清单
+
+关闭包级修改前，按对应表面检查：
+
+| 区域 | 检查项 |
+| --- | --- |
+| 语言语法 | 更新 parser coverage、resolver/typechecker 预期、compiler outputs、CLI validation 和使用者文档示例 |
+| Diagnostics | 保持 code、severity、location、message 和 remediation 在 CLI、language service、web、desktop 中一致 |
+| Exports | 验证 renderer output、compiler aggregate output、CLI export command，以及暴露该格式的 app API route |
+| Storage 或 graph | 检查 migration/schema shape、repository helpers、graph export contracts 和 app/service callers |
+| App support | 共享行为保留在 packages；app 代码聚焦 UI、routing、permissions 和 platform adaptation |
+

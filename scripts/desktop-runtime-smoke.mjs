@@ -1029,7 +1029,9 @@ const invokeSmokeCommand = async ({ commandRunner, command, input, commands }) =
   try {
     return await commandRunner({ command, input });
   } catch (error) {
-    throw new Error(`Tauri command ${command} failed: ${commandErrorMessage(error)}`);
+    throw new Error(`Tauri command ${command} failed: ${commandErrorMessage(error)}`, {
+      cause: error
+    });
   }
 };
 

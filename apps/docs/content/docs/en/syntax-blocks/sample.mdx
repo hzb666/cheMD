@@ -1,0 +1,76 @@
+---
+title: '`:::sample` Sample Block'
+description: '`:::sample` records sample name, batch, purity, lineage, aliquot relationships, and artifact refs.'
+---
+
+`:::sample` produces a sample node and participates in sample lineage and evidence export.
+
+## Syntax
+
+```md
+:::sample #sample-product
+name: purified product
+sample_id: P-2026-0519-01
+batch: B1
+purity: 98%
+derived_from: rxn-main
+artifacts: art-nmr-product | art-hplc-product
+:::
+```
+
+## Fields
+
+| field | required | notes |
+| --- | --- | --- |
+| `name` | yes | resolver-required |
+| `sample_id` | no | laboratory sample code |
+| `batch` | no | batch |
+| `purity` | no | purity |
+| `supplier` | no | supplier |
+| `notes` | no | notes |
+| `ref` | no | generic target |
+| `derived_from` | no | source object, such as reaction, molecule, result, or sample |
+| `aliquot_of` | no | source sample for an aliquot |
+| `batch_of` | no | source sample for a batch relationship |
+| `artifacts` | no | artifact ID list, separated by `|` or `,` |
+| `chemistry_features` | no | feature ID list |
+
+## Required Fields and Defaults
+
+The resolver requires `name`. The parser sets no defaults. When ID is omitted, the resolver assigns a generated sample ID.
+
+## Recommended Practice
+
+Sample tracking should distinguish reaction source, batch sample, and aliquot. Use `artifacts` to connect evidence files.
+
+```md
+:::sample #sample-crude
+name: crude reaction mixture
+derived_from: rxn-main
+batch: crude-batch-01
+notes: collected before purification
+:::
+
+:::sample #sample-purified
+name: purified product
+sample_id: P-01
+batch_of: sample-crude
+purity: 98%
+artifacts: art-nmr-product | art-hplc-product
+:::
+
+:::sample #sample-aliquot
+name: NMR aliquot
+aliquot_of: sample-purified
+artifacts: art-nmr-product
+:::
+```
+
+## Diagnostics
+
+| code | condition |
+| --- | --- |
+| `E_INVALID_ID` | invalid sample ID |
+| `W_UNKNOWN_FIELD` | undeclared field |
+| `E_MISSING_REQUIRED_FIELD` | missing `name` |
+| `E_TYPED_REFERENCE_MISMATCH` | relationship points to an incompatible object kind |

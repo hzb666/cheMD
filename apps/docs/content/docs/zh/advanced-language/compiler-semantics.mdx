@@ -1,0 +1,146 @@
+---
+title: 编译语义与实现逻辑
+description: 从源码到 AST、resolver、语义校验和导出数据的当前实现路径。
+---
+
+Chemd 编译链路由解析、解析增强、语义检查和导出层组成。语言手册中的语法规则来自这些实现边界。
+
+## 解析阶段
+
+解析阶段把源码拆成两个部分：
+
+1. frontmatter：生成 `meta` 和可选 `renderSelection`。
+2. body：生成 `children`，包括 Markdown 节点和结构化节点。
+
+Markdown 节点保存原始文本，并附带四类 token：
+
+- `references`
+- `inlineChem`
+- `inlineCode`
+- `links`
+
+结构化节点由 `parseRegisteredBlock` 分发到对应 block parser。
+
+## 字段过滤与诊断
+
+每个结构化块声明允许字段集合。未注册字段会产生 `W_UNKNOWN_FIELD`，并且不会进入该节点。
+
+```md
+:::result #res-main
+status: success
+yield: 76%
+unknown_metric: 1
+:::
+```
+
+`unknown_metric` 会被报告为未知字段。该字段不会成为 `ResultNode` 的属性。
+
+## 解析增强阶段
+
+resolver 执行以下工作：
+
+- 为无 ID 的对象节点生成默认 ID。
+- 构建对象索引。
+- 检查重复对象 ID。
+- 构建模板索引。
+- 展开 `:::use`。
+- 解析 Markdown 中的引用 token。
+- 校验对象必填字段。
+- 校验 frontmatter 中的 primary 引用。
+
+## 默认对象 ID
+
+无 ID 对象会得到默认 ID，格式为：
+
+```text
+<document-id>-<node-type>-<counter>
+```
+
+建议使用者显式提供 ID。显式 ID 更利于跨块引用、诊断定位和导出稳定性。
+
+## 必填字段
+
+resolver 当前校验以下对象：
+
+| 类型 | 必填字段 |
+| --- | --- |
+| molecule | `smiles` |
+| reaction | `reactants`, `products` |
+| analysis | `type_name`, `data` |
+| TLC analysis | `type_name` |
+| sample | `name` |
+| artifact | `kind`, `path` |
+
+result、procedure、observation 和 condition-varies 当前没有通用必填字段校验。实际工作流仍建议写入 `ref` 或 `reaction` 关联。
+
+## primary 引用校验
+
+resolver 会检查 `primary_reaction`、`primary_result`、`primary_product`、`primary_sample`、`primary_molecule` 和 `primary_analysis` 是否指向已存在对象。
+
+```yaml
+---
+id: exp-invalid-primary
+title: Invalid primary reference
+date: 2026-04-24
+primary_reaction: rxn-missing
+---
+```
+
+如果文档没有 `#rxn-missing`，诊断中会出现 `E_INVALID_PRIMARY_REFERENCE`。
+
+## 输出语义
+
+compiler 在 resolver 之后聚合多种输出。`CompileResult` 暴露 HTML、JSON、DOCX bridge、RAG export、training understanding export 和 full training export。graph index export 由 CLI/exporter tooling 基于一份或多份 training understanding 构建，不直接存放在 `CompileResult` 上。
+
+使用层面的关键原则：
+
+- 对象关系写入字段。
+- 叙述性说明保留在 Markdown 或 `notes` 中。
+- route、prev、condition-varies、sample lineage 和 artifact ref 为导出层提供结构化图谱输入。
+
+## 推荐实践示例
+
+后续需要引用的对象使用显式 ID。测量事实写入字段，解释性内容写入正文或 `notes`。
+
+```md
+---
+id: exp-compiler-semantics
+title: Compiler semantics example
+date: 2026-05-19
+primary_reaction: rxn-main
+primary_result: res-main
+---
+
+:::chemd #mol-substrate
+kind: molecule
+smiles: CCO
+name: ethanol
+:::
+
+:::chemd #mol-product
+kind: molecule
+smiles: CC=O
+name: acetaldehyde
+:::
+
+:::chemd #rxn-main
+kind: reaction
+reactants: @mol-substrate
+products: @mol-product
+solvent: MeCN
+temperature: 60 C
+time: 3 h
+:::
+
+:::result #res-main
+reaction: rxn-main
+product: mol-product
+status: success
+yield: 74%
+notes: isolated after chromatography
+:::
+
+The primary reaction used @reaction.solvent and gave @result.yield.
+```
+
+

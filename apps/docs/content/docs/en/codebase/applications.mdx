@@ -1,0 +1,66 @@
+---
+title: Application Layer
+description: Actual responsibilities and technical entrypoints for apps/web, apps/desktop, and apps/docs.
+---
+
+The `apps` directory currently contains three applications: `web`, `desktop`, and `docs`.
+
+## `apps/web`
+
+Package name: `@chemd/web`. The main stack is Next.js, React, and server routes.
+
+```bash
+pnpm --filter @chemd/web dev
+pnpm --filter @chemd/web test
+```
+
+### Secondary Topics
+
+- `apps/web/src/app`: Next.js App Router entrypoints.
+- `apps/web/src/app/api`: Server API routes.
+- `apps/web/src/features`: Editor, preview, OCR, export, structure editing, and reaction editor feature areas.
+- `apps/web/src/server`: Server-side chemistry service clients and route support logic.
+- `apps/web/tests`: Web application tests.
+
+## `apps/desktop`
+
+Package name: `@chemd/desktop`. The main stack is Vite, React, Tauri, and Rust.
+
+```bash
+pnpm --filter @chemd/desktop dev
+pnpm --filter @chemd/desktop tauri:dev
+pnpm --filter @chemd/desktop typecheck
+```
+
+### Secondary Topics
+
+- `apps/desktop/src`: Desktop frontend UI, Monaco editor, workspace index, and controllers.
+- `apps/desktop/src-tauri/src`: Tauri Rust commands, workspace IO, PostgreSQL, local store, diagnostics bundle, and reaction intelligence worker.
+- `apps/desktop/src-tauri/Cargo.toml`: Rust dependencies and crate configuration.
+- `apps/desktop/tests` and `apps/desktop/src/**/*.test.ts`: Desktop frontend tests.
+- `apps/desktop/src-tauri/src/*_tests.rs`: Rust-side tests.
+
+## `apps/docs`
+
+Package name: `@chemd/docs`. The main stack is Next.js and Fumadocs.
+
+```bash
+pnpm --filter @chemd/docs dev
+pnpm --filter @chemd/docs typecheck
+pnpm --filter @chemd/docs build
+```
+
+### Secondary Topics
+
+- `apps/docs/source.config.ts`: Fumadocs MDX collection configuration.
+- `apps/docs/content/docs`: Chinese and English documentation content.
+- `apps/docs/src/app`: Next.js App Router pages.
+- `apps/docs/src/lib/source.ts`: Fumadocs source loader.
+
+## Cross-Application Data Flow
+
+`apps/web` depends directly on compiler, core, render-profile, renderers, and storage-postgres packages for browser editing, server export, and backend storage APIs. `apps/web/src/app/api/export/json` and `api/export/docx` use the compiler/render path, while `apps/web/src/app/api/chem/*` proxies `services/chem-service`.
+
+`apps/desktop` uses Monaco and the Chemd language service on the frontend. The Tauri Rust backend handles workspace files, local store, PostgreSQL runtime, RAG backfill, diagnostics bundle, chemistry preview rendering, and the reaction intelligence worker. The desktop app targets local workspaces, offline editing, and controlled backend execution.
+
+`apps/docs` is the standalone documentation application. It reads MDX from `apps/docs/content/docs` and uses the Fumadocs source loader to generate the bilingual documentation site.

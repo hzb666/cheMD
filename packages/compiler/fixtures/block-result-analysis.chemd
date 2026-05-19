@@ -1,0 +1,64 @@
+---
+id: exp-block-result-analysis
+title: Result and analysis block contract
+date: 2026-05-19
+primary_reaction: rxn-main
+primary_result: res-main
+primary_analysis: ana-tlc
+---
+
+:::chemd #mol-start
+kind: molecule
+name: cyclohexanone
+smiles: O=C1CCCCC1
+:::
+
+:::chemd #mol-product
+kind: molecule
+name: cyclohexanol
+smiles: OC1CCCCC1
+:::
+
+:::chemd #rxn-main
+kind: reaction
+reactants: @mol-start
+products: @mol-product
+reagents: NaBH4
+solvent: MeOH
+temperature: 25 C
+time: 45 min
+:::
+
+:::result #res-main
+ref: rxn-main
+reaction: rxn-main
+product: mol-product
+status: success
+yield: 84%
+conversion: 96%
+selectivity: 94%
+isolated_mass: 210 mg
+product_state: white solid
+purity: 99%
+notes: isolated by evaporation and trituration
+:::
+
+:::analysis #ana-tlc
+type: tlc
+ref: rxn-main
+time: 45 min
+eluent: petroleum ether/ethyl acetate 4:1
+p1: sm 0.60
+p2: rxn 0.28 ^3(4) | sm 0.60 v1
+p3: product 0.28
+:::
+
+:::analysis #ana-hplc
+type: hplc
+ref: res-main
+instrument: Agilent 1260
+method: area normalization
+result: 99% area product peak
+data: Main peak at 4.8 min with trace impurity.
+notes: confirms product purity
+:::

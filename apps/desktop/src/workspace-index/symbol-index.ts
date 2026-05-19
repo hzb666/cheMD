@@ -150,7 +150,7 @@ export const buildWorkspaceSymbolIndex = async (
     }
 
     const documentUri = createDocumentUri(file, input.workspace);
-    let source = "";
+    let source: string;
     try {
       source = await input.readFile(file);
     } catch (error) {

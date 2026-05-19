@@ -1,0 +1,51 @@
+---
+title: 代码库导览
+description: Chemd monorepo 的真实目录、包、应用、服务、脚本和测试导览。
+---
+
+本卷说明当前代码库中已经存在的模块。主题依据 `apps`、`packages`、`services`、`scripts`、根级 package 配置和测试文件组织。
+
+需要实现细节时使用本章。使用者手册只说明 Chemd 语法和工作流的用户视角行为；代码库导览说明这些行为在仓库中的位置，以及哪些文件通常需要同步修改。
+
+## 一级主题
+
+1. [仓库结构](/zh/docs/codebase/overview)
+2. [核心 packages](/zh/docs/codebase/packages)
+3. [Parser 实现](/zh/docs/codebase/parser)
+4. [Resolver 实现](/zh/docs/codebase/resolver)
+5. [Compiler 与导出链路](/zh/docs/codebase/compiler)
+6. [应用层](/zh/docs/codebase/applications)
+7. [服务层](/zh/docs/codebase/services)
+8. [CLI、脚本与测试](/zh/docs/codebase/cli-scripts-tests)
+9. [贡献者工作流](/zh/docs/codebase/contributor-workflows)
+
+## 阅读方式
+
+先读 [仓库结构](/zh/docs/codebase/overview) 获取 workspace 地图，再按要修改的区域进入专门页面。
+
+| 任务 | 先看 | 继续检查 |
+| --- | --- | --- |
+| 新增或修改 Chemd 语法 | [Parser 实现](/zh/docs/codebase/parser) | `@chemd/core`、resolver、typechecker、compiler fixtures、CLI validation、docs |
+| 修改引用、模板、必填字段或校验语义 | [Resolver 实现](/zh/docs/codebase/resolver) | core 引用类型、typechecker diagnostics、校验文档 |
+| 修改派生数量、路线、类型化引用或 step 检查 | [核心 packages](/zh/docs/codebase/packages) | `@chemd/typechecker`、`@chemd/step-ontology`、compiler outputs |
+| 修改 HTML、JSON、DOCX、LNF、RAG 或 training 导出 | [Compiler 与导出链路](/zh/docs/codebase/compiler) | renderer packages、render profiles、exporter-training tests |
+| 修改 CLI 命令或工作流校验 | [CLI、脚本与测试](/zh/docs/codebase/cli-scripts-tests) | `@chemd/cli`、compiler repair、scripts、根级 package scripts |
+| 修改 web、desktop 或 docs 集成 | [应用层](/zh/docs/codebase/applications) | package 依赖、service API、应用专项测试 |
+| 修改化学服务、OCR、聚类或外部服务边界 | [服务层](/zh/docs/codebase/services) | web API proxy、desktop 后端调用、Python tests |
+
+## 实现依据边界
+
+代码库导览负责承载源码路径、包名、入口和实现说明。面向使用者的页面应描述用户能写什么、Chemd 接受什么、会得到什么输出或诊断，不要求读者理解仓库结构。
+
+## 依据范围
+
+- `package.json`
+- `pnpm-workspace.yaml`
+- `turbo.json`
+- `apps/web`
+- `apps/desktop`
+- `apps/docs`
+- `packages/*`
+- `services/chem-service`
+- `services/chem-cluster-service`
+- `scripts/*`

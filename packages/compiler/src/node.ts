@@ -170,7 +170,9 @@ export const exportMarkdownToDocx = async (
         await fs.access(options.outputPath);
       } catch (error) {
         if (error instanceof Error && "code" in error && error.code === "ENOENT") {
-          throw new Error(`Pandoc finished but DOCX output was not created: ${options.outputPath}`);
+          throw new Error(`Pandoc finished but DOCX output was not created: ${options.outputPath}`, {
+            cause: error
+          });
         }
 
         throw error;

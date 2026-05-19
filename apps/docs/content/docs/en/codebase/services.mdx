@@ -1,0 +1,62 @@
+---
+title: Service Layer
+description: Responsibilities, entrypoints, and tests for chem-service and chem-cluster-service.
+---
+
+The `services` directory currently contains `chem-service` and `chem-cluster-service`.
+
+## `services/chem-service`
+
+`chem-service` is a Flask chemistry HTTP service. `services/chem-service/README.md` states that `apps/web` uses it through `/api/chem/*`.
+
+```bash
+cd services/chem-service
+poetry run flask --app app run --port 5001
+poetry run python -m unittest discover tests
+```
+
+### Secondary Topics
+
+- `GET /healthz`
+- `POST /ocr`
+- `POST /reaction/ocr`
+- `POST /normalize`
+- `POST /render`
+- `POST /reaction/render`
+- `GET|POST /structure`
+
+Source topics:
+
+- `chem_service/molecule_rendering.py`
+- `chem_service/reaction_rendering.py`
+- `chem_service/reaction_ocr.py`
+- `chem_service/remote_provider.py`
+- `chem_service/structure_store.py`
+- `chem_service/reaction_intelligence`
+
+Tests live under `services/chem-service/tests`.
+
+## `services/chem-cluster-service`
+
+`chem-cluster-service` contains reaction intelligence, layout, fingerprint, similarity, and provider-related code.
+
+```bash
+cd services/chem-service
+poetry run python -m unittest discover ../chem-cluster-service/tests
+```
+
+### Secondary Topics
+
+- `chem_cluster_service/layout.py`
+- `chem_cluster_service/reaction_center.py`
+- `chem_cluster_service/intelligence_*`
+- `chem_cluster_service/*provider*`
+- `tests/test_*`
+
+This service directory also contains reaction intelligence artifact fixtures for provider and artifact contract tests.
+
+## Service Boundaries
+
+`chem-service` serves chemistry structure capabilities: OCR, structure normalization, molecule rendering, reaction rendering, and structure editing endpoints. Its README and source show RDKit-first behavior, with fallback responses when RDKit or a provider is unavailable. The service supports access keys, internal access protection, CORS defaults, and upload limits.
+
+`chem-cluster-service` serves reaction intelligence and clustering capabilities, including layout, reaction center detection, fingerprints, similarity, providers, and artifact contracts. It cooperates with `@chemd/reaction-map`, training export, and reaction intelligence artifact schemas.

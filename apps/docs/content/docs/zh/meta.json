@@ -1,0 +1,14 @@
+{
+  "title": "Chemd 语言手册",
+  "pages": [
+    "index",
+    "getting-started",
+    "language-fundamentals",
+    "syntax-blocks",
+    "experiment-records",
+    "advanced-language",
+    "validation-tooling",
+    "codebase",
+    "appendix"
+  ]
+}

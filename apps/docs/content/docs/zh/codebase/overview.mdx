@@ -1,0 +1,86 @@
+---
+title: 仓库结构
+description: Chemd monorepo 的工作区、应用、包、服务和脚本结构。
+---
+
+Chemd 使用 `pnpm` workspace。`pnpm-workspace.yaml` 声明两个工作区模式：
+
+```yaml
+packages:
+  - apps/*
+  - packages/*
+```
+
+## 根级配置
+
+| 路径 | 作用 |
+| --- | --- |
+| `package.json` | 根级脚本、依赖约束和 workspace 工具入口 |
+| `pnpm-workspace.yaml` | workspace 包发现规则 |
+| `turbo.json` | `build`、`dev`、`test`、`typecheck` 任务配置 |
+| `tsconfig.base.json` | TypeScript 基础配置和 workspace 路径别名 |
+| `eslint.config.mjs` | TypeScript、React、脚本和测试 lint 配置 |
+| `vitest.workspace.ts` | Vitest workspace 配置 |
+
+## Workspace 形态
+
+当前 workspace 有意拆分为应用和可复用包：
+
+```text
+apps/*      产品界面和文档站点
+packages/*  可复用语言、渲染、导出、运行时和集成包
+services/*  供 web 或 desktop 集成的 Python 服务进程
+scripts/*   根级自动化、smoke 检查、迁移辅助和发布门禁
+```
+
+根级 package 暴露高层命令，各 workspace package 保留自己的 `build`、`test` 和 `typecheck` 脚本。`turbo.json` 负责串联包级任务，让依赖包先于消费它们的包执行。
+
+## 应用目录
+
+| 路径 | 包名 | 技术栈 |
+| --- | --- | --- |
+| `apps/web` | `@chemd/web` | Next.js、React、server routes |
+| `apps/desktop` | `@chemd/desktop` | Vite、React、Tauri、Rust |
+| `apps/docs` | `@chemd/docs` | Next.js、Fumadocs |
+
+应用层应围绕产品工作流保持轻量。共享语言行为、渲染、导出、存储和 workspace 逻辑应放在 `packages`，除非它确实只属于某个应用。
+
+## 包目录
+
+`packages` 目录包含语言核心、编译、渲染、导出、存储、桌面能力和开发工具包。各包通过 `workspace:*` 互相依赖。
+
+## 主要数据流
+
+| 链路 | 顺序 | 说明 |
+| --- | --- | --- |
+| 语言编译 | `parser` -> `resolver` -> `typechecker` -> `compiler` | 将源码文本转换为 diagnostics、typed graph、step graph、render data 和导出结果 |
+| 渲染与导出 | `compiler` -> `render-profile` -> renderer packages -> `exporter-training` | 处理预览、JSON、DOCX bridge、LNF、RAG 和 training data |
+| 编辑器支撑 | apps -> `language-service` -> parser/resolver/compiler packages | 支撑 diagnostics 和编辑器侧语言行为 |
+| Workspace 索引 | apps -> `workspace-index` -> compiler/export packages | 为搜索、graph 和 RAG 工作流构建 workspace 文档索引 |
+| 存储与图谱 | apps/services -> `storage-postgres`、`reaction-map`、`exporter-training` | 持久化 records、graph data 和 reaction intelligence 数据面 |
+
+如果一个行为同时出现在 CLI 和应用界面中，应由共享 package 持有行为，CLI 或应用只负责输入输出适配。
+
+## 服务目录
+
+| 路径 | 说明 |
+| --- | --- |
+| `services/chem-service` | Flask 化学 HTTP 服务、OCR provider、RDKit 优先渲染与规范化 |
+| `services/chem-cluster-service` | 反应聚类、布局和 reaction intelligence 相关服务代码 |
+
+## 脚本目录
+
+`scripts` 包含开发启动、PostgreSQL、桌面 smoke、诊断打包和迁移脚本。根级 `package.json` 将部分脚本暴露为 `pnpm` 命令。
+
+## 修改定位
+
+编辑前先按这些边界定位：
+
+| 修改类型 | 主要归属 | 常见验证 |
+| --- | --- | --- |
+| 语法解析 | `packages/parser` | parser tests、compiler tests、docs build |
+| 语义校验 | `packages/resolver`、`packages/typechecker` | resolver/typechecker tests、CLI validation |
+| 输出格式 | compiler、renderers、exporter-training | package tests、sample export checks |
+| 产品 UI | `apps/web`、`apps/desktop`、`apps/docs` | app typecheck、app tests、visual 或 smoke check |
+| 服务集成 | `services/*`、app API routes、desktop backend | Python tests、app route tests、smoke scripts |
+| 发布或环境门禁 | `scripts/*`、根级 package scripts | 定向 node test、release readiness command |

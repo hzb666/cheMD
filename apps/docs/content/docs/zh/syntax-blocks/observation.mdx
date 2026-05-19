@@ -1,0 +1,70 @@
+---
+title: '`:::observation` 观察块'
+description: '`:::observation` 记录实验观察正文，并可包含结构化 event。'
+---
+
+`:::observation` 支持自由正文、行内 `event:` 和嵌套 `:::event`。
+
+## 语法
+
+```md
+:::observation #obs-main
+ref: rxn-main
+event: color_change | id=e-color | color=deep red | linkedStep=s-add | confidence=0.8
+The mixture turned deep red after n-BuLi addition.
+:::
+```
+
+## 字段
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| `ref` | 否 | 观察目标引用 |
+
+`observation` 没有 resolver 必填字段。若未写显式 event，typechecker 会把正文交给 step ontology lowering 生成观察事件。
+
+## 结构化事件
+
+事件支持行内 `event:` 和嵌套 `:::event`。显式事件会进入 `events`，并保留正文到 `body`。
+
+```md
+:::observation #obs-workup
+ref: rxn-main
+
+:::event #e-precipitate
+type: precipitation
+stage: workup
+timepoint: after water addition
+value: white solid
+linkedStep: s-quench
+evidence: photo-workup
+confidence: 0.9
+:::
+
+A white solid appeared after water addition.
+:::
+```
+
+嵌套 event header 也接受裸 ID，例如 `:::event e-color`。如果 header 与字段都没有提供 ID，parser 会生成 `<observation-id>:eN`。
+
+## 诊断
+
+| 诊断码 | 条件 |
+| --- | --- |
+| `E_INVALID_ID` | observation ID 非法 |
+| `W_UNKNOWN_FIELD` | 顶部字段不在 `ref` 内 |
+| `E_OBSERVATION_EVENT_INVALID_TYPE` | event type 不在支持集合 |
+| `E_OBSERVATION_LINKED_STEP_MISSING` | `linkedStep` 指向缺失 step |
+
+## 推荐实践案例
+
+观察记录应把可结构化的变化写成 event，把叙述细节保留在正文。
+
+```md
+:::observation #obs-main
+ref: rxn-main
+event: color_change | id=e-color | stage=reaction | timepoint=after addition | color=orange | linkedStep=s-add | evidence=photo-1
+event: gas_evolution | id=e-gas | severity=low | linkedStep=s-quench
+Mixture became orange after addition. Mild bubbling occurred during quench.
+:::
+```

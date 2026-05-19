@@ -1,0 +1,14 @@
+{
+  "title": "Codebase Guide",
+  "pages": [
+    "overview",
+    "packages",
+    "parser",
+    "resolver",
+    "compiler",
+    "applications",
+    "services",
+    "cli-scripts-tests",
+    "contributor-workflows"
+  ]
+}

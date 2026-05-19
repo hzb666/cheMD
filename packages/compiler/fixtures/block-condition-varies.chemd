@@ -1,0 +1,86 @@
+---
+id: exp-block-condition-varies
+title: Condition varies block contract
+date: 2026-05-19
+primary_reaction: rxn-var1
+primary_result: res-var1
+---
+
+:::chemd #mol-start
+kind: molecule
+name: aryl chloride
+smiles: Clc1ccccc1
+:::
+
+:::chemd #mol-product
+kind: molecule
+name: biaryl product
+smiles: c1ccc(-c2ccccc2)cc1
+:::
+
+:::chemd #rxn-standard
+kind: reaction
+reactants: @mol-start
+products: @mol-product
+reagents: phenylboronic acid | K3PO4
+catalyst: Pd(PPh3)4
+solvent: THF
+temperature: 25 C
+time: 2 h
+:::
+
+:::chemd #rxn-var1
+kind: reaction
+reactants: @mol-start
+products: @mol-product
+reagents: phenylboronic acid | K3PO4
+catalyst: Pd(PPh3)4
+solvent: MeCN
+temperature: 40 C
+time: 2 h
+:::
+
+:::chemd #rxn-var2
+kind: reaction
+reactants: @mol-start
+products: @mol-product
+reagents: phenylboronic acid | K3PO4
+catalyst: Pd(dppf)Cl2
+solvent: DMF
+temperature: 60 C
+time: 2 h
+:::
+
+:::result #res-standard
+reaction: rxn-standard
+product: mol-product
+status: partial
+yield: 35%
+:::
+
+:::result #res-var1
+reaction: rxn-var1
+product: mol-product
+status: success
+yield: 76%
+:::
+
+:::result #res-var2
+reaction: rxn-var2
+product: mol-product
+status: failed
+yield: 12%
+:::
+
+:::condition-varies #cv-screen
+standard: rxn-standard
+condition: solvent=THF | temperature=25 C | catalyst=Pd(PPh3)4
+varies: solvent | temperature | catalyst
+var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
+res1: res-var1
+note1: best conversion in the screen
+var2: reaction=rxn-var2 | mode=override | solvent=DMF | temperature=60 C | catalyst=Pd(dppf)Cl2
+res2: res-var2
+note2: override catalyst gave low conversion
+notes: screening record with one inherited and one override attempt
+:::

@@ -1,0 +1,236 @@
+---
+title: 模板与复用
+description: template、params、typed params、bind、use、展开限制和循环诊断。
+---
+
+
+## `:::template` 基础
+
+模板节点包含 `name`、`params`、`paramSpecs`、`bind`、可选 `description` 和 `body`。模板本身保留在 children 中，`:::use` 会在 resolver 阶段展开模板 body。
+
+```md
+:::template reaction-note
+params: rxn: ref<reaction> | label: string
+description: reusable reaction note
+
+Reaction `@param.label` records @param.rxn.
+:::
+
+:::use reaction-note
+rxn: rxn-main
+label: main oxidation
+:::
+```
+
+模板适合复用结构一致的说明、过程片段或分析片段。模板体内可以使用普通 Markdown、结构化块和嵌套 `:::use`。
+
+模板头部支持：
+
+| 字段 | 说明 |
+| --- | --- |
+| `description` | 可选模板说明 |
+| `params` | 参数声明，支持同一行 `|` 列表或 YAML 风格列表 |
+| `bind` | 默认别名绑定，格式为 `alias=source` |
+
+## `params` 参数声明
+
+`params` 是列表字段。也支持 YAML 式列表写法，解析器会收集 `- name` 项并转为列表值。
+
+```md
+:::template sample-row
+params:
+  - sample: ref<sample>
+  - label: string
+  - purity: quantity<percent>
+
+Sample @param.label is @param.sample with purity @param.purity.
+:::
+```
+
+列表项使用 `name: type` 声明。没有冒号的列表项只声明参数名，并按 `string` 处理。
+
+## string 参数
+
+无类型声明或 `string` 声明会生成 `{ kind: "string" }`。resolver 只检查该参数是否存在且非空。
+
+```md
+:::template condition-line
+params: label: string | note
+
+Condition @param.label: @param.note
+:::
+
+:::use condition-line
+label: entry 1
+note: base changed from K2CO3 to Cs2CO3
+:::
+```
+
+`note` 未声明类型，等价于 `note: string`。空字符串或缺失参数会产生模板参数诊断。
+
+## `ref<kind>` 参数
+
+支持的 ref target 包括 `molecule`、`reaction`、`result`、`analysis`、`procedure`、`observation`、`sample`、`artifact` 和 `condition_varies`。类型不匹配产生 `E_TEMPLATE_PARAM_TYPE_MISMATCH`。
+
+```md
+:::template result-summary
+params: result: ref<result> | sample: ref<sample>
+
+Result @param.result was characterized by sample @param.sample.
+:::
+
+:::use result-summary
+result: res-main
+sample: sample-main
+:::
+```
+
+`ref<result>` 只接受 result 目标。传入 molecule、reaction 或不存在的 ID 时，resolver 会保留源码并输出诊断。
+
+## `quantity<class>` 参数
+
+quantity 参数校验数字加单位。支持的 class 包括 `amount`、`mass`、`volume`、`temperature`、`time`、`pressure`、`concentration`、`equivalent` 和 `percent`。
+
+```md
+:::template heat-step
+params: target: quantity<temperature> | duration: quantity<time>
+
+:::procedure #proc-heating
+step: heat to @param.target for @param.duration
+:::
+:::
+
+:::use heat-step
+target: 80 C
+duration: 3 h
+:::
+```
+
+quantity 参数在 resolver 阶段做类型检查。`80 C` 可作为 temperature，`3 h` 可作为 time；`80 C` 不能传给 `quantity<mass>`。
+
+## `bind` 别名绑定
+
+`bind` 使用 `alias=source | alias2=source2`。resolver 先解析 use 传入覆盖，再解析 template bind，最后解析 primary alias。
+
+```md
+---
+id: bind-example
+title: Bind example
+date: 2026-05-19
+primary_reaction: rxn-main
+---
+
+:::template bound-reaction-note
+bind: reaction=rxn-template-default
+
+Template body resolves @reaction.field through bind unless use overrides it.
+:::
+
+:::use bound-reaction-note
+reaction: rxn-main
+:::
+```
+
+`bind` 适合给模板提供默认 alias。`:::use` 中的同名字段优先级更高，因此可以按调用点覆盖模板默认值。
+
+## `:::use` 模板调用
+
+`:::use template-name` 的字段全部进入 `values`。列表字段值会被拼接为 ` | `。
+
+```md
+:::template artifact-list
+params: sample: ref<sample> | files: string
+
+Sample @param.sample has artifacts: @param.files
+:::
+
+:::use artifact-list
+sample: sample-main
+files:
+  - art-nmr-1h
+  - art-hplc-report
+:::
+```
+
+`files` 在调用值中会归并为 `art-nmr-1h | art-hplc-report`。需要结构化附件关系时，仍应在 `:::sample` 的 `artifacts` 字段中维护 ID 列表。
+
+resolver 会在展开前校验已声明参数：
+
+- 缺少必填参数会产生 `E_TEMPLATE_PARAM_MISSING`。
+- `ref<kind>` 参数会检查本地对象是否存在，并检查对象类型。
+- `quantity<class>` 参数会检查数量形态和单位。
+
+## 模板展开限制
+
+resolver 限制模板展开深度为 32，展开节点数为 2000。超过限制产生 `E_TEMPLATE_EXPANSION_LIMIT`。
+
+```md
+:::template many-nodes
+params: label: string
+
+:::result #res-@param.label
+status: success
+:::
+:::
+
+:::use many-nodes
+label: run-001
+:::
+```
+
+展开后的节点继续进入对象索引和必填字段校验。大量批量展开会受到节点数上限保护，避免单个源文件生成过大的 AST。
+
+## 循环模板诊断
+
+resolver 维护 template stack。若模板调用链重复进入同一模板，会产生 `E_TEMPLATE_CYCLE`。
+
+```md
+:::template a
+:::use b
+:::
+:::
+
+:::template b
+:::use a
+:::
+:::
+
+:::use a
+:::
+```
+
+该调用链形成 `a -> b -> a`。resolver 会停止循环展开并产生 `E_TEMPLATE_CYCLE`，保留其余可解析内容。
+
+## 参数类型与单位清单
+
+`ref<kind>` 的 kind 集合为 molecule、reaction、result、analysis、procedure、observation、sample、artifact 和 condition_varies。参数值必须解析为对应目标类型的引用。
+
+`quantity<class>` 的 class 集合为 amount、mass、volume、temperature、time、pressure、concentration、equivalent 和 percent。单位支持与 typechecker 数量解析一致：amount 支持 `mmol`、`mol`；mass 支持 `mg`、`g`、`kg`；volume 支持 `mL`、`ml`、`L`、`l`；temperature 支持 `C`、`°C`、`℃`、`K`、`F`；time 支持 `h`、`hr`、`hrs`、`min`、`mins`、`分钟`、`小时`；pressure 支持 `bar`、`atm`、`psi`；concentration 支持 `M`、`mM`；equivalent 支持 `equiv`、`eq`；percent 支持 `%` 与 `percent`。
+
+模板 body 中可以包含普通 Markdown、结构化块和嵌套 `:::use`。展开后的节点继续进入 resolver 与 typechecker，因此模板内对象仍受 ID、引用和必填字段规则约束。
+
+布局属于表现层语法。可复用模板需要并列呈现时使用 `:::col`，列语法和诊断见[布局与表现层语法](/zh/docs/advanced-language/layout-syntax)。
+
+## 推荐实践示例
+
+模板生成关系或含数量文本时，应使用类型化参数。除非每次展开都能提供稳定 ID，否则对象创建应放在模板外部。
+
+```md
+:::template result-evidence-line
+description: result evidence sentence
+params:
+  - result: ref<result>
+  - sample: ref<sample>
+  - method: string
+  - purity: quantity<percent>
+
+Result @param.result is supported by sample @param.sample using @param.method. Purity is @param.purity.
+:::
+
+:::use result-evidence-line
+result: res-main
+sample: sample-product
+method: HPLC
+purity: 98%
+:::
+```

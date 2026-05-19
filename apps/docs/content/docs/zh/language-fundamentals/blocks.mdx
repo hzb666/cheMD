@@ -1,0 +1,167 @@
+---
+title: 结构化块与字段
+description: Chemd 结构化块语法、支持的块形式、字段集合、必填字段和诊断。
+---
+
+
+## 通用块语法
+
+结构化块以 `:::block-type` 开始，以独立的 `:::` 结束。起始行可以带 header 参数，常见写法是对象 ID，例如 `#res-main`。
+
+```md
+:::result #res-main
+status: success
+yield: 76%
+:::
+```
+
+对象 ID 必须匹配 `[a-zA-Z][a-zA-Z0-9_-]*`。非法 ID 产生 `E_INVALID_ID`。无显式 ID 的节点会获得 `<document-id>-<node-type>-<counter>` 形式的生成 ID，但稳定引用应使用显式 ID。
+
+字段行使用 `key: value`。字段 key 必须以小写字母开头，后续允许小写字母、数字和下划线。字段值会去除两端空白。
+
+```md
+solvent: MeCN ;; temperature: 40 C ;; time: 2 h
+```
+
+解析器也支持 `;;` 多字段行。每个片段会按字段解析，但 span 仍指向同一物理行。
+
+列表字段使用 `|` 分隔。默认列表字段为 `reactants`、`products`、`reactant`、`product`、`reac`、`prod`、`conditions` 和 `params`；`:::chemd` 额外把 `prev` 作为列表字段。空列表项产生 `E_INVALID_LIST_ITEM`。
+
+每个块解析器声明自己的允许字段集合。未知字段产生 `W_UNKNOWN_FIELD`，该字段不会写入解析节点。
+
+## 支持的块
+
+正文解析器当前支持以下结构化块形式。大多数条目来自 block parser registry；`:::template` 是 `parseChildren` 内部处理的特殊分支。
+
+| 块 | AST 类型 | 用途 |
+| --- | --- | --- |
+| `:::chemd` | `molecule` 或 `reaction` | 分子和反应的统一使用者输入表面 |
+| `:::result` | `result` | 结果、产率、纯度和状态 |
+| `:::analysis` | `analysis` | TLC、NMR、HPLC 等分析记录 |
+| `:::procedure` | `procedure` | 操作步骤和步骤依赖 |
+| `:::observation` | `observation` | 观察事件 |
+| `:::sample` | `sample` | 样品、批次和派生关系 |
+| `:::artifact` | `artifact` | 文件、谱图、图片和外部证据 |
+| `:::condition-varies` | `condition_varies` | 条件筛选和变量对比 |
+| `:::template` | `template` | 可复用片段；parser 特殊分支 |
+| `:::use` | `use` | 模板调用 |
+| `:::col` | `col` | 多列布局节点 |
+
+未知块产生 `W_UNKNOWN_BLOCK`。
+
+## `:::chemd`
+
+`:::chemd` 是分子和反应的统一块。`kind: molecule` 生成 molecule 节点，`kind: reaction` 生成 reaction 节点。省略 `kind` 时，解析器根据 `reactants` 或 `products` 形状推断节点类型，并记录推断诊断。
+
+```md
+:::chemd #mol-aryl
+kind: molecule
+name: aryl bromide
+smiles: Brc1ccccc1
+role: substrate
+:::
+
+:::chemd #rxn-main
+kind: reaction
+name: Suzuki coupling
+reactants: @mol-aryl | @mol-boron
+products: @mol-product
+reagents: K3PO4
+catalyst: Pd(PPh3)4
+solvent: MeCN
+temperature: 40 C
+time: 2 h
+atmosphere: nitrogen
+:::
+```
+
+分子字段：`smiles`、`cas`、`name`、`role`、`caption`、`formula`、`amount`、`equivalents`、`chemistry_features`。
+
+反应字段：`reactants`、`products`、`reactant`、`product`、`reac`、`prod`、`conditions`、`route`、`prev`、`reagents`、`catalyst`、`solvent`、`temperature`、`time`、`pressure`、`atmosphere`、`yield`、`conversion`、`selectivity`、`caption`、`chemistry_features`。
+
+resolver 必填校验：
+
+- molecule 需要 `smiles`。
+- reaction 需要非空 `reactants` 和非空 `products`。
+
+## `:::result`
+
+结果块记录实验输出。`ref` 和 `reaction` 都可承载反应关联；同一份记录中建议保持写法一致。
+
+```md
+:::result #res-main
+ref: rxn-main
+product: @mol-product
+status: success
+yield: 78%
+conversion: 96%
+selectivity: 93%
+purity: 97%
+notes: Best balance of conversion and purity.
+:::
+```
+
+字段：`status`、`yield`、`conversion`、`selectivity`、`isolated_mass`、`product_state`、`purity`、`notes`、`ref`、`reaction`、`product`。
+
+## `:::analysis`
+
+分析块记录仪器或观察型分析。字段 `type` 会进入 AST 的 `type_name`。当 `type: tlc` 时，解析器为缺失的 `plate` 和 `visualization` 填入 TLC 默认值。
+
+```md
+:::analysis #ana-tlc-main
+type: tlc
+ref: rxn-main
+time: 2 h
+eluent: PE/EA = 4:1
+result: one major product spot with trace starting material
+data: TLC plate after 2 h.
+p1: sm 0.78
+p2: crude 0.52 | sm-trace(0.79)
+p3: product-std 0.50
+:::
+```
+
+字段：`type`、`ref`、`time`、`eluent`、`plate`、`visualization`、`result`、`instrument`、`solvent`、`frequency`、`method`、`data`、`notes`，以及 `p1`、`p2` 等 TLC lane 字段。
+
+resolver 必填校验：
+
+- 普通 analysis 需要 `type` 和 `data`。
+- TLC analysis 需要 `type`；`plate` 和 `visualization` 可由默认值补齐。
+
+## `:::sample`
+
+样品块表达样品身份、来源和附件关系。
+
+```md
+:::sample #sample-product-var1
+ref: res-var1
+name: purified product from var1
+derived_from: sample-batch-var1
+purity: 97%
+artifacts: art-nmr-var1
+:::
+```
+
+字段：`name`、`sample_id`、`batch`、`purity`、`supplier`、`notes`、`ref`、`derived_from`、`aliquot_of`、`batch_of`、`artifacts`、`chemistry_features`。
+
+resolver 必填校验：sample 需要 `name`。
+
+## `:::artifact`
+
+附件块表达谱图、图片、报告和其他证据文件。
+
+```md
+:::artifact #art-nmr-var1
+kind: nmr_spectrum
+ref: res-var1
+path: data/nmr/var1.pdf
+checksum: sha256:var1nmr
+instrument: Bruker 400
+notes: Purified product spectrum.
+:::
+```
+
+字段：`kind`、`ref`、`path`、`checksum`、`instrument`、`notes`、`chemistry_features`。
+
+resolver 必填校验：artifact 需要 `kind` 和 `path`。
+
