@@ -1224,3 +1224,62 @@ Implemented plan sections 6.1-6.4: StepFamily schema contract, brace-based proce
 ### Next Steps
 
 - None - task complete
+
+
+## Session 119: Experiment language interop governance closeout
+
+**Date**: 2026-05-20
+**Task**: Experiment language interop governance closeout
+**Package**: core
+**Branch**: `trellis/language-contract-p0`
+
+### Summary
+
+Implemented interop, governance, language-service, templates, CLI, and docs closeout for the experiment language plan.
+
+### Main Changes
+
+Implemented plan chapters 8-14 as Stage 5.
+
+Code changes:
+- Added @chemd/interoperability adapter contract and surface validators for SMILES, InChI, InChIKey, and RXN SMILES.
+- Added training governance parsing, diagnostics, sanitized projection gating, and audit-only field tracking.
+- Added schema-driven language-service field and step-parameter completions.
+- Added @chemd/domain-templates with validated domain templates and CLI templates/new commands.
+- Updated parser/typechecker/semantic export for reaction_smiles alias normalization and interop diagnostics.
+- Updated app/docs user syntax docs and developer package docs in English and Chinese.
+
+Validation:
+- pnpm typecheck passed.
+- pnpm test passed.
+- pnpm --filter @chemd/compiler test -- docs-marked-examples.test.ts docs-coverage.test.ts passed.
+- pnpm chemd --help passed.
+- pnpm chemd templates --json passed and listed 9 templates.
+- pnpm chemd new organic-synthesis/suzuki-screen --out <temp> passed.
+- pnpm chemd validate <temp> passed.
+- pnpm chemd check <temp> --target training --format json passed with 0 diagnostics.
+- pnpm run lint:py passed.
+- git diff --check passed with only line-ending warnings.
+
+Known blockers not introduced by this stage:
+- pnpm run lint -- --quiet fails in ESLint 10 runtime with scopeManager.addGlobals is not a function.
+- pnpm run format:check:py reports pre-existing Python formatting in rxnfp_provider.py and services/chem-service/app.py.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `44df622` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
