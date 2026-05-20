@@ -7,7 +7,7 @@ description: Chemd 如何为编辑器和工作区工具构建多文档符号、�
 
 ## 输入模型
 
-每个 workspace document 提供 URI、source 文本，以及可选的 path 或 metadata。默认编译器是带有 `strictChemdKind: true` 的 `compileChemdForEditor`。
+每个 workspace document 提供 URI、source 文本，以及可选的 path 或 metadata。默认编译器使用当前语言契约下的 `compileChemdForEditor`。
 
 ```ts
 import { buildWorkspaceSymbolIndex } from "@chemd/workspace-index";

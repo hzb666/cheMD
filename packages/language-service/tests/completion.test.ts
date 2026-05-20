@@ -120,7 +120,7 @@ kind: reaction
     expect(labels).toEqual(expect.arrayContaining([
       "reactants:",
       "products:",
-      "stage:"
+      "route:"
     ]));
     expect(labels).not.toContain("kind:");
   });

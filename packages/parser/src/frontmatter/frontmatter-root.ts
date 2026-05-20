@@ -49,7 +49,7 @@ export const reportYamlDocumentErrors = (
     diagnostics.push(
       createFrontmatterDiagnostic({
         code: "W_INVALID_FRONTMATTER_LINE",
-        severity: "warning",
+        severity: "error",
         message: trimmed ? `Invalid frontmatter line: ${trimmed}` : `Invalid frontmatter line: ${error.message}`,
         lineIndex,
         lineText,

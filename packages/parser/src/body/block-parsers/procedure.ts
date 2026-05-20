@@ -1,4 +1,10 @@
-import type { Diagnostic, ProcedureNode, ProcedureStepNode, SourceSpan } from "@chemd/core";
+import {
+  getAllowedBlockFieldSet,
+  type Diagnostic,
+  type ProcedureNode,
+  type ProcedureStepNode,
+  type SourceSpan
+} from "@chemd/core";
 
 import {
   createBodyText,
@@ -12,7 +18,7 @@ import {
 import { createMarkdownFromText } from "../parse-body-shared";
 import type { BlockParser } from "./types";
 
-const PROCEDURE_FIELDS = new Set(["ref", "reaction", "evidence"]);
+const PROCEDURE_FIELDS = getAllowedBlockFieldSet("procedure");
 const STEP_LINE_RE = /^\s*step\s*:\s*(.+)$/i;
 const STEP_BLOCK_START_RE = /^\s*:::step(?:\s+(.*))?\s*$/i;
 const STEP_STRUCTURAL_PARAM_KEYS = new Set([
@@ -323,9 +329,10 @@ export const parseProcedureBlock: BlockParser = ({ headerArg, lines, diagnostics
   const { fieldLines, bodyLines } = splitLeadingFieldLines(lines, PROCEDURE_FIELDS);
   const parsedBody = splitProcedureBodyAndSteps(bodyLines, diagnostics, id);
   const fields = parseAllowedFields(fieldLines, diagnostics, "procedure", PROCEDURE_FIELDS, {
-    listFields: new Set(["evidence"])
+    listFields: new Set(["evidence"]),
+    sourceNodeId: id
   });
-  const fieldSpans = parseAllowedFieldSpans(fieldLines, PROCEDURE_FIELDS);
+  const fieldSpans = parseAllowedFieldSpans(fieldLines, PROCEDURE_FIELDS, "procedure");
 
   return {
     type: "procedure",

@@ -22,10 +22,16 @@ smiles: CCO
 amount: 1 mmol
 :::
 
+:::chemd #mol-product
+kind: molecule
+name: product
+smiles: CCO
+:::
+
 :::chemd #rxn-main
 kind: reaction
 reactants: @mol-a
-products: product
+products: @mol-product
 solvent: THF
 temperature: 25 C
 yield: 81%
@@ -34,7 +40,7 @@ yield: 81%
 :::result #res-main
 reaction: @rxn-main
 status: success
-yield: 80%
+yield: 81%
 :::
 
 :::sample #sample-main
@@ -52,7 +58,7 @@ path: data/spec-main.pdf
 
 describe("PostgreSQL storage records", () => {
   it("maps compiled Chemd outputs into revision-scoped storage records", () => {
-    const compiled = compileChemd(source, { strictChemdKind: true });
+    const compiled = compileChemd(source);
     const records = buildExperimentStorageRecords({
       revisionId: "rev-1",
       source,
@@ -75,7 +81,7 @@ describe("PostgreSQL storage records", () => {
       sourceKind: "chemd",
       commitSha: "abc123"
     });
-    expect(records.compileRun.status).toBe("warning");
+    expect(records.compileRun.status).toBe("success");
     expect(records.compileRun.diagnosticCounts.error).toBe(0);
     expect(records.compileArtifact.trainingExport.schema_version).toBe("chemd-training-export/v0.2");
     expect(records.compileArtifact.trainingUnderstanding.schema_version).toBe(
@@ -84,7 +90,7 @@ describe("PostgreSQL storage records", () => {
   });
 
   it("extracts semantic facts, field evidence, and RAG chunks", () => {
-    const compiled = compileChemd(source, { strictChemdKind: true });
+    const compiled = compileChemd(source);
     const records = buildExperimentStorageRecords({
       revisionId: "rev-1",
       source,

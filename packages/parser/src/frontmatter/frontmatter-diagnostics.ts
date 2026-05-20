@@ -29,6 +29,7 @@ export const createFrontmatterDiagnostic = ({
     code,
     severity,
     message,
+    sourceLayer: "frontmatter",
     position: {
       // Frontmatter 从开头 `---` 之后起算，需要补回 2 行偏移。
       start: { line: lineIndex + 2, column: startColumn },

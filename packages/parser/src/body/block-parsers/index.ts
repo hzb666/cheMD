@@ -32,8 +32,10 @@ const parseColColumns = (headerArg: string | undefined, diagnostics: BlockParser
   if (!Number.isFinite(columns) || columns < 1) {
     diagnostics.push({
       code: "W_INVALID_COL_COLUMNS",
-      severity: "warning",
-      message: `Invalid column count on col block: ${trimmed || "(empty)"}, fallback to 1`
+      severity: "error",
+      message: `Invalid column count on col block: ${trimmed || "(empty)"}, fallback to 1`,
+      sourceLayer: "parser",
+      sourceNodeType: "col"
     });
     return 1;
   }
@@ -48,8 +50,10 @@ const parseColBlock: BlockParser = ({ headerArg, diagnostics, bodyChildren }) =>
   if (children.length !== columns) {
     diagnostics.push({
       code: "W_COL_COUNT_MISMATCH",
-      severity: "warning",
-      message: `Invalid col child count: expected ${columns}, got ${children.length}`
+      severity: "error",
+      message: `Invalid col child count: expected ${columns}, got ${children.length}`,
+      sourceLayer: "parser",
+      sourceNodeType: "col"
     });
   }
 

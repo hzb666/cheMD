@@ -1,0 +1,10 @@
+---
+id: fixture-error-boundary
+title: Error boundary fixture
+date: 2026-05-20
+---
+
+:::chemd #bad-field
+smiles: CCO
+unknown_field: must be an error
+:::

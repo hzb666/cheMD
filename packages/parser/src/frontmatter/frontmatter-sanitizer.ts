@@ -29,7 +29,7 @@ export const sanitizeFrontmatterLines = (
       diagnostics.push(
         createFrontmatterDiagnostic({
           code: "W_INVALID_FRONTMATTER_LINE",
-          severity: "warning",
+          severity: "error",
           message: `Invalid frontmatter line: ${trimmed}`,
           lineIndex: index,
           lineText: line,

@@ -1,0 +1,36 @@
+---
+id: fixture-alias-normalization
+title: Alias normalization fixture
+date: 2026-05-20
+primary_reaction: rxn-main
+primary_result: res-main
+---
+
+:::chemd #substrate
+kind: mol
+smiles: CCO
+:::
+
+:::chemd #product
+kind: mol
+smiles: CC=O
+:::
+
+:::chemd #rxn-main
+kind: reac
+reac: substrate
+prod: product
+:::
+
+:::result #res-main
+ref: rxn-main
+product: product
+status: success
+yield: 68%
+:::
+
+:::analysis #tlc-main
+analysisType: tlc
+ref: rxn-main
+result: one spot
+:::

@@ -56,7 +56,7 @@ yield: ${input.yieldPercent}
 `;
 
 const compileUnderstanding = (source: string) =>
-  compileChemd(source, { strictChemdKind: true }).trainingUnderstanding;
+  compileChemd(source).trainingUnderstanding;
 
 describe("training memory loop records", () => {
   it("derives semantic memory records from a revision pair", () => {

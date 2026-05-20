@@ -1,23 +1,9 @@
-import type { AnalysisNode } from "@chemd/core";
+import { getAllowedBlockFieldSet, type AnalysisNode } from "@chemd/core";
 
 import { parseAllowedFields, parseAllowedFieldSpans, readStructuredBlockId } from "./common";
 import type { BlockParser } from "./types";
 
-const ANALYSIS_FIELDS = new Set([
-  "type",
-  "ref",
-  "time",
-  "eluent",
-  "plate",
-  "visualization",
-  "result",
-  "instrument",
-  "solvent",
-  "frequency",
-  "method",
-  "data",
-  "notes"
-]);
+const ANALYSIS_FIELDS = getAllowedBlockFieldSet("analysis");
 
 const LANE_FIELD_PATTERN = /^p\d+$/;
 
@@ -37,9 +23,10 @@ export const parseAnalysisBlock: BlockParser = ({ headerArg, lines, diagnostics 
   const id = readStructuredBlockId(headerArg, diagnostics);
   const fields = parseAllowedFields(lines, diagnostics, "analysis", ANALYSIS_FIELDS, {
     allowExtraField: (key) => LANE_FIELD_PATTERN.test(key),
-    listFields: new Set()
+    listFields: new Set(),
+    sourceNodeId: id
   });
-  const fieldSpans = parseAllowedFieldSpans(lines, ANALYSIS_FIELDS, {
+  const fieldSpans = parseAllowedFieldSpans(lines, ANALYSIS_FIELDS, "analysis", {
     allowExtraField: (key) => LANE_FIELD_PATTERN.test(key)
   });
   const { type: analysisType, ...rest } = fields;

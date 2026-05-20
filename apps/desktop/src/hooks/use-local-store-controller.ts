@@ -342,7 +342,7 @@ export const useWorkspaceIngestController = ({
           const output = compileChemdForEditor({
             source,
             documentUri: file.path,
-            options: { strictChemdKind: true, procedureMode: "auto" }
+            options: { procedureMode: "auto" }
           });
           if (output.status === "failed") throw output.error;
           return {

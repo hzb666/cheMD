@@ -84,7 +84,7 @@ prod: CC(=O)O
     );
 
     expect(payload.document.body["01_molecule"]?.smiles).toBe("CCO");
-    expect(Object.values(payload.diagnostics ?? {}).map((diagnostic) => diagnostic.code)).toContain(
+    expect(Object.values(payload.diagnostics ?? {}).map((diagnostic) => diagnostic.code)).not.toContain(
       "W_CHEMD_KIND_AMBIGUOUS"
     );
     expect(payload.document.body["02_reaction"]?.reactants).toEqual({

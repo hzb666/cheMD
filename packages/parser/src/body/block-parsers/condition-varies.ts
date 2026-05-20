@@ -1,16 +1,17 @@
-import type {
-  ConditionVariationAttempt,
-  ConditionVariationAttemptMode,
-  ConditionVariationDelta,
-  ConditionVariationVariable,
-  ConditionVariesNode
+import {
+  getAllowedBlockFieldSet,
+  type ConditionVariationAttempt,
+  type ConditionVariationAttemptMode,
+  type ConditionVariationDelta,
+  type ConditionVariationVariable,
+  type ConditionVariesNode
 } from "@chemd/core";
 
 import { parseKeyValueLines, pickFirstStringValue } from "../parse-body-shared";
 import { parseAllowedFieldSpans, readStructuredBlockId } from "./common";
 import type { BlockParser } from "./types";
 
-const CONDITION_VARIES_META_FIELDS = new Set(["reaction", "standard", "condition", "varies", "notes"]);
+const CONDITION_VARIES_META_FIELDS = getAllowedBlockFieldSet("condition-varies");
 const DELTA_SEPARATOR_PATTERN = /^(.*?)\s*(?:->|=>)\s*(.*?)$/;
 const ATTEMPT_FIELD_PATTERN = /^var(\d+)$/;
 const RESULT_FIELD_PATTERN = /^res(\d+)$/;
@@ -213,7 +214,7 @@ export const parseConditionVariesBlock: BlockParser = ({ headerArg, lines, diagn
     listFields: new Set(),
     blockTypeForDiagnostics: "condition-varies"
   });
-  const fieldSpans = parseAllowedFieldSpans(lines, CONDITION_VARIES_META_FIELDS, {
+  const fieldSpans = parseAllowedFieldSpans(lines, CONDITION_VARIES_META_FIELDS, "condition-varies", {
     allowExtraField: () => true
   });
   const condition = parseConditionVariables(pickFirstStringValue(fields, ["condition"]));

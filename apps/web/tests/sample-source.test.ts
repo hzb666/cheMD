@@ -11,7 +11,7 @@ describe("sampleSource", () => {
     expect(sampleSource).toContain("kind: molecule");
     expect(sampleSource).toContain(":::step heat-main");
     expect(result.diagnostics.map((diagnostic) => diagnostic.code)).not.toContain(
-      "W_CHEMD_KIND_INFERRED"
+      "W_CHEMD_KIND_AMBIGUOUS"
     );
     expect(result.stepGraph.procedures[0]).toMatchObject({
       sourceType: "explicit_steps"

@@ -58,7 +58,7 @@ typechecker 对 reaction 执行四类语义处理：`reactants` 与 `products` �
 
 ## 省略 `kind` 时的类型推断
 
-parser 根据字段形状推断 `chemd` 块类型。出现 `reactants`、`products` 或它们的别名字段时推断为 reaction；其余有效 chemd 字段推断为 molecule。非 strict 模式会产生 `W_CHEMD_KIND_INFERRED`，并附带 `insert_chemd_kind` quick fix。strict 模式会产生 `W_CHEMD_KIND_AMBIGUOUS`，CLI `validate` 默认使用 strict 模式。
+parser 根据字段形状推断 `chemd` 块类型。出现 `reactants`、`products` 或它们的别名字段时推断为 reaction；出现 `smiles`、`cas`、`formula`、`role`、`amount` 或 `equivalents` 时推断为 molecule。无法稳定推断时产生 `W_CHEMD_KIND_AMBIGUOUS` error，并提供插入 `kind: molecule` 或 `kind: reaction` 的 quick fix。
 
 冲突规则：
 
@@ -67,8 +67,7 @@ parser 根据字段形状推断 `chemd` 块类型。出现 `reactants`、`produc
 | `kind: molecule` 且存在 reaction 形状字段 | `E_CHEMD_KIND_CONFLICT` |
 | `kind: reaction` 且缺少 reaction 形状字段 | `E_CHEMD_KIND_CONFLICT` |
 | `kind` 为空字符串或非法字符串 | `E_CHEMD_KIND_CONFLICT` |
-| 省略 `kind` 且 strict 模式开启 | `W_CHEMD_KIND_AMBIGUOUS` |
-| 省略 `kind` 且 strict 模式关闭 | `W_CHEMD_KIND_INFERRED` |
+| 省略 `kind` 且字段形态无法稳定推断 | `W_CHEMD_KIND_AMBIGUOUS` |
 
 ## molecule 字段手册
 
@@ -81,7 +80,7 @@ molecule 字段集合固定在 `MOLECULE_FIELDS`。未知字段产生 `W_UNKNOWN
 | `amount` | amount | `mmol`、`mol` | `mmol` |
 | `equivalents` | equivalent | `equiv`、`eq` | `equiv` |
 
-无法解析的数量仍以 raw quantity 写入 typed graph，同时产生 `E403` warning。该行为保留使用者原文，并让诊断面板提示单位或格式问题。
+无法解析的数量仍以 raw quantity 写入 typed graph，同时产生 `E403` error。该行为保留使用者原文，并让诊断面板提示单位或格式问题。
 
 ## reaction 字段手册
 

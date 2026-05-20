@@ -106,9 +106,7 @@ products: product
 kind: invalid
 smiles: CCO
 :::`;
-    const result = compileChemd(source, {
-      strictChemdKind: true
-    });
+    const result = compileChemd(source);
 
     expect(result.diagnosis).toMatchObject({
       status: "manual_review",
@@ -125,7 +123,7 @@ smiles: CCO
     }));
   });
 
-  it("treats missing chemd kind as a safe canonicalization fix", () => {
+  it("does not canonicalize stable inferred chemd kind", () => {
     const source = `---
 id: exp-diagnosis-kind
 title: Diagnosis kind
@@ -142,29 +140,24 @@ ref: rxn-main
 status: success
 yield: 72%
 :::`;
-    const firstPass = compileChemd(source, {
-      strictChemdKind: true
-    });
+    const firstPass = compileChemd(source);
 
     expect(firstPass.diagnosis).toMatchObject({
       status: "fixable",
       summary: {
-        safeFixCount: 4,
+        safeFixCount: 3,
         requiredInputCount: 0,
         manualReviewCount: 0
       }
     });
-    expect(firstPass.diagnosis.safeFixes).toContainEqual(expect.objectContaining({
-      diagnosticCode: "W_CHEMD_KIND_AMBIGUOUS",
-      sourceNodeId: "rxn-main"
+    expect(firstPass.diagnosis.safeFixes).not.toContainEqual(expect.objectContaining({
+      diagnosticCode: "W_CHEMD_KIND_AMBIGUOUS"
     }));
 
     const fixedSource = applyCompilerDiagnosisSafeFixes(source, firstPass.diagnosis);
-    const secondPass = compileChemd(fixedSource, {
-      strictChemdKind: true
-    });
+    const secondPass = compileChemd(fixedSource);
 
-    expect(fixedSource).toContain("kind: reaction");
+    expect(fixedSource).not.toContain("kind: reaction");
     expect(secondPass.diagnosis.status).toBe("clean");
   });
 });

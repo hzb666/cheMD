@@ -69,7 +69,7 @@ yield: ${input.yieldPercent}
 `;
 
 const compileUnderstanding = (source: string): ChemdTrainingUnderstandingV1 =>
-  compileChemd(source, { strictChemdKind: true }).trainingUnderstanding;
+  compileChemd(source).trainingUnderstanding;
 
 const createClient = (
   revisions: Record<string, RevisionFixture>

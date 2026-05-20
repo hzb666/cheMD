@@ -32,14 +32,17 @@ const createUnknownBlockDiagnostic = (
   if (!LEGACY_SURFACE_BLOCKS.has(blockType)) {
     return {
       code: "W_UNKNOWN_BLOCK",
-      severity: "warning",
-      message: `Unknown block type: ${blockType}`
+      severity: "error",
+      message: `Unknown block type: ${blockType}`,
+      sourceLayer: "parser",
+      sourceNodeType: blockType,
+      sourceNodeId
     };
   }
 
   return {
     code: "W_UNKNOWN_BLOCK",
-    severity: "warning",
+    severity: "error",
     message: `Unknown block type: ${blockType}`,
     sourceLayer: "parser",
     sourceNodeType: blockType,

@@ -52,7 +52,7 @@ describe("marked Chemd examples in docs", () => {
     expect(examples.length).toBeGreaterThan(0);
 
     for (const example of examples) {
-      const result = compileChemd(example.source, { strictChemdKind: true });
+      const result = compileChemd(example.source);
 
       expect(result.diagnostics, `${example.file} example ${example.index}`).toEqual([]);
     }

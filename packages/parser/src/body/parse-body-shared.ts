@@ -36,8 +36,10 @@ const resolveHeaderArg = (
 
 const isLowerAlphaCode = (code: number): boolean => code >= 97 && code <= 122;
 
+const isUpperAlphaCode = (code: number): boolean => code >= 65 && code <= 90;
+
 const isKeyBodyCode = (code: number): boolean =>
-  isLowerAlphaCode(code) || (code >= 48 && code <= 57) || code === 95;
+  isLowerAlphaCode(code) || isUpperAlphaCode(code) || (code >= 48 && code <= 57) || code === 95;
 
 const findKeyEnd = (line: string): number => {
   let index = 1;
@@ -117,7 +119,9 @@ const splitListValue = (field: string, value: string, diagnostics: Diagnostic[])
       diagnostics.push({
         code: "E_INVALID_LIST_ITEM",
         severity: "error",
-        message: `Invalid empty list item in ${field}`
+        message: `Invalid empty list item in ${field}`,
+        sourceLayer: "parser",
+        sourceField: field
       });
       continue;
     }
@@ -136,8 +140,10 @@ const splitFieldSegments = (line: string): string[] =>
 
 export interface KeyValueParseOptions {
   allowField?: (key: string) => boolean;
+  resolveField?: (key: string) => string | undefined;
   listFields?: Set<string>;
   blockTypeForDiagnostics?: string;
+  sourceNodeId?: string;
 }
 
 export const parseKeyValueLines = (
@@ -149,7 +155,7 @@ export const parseKeyValueLines = (
   const allowField = options.allowField ?? (() => true);
   const listFields = options.listFields ?? LIST_FIELDS;
 
-  for (const line of lines) {
+  lines.forEach((line, lineIndex) => {
     for (const segment of splitFieldSegments(line)) {
       const parsed = parseKeyValueLine(segment);
       if (!parsed) {
@@ -157,21 +163,33 @@ export const parseKeyValueLines = (
       }
 
       const { key, rawValue } = parsed;
+      const resolvedKey = options.resolveField?.(key) ?? (allowField(key) ? key : undefined);
 
-      if (!allowField(key)) {
+      if (!resolvedKey) {
         diagnostics.push({
           code: "W_UNKNOWN_FIELD",
-          severity: "warning",
-          message: `Unknown field "${key}" on ${options.blockTypeForDiagnostics ?? "block"}`
+          severity: "error",
+          message: `Unknown field "${key}" on ${options.blockTypeForDiagnostics ?? "block"}`,
+          sourceLayer: "parser",
+          sourceNodeType: options.blockTypeForDiagnostics,
+          sourceNodeId: options.sourceNodeId,
+          sourceField: key,
+          sourceSpan: {
+            startLine: lineIndex + 1,
+            endLine: lineIndex + 1,
+            startColumn: 1,
+            endColumn: line.length + 1
+          },
+          facts: { field: key }
         });
         continue;
       }
 
-      fields[key] = listFields.has(key)
+      fields[resolvedKey] = listFields.has(resolvedKey)
         ? splitListValue(key, rawValue, diagnostics)
         : rawValue.trim();
     }
-  }
+  });
 
   return fields;
 };
@@ -207,8 +225,10 @@ export const collectImplicitChemdValue = (
   if (implicitLines.length > 1) {
     diagnostics.push({
       code: "W_INVALID_CHEMD_IMPLICIT_VALUE",
-      severity: "warning",
-      message: "Multiple implicit chemd values detected; only the first line will be used"
+      severity: "error",
+      message: "Multiple implicit chemd values detected; only the first line will be used",
+      sourceLayer: "parser",
+      sourceNodeType: "chemd"
     });
   }
 

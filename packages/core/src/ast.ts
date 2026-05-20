@@ -77,7 +77,7 @@ export interface Confidence {
   score: number;
   method?: string;
 }
-export type ProvenanceOrigin = "author" | "lowered" | "normalized" | "inferred";
+export type ProvenanceOrigin = "author" | "lowered" | "normalized" | "inferred" | "external_provider";
 export interface ProvenanceInfo {
   origin: ProvenanceOrigin;
   source?: string;

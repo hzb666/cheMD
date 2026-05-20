@@ -58,7 +58,7 @@ The typechecker performs four semantic passes for reactions: `reactants` and `pr
 
 ## Type Inference When `kind` Is Omitted
 
-The parser infers the `chemd` block type from field shape. The presence of `reactants`, `products`, or their aliases infers reaction; other valid chemd fields infer molecule. Non-strict mode emits `W_CHEMD_KIND_INFERRED` with an `insert_chemd_kind` quick fix. Strict mode emits `W_CHEMD_KIND_AMBIGUOUS`; CLI `validate` uses strict mode.
+The parser infers the `chemd` block type from field shape. The presence of `reactants`, `products`, or their aliases infers reaction; `smiles`, `cas`, `formula`, `role`, `amount`, or `equivalents` infer molecule. Unstable inference emits a `W_CHEMD_KIND_AMBIGUOUS` error with quick fixes for inserting `kind: molecule` or `kind: reaction`.
 
 Conflict matrix:
 
@@ -67,8 +67,7 @@ Conflict matrix:
 | `kind: molecule` with reaction-shaped fields | `E_CHEMD_KIND_CONFLICT` |
 | `kind: reaction` without reaction-shaped fields | `E_CHEMD_KIND_CONFLICT` |
 | empty or invalid `kind` | `E_CHEMD_KIND_CONFLICT` |
-| omitted `kind` in strict mode | `W_CHEMD_KIND_AMBIGUOUS` |
-| omitted `kind` in non-strict mode | `W_CHEMD_KIND_INFERRED` |
+| omitted `kind` with no stable field-shape inference | `W_CHEMD_KIND_AMBIGUOUS` |
 
 ## Molecule Field Reference
 
@@ -81,7 +80,7 @@ Quantity parsing:
 | `amount` | amount | `mmol`, `mol` | `mmol` |
 | `equivalents` | equivalent | `equiv`, `eq` | `equiv` |
 
-Unparseable quantities are still retained as raw quantities in the typed graph, with `E403` emitted as a warning.
+Unparseable quantities are still retained as raw quantities in the typed graph, with `E403` emitted as an error.
 
 ## Reaction Field Reference
 

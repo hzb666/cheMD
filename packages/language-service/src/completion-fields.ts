@@ -1,3 +1,5 @@
+import { getCanonicalBlockFields } from "@chemd/core";
+
 import type {
   ChemdCompletionBlockKind,
   ChemdCompletionContext,
@@ -5,45 +7,46 @@ import type {
 } from "./completion-types";
 
 const commonFields = ["kind", "name", "caption"];
+
+const moleculeFieldNames = new Set(["kind", "name", "smiles", "cas", "formula", "amount", "equivalents", "role", "caption"]);
+const reactionFieldNames = new Set([
+  "kind",
+  "name",
+  "route",
+  "prev",
+  "reactants",
+  "products",
+  "conditions",
+  "reagents",
+  "catalyst",
+  "solvent",
+  "temperature",
+  "time",
+  "pressure",
+  "atmosphere",
+  "yield",
+  "conversion",
+  "selectivity",
+  "caption"
+]);
+
+const filterChemdFields = (allowed: ReadonlySet<string>): string[] =>
+  getCanonicalBlockFields("chemd").filter((field) => allowed.has(field));
+
 const fieldRegistry: Record<Exclude<ChemdCompletionBlockKind, "unknown">, string[]> = {
-  molecule: [
-    "kind",
-    "name",
-    "smiles",
-    "cas",
-    "formula",
-    "amount",
-    "equivalents",
-    "role",
-    "caption"
-  ],
-  reaction: [
-    "kind",
-    "name",
-    "stage",
-    "route",
-    "prev",
-    "reactants",
-    "products",
-    "conditions",
-    "reagents",
-    "catalyst",
-    "solvent",
-    "temperature",
-    "time",
-    "pressure",
-    "atmosphere",
-    "yield",
-    "conversion",
-    "selectivity",
-    "caption"
-  ],
-  result: ["status", "yield", "conversion", "selectivity", "reaction", "product", "notes"],
-  procedure: ["ref", "reaction", "evidence", "step"],
-  step: ["family", "stage", "purpose", "inputs", "outputs", "dependsOn", "evidence", "confidence"],
-  template: ["params", "bind", "description", "body"],
-  use: [],
-  condition_varies: ["reaction", "standard", "condition", "varies", "notes", "var1", "res1", "note1"]
+  molecule: filterChemdFields(moleculeFieldNames),
+  reaction: filterChemdFields(reactionFieldNames),
+  result: getCanonicalBlockFields("result"),
+  procedure: [...getCanonicalBlockFields("procedure"), "step"],
+  step: getCanonicalBlockFields("step"),
+  template: getCanonicalBlockFields("template"),
+  use: getCanonicalBlockFields("use"),
+  condition_varies: [
+    ...getCanonicalBlockFields("condition-varies"),
+    "var1",
+    "res1",
+    "note1"
+  ]
 };
 
 export const getChemdFieldCompletions = (

@@ -66,7 +66,7 @@ const collectNodeTypes = (nodes: ReturnType<typeof compileChemd>["document"]["ch
 
 describe("language fixture matrix", () => {
   it.each(fixtureCases)("$file compiles without diagnostics", ({ file, expectedNodeTypes }) => {
-    const result = compileChemd(readFixture(file), { strictChemdKind: true });
+    const result = compileChemd(readFixture(file));
     const nodeTypes = collectNodeTypes(result.document.children);
 
     expect(result.diagnostics, file).toEqual([]);

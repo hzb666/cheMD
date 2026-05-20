@@ -119,8 +119,7 @@ const buildDocumentRagResults = (
       documentUri: document.uri,
       experimentId: stablePart(`${workspaceId}-${documentIdFromPath(documentPath)}`),
       revisionId: stablePart(`rev-${workspaceId}-${documentPath}-${sourceHash}`),
-      createdAt: createdAtFromDocument(document),
-      options: { strictChemdKind: true }
+      createdAt: createdAtFromDocument(document)
     });
     const chunkTextById = records.compileOutput.status === "ok"
       ? new Map(records.compileOutput.result.ragExport.chunks.map((chunk) => [

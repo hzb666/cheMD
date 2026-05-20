@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
+import { getCanonicalBlockFields } from "@chemd/core";
 
 const workspaceRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const docsRoot = join(workspaceRoot, "apps", "docs", "content", "docs");
@@ -58,34 +59,26 @@ const uniqueSorted = (values: string[]): string[] => Array.from(new Set(values))
 
 const parserFieldCoverage = (): Record<string, string[]> => {
   const blockParserRoot = ["packages", "parser", "src", "body", "block-parsers"];
-  const chemd = readWorkspaceFile(...blockParserRoot, "chemd.ts");
-  const result = readWorkspaceFile(...blockParserRoot, "result.ts");
-  const analysis = readWorkspaceFile(...blockParserRoot, "analysis.ts");
-  const artifact = readWorkspaceFile(...blockParserRoot, "artifact.ts");
-  const sample = readWorkspaceFile(...blockParserRoot, "sample.ts");
   const conditionVaries = readWorkspaceFile(...blockParserRoot, "condition-varies.ts");
-  const procedure = readWorkspaceFile(...blockParserRoot, "procedure.ts");
-  const observation = readWorkspaceFile(...blockParserRoot, "observation.ts");
-  const parseChildren = readWorkspaceFile("packages", "parser", "src", "body", "parse-children.ts");
 
   return {
-    chemd: extractSetValues(chemd, "CHEMD_FIELDS"),
-    result: extractSetValues(result, "RESULT_FIELDS"),
-    analysis: [...extractSetValues(analysis, "ANALYSIS_FIELDS"), "p1"],
-    artifact: extractSetValues(artifact, "ARTIFACT_FIELDS"),
-    sample: extractSetValues(sample, "SAMPLE_FIELDS"),
+    chemd: getCanonicalBlockFields("chemd"),
+    result: getCanonicalBlockFields("result"),
+    analysis: [...getCanonicalBlockFields("analysis"), "p1"],
+    artifact: getCanonicalBlockFields("artifact"),
+    sample: getCanonicalBlockFields("sample"),
     "condition-varies": [
-      ...extractSetValues(conditionVaries, "CONDITION_VARIES_META_FIELDS"),
+      ...getCanonicalBlockFields("condition-varies"),
       ...extractSetValues(conditionVaries, "ATTEMPT_META_FIELDS"),
       "varN",
       "resN",
       "noteN"
     ],
-    procedure: extractSetValues(procedure, "PROCEDURE_FIELDS"),
-    step: extractSetValues(procedure, "STEP_STRUCTURAL_PARAM_KEYS"),
-    observation: extractSetValues(observation, "OBSERVATION_FIELDS"),
-    event: extractSetValues(observation, "EVENT_STRUCTURAL_PARAM_KEYS"),
-    template: extractSetValues(parseChildren, "templateFields"),
+    procedure: getCanonicalBlockFields("procedure"),
+    step: getCanonicalBlockFields("step"),
+    observation: getCanonicalBlockFields("observation"),
+    event: getCanonicalBlockFields("event"),
+    template: getCanonicalBlockFields("template"),
     col: ["columns", "col:"]
   };
 };

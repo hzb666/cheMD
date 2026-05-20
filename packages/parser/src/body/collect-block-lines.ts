@@ -155,11 +155,12 @@ export const collectStructuredBlockLines = (
   }
 
   if (blockType === "col" && braceDepth > 0) {
-    diagnostics.push({
-      code: "W_UNTERMINATED_BRACE_BLOCK",
-      severity: "warning",
-      message: "Unterminated brace block inside col block"
-    });
+      diagnostics.push({
+        code: "W_UNTERMINATED_BRACE_BLOCK",
+        severity: "error",
+        message: "Unterminated brace block inside col block",
+        sourceLayer: "parser"
+      });
   }
 
   return { blockLines, nextIndex: index, terminated: false };

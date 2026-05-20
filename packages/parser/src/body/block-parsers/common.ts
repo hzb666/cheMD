@@ -1,4 +1,11 @@
-import type { ChemistryFeatureRef, Diagnostic, SourceSpan } from "@chemd/core";
+import {
+  getAllowedBlockFieldSet,
+  getBlockListFieldSet,
+  resolveBlockField,
+  type ChemistryFeatureRef,
+  type Diagnostic,
+  type SourceSpan
+} from "@chemd/core";
 
 import { parseKeyValueLine, parseKeyValueLines } from "../parse-body-shared";
 
@@ -28,7 +35,9 @@ export const readStructuredBlockId = (
       code: "E_INVALID_ID",
       severity: "error",
       message: `Invalid block id: ${id}`,
-      nodeId: id
+      nodeId: id,
+      sourceLayer: "parser",
+      sourceNodeId: id
     });
   }
 
@@ -39,16 +48,20 @@ export const parseAllowedFields = (
   lines: string[],
   diagnostics: Diagnostic[],
   blockType: string,
-  allowedFields: Set<string>,
+  allowedFields: Set<string> = getAllowedBlockFieldSet(blockType),
   options: {
     listFields?: Set<string>;
     allowExtraField?: (key: string) => boolean;
+    sourceNodeId?: string;
   } = {}
 ): Record<string, string | string[]> =>
   parseKeyValueLines(lines, diagnostics, {
     allowField: (key) => allowedFields.has(key) || options.allowExtraField?.(key) === true,
-    listFields: options.listFields ?? DEFAULT_LIST_FIELDS,
-    blockTypeForDiagnostics: blockType
+    resolveField: (key) => resolveBlockField(blockType, key)?.canonicalName
+      ?? (options.allowExtraField?.(key) === true ? key : undefined),
+    listFields: options.listFields ?? getBlockListFieldSet(blockType),
+    blockTypeForDiagnostics: blockType,
+    sourceNodeId: options.sourceNodeId
   });
 
 export const createLineSourceSpan = (lines: string[], startIndex: number, endIndex = startIndex): SourceSpan => ({
@@ -67,6 +80,7 @@ const splitFieldSegments = (line: string): string[] =>
 export const parseAllowedFieldSpans = (
   lines: string[],
   allowedFields: Set<string>,
+  blockType?: string,
   options: {
     allowExtraField?: (key: string) => boolean;
   } = {}
@@ -76,8 +90,17 @@ export const parseAllowedFieldSpans = (
   lines.forEach((line, index) => {
     for (const segment of splitFieldSegments(line)) {
       const parsed = parseKeyValueLine(segment);
-      if (parsed && (allowedFields.has(parsed.key) || options.allowExtraField?.(parsed.key) === true)) {
-        spans[parsed.key] = createLineSourceSpan(lines, index);
+      if (!parsed) {
+        continue;
+      }
+
+      const resolvedKey = blockType
+        ? resolveBlockField(blockType, parsed.key)?.canonicalName
+          ?? (options.allowExtraField?.(parsed.key) === true ? parsed.key : undefined)
+        : parsed.key;
+
+      if (resolvedKey && (allowedFields.has(resolvedKey) || options.allowExtraField?.(parsed.key) === true)) {
+        spans[resolvedKey] = createLineSourceSpan(lines, index);
       }
     }
   });

@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import type {
@@ -7,6 +7,7 @@ import type {
   ChemdAgentLoopResult,
   ChemdTrainingGraphIndexV1,
   ChemdRepairLoopResult,
+  CompileOptions,
   CompileResult
 } from "@chemd/compiler";
 import type { Diagnostic } from "@chemd/core";
@@ -26,7 +27,10 @@ import { createProcessAgentLoopDriver } from "./agent-driver";
 
 const EXPORT_FORMATS = new Set(["json", "lnf", "rag", "training", "training-full"]);
 const DIFF_FORMATS = new Set(["text", "json"]);
+const CHECK_TARGETS = new Set(["validate", "run-plan", "training", "graph"]);
+const VALIDATE_OPTIONS = new Set<CliOption>(["dry-run"]);
 const FORMAT_OPTION = new Set<CliOption>(["format"]);
+const CHECK_OPTIONS = new Set<CliOption>(["dry-run", "format", "target"]);
 const CHANGED_OPTIONS = new Set<CliOption>(["base", "format"]);
 const REPAIR_OPTIONS = new Set<CliOption>(["format", "max-iterations", "write"]);
 const AGENT_LOOP_OPTIONS = new Set<CliOption>([
@@ -44,7 +48,8 @@ export const EXIT_USAGE = 2;
 
 const usage = [
   "Usage:",
-  "  chemd validate <file...>",
+  "  chemd validate <file...> [--dry-run]",
+  "  chemd check <path...> [--target validate|run-plan|training|graph] [--format text|json] [--dry-run]",
   "  chemd export <file> --format json|lnf|rag|training|training-full",
   "  chemd graph <file...> [--format text|json]",
   "  chemd diff <old-file> <new-file> [--format text|json]",
@@ -55,18 +60,18 @@ const usage = [
 
 type ExportFormat = "json" | "lnf" | "rag" | "training" | "training-full";
 type TextFormat = "text" | "json";
+type CheckTarget = "validate" | "run-plan" | "training" | "graph";
 type CliOption =
   | "base"
   | "driver"
   | "driver-arg"
+  | "dry-run"
   | "format"
   | "max-iterations"
   | "max-repair-iterations"
+  | "target"
   | "write";
-type CompileChemd = (
-  source: string,
-  options?: { strictChemdKind?: boolean }
-) => CompileResult;
+type CompileChemd = (source: string, options?: CompileOptions) => CompileResult;
 type BuildTrainingGraphIndex = (
   understandings: CompileResult["trainingUnderstanding"][],
   options?: BuildTrainingGraphIndexOptions
@@ -75,7 +80,7 @@ type RunChemdAgentLoop = (
   source: string,
   options: {
     agent: ChemdAgentLoopAgent;
-    compileOptions?: { strictChemdKind?: boolean };
+    compileOptions?: CompileOptions;
     maxIterations?: number;
     repairMaxIterations?: number;
   }
@@ -83,7 +88,7 @@ type RunChemdAgentLoop = (
 type RunChemdRepairLoop = (
   source: string,
   options?: {
-    compileOptions?: { strictChemdKind?: boolean };
+    compileOptions?: CompileOptions;
     maxIterations?: number;
   }
 ) => ChemdRepairLoopResult;
@@ -94,7 +99,8 @@ interface CliWriter {
 
 type CliCommand =
   | { type: "help" }
-  | { type: "validate"; filePaths: string[] }
+  | { type: "validate"; dryRun: boolean; filePaths: string[] }
+  | { type: "check"; dryRun: boolean; format: TextFormat; paths: string[]; target: CheckTarget }
   | { type: "export"; filePath: string; format: ExportFormat }
   | { type: "graph"; filePaths: string[]; format: TextFormat }
   | { type: "diff"; beforePath: string; afterPath: string; format: TextFormat }
@@ -138,8 +144,17 @@ interface DiagnosticCounts {
 }
 
 interface ValidationReport {
+  filePath?: string;
   counts: DiagnosticCounts;
   diagnostics: Diagnostic[];
+}
+
+interface CheckReport {
+  schemaVersion: "chemd-check/v0.1";
+  dryRun: boolean;
+  files: ValidationReport[];
+  target: CheckTarget;
+  totals: DiagnosticCounts;
 }
 
 interface SkippedValidation {
@@ -247,6 +262,14 @@ const asTextFormat = (format: string | undefined, command: string): TextFormat =
   throw new CliUsageError(`${command} format must be one of: text, json.`);
 };
 
+const asCheckTarget = (target: string | undefined): CheckTarget => {
+  if (!target || CHECK_TARGETS.has(target)) {
+    return (target ?? "validate") as CheckTarget;
+  }
+
+  throw new CliUsageError("Check target must be one of: validate, run-plan, training, graph.");
+};
+
 const assertOptionAllowed = (
   optionName: CliOption,
   allowedOptions: ReadonlySet<CliOption>
@@ -307,8 +330,8 @@ const parseOptionToken = (args: string[], index: number): ParsedOptionToken | un
     return undefined;
   }
 
-  if (arg === "--write") {
-    return { consumedNext: false, name: "write" };
+  if (arg === "--write" || arg === "--dry-run") {
+    return { consumedNext: false, name: arg.slice(2) as CliOption };
   }
 
   const equalsIndex = arg.indexOf("=");
@@ -336,9 +359,11 @@ const assignCommandOption = (
     base?: string;
     driver?: string;
     driverArgs: string[];
+    dryRun: boolean;
     format?: string;
     maxIterations?: number;
     maxRepairIterations?: number;
+    target?: string;
     write: boolean;
   }
 ): void => {
@@ -357,6 +382,9 @@ const assignCommandOption = (
     case "driver-arg":
       state.driverArgs.push(option.value ?? "");
       return;
+    case "dry-run":
+      state.dryRun = true;
+      return;
     case "max-iterations":
       state.maxIterations = parsePositiveIntegerOption(option.value ?? "", "max-iterations");
       return;
@@ -365,6 +393,9 @@ const assignCommandOption = (
         option.value ?? "",
         "max-repair-iterations"
       );
+      return;
+    case "target":
+      state.target = option.value;
       return;
     case "write":
       state.write = true;
@@ -380,12 +411,15 @@ const parseCommandArgs = (args: string[], allowedOptions: ReadonlySet<CliOption>
     base?: string;
     driver?: string;
     driverArgs: string[];
+    dryRun: boolean;
     format?: string;
     maxIterations?: number;
     maxRepairIterations?: number;
+    target?: string;
     write: boolean;
   } = {
     driverArgs: [],
+    dryRun: false,
     write: false
   };
 
@@ -411,11 +445,39 @@ const parseCommandArgs = (args: string[], allowedOptions: ReadonlySet<CliOption>
     base: state.base,
     driver: state.driver,
     driverArgs: state.driverArgs,
+    dryRun: state.dryRun,
     format: state.format,
     maxIterations: state.maxIterations,
     maxRepairIterations: state.maxRepairIterations,
     positional,
+    target: state.target,
     write: state.write
+  };
+};
+
+const parseValidateArgs = (args: string[]): CliCommand => {
+  const { dryRun, positional } = parseCommandArgs(args, VALIDATE_OPTIONS);
+
+  if (positional.length === 0) {
+    throw new CliUsageError("Validate requires at least one file path.");
+  }
+
+  return { type: "validate", dryRun, filePaths: positional };
+};
+
+const parseCheckArgs = (args: string[]): CliCommand => {
+  const { dryRun, format = "text", positional, target } = parseCommandArgs(args, CHECK_OPTIONS);
+
+  if (positional.length === 0) {
+    throw new CliUsageError("Check requires at least one file or directory path.");
+  }
+
+  return {
+    type: "check",
+    dryRun,
+    format: asTextFormat(format, "Check"),
+    paths: positional,
+    target: asCheckTarget(target)
   };
 };
 
@@ -536,10 +598,11 @@ export const parseChemdCliArgs = (argv: string[]): CliCommand => {
   }
 
   if (command === "validate") {
-    if (rest.length === 0) {
-      throw new CliUsageError("Validate requires at least one file path.");
-    }
-    return { type: "validate", filePaths: rest };
+    return parseValidateArgs(rest);
+  }
+
+  if (command === "check") {
+    return parseCheckArgs(rest);
   }
 
   if (command === "export") {
@@ -607,6 +670,16 @@ const countDiagnostics = (diagnostics: Diagnostic[]): DiagnosticCounts => ({
 const hasErrorDiagnostics = (diagnostics: Diagnostic[]): boolean =>
   countDiagnostics(diagnostics).error > 0;
 
+const sumDiagnosticCounts = (reports: ValidationReport[]): DiagnosticCounts =>
+  reports.reduce<DiagnosticCounts>(
+    (total, report) => ({
+      error: total.error + report.counts.error,
+      info: total.info + report.counts.info,
+      warning: total.warning + report.counts.warning
+    }),
+    { error: 0, warning: 0, info: 0 }
+  );
+
 const formatDiagnosticLocation = (diagnostic: Diagnostic): string => {
   const start = diagnostic.position?.start;
 
@@ -663,13 +736,105 @@ const validateFiles = (
 
   for (const filePath of command.filePaths) {
     const source = readSource(filePath, options.cwd);
-    const result = compileChemd(source, { strictChemdKind: true });
+    const result = compileChemd(source);
     const diagnostics = result.diagnostics ?? [];
     hasErrors = hasErrors || hasErrorDiagnostics(diagnostics);
     writeDiagnosticResult(options.stdout, filePath, diagnostics);
   }
 
   return hasErrors ? EXIT_VALIDATION_FAILED : EXIT_OK;
+};
+
+const isChemdFilePath = (filePath: string): boolean =>
+  filePath.endsWith(".chemd") || filePath.endsWith(".chemd.md");
+
+const collectChemdFilesFromDirectory = (dirPath: string): string[] =>
+  readdirSync(dirPath, { withFileTypes: true })
+    .flatMap((entry) => {
+      const childPath = path.join(dirPath, entry.name);
+      if (entry.isDirectory()) {
+        return collectChemdFilesFromDirectory(childPath);
+      }
+
+      return entry.isFile() && isChemdFilePath(entry.name) ? [childPath] : [];
+    })
+    .sort();
+
+const readCheckPathStat = (inputPath: string, resolvedPath: string) => {
+  try {
+    return statSync(resolvedPath);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new CliUsageError(`Unable to access check path "${inputPath}": ${message}`);
+  }
+};
+
+const collectCheckFilePaths = (inputPaths: string[], cwd: string): string[] => {
+  const files = inputPaths.flatMap((inputPath) => {
+    const resolvedPath = path.resolve(cwd, inputPath);
+    const stat = readCheckPathStat(inputPath, resolvedPath);
+
+    if (stat.isDirectory()) {
+      return collectChemdFilesFromDirectory(resolvedPath);
+    }
+
+    return [resolvedPath];
+  });
+
+  return [...new Set(files)].sort();
+};
+
+const checkPaths = (
+  command: Extract<CliCommand, { type: "check" }>,
+  compileChemd: CompileChemd,
+  options: NormalizedRunOptions
+): number => {
+  const files = collectCheckFilePaths(command.paths, options.cwd).map((filePath) => {
+    const source = readSource(filePath, options.cwd);
+    const result = compileChemd(source);
+    const diagnostics = result.diagnostics ?? [];
+
+    return {
+      filePath: path.relative(options.cwd, filePath) || filePath,
+      counts: countDiagnostics(diagnostics),
+      diagnostics
+    };
+  });
+  const report: CheckReport = {
+    schemaVersion: "chemd-check/v0.1",
+    dryRun: command.dryRun,
+    files,
+    target: command.target,
+    totals: sumDiagnosticCounts(files)
+  };
+
+  if (command.format === "json") {
+    options.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  } else {
+    options.stdout.write(formatCheckReport(report));
+  }
+
+  return report.totals.error > 0 ? EXIT_VALIDATION_FAILED : EXIT_OK;
+};
+
+const formatCheckReport = (report: CheckReport): string => {
+  const lines = [
+    `Chemd check (${report.target})`,
+    `  files: ${report.files.length}`,
+    `  totals: ${report.totals.error} error(s), ${report.totals.warning} warning(s), ${report.totals.info} info`
+  ];
+
+  for (const file of report.files) {
+    lines.push(
+      `${file.filePath}: ${file.counts.error} error(s), `
+      + `${file.counts.warning} warning(s), ${file.counts.info} info`
+    );
+    for (const diagnostic of file.diagnostics) {
+      lines.push(formatDiagnostic(file.filePath ?? "", diagnostic));
+    }
+  }
+
+  return `${lines.join("\n")}\n`;
 };
 
 const selectExportPayload = (result: CompileResult, format: ExportFormat): unknown => {
@@ -694,7 +859,7 @@ const exportFile = (
   options: NormalizedRunOptions
 ): number => {
   const source = readSource(command.filePath, options.cwd);
-  const result = compileChemd(source, { strictChemdKind: true });
+  const result = compileChemd(source);
   if (writeErrorsIfPresent(command.filePath, result, options.stderr)) {
     return EXIT_VALIDATION_FAILED;
   }
@@ -767,7 +932,7 @@ const compileSourceFile = (
   options: NormalizedRunOptions
 ): CompileResult => {
   const source = readSource(filePath, options.cwd);
-  return compileChemd(source, { strictChemdKind: true });
+  return compileChemd(source);
 };
 
 const diffFiles = (
@@ -794,7 +959,7 @@ const diffFiles = (
 };
 
 const compileSource = (source: string, compileChemd: CompileChemd): CompileResult =>
-  compileChemd(source, { strictChemdKind: true });
+  compileChemd(source);
 
 const compileCurrentChangedFile = (
   record: GitChangedFile,
@@ -987,7 +1152,6 @@ const repairFile = (
 ): number => {
   const source = readSource(command.filePath, options.cwd);
   const repairResult = runChemdRepairLoop(source, {
-    compileOptions: { strictChemdKind: true },
     maxIterations: command.maxIterations
   });
   const shouldWrite = command.write
@@ -1137,7 +1301,6 @@ const agentLoopFile = async (
   });
   const agentLoopResult = await runChemdAgentLoop(source, {
     agent: driver,
-    compileOptions: { strictChemdKind: true },
     maxIterations: command.maxIterations,
     repairMaxIterations: command.maxRepairIterations
   });
@@ -1177,6 +1340,10 @@ const executeCommand = (
 ): Promise<number> => {
   if (command.type === "validate") {
     return Promise.resolve(validateFiles(command, services.compileChemd, options));
+  }
+
+  if (command.type === "check") {
+    return Promise.resolve(checkPaths(command, services.compileChemd, options));
   }
 
   if (command.type === "export") {

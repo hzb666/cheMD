@@ -290,7 +290,6 @@ export const saveCompiledExperiment = async (
   input: SaveCompiledExperimentInput
 ): Promise<ExperimentStorageRecords> => {
   const compiled = compileChemd(input.source, {
-    strictChemdKind: true,
     ...input.compileOptions
   });
   const records = buildExperimentStorageRecords({

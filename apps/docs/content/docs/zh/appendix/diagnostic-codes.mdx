@@ -27,8 +27,7 @@ description: Chemd parser、resolver、typechecker、compiler 和 runtime 常见
 
 | 诊断码 | 含义 |
 | --- | --- |
-| `W_CHEMD_KIND_INFERRED` | 省略 `kind` 且 parser 已按字段推断类型 |
-| `W_CHEMD_KIND_AMBIGUOUS` | strict 模式下省略 `kind` |
+| `W_CHEMD_KIND_AMBIGUOUS` | 省略 `kind` 且 parser 无法稳定推断类型 |
 | `E_CHEMD_KIND_CONFLICT` | `kind` 非法，或显式类型与字段形状冲突 |
 | `W_INVALID_CHEMD_IMPLICIT_VALUE` | molecule 隐式 SMILES 行数非法 |
 

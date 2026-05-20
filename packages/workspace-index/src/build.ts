@@ -20,8 +20,7 @@ const VERSION = "chemd-workspace-symbol-index/v0.1" as const;
 const defaultCompile: WorkspaceIndexCompileFn = (input) =>
   compileChemdForEditor({
     source: input.source,
-    documentUri: input.documentUri,
-    options: { strictChemdKind: true }
+    documentUri: input.documentUri
   });
 
 const sortDocuments = (

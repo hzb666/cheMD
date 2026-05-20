@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { parseChemd } from "../src/index";
 
-describe("parseChemd chemd kind fallback", () => {
-  it("warns when chemd kind is inferred from molecule shape", () => {
+describe("parseChemd chemd kind inference", () => {
+  it("infers molecule kind from molecule-shaped fields without diagnostics", () => {
     const document = parseChemd(`---
 id: exp-inferred-molecule-kind
 title: Inferred molecule kind
@@ -20,18 +20,10 @@ smiles: CCO
       id: "mol-inferred",
       syntaxOrigin: "chemd"
     });
-    expect(document.diagnostics).toContainEqual(
-      expect.objectContaining({
-        code: "W_CHEMD_KIND_INFERRED",
-        severity: "warning",
-        nodeId: "mol-inferred",
-        facts: expect.objectContaining({ inferred_kind: "molecule" }),
-        quickFixes: [expect.objectContaining({ kind: "insert_chemd_kind" })]
-      })
-    );
+    expect(document.diagnostics).toEqual([]);
   });
 
-  it("warns when chemd kind is inferred from reaction shape", () => {
+  it("infers reaction kind from reaction-shaped fields without diagnostics", () => {
     const document = parseChemd(`---
 id: exp-inferred-reaction-kind
 title: Inferred reaction kind
@@ -49,29 +41,62 @@ products: @b
       id: "rxn-inferred",
       syntaxOrigin: "chemd"
     });
+    expect(document.diagnostics).toEqual([]);
+  });
+
+  it("errors when chemd kind cannot be inferred", () => {
+    const document = parseChemd(`---
+id: exp-ambiguous-kind
+title: Ambiguous kind
+date: 2026-04-18
+---
+
+:::chemd #draft
+name: Draft node
+:::
+`);
+
+    expect(document.children).toEqual([]);
     expect(document.diagnostics).toContainEqual(
       expect.objectContaining({
-        code: "W_CHEMD_KIND_INFERRED",
-        severity: "warning",
-        nodeId: "rxn-inferred",
-        facts: expect.objectContaining({ inferred_kind: "reaction" })
+        code: "W_CHEMD_KIND_AMBIGUOUS",
+        severity: "error",
+        nodeId: "draft",
+        quickFixes: expect.arrayContaining([
+          expect.objectContaining({
+            kind: "insert_chemd_kind",
+            patch: expect.objectContaining({ kind: "molecule" })
+          }),
+          expect.objectContaining({
+            kind: "insert_chemd_kind",
+            patch: expect.objectContaining({ kind: "reaction" })
+          })
+        ])
       })
     );
   });
 
-  it("keeps strict missing-kind diagnostics distinct from inferred fallback warnings", () => {
+  it("accepts official kind value aliases", () => {
     const document = parseChemd(`---
-id: exp-strict-missing-kind
-title: Strict missing kind
+id: exp-kind-aliases
+title: Kind aliases
 date: 2026-04-18
 ---
 
-:::chemd #mol-strict
+:::chemd #mol-alias
+kind: mol
 smiles: CCO
 :::
-`, { strictChemdKind: true });
 
-    expect(document.diagnostics.map((diagnostic) => diagnostic.code)).toContain("W_CHEMD_KIND_AMBIGUOUS");
-    expect(document.diagnostics.map((diagnostic) => diagnostic.code)).not.toContain("W_CHEMD_KIND_INFERRED");
+:::chemd #rxn-alias
+kind: reac
+reactants: @mol-alias
+products: product
+:::
+`);
+
+    expect(document.children[0]).toMatchObject({ type: "molecule", declaredKind: "molecule" });
+    expect(document.children[1]).toMatchObject({ type: "reaction", declaredKind: "reaction" });
+    expect(document.diagnostics).toEqual([]);
   });
 });

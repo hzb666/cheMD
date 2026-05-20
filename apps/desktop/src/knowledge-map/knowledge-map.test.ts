@@ -20,7 +20,7 @@ const compile = (source: string): ChemdLanguageCompileOutput =>
   compileChemdForEditor({
     source,
     documentUri: "experiments/map.chemd",
-    options: { strictChemdKind: true, procedureMode: "auto" }
+    options: { procedureMode: "auto" }
   });
 
 const outputWithReaction = (): ChemdLanguageCompileSuccess => ({

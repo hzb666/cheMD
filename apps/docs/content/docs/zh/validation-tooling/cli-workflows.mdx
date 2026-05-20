@@ -8,14 +8,14 @@ description: validate、export、graph、diff、changed、repair 和 agent-loop 
 
 ## `pnpm chemd validate`
 
-`validate` 接收一个或多个 `.chemd` 文件。每个文件通过 `compileChemd` 编译，并传入 `strictChemdKind: true`。无 error 时输出 `file: ok`；存在 error 时返回退出码 1。CLI 退出码约定为：0 成功，1 validation failed，2 usage error。
+`validate` 接收一个或多个 `.chemd` 文件。每个文件通过当前语言契约下的 `compileChemd` 编译。无 error 时输出 `file: ok`；存在 error 时返回退出码 1。CLI 退出码约定为：0 成功，1 validation failed，2 usage error。
 
 ```text
 pnpm chemd validate experiment.chemd
 pnpm chemd validate experiments/*.chemd
 ```
 
-strict 模式会把省略 `kind` 的 `:::chemd` 标记为 `W_CHEMD_KIND_AMBIGUOUS`，便于使用者显式确认 molecule 或 reaction。
+`:::chemd` 可以省略 `kind` 并由字段形态推断。无法稳定推断，或显式 `kind` 与字段形态冲突时，产生 error。
 
 为了获得高质量下游导出，建议显式维护这些关系：
 

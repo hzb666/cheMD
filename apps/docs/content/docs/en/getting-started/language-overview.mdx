@@ -22,7 +22,7 @@ The current semantic usage surface uses `:::chemd` for both molecule and reactio
 
 ## Minimal Validatable Document
 
-The `validate` command compiles with `strictChemdKind: true`. A minimal validatable document needs required frontmatter and an explicit `kind` in `:::chemd`.
+The `validate` command compiles under the current language contract. A minimal validatable document needs required frontmatter; `:::chemd` may declare `kind` explicitly or omit it when the fields make the identity clear.
 
 ```md validate
 ---

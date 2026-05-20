@@ -19,7 +19,7 @@ date: 2026-05-13
 ---
 
 :::chemd #mol-main
-smiles: CCO
+name: draft
 :::
 `;
 
@@ -98,8 +98,7 @@ describe("chemd Monaco code action provider", () => {
 
     const compileOutput = compileChemdForEditor({
       source,
-      documentUri,
-      options: { strictChemdKind: true }
+      documentUri
     });
     const diagnostic = compileOutput.diagnostics.find((item) =>
       item.code === "W_CHEMD_KIND_AMBIGUOUS"
@@ -127,12 +126,19 @@ describe("chemd Monaco code action provider", () => {
     expect(providedKinds).toEqual([["quickfix"]]);
     expect(emptyResult?.actions).toEqual([]);
     expect(cleanedResult?.actions).toEqual([]);
-    expect(result?.actions).toHaveLength(1);
+    expect(result?.actions).toHaveLength(2);
     expect(result?.actions[0]).toMatchObject({
       title: diagnostic.quickFixes[0].title,
       kind: "quickfix",
       data: expect.objectContaining({
         id: diagnostic.quickFixes[0].id
+      })
+    });
+    expect(result?.actions[1]).toMatchObject({
+      title: diagnostic.quickFixes[1].title,
+      kind: "quickfix",
+      data: expect.objectContaining({
+        id: diagnostic.quickFixes[1].id
       })
     });
 

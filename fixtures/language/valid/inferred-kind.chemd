@@ -1,0 +1,27 @@
+---
+id: fixture-inferred-kind
+title: Inferred kind fixture
+date: 2026-05-20
+primary_reaction: rxn-main
+primary_result: res-main
+---
+
+:::chemd #ethanol
+smiles: CCO
+:::
+
+:::chemd #acetaldehyde
+smiles: CC=O
+:::
+
+:::chemd #rxn-main
+reactants: ethanol
+products: acetaldehyde
+:::
+
+:::result #res-main
+ref: rxn-main
+product: acetaldehyde
+status: success
+yield: 72%
+:::

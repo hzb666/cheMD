@@ -28,8 +28,7 @@ yield: 82%
 const compileOk = (): ChemdLanguageCompileOutput =>
   compileChemdForEditor({
     source,
-    documentUri: "file:///D:/labs/alpha/semantic-preview.chemd",
-    options: { strictChemdKind: true }
+    documentUri: "file:///D:/labs/alpha/semantic-preview.chemd"
   });
 
 describe("buildSemanticPreview", () => {

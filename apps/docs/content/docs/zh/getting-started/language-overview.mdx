@@ -22,7 +22,7 @@ Chemd 源文件由 frontmatter、Markdown 正文和结构化块组成。解析�
 
 ## 最小可验证文档
 
-`validate` 命令以 `strictChemdKind: true` 编译输入。最小可验证文档需要必需 frontmatter，并让 `:::chemd` 显式声明 `kind`。
+`validate` 命令按当前语言契约编译输入。最小可验证文档需要必需 frontmatter；`:::chemd` 可显式声明 `kind`，也可在字段形态清楚时省略。
 
 ```md validate
 ---

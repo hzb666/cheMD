@@ -3,7 +3,8 @@
 ## Commands
 
 ```text
-pnpm chemd validate <file...>
+pnpm chemd validate <file...> [--dry-run]
+pnpm chemd check <path...> [--target validate|run-plan|training|graph] [--format text|json] [--dry-run]
 pnpm chemd export <file> --format json|lnf|rag|training|training-full
 pnpm chemd graph <file...> [--format text|json]
 pnpm chemd diff <old-file> <new-file> [--format text|json]
@@ -43,6 +44,10 @@ error message without the usage block.
 ## Diagnostic Boundaries
 
 - `validate` writes diagnostic summaries to stdout.
+- `check` recursively discovers `.chemd` and `.chemd.md` files under directory
+  arguments, validates with the current language contract, and writes a
+  deterministic text or JSON batch report to stdout. `--dry-run` is accepted for
+  CLI consistency and guarantees the command will not write source files.
 - `export` and `diff` must not write business payloads to stdout if any input
   has error diagnostics; they write diagnostics to stderr and return `1`.
 - `graph` follows the same validation boundary as `export`: if any input file
@@ -185,9 +190,30 @@ iterations: Array<{
 }>
 ```
 
+## Check Command
+
+`check --format json` emits:
+
+```text
+schemaVersion: "chemd-check/v0.1"
+dryRun: boolean
+target: "validate" | "run-plan" | "training" | "graph"
+totals: { error: number; warning: number; info: number }
+files: Array<{
+  filePath: string
+  counts: { error: number; warning: number; info: number }
+  diagnostics: Diagnostic[]
+}>
+```
+
+P0 `check` uses the same validation semantics for all accepted targets. Later
+target-specific passes may add stricter target requirements, but they must keep
+the schema and exit-code contract stable.
+
 ## Repair Command
 
-- `repair` must reuse `runChemdRepairLoop(source, { compileOptions: { strictChemdKind: true } })`.
+- `repair` must reuse `runChemdRepairLoop(source, ...)` with the current
+  language contract; do not require an author-selectable language mode.
 - `--max-iterations` must be a positive integer.
 - `--write` only persists the repaired source when the final diagnosis is
   `clean`; partially repaired but unresolved source remains in the report only.
@@ -196,7 +222,8 @@ iterations: Array<{
 
 ## Agent Loop Command
 
-- `agent-loop` must reuse `runChemdAgentLoop(source, { compileOptions: { strictChemdKind: true } })`.
+- `agent-loop` must reuse `runChemdAgentLoop(source, ...)` with the current
+  language contract; do not require an author-selectable language mode.
 - `agent-loop` must create the external driver with `spawnSync(command, args, { shell: false })`; do not shell-join user-provided values.
 - `--driver` is required and names the executable to launch.
 - `--driver-arg` is repeatable and appends raw argv entries after the driver command.

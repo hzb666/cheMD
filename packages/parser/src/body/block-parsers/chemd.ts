@@ -1,15 +1,17 @@
-import type {
-  ChemdSemanticKind,
-  ChemistryFeatureRef,
-  FieldSourceSpans,
-  MoleculeNode,
-  ReactionNode,
-  SyntaxOrigin
+import {
+  getAllowedBlockFieldSet,
+  getBlockListFieldSet,
+  normalizeChemdKind,
+  type ChemdSemanticKind,
+  type ChemistryFeatureRef,
+  type FieldSourceSpans,
+  type MoleculeNode,
+  type ReactionNode,
+  type SyntaxOrigin
 } from "@chemd/core";
 
 import { collectImplicitChemdValue, pickFirstStringArray, pickFirstStringValue } from "../parse-body-shared";
 import {
-  DEFAULT_LIST_FIELDS,
   parseAllowedFields,
   parseAllowedFieldSpans,
   readChemistryFeatureRefs,
@@ -17,39 +19,8 @@ import {
 } from "./common";
 import type { BlockParser } from "./types";
 
-const CHEMD_FIELDS = new Set([
-  "kind",
-  "smiles",
-  "cas",
-  "name",
-  "role",
-  "caption",
-  "formula",
-  "amount",
-  "equivalents",
-  "reactants",
-  "products",
-  "reactant",
-  "product",
-  "reac",
-  "prod",
-  "conditions",
-  "route",
-  "prev",
-  "reagents",
-  "catalyst",
-  "solvent",
-  "temperature",
-  "time",
-  "pressure",
-  "atmosphere",
-  "yield",
-  "conversion",
-  "selectivity",
-  "chemistry_features"
-]);
-
-const CHEMD_KINDS = new Set<ChemdSemanticKind>(["molecule", "reaction"]);
+const CHEMD_FIELDS = getAllowedBlockFieldSet("chemd");
+const CHEMD_LIST_FIELDS = getBlockListFieldSet("chemd");
 
 interface ParsedChemdMetadata {
   id?: string;
@@ -66,17 +37,27 @@ interface DeclaredKindResult {
 }
 
 const hasReactionShape = (fields: Record<string, string | string[]>): boolean => {
-  const reactants = pickFirstStringArray(fields, ["reac", "reactant", "reactants"]) ?? [];
-  const products = pickFirstStringArray(fields, ["prod", "product", "products"]) ?? [];
+  const reactants = pickFirstStringArray(fields, ["reactants"]) ?? [];
+  const products = pickFirstStringArray(fields, ["products"]) ?? [];
 
   return reactants.length > 0
     || products.length > 0
-    || "reac" in fields
-    || "prod" in fields
-    || "reactant" in fields
-    || "product" in fields
     || "reactants" in fields
     || "products" in fields;
+};
+
+const hasMoleculeShape = (fields: Record<string, string | string[]>): boolean =>
+  ["smiles", "cas", "formula", "role", "amount", "equivalents"].some((fieldName) => fieldName in fields);
+
+const inferChemdKind = (fields: Record<string, string | string[]>): ChemdSemanticKind | undefined => {
+  const reactionShape = hasReactionShape(fields);
+  const moleculeShape = hasMoleculeShape(fields);
+
+  if (reactionShape === moleculeShape) {
+    return undefined;
+  }
+
+  return reactionShape ? "reaction" : "molecule";
 };
 
 const readDeclaredKind = (
@@ -107,8 +88,9 @@ const readDeclaredKind = (
     return { hasKindField: true, isValid: false };
   }
 
-  if (CHEMD_KINDS.has(kind as ChemdSemanticKind)) {
-    return { declaredKind: kind as ChemdSemanticKind, hasKindField: true, isValid: true };
+  const normalizedKind = normalizeChemdKind(kind);
+  if (normalizedKind) {
+    return { declaredKind: normalizedKind, hasKindField: true, isValid: true };
   }
 
   diagnostics.push({
@@ -152,8 +134,8 @@ const createReactionNode = (
   fieldSpans: metadata.fieldSpans,
   route: pickFirstStringValue(fields, ["route"]),
   prev: pickFirstStringArray(fields, ["prev"]),
-  reactants: pickFirstStringArray(fields, ["reac", "reactant", "reactants"]) ?? [],
-  products: pickFirstStringArray(fields, ["prod", "product", "products"]) ?? [],
+  reactants: pickFirstStringArray(fields, ["reactants"]) ?? [],
+  products: pickFirstStringArray(fields, ["products"]) ?? [],
   conditions: Array.isArray(fields.conditions) ? fields.conditions : [],
   name: pickFirstStringValue(fields, ["name"]),
   reagents: pickFirstStringValue(fields, ["reagents"]),
@@ -192,69 +174,41 @@ const createMoleculeNode = (
   chemistryFeatureRefs: metadata.chemistryFeatureRefs
 });
 
-const reportMissingKind = (
+const reportAmbiguousKind = (
   id: string | undefined,
   diagnostics: Parameters<BlockParser>[0]["diagnostics"]
 ) => {
   const quickFixes = id
-    ? [{
-        title: "Insert an explicit kind field in this chemd block",
-        kind: "insert_chemd_kind" as const,
-        patch: {
-          source_node_type: "chemd",
-          source_node_id: id
-        }
-      }]
-    : [];
-
-  diagnostics.push({
-    code: "W_CHEMD_KIND_AMBIGUOUS",
-    severity: "warning",
-    message: "Chemd block should declare kind: molecule or kind: reaction",
-    nodeId: id,
-    sourceLayer: "parser",
-    sourceNodeType: "chemd",
-    sourceNodeId: id,
-    ...(quickFixes.length > 0 ? { quickFixes } : {})
-  });
-};
-
-const reportInferredKind = (
-  id: string | undefined,
-  diagnostics: Parameters<BlockParser>[0]["diagnostics"],
-  inferredKind: ChemdSemanticKind
-) => {
-  const quickFixes = id
-    ? [{
-        title: `Insert kind: ${inferredKind} in this chemd block`,
+    ? (["molecule", "reaction"] as const).map((kind) => ({
+        title: `Insert kind: ${kind} in this chemd block`,
         kind: "insert_chemd_kind" as const,
         patch: {
           source_node_type: "chemd",
           source_node_id: id,
-          kind: inferredKind
+          kind
         }
-      }]
+      }))
     : [];
 
   diagnostics.push({
-    code: "W_CHEMD_KIND_INFERRED",
-    severity: "warning",
-    message: `Chemd kind inferred as ${inferredKind}; declare kind explicitly.`,
+    code: "W_CHEMD_KIND_AMBIGUOUS",
+    severity: "error",
+    message: "Chemd block kind cannot be inferred; declare kind: molecule or kind: reaction",
     nodeId: id,
     sourceLayer: "parser",
     sourceNodeType: "chemd",
     sourceNodeId: id,
-    facts: { inferred_kind: inferredKind },
     ...(quickFixes.length > 0 ? { quickFixes } : {})
   });
 };
 
-export const parseChemdBlock: BlockParser = ({ headerArg, lines, diagnostics, options }) => {
+export const parseChemdBlock: BlockParser = ({ headerArg, lines, diagnostics }) => {
   const id = readStructuredBlockId(headerArg, diagnostics);
   const fields = parseAllowedFields(lines, diagnostics, "chemd", CHEMD_FIELDS, {
-    listFields: new Set([...DEFAULT_LIST_FIELDS, "prev"])
+    listFields: CHEMD_LIST_FIELDS,
+    sourceNodeId: id
   });
-  const fieldSpans = parseAllowedFieldSpans(lines, CHEMD_FIELDS);
+  const fieldSpans = parseAllowedFieldSpans(lines, CHEMD_FIELDS, "chemd");
   const kindResult = readDeclaredKind(id, fields, diagnostics);
   const declaredKind = kindResult.declaredKind;
   const reactionShape = hasReactionShape(fields);
@@ -265,10 +219,6 @@ export const parseChemdBlock: BlockParser = ({ headerArg, lines, diagnostics, op
 
   if (!kindResult.isValid) {
     return undefined;
-  }
-
-  if (!declaredKind && !kindResult.hasKindField && options?.strictChemdKind) {
-    reportMissingKind(id, diagnostics);
   }
 
   if (declaredKind === "reaction") {
@@ -294,10 +244,12 @@ export const parseChemdBlock: BlockParser = ({ headerArg, lines, diagnostics, op
     );
   }
 
-  if (!options?.strictChemdKind) {
-    reportInferredKind(id, diagnostics, reactionShape ? "reaction" : "molecule");
+  const inferredKind = inferChemdKind(fields);
+  if (!inferredKind) {
+    reportAmbiguousKind(id, diagnostics);
+    return undefined;
   }
-  return reactionShape
+  return inferredKind === "reaction"
     ? createReactionNode({ id, syntaxOrigin: "chemd", fieldSpans, chemistryFeatureRefs }, fields)
     : createMoleculeNode(
       { id, syntaxOrigin: "chemd", fieldSpans, chemistryFeatureRefs },

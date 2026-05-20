@@ -1,4 +1,4 @@
-import type { ArtifactNode } from "@chemd/core";
+import { getAllowedBlockFieldSet, type ArtifactNode } from "@chemd/core";
 
 import {
   parseAllowedFields,
@@ -8,22 +8,15 @@ import {
 } from "./common";
 import type { BlockParser } from "./types";
 
-const ARTIFACT_FIELDS = new Set([
-  "kind",
-  "ref",
-  "path",
-  "checksum",
-  "instrument",
-  "notes",
-  "chemistry_features"
-]);
+const ARTIFACT_FIELDS = getAllowedBlockFieldSet("artifact");
 
 export const parseArtifactBlock: BlockParser = ({ headerArg, lines, diagnostics }) => {
   const id = readStructuredBlockId(headerArg, diagnostics);
   const fields = parseAllowedFields(lines, diagnostics, "artifact", ARTIFACT_FIELDS, {
-    listFields: new Set(["chemistry_features"])
+    listFields: new Set(["chemistry_features"]),
+    sourceNodeId: id
   });
-  const fieldSpans = parseAllowedFieldSpans(lines, ARTIFACT_FIELDS);
+  const fieldSpans = parseAllowedFieldSpans(lines, ARTIFACT_FIELDS, "artifact");
   const { chemistry_features: _chemistryFeatures, ...rest } = fields;
 
   return {

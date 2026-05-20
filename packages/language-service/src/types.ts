@@ -64,7 +64,7 @@ export interface ChemdSymbol {
 export interface ChemdLanguageCompileInput {
   source: string;
   documentUri?: string;
-  options?: Pick<CompileOptions, "strictChemdKind" | "procedureMode">;
+  options?: Pick<CompileOptions, "procedureMode">;
 }
 
 interface ChemdLanguageCompileOutputBase {

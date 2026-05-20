@@ -102,8 +102,9 @@ export const tokenizeMarkdownLinks = (
     if (!safe) {
       diagnostics.push({
         code: "W_UNSAFE_LINK_HREF",
-        severity: "warning",
-        message: `Unsafe markdown link href: ${href}`
+        severity: "error",
+        message: `Unsafe markdown link href: ${href}`,
+        sourceLayer: "parser"
       });
     }
 

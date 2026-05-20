@@ -40,7 +40,7 @@ Default list fields are `reactants`, `products`, `reactant`, `product`, `reac`, 
 
 ## Structured Object Features
 
-- `:::chemd`: produces molecule or reaction by `kind`. Missing `kind` is inferred from reaction-shaped fields, and strict mode produces `W_CHEMD_KIND_AMBIGUOUS`.
+- `:::chemd`: produces molecule or reaction by `kind` or field shape. Missing `kind` is inferred from reaction-shaped fields; unstable inference produces a `W_CHEMD_KIND_AMBIGUOUS` error.
 - Molecule fields: `smiles`, `cas`, `name`, `role`, `caption`, `formula`, `amount`, `equivalents`, and `chemistry_features`.
 - Reaction fields: `name`, `reactants`, `products`, `reactant`, `product`, `reac`, `prod`, `conditions`, `route`, `prev`, `reagents`, `catalyst`, `solvent`, `temperature`, `time`, `pressure`, `atmosphere`, `yield`, `conversion`, `selectivity`, `caption`, and `chemistry_features`.
 - `:::result` fields: `status`, `yield`, `conversion`, `selectivity`, `isolated_mass`, `product_state`, `purity`, `notes`, `ref`, `reaction`, and `product`.

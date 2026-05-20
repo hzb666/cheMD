@@ -26,9 +26,7 @@ type: tlc
 result: one major spot
 :::
 `;
-    const result = runChemdRepairLoop(source, {
-      compileOptions: { strictChemdKind: true }
-    });
+    const result = runChemdRepairLoop(source);
 
     expect(result.stoppedReason).toBe("clean");
     expect(result.changed).toBe(true);
@@ -61,9 +59,7 @@ reactants: substrate
 products: product
 :::
 `;
-    const result = runChemdRepairLoop(source, {
-      compileOptions: { strictChemdKind: true }
-    });
+    const result = runChemdRepairLoop(source);
 
     expect(result.stoppedReason).toBe("needs_author_input");
     expect(result.changed).toBe(true);
@@ -98,7 +94,6 @@ result: one major spot
 :::
 `;
     const result = runChemdRepairLoop(source, {
-      compileOptions: { strictChemdKind: true },
       maxIterations: 1
     });
 
@@ -108,7 +103,7 @@ result: one major spot
     expect(result.finalResult.diagnosis.status).toBe("fixable");
   });
 
-  it("canonicalizes missing chemd kind before finishing the repair loop", () => {
+  it("keeps stable inferred chemd kind while finishing the repair loop", () => {
     const source = `---
 id: exp-repair-loop-kind
 title: Repair loop kind
@@ -124,19 +119,16 @@ products: product
 status: success
 yield: 72%
 :::`;
-    const result = runChemdRepairLoop(source, {
-      compileOptions: { strictChemdKind: true }
-    });
+    const result = runChemdRepairLoop(source);
 
     expect(result.stoppedReason).toBe("clean");
     expect(result.changed).toBe(true);
-    expect(result.finalSource).toContain("kind: reaction");
+    expect(result.finalSource).not.toContain("kind: reaction");
     expect(result.finalSource).toContain("ref: rxn-main");
+    expect(result.totalAppliedSafeFixes).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ diagnosticCode: "W_CHEMD_KIND_AMBIGUOUS" })
+    ]));
     expect(result.totalAppliedSafeFixes).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        diagnosticCode: "W_CHEMD_KIND_AMBIGUOUS",
-        sourceNodeId: "rxn-main"
-      }),
       expect.objectContaining({
         diagnosticCode: "W_AUTHORING_FIX_AVAILABLE",
         sourceNodeId: "res-main"
@@ -180,7 +172,6 @@ var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
 :::
 `;
     const result = runChemdRepairLoop(source, {
-      compileOptions: { strictChemdKind: true },
       maxIterations: 5
     });
 

@@ -1,0 +1,14 @@
+---
+id: fixture-heuristic-lowering
+title: Heuristic lowering fixture
+date: 2026-05-20
+---
+
+:::chemd #rxn-main
+reactants: substrate
+products: product
+:::
+
+:::procedure #proc-main
+Charge substrate and heat overnight.
+:::

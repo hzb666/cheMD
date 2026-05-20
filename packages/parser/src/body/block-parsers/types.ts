@@ -10,6 +10,4 @@ export interface BlockParserContext {
 
 export type BlockParser = (context: BlockParserContext) => StructuredNode | undefined;
 
-export interface ParserOptions {
-  strictChemdKind?: boolean;
-}
+export type ParserOptions = Record<string, never>;

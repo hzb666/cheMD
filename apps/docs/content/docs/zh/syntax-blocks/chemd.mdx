@@ -33,7 +33,7 @@ atmosphere: nitrogen
 
 | 字段 | molecule | reaction | 说明 |
 | --- | --- | --- | --- |
-| `kind` | 可选 | 可选 | 支持 `molecule`、`reaction`。CLI strict 校验建议显式填写 |
+| `kind` | 可选 | 可选 | 支持 `molecule`、`reaction`、`mol`、`reac`；省略时按字段形态推断 |
 | `smiles` | 必填 | 不适用 | resolver 要求 molecule 具备该字段 |
 | `cas` | 可选 | 不适用 | 原样保存 |
 | `name` | 可选 | 可选 | 使用者可读名称 |
@@ -83,7 +83,7 @@ CCO
 
 ## 类型推断
 
-存在 `reactants`、`products` 或别名字段时，parser 推断为 reaction。其余有效字段推断为 molecule。`strictChemdKind` 开启时，省略 `kind` 产生 `W_CHEMD_KIND_AMBIGUOUS`。非 strict 模式产生 `W_CHEMD_KIND_INFERRED`。
+存在 `reactants`、`products` 或别名字段时，parser 推断为 reaction。存在 `smiles`、`cas`、`formula`、`role`、`amount` 或 `equivalents` 时推断为 molecule。无法稳定推断，或显式 `kind` 与字段形态冲突时，产生 error。显式 `kind` 支持 `mol` 和 `reac` 作为值别名。
 
 ## Route 与前驱链接
 

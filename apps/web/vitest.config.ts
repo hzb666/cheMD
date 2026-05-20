@@ -6,6 +6,12 @@ const srcDirectory = fileURLToPath(new URL("./src", import.meta.url));
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 
 export default defineConfig({
+  oxc: {
+    jsx: {
+      importSource: "react",
+      runtime: "automatic"
+    }
+  },
   resolve: {
     dedupe: ["react", "react-dom"],
     alias: {

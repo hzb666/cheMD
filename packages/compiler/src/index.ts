@@ -111,7 +111,6 @@ export interface CompileResult {
 
 export interface CompileOptions {
   renderSelection?: RenderSelection;
-  strictChemdKind?: boolean;
   procedureMode?: "auto" | "explicit" | "lowered";
   referenceContext?: ReferenceContext;
   reactionRouteContext?: ReactionRouteContext;
@@ -143,9 +142,7 @@ export const renderCompiledJson = (
 ): string => renderJson(document, { typedGraph });
 
 export const compileChemd = (source: string, options: CompileOptions = {}): CompileResult => {
-  const parsedDocument = parseChemd(source, {
-    strictChemdKind: options.strictChemdKind
-  });
+  const parsedDocument = parseChemd(source);
   const resolvedDocument = resolveChemd(parsedDocument);
   const typecheckResult = typecheckDocument(resolvedDocument, {
     procedureMode: options.procedureMode,

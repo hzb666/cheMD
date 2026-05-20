@@ -44,8 +44,7 @@ describe("runChemdAgentLoop", () => {
   it("skips agent calls when repair already reaches clean", async () => {
     const agent = vi.fn();
     const result = await runChemdAgentLoop(cleanRecordSource, {
-      agent,
-      compileOptions: { strictChemdKind: true }
+      agent
     });
 
     expect(result.stoppedReason).toBe("clean");
@@ -55,7 +54,6 @@ describe("runChemdAgentLoop", () => {
 
   it("lets the agent rewrite unresolved records and reaches clean after recompile", async () => {
     const result = await runChemdAgentLoop(sourceNeedingFacts, {
-      compileOptions: { strictChemdKind: true },
       agent: ({ source }) => ({
         action: "rewrite",
         note: "add linked result",
@@ -89,7 +87,6 @@ result: one major spot
 
   it("stops with the unresolved diagnosis status when the agent declines to rewrite", async () => {
     const result = await runChemdAgentLoop(sourceNeedingFacts, {
-      compileOptions: { strictChemdKind: true },
       agent: () => ({
         action: "stop",
         note: "need human facts"
@@ -128,7 +125,6 @@ type: tlc
 result: one major spot
 :::
 `, {
-      compileOptions: { strictChemdKind: true },
       repairMaxIterations: 1,
       agent: () => ({
         action: "rewrite",

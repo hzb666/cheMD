@@ -117,7 +117,7 @@ describe("chemd-lang v0.3 compiler integration", () => {
   });
 
   it("compiles the golden record fixture with explicit experiment logic", () => {
-    const result = compileChemd(goldenSource, { strictChemdKind: true });
+    const result = compileChemd(goldenSource);
     const diagnostics = result.diagnostics.filter((diagnostic) => diagnostic.severity === "error");
 
     expect(diagnostics).toHaveLength(0);
@@ -203,7 +203,6 @@ describe("chemd-lang v0.3 compiler integration", () => {
 
   it("compiles the total synthesis best-practice fixture and infers route edges", () => {
     const result = compileChemd(totalSynthesisSource, {
-      strictChemdKind: true,
       reactionRouteContext: {
         externalReactions: [{
           refId: "report-step-08#rxn-step-08",
@@ -251,7 +250,7 @@ describe("chemd-lang v0.3 compiler integration", () => {
   });
 
   it("compiles the one-step synthesis best-practice fixture", () => {
-    const result = compileChemd(oneStepSynthesisSource, { strictChemdKind: true });
+    const result = compileChemd(oneStepSynthesisSource);
     const diagnostics = result.diagnostics.filter((diagnostic) => diagnostic.severity === "error");
 
     expect(diagnostics).toHaveLength(0);
@@ -277,7 +276,7 @@ describe("chemd-lang v0.3 compiler integration", () => {
   });
 
   it("compiles the condition screen best-practice fixture", () => {
-    const result = compileChemd(conditionScreenSource, { strictChemdKind: true });
+    const result = compileChemd(conditionScreenSource);
     const diagnostics = result.diagnostics.filter((diagnostic) => diagnostic.severity === "error");
 
     expect(diagnostics).toHaveLength(0);

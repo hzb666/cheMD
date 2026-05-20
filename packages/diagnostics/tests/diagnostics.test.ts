@@ -47,14 +47,6 @@ describe("v0.3 diagnostics registry", () => {
   });
 
   it("classifies chemd surface policy diagnostics and quick fixes", () => {
-    const inferredKindDiagnostic = createV03Diagnostic({
-      code: "W_CHEMD_KIND_INFERRED",
-      severity: "warning",
-      message: "Chemd kind inferred from fields",
-      sourceLayer: "parser",
-      sourceNodeType: "chemd",
-      sourceNodeId: "mol-1"
-    });
     const legacyDiagnostic = createV03Diagnostic({
       code: "W_LEGACY_BLOCK_KIND",
       severity: "warning",
@@ -65,19 +57,19 @@ describe("v0.3 diagnostics registry", () => {
     });
     const missingKindDiagnostic = createV03Diagnostic({
       code: "W_CHEMD_KIND_AMBIGUOUS",
-      severity: "warning",
+      severity: "error",
       message: "Chemd block should declare kind",
       sourceLayer: "parser",
       sourceNodeType: "molecule",
       sourceNodeId: "mol-1"
     });
 
-    expect(getDiagnosticSpec("W_CHEMD_KIND_INFERRED")?.band).toBe("syntax");
+    expect(getDiagnosticSpec("W_CHEMD_KIND_AMBIGUOUS")).toMatchObject({
+      band: "syntax",
+      defaultSeverity: "error"
+    });
     expect(getDiagnosticSpec("E_CHEMD_KIND_CONFLICT")?.band).toBe("syntax");
     expect(getLegacyDiagnosticBand("W_LEGACY_BLOCK_KIND")).toBe("syntax");
-    expect(buildQuickFixes(inferredKindDiagnostic)[0]).toMatchObject({
-      kind: "insert_chemd_kind"
-    });
     expect(buildQuickFixes(legacyDiagnostic)[0]).toMatchObject({
       kind: "convert_legacy_block",
       title: expect.stringContaining("chemd")

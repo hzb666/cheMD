@@ -72,7 +72,7 @@ products: b
     });
   });
 
-  it("can report missing chemd kind in strict mode", () => {
+  it("does not report missing chemd kind when inference is stable", () => {
     const document = parseChemd(`---
 id: exp-strict-kind
 title: Strict kind
@@ -82,20 +82,14 @@ date: 2026-04-17
 :::chemd #mol-implicit
 smiles: CCO
 :::
-`, { strictChemdKind: true });
+`);
 
     expect(document.children[0]).toMatchObject({
       type: "molecule",
       id: "mol-implicit",
       syntaxOrigin: "chemd"
     });
-    expect(document.diagnostics).toContainEqual(
-      expect.objectContaining({
-        code: "W_CHEMD_KIND_AMBIGUOUS",
-        severity: "warning",
-        nodeId: "mol-implicit"
-      })
-    );
+    expect(document.diagnostics).toEqual([]);
   });
 
   it("reports conflicts between explicit kind and reaction-shaped fields", () => {
@@ -167,7 +161,7 @@ products: @product
     );
   });
 
-  it("does not report missing kind when strict mode sees an invalid kind field", () => {
+  it("does not report ambiguous kind when the kind field is invalid", () => {
     const document = parseChemd(`---
 id: exp-invalid-kind
 title: Invalid kind
@@ -178,7 +172,7 @@ date: 2026-04-17
 kind: compound
 smiles: CCO
 :::
-`, { strictChemdKind: true });
+`);
 
     expect(document.diagnostics.filter((diagnostic) => diagnostic.code === "E_CHEMD_KIND_CONFLICT")).toHaveLength(1);
     expect(document.diagnostics.some((diagnostic) => diagnostic.code === "W_CHEMD_KIND_AMBIGUOUS")).toBe(false);
@@ -292,22 +286,32 @@ note2: Trace product by TLC.
     });
   });
 
-  it("attaches quick fixes to strict missing-kind diagnostics", () => {
+  it("attaches quick fixes when chemd kind is ambiguous", () => {
     const document = parseChemd(`---
-id: exp-missing-kind-fix
-title: Missing kind quick fix
+id: exp-ambiguous-kind-fix
+title: Ambiguous kind quick fix
 date: 2026-04-17
 ---
 
-:::chemd #mol-quick-fix
-smiles: CCO
+:::chemd #ambiguous-quick-fix
+name: draft
 :::
-`, { strictChemdKind: true });
+`);
 
     expect(document.diagnostics).toContainEqual(
       expect.objectContaining({
         code: "W_CHEMD_KIND_AMBIGUOUS",
-        quickFixes: [expect.objectContaining({ kind: "insert_chemd_kind" })]
+        severity: "error",
+        quickFixes: expect.arrayContaining([
+          expect.objectContaining({
+            kind: "insert_chemd_kind",
+            patch: expect.objectContaining({ kind: "molecule" })
+          }),
+          expect.objectContaining({
+            kind: "insert_chemd_kind",
+            patch: expect.objectContaining({ kind: "reaction" })
+          })
+        ])
       })
     );
   });

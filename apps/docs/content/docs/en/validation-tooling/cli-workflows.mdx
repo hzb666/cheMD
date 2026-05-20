@@ -8,14 +8,14 @@ The repository root exposes the CLI through `pnpm chemd`. Common commands operat
 
 ## `pnpm chemd validate`
 
-`validate` accepts one or more `.chemd` files. Each file is compiled through `compileChemd` with `strictChemdKind: true`. Files without errors print `file: ok`; files with errors return exit code 1. CLI exit codes are 0 for success, 1 for validation failed, and 2 for usage error.
+`validate` accepts one or more `.chemd` files. Each file is compiled through `compileChemd` under the current language contract. Files without errors print `file: ok`; files with errors return exit code 1. CLI exit codes are 0 for success, 1 for validation failed, and 2 for usage error.
 
 ```text
 pnpm chemd validate experiment.chemd
 pnpm chemd validate experiments/*.chemd
 ```
 
-Strict mode marks omitted `kind` in `:::chemd` as `W_CHEMD_KIND_AMBIGUOUS`, forcing users to confirm molecule or reaction identity.
+`:::chemd` may omit `kind` when the fields make the molecule or reaction identity clear. Unstable inference, invalid `kind`, or a field-shape conflict is an error.
 
 For high-quality downstream exports, keep these relationships explicit:
 

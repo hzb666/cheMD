@@ -130,7 +130,7 @@ export const App = () => {
         () => compileChemdForEditor({
           source: debouncedCompileInput.source,
           documentUri: debouncedCompileInput.documentUri,
-          options: { strictChemdKind: true, procedureMode: "auto" },
+          options: { procedureMode: "auto" },
         }),
         {
           documentUri: debouncedCompileInput.documentUri,

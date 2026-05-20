@@ -339,11 +339,12 @@ const resolveReference = (
   context: TemplateContext
 ): ReferenceToken => {
   const unresolved = (message: string): ReferenceToken => {
-    environment.diagnostics.push({
-      code: "W_UNRESOLVED_REFERENCE",
-      severity: "warning",
-      message
-    });
+      environment.diagnostics.push({
+        code: "W_UNRESOLVED_REFERENCE",
+        severity: "error",
+        message,
+        sourceLayer: "resolver"
+      });
 
     return {
       ...token,

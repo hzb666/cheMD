@@ -11,13 +11,13 @@ const docsLanguageContractSource = readFileSync(
 
 describe("documentation language contract fixture", () => {
   it("compiles documented syntax without warnings or errors", () => {
-    const result = compileChemd(docsLanguageContractSource, { strictChemdKind: true });
+    const result = compileChemd(docsLanguageContractSource);
 
     expect(result.diagnostics).toEqual([]);
   });
 
   it("keeps template parameters, col children, and nested event/step syntax executable", () => {
-    const result = compileChemd(docsLanguageContractSource, { strictChemdKind: true });
+    const result = compileChemd(docsLanguageContractSource);
     const col = result.document.children.find((node) => node.type === "col");
     const template = result.document.children.find((node) => node.type === "template");
     const procedure = result.document.children.find((node) => node.type === "procedure");

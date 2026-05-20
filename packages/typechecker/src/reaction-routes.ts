@@ -161,7 +161,7 @@ const buildRouteMismatchDiagnostics = (
       return prevRouteId && prevRouteId !== reaction.route
         ? [createV03Diagnostic({
             code: "W_REACTION_ROUTE_MISMATCH",
-            severity: "warning",
+            severity: "error",
             message: `Reaction route ${reaction.route} conflicts with prev route ${prevRouteId}.`,
             sourceLayer: "typechecker",
             sourceNodeType: "reaction",
@@ -298,7 +298,7 @@ const buildOrphanDiagnostics = (
     return prevCount === 0 && nextCount === 0
       ? [createV03Diagnostic({
           code: "W_REACTION_ROUTE_ORPHAN",
-          severity: "warning",
+          severity: "error",
           message: `Reaction is isolated inside route ${reaction.route}.`,
           sourceLayer: "typechecker",
           sourceNodeType: "reaction",

@@ -33,7 +33,7 @@ atmosphere: nitrogen
 
 | field | molecule | reaction | notes |
 | --- | --- | --- | --- |
-| `kind` | optional | optional | `molecule` or `reaction`; recommended for CLI strict validation |
+| `kind` | optional | optional | `molecule`, `reaction`, `mol`, or `reac`; inferred from field shape when omitted |
 | `smiles` | required | not applicable | required by the resolver for molecule nodes |
 | `cas` | optional | not applicable | stored as raw text |
 | `name` | optional | optional | user-facing name |
@@ -83,7 +83,7 @@ This shorthand is useful for short molecule records. If more than one implicit b
 
 ## Type Inference
 
-The parser infers reaction when `reactants`, `products`, or their aliases are present. Other valid chemd fields infer molecule. With `strictChemdKind`, omitted `kind` produces `W_CHEMD_KIND_AMBIGUOUS`. Without strict mode, omitted `kind` produces `W_CHEMD_KIND_INFERRED`.
+The parser infers reaction when `reactants`, `products`, or their aliases are present. `smiles`, `cas`, `formula`, `role`, `amount`, or `equivalents` infer molecule. Unstable inference, invalid explicit `kind`, or a field-shape conflict is an error. Explicit `kind` supports `mol` and `reac` as value aliases.
 
 ## Route and Predecessor Links
 

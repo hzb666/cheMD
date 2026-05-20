@@ -40,7 +40,7 @@ Chemd 接收 Markdown 正文、YAML frontmatter、`:::` 结构化块、模板块
 
 ## 结构化对象特性
 
-- `:::chemd`：通过 `kind` 生成 molecule 或 reaction。缺少 `kind` 时按 reaction 形状字段推断，strict 模式产生 `W_CHEMD_KIND_AMBIGUOUS`。
+- `:::chemd`：通过 `kind` 或字段形状生成 molecule 或 reaction。缺少 `kind` 时按 reaction 形状字段推断；无法稳定推断时产生 `W_CHEMD_KIND_AMBIGUOUS` error。
 - molecule 字段：`smiles`、`cas`、`name`、`role`、`caption`、`formula`、`amount`、`equivalents`、`chemistry_features`。
 - reaction 字段：`name`、`reactants`、`products`、`reactant`、`product`、`reac`、`prod`、`conditions`、`route`、`prev`、`reagents`、`catalyst`、`solvent`、`temperature`、`time`、`pressure`、`atmosphere`、`yield`、`conversion`、`selectivity`、`caption`、`chemistry_features`。
 - `:::result` 字段：`status`、`yield`、`conversion`、`selectivity`、`isolated_mass`、`product_state`、`purity`、`notes`、`ref`、`reaction`、`product`。

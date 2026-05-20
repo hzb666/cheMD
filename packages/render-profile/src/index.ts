@@ -228,7 +228,8 @@ const createValidationDiagnostic = (
 ): Diagnostic => ({
   code,
   severity,
-  message
+  message,
+  sourceLayer: "render-profile"
 });
 
 const validateSection = <TSection extends RenderOptions[RenderSectionName]>(
@@ -262,7 +263,7 @@ const validateSection = <TSection extends RenderOptions[RenderSectionName]>(
       diagnostics.push(
         createValidationDiagnostic(
           "W_UNKNOWN_RENDER_PROFILE_FIELD",
-          "warning",
+          "error",
           `Unknown render profile field: ${sectionName}.${key}`
         )
       );
@@ -304,7 +305,7 @@ const applyOverride = (
     diagnostics.push(
       createValidationDiagnostic(
         "W_UNKNOWN_RENDER_PROFILE_FIELD",
-        "warning",
+        "error",
         `Unknown render profile field: ${path}`
       )
     );
@@ -490,8 +491,9 @@ const resolveProfileOrUndefined = (
   if (!profile) {
     diagnostics.push({
       code: "W_UNKNOWN_RENDER_PROFILE",
-      severity: "warning",
-      message: `Unknown render profile: ${profileId}`
+      severity: "error",
+      message: `Unknown render profile: ${profileId}`,
+      sourceLayer: "render-profile"
     });
     return undefined;
   }
@@ -534,7 +536,7 @@ const resolveProfileOrUndefined = (
       diagnostics.push(
         createValidationDiagnostic(
           "W_UNKNOWN_RENDER_PROFILE_FIELD",
-          "warning",
+          "error",
           `Unknown render profile field: ${key}`
         )
       );

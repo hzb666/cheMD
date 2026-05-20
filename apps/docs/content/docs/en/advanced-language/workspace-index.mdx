@@ -7,7 +7,7 @@ The workspace index is a tooling layer over compiled documents. It is useful for
 
 ## Input Model
 
-Each workspace document supplies a URI, source text, and optional path or metadata. The default compiler is `compileChemdForEditor` with `strictChemdKind: true`.
+Each workspace document supplies a URI, source text, and optional path or metadata. The default compiler is `compileChemdForEditor` under the current language contract.
 
 ```ts
 import { buildWorkspaceSymbolIndex } from "@chemd/workspace-index";

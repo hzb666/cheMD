@@ -10,6 +10,15 @@ export interface SourceRange {
   end: SourcePosition;
 }
 
+export interface DiagnosticSourceSpan {
+  start?: number;
+  end?: number;
+  startLine?: number;
+  startColumn?: number;
+  endLine?: number;
+  endColumn?: number;
+}
+
 export interface Diagnostic {
   code: string;
   severity: DiagnosticSeverity;
@@ -20,6 +29,7 @@ export interface Diagnostic {
   sourceNodeType?: string;
   sourceNodeId?: string;
   sourceField?: string;
+  sourceSpan?: DiagnosticSourceSpan;
   facts?: Record<string, unknown>;
   quickFixes?: DiagnosticQuickFix[];
 }

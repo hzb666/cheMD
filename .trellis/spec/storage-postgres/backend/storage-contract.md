@@ -259,7 +259,7 @@ Runtime writer responsibilities:
 
 ```text
 source
-  -> compileChemd(source, { strictChemdKind: true })
+  -> compileChemd(source)
   -> buildExperimentStorageRecords()
   -> transactional SQL writes
 ```
@@ -291,7 +291,7 @@ binding may adapt `pg.PoolClient` to this interface.
 | All writes succeed | Commit transaction and return `ExperimentStorageRecords` |
 | Any write fails | Execute `ROLLBACK` and rethrow original error |
 | `compileOptions` omitted | Use strict Chemd kind mode |
-| `compileOptions.strictChemdKind` supplied | Caller value can override default |
+| `compileOptions` supplied | Caller can pass non-language-mode compile options |
 | Embeddings needed | Schedule in later layer; this writer does not create vectors |
 
 ### 5. Good/Base/Bad Cases

@@ -18,7 +18,7 @@ Compiler implementation lives in `packages/compiler`. Entrypoints include `packa
 ```ts
 import { compileChemd } from "@chemd/compiler";
 
-const result = compileChemd(source, { strictChemdKind: true });
+const result = compileChemd(source);
 
 if (result.diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
   throw new Error("Chemd source did not compile cleanly");

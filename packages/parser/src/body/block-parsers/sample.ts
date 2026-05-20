@@ -1,4 +1,4 @@
-import type { SampleNode } from "@chemd/core";
+import { getAllowedBlockFieldSet, type SampleNode } from "@chemd/core";
 
 import {
   parseAllowedFields,
@@ -9,27 +9,15 @@ import {
 } from "./common";
 import type { BlockParser } from "./types";
 
-const SAMPLE_FIELDS = new Set([
-  "name",
-  "sample_id",
-  "batch",
-  "purity",
-  "supplier",
-  "notes",
-  "ref",
-  "derived_from",
-  "aliquot_of",
-  "batch_of",
-  "artifacts",
-  "chemistry_features"
-]);
+const SAMPLE_FIELDS = getAllowedBlockFieldSet("sample");
 
 export const parseSampleBlock: BlockParser = ({ headerArg, lines, diagnostics }) => {
   const id = readStructuredBlockId(headerArg, diagnostics);
   const fields = parseAllowedFields(lines, diagnostics, "sample", SAMPLE_FIELDS, {
-    listFields: new Set(["artifacts", "chemistry_features"])
+    listFields: new Set(["artifacts", "chemistry_features"]),
+    sourceNodeId: id
   });
-  const fieldSpans = parseAllowedFieldSpans(lines, SAMPLE_FIELDS);
+  const fieldSpans = parseAllowedFieldSpans(lines, SAMPLE_FIELDS, "sample");
   const { chemistry_features: _chemistryFeatures, artifacts, ...rest } = fields;
 
   return {

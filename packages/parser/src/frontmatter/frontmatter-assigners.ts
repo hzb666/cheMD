@@ -75,8 +75,8 @@ const markSeenKey = ({
     diagnostics.push(
       createFrontmatterDiagnostic({
         code: "W_DUPLICATE_FRONTMATTER_KEY",
-        severity: "warning",
-        message: `Duplicate frontmatter key: ${key} (last value wins)`,
+        severity: "error",
+        message: `Duplicate frontmatter key: ${key}`,
         lineIndex,
         lineText: `${key}:`,
         token: key
@@ -239,7 +239,7 @@ const assignRequiredStringValue = ({
       diagnostics.push(
         createFrontmatterDiagnostic({
           code: "W_NON_ISO_FRONTMATTER_DATE",
-          severity: "warning",
+          severity: "error",
           message: "Non-ISO date format for date: expected YYYY-MM-DD",
           lineIndex,
           lineText: `${key}: ${dateValue}`,
@@ -250,7 +250,7 @@ const assignRequiredStringValue = ({
       diagnostics.push(
         createFrontmatterDiagnostic({
           code: "W_INVALID_FRONTMATTER_DATE_VALUE",
-          severity: "warning",
+          severity: "error",
           message: "Invalid date value for date: expected a real calendar date",
           lineIndex,
           lineText: `${key}: ${dateValue}`,

@@ -3,17 +3,16 @@ import { describe, expect, it } from "vitest";
 import { applyDiagnosticQuickFix, type DiagnosticWithQuickFixes } from "../src/index";
 
 describe("applyDiagnosticQuickFix", () => {
-  it("inserts an inferred chemd kind into the matching block", () => {
+  it("inserts a selected chemd kind into the matching block", () => {
     const source = `:::chemd #rxn-main
 reactants: @a
 products: @b
 :::`;
     const diagnostic: DiagnosticWithQuickFixes = {
-      code: "W_CHEMD_KIND_INFERRED",
-      severity: "warning",
-      message: "Chemd kind inferred as reaction; declare kind explicitly.",
-      sourceNodeId: "rxn-main",
-      facts: { inferred_kind: "reaction" }
+      code: "W_CHEMD_KIND_AMBIGUOUS",
+      severity: "error",
+      message: "Chemd block kind cannot be inferred; declare kind explicitly.",
+      sourceNodeId: "rxn-main"
     };
 
     expect(applyDiagnosticQuickFix(source, diagnostic, {
@@ -33,7 +32,7 @@ smiles: CCO
 :::`;
     const diagnostic: DiagnosticWithQuickFixes = {
       code: "W_CHEMD_KIND_AMBIGUOUS",
-      severity: "warning",
+      severity: "error",
       message: "Chemd block should declare kind.",
       sourceNodeId: "mol-main"
     };
@@ -60,10 +59,9 @@ smiles: CCO
       ":::"
     ].join("\n");
     const diagnostic: DiagnosticWithQuickFixes = {
-      code: "W_CHEMD_KIND_INFERRED",
-      severity: "warning",
-      message: "Chemd kind inferred as reaction; declare kind explicitly.",
-      facts: { inferred_kind: "reaction" }
+      code: "W_CHEMD_KIND_AMBIGUOUS",
+      severity: "error",
+      message: "Chemd block kind cannot be inferred; declare kind explicitly."
     };
 
     expect(applyDiagnosticQuickFix(source, diagnostic, {

@@ -19,8 +19,8 @@ contracts, Git working-tree discovery, and semantic diff formatting.
 ## Pre-Development Checklist
 
 - Read `AGENTS.md` and this package's relevant guideline file before editing.
-- Preserve `compileChemd(source, { strictChemdKind: true })` as the semantic
-  source of truth.
+- Preserve `compileChemd(source)` under the current language contract as the
+  semantic source of truth.
 - Keep machine-readable output deterministic and JSON-parseable.
 - Do not write business payloads to stdout when returning a validation failure.
 - Add or update tests in `packages/cli/src/*.spec.ts` for every CLI behavior

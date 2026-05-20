@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -473,6 +473,69 @@ describe("chemd cli help validation export and repair", () => {
     expect(result.exitCode).toBe(EXIT_USAGE);
     expect(result.stderr).toMatch(/Unable to read file/);
   });
+
+  it("checks chemd files recursively with user-facing JSON output", async () =>
+    withTempDir(async (dir) => {
+      mkdirSync(path.join(dir, "fixtures", "valid"), { recursive: true });
+      mkdirSync(path.join(dir, "fixtures", "invalid"), { recursive: true });
+      writeFileSync(path.join(dir, "fixtures", "valid", "alias.chemd"), `---
+id: exp-check-valid
+title: Check valid
+date: 2026-05-20
+---
+
+:::chemd #substrate
+kind: mol
+smiles: CCO
+:::
+
+:::chemd #rxn-main
+kind: reac
+reac: substrate
+prod: product
+:::
+`);
+      writeFileSync(path.join(dir, "fixtures", "invalid", "bad.chemd"), `---
+id: exp-check-invalid
+title: Check invalid
+date: 2026-05-20
+---
+
+:::chemd #bad
+smiles: CCO
+unknown_field: should fail
+:::
+`);
+
+      const stdout = createWriter();
+      const stderr = createWriter();
+      const exitCode = await runChemdCli([
+        "check",
+        "fixtures",
+        "--format",
+        "json",
+        "--dry-run"
+      ], { cwd: dir, stderr, stdout });
+      const payload = JSON.parse(stdout.value);
+
+      expect(exitCode).toBe(EXIT_VALIDATION_FAILED);
+      expect(payload).toMatchObject({
+        schemaVersion: "chemd-check/v0.1",
+        dryRun: true,
+        target: "validate",
+        totals: expect.objectContaining({ error: 1 })
+      });
+      expect(payload.files.map((file: { filePath: string }) => file.filePath)).toEqual([
+        path.join("fixtures", "invalid", "bad.chemd"),
+        path.join("fixtures", "valid", "alias.chemd")
+      ]);
+      expect(payload.files[0].diagnostics[0]).toMatchObject({
+        code: "W_UNKNOWN_FIELD",
+        severity: "error",
+        sourceField: "unknown_field"
+      });
+      expect(stderr.value).toBe("");
+    }));
 });
 
 describe("chemd cli agent loop", () => {

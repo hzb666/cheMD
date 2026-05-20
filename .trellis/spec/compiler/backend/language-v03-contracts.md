@@ -314,9 +314,7 @@ Use the compiler pipeline for consumers. Only call the builders directly in focu
 ### 2. Signatures
 
 ```typescript
-parseChemd(source: string, options?: {
-  strictChemdKind?: boolean;
-}): ChemdDocument
+parseChemd(source: string): ChemdDocument
 
 typecheckDocument(document: ChemdDocument, options?: {
   procedureMode?: "auto" | "explicit" | "lowered";
@@ -344,7 +342,8 @@ Canonical surface contract:
 |---------------|-------------------|
 | `:::chemd kind: molecule` | Emit semantic `MoleculeNode` with `syntaxOrigin: "chemd"` and `declaredKind: "molecule"` |
 | `:::chemd kind: reaction` | Emit semantic `ReactionNode` with `syntaxOrigin: "chemd"` and `declaredKind: "reaction"` |
-| `:::chemd` without `kind` | Keep shape inference for compatibility; strict mode emits `W_CHEMD_KIND_AMBIGUOUS` |
+| `:::chemd kind: mol/reac` | Normalize explicit kind aliases to `molecule` / `reaction` |
+| `:::chemd` without `kind` | Infer molecule or reaction from canonicalized fields; ambiguous shape emits error |
 | `:::chemd kind: invalid` or empty `kind:` | Emit `E_CHEMD_KIND_CONFLICT`; do not create a semantic molecule/reaction node by shape fallback |
 | `:::molecule` / `:::reaction` | Do not parse as semantic nodes; migration/audit scripts identify and convert them before compile |
 
@@ -402,7 +401,7 @@ Runtime/service contract:
 | Code / State | Owner | Condition | Expected behavior |
 |--------------|-------|-----------|-------------------|
 | `W_UNKNOWN_BLOCK` | parser | Legacy `:::molecule` / `:::reaction` reaches parser | Warn as unsupported block; do not create semantic node |
-| `W_CHEMD_KIND_AMBIGUOUS` | parser | `strictChemdKind` sees `:::chemd` without `kind:` | Keep parsing, emit warning |
+| `W_CHEMD_KIND_AMBIGUOUS` | parser | `:::chemd` kind cannot be inferred from fields | Emit error and require explicit kind |
 | `E_CHEMD_KIND_CONFLICT` | parser | Explicit `kind:` is unsupported, empty, or conflicts with reaction/molecule fields | Emit error diagnostic; do not create a shape-inferred semantic node |
 | `convert_legacy_block` quick fix | diagnostics/compiler | Legacy `:::molecule` / `:::reaction` warning is enriched | Provide a deterministic migration suggestion instead of a local ad hoc type |
 | `E_STEP_MISSING_FIELD` | typechecker | `procedureMode: "explicit"` without explicit steps | Emit diagnostic and no lowered steps |

@@ -41,7 +41,7 @@ const sourceRange = {
 };
 
 const buildRecords = () => {
-  const compiled = compileChemd(source, { strictChemdKind: true });
+  const compiled = compileChemd(source);
   return buildPostgresGraphRagStorageRecords({
     experimentId: "exp-desktop",
     revisionId: "rev-graph-rag-1",
@@ -203,7 +203,7 @@ describe("PostgreSQL Graph/RAG extension records", () => {
   });
 
   it("rejects RAG citations without source ranges before records are emitted", () => {
-    const compiled = compileChemd(source, { strictChemdKind: true });
+    const compiled = compileChemd(source);
     const firstChunk = compiled.ragExport.chunks[0];
     if (!firstChunk) {
       throw new Error("Expected compiled fixture to produce a RAG chunk");

@@ -21,10 +21,11 @@ export interface ParseChildrenResult {
   terminatedBlock?: boolean;
 }
 
-const pushWarning = (diagnostics: Diagnostic[], code: string, message: string) => {
+const pushError = (diagnostics: Diagnostic[], code: string, message: string) => {
   diagnostics.push({
     code,
-    severity: "warning",
+    severity: "error",
+    sourceLayer: "parser",
     message
   });
 };
@@ -57,7 +58,7 @@ const parseBraceColChild = (
     braceBlockLines.push(...collected.lines);
 
     if (!collected.terminated) {
-      pushWarning(diagnostics, "W_UNTERMINATED_BRACE_BLOCK", "Unterminated brace block inside col block");
+      pushError(diagnostics, "W_UNTERMINATED_BRACE_BLOCK", "Unterminated brace block inside col block");
     }
 
     // legacy brace block 继续走同一套 structured block 解析，避免旧语法立即失效。
@@ -98,7 +99,7 @@ const parseBraceColChild = (
     nextIndex += 1;
   }
 
-  pushWarning(diagnostics, "W_UNTERMINATED_BRACE_BLOCK", "Unterminated brace block inside col block");
+  pushError(diagnostics, "W_UNTERMINATED_BRACE_BLOCK", "Unterminated brace block inside col block");
   const parsed = parseChildren(braceBlockLines, diagnostics, 0, false, options);
   return {
     children: parsed.children,
@@ -124,7 +125,7 @@ const parseColChildren = (
     }
 
     if (!line.startsWith("col:")) {
-      pushWarning(diagnostics, "W_INVALID_COL_CHILD", `Invalid col child line: ${line}`);
+      pushError(diagnostics, "W_INVALID_COL_CHILD", `Invalid col child line: ${line}`);
       index += 1;
       continue;
     }
@@ -208,7 +209,7 @@ const parseStructuredNodeBlock = ({
   );
 
   if (!terminated) {
-    pushWarning(diagnostics, "W_UNTERMINATED_BLOCK", `Unterminated block: ${blockType}`);
+    pushError(diagnostics, "W_UNTERMINATED_BLOCK", `Unterminated block: ${blockType}`);
   }
 
   return {
@@ -230,7 +231,7 @@ const parseMatchedBlock = (context: MatchedBlockContext): { node?: ChemdNode; ne
   if (blockType === "template") {
     const parsed = parseTemplateBlock(lines, diagnostics, startIndex, headerArg?.trim() ?? "", options);
     if (!parsed.terminatedBlock) {
-      pushWarning(diagnostics, "W_UNTERMINATED_BLOCK", "Unterminated block: template");
+      pushError(diagnostics, "W_UNTERMINATED_BLOCK", "Unterminated block: template");
     }
 
     return {

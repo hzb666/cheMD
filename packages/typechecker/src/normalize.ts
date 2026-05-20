@@ -130,7 +130,7 @@ const createQuantityDiagnostic = (
 ): V03Diagnostic =>
   createV03Diagnostic({
     code: "E403",
-    severity: "warning",
+    severity: "error",
     message: `Unable to parse ${context.field} as ${quantityClass}: ${raw}`,
     sourceLayer: "typechecker",
     sourceNodeType: context.sourceNodeType,
@@ -149,7 +149,7 @@ const createPercentDiagnostic = (
 ): V03Diagnostic =>
   createV03Diagnostic({
     code: "E402",
-    severity: "warning",
+    severity: "error",
     message: `Percent value is outside the expected 0-100 range: ${raw}`,
     sourceLayer: "typechecker",
     sourceNodeType: context.sourceNodeType,
@@ -245,7 +245,7 @@ export const normalizeStatus = (
     status: "unknown",
     diagnostic: createV03Diagnostic({
       code: "E306",
-      severity: "warning",
+      severity: "error",
       message: `Invalid result status value: ${raw}`,
       sourceLayer: "typechecker",
       sourceNodeType: context.sourceNodeType,

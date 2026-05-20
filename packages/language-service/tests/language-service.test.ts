@@ -31,11 +31,21 @@ yield: 78%
 :::
 `;
 
+const ambiguousKindSource = `---
+id: exp-language-service
+title: Language service
+date: 2026-05-12
+---
+
+:::chemd #mol-main
+name: Draft molecule
+:::
+`;
+
 describe("compileChemdForEditor", () => {
   it("maps compiler diagnostics and exposes patch proposals", () => {
     const output = compileChemdForEditor({
-      source,
-      options: { strictChemdKind: true }
+      source: ambiguousKindSource
     });
 
     expect(output.status).toBe("ok");
@@ -45,7 +55,7 @@ describe("compileChemdForEditor", () => {
 
     expect(diagnostic).toMatchObject({
       code: "W_CHEMD_KIND_AMBIGUOUS",
-      severity: "warning",
+      severity: "error",
       sourceNodeId: "mol-main"
     });
     expect(diagnostic?.quickFixes[0]).toMatchObject({
@@ -169,17 +179,16 @@ describe("compileChemdForEditor", () => {
   });
 
   it("keeps quick fixes as proposals and leaves source untouched", () => {
-    const originalSource = source;
+    const originalSource = ambiguousKindSource;
     const output = compileChemdForEditor({
-      source,
-      options: { strictChemdKind: true }
+      source: ambiguousKindSource
     });
     const proposal = output.diagnostics
       .flatMap((diagnostic) => diagnostic.quickFixes)[0];
 
-    expect(source).toBe(originalSource);
+    expect(ambiguousKindSource).toBe(originalSource);
     expect(proposal.patch.beforeHash).toEqual(expect.any(String));
-    expect(proposal.patch.edits[0].replacement).not.toBe(source);
+    expect(proposal.patch.edits[0].replacement).not.toBe(ambiguousKindSource);
     expect(proposal.patch.edits[0].replacement).toContain("kind: molecule");
   });
 
@@ -326,11 +335,10 @@ This observation is plain markdown with no Chemd blocks.
 
   it("links diagnostic evidence to editor source ranges", () => {
     const records = buildEditorGraphRagRecords({
-      source,
+      source: ambiguousKindSource,
       experimentId: "exp-language-service",
       revisionId: "rev-diagnostics-1",
-      createdAt,
-      options: { strictChemdKind: true }
+      createdAt
     });
 
     expect(records.reactionGraphNodes).toEqual(expect.arrayContaining([

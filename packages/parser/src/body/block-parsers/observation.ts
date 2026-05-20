@@ -1,4 +1,10 @@
-import type { Diagnostic, ObservationEventAuthorNode, ObservationNode, SourceSpan } from "@chemd/core";
+import {
+  getAllowedBlockFieldSet,
+  type Diagnostic,
+  type ObservationEventAuthorNode,
+  type ObservationNode,
+  type SourceSpan
+} from "@chemd/core";
 
 import {
   createBodyText,
@@ -11,7 +17,7 @@ import {
 import { createMarkdownFromText } from "../parse-body-shared";
 import type { BlockParser } from "./types";
 
-const OBSERVATION_FIELDS = new Set(["ref"]);
+const OBSERVATION_FIELDS = getAllowedBlockFieldSet("observation");
 const EVENT_LINE_RE = /^\s*event\s*:\s*(.+)$/i;
 const EVENT_BLOCK_START_RE = /^\s*:::event(?:\s+(.*))?\s*$/i;
 const EVENT_STRUCTURAL_PARAM_KEYS = new Set([
@@ -295,9 +301,10 @@ export const parseObservationBlock: BlockParser = ({ headerArg, lines, diagnosti
   const { fieldLines, bodyLines } = splitLeadingFieldLines(lines, OBSERVATION_FIELDS);
   const parsedBody = splitObservationBodyAndEvents(bodyLines, diagnostics, id);
   const fields = parseAllowedFields(fieldLines, diagnostics, "observation", OBSERVATION_FIELDS, {
-    listFields: new Set()
+    listFields: new Set(),
+    sourceNodeId: id
   });
-  const fieldSpans = parseAllowedFieldSpans(fieldLines, OBSERVATION_FIELDS);
+  const fieldSpans = parseAllowedFieldSpans(fieldLines, OBSERVATION_FIELDS, "observation");
 
   return {
     type: "observation",

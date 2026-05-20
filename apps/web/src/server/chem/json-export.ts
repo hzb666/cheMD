@@ -203,7 +203,7 @@ export const exportNormalizedJson = async (
   source: string,
   options: JsonExportOptions = {}
 ): Promise<string> => {
-  const compileResult = compileChemd(source, { strictChemdKind: true });
+  const compileResult = compileChemd(source);
   const document = await normalizeDocumentForJson(compileResult.document, options);
   const typedGraph = normalizeTypedGraphForJson(compileResult.typedSemanticGraph, document);
 

@@ -45,7 +45,7 @@ Keep runtime input untrusted until it is narrowed. Shared contracts belong in DT
 
 - Trigger: Web routes and editor helpers consume canonical `:::chemd` contracts, chem-service DTOs, and renderer SVG/JSON payloads.
 - Applies when editing `apps/web/src/app/api/export/json/route.ts`, `apps/web/src/server/chem/json-export.ts`, `apps/web/src/server/chem/chem-service-client.ts`, OCR target selection helpers, render routes, or preview hydration helpers.
-- This is cross-layer: parser diagnostics, compiler strict mode, chem-service responses, route envelopes, and browser hydration must agree on the same failure semantics.
+- This is cross-layer: parser diagnostics, current compiler contract, chem-service responses, route envelopes, and browser hydration must agree on the same failure semantics.
 
 ### 2. Signatures
 
@@ -72,7 +72,7 @@ JSON export route contract:
 | `Content-Type` | Accept JSON requests; reject non-JSON with `415` |
 | `Content-Length` | Reject bodies over the configured route limit with `413` before compile |
 | `source` | Require a string and enforce the route character limit |
-| Compiler options | Use `compileChemd(source, { strictChemdKind: true })` |
+| Compiler options | Use `compileChemd(source)` under the current language contract |
 | Diagnostics | Preserve missing/invalid `kind:` diagnostics in the response payload |
 
 Canonical editor target contract:
@@ -154,7 +154,7 @@ This treats field shape as author intent and bypasses strict `kind:` diagnostics
 #### Correct
 
 ```typescript
-const result = compileChemd(source, { strictChemdKind: true });
+const result = compileChemd(source);
 const target = selectTargetMoleculeBlock(source);
 ```
 

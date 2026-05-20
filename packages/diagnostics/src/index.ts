@@ -68,9 +68,8 @@ export interface DiagnosticSpec {
 
 const DIAGNOSTIC_SPECS: DiagnosticSpec[] = [
   { code: "W_LEGACY_BLOCK_KIND", band: "syntax", title: "Legacy surface block", defaultSeverity: "warning" },
-  { code: "W_UNKNOWN_BLOCK", band: "heuristic", title: "Unknown block", defaultSeverity: "warning" },
-  { code: "W_CHEMD_KIND_INFERRED", band: "syntax", title: "Inferred chemd kind", defaultSeverity: "warning" },
-  { code: "W_CHEMD_KIND_AMBIGUOUS", band: "syntax", title: "Missing chemd kind", defaultSeverity: "warning" },
+  { code: "W_UNKNOWN_BLOCK", band: "syntax", title: "Unknown block", defaultSeverity: "error" },
+  { code: "W_CHEMD_KIND_AMBIGUOUS", band: "syntax", title: "Ambiguous chemd kind", defaultSeverity: "error" },
   { code: "E_CHEMD_KIND_CONFLICT", band: "syntax", title: "Conflicting chemd kind", defaultSeverity: "error" },
   { code: "E_STEP_INVALID_FAMILY", band: "procedure", title: "Invalid step family", defaultSeverity: "error" },
   { code: "E_STEP_MISSING_FIELD", band: "procedure", title: "Missing step field", defaultSeverity: "error" },
@@ -80,7 +79,7 @@ const DIAGNOSTIC_SPECS: DiagnosticSpec[] = [
   { code: "E_STEP_ID_DUPLICATE", band: "procedure", title: "Duplicate step id", defaultSeverity: "error" },
   { code: "E_STEP_INVALID_REFERENCE", band: "reference", title: "Invalid step reference", defaultSeverity: "error" },
   { code: "E_TYPED_REFERENCE_MISMATCH", band: "reference", title: "Typed reference mismatch", defaultSeverity: "error" },
-  { code: "E_RESULT_REACTION_CONFLICT", band: "type", title: "Result reaction conflict", defaultSeverity: "warning" },
+  { code: "E_RESULT_REACTION_CONFLICT", band: "type", title: "Result reaction conflict", defaultSeverity: "error" },
   { code: "E_TEMPLATE_PARAM_MISSING", band: "type", title: "Missing template parameter", defaultSeverity: "error" },
   { code: "E_TEMPLATE_PARAM_TYPE_MISMATCH", band: "type", title: "Template parameter type mismatch", defaultSeverity: "error" },
   { code: "E_DERIVED_EXPRESSION_INVALID", band: "type", title: "Invalid derived expression", defaultSeverity: "error" },
@@ -91,13 +90,13 @@ const DIAGNOSTIC_SPECS: DiagnosticSpec[] = [
   { code: "E_RUNTIME_UNKNOWN_STEP", band: "runtime", title: "Unknown runtime step", defaultSeverity: "error" },
   { code: "E_RUNTIME_STEP_NOT_READY", band: "runtime", title: "Runtime step not ready", defaultSeverity: "error" },
   { code: "E301", band: "type", title: "Missing required field", defaultSeverity: "error" },
-  { code: "E306", band: "type", title: "Invalid status value", defaultSeverity: "warning" },
-  { code: "E401", band: "quantity", title: "Invalid unit", defaultSeverity: "warning" },
-  { code: "E402", band: "quantity", title: "Invalid percent value", defaultSeverity: "warning" },
-  { code: "E403", band: "quantity", title: "Quantity parse failed", defaultSeverity: "warning" },
+  { code: "E306", band: "type", title: "Invalid status value", defaultSeverity: "error" },
+  { code: "E401", band: "quantity", title: "Invalid unit", defaultSeverity: "error" },
+  { code: "E402", band: "quantity", title: "Invalid percent value", defaultSeverity: "error" },
+  { code: "E403", band: "quantity", title: "Quantity parse failed", defaultSeverity: "error" },
   { code: "E501", band: "procedure", title: "Procedure lowering failed", defaultSeverity: "error" },
-  { code: "E504", band: "procedure", title: "Analysis step unbound", defaultSeverity: "warning" },
-  { code: "E505", band: "procedure", title: "Observation stage ambiguous", defaultSeverity: "warning" },
+  { code: "E504", band: "procedure", title: "Analysis step unbound", defaultSeverity: "error" },
+  { code: "E505", band: "procedure", title: "Observation stage ambiguous", defaultSeverity: "error" },
   { code: "E605", band: "safety", title: "Capability required but missing", defaultSeverity: "error" },
   { code: "E701", band: "runtime", title: "Run plan build failed", defaultSeverity: "error" },
   { code: "W805", band: "heuristic", title: "Low confidence step extraction", defaultSeverity: "warning" },
@@ -109,7 +108,6 @@ const LEGACY_BANDS: Record<string, DiagnosticBand> = {
   E_INVALID_ID: "syntax",
   E_DUPLICATE_ID: "syntax",
   W_LEGACY_BLOCK_KIND: "syntax",
-  W_CHEMD_KIND_INFERRED: "syntax",
   W_CHEMD_KIND_AMBIGUOUS: "syntax",
   E_CHEMD_KIND_CONFLICT: "syntax",
   E_STEP_INVALID_FAMILY: "procedure",
@@ -188,12 +186,16 @@ const isLegacySurfaceDiagnostic = (diagnostic: V03Diagnostic): boolean =>
     )
   );
 
-const createInsertChemdKindQuickFix = (diagnostic: V03Diagnostic): QuickFix => ({
-  title: "Insert an explicit kind field in this chemd block",
+const createInsertChemdKindQuickFix = (
+  diagnostic: V03Diagnostic,
+  kind: "molecule" | "reaction"
+): QuickFix => ({
+  title: `Insert kind: ${kind} in this chemd block`,
   kind: "insert_chemd_kind",
   patch: {
     source_node_type: diagnostic.sourceNodeType,
-    source_node_id: diagnostic.sourceNodeId
+    source_node_id: diagnostic.sourceNodeId,
+    kind
   }
 });
 
@@ -214,8 +216,13 @@ export const buildQuickFixes = (diagnostic: V03Diagnostic): QuickFix[] => {
     return [createLegacyBlockQuickFix(diagnostic)];
   }
 
-  if (["W_CHEMD_KIND_INFERRED", "W_CHEMD_KIND_AMBIGUOUS"].includes(diagnostic.code)) {
-    return diagnostic.sourceNodeId ? [createInsertChemdKindQuickFix(diagnostic)] : [];
+  if (diagnostic.code === "W_CHEMD_KIND_AMBIGUOUS") {
+    return diagnostic.sourceNodeId
+      ? [
+          createInsertChemdKindQuickFix(diagnostic, "molecule"),
+          createInsertChemdKindQuickFix(diagnostic, "reaction")
+        ]
+      : [];
   }
 
   return [];

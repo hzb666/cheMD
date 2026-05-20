@@ -56,7 +56,7 @@ const createMetricConflictDiagnostic = (
 ): V03Diagnostic =>
   createV03Diagnostic({
     code: "E_RESULT_REACTION_CONFLICT",
-    severity: "warning",
+    severity: "error",
     message: `Result ${field} does not match the linked reaction ${field}.`,
     sourceLayer: "typechecker",
     sourceNodeType: "result",
