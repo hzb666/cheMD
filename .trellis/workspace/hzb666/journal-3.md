@@ -1156,3 +1156,37 @@ Implemented quantity v2, material/batch nodes, reaction participant stoichiometr
 ### Next Steps
 
 - None - task complete
+
+
+## Session 117: Condition outcome analysis schemas
+
+**Date**: 2026-05-20
+**Task**: Condition outcome analysis schemas
+**Package**: parser
+**Branch**: `trellis/language-contract-p0`
+
+### Summary
+
+Implemented plan sections 5.4-5.5: factor/outcome/attempt condition DSL, TLC lane/spot references, structured NMR/HPLC/LCMS/MS analysis normalization, exporter measurements, language-service snippets, docs, fixtures, and validation coverage. Verification: pnpm typecheck; pnpm test; pnpm chemd validate fixtures/language/valid/condition-analysis-schemas.chemd; pnpm chemd check fixtures/language/valid --target validate --format json; git diff --check. Lint remains blocked by ESLint 10.4.0 scopeManager.addGlobals runtime error before rule execution.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `af27f77` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
