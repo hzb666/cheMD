@@ -1337,3 +1337,37 @@ Implemented current experiment language contract, synchronized app/docs syntax e
 ### Next Steps
 
 - None - task complete
+
+
+## Session 121: Chemd IDE language features and export docs
+
+**Date**: 2026-05-21
+**Task**: Chemd IDE language features and export docs
+**Package**: desktop
+**Branch**: `develop`
+
+### Summary
+
+Completed Chemd IDE language-service highlighting, block matching, graph/export documentation updates, and verification.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `99dfa39` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
