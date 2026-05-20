@@ -34,7 +34,7 @@ export const serializeValue = (value: ExpressionValue): string => {
   }
 
   const formatted = formatNumber(value.value);
-  return value.unit === "%" ? `${formatted}%` : `${formatted} ${value.unit}`;
+  return `${formatted} ${value.unit}`;
 };
 
 export const parseValueLiteral = (raw: string): ExpressionValue => {

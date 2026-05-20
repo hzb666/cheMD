@@ -1,166 +1,113 @@
 ---
 title: '`:::chemd` 分子与反应块'
-description: '`:::chemd` 是 molecule 与 reaction 的统一使用者输入块，支持显式 kind、字段推断、引用列表和化学特征引用。'
+description: '`:::chemd` 声明 molecule 身份与 reaction；material 和 batch 表达物理物料与批次来源。'
 ---
 
-`:::chemd` 根据 `kind` 和字段形状生成 `molecule` 或 `reaction` 节点。
+`:::chemd` 根据 `kind` 和字段形状生成 `molecule` 或 `reaction` 节点。字段形状明确时可以省略 `kind`。`mol` 和 `reac` 是 `kind` 的值别名。
 
-## 语法
+## Molecule 身份
+
+molecule 只表达化学身份。不要把本次反应用量、当量或投料量写在 molecule 上；这些数量写在 reaction participant 上。
 
 ```md
 :::chemd #mol-substrate
 kind: molecule
 name: ethyl acetate
 smiles: CCOC(C)=O
-amount: 2.00 mmol
-equivalents: 1.0 equiv
+formula: C4H8O2
+mw: 88.11 g/mol
 :::
 ```
+
+身份字段包括 `name`、`smiles`、`canonical_smiles`、`cas`、`inchi`、`inchikey`、`formula`、`mw`、`role`、`caption` 和 `chemistry_features`。typechecker 要求 molecule 至少具备一个身份字段。molecule 上的 `amount` 和 `equivalents` 会产生 error。
+
+## Reaction Participant
+
+reaction 使用单数 canonical 字段表达参与物。`reactant` 和 `product` 可重复。`reac` 和 `prod` 是短别名。复数字段 `reactants` 和 `products` 只作为简单列表别名；不要在其中写 amount、equiv 或 `limiting=true`。
 
 ```md
 :::chemd #rxn-main
 kind: reaction
-reactants: @mol-substrate | @mol-base
-products: @mol-product
+reactant: @mat-substrate-lot-a | 1.00 mmol | 1.0 eq | limiting=true
+reactant: @mol-base | equiv=1.2
+product: @mol-product
 solvent: MeCN
-temperature: 60 C
-time: 3 h
+temperature: r.t. -> 60 C over 30 min
+time: overnight
 atmosphere: nitrogen
 :::
 ```
+
+participant 可引用 `molecule`、`material` 或 `batch`。amount 可写 `amount=1.0 mmol`，也可省成 `1.0 mmol`。equivalent 可写 `equiv=1.2`、`equiv=1.2 eq` 或 `1.2 eq`。只要任一 reactant 写了 amount、equivalent、mass、volume 或 `limiting=true`，就必须且只能有一个 `limiting=true`。limiting reactant 必须同时有 amount 和 equivalent。其他有化学计量语义的 reactant 至少有 amount 或 equivalent。product participant 不能写 expected 或 isolated 数量；结果数据写在 `:::result`。
+
+## Material 与 Batch
+
+`:::material` 表示购买或库存物料。`:::batch` 表示实验中生成、分装、纯化或得到的一批物理样品。
+
+```md
+:::material #mat-substrate-lot-a
+molecule: @mol-substrate
+supplier: Sigma
+lot: A123
+purity: 98 %
+storage: flammable cabinet
+:::
+
+:::batch #batch-crude
+source: @rxn-main
+molecule: @mol-product
+state: crude
+mass: 120 mg
+purity: 84 %
+:::
+```
+
+`material.molecule` 必须引用 molecule。`batch.source` 可引用 reaction、result、sample 或 batch。`batch.molecule` 可引用 molecule。sample 的 `ref` 可指向 material、batch、reaction、result、sample 或其他对象。
 
 ## 字段
 
 | 字段 | molecule | reaction | 说明 |
 | --- | --- | --- | --- |
-| `kind` | 可选 | 可选 | 支持 `molecule`、`reaction`、`mol`、`reac`；省略时按字段形态推断 |
-| `smiles` | 必填 | 不适用 | resolver 要求 molecule 具备该字段 |
-| `cas` | 可选 | 不适用 | 原样保存 |
+| `kind` | 可选 | 可选 | `molecule`、`reaction`、`mol`、`reac`；字段明确时可推断 |
 | `name` | 可选 | 可选 | 使用者可读名称 |
-| `role` | 可选 | 不适用 | substrate、reagent、product 等使用者角色 |
-| `caption` | 可选 | 可选 | 渲染说明 |
+| `smiles` | 可选 | 不适用 | molecule 身份 |
+| `canonical_smiles` | 可选 | 不适用 | canonical 结构字符串 |
+| `cas` | 可选 | 不适用 | CAS registry string |
+| `inchi` / `inchikey` | 可选 | 不适用 | molecule 身份 |
 | `formula` | 可选 | 不适用 | 分子式原文 |
-| `amount` | 可选 | 不适用 | 数量字段，支持 `mmol`、`mol` |
-| `equivalents` | 可选 | 不适用 | 数量字段，支持 `equiv`、`eq` |
-| `reactants` / `reactant` / `reac` | 不适用 | 必填 | molecule 引用列表 |
-| `products` / `product` / `prod` | 不适用 | 必填 | molecule 引用列表 |
+| `mw` | 可选 | 不适用 | 分子量文本 |
+| `reactant` / `reac` | 不适用 | 可重复 | 结构化 participant |
+| `product` / `prod` | 不适用 | 可重复 | 结构化 participant |
+| `reactants` / `products` | 不适用 | 可选别名 | 仅简单引用/文本列表 |
 | `conditions` | 不适用 | 可选 | 字符串列表 |
-| `route` | 不适用 | 可选 | 路线 ID 或路线标签 |
+| `route` | 不适用 | 可选 | 路线 ID 或标签 |
 | `prev` | 不适用 | 可选 | 前驱 reaction 引用列表 |
-| `reagents` | 不适用 | 可选 | 原文字符串 |
-| `catalyst` | 不适用 | 可选 | 原文字符串 |
-| `solvent` | 不适用 | 可选 | 原文字符串 |
-| `temperature` | 不适用 | 可选 | 温度数量 |
-| `time` | 不适用 | 可选 | 时间数量 |
-| `pressure` | 不适用 | 可选 | 压力数量 |
+| `reagents` / `catalyst` / `solvent` | 不适用 | 可选 | 原文条件字段 |
+| `temperature` / `time` / `pressure` | 不适用 | 可选 | 类型化数量 |
 | `atmosphere` | 不适用 | 可选 | `nitrogen`、`argon`、`air`、`oxygen`、`inert` 或扩展值 |
-| `yield` | 不适用 | 可选 | 反应摘要产率 |
-| `conversion` | 不适用 | 可选 | 转化率 |
-| `selectivity` | 不适用 | 可选 | 选择性 |
-| `chemistry_features` | 可选 | 可选 | `|` 或 `,` 分隔的 feature ID 列表 |
-
-## 必填与默认值
-
-| 节点 | resolver 必填字段 | 默认值 |
-| --- | --- | --- |
-| molecule | `smiles` | 无 |
-| reaction | `reactants`、`products` | 无 |
-
-省略 `id` 时，resolver 生成 `<document-id>-<node-type>-<counter>`。需要跨块引用的对象应始终写显式 ID。
-
-## 隐式 Molecule SMILES
-
-对于 molecule 形状的 `:::chemd` 块，如果缺少 `smiles:` 字段，parser 可以把首个非字段正文行作为 `smiles`。
-
-```md
-:::chemd #mol-ethanol
-kind: molecule
-CCO
-:::
-```
-
-这种简写适合短 molecule 记录。若存在多行隐式正文，只有首行生效，并产生 `W_INVALID_CHEMD_IMPLICIT_VALUE`。
+| `yield` / `conversion` / `selectivity` | 不适用 | 可选 | reaction 级结果提示；result 仍是权威结果 |
+| `equation` / `rxn_smiles` | 不适用 | 可选 | reaction 身份字符串 |
+| `chemistry_features` | 可选 | 可选 | `|` 或 `,` 分隔的 feature ID |
 
 ## 类型推断
 
-存在 `reactants`、`products` 或别名字段时，parser 推断为 reaction。存在 `smiles`、`cas`、`formula`、`role`、`amount` 或 `equivalents` 时推断为 molecule。无法稳定推断，或显式 `kind` 与字段形态冲突时，产生 error。显式 `kind` 支持 `mol` 和 `reac` 作为值别名。
+parser 通过 `reactant`、`product`、`reac`、`prod`、`reactants` 或 `products` 推断 reaction。通过 `smiles`、`cas`、`inchi`、`inchikey`、`canonical_smiles`、`formula` 或 `mw` 等身份字段推断 molecule。推断不稳定、显式 `kind` 非法或字段形状冲突时都是 error。
 
-## Route 与前驱链接
+## 数量表面语法
 
-`route` 用于把 reaction 归入同一合成路线。`prev` 记录前驱 reaction，列表解析规则与其他 reaction 引用列表一致。
-
-```md
-:::chemd #rxn-step-1
-kind: reaction
-route: route-total-synthesis
-reactants: @mol-a
-products: @mol-b
-:::
-
-:::chemd #rxn-step-2
-kind: reaction
-route: route-total-synthesis
-prev: @rxn-step-1
-reactants: @mol-b
-products: @mol-c
-:::
-```
+带单位数量必须在数字和单位之间保留空格：`78 %`、`1.0 mmol`、`1.0 eq`、`30 min`。`78%` 这样的紧凑写法是 error。`1 ml` 这类大小写不规范会被接受并归一为 `1 mL`，同时产生 warning。
 
 ## 诊断
 
 | 诊断码 | 条件 |
 | --- | --- |
-| `E_INVALID_ID` | 块 ID 不符合 ID 规则 |
-| `W_UNKNOWN_FIELD` | 使用未声明字段 |
+| `E_INVALID_ID` | block ID 非法 |
+| `W_UNKNOWN_FIELD` | 未声明字段 |
 | `E_INVALID_LIST_ITEM` | 列表字段出现空项 |
-| `W_INVALID_CHEMD_IMPLICIT_VALUE` | molecule 隐式 SMILES 多于一行 |
 | `E_CHEMD_KIND_CONFLICT` | `kind` 非法，或显式类型与字段形状冲突 |
-| `E_MISSING_REQUIRED_FIELD` | resolver 必填字段缺失 |
-| `E_TYPED_REFERENCE_MISMATCH` | reaction 引用目标类型不匹配 |
-
-## 推荐实践案例
-
-完整 reaction 记录应显式声明 molecule 和 reaction，引用使用 `@id`，条件字段保持可解析的单位。
-
-```md
-:::chemd #mol-bromide
-kind: molecule
-name: 4-bromoanisole
-smiles: COc1ccc(Br)cc1
-role: substrate
-amount: 1.00 mmol
-equivalents: 1.0 equiv
-:::
-
-:::chemd #mol-boronic
-kind: molecule
-name: phenylboronic acid
-smiles: OB(O)c1ccccc1
-role: coupling_partner
-amount: 1.20 mmol
-equivalents: 1.2 equiv
-:::
-
-:::chemd #mol-biaryl
-kind: molecule
-name: 4-methoxybiphenyl
-smiles: COc1ccc(-c2ccccc2)cc1
-role: product
-:::
-
-:::chemd #rxn-suzuki
-kind: reaction
-name: Suzuki coupling
-reactants: @mol-bromide | @mol-boronic
-products: @mol-biaryl
-reagents: K2CO3
-catalyst: Pd(PPh3)4
-solvent: dioxane/water
-temperature: 90 C
-time: 12 h
-atmosphere: nitrogen
-yield: 82%
-:::
-```
-
-
+| `E_MOLECULE_IDENTITY_MISSING` | molecule 没有身份字段 |
+| `E_MOLECULE_REACTION_QUANTITY` | molecule 写了反应用量 |
+| `E_REACTION_PARTICIPANT_SYNTAX` | 在复数列表别名上写了结构化 participant 事实 |
+| `E_TYPED_REFERENCE_MISMATCH` | 引用目标类型错误 |
+| `E_STOICHIOMETRY_LIMITING` | limiting reactant 规则被破坏 |
+| `E_STOICHIOMETRY_QUANTITY_MISSING` | participant 缺少必要 amount/equivalent |

@@ -14,6 +14,8 @@ import type {
 
 const OUTLINE_KINDS = new Set<string>([
   "molecule",
+  "material",
+  "batch",
   "reaction",
   "result",
   "analysis",

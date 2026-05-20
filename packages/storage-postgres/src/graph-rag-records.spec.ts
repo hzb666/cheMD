@@ -20,14 +20,14 @@ kind: reaction
 reactants: aldehyde
 products: alcohol
 solvent: THF
-yield: 72%
+yield: 72 %
 route: route-a
 :::
 
 :::result #res-main
 reaction: @rxn-main
 status: success
-yield: 72%
+yield: 72 %
 :::
 `;
 

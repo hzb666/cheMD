@@ -23,7 +23,7 @@ solvent: THF
 
 :::result #res-main
 status: success
-yield: 72%
+yield: 72 %
 :::
 
 :::analysis #ana-main
@@ -108,7 +108,7 @@ catalyst: Pd
 :::result #res-var1
 ref: rxn-var1
 status: success
-yield: 81%
+yield: 81 %
 :::
 
 :::condition-varies #cv-screen
@@ -215,7 +215,7 @@ products: @mol-step-02
 :::result #res-step-02
 product: @mol-step-02
 status: success
-yield: 74%
+yield: 74 %
 :::
 `;
     const result = compileChemd(source);

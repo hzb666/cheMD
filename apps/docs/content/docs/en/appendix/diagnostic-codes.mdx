@@ -54,8 +54,16 @@ The following reference lists common diagnostics by source and purpose. Use it t
 | `E401` | Unit is invalid for the target quantity class |
 | `E402` | Percent quantity is outside 0 to 100 |
 | `E403` | Quantity cannot be parsed for the target class |
+| `W_QUANTITY_UNIT_CASING` | Unit casing is accepted but not canonical |
 | `E301` | v0.3 missing required field diagnostic |
 | `E_TYPED_REFERENCE_MISMATCH` | Reference target type mismatch |
+| `E_MOLECULE_IDENTITY_MISSING` | Molecule has no identity field |
+| `E_MOLECULE_REACTION_QUANTITY` | Reaction usage quantity is written on a molecule |
+| `E_REACTION_PARTICIPANT_MISSING` | Reaction is missing a reactant or product participant |
+| `E_REACTION_PARTICIPANT_SYNTAX` | Structured participant facts use an invalid surface |
+| `E_REACTION_PARTICIPANT_PRODUCT_QUANTITY` | Product participant contains an invalid quantity |
+| `E_STOICHIOMETRY_LIMITING` | Limiting reactant rules are violated |
+| `E_STOICHIOMETRY_QUANTITY_MISSING` | Stoichiometric participant is missing amount or equivalent |
 | `E_RESULT_REACTION_CONFLICT` | Result conflicts with linked reaction fields |
 | `E_DERIVED_EXPRESSION_INVALID` | Invalid derived expression |
 | `W_REACTION_ROUTE_MISMATCH` | Previous reaction route mismatch |

@@ -53,6 +53,8 @@ Block types use lowercase letters, digits, underscores, and hyphens. Field names
 | Block | Semantics |
 | --- | --- |
 | `:::chemd` | molecule or reaction |
+| `:::material` | inventory material |
+| `:::batch` | generated or purified batch |
 | `:::result` | experiment result |
 | `:::analysis` | analytical data |
 | `:::procedure` | experimental procedure |
@@ -88,7 +90,7 @@ amount: 1.00 mmol
 
 ```md
 :::procedure #proc-main
-step: charge | id=s1 | inputs=@mol-a | amount=1.00 mmol
+step: charge | id=s1 | inputs=@mat-a | amount=1.00 mmol
 step: heat | id=s2 | temperature=80 C | duration=2 h | dependsOn=s1
 :::
 ```
@@ -123,7 +125,7 @@ col: Left narrative with @reaction.solvent.
 col: {
 :::result #res-main
 status: success
-yield: 80%
+yield: 80 %
 :::
 }
 :::

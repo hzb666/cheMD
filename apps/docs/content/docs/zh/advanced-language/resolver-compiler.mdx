@@ -6,7 +6,7 @@ description: 对象索引、重复 ID、引用解析、primary 校验、模板�
 
 ## 对象索引构建
 
-resolver 遍历 children 和 `col.children`，收集带 ID 的对象节点。对象类型包括 molecule、reaction、result、analysis、procedure、observation、sample、artifact 和 condition_varies。
+resolver 遍历 children 和 `col.children`，收集带 ID 的对象节点。对象类型包括 molecule、material、batch、reaction、result、analysis、procedure、observation、sample、artifact 和 condition_varies。
 
 ```md
 :::col 2
@@ -69,8 +69,8 @@ primary_reaction: rxn-main
 
 :::chemd #rxn-main
 kind: reaction
-reactants: mol-a
-products: mol-p
+reactant: mol-a
+product: mol-p
 temperature: 25 C
 :::
 
@@ -101,17 +101,16 @@ Primary reaction: @reaction
 
 ## 必填字段校验
 
-当前必填字段为 molecule `smiles`，reaction `reactants` 和 `products`，普通 analysis `type_name` 和 `data`，TLC analysis `type_name`，sample `name`，artifact `kind` 和 `path`。
+当前 resolver 必填字段为 material `molecule`，batch `source`，普通 analysis `type_name` 和 `data`，TLC analysis `type_name`，sample `name`，artifact `kind` 和 `path`。molecule identity 与 reaction participant 存在性由 typechecker 校验。
 
 ```md
-:::chemd #mol-missing-smiles
+:::chemd #mol-missing-identity
 kind: molecule
-name: unnamed molecule
 :::
 
 :::chemd #rxn-missing-products
 kind: reaction
-reactants: mol-a
+reactant: mol-a
 :::
 
 :::artifact #art-missing-path
@@ -119,7 +118,7 @@ kind: nmr
 :::
 ```
 
-这些块语法可被 parser 接受，但 resolver 会按对象类型产生缺失必填字段诊断。TLC analysis 只要求 `type`；其他 analysis 还要求 `data`。
+这些块语法可被 parser 接受。analysis 与 artifact 的缺失字段由 resolver 诊断；molecule identity 与 reaction participant 缺失由 typechecker 诊断。TLC analysis 只要求 `type`；其他 analysis 还要求 `data`。
 
 ## 模板索引与展开
 
@@ -182,7 +181,7 @@ source
 
 typechecker 创建局部对象索引和 external target index。局部对象同时支持 bare ID 和 `documentId#id` scoped ID。external target 来自 `referenceContext.externalTargets` 与 `reactionRouteContext.externalReactions`。
 
-typed semantic graph 包含 molecule、reaction、result、analysis、sample、artifact、condition_varies、procedure_narrative 和 observation_narrative。step graph 包含 canonical steps、procedure records、observation records 和 diagnostics。导出层可继续物化 event-to-step 等附加关系。
+typed semantic graph 包含 molecule、material、batch、reaction、result、analysis、sample、artifact、condition_varies、procedure_narrative 和 observation_narrative。step graph 包含 canonical steps、procedure records、observation records 和 diagnostics。导出层可继续物化 material-to-molecule、batch lineage、reaction participant 和 event-to-step 等附加关系。
 
 ## compiler 输出清单
 
@@ -213,16 +212,16 @@ smiles: CC=O
 
 :::chemd #rxn-main
 kind: reaction
-reactants: @mol-a
-products: @mol-p
+reactant: @mol-a
+product: @mol-p
 :::
 
 :::result #res-main
 reaction: rxn-main
 product: mol-p
 status: success
-yield: 80%
+yield: 80 %
 :::
 
-Resolved summary: @rxn-main.products gave @result.yield.
+Resolved summary: @rxn-main.product gave @result.yield.
 ```

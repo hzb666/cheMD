@@ -3,7 +3,9 @@ import type { ChemdSemanticKind } from "../ast";
 export interface BlockFieldSchema {
   name: string;
   aliases?: string[];
+  aliasListModes?: Record<string, "pipe" | "repeat">;
   list?: boolean;
+  listMode?: "pipe" | "repeat";
   values?: Record<string, string>;
 }
 
@@ -56,17 +58,33 @@ export const BLOCK_SCHEMAS: readonly BlockSchema[] = [
       field("kind", { values: CHEMD_KIND_VALUE_ALIASES }),
       field("smiles"),
       field("cas"),
+      field("inchi"),
+      field("inchikey"),
+      field("canonical_smiles"),
       field("name"),
       field("role"),
       field("caption"),
       field("formula"),
+      field("mw"),
       field("amount"),
       field("equivalents", { aliases: ["equiv"] }),
-      field("reactants", { aliases: ["reactant", "reac"], list: true }),
-      field("products", { aliases: ["product", "prod"], list: true }),
+      field("reactant", {
+        aliases: ["reac", "reactants"],
+        aliasListModes: { reactants: "pipe" },
+        list: true,
+        listMode: "repeat"
+      }),
+      field("product", {
+        aliases: ["prod", "products"],
+        aliasListModes: { products: "pipe" },
+        list: true,
+        listMode: "repeat"
+      }),
       field("conditions", { list: true }),
       field("route"),
       field("prev", { list: true }),
+      field("equation"),
+      field("rxn_smiles"),
       field("reagents"),
       field("catalyst"),
       field("solvent"),
@@ -77,6 +95,34 @@ export const BLOCK_SCHEMAS: readonly BlockSchema[] = [
       field("yield"),
       field("conversion"),
       field("selectivity"),
+      field("chemistry_features", { list: true })
+    ]
+  },
+  {
+    blockType: "material",
+    nodeType: "material",
+    fields: [
+      field("molecule"),
+      field("supplier"),
+      field("lot"),
+      field("purity"),
+      field("density"),
+      field("storage"),
+      field("notes"),
+      field("chemistry_features", { list: true })
+    ]
+  },
+  {
+    blockType: "batch",
+    nodeType: "batch",
+    fields: [
+      field("source"),
+      field("molecule"),
+      field("state"),
+      field("mass"),
+      field("purity"),
+      field("notes"),
+      field("artifacts", { list: true }),
       field("chemistry_features", { list: true })
     ]
   },
@@ -251,6 +297,20 @@ export const getAllowedBlockFieldSet = (blockType: string): Set<string> =>
 export const getBlockListFieldSet = (blockType: string): Set<string> => {
   const schema = getBlockSchema(blockType);
   return new Set(schema?.fields.filter((item) => item.list).map((item) => item.name) ?? []);
+};
+
+export const getBlockFieldListMode = (
+  blockType: string,
+  canonicalName: string,
+  originalName = canonicalName
+): "pipe" | "repeat" | undefined => {
+  const schema = getBlockSchema(blockType);
+  const fieldSchema = schema?.fields.find((item) => item.name === canonicalName);
+  if (!fieldSchema?.list) {
+    return undefined;
+  }
+
+  return fieldSchema.aliasListModes?.[originalName] ?? fieldSchema.listMode ?? "pipe";
 };
 
 export const resolveBlockField = (

@@ -9,6 +9,8 @@ description: 面向 Chemd 使用者的结构化块使用手册，每一种块独
 | 块 | 作用 | 主要输出节点 |
 | --- | --- | --- |
 | `:::chemd` | 分子与反应对象 | `molecule` 或 `reaction` |
+| `:::material` | 库存物料或试剂 lot | `material` |
+| `:::batch` | 实验生成或纯化得到的物理批次 | `batch` |
 | `:::result` | 实验结果 | `result` |
 | `:::analysis` | 分析记录 | `analysis` |
 | `:::procedure` | 实验过程 | `procedure` |
@@ -28,7 +30,7 @@ description: 面向 Chemd 使用者的结构化块使用手册，每一种块独
 
 ```md
 :::result #res-main
-status: success ;; yield: 82% ;; purity: 96%
+status: success ;; yield: 82 % ;; purity: 96 %
 :::
 ```
 
@@ -51,7 +53,6 @@ primary_result: res-main
 kind: molecule
 name: substrate
 smiles: CCO
-amount: 1.00 mmol
 :::
 
 :::chemd #mol-product
@@ -62,8 +63,8 @@ smiles: CC=O
 
 :::chemd #rxn-main
 kind: reaction
-reactants: @mol-substrate
-products: @mol-product
+reactant: @mol-substrate | 1.00 mmol | 1.0 eq | limiting=true
+product: @mol-product
 solvent: MeCN
 temperature: 60 C
 time: 3 h
@@ -73,7 +74,7 @@ time: 3 h
 reaction: rxn-main
 product: mol-product
 status: success
-yield: 74%
+yield: 74 %
 :::
 ```
 

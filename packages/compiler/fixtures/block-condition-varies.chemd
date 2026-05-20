@@ -55,21 +55,21 @@ time: 2 h
 reaction: rxn-standard
 product: mol-product
 status: partial
-yield: 35%
+yield: 35 %
 :::
 
 :::result #res-var1
 reaction: rxn-var1
 product: mol-product
 status: success
-yield: 76%
+yield: 76 %
 :::
 
 :::result #res-var2
 reaction: rxn-var2
 product: mol-product
 status: failed
-yield: 12%
+yield: 12 %
 :::
 
 :::condition-varies #cv-screen

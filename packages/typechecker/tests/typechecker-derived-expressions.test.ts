@@ -23,7 +23,7 @@ yield: =percent(20 + 1, 50)
     expect(node).toMatchObject({
       kind: "result",
       yield: {
-        raw: "42%",
+        raw: "42 %",
         value: 42,
         canonicalUnit: "percent",
         provenance: {
@@ -46,13 +46,13 @@ date: 2026-04-18
 
 :::result #res-source
 status: partial
-selectivity: 80%
+selectivity: 80 %
 isolated_mass: 1 g
 :::
 
 :::result #res-derived
 status: success
-purity: =coalesce(@res-source.selectivity, 95%)
+purity: =coalesce(@res-source.selectivity, 95 %)
 isolated_mass: =to_unit(@res-source.isolated_mass, mg)
 :::
 `));
@@ -61,7 +61,7 @@ isolated_mass: =to_unit(@res-source.isolated_mass, mg)
     expect(result.diagnostics).toEqual([]);
     expect(node).toMatchObject({
       purity: {
-        raw: "80%",
+        raw: "80 %",
         value: 80
       },
       isolatedMass: {

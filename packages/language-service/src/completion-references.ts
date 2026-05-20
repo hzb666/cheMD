@@ -5,11 +5,18 @@ import type {
 } from "./completion-types";
 import type { ChemdSourceRange, ChemdSymbol } from "./types";
 
-const referenceFields = new Set(["reactants", "products", "prev"]);
+const referenceFields = new Set(["reactant", "product", "reac", "prod", "reactants", "products", "prev", "molecule", "source", "ref"]);
 const referenceTokenPattern = /@([A-Za-z0-9_-]*)$/;
 const preferredKindsByField: Record<string, string[]> = {
-  reactants: ["molecule"],
-  products: ["molecule"],
+  reactant: ["molecule", "material", "batch"],
+  reac: ["molecule", "material", "batch"],
+  reactants: ["molecule", "material", "batch"],
+  product: ["molecule", "material", "batch"],
+  prod: ["molecule", "material", "batch"],
+  products: ["molecule", "material", "batch"],
+  molecule: ["molecule"],
+  source: ["reaction", "result", "sample", "batch"],
+  ref: ["material", "batch", "reaction", "result", "sample"],
   prev: ["reaction"]
 };
 
@@ -73,7 +80,7 @@ const readReferenceToken = (
 };
 
 const isReferenceValuePosition = (context: ChemdCompletionContext): boolean =>
-  context.isChemdBlock &&
+  Boolean(context.block) &&
   context.isFieldValuePosition &&
   Boolean(context.fieldKey && referenceFields.has(context.fieldKey));
 

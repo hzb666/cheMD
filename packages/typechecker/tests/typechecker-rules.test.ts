@@ -16,14 +16,12 @@ date: 2026-04-18
 :::chemd #substrate
 kind: molecule
 smiles: CCO
-amount: 1.2 mmol
-equivalents: 1.5 equiv
 :::
 
 :::chemd #rxn-main
 kind: reaction
-reactants: @substrate
-products: product
+reactant: @substrate | 1.2 mmol | 1.5 equiv | limiting=true
+product: product
 temperature: 25 C
 time: 30 min
 pressure: 1 atm
@@ -39,8 +37,8 @@ pressure: 1 atm
 
     expect(quantities).toEqual(
       expect.arrayContaining([
-        { sourceNodeId: "substrate", sourceField: "amount", canonicalUnit: "mmol" },
-        { sourceNodeId: "substrate", sourceField: "equivalents", canonicalUnit: "equiv" },
+        { sourceNodeId: "rxn-main", sourceField: "reactant.amount", canonicalUnit: "mmol" },
+        { sourceNodeId: "rxn-main", sourceField: "reactant.equivalents", canonicalUnit: "equiv" },
         { sourceNodeId: "rxn-main", sourceField: "temperature", canonicalUnit: "C" },
         { sourceNodeId: "rxn-main", sourceField: "time", canonicalUnit: "h" },
         { sourceNodeId: "rxn-main", sourceField: "pressure", canonicalUnit: "bar" }
@@ -113,8 +111,9 @@ smiles: CCO
 
 :::chemd #rxn-main
 kind: reaction
-reactants: @substrate | @missing-reactant
-products: @missing-product
+reactant: @substrate
+reactant: @missing-reactant
+product: @missing-product
 :::
 
 :::analysis #ana-main
@@ -131,18 +130,18 @@ ref: @missing-analysis-ref
           code: "E_TYPED_REFERENCE_MISMATCH",
           sourceNodeId: "rxn-main",
           facts: expect.objectContaining({
-            field: "reactants",
+            field: "reactant",
             ref_id: "missing-reactant",
-            expected_target_kind: "molecule"
+            expected_target_kind: "molecule|material|batch"
           })
         }),
         expect.objectContaining({
           code: "E_TYPED_REFERENCE_MISMATCH",
           sourceNodeId: "rxn-main",
           facts: expect.objectContaining({
-            field: "products",
+            field: "product",
             ref_id: "missing-product",
-            expected_target_kind: "molecule"
+            expected_target_kind: "molecule|material|batch"
           })
         }),
         expect.objectContaining({
@@ -176,13 +175,13 @@ smiles: CCO
 kind: reaction
 reactants: reagent
 products: @product-a
-yield: 50%
+yield: 50 %
 :::
 
 :::result #res-main
 reaction: @rxn-main
 product: @missing-product
-yield: 65%
+yield: 65 %
 :::
 
 :::sample #sample-main

@@ -5,7 +5,9 @@ import type { V03Diagnostic } from "@chemd/diagnostics";
 import {
   buildAnalysisNode,
   buildArtifactNode,
+  buildBatchNode,
   buildConditionVariesNode,
+  buildMaterialNode,
   buildMoleculeNode,
   buildObservationNode,
   buildProcedureNode,
@@ -128,6 +130,14 @@ const buildTypedObjectNode = (
 ): BuiltTypedNode => {
   if (node.type === "molecule") {
     return buildMoleculeNode(node, { documentId, objectIndex, externalTargetIndex });
+  }
+
+  if (node.type === "material") {
+    return buildMaterialNode(node, { documentId, objectIndex, externalTargetIndex });
+  }
+
+  if (node.type === "batch") {
+    return buildBatchNode(node, { documentId, objectIndex, externalTargetIndex });
   }
 
   if (node.type === "reaction") {

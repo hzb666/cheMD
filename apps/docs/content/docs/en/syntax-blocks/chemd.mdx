@@ -1,110 +1,101 @@
 ---
 title: '`:::chemd` Molecule and Reaction Block'
-description: '`:::chemd` is the unified usage block for molecules and reactions, with explicit kind, shape inference, reference lists, and chemistry feature refs.'
+description: '`:::chemd` declares molecule identity and reactions; material and batch blocks carry physical inventory and lineage.'
 ---
 
-`:::chemd` produces either a `molecule` or `reaction` node according to `kind` and field shape.
+`:::chemd` produces either a `molecule` or `reaction` node according to `kind` and field shape. `kind` can be omitted when fields are unambiguous. `mol` and `reac` are accepted as `kind` value aliases.
 
-## Syntax
+## Molecule Identity
+
+Molecule nodes describe chemical identity only. Do not put reaction usage, amount, or equivalents on a molecule. Put those quantities on reaction participants.
 
 ```md
 :::chemd #mol-substrate
 kind: molecule
 name: ethyl acetate
 smiles: CCOC(C)=O
-amount: 2.00 mmol
-equivalents: 1.0 equiv
+formula: C4H8O2
+mw: 88.11 g/mol
 :::
 ```
+
+Identity fields include `name`, `smiles`, `canonical_smiles`, `cas`, `inchi`, `inchikey`, `formula`, `mw`, `role`, `caption`, and `chemistry_features`. At least one identity field is required by the typechecker. `amount` and `equivalents` on a molecule produce an error.
+
+## Reaction Participants
+
+Reaction nodes use canonical singular fields for participants. `reactant` and `product` can repeat. `reac` and `prod` are short aliases. Plural `reactants` and `products` remain simple list aliases only; do not attach amount, equivalents, or `limiting=true` to plural list values.
 
 ```md
 :::chemd #rxn-main
 kind: reaction
-reactants: @mol-substrate | @mol-base
-products: @mol-product
+reactant: @mat-substrate-lot-a | 1.00 mmol | 1.0 eq | limiting=true
+reactant: @mol-base | equiv=1.2
+product: @mol-product
 solvent: MeCN
-temperature: 60 C
-time: 3 h
+temperature: r.t. -> 60 C over 30 min
+time: overnight
 atmosphere: nitrogen
 :::
 ```
+
+Participant targets may be `molecule`, `material`, or `batch`. Amount can be written as `amount=1.0 mmol` or the shorter `1.0 mmol`. Equivalents can be written as `equiv=1.2`, `equiv=1.2 eq`, or `1.2 eq`. If any reactant has amount, equivalent, mass, volume, or `limiting=true`, exactly one reactant must be `limiting=true`. The limiting reactant must provide both amount and equivalent. Other stoichiometric reactants need at least amount or equivalent. Product participants cannot carry expected or isolated quantities; put outcome data in `:::result`.
+
+## Material and Batch
+
+Use `:::material` for purchased or inventory material. Use `:::batch` for material generated, split, purified, or otherwise produced during the experiment.
+
+```md
+:::material #mat-substrate-lot-a
+molecule: @mol-substrate
+supplier: Sigma
+lot: A123
+purity: 98 %
+storage: flammable cabinet
+:::
+
+:::batch #batch-crude
+source: @rxn-main
+molecule: @mol-product
+state: crude
+mass: 120 mg
+purity: 84 %
+:::
+```
+
+`material.molecule` must reference a molecule. `batch.source` may reference a reaction, result, sample, or batch. `batch.molecule` may reference a molecule. Samples may point their `ref` at material, batch, reaction, result, sample, or another object.
 
 ## Fields
 
 | field | molecule | reaction | notes |
 | --- | --- | --- | --- |
-| `kind` | optional | optional | `molecule`, `reaction`, `mol`, or `reac`; inferred from field shape when omitted |
-| `smiles` | required | not applicable | required by the resolver for molecule nodes |
-| `cas` | optional | not applicable | stored as raw text |
+| `kind` | optional | optional | `molecule`, `reaction`, `mol`, or `reac`; inferred when fields are unambiguous |
 | `name` | optional | optional | user-facing name |
-| `role` | optional | not applicable | user-defined role such as substrate, reagent, or product |
-| `caption` | optional | optional | render caption |
+| `smiles` | optional | not applicable | molecule identity |
+| `canonical_smiles` | optional | not applicable | canonical structure string |
+| `cas` | optional | not applicable | CAS registry string |
+| `inchi` / `inchikey` | optional | not applicable | molecule identity |
 | `formula` | optional | not applicable | formula text |
-| `amount` | optional | not applicable | quantity field supporting `mmol` and `mol` |
-| `equivalents` | optional | not applicable | quantity field supporting `equiv` and `eq` |
-| `reactants` / `reactant` / `reac` | not applicable | required | molecule reference list |
-| `products` / `product` / `prod` | not applicable | required | molecule reference list |
+| `mw` | optional | not applicable | molecular weight text |
+| `reactant` / `reac` | not applicable | repeatable | structured participant |
+| `product` / `prod` | not applicable | repeatable | structured participant |
+| `reactants` / `products` | not applicable | optional alias | simple reference/literal list only |
 | `conditions` | not applicable | optional | string list |
 | `route` | not applicable | optional | route ID or label |
 | `prev` | not applicable | optional | predecessor reaction reference list |
-| `reagents` | not applicable | optional | raw text |
-| `catalyst` | not applicable | optional | raw text |
-| `solvent` | not applicable | optional | raw text |
-| `temperature` | not applicable | optional | temperature quantity |
-| `time` | not applicable | optional | time quantity |
-| `pressure` | not applicable | optional | pressure quantity |
-| `atmosphere` | not applicable | optional | `nitrogen`, `argon`, `air`, `oxygen`, `inert`, or extension value |
-| `yield` | not applicable | optional | reaction-level yield summary |
-| `conversion` | not applicable | optional | conversion |
-| `selectivity` | not applicable | optional | selectivity |
+| `reagents` / `catalyst` / `solvent` | not applicable | optional | raw condition fields |
+| `temperature` / `time` / `pressure` | not applicable | optional | typed quantities |
+| `atmosphere` | not applicable | optional | `nitrogen`, `argon`, `air`, `oxygen`, `inert`, or extension |
+| `yield` / `conversion` / `selectivity` | not applicable | optional | reaction-level outcome hints; result remains authoritative |
+| `equation` / `rxn_smiles` | not applicable | optional | reaction identity strings |
 | `chemistry_features` | optional | optional | feature IDs separated by `|` or `,` |
-
-## Required Fields and Defaults
-
-| node | resolver-required fields | default |
-| --- | --- | --- |
-| molecule | `smiles` | none |
-| reaction | `reactants`, `products` | none |
-
-When `id` is omitted, the resolver assigns `<document-id>-<node-type>-<counter>`. Objects referenced by other blocks should use explicit IDs.
-
-## Implicit Molecule SMILES
-
-For molecule-shaped `:::chemd` blocks, the parser can use the first non-field body line as `smiles` when the `smiles:` field is absent.
-
-```md
-:::chemd #mol-ethanol
-kind: molecule
-CCO
-:::
-```
-
-This shorthand is useful for short molecule records. If more than one implicit body line is present, only the first line is used and `W_INVALID_CHEMD_IMPLICIT_VALUE` is emitted.
 
 ## Type Inference
 
-The parser infers reaction when `reactants`, `products`, or their aliases are present. `smiles`, `cas`, `formula`, `role`, `amount`, or `equivalents` infer molecule. Unstable inference, invalid explicit `kind`, or a field-shape conflict is an error. Explicit `kind` supports `mol` and `reac` as value aliases.
+The parser infers reaction from `reactant`, `product`, `reac`, `prod`, `reactants`, or `products`. It infers molecule from identity fields such as `smiles`, `cas`, `inchi`, `inchikey`, `canonical_smiles`, `formula`, or `mw`. Unstable inference, invalid explicit `kind`, or field-shape conflict is an error.
 
-## Route and Predecessor Links
+## Quantity Surface
 
-`route` groups reactions into a named synthesis path. `prev` lists predecessor reactions and supports the same list parsing as other reaction reference lists.
-
-```md
-:::chemd #rxn-step-1
-kind: reaction
-route: route-total-synthesis
-reactants: @mol-a
-products: @mol-b
-:::
-
-:::chemd #rxn-step-2
-kind: reaction
-route: route-total-synthesis
-prev: @rxn-step-1
-reactants: @mol-b
-products: @mol-c
-:::
-```
+Unit-bearing quantities require a space between number and unit: `78 %`, `1.0 mmol`, `1.0 eq`, `30 min`. Compact forms such as `78%` are errors. Non-canonical unit casing such as `1 ml` is accepted with a warning and normalized to `1 mL`.
 
 ## Diagnostics
 
@@ -113,53 +104,10 @@ products: @mol-c
 | `E_INVALID_ID` | invalid block ID |
 | `W_UNKNOWN_FIELD` | undeclared field |
 | `E_INVALID_LIST_ITEM` | empty list item |
-| `W_INVALID_CHEMD_IMPLICIT_VALUE` | more than one implicit molecule value |
 | `E_CHEMD_KIND_CONFLICT` | invalid `kind`, or explicit kind conflicts with field shape |
-| `E_MISSING_REQUIRED_FIELD` | resolver-required field is missing |
-| `E_TYPED_REFERENCE_MISMATCH` | reaction reference target has the wrong type |
-
-## Recommended Practice
-
-A complete reaction record should declare molecules and reaction explicitly, use `@id` references, and keep condition values unit-bearing.
-
-```md
-:::chemd #mol-bromide
-kind: molecule
-name: 4-bromoanisole
-smiles: COc1ccc(Br)cc1
-role: substrate
-amount: 1.00 mmol
-equivalents: 1.0 equiv
-:::
-
-:::chemd #mol-boronic
-kind: molecule
-name: phenylboronic acid
-smiles: OB(O)c1ccccc1
-role: coupling_partner
-amount: 1.20 mmol
-equivalents: 1.2 equiv
-:::
-
-:::chemd #mol-biaryl
-kind: molecule
-name: 4-methoxybiphenyl
-smiles: COc1ccc(-c2ccccc2)cc1
-role: product
-:::
-
-:::chemd #rxn-suzuki
-kind: reaction
-name: Suzuki coupling
-reactants: @mol-bromide | @mol-boronic
-products: @mol-biaryl
-reagents: K2CO3
-catalyst: Pd(PPh3)4
-solvent: dioxane/water
-temperature: 90 C
-time: 12 h
-atmosphere: nitrogen
-yield: 82%
-:::
-```
-
+| `E_MOLECULE_IDENTITY_MISSING` | molecule has no identity field |
+| `E_MOLECULE_REACTION_QUANTITY` | molecule contains reaction usage quantity |
+| `E_REACTION_PARTICIPANT_SYNTAX` | structured participant facts are written on plural list aliases |
+| `E_TYPED_REFERENCE_MISMATCH` | reference target has the wrong type |
+| `E_STOICHIOMETRY_LIMITING` | limiting reactant rules are violated |
+| `E_STOICHIOMETRY_QUANTITY_MISSING` | required participant amount/equivalent is missing |

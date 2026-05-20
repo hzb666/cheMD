@@ -17,12 +17,12 @@ Yield: @res-main.yield
 
 :::result #res-main
 status: partial
-yield: 42%
+yield: 42 %
 :::
 `));
     const markdown = document.children.find((node) => node.type === "markdown");
 
     expect(document.diagnostics).toEqual([]);
-    expect(markdown?.type === "markdown" ? markdown.references[0]?.resolution?.value : undefined).toBe("42%");
+    expect(markdown?.type === "markdown" ? markdown.references[0]?.resolution?.value : undefined).toBe("42 %");
   });
 });

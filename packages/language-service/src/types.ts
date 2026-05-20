@@ -37,6 +37,8 @@ export interface ChemdEditorDiagnostic {
 export type ChemdOutlineKind =
   | "metadata"
   | "molecule"
+  | "material"
+  | "batch"
   | "reaction"
   | "result"
   | "analysis"

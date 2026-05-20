@@ -11,9 +11,11 @@ description: Chemd typechecker 支持的等号派生数量表达式、函数、�
 
 | 对象 | 字段 |
 | --- | --- |
-| molecule | `amount`、`equivalents` |
 | reaction | `temperature`、`time`、`pressure` |
+| reaction participant | `amount`、`mass`、`volume`、`equiv`、`equivalents` |
 | result | `yield`、`conversion`、`selectivity`、`purity`、`isolated_mass` |
+| material | `purity` |
+| batch | `mass`、`purity` |
 | sample | `purity` |
 
 procedure step 参数的数量字段会执行数量解析，但当前不经过派生表达式求值。
@@ -60,7 +62,7 @@ isolated_mass: = @res-crude.isolated_mass * 0.72
 | `to_unit(quantity, unit)` | 转换质量、物质的量、体积单位 |
 | `theoretical_yield(a, b, ...)` | 依次相乘 |
 
-`to_unit` 支持 `mg`、`g`、`kg`，`mmol`、`mol`，`ml`、`l` 的实现内转换。目标单位参数写作标识符，例如 `to_unit(1 g, mg)`。
+`to_unit` 支持 `mg`、`g`、`kg`，`mmol`、`mol`，`mL`、`L` 的实现内转换。目标单位参数写作标识符，例如 `to_unit(1 g, mg)`。
 
 ## 诊断
 
@@ -75,7 +77,7 @@ product: @mol-product
 status: success
 isolated_mass: = to_unit(0.126 g, mg)
 yield: = percent(0.84, 1)
-purity: 98%
+purity: 98 %
 :::
 ```
 

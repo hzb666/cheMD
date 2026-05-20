@@ -528,6 +528,8 @@ const semanticFlowLaneByNodeType: Record<ChemdRenderableNodeV1["node_type"], Sem
   ChemdDocumentNode: "source",
   ChemdEvidenceNode: "evidence",
   ChemdListNode: "source",
+  ChemdMaterialNode: "materials",
+  ChemdBatchNode: "materials",
   ChemdMoleculeNode: "materials",
   ChemdParagraphNode: "source",
   ChemdProcedureNode: "procedure",

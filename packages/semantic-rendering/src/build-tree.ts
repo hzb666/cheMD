@@ -38,6 +38,8 @@ const typeToRenderableNodeType = (type: unknown): ChemdRenderableNodeTypeV1 => {
     case "document": return "ChemdDocumentNode";
     case "markdown": return "ChemdParagraphNode";
     case "molecule": return "ChemdMoleculeNode";
+    case "material": return "ChemdMaterialNode";
+    case "batch": return "ChemdBatchNode";
     case "reaction": return "ChemdReactionNode";
     case "condition_varies": return "ChemdConditionNode";
     case "procedure": return "ChemdProcedureNode";

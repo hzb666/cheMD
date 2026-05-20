@@ -5,6 +5,8 @@ import type {
   ChemdNode,
   ConditionVariesNode,
   ExternalReferenceTarget,
+  BatchNode,
+  MaterialNode,
   ReactionRouteContext,
   ReferenceContext,
   ReferenceTargetKind,
@@ -12,8 +14,13 @@ import type {
   ObservationNode,
   ProvenanceInfo,
   ProcedureNode,
+  QuantityClass,
+  QuantityComparator,
+  QuantityShorthand,
+  QuantityValueKind,
   ReactionNode,
   ResultNode,
+  SourceSpan,
   SampleNode
 } from "@chemd/core";
 import type {
@@ -23,28 +30,36 @@ import type {
 import type { V03Diagnostic } from "@chemd/diagnostics";
 import type { CanonicalStepNode, ObservationEventNode, StepGraph } from "@chemd/step-ontology";
 
-export type QuantityClass =
-  | "amount"
-  | "mass"
-  | "volume"
-  | "temperature"
-  | "time"
-  | "pressure"
-  | "concentration"
-  | "equivalent"
-  | "percent";
+export type { QuantityClass } from "@chemd/core";
 
 export interface QuantityType {
   kind: "quantity";
   quantityClass: QuantityClass;
   raw: string;
+  valueKind?: QuantityValueKind;
+  comparator?: QuantityComparator;
   value?: number;
+  minValue?: number;
+  maxValue?: number;
+  uncertainty?: number;
   unit?: string;
   canonicalValue?: number;
   canonicalUnit?: string;
+  shorthand?: QuantityShorthand;
+  program?: QuantityProgramSegment[];
+  normalizedText?: string;
   sourceNodeId?: string;
   sourceField?: string;
+  sourceSpan?: SourceSpan;
   provenance?: ProvenanceInfo;
+}
+
+export interface QuantityProgramSegment {
+  raw: string;
+  from?: QuantityType;
+  to?: QuantityType;
+  rate?: QuantityType;
+  hold?: QuantityType;
 }
 
 export type StatusLabel = "success" | "partial" | "failed" | "unknown";
@@ -83,11 +98,56 @@ export interface TypedMoleculeNode extends TypedNodeBase {
   kind: "molecule";
   smiles?: string;
   cas?: string;
+  inchi?: string;
+  inchikey?: string;
+  canonicalSmiles?: string;
   name?: string;
   role?: string;
   formula?: string;
+  mw?: string;
   amount?: QuantityType;
   equivalents?: QuantityType;
+}
+
+export interface TypedMaterialNode extends TypedNodeBase {
+  kind: "material";
+  molecule?: ReferenceOrLiteral;
+  supplier?: string;
+  lot?: string;
+  purity?: QuantityType;
+  density?: string;
+  storage?: string;
+  notes?: string;
+}
+
+export interface TypedBatchNode extends TypedNodeBase {
+  kind: "batch";
+  source?: ReferenceOrLiteral;
+  molecule?: ReferenceOrLiteral;
+  state?: string;
+  mass?: QuantityType;
+  purity?: QuantityType;
+  artifacts?: ReferenceOrLiteral[];
+  notes?: string;
+}
+
+export type ReactionParticipantRole = "reactant" | "product";
+
+export interface TypedReactionParticipant {
+  id: string;
+  role: ReactionParticipantRole;
+  raw: string;
+  reference?: ReferenceOrLiteral;
+  amount?: QuantityType;
+  mass?: QuantityType;
+  volume?: QuantityType;
+  equivalents?: QuantityType;
+  limiting?: boolean;
+}
+
+export interface StoichiometrySummary {
+  limitingParticipantId?: string;
+  consistencyStatus: "ok" | "warning" | "error" | "unknown";
 }
 
 export interface TypedReactionNode extends TypedNodeBase {
@@ -97,6 +157,8 @@ export interface TypedReactionNode extends TypedNodeBase {
   next: ReferenceType[];
   reactants: ReferenceOrLiteral[];
   products: ReferenceOrLiteral[];
+  participants: TypedReactionParticipant[];
+  stoichiometry?: StoichiometrySummary;
   normalizedConditions: NormalizedReactionConditions;
   solvent?: string;
   catalyst?: string;
@@ -217,6 +279,8 @@ export interface TypedConditionVariesNode extends TypedNodeBase {
 
 export type TypedSemanticNode =
   | TypedMoleculeNode
+  | TypedMaterialNode
+  | TypedBatchNode
   | TypedReactionNode
   | TypedResultNode
   | TypedAnalysisNode
@@ -256,10 +320,13 @@ export interface QuantityParseContext {
   sourceNodeType: string;
   sourceNodeId?: string;
   field: string;
+  sourceSpan?: SourceSpan;
 }
 
 export type ObjectNode =
   | MoleculeNode
+  | MaterialNode
+  | BatchNode
   | ReactionNode
   | ResultNode
   | AnalysisNode

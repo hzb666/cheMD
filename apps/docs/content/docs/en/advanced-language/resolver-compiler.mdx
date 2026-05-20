@@ -6,7 +6,7 @@ description: Object indexes, duplicate IDs, references, primary validation, temp
 
 ## Object Index Construction
 
-The resolver walks children and `col.children`, collecting object nodes with IDs. Object types are molecule, reaction, result, analysis, procedure, observation, sample, artifact, and condition_varies.
+The resolver walks children and `col.children`, collecting object nodes with IDs. Object types are molecule, material, batch, reaction, result, analysis, procedure, observation, sample, artifact, and condition_varies.
 
 ```md
 :::col 2
@@ -69,8 +69,8 @@ primary_reaction: rxn-main
 
 :::chemd #rxn-main
 kind: reaction
-reactants: mol-a
-products: mol-p
+reactant: mol-a
+product: mol-p
 temperature: 25 C
 :::
 
@@ -101,17 +101,16 @@ When `rxn-missing` does not exist, the resolver emits `E_INVALID_PRIMARY_REFEREN
 
 ## Required Field Validation
 
-Current required fields are molecule `smiles`, reaction `reactants` and `products`, generic analysis `type_name` and `data`, TLC analysis `type_name`, sample `name`, and artifact `kind` plus `path`.
+Current resolver-required fields are material `molecule`, batch `source`, generic analysis `type_name` and `data`, TLC analysis `type_name`, sample `name`, and artifact `kind` plus `path`. Molecule identity and reaction participant presence are typechecker rules.
 
 ```md
-:::chemd #mol-missing-smiles
+:::chemd #mol-missing-identity
 kind: molecule
-name: unnamed molecule
 :::
 
 :::chemd #rxn-missing-products
 kind: reaction
-reactants: mol-a
+reactant: mol-a
 :::
 
 :::artifact #art-missing-path
@@ -119,7 +118,7 @@ kind: nmr
 :::
 ```
 
-These blocks are syntactically accepted by the parser, then reported by the resolver as missing required fields. TLC analysis only requires `type`; other analysis blocks also require `data`.
+These blocks are syntactically accepted by the parser. Missing analysis and artifact fields are reported by the resolver; missing molecule identity and reaction participants are reported by the typechecker. TLC analysis only requires `type`; other analysis blocks also require `data`.
 
 ## Template Index and Expansion
 
@@ -182,7 +181,7 @@ The source stores language facts. Export formats select the structures they need
 
 The typechecker creates a local object index and an external target index. Local objects support both bare IDs and `documentId#id` scoped IDs. External targets come from `referenceContext.externalTargets` and `reactionRouteContext.externalReactions`.
 
-The typed semantic graph contains molecule, reaction, result, analysis, sample, artifact, condition_varies, procedure_narrative, and observation_narrative nodes. The step graph contains canonical steps, procedure records, observation records, and diagnostics. Export layers can materialize additional relations, such as event-to-step links.
+The typed semantic graph contains molecule, material, batch, reaction, result, analysis, sample, artifact, condition_varies, procedure_narrative, and observation_narrative nodes. The step graph contains canonical steps, procedure records, observation records, and diagnostics. Export layers can materialize additional relations, such as material-to-molecule, batch lineage, reaction participant, and event-to-step links.
 
 ## Compiler Output Inventory
 
@@ -213,16 +212,16 @@ smiles: CC=O
 
 :::chemd #rxn-main
 kind: reaction
-reactants: @mol-a
-products: @mol-p
+reactant: @mol-a
+product: @mol-p
 :::
 
 :::result #res-main
 reaction: rxn-main
 product: mol-p
 status: success
-yield: 80%
+yield: 80 %
 :::
 
-Resolved summary: @rxn-main.products gave @result.yield.
+Resolved summary: @rxn-main.product gave @result.yield.
 ```

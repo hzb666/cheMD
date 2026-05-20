@@ -1,5 +1,6 @@
 import {
   getAllowedBlockFieldSet,
+  getBlockFieldListMode,
   getBlockListFieldSet,
   resolveBlockField,
   type ChemistryFeatureRef,
@@ -59,6 +60,7 @@ export const parseAllowedFields = (
     allowField: (key) => allowedFields.has(key) || options.allowExtraField?.(key) === true,
     resolveField: (key) => resolveBlockField(blockType, key)?.canonicalName
       ?? (options.allowExtraField?.(key) === true ? key : undefined),
+    getListMode: (key, resolvedKey) => getBlockFieldListMode(blockType, resolvedKey, key),
     listFields: options.listFields ?? getBlockListFieldSet(blockType),
     blockTypeForDiagnostics: blockType,
     sourceNodeId: options.sourceNodeId

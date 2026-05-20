@@ -19,7 +19,6 @@ primary_result: res-main
 kind: molecule
 name: ethanol
 smiles: CCO
-amount: 1 mmol
 :::
 
 :::chemd #mol-product
@@ -30,17 +29,17 @@ smiles: CCO
 
 :::chemd #rxn-main
 kind: reaction
-reactants: @mol-a
-products: @mol-product
+reactant: @mol-a | 1 mmol | 1 eq | limiting=true
+product: @mol-product
 solvent: THF
 temperature: 25 C
-yield: 81%
+yield: 81 %
 :::
 
 :::result #res-main
 reaction: @rxn-main
 status: success
-yield: 81%
+yield: 81 %
 :::
 
 :::sample #sample-main

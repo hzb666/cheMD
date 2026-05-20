@@ -45,6 +45,8 @@ export const buildScopedReferenceId = (documentId: string, objectId: string): st
 
 const ENTITY_PREFIX_BY_TARGET_KIND: Partial<Record<ReferenceTargetKind, string>> = {
   molecule: "mol",
+  material: "mat",
+  batch: "bat",
   reaction: "rxn",
   result: "res",
   analysis: "ana",

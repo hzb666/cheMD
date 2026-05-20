@@ -1,0 +1,36 @@
+---
+title: '`:::batch` Block'
+description: '`:::batch` records generated, split, purified, or otherwise derived physical batches.'
+---
+
+`:::batch` represents a physical batch produced or derived during the experiment. It is distinct from `:::sample`, which records a sampled analytical object.
+
+```md
+:::batch #batch-crude-var1
+source: @rxn-var1
+molecule: @mol-product
+state: crude
+mass: 120 mg
+purity: 84 %
+:::
+```
+
+| field | required | semantics |
+| --- | --- | --- |
+| `source` | yes | reaction, result, sample, or batch reference |
+| `molecule` | no | molecule reference |
+| `state` | no | batch state such as `crude` or `purified` |
+| `mass` | no | mass quantity |
+| `purity` | no | percent quantity |
+| `artifacts` | no | artifact reference list |
+| `notes` | no | free text notes |
+| `chemistry_features` | no | feature IDs separated by `|` or `,` |
+
+Samples can point at a batch through `ref`:
+
+```md
+:::sample #sample-nmr-var1
+ref: @batch-crude-var1
+artifacts: @art-nmr-var1
+:::
+```

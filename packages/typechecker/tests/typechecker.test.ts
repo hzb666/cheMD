@@ -28,7 +28,7 @@ atmosphere: nitrogen
 
 :::result #res-main
 status: partial
-yield: 23%
+yield: 23 %
 :::
 `));
 
@@ -322,7 +322,7 @@ date: 2026-04-24
 :::result #res-main
 reaction: ext-doc#rxn-main
 product: ext-doc#mol-product
-yield: 72%
+yield: 72 %
 :::
 
 :::analysis #ana-main

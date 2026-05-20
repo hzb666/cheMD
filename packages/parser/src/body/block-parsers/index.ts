@@ -3,9 +3,11 @@ import type { ColNode, StructuredNode, UseNode } from "@chemd/core";
 import { parseKeyValueLines } from "../parse-body-shared";
 import { parseAnalysisBlock } from "./analysis";
 import { parseArtifactBlock } from "./artifact";
+import { parseBatchBlock } from "./batch";
 import { parseChemdBlock } from "./chemd";
 import { parseConditionVariesBlock } from "./condition-varies";
 import { readStructuredBlockId } from "./common";
+import { parseMaterialBlock } from "./material";
 import { parseObservationBlock } from "./observation";
 import { parseProcedureBlock } from "./procedure";
 import { parseResultBlock } from "./result";
@@ -68,6 +70,8 @@ const PARSERS = new Map<string, BlockParser>([
   ["chemd", parseChemdBlock],
   ["result", parseResultBlock],
   ["analysis", parseAnalysisBlock],
+  ["material", parseMaterialBlock],
+  ["batch", parseBatchBlock],
   ["artifact", parseArtifactBlock],
   ["sample", parseSampleBlock],
   ["condition-varies", parseConditionVariesBlock],

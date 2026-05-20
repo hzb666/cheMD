@@ -1,0 +1,34 @@
+---
+title: '`:::material` Block'
+description: '`:::material` records inventory material, reagent bottles, supplier lots, and purity metadata.'
+---
+
+`:::material` represents a physical material or reagent lot. It must reference the molecule identity it contains.
+
+```md
+:::material #mat-aryl-bromide-lot-a
+molecule: @mol-aryl-bromide
+supplier: Sigma
+lot: A123
+purity: 98 %
+density: 1.49 g/mL
+storage: flammable cabinet
+:::
+```
+
+| field | required | semantics |
+| --- | --- | --- |
+| `molecule` | yes | reference to a molecule |
+| `supplier` | no | supplier name |
+| `lot` | no | supplier or inventory lot |
+| `purity` | no | percent quantity |
+| `density` | no | raw density text |
+| `storage` | no | storage condition |
+| `notes` | no | free text notes |
+| `chemistry_features` | no | feature IDs separated by `|` or `,` |
+
+Reaction participants can reference material IDs directly:
+
+```md
+reactant: @mat-aryl-bromide-lot-a | 1.0 mmol | 1.0 eq | limiting=true
+```

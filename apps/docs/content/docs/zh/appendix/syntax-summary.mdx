@@ -53,6 +53,8 @@ multi: a ;; other: b
 | 块 | 语义 |
 | --- | --- |
 | `:::chemd` | molecule 或 reaction |
+| `:::material` | 库存物料 |
+| `:::batch` | 生成或纯化得到的批次 |
 | `:::result` | 实验结果 |
 | `:::analysis` | 分析数据 |
 | `:::procedure` | 实验过程 |
@@ -88,7 +90,7 @@ amount: 1.00 mmol
 
 ```md
 :::procedure #proc-main
-step: charge | id=s1 | inputs=@mol-a | amount=1.00 mmol
+step: charge | id=s1 | inputs=@mat-a | amount=1.00 mmol
 step: heat | id=s2 | temperature=80 C | duration=2 h | dependsOn=s1
 :::
 ```
@@ -123,7 +125,7 @@ col: Left narrative with @reaction.solvent.
 col: {
 :::result #res-main
 status: success
-yield: 80%
+yield: 80 %
 :::
 }
 :::

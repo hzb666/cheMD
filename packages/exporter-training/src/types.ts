@@ -49,6 +49,8 @@ export interface SourceNodeSnapshot {
   node_type:
     | "markdown"
     | "molecule"
+    | "material"
+    | "batch"
     | "reaction"
     | "result"
     | "analysis"
@@ -81,6 +83,8 @@ export interface ExportedDiagnostic {
 
 export interface SemanticLayerV1 {
   molecules: ExportedMoleculeV1[];
+  materials: ExportedMaterialV1[];
+  batches: ExportedBatchV1[];
   reactions: ExportedReactionV1[];
   results: ExportedResultV1[];
   analyses: ExportedAnalysisV1[];
@@ -112,9 +116,15 @@ export interface ExportedEntityBase {
 
 export interface NumericWithUnit {
   raw: string;
-  value: number;
+  value?: number;
+  min_value?: number;
+  max_value?: number;
+  uncertainty?: number;
   unit: string;
   original_unit?: string;
+  comparator?: string;
+  value_kind?: string;
+  normalized_text?: string;
 }
 
 export interface NormalizedTokenValue {
@@ -134,8 +144,11 @@ export interface ExportedMoleculeV1 extends ExportedEntityBase {
   caption?: string;
   smiles?: string;
   cas?: string;
+  inchi?: string;
+  inchikey?: string;
   canonical_smiles?: string;
   formula?: string;
+  mw?: string;
   amount_raw?: string;
   amount_value?: NumericWithUnit | null;
   equivalents_raw?: string;
@@ -144,15 +157,51 @@ export interface ExportedMoleculeV1 extends ExportedEntityBase {
   text_for_embedding?: string;
 }
 
+export interface ExportedMaterialV1 extends ExportedEntityBase {
+  source_node_type: "material";
+  molecule_ref_raw?: string;
+  supplier?: string;
+  lot?: string;
+  purity_raw?: string;
+  density?: string;
+  storage?: string;
+  notes?: string;
+  purity_percent?: number | null;
+  chemistry_feature_ref_ids?: string[];
+  text_for_embedding?: string;
+}
+
+export interface ExportedBatchV1 extends ExportedEntityBase {
+  source_node_type: "batch";
+  source_ref_raw?: string;
+  molecule_ref_raw?: string;
+  state?: string;
+  mass_raw?: string;
+  purity_raw?: string;
+  artifact_refs_raw?: string[];
+  mass?: NumericWithUnit | null;
+  purity_percent?: number | null;
+  notes?: string;
+  chemistry_feature_ref_ids?: string[];
+  text_for_embedding?: string;
+}
+
 export interface ReactionParticipantV1 {
   role: "reactant" | "product";
+  participant_id?: string;
   raw: string;
   reference_status: "resolved" | "unresolved" | "literal";
+  target_kind?: string;
   target_entity_id?: string;
   target_original_id?: string;
   name?: string;
   smiles?: string;
   canonical_smiles?: string;
+  amount?: NumericWithUnit | null;
+  mass?: NumericWithUnit | null;
+  volume?: NumericWithUnit | null;
+  equivalents?: number | null;
+  limiting?: boolean;
 }
 
 export interface NormalizedReactionConditionsV1 {
@@ -360,12 +409,24 @@ export interface ExportedRelationV1 {
   relation_type:
     | "document_primary"
     | "reaction_uses_molecule"
+    | "reaction_uses_material"
+    | "reaction_uses_batch"
     | "reaction_produces_molecule"
+    | "reaction_produces_material"
+    | "reaction_produces_batch"
+    | "material_is_molecule"
+    | "batch_derived_from_reaction"
+    | "batch_related_to_result"
+    | "batch_derived_from_sample"
+    | "batch_derived_from_batch"
+    | "batch_has_molecule"
     | "result_describes_reaction"
     | "analysis_targets_reaction"
     | "analysis_targets_sample"
     | "analysis_targets_result"
     | "sample_derived_from_reaction"
+    | "sample_from_batch"
+    | "sample_from_material"
     | "sample_related_to_molecule"
     | "sample_related_to_result"
     | "sample_derived_from_sample"
@@ -397,6 +458,8 @@ export interface RetrievalMetadataV1 {
   date: string;
   tags?: string[];
   molecule_ids?: string[];
+  material_ids?: string[];
+  batch_ids?: string[];
   reaction_ids?: string[];
   result_ids?: string[];
   analysis_ids?: string[];

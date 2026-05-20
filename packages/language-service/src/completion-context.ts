@@ -5,8 +5,8 @@ import type {
   ChemdEditorPosition
 } from "./completion-types";
 
-const reactionFields = new Set(["reactants", "products", "route", "prev", "reagents"]);
-const moleculeFields = new Set(["smiles", "cas", "formula", "amount", "equivalents"]);
+const reactionFields = new Set(["reactant", "product", "reac", "prod", "reactants", "products", "route", "prev", "reagents"]);
+const moleculeFields = new Set(["smiles", "cas", "inchi", "inchikey", "canonical_smiles", "formula", "mw"]);
 
 const splitSourceLines = (source: string): string[] =>
   source.split("\n").map((line) => (line.endsWith("\r") ? line.slice(0, -1) : line));
@@ -152,6 +152,8 @@ const normalizeBlockType = (type: string): string =>
 const isKnownBlockKind = (type: string): type is ChemdCompletionBlockKind =>
   [
     "molecule",
+    "material",
+    "batch",
     "reaction",
     "result",
     "procedure",

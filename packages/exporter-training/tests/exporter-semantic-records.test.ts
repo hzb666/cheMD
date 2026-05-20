@@ -85,6 +85,91 @@ name: ethanol
     expect(record.semantic_layer.molecules[0]).not.toMatchObject({ smiles: "64-17-5" });
   });
 
+  it("exports material, batch, and structured reaction participant links", () => {
+    const document = resolveChemd(parseChemd(`---
+id: exp-export-material-batch
+title: Export material batch
+date: 2026-05-20
+---
+
+:::chemd #mol-aryl
+kind: molecule
+smiles: Brc1ccccc1
+:::
+
+:::chemd #mol-boron
+kind: molecule
+smiles: OB(O)c1ccccc1
+:::
+
+:::chemd #mol-product
+kind: molecule
+smiles: c1ccc(-c2ccccc2)cc1
+:::
+
+:::material #mat-aryl-lot-a
+molecule: @mol-aryl
+supplier: Sigma
+lot: A123
+purity: 98 %
+:::
+
+:::chemd #rxn-main
+kind: reaction
+reactant: @mat-aryl-lot-a | 1.0 mmol | 1.0 eq | limiting=true
+reactant: @mol-boron | 1.5 eq
+product: @mol-product
+:::
+
+:::batch #batch-crude
+source: @rxn-main
+molecule: @mol-product
+state: crude
+mass: 120 mg
+purity: 84 %
+:::
+`));
+    const checked = typecheckDocument(document);
+    const record = exportTrainingRecordFromDocument(document, {
+      typedGraph: checked.typedGraph,
+      stepGraph: checked.stepGraph,
+      exportedAt: "2026-05-20T00:00:00.000Z"
+    });
+    const reaction = record.semantic_layer.reactions[0];
+    const relationTypes = record.semantic_layer.links.map((link) => link.relation_type);
+
+    expect(checked.diagnostics).toEqual([]);
+    expect(record.semantic_layer.materials[0]).toMatchObject({
+      original_id: "mat-aryl-lot-a",
+      molecule_ref_raw: "@mol-aryl",
+      purity_percent: 98
+    });
+    expect(record.semantic_layer.batches[0]).toMatchObject({
+      original_id: "batch-crude",
+      source_ref_raw: "@rxn-main",
+      molecule_ref_raw: "@mol-product",
+      mass: { value: 120, unit: "mg" },
+      purity_percent: 84
+    });
+    expect(reaction).toMatchObject({
+      reactants: expect.arrayContaining([
+        expect.objectContaining({
+          target_kind: "material",
+          target_original_id: "mat-aryl-lot-a",
+          amount: expect.objectContaining({ value: 1, unit: "mmol" }),
+          equivalents: 1,
+          limiting: true
+        })
+      ])
+    });
+    expect(relationTypes).toEqual(expect.arrayContaining([
+      "material_is_molecule",
+      "reaction_uses_material",
+      "batch_derived_from_reaction",
+      "batch_has_molecule"
+    ]));
+  });
+
   it("uses typed graph and canonical LNF data for training features", () => {
     const document = resolveChemd(parseChemd(`---
 id: exp-export-typed
@@ -96,28 +181,26 @@ primary_result: res-main
 :::chemd #mol-a
 kind: molecule
 smiles: CCO
-amount: 1.2 mmol
-equivalents: 1.0 equiv
 :::
 
 :::chemd #rxn-main
 kind: reaction
-reactants: @mol-a
-products: product
+reactant: @mol-a | 1.2 mmol | 1.0 equiv | limiting=true
+product: product
 solvent: THF
 temperature: 25 C
-yield: 81%
+yield: 81 %
 :::
 
 :::result #res-main
 status: success
-yield: 80%
-purity: 95%
+yield: 80 %
+purity: 95 %
 :::
 
 :::sample #sample-main
 name: final product
-purity: 95%
+purity: 95 %
 :::
 `));
     const checked = typecheckDocument(document);
@@ -136,10 +219,17 @@ purity: 95%
 
     expect(record.semantic_layer.lnf?.schemaVersion).toBe("chemd-lnf/v0.5");
     expect(record.semantic_layer.molecules[0]).toMatchObject({
-      amount_value: { value: 1.2, unit: "mmol" },
-      equivalents_value: 1
+      original_id: "mol-a",
+      smiles: "CCO"
     });
     expect(record.semantic_layer.reactions[0]).toMatchObject({
+      reactants: expect.arrayContaining([
+        expect.objectContaining({
+          amount: expect.objectContaining({ value: 1.2, unit: "mmol" }),
+          equivalents: 1,
+          limiting: true
+        })
+      ]),
       normalized_outcome_hints: {
         yield_percent: 81
       }
@@ -196,7 +286,7 @@ solvent: THF
 :::result #res-main
 ref: rxn-main
 status: success
-yield: 80%
+yield: 80 %
 notes: isolated product after workup
 :::
 
@@ -204,7 +294,7 @@ notes: isolated product after workup
 ref: mol-product
 name: final product
 batch: B-001
-purity: 95%
+purity: 95 %
 notes: stored under nitrogen
 :::
 
@@ -289,7 +379,7 @@ date: 2026-04-24
 :::result #res-local
 reaction: ext-doc#rxn-main
 status: success
-yield: 88%
+yield: 88 %
 :::
 
 :::sample #sample-local

@@ -67,18 +67,18 @@ time: 2 h
 ref: rxn-var1
 product: @mol-product
 status: success
-yield: 78%
-conversion: 96%
-purity: 97%
+yield: 78 %
+conversion: 96 %
+purity: 97 %
 :::
 
 :::result #res-var2
 ref: rxn-var2
 product: @mol-product
 status: failed
-yield: 18%
-conversion: 25%
-purity: 61%
+yield: 18 %
+conversion: 25 %
+purity: 61 %
 :::
 
 :::condition-varies #cv-screen

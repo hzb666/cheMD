@@ -32,7 +32,7 @@ time: 1 h
 reaction: rxn-main
 product: mol-product
 status: success
-yield: 88%
+yield: 88 %
 :::
 
 :::template reaction-note

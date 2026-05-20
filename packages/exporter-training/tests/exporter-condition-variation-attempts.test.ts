@@ -29,13 +29,13 @@ reactants: substrate
 products: product
 solvent: THF
 temperature: 25 C
-yield: 40%
+yield: 40 %
 :::
 
 :::result #res-standard
 ref: rxn-standard
 status: partial
-yield: 40%
+yield: 40 %
 :::
 
 :::chemd #rxn-var1
@@ -44,13 +44,13 @@ reactants: substrate
 products: product
 solvent: MeCN
 temperature: 40 C
-yield: 78%
+yield: 78 %
 :::
 
 :::result #res-var1
 ref: rxn-var1
 status: success
-yield: 78%
+yield: 78 %
 :::
 
 :::chemd #rxn-var2
@@ -59,13 +59,13 @@ reactants: substrate
 products: product
 solvent: DMSO
 temperature: 60 C
-yield: 12%
+yield: 12 %
 :::
 
 :::result #res-var2
 ref: rxn-var2
 status: partial
-yield: 12%
+yield: 12 %
 :::
 
 :::condition-varies #cv-screen

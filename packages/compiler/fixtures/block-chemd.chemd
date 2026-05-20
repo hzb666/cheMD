@@ -12,8 +12,6 @@ kind: molecule
 name: benzyl bromide
 smiles: BrCc1ccccc1
 role: substrate
-amount: 1.0 mmol
-equivalents: 1.0 equiv
 :::
 
 :::chemd #mol-product
@@ -21,31 +19,29 @@ kind: molecule
 name: benzyl acetate
 smiles: CC(=O)OCc1ccccc1
 role: product
-amount: 0.78 mmol
-equivalents: 0.78 equiv
 :::
 
 :::chemd #rxn-main
 kind: reaction
 name: acetate substitution
-reactants: @mol-substrate
-products: @mol-product
+reactant: @mol-substrate | 1.0 mmol | 1.0 equiv | limiting=true
+product: @mol-product
 reagents: KOAc
 solvent: DMF
 temperature: 80 C
 time: 4 h
 pressure: 1 atm
 atmosphere: nitrogen
-yield: 78%
+yield: 78 %
 :::
 
 :::result #res-main
 reaction: rxn-main
 product: mol-product
 status: success
-yield: 78%
-conversion: 92%
-purity: 96%
+yield: 78 %
+conversion: 92 %
+purity: 96 %
 :::
 
 :::analysis #ana-main

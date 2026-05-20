@@ -10,6 +10,8 @@ export type ChemdRenderableNodeTypeV1 =
   | "ChemdListNode"
   | "ChemdTableNode"
   | "ChemdMoleculeNode"
+  | "ChemdMaterialNode"
+  | "ChemdBatchNode"
   | "ChemdReactionNode"
   | "ChemdConditionNode"
   | "ChemdProcedureNode"

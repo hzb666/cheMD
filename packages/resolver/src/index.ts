@@ -11,7 +11,9 @@ import type {
 import { validateTemplateParams } from "./template-params";
 
 const REQUIRED_FIELDS: Record<string, string[]> = {
-  molecule: ["smiles"],
+  molecule: [],
+  material: ["molecule"],
+  batch: ["source"],
   reaction: ["reactants", "products"],
   analysis: ["type_name", "data"],
   sample: ["name"],
@@ -34,6 +36,8 @@ const MAX_TEMPLATE_EXPANDED_NODES = 2000;
 const isObjectNode = (node: ChemdNode): node is ObjectNode =>
   [
     "molecule",
+    "material",
+    "batch",
     "reaction",
     "result",
     "analysis",

@@ -22,6 +22,7 @@ describe("canonical LNF builder", () => {
           next: [],
           reactants: [],
           products: [],
+          participants: [],
           normalizedConditions: {
             solvent: {
               raw: "THF",
@@ -166,6 +167,17 @@ describe("canonical LNF builder", () => {
             resolved: true
           }],
           products: [],
+          participants: [{
+            id: "rxn-main.reactant.1",
+            role: "reactant",
+            raw: "@mol-a",
+            reference: {
+              kind: "reference",
+              targetKind: "molecule",
+              refId: "mol-a",
+              resolved: true
+            }
+          }],
           normalizedConditions: {}
         }],
         quantities: [],

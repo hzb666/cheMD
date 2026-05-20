@@ -60,7 +60,7 @@ products: product-a
 :::result #res-a
 reaction: rxn-a
 status: success
-yield: 72%
+yield: 72 %
 :::
 `;
 

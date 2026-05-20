@@ -27,7 +27,7 @@ products: product-main
 
 :::result #res-main
 status: success
-yield: 78%
+yield: 78 %
 :::
 `;
 
@@ -261,7 +261,7 @@ products: product-b
 :::result #res-step-02
 reaction: rxn-step-02
 status: success
-yield: 82%
+yield: 82 %
 :::
 `;
 

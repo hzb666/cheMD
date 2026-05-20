@@ -43,7 +43,7 @@ export const DEFAULT_SAMPLE_SOURCE_NAME = "ethanol-oxidation.chemd";
 
 export const sampleSources: Record<string, string> = {
   [DEFAULT_SAMPLE_SOURCE_NAME]: playgroundSampleSource,
-  "suzuki-screen.chemd": "---\nid: exp-desktop-suzuki\ntitle: Suzuki coupling condition screen\ndate: 2026-05-12\n---\n\n:::chemd #mol-aryl-bromide\nsmiles: Cc1ccc(Br)cc1\n:::\n\n:::chemd #mol-boronic-acid\nsmiles: OB(O)c1ccccc1\n:::\n\n:::chemd #mol-biaryl-product\nsmiles: Cc1ccc(-c2ccccc2)cc1\n:::\n\n:::chemd #rxn-screen\nkind: reaction\nreactants: @mol-aryl-bromide | @mol-boronic-acid\nproducts: @mol-biaryl-product\nconditions:\n  catalyst: Pd(PPh3)4\n  base: K2CO3\n  solvent: dioxane/water\n:::\n\n:::result #screen-result\nstatus: pending\nyield: 78%\n:::\n",
+  "suzuki-screen.chemd": "---\nid: exp-desktop-suzuki\ntitle: Suzuki coupling condition screen\ndate: 2026-05-12\n---\n\n:::chemd #mol-aryl-bromide\nsmiles: Cc1ccc(Br)cc1\n:::\n\n:::chemd #mol-boronic-acid\nsmiles: OB(O)c1ccccc1\n:::\n\n:::chemd #mol-biaryl-product\nsmiles: Cc1ccc(-c2ccccc2)cc1\n:::\n\n:::chemd #rxn-screen\nkind: reaction\nreactants: @mol-aryl-bromide | @mol-boronic-acid\nproducts: @mol-biaryl-product\nconditions:\n  catalyst: Pd(PPh3)4\n  base: K2CO3\n  solvent: dioxane/water\n:::\n\n:::result #screen-result\nstatus: pending\nyield: 78 %\n:::\n",
   "calibration.chemd": "---\nid: exp-desktop-calibration\ntitle: HPLC calibration record\ndate: 2026-05-12\n---\n\n:::sample #std-a\nname: caffeine standard\namount: 2.0 mg\n:::\n\n:::analysis #calibration\nmethod: HPLC-UV\ntarget: caffeine\nresult: linear fit accepted\n:::\n"
 };
 

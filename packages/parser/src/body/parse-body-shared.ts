@@ -142,6 +142,7 @@ export interface KeyValueParseOptions {
   allowField?: (key: string) => boolean;
   resolveField?: (key: string) => string | undefined;
   listFields?: Set<string>;
+  getListMode?: (key: string, resolvedKey: string) => "pipe" | "repeat" | undefined;
   blockTypeForDiagnostics?: string;
   sourceNodeId?: string;
 }
@@ -185,9 +186,18 @@ export const parseKeyValueLines = (
         continue;
       }
 
-      fields[resolvedKey] = listFields.has(resolvedKey)
-        ? splitListValue(key, rawValue, diagnostics)
-        : rawValue.trim();
+      const listMode = options.getListMode?.(key, resolvedKey)
+        ?? (listFields.has(resolvedKey) ? "pipe" : undefined);
+      if (listMode) {
+        const existing = Array.isArray(fields[resolvedKey]) ? fields[resolvedKey] as string[] : [];
+        const values = listMode === "pipe"
+          ? splitListValue(key, rawValue, diagnostics)
+          : [rawValue.trim()].filter(Boolean);
+        fields[resolvedKey] = [...existing, ...values];
+        continue;
+      }
+
+      fields[resolvedKey] = rawValue.trim();
     }
   });
 

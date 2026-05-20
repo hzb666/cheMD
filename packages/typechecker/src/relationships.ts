@@ -19,7 +19,7 @@ interface SampleRelationshipResolution {
 }
 
 const normalizeReferenceId = (value: string): string =>
-  value.startsWith("@") ? value.slice(1).trim() : value.trim();
+  (value.split("|")[0]?.trim() ?? value.trim()).replace(/^@/, "");
 
 const findReactionNode = (
   reference: ReferenceOrLiteral | undefined,

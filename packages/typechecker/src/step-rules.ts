@@ -45,7 +45,10 @@ const STEP_QUANTITY_FIELDS: Record<string, QuantityClass> = {
   concentration: "concentration",
   equivalent: "equivalent",
   equivalents: "equivalent",
-  percent: "percent"
+  percent: "percent",
+  rate: "rate",
+  rpm: "rpm",
+  ph: "ph"
 };
 
 const REQUIRED_PARAM_HINTS: Partial<Record<StepFamily, { keys: string[]; expected: string }>> = {
@@ -103,9 +106,7 @@ export const normalizeStepParams = (
     if (parsed.quantity) {
       quantities.push(parsed.quantity);
     }
-    if (parsed.diagnostic) {
-      diagnostics.push(parsed.diagnostic);
-    }
+    diagnostics.push(...(parsed.diagnostics ?? (parsed.diagnostic ? [parsed.diagnostic] : [])));
   }
 
   return { params: normalized, quantities, diagnostics };

@@ -7,7 +7,7 @@ description: Chemd 语言、校验、CLI 和导出能力的字段级索引。
 
 ## 语言输入面
 
-Chemd 接收 Markdown 正文、YAML frontmatter、`:::` 结构化块、模板块、列布局块、行内引用、行内化学表达式、行内代码和 Markdown 链接。支持的结构化块名称包含 `chemd`、`result`、`analysis`、`artifact`、`sample`、`condition-varies`、`procedure`、`observation`、`use` 和 `col`。`template` 使用 `bind`、`params`、`description` 和 `body` 头部字段。
+Chemd 接收 Markdown 正文、YAML frontmatter、`:::` 结构化块、模板块、列布局块、行内引用、行内化学表达式、行内代码和 Markdown 链接。支持的结构化块名称包含 `chemd`、`material`、`batch`、`result`、`analysis`、`artifact`、`sample`、`condition-varies`、`procedure`、`observation`、`use` 和 `col`。`template` 使用 `bind`、`params`、`description` 和 `body` 头部字段。
 
 未知结构化块产生 `W_UNKNOWN_BLOCK`。
 
@@ -40,9 +40,11 @@ Chemd 接收 Markdown 正文、YAML frontmatter、`:::` 结构化块、模板块
 
 ## 结构化对象特性
 
-- `:::chemd`：通过 `kind` 或字段形状生成 molecule 或 reaction。缺少 `kind` 时按 reaction 形状字段推断；无法稳定推断时产生 `W_CHEMD_KIND_AMBIGUOUS` error。
-- molecule 字段：`smiles`、`cas`、`name`、`role`、`caption`、`formula`、`amount`、`equivalents`、`chemistry_features`。
-- reaction 字段：`name`、`reactants`、`products`、`reactant`、`product`、`reac`、`prod`、`conditions`、`route`、`prev`、`reagents`、`catalyst`、`solvent`、`temperature`、`time`、`pressure`、`atmosphere`、`yield`、`conversion`、`selectivity`、`caption`、`chemistry_features`。
+- `:::chemd`：通过 `kind` 或字段形状生成 molecule 或 reaction。缺少 `kind` 时按 reaction participant 字段或 molecule identity 字段推断；无法稳定推断时产生 `W_CHEMD_KIND_AMBIGUOUS` error。
+- molecule 字段：`smiles`、`canonical_smiles`、`cas`、`inchi`、`inchikey`、`name`、`role`、`caption`、`formula`、`mw`、`chemistry_features`。
+- reaction 字段：`name`、`reactant`、`product`、`reac`、`prod`、`reactants`、`products`、`conditions`、`route`、`prev`、`reagents`、`catalyst`、`solvent`、`temperature`、`time`、`pressure`、`atmosphere`、`yield`、`conversion`、`selectivity`、`equation`、`rxn_smiles`、`caption`、`chemistry_features`。
+- `:::material` 字段：`molecule`、`supplier`、`lot`、`purity`、`density`、`storage`、`notes`、`chemistry_features`。
+- `:::batch` 字段：`source`、`molecule`、`state`、`mass`、`purity`、`artifacts`、`notes`、`chemistry_features`。
 - `:::result` 字段：`status`、`yield`、`conversion`、`selectivity`、`isolated_mass`、`product_state`、`purity`、`notes`、`ref`、`reaction`、`product`。
 - `:::analysis` 字段：`type`、`ref`、`time`、`eluent`、`plate`、`visualization`、`result`、`instrument`、`solvent`、`frequency`、`method`、`data`、`notes`、`p1` 到 `pN`。
 - `:::sample` 字段：`name`、`sample_id`、`batch`、`purity`、`supplier`、`notes`、`ref`、`derived_from`、`aliquot_of`、`batch_of`、`artifacts`、`chemistry_features`。
@@ -54,9 +56,9 @@ Chemd 接收 Markdown 正文、YAML frontmatter、`:::` 结构化块、模板块
 
 ## Resolver 与 Typechecker 特性
 
-resolver 构建对象索引，检查重复 ID，解析行内引用，解析 primary alias，展开模板，校验必填字段。必填字段为 molecule `smiles`、reaction `reactants` 与 `products`、analysis `type_name` 与 `data`、sample `name`、artifact `kind` 与 `path`。TLC analysis 只要求 `type_name`。
+resolver 构建对象索引，检查重复 ID，解析行内引用，解析 primary alias，展开模板，校验必填字段。必填字段为 material `molecule`、batch `source`、analysis `type_name` 与 `data`、sample `name`、artifact `kind` 与 `path`。molecule identity 与 reaction participant 存在性由 typechecker 校验。TLC analysis 只要求 `type_name`。
 
-typechecker 构建 typed semantic graph、step graph、数量单位归一化、引用类型检查、结果关系检查、样品关系检查、reaction route 检查和 observation 事件链接检查。数量单位覆盖 amount、mass、volume、temperature、time、pressure、concentration、equivalent 和 percent。percent 超出 0 到 100 产生 `E402`，无法解析数量产生 `E403`。
+typechecker 构建 typed semantic graph、step graph、数量单位归一化、引用类型检查、结果关系检查、样品关系检查、reaction route 检查、reaction participant 化学计量检查和 observation 事件链接检查。数量单位覆盖 amount、mass、volume、temperature、time、pressure、concentration、equivalent、percent、rate、rpm 和 pH。percent 超出 0 到 100 产生 `E402`，无法解析数量或紧凑数字-单位语法产生 `E403`，单位大小写不规范产生 `W_QUANTITY_UNIT_CASING`。
 
 ## Procedure 与 Observation 特性
 
@@ -66,7 +68,7 @@ typechecker 构建 typed semantic graph、step graph、数量单位归一化、�
 
 ## 模板特性
 
-`:::template name` 支持 `params`、`bind`、`description` 和 body。参数类型支持 `string`、`ref<kind>` 和 `quantity<class>`。ref kind 支持 molecule、reaction、result、analysis、procedure、observation、sample、artifact 和 condition_varies。quantity class 支持 amount、mass、volume、temperature、time、pressure、concentration、equivalent 和 percent。
+`:::template name` 支持 `params`、`bind`、`description` 和 body。参数类型支持 `string`、`ref<kind>` 和 `quantity<class>`。ref kind 支持 molecule、material、batch、reaction、result、analysis、procedure、observation、sample、artifact 和 condition_varies。quantity class 支持 amount、mass、volume、temperature、time、pressure、concentration、equivalent、percent、rate、rpm 和 pH。
 
 模板展开最大深度为 32，最大展开节点数为 2000。循环产生 `E_TEMPLATE_CYCLE`，未知模板产生 `E_UNKNOWN_TEMPLATE`，缺参产生 `E_TEMPLATE_PARAM_MISSING`，类型不匹配产生 `E_TEMPLATE_PARAM_TYPE_MISMATCH`。
 

@@ -70,9 +70,9 @@ atmosphere: nitrogen
 ref: rxn-standard
 product: @mol-product
 status: partial
-yield: 41%
-conversion: 58%
-purity: 84%
+yield: 41 %
+conversion: 58 %
+purity: 84 %
 notes: Baseline THF entry stops at partial conversion.
 :::
 
@@ -80,10 +80,10 @@ notes: Baseline THF entry stops at partial conversion.
 ref: rxn-var1
 product: @mol-product
 status: success
-yield: 78%
-conversion: 96%
-selectivity: 93%
-purity: 97%
+yield: 78 %
+conversion: 96 %
+selectivity: 93 %
+purity: 97 %
 notes: Best balance of conversion and purity in the solvent screen.
 :::
 
@@ -91,9 +91,9 @@ notes: Best balance of conversion and purity in the solvent screen.
 ref: rxn-var2
 product: @mol-product
 status: failed
-yield: 18%
-conversion: 25%
-purity: 61%
+yield: 18 %
+conversion: 25 %
+purity: 61 %
 notes: Override condition increases impurity and depresses yield.
 :::
 
@@ -185,7 +185,7 @@ artifacts: art-tlc-var1
 ref: res-var1
 name: purified product from var1
 derived_from: sample-batch-var1
-purity: 97%
+purity: 97 %
 artifacts: art-nmr-var1
 :::
 

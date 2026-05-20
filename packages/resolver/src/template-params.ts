@@ -5,18 +5,7 @@ import type {
   TemplateParamSpec,
   UseNode
 } from "@chemd/core";
-
-const QUANTITY_UNITS: Record<string, Set<string>> = {
-  amount: new Set(["mmol", "mol"]),
-  mass: new Set(["mg", "g", "kg"]),
-  volume: new Set(["ml", "mL", "l", "L"]),
-  temperature: new Set(["C", "°C", "℃", "K", "F"]),
-  time: new Set(["h", "hr", "hrs", "min", "mins", "分钟", "小时"]),
-  pressure: new Set(["bar", "atm", "psi"]),
-  concentration: new Set(["M", "mM"]),
-  equivalent: new Set(["equiv", "eq"]),
-  percent: new Set(["%", "percent"])
-};
+import { getQuantityClassUnits, isQuantityClass, normalizeQuantityUnitKey } from "@chemd/core";
 
 const hasOwn = <TValue>(record: Record<string, TValue>, key: string): boolean =>
   Object.prototype.hasOwnProperty.call(record, key);
@@ -87,10 +76,8 @@ const validateReferenceParam = (
   }
 };
 
-const normalizeUnit = (unit: string): string => unit.trim().toLowerCase();
-
 const isQuantityValue = (rawValue: string, quantityClass: string | undefined): boolean => {
-  const match = rawValue.trim().match(/^-?\d+(?:\.\d+)?\s*([a-zA-Z%°℃]+)$/);
+  const match = rawValue.trim().match(/^-?\d+(?:\.\d+)?\s+(°\s*C|℃|[a-zA-Z]+(?:\s*\/\s*[a-zA-Z%]+|\s*%)?|%)$/);
   if (!match) {
     return false;
   }
@@ -99,8 +86,12 @@ const isQuantityValue = (rawValue: string, quantityClass: string | undefined): b
     return true;
   }
 
-  const units = QUANTITY_UNITS[quantityClass];
-  return Boolean(units && [...units].some((unit) => normalizeUnit(unit) === normalizeUnit(match[1])));
+  if (!isQuantityClass(quantityClass)) {
+    return false;
+  }
+
+  const unitKey = normalizeQuantityUnitKey(match[1]);
+  return getQuantityClassUnits(quantityClass).some((unit) => normalizeQuantityUnitKey(unit.unit) === unitKey);
 };
 
 const validateQuantityParam = (

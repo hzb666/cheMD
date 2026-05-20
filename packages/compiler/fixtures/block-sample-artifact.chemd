@@ -32,7 +32,7 @@ time: 30 min
 reaction: rxn-main
 product: mol-product
 status: success
-yield: 70%
+yield: 70 %
 :::
 
 :::sample #sample-crude
@@ -49,7 +49,7 @@ ref: res-main
 derived_from: sample-crude
 aliquot_of: sample-crude
 batch_of: sample-crude
-purity: 97%
+purity: 97 %
 artifacts: art-nmr | art-hplc
 :::
 

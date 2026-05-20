@@ -1,10 +1,12 @@
 import type {
   AnalysisNode,
   ArtifactNode,
+  BatchNode,
   ChemdDocument,
   ChemdNode,
   ConditionVariesNode,
   MarkdownNode,
+  MaterialNode,
   MoleculeNode,
   ReactionNode,
   ResultNode,
@@ -19,8 +21,10 @@ import {
 import type {
   ExportedAnalysisV1,
   ExportedArtifactV1,
+  ExportedBatchV1,
   ExportedConditionVariationAttemptV1,
   ExportedConditionVaryV1,
+  ExportedMaterialV1,
   ExportedMarkdownBlockV1,
   ExportedMoleculeV1,
   ExportedReactionV1,
@@ -37,8 +41,11 @@ import type {
   ReferenceOrLiteral,
   TypedAnalysisNode,
   TypedArtifactNode,
+  TypedBatchNode,
   TypedConditionVariesNode,
+  TypedMaterialNode,
   TypedMoleculeNode,
+  TypedReactionParticipant,
   TypedReactionNode,
   TypedResultNode,
   TypedSampleNode,
@@ -57,7 +64,7 @@ const compactText = (...parts: Array<string | undefined>): string | undefined =>
 };
 
 const buildEntityId = (
-  prefix: "mol" | "rxn" | "res" | "ana" | "sam" | "art" | "cv" | "cva" | "md",
+  prefix: "mol" | "mat" | "bat" | "rxn" | "res" | "ana" | "sam" | "art" | "cv" | "cva" | "md",
   documentId: string,
   originalId: string | undefined,
   nodeIndex: number
@@ -66,6 +73,8 @@ const buildEntityId = (
 type PrimaryNodeType = "molecule" | "reaction" | "result" | "analysis" | "sample";
 type ExportedObjectEntity =
   | ExportedMoleculeV1
+  | ExportedMaterialV1
+  | ExportedBatchV1
   | ExportedReactionV1
   | ExportedResultV1
   | ExportedAnalysisV1
@@ -81,6 +90,8 @@ type EntityIndex = Map<string, ExportedObjectEntity>;
 
 const SOURCE_NODE_TYPE_BY_TARGET_KIND: Partial<Record<ReferenceTargetKind, ResolvedEntityTarget["source_node_type"]>> = {
   molecule: "molecule",
+  material: "material",
+  batch: "batch",
   reaction: "reaction",
   result: "result",
   analysis: "analysis",
@@ -163,7 +174,13 @@ const toNumericWithUnit = (quantity: QuantityType | undefined): NumericWithUnit 
     raw: quantity.raw,
     value,
     unit,
-    ...(quantity.unit && quantity.unit !== unit ? { original_unit: quantity.unit } : {})
+    ...(typeof quantity.minValue === "number" ? { min_value: quantity.minValue } : {}),
+    ...(typeof quantity.maxValue === "number" ? { max_value: quantity.maxValue } : {}),
+    ...(typeof quantity.uncertainty === "number" ? { uncertainty: quantity.uncertainty } : {}),
+    ...(quantity.unit && quantity.unit !== unit ? { original_unit: quantity.unit } : {}),
+    ...(quantity.comparator ? { comparator: quantity.comparator } : {}),
+    ...(quantity.valueKind ? { value_kind: quantity.valueKind } : {}),
+    ...(quantity.normalizedText ? { normalized_text: quantity.normalizedText } : {})
   };
 };
 
@@ -210,61 +227,151 @@ const buildMolecule = (
   caption: node.caption,
   smiles: node.smiles,
   cas: node.cas,
+  inchi: node.inchi,
+  inchikey: node.inchikey,
+  canonical_smiles: node.canonical_smiles,
   formula: node.formula,
+  mw: node.mw,
   amount_raw: node.amount,
   amount_value: toNumericWithUnit(typedMolecule?.amount),
   equivalents_raw: node.equivalents,
   equivalents_value: toNumericValue(typedMolecule?.equivalents),
   chemistry_feature_ref_ids: readChemistryFeatureIds(node),
-  text_for_embedding: compactText(node.name, node.smiles, node.cas, node.role, node.formula, node.caption)
+  text_for_embedding: compactText(
+    node.name,
+    node.smiles,
+    node.canonical_smiles,
+    node.cas,
+    node.inchi,
+    node.inchikey,
+    node.role,
+    node.formula,
+    node.mw,
+    node.caption
+  )
+});
+
+const buildMaterial = (
+  documentId: string,
+  node: MaterialNode,
+  nodeIndex: number,
+  typedMaterial: TypedMaterialNode | undefined
+): ExportedMaterialV1 => ({
+  entity_id: buildEntityId("mat", documentId, node.id, nodeIndex),
+  original_id: node.id,
+  node_index: nodeIndex,
+  source_node_type: "material",
+  ...createEntityBase("material", node),
+  molecule_ref_raw: node.molecule,
+  supplier: node.supplier,
+  lot: node.lot,
+  purity_raw: node.purity,
+  density: node.density,
+  storage: node.storage,
+  notes: node.notes,
+  purity_percent: toNumericValue(typedMaterial?.purity),
+  chemistry_feature_ref_ids: readChemistryFeatureIds(node),
+  text_for_embedding: compactText(node.molecule, node.supplier, node.lot, node.purity, node.storage, node.notes)
+});
+
+const buildBatch = (
+  documentId: string,
+  node: BatchNode,
+  nodeIndex: number,
+  typedBatch: TypedBatchNode | undefined
+): ExportedBatchV1 => ({
+  entity_id: buildEntityId("bat", documentId, node.id, nodeIndex),
+  original_id: node.id,
+  node_index: nodeIndex,
+  source_node_type: "batch",
+  ...createEntityBase("batch", node),
+  source_ref_raw: node.source,
+  molecule_ref_raw: node.molecule,
+  state: node.state,
+  mass_raw: node.mass,
+  purity_raw: node.purity,
+  artifact_refs_raw: node.artifacts,
+  mass: toNumericWithUnit(typedBatch?.mass),
+  purity_percent: toNumericValue(typedBatch?.purity),
+  notes: node.notes,
+  chemistry_feature_ref_ids: readChemistryFeatureIds(node),
+  text_for_embedding: compactText(node.source, node.molecule, node.state, node.mass, node.purity, node.notes)
 });
 
 const createParticipant = (
   role: "reactant" | "product",
   raw: string,
-  moleculeByOriginalId: Map<string, ExportedMoleculeV1>,
-  typedReference?: ReferenceOrLiteral
+  entityByOriginalId: Map<string, ExportedObjectEntity>,
+  typedParticipant?: TypedReactionParticipant
 ): ReactionParticipantV1 => {
-  if (!raw.startsWith("@")) {
+  const reference = typedParticipant?.reference;
+  const head = reference?.kind === "reference" ? `@${reference.refId}` : raw.split("|")[0]?.trim() ?? raw;
+  if (reference?.kind !== "reference" && !head.startsWith("@")) {
     return {
       role,
+      participant_id: typedParticipant?.id,
       raw,
-      reference_status: "literal"
+      reference_status: "literal",
+      amount: toNumericWithUnit(typedParticipant?.amount),
+      mass: toNumericWithUnit(typedParticipant?.mass),
+      volume: toNumericWithUnit(typedParticipant?.volume),
+      equivalents: toNumericValue(typedParticipant?.equivalents),
+      limiting: typedParticipant?.limiting
     };
   }
 
-  const candidateId = raw.slice(1).trim();
-  const molecule = moleculeByOriginalId.get(candidateId);
+  const candidateId = reference?.kind === "reference" ? reference.refId : head.slice(1).trim();
+  const target = entityByOriginalId.get(candidateId);
 
-  if (molecule) {
+  if (target) {
     return {
       role,
+      participant_id: typedParticipant?.id,
       raw,
       reference_status: "resolved",
-      target_entity_id: molecule.entity_id,
-      target_original_id: molecule.original_id,
-      name: molecule.name,
-      smiles: molecule.smiles,
-      canonical_smiles: molecule.canonical_smiles
+      target_kind: target.source_node_type,
+      target_entity_id: target.entity_id,
+      target_original_id: target.original_id,
+      ...("name" in target ? { name: target.name } : {}),
+      ...("smiles" in target ? { smiles: target.smiles } : {}),
+      ...("canonical_smiles" in target ? { canonical_smiles: target.canonical_smiles } : {}),
+      amount: toNumericWithUnit(typedParticipant?.amount),
+      mass: toNumericWithUnit(typedParticipant?.mass),
+      volume: toNumericWithUnit(typedParticipant?.volume),
+      equivalents: toNumericValue(typedParticipant?.equivalents),
+      limiting: typedParticipant?.limiting
     };
   }
 
-  const externalTarget = isResolvedReference(typedReference)
-    ? buildExternalReferencedEntity(typedReference.targetKind, typedReference.refId)
+  const externalTarget = isResolvedReference(reference)
+    ? buildExternalReferencedEntity(reference.targetKind, reference.refId)
     : undefined;
 
-  return externalTarget?.source_node_type === "molecule"
+  return externalTarget && ["molecule", "material", "batch"].includes(externalTarget.source_node_type)
     ? {
         role,
+        participant_id: typedParticipant?.id,
         raw,
         reference_status: "resolved",
+        target_kind: externalTarget.source_node_type,
         target_entity_id: externalTarget.entity_id,
-        target_original_id: externalTarget.original_id
+        target_original_id: externalTarget.original_id,
+        amount: toNumericWithUnit(typedParticipant?.amount),
+        mass: toNumericWithUnit(typedParticipant?.mass),
+        volume: toNumericWithUnit(typedParticipant?.volume),
+        equivalents: toNumericValue(typedParticipant?.equivalents),
+        limiting: typedParticipant?.limiting
       }
     : {
         role,
+        participant_id: typedParticipant?.id,
         raw,
-        reference_status: "unresolved"
+        reference_status: "unresolved",
+        amount: toNumericWithUnit(typedParticipant?.amount),
+        mass: toNumericWithUnit(typedParticipant?.mass),
+        volume: toNumericWithUnit(typedParticipant?.volume),
+        equivalents: toNumericValue(typedParticipant?.equivalents),
+        limiting: typedParticipant?.limiting
       };
 };
 
@@ -273,17 +380,19 @@ interface BuildReactionInput {
   node: ReactionNode;
   nodeIndex: number;
   isPrimary: boolean;
-  moleculeByOriginalId: Map<string, ExportedMoleculeV1>;
+  entityByOriginalId: Map<string, ExportedObjectEntity>;
   typedReaction?: TypedReactionNode;
 }
 
 const buildReaction = (input: BuildReactionInput): ExportedReactionV1 => {
-  const { documentId, node, nodeIndex, isPrimary, moleculeByOriginalId, typedReaction } = input;
+  const { documentId, node, nodeIndex, isPrimary, entityByOriginalId, typedReaction } = input;
+  const typedReactants = typedReaction?.participants.filter((participant) => participant.role === "reactant") ?? [];
+  const typedProducts = typedReaction?.participants.filter((participant) => participant.role === "product") ?? [];
   const reactants = asNodeArray(node.reactants).map((raw, index) =>
-    createParticipant("reactant", raw, moleculeByOriginalId, typedReaction?.reactants[index])
+    createParticipant("reactant", raw, entityByOriginalId, typedReactants[index])
   );
   const products = asNodeArray(node.products).map((raw, index) =>
-    createParticipant("product", raw, moleculeByOriginalId, typedReaction?.products[index])
+    createParticipant("product", raw, entityByOriginalId, typedProducts[index])
   );
   const conditions = asNodeArray(node.conditions);
   const compactConditions = conditions.length > 0 ? conditions : undefined;
@@ -682,6 +791,10 @@ const getTargetByEntityId = (
     switch (prefix) {
       case "mol":
         return "molecule" as const;
+      case "mat":
+        return "material" as const;
+      case "bat":
+        return "batch" as const;
       case "rxn":
         return "reaction" as const;
       case "res":
@@ -720,15 +833,89 @@ const buildReactionParticipantLinks = (
   reactions.flatMap((reaction) => [
     ...reaction.reactants.flatMap((participant) =>
       participant.target_entity_id
-        ? [createRelation(documentId, "reaction_uses_molecule", reaction.entity_id, participant.target_entity_id, "reactant")]
+        ? [createRelation(
+            documentId,
+            participant.target_kind === "material"
+              ? "reaction_uses_material"
+              : participant.target_kind === "batch" ? "reaction_uses_batch" : "reaction_uses_molecule",
+            reaction.entity_id,
+            participant.target_entity_id,
+            "reactant"
+          )]
         : []
     ),
     ...reaction.products.flatMap((participant) =>
       participant.target_entity_id
-        ? [createRelation(documentId, "reaction_produces_molecule", reaction.entity_id, participant.target_entity_id, "product")]
+        ? [createRelation(
+            documentId,
+            participant.target_kind === "material"
+              ? "reaction_produces_material"
+              : participant.target_kind === "batch" ? "reaction_produces_batch" : "reaction_produces_molecule",
+            reaction.entity_id,
+            participant.target_entity_id,
+            "product"
+          )]
         : []
     )
   ]);
+
+const buildMaterialLinks = (
+  documentId: string,
+  materials: ExportedMaterialV1[],
+  entityByOriginalId: Map<string, ExportedObjectEntity>,
+  typedNodes: TypedNodeIndex
+): ExportedRelationV1[] =>
+  materials.flatMap((material) => {
+    const typedMaterial = material.original_id ? typedNodes.get(material.original_id) : undefined;
+    const target = typedMaterial?.kind === "material"
+      ? resolveTargetFromReference(entityByOriginalId, typedMaterial.molecule)
+      : resolveTargetFromRaw(entityByOriginalId, material.molecule_ref_raw, "molecule");
+    return target?.source_node_type === "molecule"
+      ? [createRelation(documentId, "material_is_molecule", material.entity_id, target.entity_id, "molecule")]
+      : [];
+  });
+
+const getBatchSourceRelationType = (target: LinkTarget | undefined): RelationType | undefined => {
+  if (target?.source_node_type === "reaction") {
+    return "batch_derived_from_reaction";
+  }
+  if (target?.source_node_type === "result") {
+    return "batch_related_to_result";
+  }
+  if (target?.source_node_type === "sample") {
+    return "batch_derived_from_sample";
+  }
+  if (target?.source_node_type === "batch") {
+    return "batch_derived_from_batch";
+  }
+  return undefined;
+};
+
+const buildBatchLinks = (
+  documentId: string,
+  batches: ExportedBatchV1[],
+  entityByOriginalId: Map<string, ExportedObjectEntity>,
+  typedNodes: TypedNodeIndex
+): ExportedRelationV1[] =>
+  batches.flatMap((batch) => {
+    const typedBatch = batch.original_id ? typedNodes.get(batch.original_id) : undefined;
+    const sourceTarget = typedBatch?.kind === "batch"
+      ? resolveTargetFromReference(entityByOriginalId, typedBatch.source)
+      : getReferencedEntity(batch.source_ref_raw, entityByOriginalId);
+    const moleculeTarget = typedBatch?.kind === "batch"
+      ? resolveTargetFromReference(entityByOriginalId, typedBatch.molecule)
+      : resolveTargetFromRaw(entityByOriginalId, batch.molecule_ref_raw, "molecule");
+    const sourceRelation = getBatchSourceRelationType(sourceTarget);
+
+    return [
+      ...(sourceTarget && sourceRelation
+        ? [createRelation(documentId, sourceRelation, batch.entity_id, sourceTarget.entity_id, "source")]
+        : []),
+      ...(moleculeTarget?.source_node_type === "molecule"
+        ? [createRelation(documentId, "batch_has_molecule", batch.entity_id, moleculeTarget.entity_id, "molecule")]
+        : [])
+    ];
+  });
 
 const buildResultLinks = (
   documentId: string,
@@ -819,6 +1006,12 @@ const getSampleRelationType = (target: LinkTarget | undefined): RelationType | u
   }
   if (target?.source_node_type === "molecule") {
     return "sample_related_to_molecule";
+  }
+  if (target?.source_node_type === "material") {
+    return "sample_from_material";
+  }
+  if (target?.source_node_type === "batch") {
+    return "sample_from_batch";
   }
   if (target?.source_node_type === "sample") {
     return "sample_derived_from_sample";
@@ -1071,6 +1264,8 @@ const buildSemanticLinks = (
 ): ExportedRelationV1[] => {
   const entities = [
     ...parts.molecules,
+    ...parts.materials,
+    ...parts.batches,
     ...parts.reactions,
     ...parts.results,
     ...parts.analyses,
@@ -1084,6 +1279,8 @@ const buildSemanticLinks = (
 
   return uniqueRelations([
     ...buildPrimaryLinks(documentId, entities),
+    ...buildMaterialLinks(documentId, parts.materials, entityByOriginalId, typedNodes),
+    ...buildBatchLinks(documentId, parts.batches, entityByOriginalId, typedNodes),
     ...buildReactionParticipantLinks(documentId, parts.reactions),
     ...buildReactionRouteLinks(documentId, parts.reactions, entityByOriginalId),
     ...buildResultLinks(documentId, parts.results, entityByOriginalId, typedNodes),
@@ -1098,6 +1295,8 @@ const buildSemanticLinks = (
 
 interface SemanticLayerParts {
   molecules: ExportedMoleculeV1[];
+  materials: ExportedMaterialV1[];
+  batches: ExportedBatchV1[];
   reactions: ExportedReactionV1[];
   results: ExportedResultV1[];
   analyses: ExportedAnalysisV1[];
@@ -1113,6 +1312,8 @@ type TypedNodeIndex = Map<string, TypedSemanticGraph["nodes"][number]>;
 
 const createSemanticLayerParts = (): SemanticLayerParts => ({
   molecules: [],
+  materials: [],
+  batches: [],
   reactions: [],
   results: [],
   analyses: [],
@@ -1123,7 +1324,7 @@ const createSemanticLayerParts = (): SemanticLayerParts => ({
   markdownBlocks: []
 });
 
-const collectMoleculesAndMarkdown = (
+const collectIdentityEntitiesAndMarkdown = (
   document: ChemdDocument,
   traversedNodes: TraversedNode[],
   parts: SemanticLayerParts,
@@ -1144,22 +1345,45 @@ const collectMoleculesAndMarkdown = (
       continue;
     }
 
+    if (node.type === "material") {
+      parts.materials.push(buildMaterial(
+        documentId,
+        node,
+        nodeIndex,
+        getTypedMaterial(typedNodes, node)
+      ));
+      continue;
+    }
+
+    if (node.type === "batch") {
+      parts.batches.push(buildBatch(
+        documentId,
+        node,
+        nodeIndex,
+        getTypedBatch(typedNodes, node)
+      ));
+      continue;
+    }
+
     if (node.type === "markdown") {
       parts.markdownBlocks.push(buildMarkdown(documentId, node, nodeIndex));
     }
   }
 };
 
-const createMoleculeIndex = (molecules: ExportedMoleculeV1[]): Map<string, ExportedMoleculeV1> =>
-  new Map(
-    molecules
-      .filter((molecule) => molecule.original_id)
-      .map((molecule) => [molecule.original_id as string, molecule])
-  );
-
 const getTypedMolecule = (typedNodes: TypedNodeIndex, node: MoleculeNode): TypedMoleculeNode | undefined => {
   const typedNode = typedNodes.get(node.id ?? "");
   return typedNode?.kind === "molecule" ? typedNode : undefined;
+};
+
+const getTypedMaterial = (typedNodes: TypedNodeIndex, node: MaterialNode): TypedMaterialNode | undefined => {
+  const typedNode = typedNodes.get(node.id ?? "");
+  return typedNode?.kind === "material" ? typedNode : undefined;
+};
+
+const getTypedBatch = (typedNodes: TypedNodeIndex, node: BatchNode): TypedBatchNode | undefined => {
+  const typedNode = typedNodes.get(node.id ?? "");
+  return typedNode?.kind === "batch" ? typedNode : undefined;
 };
 
 const getTypedReaction = (typedNodes: TypedNodeIndex, node: ReactionNode): TypedReactionNode | undefined => {
@@ -1198,7 +1422,7 @@ const getTypedConditionVaries = (
 const collectRelatedEntities = (
   document: ChemdDocument,
   traversedNodes: TraversedNode[],
-  moleculeByOriginalId: Map<string, ExportedMoleculeV1>,
+  entityByOriginalId: Map<string, ExportedObjectEntity>,
   parts: SemanticLayerParts,
   typedNodes: TypedNodeIndex
 ): void => {
@@ -1212,7 +1436,7 @@ const collectRelatedEntities = (
         node,
         nodeIndex,
         isPrimary,
-        moleculeByOriginalId,
+        entityByOriginalId,
         typedReaction: getTypedReaction(typedNodes, node)
       }));
       continue;
@@ -1287,12 +1511,20 @@ export const buildSemanticLayer = (
   const parts = createSemanticLayerParts();
   const typedNodes = indexTypedNodes(options.typedGraph);
 
-  collectMoleculesAndMarkdown(document, traversedNodes, parts, typedNodes);
-  // Reaction participant 可以用 @id 指向 molecule，索引必须先于 reaction 语义层生成。
-  collectRelatedEntities(document, traversedNodes, createMoleculeIndex(parts.molecules), parts, typedNodes);
+  collectIdentityEntitiesAndMarkdown(document, traversedNodes, parts, typedNodes);
+  // Reaction participant 可以用 @id 指向 molecule/material/batch，索引必须先于 reaction 语义层生成。
+  collectRelatedEntities(
+    document,
+    traversedNodes,
+    buildEntityIndex([...parts.molecules, ...parts.materials, ...parts.batches]),
+    parts,
+    typedNodes
+  );
 
   const {
     molecules,
+    materials,
+    batches,
     reactions,
     results,
     analyses,
@@ -1306,6 +1538,8 @@ export const buildSemanticLayer = (
 
   return {
     molecules,
+    materials,
+    batches,
     reactions,
     results,
     analyses,

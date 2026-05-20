@@ -45,7 +45,7 @@ const buildResultBlockText = (resultId: string, reactionId: string): string =>
     `:::result #${resultId}`,
     `ref: ${reactionId}`,
     "status: success",
-    "yield: 0%",
+    "yield: 0 %",
     ":::"
   ].join("\n");
 
@@ -481,7 +481,7 @@ const buildReactionResultStarter = (usedIds: Set<string>): AuthoringTemplate => 
         `:::result #${resultId}`,
         `ref: ${reactionId}`,
         "status: success",
-        "yield: 0%",
+        "yield: 0 %",
         ":::"
       ].join("\n")
     }

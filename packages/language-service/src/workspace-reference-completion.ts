@@ -9,12 +9,19 @@ import type {
   ChemdWorkspaceSymbolIndex
 } from "./workspace-symbol-types";
 
-const referenceFields = new Set(["reactants", "products", "prev"]);
+const referenceFields = new Set(["reactant", "product", "reac", "prod", "reactants", "products", "prev", "molecule", "source", "ref"]);
 const referenceTokenPattern = /@([A-Za-z0-9_.#/-]*)$/;
-const preferredKindsByField: Record<string, string> = {
-  reactants: "molecule",
-  products: "molecule",
-  prev: "reaction"
+const preferredKindsByField: Record<string, string[]> = {
+  reactant: ["material", "batch", "molecule"],
+  reac: ["material", "batch", "molecule"],
+  reactants: ["material", "batch", "molecule"],
+  product: ["batch", "molecule"],
+  prod: ["batch", "molecule"],
+  products: ["batch", "molecule"],
+  molecule: ["molecule"],
+  source: ["reaction", "result", "sample", "batch"],
+  ref: ["batch", "material", "reaction", "result", "sample"],
+  prev: ["reaction"]
 };
 
 export interface ChemdWorkspaceReferenceCompletionRequest
@@ -107,7 +114,7 @@ const readWorkspaceReferenceToken = (
 };
 
 const isReferenceValuePosition = (context: ChemdCompletionContext): boolean =>
-  context.isChemdBlock &&
+  Boolean(context.block) &&
   context.isFieldValuePosition &&
   Boolean(context.fieldKey && referenceFields.has(context.fieldKey));
 
@@ -164,10 +171,10 @@ const preferredRank = (
   symbol: ChemdWorkspaceSymbol,
   context: ChemdCompletionContext
 ): number => {
-  const preferredKind = context.fieldKey
+  const preferredKinds = context.fieldKey
     ? preferredKindsByField[context.fieldKey]
     : undefined;
-  return preferredKind && symbol.kind === preferredKind ? 0 : 1;
+  return preferredKinds?.includes(symbol.kind) ? 0 : 1;
 };
 
 const staleRank = (symbol: ChemdWorkspaceSymbol): number =>

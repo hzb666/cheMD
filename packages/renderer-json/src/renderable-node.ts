@@ -60,7 +60,9 @@ interface BuildContext {
 const HEAVY_NODE_TYPES = new Set<ChemdHydrationTargetV1>(["molecule", "reaction", "analysis"]);
 
 const FIELD_KEYS_BY_TYPE: Record<string, string[]> = {
-  molecule: ["id", "name", "smiles", "cas", "formula", "role", "caption", "chemistryFeatureRefs"],
+  molecule: ["id", "name", "smiles", "cas", "inchi", "inchikey", "canonical_smiles", "formula", "mw", "role", "caption", "chemistryFeatureRefs"],
+  material: ["id", "molecule", "supplier", "lot", "purity", "density", "storage", "notes", "chemistryFeatureRefs"],
+  batch: ["id", "source", "molecule", "state", "mass", "purity", "artifacts", "notes", "chemistryFeatureRefs"],
   reaction: ["id", "name", "route", "reactants", "products", "conditions", "caption", "chemistryFeatureRefs"],
   analysis: ["id", "type_name", "ref", "method", "data", "result", "instrument", "notes"],
   result: ["id", "status", "yield", "conversion", "selectivity", "purity", "notes"],

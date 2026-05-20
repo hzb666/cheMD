@@ -11,27 +11,39 @@ Chemd keeps the raw quantity text and computes canonical values for supported qu
 | --- | --- | --- |
 | `amount` | `mmol`, `mol` | `mmol` |
 | `mass` | `mg`, `g`, `kg` | `mg` |
-| `volume` | `ml`, `mL`, `l`, `L` | `mL` |
+| `volume` | `mL`, `L` plus lowercase forms with warning | `mL` |
 | `temperature` | `C`, `°C`, `℃`, `K`, `F` | preserved by input class |
 | `time` | `h`, `hr`, `hrs`, `min`, `mins`, `分钟`, `小时` | `h` |
 | `pressure` | `bar`, `atm`, `psi` | `bar` |
 | `concentration` | `M`, `mM` | `M` |
 | `equivalent` | `equiv`, `eq` | `equiv` |
 | `percent` | `%`, `percent` | `percent` |
+| `rate` | `mL/min`, `L/min` | `mL/min` |
+| `rpm` | `rpm` | `rpm` |
+| `ph` | `pH` | `pH` |
+
+`rt` and `r.t.` are accepted temperature shorthands for room temperature. `overnight` is accepted as a time shorthand. Temperature programs use the same quantity parser, for example `r.t. -> 80 C over 30 min`.
+
+Unit-bearing quantities require a space between value and unit. `78 %` and `1.0 mmol` are valid; `78%` and `1.0mmol` are errors. Reaction participant equivalents also accept a unitless `equiv=1.2` form. Non-canonical unit casing emits a warning when it can be normalized.
 
 ## Field Mapping
 
 | Object or syntax | Fields | Quantity class |
 | --- | --- | --- |
-| molecule | `amount` | `amount` |
-| molecule | `equivalents` | `equivalent` |
 | reaction | `temperature` | `temperature` |
 | reaction | `time` | `time` |
 | reaction | `pressure` | `pressure` |
+| reaction participant | `amount` | `amount` |
+| reaction participant | `mass` | `mass` |
+| reaction participant | `volume` | `volume` |
+| reaction participant | `equiv`, `equivalents` | `equivalent` |
 | result | `yield`, `conversion`, `selectivity`, `purity` | `percent` |
 | result | `isolated_mass` | `mass` |
+| material | `purity` | `percent` |
+| batch | `mass` | `mass` |
+| batch | `purity` | `percent` |
 | sample | `purity` | `percent` |
-| step params | `amount`, `mass`, `volume`, `temperature`, `target_temperature`, `duration`, `time`, `pressure`, `concentration`, `equivalent`, `equivalents`, `percent` | matching class |
+| step params | `amount`, `mass`, `volume`, `temperature`, `target_temperature`, `duration`, `time`, `pressure`, `concentration`, `equivalent`, `equivalents`, `percent`, `rate`, `rpm`, `ph` | matching class |
 
 ## Template Parameters
 
@@ -47,7 +59,7 @@ The derived-expression function `to_unit(quantity, unit)` supports mass, amount,
 
 - `mg`, `g`, `kg`
 - `mmol`, `mol`
-- `ml`, `l`
+- `mL`, `L`
 
 ```md
 isolated_mass: = to_unit(0.126 g, mg)
@@ -55,4 +67,4 @@ isolated_mass: = to_unit(0.126 g, mg)
 
 ## Diagnostics
 
-Quantity text that cannot be parsed for the target class produces `E403`. Percent values below 0 or above 100 produce `E402`. Expression evaluation failures produce `E_DERIVED_EXPRESSION_INVALID`.
+Quantity text that cannot be parsed for the target class produces `E403`. Compact number-unit syntax also produces `E403`. Percent values below 0 or above 100 produce `E402`. Non-canonical unit casing produces `W_QUANTITY_UNIT_CASING`. Expression evaluation failures produce `E_DERIVED_EXPRESSION_INVALID`.

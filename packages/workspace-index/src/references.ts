@@ -5,8 +5,13 @@ const REFERENCE_FIELDS = new Set([
   "ref",
   "reaction",
   "product",
+  "molecule",
+  "source",
   "prev",
   "next",
+  "reactant",
+  "reac",
+  "prod",
   "reactants",
   "products"
 ]);

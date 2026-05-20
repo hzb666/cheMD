@@ -118,10 +118,12 @@ kind: reaction
 :::`);
 
     expect(labels).toEqual(expect.arrayContaining([
-      "reactants:",
-      "products:",
+      "reactant:",
+      "product:",
       "route:"
     ]));
+    expect(labels).not.toContain("reactants:");
+    expect(labels).not.toContain("products:");
     expect(labels).not.toContain("kind:");
   });
 
@@ -132,8 +134,15 @@ kind: molecule
 :::`)).toEqual(expect.arrayContaining([
       "smiles:",
       "cas:",
-      "amount:"
+      "inchi:",
+      "inchikey:",
+      "canonical_smiles:",
+      "mw:"
     ]));
+    expect(labelsFor(`:::chemd #mol-main
+kind: molecule
+|
+:::`)).not.toContain("amount:");
   });
 
   it("does not offer completions inside frontmatter", () => {

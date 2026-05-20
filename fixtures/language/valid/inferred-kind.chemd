@@ -23,5 +23,5 @@ products: acetaldehyde
 ref: rxn-main
 product: acetaldehyde
 status: success
-yield: 72%
+yield: 72 %
 :::

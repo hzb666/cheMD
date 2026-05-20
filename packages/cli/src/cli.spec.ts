@@ -79,7 +79,7 @@ products: product
 
 :::result #res-main
 status: success
-yield: 72%
+yield: 72 %
 :::
 
 :::analysis #ana-main
@@ -115,7 +115,7 @@ temperature: 25 C
 :::
 
 :::result #res-main
-yield: 23%
+yield: 23 %
 :::
 
 :::sample #sample-old
@@ -137,7 +137,7 @@ temperature: 80 C
 :::
 
 :::result #res-main
-yield: 41%
+yield: 41 %
 :::
 
 :::analysis #ana-new
@@ -693,7 +693,7 @@ describe("chemd cli diff", () => {
     expect(result.stdout).toMatch(/~ reaction #rxn-main/);
     expect(result.stdout).toMatch(/~ temperature: "25 C" -> "80 C"/);
     expect(result.stdout).toMatch(/~ result #res-main/);
-    expect(result.stdout).toMatch(/~ yield: "23%" -> "41%"/);
+    expect(result.stdout).toMatch(/~ yield: "23 %" -> "41 %"/);
     expect(result.stdout).toMatch(/\+ analysis #ana-new/);
     expect(result.stdout).toMatch(/- sample #sample-old/);
   });

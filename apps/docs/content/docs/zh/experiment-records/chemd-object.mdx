@@ -6,7 +6,7 @@ description: '`:::chemd` 的 molecule、reaction、类型推断、字段、数�
 
 ## `kind: molecule`
 
-`kind: molecule` 生成 `MoleculeNode`。molecule 表达可被 reaction、sample、artifact、analysis 和正文引用的化学实体。resolver 要求 molecule 具备 `smiles` 字段；缺失时产生 `E_MISSING_REQUIRED_FIELD`。typechecker 会解析 `amount` 与 `equivalents`，并把解析成功的值写入 typed semantic graph 的 quantity 集合。
+`kind: molecule` 生成 `MoleculeNode`。molecule 表达化学身份：结构、名称、标识符、分子式和分子量。本次反应用量不属于 molecule；amount 与 equivalents 写在 reaction participant 上。
 
 ```md
 :::chemd #mol-aryl
@@ -15,8 +15,6 @@ name: aryl bromide
 smiles: Brc1ccccc1
 role: substrate
 formula: C6H5Br
-amount: 1.00 mmol
-equivalents: 1.0 equiv
 :::
 ```
 
@@ -24,41 +22,44 @@ equivalents: 1.0 equiv
 
 | 字段 | 语义 |
 | --- | --- |
-| `smiles` | resolver 必填字段，作为结构表达式保存 |
+| `smiles` | 结构表达式 |
 | `cas` | CAS registry string，当前实现只保存原值 |
+| `inchi` | InChI 标识符 |
+| `inchikey` | InChIKey 标识符 |
+| `canonical_smiles` | canonical 结构字符串 |
 | `name` | 使用者可读名称 |
 | `role` | 使用者定义角色，如 substrate、reagent、product |
 | `caption` | 渲染层说明文本 |
 | `formula` | 分子式原文 |
-| `amount` | amount 数量，支持 `mmol` 与 `mol` |
-| `equivalents` | equivalent 数量，支持 `equiv` 与 `eq` |
+| `mw` | 分子量文本 |
 | `chemistry_features` | 扩展 feature 引用列表 |
 
 ## `kind: reaction`
 
-`kind: reaction` 生成 `ReactionNode`。显式 reaction 必须包含 reaction 形状字段，即 `reactants`、`products`、`reactant`、`product`、`reac` 或 `prod` 中至少一类。显式 reaction 缺少这些字段时产生 `E_CHEMD_KIND_CONFLICT`。resolver 要求 reaction 同时具备 `reactants` 和 `products`。
+`kind: reaction` 生成 `ReactionNode`。canonical 写法使用可重复的 `reactant` 和 `product`。`reac` 与 `prod` 是短别名。`reactants` 与 `products` 仍是简单列表别名，但结构化数量只能写在单数 participant 字段上。
 
 ```md
 :::chemd #rxn-main
 kind: reaction
 name: Suzuki coupling
-reactants: @mol-aryl | @mol-boron
-products: @mol-product
+reactant: @mat-aryl-lot-a | 1.00 mmol | 1.0 eq | limiting=true
+reactant: @mol-boron | 1.5 eq
+product: @mol-product
 reagents: K2CO3
 catalyst: Pd(PPh3)4
 solvent: dioxane/water
 temperature: 90 C
 time: 12 h
 atmosphere: nitrogen
-yield: 82%
+yield: 82 %
 :::
 ```
 
-typechecker 对 reaction 执行四类语义处理：`reactants` 与 `products` 解析为目标类型为 molecule 的引用列表；`prev` 解析为目标类型为 reaction 的路线引用；`temperature`、`time` 与 `pressure` 解析为数量；`atmosphere` 归一化为 known 或 extension 值。
+typechecker 会把 reaction participant 解析到 molecule、material 或 batch；校验 limiting reactant 边界；解析 `prev` 路线关系；解析 `temperature`、`time` 与 `pressure`；并归一化 `atmosphere`。
 
 ## 省略 `kind` 时的类型推断
 
-parser 根据字段形状推断 `chemd` 块类型。出现 `reactants`、`products` 或它们的别名字段时推断为 reaction；出现 `smiles`、`cas`、`formula`、`role`、`amount` 或 `equivalents` 时推断为 molecule。无法稳定推断时产生 `W_CHEMD_KIND_AMBIGUOUS` error，并提供插入 `kind: molecule` 或 `kind: reaction` 的 quick fix。
+parser 根据字段形状推断 `chemd` 块类型。participant 字段推断为 reaction；`smiles`、`cas`、`inchi`、`inchikey`、`canonical_smiles`、`formula` 或 `mw` 等身份字段推断为 molecule。无法稳定推断时产生 `W_CHEMD_KIND_AMBIGUOUS` error，并提供插入 `kind: molecule` 或 `kind: reaction` 的 quick fix。
 
 冲突规则：
 
@@ -71,25 +72,20 @@ parser 根据字段形状推断 `chemd` 块类型。出现 `reactants`、`produc
 
 ## molecule 字段手册
 
-molecule 字段集合固定在 `MOLECULE_FIELDS`。未知字段产生 `W_UNKNOWN_FIELD`，字段不会写入 AST。非字段正文可作为隐式 `smiles` 值读取；隐式值超过一行时产生 `W_INVALID_CHEMD_IMPLICIT_VALUE`。
+molecule 字段集合由 schema registry 固定。未知字段产生 `W_UNKNOWN_FIELD`，字段不会写入 AST。非字段正文可作为隐式 `smiles` 值读取；隐式值超过一行时产生 `W_INVALID_CHEMD_IMPLICIT_VALUE`。
 
-数量解析规则：
-
-| 字段 | quantity class | 支持单位 | canonical unit |
-| --- | --- | --- | --- |
-| `amount` | amount | `mmol`、`mol` | `mmol` |
-| `equivalents` | equivalent | `equiv`、`eq` | `equiv` |
-
-无法解析的数量仍以 raw quantity 写入 typed graph，同时产生 `E403` error。该行为保留使用者原文，并让诊断面板提示单位或格式问题。
+typechecker 要求 molecule 有身份字段。没有身份字段产生 `E_MOLECULE_IDENTITY_MISSING`。molecule 上写 `amount` 或 `equivalents` 产生 `E_MOLECULE_REACTION_QUANTITY`。
 
 ## reaction 字段手册
 
-reaction 字段集合固定在 `REACTION_FIELDS`。列表字段包含 `reactants`、`products`、`reactant`、`product`、`reac`、`prod`、`conditions` 和 `prev`。其中 `reactant` 与 `reac` 合并到 `reactants`，`product` 与 `prod` 合并到 `products`。
+reaction 字段集合由 schema registry 固定。可重复的单数 participant 字段是 canonical 写法；复数形式只作为简单列表别名。
 
 | 字段 | 解析与语义 |
 | --- | --- |
-| `reactants` | molecule 引用列表，resolver 必填 |
-| `products` | molecule 引用列表，resolver 必填 |
+| `reactant` / `reac` | 可重复 reactant participant；支持引用、amount、equiv、mass、volume 和 `limiting=true` |
+| `product` / `prod` | 可重复 product participant |
+| `reactants` | 简单 reactant 引用/文本列表别名 |
+| `products` | 简单 product 引用/文本列表别名 |
 | `conditions` | 字符串列表，供渲染和导出使用 |
 | `route` | 路线标签 |
 | `prev` | reaction 前驱引用列表 |
@@ -104,22 +100,23 @@ reaction 字段集合固定在 `REACTION_FIELDS`。列表字段包含 `reactants
 | `conversion` | AST 字符串，result 关系校验会与 result conversion 比对 |
 | `selectivity` | AST 字符串，result 关系校验会与 result selectivity 比对 |
 
-## `reactants` / `products` 引用写法
+## Participant 引用写法
 
-`reactants` 和 `products` 支持 `|` 与逗号分隔。引用可写为 `@id`，也可写为 bare ID。typechecker 在本地对象索引或 external target index 中找到 bare ID 时会将其视为引用；未命中的 bare value 保留为 literal。
+`reactant` 和 `product` 值以引用或文本开头。引用可写为 `@id`，也可写为 bare ID。typechecker 在本地对象索引或 external target index 中找到 bare ID 时会将其视为引用；未命中的 bare value 保留为 literal。
 
 ```md
-reactants: @mol-aryl | mol-boron
-products: @mol-product
+reactant: @mat-aryl-lot-a | 1.00 mmol | 1.0 eq | limiting=true
+reactant: mol-boron | 1.5 eq
+product: @mol-product
 ```
 
 解析错误示例：
 
 ```md
-reactants: @mol-a |
+reactants: @mol-a | 1.0 mmol
 ```
 
-尾部分隔符产生空列表项，诊断码为 `E_INVALID_LIST_ITEM`。
+在复数列表别名上写结构化 participant 事实会产生 `E_REACTION_PARTICIPANT_SYNTAX`。尾部分隔符产生空列表项，诊断码为 `E_INVALID_LIST_ITEM`。
 
 ## `route` / `prev` 路线关系
 
@@ -148,8 +145,6 @@ kind: molecule
 name: benzyl alcohol
 smiles: OCc1ccccc1
 role: substrate
-amount: 1.00 mmol
-equivalents: 1.0 equiv
 :::
 
 :::chemd #mol-product
@@ -163,13 +158,13 @@ role: product
 kind: reaction
 name: benzyl alcohol oxidation
 route: route-oxidation
-reactants: @mol-substrate
-products: @mol-product
+reactant: @mol-substrate | 1.00 mmol | 1.0 eq | limiting=true
+product: @mol-product
 reagents: MnO2
 solvent: CH2Cl2
 temperature: 25 C
 time: 4 h
-yield: 81%
+yield: 81 %
 :::
 ```
 

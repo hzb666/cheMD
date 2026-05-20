@@ -37,13 +37,13 @@ reactants: substrate
 products: product
 solvent: THF
 temperature: 25 C
-yield: 35%
+yield: 35 %
 :::
 
 :::result #res-a
 ref: rxn-a
 status: partial
-yield: 35%
+yield: 35 %
 :::
 `;
     const sourceB = `---
@@ -58,13 +58,13 @@ reactants: substrate
 products: product
 solvent: MeCN
 temperature: 25 C
-yield: 68%
+yield: 68 %
 :::
 
 :::result #res-b
 ref: rxn-b
 status: success
-yield: 68%
+yield: 68 %
 :::
 `;
 
@@ -117,7 +117,7 @@ step: concentrate
 :::result #res-a
 ref: rxn-a
 status: success
-yield: 61%
+yield: 61 %
 :::
 `;
     const sourceB = `---
@@ -144,7 +144,7 @@ step: concentrate
 :::result #res-b
 ref: rxn-b
 status: success
-yield: 73%
+yield: 73 %
 :::
 `;
 

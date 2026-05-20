@@ -1,0 +1,62 @@
+---
+id: fixture-material-stoichiometry
+title: Material stoichiometry fixture
+date: 2026-05-20
+primary_reaction: rxn-main
+primary_result: res-main
+---
+
+:::chemd #mol-aryl-bromide
+kind: molecule
+name: bromobenzene
+smiles: Brc1ccccc1
+:::
+
+:::chemd #mol-boronic-acid
+kind: molecule
+name: phenylboronic acid
+smiles: OB(O)c1ccccc1
+:::
+
+:::chemd #mol-biaryl-product
+kind: molecule
+name: biphenyl
+smiles: c1ccc(-c2ccccc2)cc1
+:::
+
+:::material #mat-aryl-bromide-lot-a
+molecule: @mol-aryl-bromide
+supplier: Sigma
+lot: A123
+purity: 98 %
+:::
+
+:::chemd #rxn-main
+kind: reaction
+name: Suzuki coupling
+reactant: @mat-aryl-bromide-lot-a | 1.0 mmol | 1.0 eq | limiting=true
+reactant: @mol-boronic-acid | equiv=1.5
+product: @mol-biaryl-product
+temperature: r.t. -> 80 C over 30 min
+time: overnight
+:::
+
+:::batch #batch-crude
+source: @rxn-main
+molecule: @mol-biaryl-product
+state: crude
+mass: 120 mg
+purity: 84 %
+:::
+
+:::result #res-main
+reaction: @rxn-main
+product: @mol-biaryl-product
+status: success
+yield: 78 %
+:::
+
+:::sample #sample-nmr
+name: NMR sample
+ref: @batch-crude
+:::

@@ -99,4 +99,28 @@ products: product
     expect(document.children[1]).toMatchObject({ type: "reaction", declaredKind: "reaction" });
     expect(document.diagnostics).toEqual([]);
   });
+
+  it("rejects structured participants on plural list aliases", () => {
+    const document = parseChemd(`---
+id: exp-participant-syntax
+title: Participant syntax
+date: 2026-05-20
+---
+
+:::chemd #rxn-main
+kind: reaction
+reactants: @mol-a | 1.0 mmol | 1.0 eq
+products: @mol-b
+:::
+`);
+
+    expect(document.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "E_REACTION_PARTICIPANT_SYNTAX",
+        severity: "error",
+        nodeId: "rxn-main",
+        sourceField: "reactants"
+      })
+    );
+  });
 });

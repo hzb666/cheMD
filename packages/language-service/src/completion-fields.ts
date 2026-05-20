@@ -8,14 +8,28 @@ import type {
 
 const commonFields = ["kind", "name", "caption"];
 
-const moleculeFieldNames = new Set(["kind", "name", "smiles", "cas", "formula", "amount", "equivalents", "role", "caption"]);
+const moleculeFieldNames = new Set([
+  "kind",
+  "name",
+  "smiles",
+  "cas",
+  "inchi",
+  "inchikey",
+  "canonical_smiles",
+  "formula",
+  "mw",
+  "role",
+  "caption"
+]);
 const reactionFieldNames = new Set([
   "kind",
   "name",
   "route",
   "prev",
-  "reactants",
-  "products",
+  "reactant",
+  "product",
+  "equation",
+  "rxn_smiles",
   "conditions",
   "reagents",
   "catalyst",
@@ -36,6 +50,8 @@ const filterChemdFields = (allowed: ReadonlySet<string>): string[] =>
 const fieldRegistry: Record<Exclude<ChemdCompletionBlockKind, "unknown">, string[]> = {
   molecule: filterChemdFields(moleculeFieldNames),
   reaction: filterChemdFields(reactionFieldNames),
+  material: getCanonicalBlockFields("material"),
+  batch: getCanonicalBlockFields("batch"),
   result: getCanonicalBlockFields("result"),
   procedure: [...getCanonicalBlockFields("procedure"), "step"],
   step: getCanonicalBlockFields("step"),

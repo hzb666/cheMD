@@ -28,6 +28,8 @@ export type ChemdSemanticKind = "molecule" | "reaction";
 
 export type ObjectSemanticKind =
   | ChemdSemanticKind
+  | "material"
+  | "batch"
   | "result"
   | "analysis"
   | "procedure"
@@ -65,7 +67,7 @@ export type FieldSourceSpans = Record<string, SourceSpan>;
 export interface ChemistryFeatureRef {
   featureId: string;
   provider?: string;
-  kind?: "molecule" | "reaction" | "analysis" | "sample" | "artifact";
+  kind?: "molecule" | "reaction" | "analysis" | "material" | "batch" | "sample" | "artifact";
   status?: "available" | "pending" | "missing" | "failed";
 }
 
@@ -144,12 +146,42 @@ export interface MoleculeNode extends SourceMappedNode {
   declaredKind?: ChemdSemanticKind;
   smiles?: string;
   cas?: string;
+  inchi?: string;
+  inchikey?: string;
+  canonical_smiles?: string;
   name?: string;
   role?: string;
   caption?: string;
   formula?: string;
+  mw?: string;
   amount?: string;
   equivalents?: string;
+  chemistryFeatureRefs?: ChemistryFeatureRef[];
+}
+
+export interface MaterialNode extends SourceMappedNode {
+  type: "material";
+  id?: string;
+  molecule?: string;
+  supplier?: string;
+  lot?: string;
+  purity?: string;
+  density?: string;
+  storage?: string;
+  notes?: string;
+  chemistryFeatureRefs?: ChemistryFeatureRef[];
+}
+
+export interface BatchNode extends SourceMappedNode {
+  type: "batch";
+  id?: string;
+  source?: string;
+  molecule?: string;
+  state?: string;
+  mass?: string;
+  purity?: string;
+  notes?: string;
+  artifacts?: string[];
   chemistryFeatureRefs?: ChemistryFeatureRef[];
 }
 
@@ -162,6 +194,8 @@ export interface ReactionNode extends SourceMappedNode {
   prev?: string[];
   reactants?: string[];
   products?: string[];
+  equation?: string;
+  rxn_smiles?: string;
   conditions?: string[];
   name?: string;
   reagents?: string;
@@ -354,6 +388,8 @@ export interface TemplateNode {
 
 export type StructuredNode =
   | MoleculeNode
+  | MaterialNode
+  | BatchNode
   | ReactionNode
   | ResultNode
   | AnalysisNode
@@ -368,6 +404,8 @@ export type StructuredNode =
 
 export type ObjectNode =
   | MoleculeNode
+  | MaterialNode
+  | BatchNode
   | ReactionNode
   | ResultNode
   | AnalysisNode

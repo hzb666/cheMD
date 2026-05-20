@@ -30,7 +30,7 @@ products: product
 :::result #res-main
 ref: rxn-main
 status: success
-yield: 72%
+yield: 72 %
 :::
 
 :::analysis #ana-main
@@ -61,7 +61,7 @@ describe("runChemdAgentLoop", () => {
 :::result #res-main
 ref: rxn-main
 status: success
-yield: 72%
+yield: 72 %
 :::
 
 :::analysis #ana-main
@@ -117,7 +117,7 @@ products: product
 
 :::result #res-main
 status: success
-yield: 72%
+yield: 72 %
 :::
 
 :::analysis #ana-main

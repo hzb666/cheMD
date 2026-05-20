@@ -10,7 +10,12 @@ import {
   type SyntaxOrigin
 } from "@chemd/core";
 
-import { collectImplicitChemdValue, pickFirstStringArray, pickFirstStringValue } from "../parse-body-shared";
+import {
+  collectImplicitChemdValue,
+  parseKeyValueLine,
+  pickFirstStringArray,
+  pickFirstStringValue
+} from "../parse-body-shared";
 import {
   parseAllowedFields,
   parseAllowedFieldSpans,
@@ -37,17 +42,19 @@ interface DeclaredKindResult {
 }
 
 const hasReactionShape = (fields: Record<string, string | string[]>): boolean => {
-  const reactants = pickFirstStringArray(fields, ["reactants"]) ?? [];
-  const products = pickFirstStringArray(fields, ["products"]) ?? [];
+  const reactants = pickFirstStringArray(fields, ["reactant"]) ?? [];
+  const products = pickFirstStringArray(fields, ["product"]) ?? [];
 
   return reactants.length > 0
     || products.length > 0
-    || "reactants" in fields
-    || "products" in fields;
+    || "reactant" in fields
+    || "product" in fields;
 };
 
 const hasMoleculeShape = (fields: Record<string, string | string[]>): boolean =>
-  ["smiles", "cas", "formula", "role", "amount", "equivalents"].some((fieldName) => fieldName in fields);
+  ["smiles", "cas", "inchi", "inchikey", "canonical_smiles", "formula", "mw", "role"].some((fieldName) =>
+    fieldName in fields
+  );
 
 const inferChemdKind = (fields: Record<string, string | string[]>): ChemdSemanticKind | undefined => {
   const reactionShape = hasReactionShape(fields);
@@ -134,8 +141,10 @@ const createReactionNode = (
   fieldSpans: metadata.fieldSpans,
   route: pickFirstStringValue(fields, ["route"]),
   prev: pickFirstStringArray(fields, ["prev"]),
-  reactants: pickFirstStringArray(fields, ["reactants"]) ?? [],
-  products: pickFirstStringArray(fields, ["products"]) ?? [],
+  reactants: pickFirstStringArray(fields, ["reactant"]) ?? [],
+  products: pickFirstStringArray(fields, ["product"]) ?? [],
+  equation: pickFirstStringValue(fields, ["equation"]),
+  rxn_smiles: pickFirstStringValue(fields, ["rxn_smiles"]),
   conditions: Array.isArray(fields.conditions) ? fields.conditions : [],
   name: pickFirstStringValue(fields, ["name"]),
   reagents: pickFirstStringValue(fields, ["reagents"]),
@@ -165,14 +174,56 @@ const createMoleculeNode = (
   fieldSpans: metadata.fieldSpans,
   smiles: pickFirstStringValue(fields, ["smiles"]) ?? collectImplicitChemdValue(lines, diagnostics),
   cas: pickFirstStringValue(fields, ["cas"]),
+  inchi: pickFirstStringValue(fields, ["inchi"]),
+  inchikey: pickFirstStringValue(fields, ["inchikey"]),
+  canonical_smiles: pickFirstStringValue(fields, ["canonical_smiles"]),
   name: pickFirstStringValue(fields, ["name"]),
   role: pickFirstStringValue(fields, ["role"]),
   caption: pickFirstStringValue(fields, ["caption"]),
   formula: pickFirstStringValue(fields, ["formula"]),
+  mw: pickFirstStringValue(fields, ["mw"]),
   amount: pickFirstStringValue(fields, ["amount"]),
   equivalents: pickFirstStringValue(fields, ["equivalents"]),
   chemistryFeatureRefs: metadata.chemistryFeatureRefs
 });
+
+const STRUCTURED_PARTICIPANT_PATTERN = /(?:^|\|)\s*(?:[-+]?\d+(?:\.\d+)?\s*[a-zA-Z%°℃]|(?:amount|equiv|equivalents|limiting|loading|volume|mass)\s*=)/i;
+
+const reportStructuredPluralParticipant = (
+  id: string | undefined,
+  diagnostics: Parameters<BlockParser>[0]["diagnostics"],
+  field: string,
+  rawValue: string
+) => {
+  diagnostics.push({
+    code: "E_REACTION_PARTICIPANT_SYNTAX",
+    severity: "error",
+    message: `${field} only accepts a simple reference/literal list; use repeated reactant/product fields for amount, equiv or limiting.`,
+    nodeId: id,
+    sourceLayer: "parser",
+    sourceNodeType: "chemd",
+    sourceNodeId: id,
+    sourceField: field,
+    facts: { field, raw_value: rawValue }
+  });
+};
+
+const validateParticipantListSurface = (
+  id: string | undefined,
+  lines: string[],
+  diagnostics: Parameters<BlockParser>[0]["diagnostics"]
+) => {
+  for (const line of lines) {
+    const parsed = parseKeyValueLine(line.trim());
+    if (!parsed || !["reactants", "products"].includes(parsed.key)) {
+      continue;
+    }
+
+    if (STRUCTURED_PARTICIPANT_PATTERN.test(parsed.rawValue)) {
+      reportStructuredPluralParticipant(id, diagnostics, parsed.key, parsed.rawValue);
+    }
+  }
+};
 
 const reportAmbiguousKind = (
   id: string | undefined,
@@ -208,6 +259,7 @@ export const parseChemdBlock: BlockParser = ({ headerArg, lines, diagnostics }) 
     listFields: CHEMD_LIST_FIELDS,
     sourceNodeId: id
   });
+  validateParticipantListSurface(id, lines, diagnostics);
   const fieldSpans = parseAllowedFieldSpans(lines, CHEMD_FIELDS, "chemd");
   const kindResult = readDeclaredKind(id, fields, diagnostics);
   const declaredKind = kindResult.declaredKind;

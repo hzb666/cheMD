@@ -9,6 +9,8 @@ description: A user-oriented block manual for Chemd users, with fields, constrai
 | block | purpose | primary node |
 | --- | --- | --- |
 | `:::chemd` | molecule and reaction objects | `molecule` or `reaction` |
+| `:::material` | inventory material or reagent lot | `material` |
+| `:::batch` | generated or purified physical batch | `batch` |
 | `:::result` | experimental outcome | `result` |
 | `:::analysis` | analytical record | `analysis` |
 | `:::procedure` | experimental procedure | `procedure` |
@@ -28,7 +30,7 @@ A block starts with `:::block-name`. Object IDs are header arguments written as 
 
 ```md
 :::result #res-main
-status: success ;; yield: 82% ;; purity: 96%
+status: success ;; yield: 82 % ;; purity: 96 %
 :::
 ```
 
@@ -51,7 +53,6 @@ primary_result: res-main
 kind: molecule
 name: substrate
 smiles: CCO
-amount: 1.00 mmol
 :::
 
 :::chemd #mol-product
@@ -62,8 +63,8 @@ smiles: CC=O
 
 :::chemd #rxn-main
 kind: reaction
-reactants: @mol-substrate
-products: @mol-product
+reactant: @mol-substrate | 1.00 mmol | 1.0 eq | limiting=true
+product: @mol-product
 solvent: MeCN
 temperature: 60 C
 time: 3 h
@@ -73,7 +74,7 @@ time: 3 h
 reaction: rxn-main
 product: mol-product
 status: success
-yield: 74%
+yield: 74 %
 :::
 ```
 

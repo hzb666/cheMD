@@ -4,6 +4,8 @@ import type { ObjectNode } from "./types";
 
 const OBJECT_TYPES = new Set([
   "molecule",
+  "material",
+  "batch",
   "reaction",
   "result",
   "analysis",

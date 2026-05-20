@@ -34,12 +34,12 @@ ref: rxn-main
 reaction: rxn-main
 product: mol-product
 status: success
-yield: 84%
-conversion: 96%
-selectivity: 94%
+yield: 84 %
+conversion: 96 %
+selectivity: 94 %
 isolated_mass: 210 mg
 product_state: white solid
-purity: 99%
+purity: 99 %
 notes: isolated by evaporation and trituration
 :::
 

@@ -15,6 +15,8 @@ import type {
 
 const TARGET_KIND_BY_NODE_TYPE: Record<string, ReferenceType["targetKind"]> = {
   molecule: "molecule",
+  material: "material",
+  batch: "batch",
   reaction: "reaction",
   result: "result",
   analysis: "analysis",

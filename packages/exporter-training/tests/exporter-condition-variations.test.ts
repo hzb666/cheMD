@@ -32,13 +32,13 @@ reactants: substrate
 products: product
 solvent: THF
 temperature: 25 C
-yield: 40%
+yield: 40 %
 :::
 
 :::result #res-standard
 ref: rxn-standard
 status: partial
-yield: 40%
+yield: 40 %
 :::
 
 :::chemd #rxn-variant
@@ -47,13 +47,13 @@ reactants: substrate
 products: product
 solvent: MeCN
 temperature: 40 C
-yield: 78%
+yield: 78 %
 :::
 
 :::result #res-variant
 ref: rxn-variant
 status: success
-yield: 78%
+yield: 78 %
 :::
 
 :::condition-varies #cv-solvent-temperature

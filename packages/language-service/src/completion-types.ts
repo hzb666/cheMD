@@ -64,6 +64,8 @@ export interface ChemdCompletionList {
 
 export type ChemdCompletionBlockKind =
   | "molecule"
+  | "material"
+  | "batch"
   | "reaction"
   | "result"
   | "procedure"
