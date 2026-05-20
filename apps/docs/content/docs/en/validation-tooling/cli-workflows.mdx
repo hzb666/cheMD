@@ -1,6 +1,6 @@
 ---
 title: CLI and Validation Workflows
-description: Implementation-level reference for validate, export, graph, diff, changed, repair, and agent-loop.
+description: Implementation-level reference for validate, check, preflight, export, graph, diff, changed, repair, and agent-loop.
 ---
 
 
@@ -23,6 +23,30 @@ For high-quality downstream exports, keep these relationships explicit:
 - `result.reaction` or a reaction-shaped `result.ref`.
 - `analysis.ref`, `procedure.ref`, `sample.derived_from`, and `artifact.ref`.
 - `factor`, `outcome`, `attempt`, and `result` in condition screens.
+
+## `pnpm chemd check`
+
+`check` accepts files or directories and discovers `.chemd` and `.chemd.md` files recursively. It is the batch entry point for user workspaces and language fixture validation.
+
+```text
+pnpm chemd check experiments --target validate --format json --dry-run
+pnpm chemd check fixtures/language --target run-plan --format text
+```
+
+`--target` accepts `validate`, `run-plan`, `training`, and `graph`. The target controls which downstream contract the source must satisfy. `validate` checks the current language contract; stricter target-specific checks can be added without changing the source syntax.
+
+The JSON report schema is `chemd-check/v0.1`. It includes per-file diagnostics, totals by severity, the target, and the `dryRun` flag. Exit code is 1 when any file has an error.
+
+## `pnpm chemd preflight`
+
+`preflight` compiles one file, builds a run plan, and runs runtime checks against a lab context.
+
+```text
+pnpm chemd preflight experiment.chemd --mode dry-run
+pnpm chemd preflight experiment.chemd --mode robot-run --context lab.json --format json --dry-run
+```
+
+`--mode` accepts `dry-run`, `human-run`, `robot-run`, and `replay-run`. `--context` points to a JSON file with `capabilities`, `devices`, `inventory`, `adapters`, `environment`, and `safetyRules`. Runtime issues are reported as both `preflight.issues` and compiler-shaped diagnostics. A blocking preflight exits with validation failed.
 
 ## `pnpm chemd export --format json`
 
@@ -96,14 +120,16 @@ Options include `--max-iterations`, `--max-repair-iterations`, `--driver-arg`, `
 Single-document user workflow:
 
 1. `pnpm chemd validate file.chemd`
-2. `pnpm chemd export file.chemd --format json`
-3. `pnpm chemd export file.chemd --format rag`
+2. `pnpm chemd preflight file.chemd --mode dry-run`
+3. `pnpm chemd export file.chemd --format json`
+4. `pnpm chemd export file.chemd --format rag`
 
 Multi-document route workflow:
 
 1. `pnpm chemd validate file-a.chemd file-b.chemd`
-2. `pnpm chemd graph file-a.chemd file-b.chemd --format json`
-3. `pnpm chemd diff before.chemd after.chemd --format json`
+2. `pnpm chemd check experiments --target validate --format json`
+3. `pnpm chemd graph file-a.chemd file-b.chemd --format json`
+4. `pnpm chemd diff before.chemd after.chemd --format json`
 
 Automated repair workflow:
 

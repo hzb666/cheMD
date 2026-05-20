@@ -222,11 +222,20 @@ export const BLOCK_SCHEMAS: readonly BlockSchema[] = [
   {
     blockType: "procedure",
     nodeType: "procedure",
-    childLineFields: ["step"],
+    childLineFields: ["step", "repeat", "until", "branch", "parallel", "wait", "abort_if"],
     fields: [
       field("ref"),
       field("reaction"),
       field("evidence", { list: true })
+    ]
+  },
+  {
+    blockType: "trace",
+    nodeType: "trace",
+    childLineFields: ["event"],
+    fields: [
+      field("plan"),
+      field("mode")
     ]
   },
   {
@@ -270,6 +279,21 @@ export const BLOCK_SCHEMAS: readonly BlockSchema[] = [
       field("purpose"),
       field("evidence"),
       field("confidence")
+    ]
+  },
+  {
+    blockType: "trace_event",
+    nodeType: "trace_event",
+    fields: [
+      field("id"),
+      field("event_id"),
+      field("type", { aliases: ["eventType", "event_type"] }),
+      field("at"),
+      field("step", { aliases: ["stepId", "step_id"] }),
+      field("control", { aliases: ["controlId", "control_id"] }),
+      field("artifact"),
+      field("analysis"),
+      field("result")
     ]
   },
   {

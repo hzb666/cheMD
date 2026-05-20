@@ -55,6 +55,7 @@ export interface SourceNodeSnapshot {
     | "result"
     | "analysis"
     | "procedure"
+    | "trace"
     | "observation"
     | "sample"
     | "artifact"

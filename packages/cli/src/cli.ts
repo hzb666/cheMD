@@ -11,6 +11,12 @@ import type {
   CompileResult
 } from "@chemd/compiler";
 import type { Diagnostic } from "@chemd/core";
+import {
+  DEFAULT_RUNTIME_CAPABILITIES,
+  preflightRun,
+  type RuntimeContext,
+  type RuntimeMode
+} from "@chemd/runtime-lab";
 
 import {
   discoverChangedChemdFiles,
@@ -31,6 +37,7 @@ const CHECK_TARGETS = new Set(["validate", "run-plan", "training", "graph"]);
 const VALIDATE_OPTIONS = new Set<CliOption>(["dry-run"]);
 const FORMAT_OPTION = new Set<CliOption>(["format"]);
 const CHECK_OPTIONS = new Set<CliOption>(["dry-run", "format", "target"]);
+const PREFLIGHT_OPTIONS = new Set<CliOption>(["context", "dry-run", "format", "mode"]);
 const CHANGED_OPTIONS = new Set<CliOption>(["base", "format"]);
 const REPAIR_OPTIONS = new Set<CliOption>(["format", "max-iterations", "write"]);
 const AGENT_LOOP_OPTIONS = new Set<CliOption>([
@@ -50,6 +57,7 @@ const usage = [
   "Usage:",
   "  chemd validate <file...> [--dry-run]",
   "  chemd check <path...> [--target validate|run-plan|training|graph] [--format text|json] [--dry-run]",
+  "  chemd preflight <file> [--mode dry-run|human-run|robot-run|replay-run] [--context lab.json] [--format text|json] [--dry-run]",
   "  chemd export <file> --format json|lnf|rag|training|training-full",
   "  chemd graph <file...> [--format text|json]",
   "  chemd diff <old-file> <new-file> [--format text|json]",
@@ -63,12 +71,14 @@ type TextFormat = "text" | "json";
 type CheckTarget = "validate" | "run-plan" | "training" | "graph";
 type CliOption =
   | "base"
+  | "context"
   | "driver"
   | "driver-arg"
   | "dry-run"
   | "format"
   | "max-iterations"
   | "max-repair-iterations"
+  | "mode"
   | "target"
   | "write";
 type CompileChemd = (source: string, options?: CompileOptions) => CompileResult;
@@ -101,6 +111,7 @@ type CliCommand =
   | { type: "help" }
   | { type: "validate"; dryRun: boolean; filePaths: string[] }
   | { type: "check"; dryRun: boolean; format: TextFormat; paths: string[]; target: CheckTarget }
+  | { type: "preflight"; contextPath?: string; dryRun: boolean; filePath: string; format: TextFormat; mode: RuntimeMode }
   | { type: "export"; filePath: string; format: ExportFormat }
   | { type: "graph"; filePaths: string[]; format: TextFormat }
   | { type: "diff"; beforePath: string; afterPath: string; format: TextFormat }
@@ -270,6 +281,15 @@ const asCheckTarget = (target: string | undefined): CheckTarget => {
   throw new CliUsageError("Check target must be one of: validate, run-plan, training, graph.");
 };
 
+const asRuntimeMode = (mode: string | undefined): RuntimeMode => {
+  const value = mode ?? "dry-run";
+  if (["dry-run", "human-run", "robot-run", "replay-run"].includes(value)) {
+    return value as RuntimeMode;
+  }
+
+  throw new CliUsageError("Preflight mode must be one of: dry-run, human-run, robot-run, replay-run.");
+};
+
 const assertOptionAllowed = (
   optionName: CliOption,
   allowedOptions: ReadonlySet<CliOption>
@@ -357,12 +377,14 @@ const assignCommandOption = (
   allowedOptions: ReadonlySet<CliOption>,
   state: {
     base?: string;
+    context?: string;
     driver?: string;
     driverArgs: string[];
     dryRun: boolean;
     format?: string;
     maxIterations?: number;
     maxRepairIterations?: number;
+    mode?: string;
     target?: string;
     write: boolean;
   }
@@ -375,6 +397,9 @@ const assignCommandOption = (
       return;
     case "base":
       state.base = option.value;
+      return;
+    case "context":
+      state.context = option.value;
       return;
     case "driver":
       state.driver = option.value;
@@ -394,6 +419,9 @@ const assignCommandOption = (
         "max-repair-iterations"
       );
       return;
+    case "mode":
+      state.mode = option.value;
+      return;
     case "target":
       state.target = option.value;
       return;
@@ -409,12 +437,14 @@ const parseCommandArgs = (args: string[], allowedOptions: ReadonlySet<CliOption>
   const positional: string[] = [];
   const state: {
     base?: string;
+    context?: string;
     driver?: string;
     driverArgs: string[];
     dryRun: boolean;
     format?: string;
     maxIterations?: number;
     maxRepairIterations?: number;
+    mode?: string;
     target?: string;
     write: boolean;
   } = {
@@ -443,12 +473,14 @@ const parseCommandArgs = (args: string[], allowedOptions: ReadonlySet<CliOption>
 
   return {
     base: state.base,
+    context: state.context,
     driver: state.driver,
     driverArgs: state.driverArgs,
     dryRun: state.dryRun,
     format: state.format,
     maxIterations: state.maxIterations,
     maxRepairIterations: state.maxRepairIterations,
+    mode: state.mode,
     positional,
     target: state.target,
     write: state.write
@@ -478,6 +510,29 @@ const parseCheckArgs = (args: string[]): CliCommand => {
     format: asTextFormat(format, "Check"),
     paths: positional,
     target: asCheckTarget(target)
+  };
+};
+
+const parsePreflightArgs = (args: string[]): CliCommand => {
+  const {
+    context,
+    dryRun,
+    format = "text",
+    mode,
+    positional
+  } = parseCommandArgs(args, PREFLIGHT_OPTIONS);
+
+  if (positional.length !== 1) {
+    throw new CliUsageError("Preflight requires exactly one file path.");
+  }
+
+  return {
+    type: "preflight",
+    ...(context ? { contextPath: context } : {}),
+    dryRun,
+    filePath: positional[0],
+    format: asTextFormat(format, "Preflight"),
+    mode: asRuntimeMode(mode)
   };
 };
 
@@ -603,6 +658,10 @@ export const parseChemdCliArgs = (argv: string[]): CliCommand => {
 
   if (command === "check") {
     return parseCheckArgs(rest);
+  }
+
+  if (command === "preflight") {
+    return parsePreflightArgs(rest);
   }
 
   if (command === "export") {
@@ -835,6 +894,89 @@ const formatCheckReport = (report: CheckReport): string => {
   }
 
   return `${lines.join("\n")}\n`;
+};
+
+interface PreflightReport {
+  schemaVersion: "chemd-preflight/v0.1";
+  dryRun: boolean;
+  filePath: string;
+  mode: RuntimeMode;
+  preflight: ReturnType<typeof preflightRun>;
+}
+
+const readPreflightContext = (
+  command: Extract<CliCommand, { type: "preflight" }>,
+  cwd: string
+): RuntimeContext => {
+  const baseContext: RuntimeContext = {
+    capabilities: DEFAULT_RUNTIME_CAPABILITIES,
+    mode: command.mode
+  };
+  if (!command.contextPath) {
+    return baseContext;
+  }
+
+  const raw = readSource(command.contextPath, cwd);
+  try {
+    const parsed = JSON.parse(raw) as Partial<RuntimeContext>;
+    return {
+      ...baseContext,
+      ...parsed,
+      capabilities: parsed.capabilities ?? baseContext.capabilities,
+      mode: command.mode
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new CliUsageError(`Unable to parse preflight context "${command.contextPath}": ${message}`);
+  }
+};
+
+const formatPreflightReport = (report: PreflightReport): string => {
+  const lines = [
+    `Chemd preflight (${report.mode})`,
+    `  file: ${report.filePath}`,
+    `  blocking: ${report.preflight.blocking ? "yes" : "no"}`,
+    `  issues: ${report.preflight.issues.length}`
+  ];
+
+  for (const issue of report.preflight.issues) {
+    lines.push(
+      `${issue.severity} ${issue.kind} ${issue.stepId ?? issue.controlId ?? ""} ${issue.message}`.trim()
+    );
+  }
+  for (const diagnostic of report.preflight.diagnostics) {
+    lines.push(formatDiagnostic(report.filePath, diagnostic));
+  }
+
+  return `${lines.join("\n")}\n`;
+};
+
+const preflightFile = (
+  command: Extract<CliCommand, { type: "preflight" }>,
+  compileChemd: CompileChemd,
+  options: NormalizedRunOptions
+): number => {
+  const source = readSource(command.filePath, options.cwd);
+  const result = compileChemd(source);
+  if (writeErrorsIfPresent(command.filePath, result, options.stderr)) {
+    return EXIT_VALIDATION_FAILED;
+  }
+
+  const report: PreflightReport = {
+    schemaVersion: "chemd-preflight/v0.1",
+    dryRun: command.dryRun,
+    filePath: command.filePath,
+    mode: command.mode,
+    preflight: preflightRun(result.runPlan, readPreflightContext(command, options.cwd))
+  };
+
+  if (command.format === "json") {
+    options.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  } else {
+    options.stdout.write(formatPreflightReport(report));
+  }
+
+  return report.preflight.blocking ? EXIT_VALIDATION_FAILED : EXIT_OK;
 };
 
 const selectExportPayload = (result: CompileResult, format: ExportFormat): unknown => {
@@ -1344,6 +1486,10 @@ const executeCommand = (
 
   if (command.type === "check") {
     return Promise.resolve(checkPaths(command, services.compileChemd, options));
+  }
+
+  if (command.type === "preflight") {
+    return Promise.resolve(preflightFile(command, services.compileChemd, options));
   }
 
   if (command.type === "export") {

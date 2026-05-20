@@ -1,11 +1,22 @@
-import { createV03Diagnostic, type V03Diagnostic } from "@chemd/diagnostics";
-import type { CanonicalStepNode, StepFamily, StepGraph } from "@chemd/step-ontology";
+import type { V03Diagnostic } from "@chemd/diagnostics";
+import {
+  STEP_FAMILIES,
+  getCapabilitiesForStep,
+  getConfirmationRuleForStep,
+  getSafetyTagsForStep,
+  type CanonicalProcedureControlNode,
+  type CanonicalStepNode,
+  type StepCapability,
+  type StepFamily,
+  type StepGraph
+} from "@chemd/step-ontology";
 import type { TypedSemanticGraph } from "@chemd/typechecker";
 import {
   initializeStepStates,
   type RuntimeStepState,
   type RuntimeTraceEvent
 } from "./state-machine";
+export { preflightRun } from "./preflight";
 export {
   completeStep,
   confirmStep,
@@ -32,17 +43,7 @@ export type RuntimeStepStatus =
 
 export type RuntimeConfirmationStrategy = "none" | "manual_required" | "review_inferred";
 
-export type CapabilityType =
-  | "stirring"
-  | "cooling"
-  | "heating"
-  | "inert_gas"
-  | "vacuum"
-  | "filtration"
-  | "chromatography"
-  | "analytical_tlc"
-  | "nmr"
-  | "hplc";
+export type CapabilityType = StepCapability;
 
 export interface RuntimeStep {
   stepId: string;
@@ -53,8 +54,10 @@ export interface RuntimeStep {
   requiredCapabilities: CapabilityType[];
   requiresConfirmation: boolean;
   confirmationStrategy: RuntimeConfirmationStrategy;
+  safetyTags: string[];
   sourceType?: CanonicalStepNode["source"]["sourceType"];
   dependsOn?: string[];
+  inputs?: CanonicalStepNode["inputs"];
   outputs?: CanonicalStepNode["outputs"];
   artifacts?: NonNullable<CanonicalStepNode["artifacts"]>;
   source: CanonicalStepNode["source"];
@@ -71,17 +74,105 @@ export interface RunPlan {
   documentId: string;
   status: "planned";
   steps: RuntimeStep[];
+  controls: RuntimeControl[];
+  controlStates: RuntimeControlState[];
   diagnostics: V03Diagnostic[];
 }
 
 export interface RuntimeContext {
   capabilities: CapabilityType[];
   mode?: RuntimeMode;
+  adapters?: RuntimeAdapterSnapshot[];
+  devices?: DeviceCapabilitySnapshot[];
+  environment?: RuntimeEnvironmentSnapshot;
+  inventory?: InventorySnapshot;
+  safetyRules?: SafetyRule[];
+}
+
+export interface RuntimeAdapterSnapshot {
+  adapterId: string;
+  supports?: Array<StepFamily | CanonicalProcedureControlNode["kind"]>;
+  available: boolean;
+}
+
+export interface DeviceCapabilitySnapshot {
+  capability: CapabilityType;
+  min?: number;
+  max?: number;
+  unit?: string;
+}
+
+export interface InventorySnapshot {
+  materials: Array<{
+    id: string;
+    available: boolean;
+    expired?: boolean;
+    amount?: string;
+    hazards?: string[];
+  }>;
+}
+
+export interface RuntimeEnvironmentSnapshot {
+  fumeHood?: boolean;
+  ppe?: string[];
+  wasteStreams?: string[];
+}
+
+export interface SafetyRule {
+  ruleId: string;
+  trigger: {
+    stepFamily?: StepFamily;
+    materialHazard?: string;
+    param?: string;
+    controlKind?: CanonicalProcedureControlNode["kind"];
+  };
+  severity: "info" | "warning" | "error";
+  requiresConfirmation?: boolean;
+  robotRunSeverity?: "warning" | "error";
+  message: string;
+}
+
+export interface PreflightIssue {
+  severity: "info" | "warning" | "error";
+  kind:
+    | "capability"
+    | "device_range"
+    | "inventory"
+    | "safety"
+    | "environment"
+    | "adapter"
+    | "control"
+    | "resource_conflict";
+  stepId?: string;
+  controlId?: string;
+  message: string;
+  requiredAction?:
+    | "manual_confirmation"
+    | "change_context"
+    | "change_procedure"
+    | "provide_adapter"
+    | "reduce_parallelism";
 }
 
 export interface PreflightResult {
   blocking: boolean;
+  issues: PreflightIssue[];
   diagnostics: V03Diagnostic[];
+}
+
+export interface RuntimeControl {
+  controlId: string;
+  kind: CanonicalProcedureControlNode["kind"];
+  params: Record<string, unknown>;
+  dynamic: boolean;
+  controlPath: string[];
+}
+
+export interface RuntimeControlState {
+  controlId: string;
+  kind: RuntimeControl["kind"];
+  status: "planned" | "waiting_adapter" | "running" | "completed" | "blocked" | "aborted";
+  dynamic: boolean;
 }
 
 export interface LabState {
@@ -91,6 +182,7 @@ export interface LabState {
   status: RunStatus;
   currentStepId?: string;
   stepStates: RuntimeStepState[];
+  controlStates: RuntimeControlState[];
   resources: Array<{ kind: CapabilityType; available: boolean }>;
   artifacts: Array<{ artifactId: string; kind: string; linkedStepId?: string }>;
   observations: Array<{ observationId: string; linkedStepId?: string; rawText?: string }>;
@@ -103,76 +195,19 @@ export interface CreateLabStateOptions {
   mode?: RuntimeMode;
 }
 
-const CAPABILITIES_BY_FAMILY: Partial<Record<StepFamily, CapabilityType[]>> = {
-  cool: ["cooling"],
-  heat: ["heating"],
-  purge: ["inert_gas"],
-  filter: ["filtration"],
-  purify: ["chromatography"],
-  dry: ["vacuum"],
-  concentrate: ["vacuum"]
-};
+const isKnownStepFamily = (family: StepFamily): boolean => STEP_FAMILIES.has(family);
 
-const MANUAL_CONFIRMATION_FAMILIES = new Set<StepFamily>([
-  "add",
-  "quench",
-  "purge",
-  "heat",
-  "cool"
-]);
-
-const KNOWN_STEP_FAMILIES = new Set<string>([
-  "charge",
-  "add",
-  "transfer",
-  "mix",
-  "cool",
-  "heat",
-  "hold",
-  "purge",
-  "quench",
-  "extract",
-  "wash",
-  "separate_layers",
-  "filter",
-  "dry",
-  "concentrate",
-  "purify",
-  "sample",
-  "analyze",
-  "observe",
-  "store"
-]);
-
-const analysisCapabilities = (step: CanonicalStepNode): CapabilityType[] => {
-  const type = typeof step.params.type === "string" ? step.params.type.toLowerCase() : "";
-
-  if (type === "tlc") {
-    return ["analytical_tlc"];
-  }
-
-  if (type === "nmr") {
-    return ["nmr"];
-  }
-
-  if (type === "hplc") {
-    return ["hplc"];
-  }
-
-  return [];
-};
-
-const requiredCapabilitiesForStep = (step: CanonicalStepNode): CapabilityType[] => [
-  ...(CAPABILITIES_BY_FAMILY[step.family] ?? []),
-  ...(step.family === "analyze" ? analysisCapabilities(step) : [])
-];
+const requiredCapabilitiesForStep = (step: CanonicalStepNode): CapabilityType[] =>
+  isKnownStepFamily(step.family) ? getCapabilitiesForStep(step) : [];
 
 const selectConfirmationStrategy = (step: CanonicalStepNode): RuntimeConfirmationStrategy => {
   if (step.source.sourceType === "lowered_step" || step.loweringConfidence < 0.85) {
     return "review_inferred";
   }
 
-  return MANUAL_CONFIRMATION_FAMILIES.has(step.family) ? "manual_required" : "none";
+  return isKnownStepFamily(step.family)
+    ? getConfirmationRuleForStep(step.family).strategy
+    : "none";
 };
 
 const toRuntimeStep = (step: CanonicalStepNode, index: number): RuntimeStep => ({
@@ -184,77 +219,44 @@ const toRuntimeStep = (step: CanonicalStepNode, index: number): RuntimeStep => (
   requiredCapabilities: requiredCapabilitiesForStep(step),
   requiresConfirmation: selectConfirmationStrategy(step) !== "none",
   confirmationStrategy: selectConfirmationStrategy(step),
+  safetyTags: isKnownStepFamily(step.family) ? getSafetyTagsForStep(step.family) : [],
   sourceType: step.source.sourceType,
   dependsOn: step.dependsOn,
+  inputs: step.inputs,
   outputs: step.outputs,
   artifacts: step.artifacts,
   source: step.source
 });
 
-const createMissingCapabilityDiagnostic = (
-  step: RuntimeStep,
-  capability: CapabilityType
-): V03Diagnostic =>
-  createV03Diagnostic({
-    code: "E605",
-    severity: "error",
-    message: `Step ${step.stepId} requires missing capability: ${capability}`,
-    sourceLayer: "runtime_preflight",
-    sourceNodeType: step.source.sourceNodeType,
-    sourceNodeId: step.source.sourceNodeId,
-    facts: {
-      step_family: step.family,
-      capability
-    }
-  });
+const toRuntimeControl = (control: CanonicalProcedureControlNode): RuntimeControl => ({
+  controlId: control.controlId,
+  kind: control.kind,
+  params: control.params,
+  dynamic: control.dynamic,
+  controlPath: control.controlPath
+});
 
-const createUnknownRobotStepDiagnostic = (step: RuntimeStep): V03Diagnostic =>
-  createV03Diagnostic({
-    code: "E_RUNTIME_UNKNOWN_STEP",
-    severity: "error",
-    message: `Unknown step family cannot enter robot-run: ${step.family}`,
-    sourceLayer: "runtime_preflight",
-    sourceNodeType: step.source.sourceNodeType,
-    sourceNodeId: step.source.sourceNodeId,
-    facts: {
-      step_family: step.family,
-      mode: "robot-run"
-    }
-  });
-
-const isKnownStepFamily = (family: StepFamily): boolean =>
-  KNOWN_STEP_FAMILIES.has(family);
+const initializeControlStates = (controls: RuntimeControl[]): RuntimeControlState[] =>
+  controls.map((control) => ({
+    controlId: control.controlId,
+    kind: control.kind,
+    status: control.dynamic ? "waiting_adapter" : "planned",
+    dynamic: control.dynamic
+  }));
 
 export const buildRunPlan = (input: RunPlanInput): RunPlan => {
   const documentId = input.documentId ?? input.typedGraph?.documentId ?? "document";
   const steps = input.stepGraph.steps.map((step, index) => toRuntimeStep(step, index));
+  const controls = (input.stepGraph.controls ?? []).map(toRuntimeControl);
 
   return {
     planId: `runplan::${documentId}`,
     documentId,
     status: "planned",
     steps,
+    controls,
+    controlStates: initializeControlStates(controls),
     diagnostics: [...input.stepGraph.diagnostics]
-  };
-};
-
-export const preflightRun = (plan: RunPlan, context: RuntimeContext): PreflightResult => {
-  const available = new Set(context.capabilities);
-  const capabilityDiagnostics = plan.steps.flatMap((step) =>
-    step.requiredCapabilities
-      .filter((capability) => !available.has(capability))
-      .map((capability) => createMissingCapabilityDiagnostic(step, capability))
-  );
-  const robotDiagnostics = context.mode === "robot-run"
-    ? plan.steps
-        .filter((step) => !isKnownStepFamily(step.family))
-        .map((step) => createUnknownRobotStepDiagnostic(step))
-    : [];
-  const diagnostics = [...capabilityDiagnostics, ...robotDiagnostics];
-
-  return {
-    blocking: diagnostics.some((diagnostic) => diagnostic.severity === "error"),
-    diagnostics
   };
 };
 
@@ -268,6 +270,7 @@ export const createInitialLabState = (
   status: "planned",
   currentStepId: plan.steps[0]?.stepId,
   stepStates: initializeStepStates(plan.steps),
+  controlStates: plan.controlStates.map((control) => ({ ...control })),
   resources: [],
   artifacts: [],
   observations: [],

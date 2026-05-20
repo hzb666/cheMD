@@ -67,6 +67,7 @@ const FIELD_KEYS_BY_TYPE: Record<string, string[]> = {
   analysis: ["id", "type_name", "ref", "method", "data", "result", "instrument", "notes"],
   result: ["id", "status", "yield", "conversion", "selectivity", "purity", "notes"],
   procedure: ["id", "ref", "reaction", "body", "evidence", "steps"],
+  trace: ["id", "plan", "mode", "events"],
   observation: ["id", "ref", "body", "events"],
   sample: ["id", "name", "sample_id", "batch", "purity", "notes"],
   artifact: ["id", "kind", "path", "checksum", "instrument", "notes"],

@@ -11,7 +11,8 @@ import type {
   ReactionNode,
   ResultNode,
   SampleNode,
-  TemplateNode
+  TemplateNode,
+  TraceNode
 } from "@chemd/core";
 import type { NormalizedTlcAnalysis } from "@chemd/core";
 import { renderMarkdownNode } from "./markdown-render";
@@ -272,6 +273,16 @@ const renderObservation = (node: ObservationNode): string =>
     ${renderBodyText(node.body)}
   </section>`;
 
+const renderTrace = (node: TraceNode): string =>
+  `<section class="chemd-block chemd-block--trace" data-node-id="${escapeHtml(node.id ?? "")}">
+    ${renderBlockTitle("Trace", node.id)}
+    ${renderFieldList([
+      ["Plan", node.plan],
+      ["Mode", node.mode],
+      ["Events", node.events?.map((event) => event.raw ?? event.eventType).join("\n")]
+    ])}
+  </section>`;
+
 const renderSample = (node: SampleNode): string =>
   `<section class="chemd-block chemd-block--sample" data-node-id="${escapeHtml(node.id ?? "")}">
     ${renderBlockTitle("Sample", node.id)}
@@ -339,6 +350,8 @@ export const renderNode = (
       return renderAnalysis(node, options);
     case "procedure":
       return renderProcedure(node);
+    case "trace":
+      return renderTrace(node);
     case "observation":
       return renderObservation(node);
     case "sample":

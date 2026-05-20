@@ -212,6 +212,17 @@ step: concentrate
 :::
 `;
 
+const preflightSource = `---
+id: exp-cli-preflight
+title: CLI Preflight
+date: 2026-05-20
+---
+
+:::procedure #proc-main
+step: heat | id=s-heat | temperature=80 C | duration=30 min
+:::
+`;
+
 const runInTempDir = async (
   argv: string[],
   files: Record<string, string>,
@@ -534,6 +545,47 @@ unknown_field: should fail
         severity: "error",
         sourceField: "unknown_field"
       });
+      expect(stderr.value).toBe("");
+    }));
+
+  it("runs runtime preflight with a user-provided lab context", async () =>
+    withTempDir(async (dir) => {
+      writeFileSync(path.join(dir, "runtime.chemd"), preflightSource);
+      writeFileSync(path.join(dir, "lab.json"), JSON.stringify({
+        capabilities: ["heating"],
+        devices: [{ capability: "heating", min: 20, max: 60, unit: "C" }]
+      }));
+
+      const stdout = createWriter();
+      const stderr = createWriter();
+      const exitCode = await runChemdCli([
+        "preflight",
+        "runtime.chemd",
+        "--mode",
+        "robot-run",
+        "--context",
+        "lab.json",
+        "--format",
+        "json",
+        "--dry-run"
+      ], { cwd: dir, stderr, stdout });
+      const payload = JSON.parse(stdout.value);
+
+      expect(exitCode).toBe(EXIT_VALIDATION_FAILED);
+      expect(payload).toMatchObject({
+        schemaVersion: "chemd-preflight/v0.1",
+        dryRun: true,
+        mode: "robot-run",
+        preflight: {
+          blocking: true,
+          issues: expect.arrayContaining([
+            expect.objectContaining({ kind: "device_range", stepId: "s-heat" })
+          ])
+        }
+      });
+      expect(payload.preflight.diagnostics).toEqual(expect.arrayContaining([
+        expect.objectContaining({ code: "E_RUNTIME_DEVICE_RANGE" })
+      ]));
       expect(stderr.value).toBe("");
     }));
 });

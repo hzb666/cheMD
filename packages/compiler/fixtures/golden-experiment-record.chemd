@@ -138,8 +138,8 @@ step: charge | id=s-charge-var1 | stage=charging | purpose=assemble reaction mix
 step: heat | id=s-heat-var1 | stage=reaction | temperature=40 C | duration=2 h | dependsOn=s-charge-var1 | purpose=form product | evidence=notebook-24 | confidence=0.95
 step: sample | id=s-sample-var1 | stage=monitoring | outputs=@sample-aliquot-var1 | dependsOn=s-heat-var1 | evidence=notebook-24 | confidence=0.93
 step: analyze | id=s-analyze-var1 | stage=monitoring | analysisType=tlc | dependsOn=s-sample-var1 | evidence=photo-var1 | confidence=0.92
-step: quench | id=s-quench-var1 | stage=workup | dependsOn=s-analyze-var1 | evidence=notebook-24 | confidence=0.9
-step: purify | id=s-purify-var1 | stage=isolation | outputs=@sample-purified-var1 | dependsOn=s-quench-var1 | evidence=notebook-24 | confidence=0.91
+step: quench | id=s-quench-var1 | stage=workup | materials=sat. NH4Cl | dependsOn=s-analyze-var1 | evidence=notebook-24 | confidence=0.9
+step: purify | id=s-purify-var1 | stage=isolation | method=column chromatography | outputs=@sample-purified-var1 | dependsOn=s-quench-var1 | evidence=notebook-24 | confidence=0.91
 :::
 
 :::observation #obs-var1

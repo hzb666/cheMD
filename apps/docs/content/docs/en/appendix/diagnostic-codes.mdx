@@ -97,11 +97,27 @@ The following reference lists common diagnostics by source and purpose. Use it t
 | `E_STEP_MISSING_FIELD` | Required step structure field is missing |
 | `E_STEP_PARAM_MISSING` | Required step family parameter is missing |
 | `E_STEP_PARAM_INVALID` | Step family rejects the parameter |
+| `E_STEP_PARAM_TYPE_MISMATCH` | Step family parameter value has the wrong schema type |
 | `E_STEP_ID_DUPLICATE` | Duplicate step ID |
 | `E_STEP_INVALID_REFERENCE` | `dependsOn` points to a missing step |
 | `E_STEP_DEPENDENCY_CYCLE` | Step dependency graph contains a cycle |
+| `E_PROCEDURE_CONTROL_SYNTAX` | Procedure control brace or line syntax is invalid |
+| `E_PROCEDURE_CONTROL_UNCLOSED` | Procedure control block is missing a closing brace |
+| `E_PROCEDURE_CONTROL_ID` | Procedure control ID is missing |
+| `E_PROCEDURE_CONTROL_ID_DUPLICATE` | Procedure control ID is duplicated or collides with a step |
+| `E_PROCEDURE_CONTROL_COUNT` | `repeat` count is missing or invalid |
+| `E_PROCEDURE_CONTROL_BODY` | Control body is empty where children are required |
+| `E_PROCEDURE_CONTROL_CONDITION` | Control condition is missing, ambiguous, or unresolved |
+| `E_PROCEDURE_CONTROL_BRANCH` | Branch control lacks valid `case` or `default` structure |
+| `E_PROCEDURE_CONTROL_PARALLEL` | Parallel control lacks at least two valid paths |
+| `W_PROCEDURE_CONTROL_DYNAMIC` | Dynamic control requires runtime review |
 | `E_OBSERVATION_EVENT_INVALID_TYPE` | Event type is not implemented |
 | `E_OBSERVATION_LINKED_STEP_MISSING` | Event points to a missing step |
+| `E_TRACE_PLAN_REFERENCE` | Trace block does not reference a procedure plan |
+| `E_TRACE_EVENT_TIME` | Trace event time is not ISO datetime or not monotonic |
+| `E_TRACE_EVENT_REFERENCE` | Trace event references an unknown step, control, artifact, analysis, or result |
+| `E_TRACE_EVENT_PAYLOAD` | Trace event payload is missing required fields |
+| `W_TRACE_STEP_STATE` | Trace step state order is suspicious or invalid for replay |
 | `E501` | Procedure lowering failed |
 | `E504` | Analysis step is unbound |
 | `E505` | Observation stage is ambiguous |
@@ -125,6 +141,12 @@ The following reference lists common diagnostics by source and purpose. Use it t
 | `E701` | Run plan build failed |
 | `E_RUNTIME_UNKNOWN_STEP` | Runtime step is unknown |
 | `E_RUNTIME_STEP_NOT_READY` | Runtime step is not ready to execute |
+| `E_RUNTIME_DEVICE_RANGE` | Step parameter is outside available device range |
+| `E_RUNTIME_INVENTORY` | Required inventory material is unavailable or expired |
+| `E_RUNTIME_ADAPTER` | Robot run lacks an adapter for a step or control |
+| `E_RUNTIME_CONTROL` | Dynamic control cannot proceed without runtime decision |
+| `E_RUNTIME_RESOURCE_CONFLICT` | Parallel control requires resource conflict review |
+| `W_RUNTIME_SAFETY` | Safety rule or safety tag requires attention |
 
 ## Repair Order
 

@@ -10,7 +10,8 @@ import type {
   ReactionNode,
   ResultNode,
   SampleNode,
-  SourceSpan
+  SourceSpan,
+  TraceNode
 } from "@chemd/core";
 import {
   classifyReactionConditions,
@@ -48,7 +49,8 @@ import type {
   TypedReactionNode,
   TypedResultNode,
   TypedSampleNode,
-  TypedSemanticNode
+  TypedSemanticNode,
+  TypedTraceNode
 } from "./types";
 
 export interface BuildNodeContext {
@@ -854,6 +856,29 @@ export const buildProcedureNode = (
     structureHint
   } as TypedProcedureNarrativeNode
 });
+
+export const buildTraceNode = (
+  node: TraceNode,
+  context: BuildNodeContext
+): BuiltTypedNode => {
+  const output = createBase("trace", node);
+  const plan = resolveOptionalReference(node.plan, context.objectIndex, {
+    sourceNodeType: "trace",
+    sourceNodeId: node.id,
+    field: "plan",
+    expectedTargetKind: "procedure"
+  }, context.externalTargetIndex);
+
+  output.diagnostics.push(...plan.diagnostics);
+  output.node = {
+    ...output.node,
+    ...(plan.value ? { plan: plan.value } : {}),
+    mode: node.mode,
+    eventCount: node.events?.length ?? 0
+  } as TypedTraceNode;
+
+  return output;
+};
 
 export const buildObservationNode = (node: ObservationNode): BuiltTypedNode => ({
   ...createBase("observation_narrative", node),

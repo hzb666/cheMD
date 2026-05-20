@@ -176,6 +176,16 @@ const renderProcedureNode = (node: DocxNodeByType<"procedure">): string =>
 const renderObservationNode = (node: DocxNodeByType<"observation">): string =>
   compactLines([renderHeading("Observation", node.id), ...renderFieldLines([["Ref", node.ref]]), node.body]);
 
+const renderTraceNode = (node: DocxNodeByType<"trace">): string =>
+  compactLines([
+    renderHeading("Trace", node.id),
+    ...renderFieldLines([
+      ["Plan", node.plan],
+      ["Mode", node.mode]
+    ]),
+    ...(node.events?.map((event) => `- Event: ${event.raw ?? event.eventType}`) ?? [])
+  ]);
+
 const renderSampleNode = (node: DocxNodeByType<"sample">): string =>
   compactLines([
     renderHeading("Sample", node.id),
@@ -269,6 +279,8 @@ const renderStructuredNode = (node: DocxNode): string => {
       return renderAnalysisNode(node);
     case "procedure":
       return renderProcedureNode(node);
+    case "trace":
+      return renderTraceNode(node);
     case "observation":
       return renderObservationNode(node);
     case "sample":

@@ -52,6 +52,7 @@ const toLnfStep = (step: CanonicalStepNode): LnfStep => ({
   evidence: step.evidence,
   artifacts: step.artifacts,
   effects: step.effects,
+  controlPath: step.controlPath,
   source: step.source,
   provenance: step.provenance,
   sourceNodeId: step.source.sourceNodeId,
@@ -149,7 +150,13 @@ const toRuntimeSummary = (input: BuildLnfInput): LnfRuntimeSummary | undefined =
     currentStepId: runtimeState?.currentStepId,
     stepCount: countRuntimeSteps(input),
     traceCount: runtimeState?.trace.length ?? 0,
-    stepStates: toRuntimeStepStates(runtimeState)
+    stepStates: toRuntimeStepStates(runtimeState),
+    controlStates: runtimeState.controlStates.map((control) => ({
+      controlId: control.controlId,
+      kind: control.kind,
+      status: control.status,
+      dynamic: control.dynamic
+    }))
   };
 };
 
@@ -185,7 +192,19 @@ const toRuntimePlanSummary = (runPlan: RunPlan): LnfRuntimePlanSummary => ({
   documentId: runPlan.documentId,
   status: runPlan.status,
   stepCount: runPlan.steps.length,
+  controlCount: runPlan.controls.length,
   diagnostics: runPlan.diagnostics,
+  controls: runPlan.controls.map((control) => ({
+    controlId: control.controlId,
+    kind: control.kind,
+    params: control.params,
+    dynamic: control.dynamic,
+    controlPath: control.controlPath,
+    source: {
+      sourceNodeType: "procedure",
+      rawText: `control: ${control.kind}`
+    }
+  })),
   steps: runPlan.steps.map(toRuntimeStepSummary)
 });
 
@@ -221,6 +240,7 @@ export const buildCanonicalLnf = (input: BuildLnfInput): ChemdLnf => {
       },
       workflow: {
         steps,
+        controls: input.stepGraph.controls,
         observations,
         diagnostics: input.stepGraph.diagnostics,
         stepSources: toStepSourceIndex(steps, observations)

@@ -8,7 +8,12 @@ import {
   startStep
 } from "@chemd/runtime-lab";
 
-import { adaptRuntimeLabTraceEvents, createTraceEvent, replayTrace } from "../src/index";
+import {
+  adaptRuntimeLabTraceEvents,
+  createTraceEvent,
+  replayTrace,
+  replayTraceToLabState
+} from "../src/index";
 
 describe("runtime trace replay", () => {
   it("replays completed step events without mutating source plans", () => {
@@ -147,5 +152,117 @@ describe("runtime trace replay", () => {
     expect(replay.artifactIds).toEqual(["art-1"]);
     expect(replay.completedStepIds).toEqual(["s1"]);
     expect(replay.status).toBe("completed");
+  });
+
+  it("replays trace events into lab step and control state", () => {
+    const plan = buildRunPlan({
+      documentId: "trace-lab-state",
+      stepGraph: {
+        procedures: [],
+        observations: [],
+        diagnostics: [],
+        steps: [
+          {
+            stepId: "s1",
+            family: "heat",
+            params: { temperature: "40 C" },
+            source: {
+              sourceNodeType: "procedure",
+              sourceNodeId: "proc-1",
+              sourceType: "explicit_step",
+              rawText: "step: heat"
+            },
+            loweringConfidence: 1
+          }
+        ],
+        controls: [
+          {
+            controlId: "operator-approval",
+            kind: "wait",
+            params: { condition: "operator.confirmed" },
+            controlPath: ["operator-approval"],
+            dynamic: true,
+            source: {
+              sourceNodeType: "procedure",
+              sourceNodeId: "proc-1",
+              rawText: "wait: operator-approval"
+            }
+          }
+        ]
+      }
+    });
+    const events = [
+      createTraceEvent({
+        eventId: "evt-run",
+        runId: "run-state",
+        timestamp: "2026-05-20T10:00:00.000Z",
+        type: "run_started"
+      }),
+      createTraceEvent({
+        eventId: "evt-control",
+        runId: "run-state",
+        timestamp: "2026-05-20T10:01:00.000Z",
+        type: "control_completed",
+        controlId: "operator-approval"
+      }),
+      createTraceEvent({
+        eventId: "evt-start",
+        runId: "run-state",
+        timestamp: "2026-05-20T10:02:00.000Z",
+        type: "step_started",
+        stepId: "s1"
+      }),
+      createTraceEvent({
+        eventId: "evt-dev",
+        runId: "run-state",
+        timestamp: "2026-05-20T10:03:00.000Z",
+        type: "deviation_recorded",
+        stepId: "s1",
+        payload: { field: "temperature", expected: "40 C", actual: "45 C" }
+      }),
+      createTraceEvent({
+        eventId: "evt-art",
+        runId: "run-state",
+        timestamp: "2026-05-20T10:04:00.000Z",
+        type: "artifact_generated",
+        stepId: "s1",
+        artifactId: "art-1"
+      }),
+      createTraceEvent({
+        eventId: "evt-obs",
+        runId: "run-state",
+        timestamp: "2026-05-20T10:05:00.000Z",
+        type: "observation_recorded",
+        stepId: "s1",
+        payload: { observationId: "obs-1", text: "Clear solution." }
+      }),
+      createTraceEvent({
+        eventId: "evt-done",
+        runId: "run-state",
+        timestamp: "2026-05-20T10:06:00.000Z",
+        type: "step_completed",
+        stepId: "s1"
+      })
+    ];
+    const replay = replayTrace({ runId: "run-state", stepIds: ["s1"], events });
+    const state = replayTraceToLabState(plan, { runId: "run-state", stepIds: ["s1"], events });
+
+    expect(replay.deviationCount).toBe(1);
+    expect(state.status).toBe("completed");
+    expect(state.stepStates).toContainEqual(expect.objectContaining({ stepId: "s1", status: "completed" }));
+    expect(state.controlStates).toContainEqual(expect.objectContaining({
+      controlId: "operator-approval",
+      status: "completed"
+    }));
+    expect(state.artifacts).toEqual([expect.objectContaining({ artifactId: "art-1" })]);
+    expect(state.observations).toEqual([expect.objectContaining({
+      observationId: "obs-1",
+      linkedStepId: "s1",
+      rawText: "Clear solution."
+    })]);
+    expect(state.trace).toEqual(expect.arrayContaining([
+      expect.objectContaining({ traceId: "evt-control", type: "control_completed", controlId: "operator-approval" }),
+      expect.objectContaining({ traceId: "evt-obs", type: "observation_recorded", stepId: "s1" })
+    ]));
   });
 });

@@ -51,8 +51,8 @@ ref: rxn-main
 reaction: rxn-main
 step: charge | id=s-charge | inputs=@mol-acid,@mol-alcohol | confidence=0.97
 step: heat | id=s-heat | temperature=78 C | duration=4 h | dependsOn=s-charge | confidence=0.95
-step: quench | id=s-quench | dependsOn=s-heat | confidence=0.92
-step: purify | id=s-purify | outputs=@sample-product | dependsOn=s-quench | confidence=0.91
+step: quench | id=s-quench | materials=sat. NaHCO3 | dependsOn=s-heat | confidence=0.92
+step: purify | id=s-purify | method=column chromatography | outputs=@sample-product | dependsOn=s-quench | confidence=0.91
 :::
 
 :::analysis #ana-tlc-main

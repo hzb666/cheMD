@@ -67,7 +67,7 @@ step: charge | id=s-charge | inputs=@substrate,@rxn-main,@missing
           facts: expect.objectContaining({
             field: "inputs",
             ref_id: "rxn-main",
-            expected_target_kind: "molecule",
+            expected_target_kind: "molecule|material|batch",
             actual_target_kind: "reaction"
           })
         }),

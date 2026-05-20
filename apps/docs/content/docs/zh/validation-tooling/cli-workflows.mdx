@@ -1,6 +1,6 @@
 ---
 title: CLI 与验证工作流
-description: validate、export、graph、diff、changed、repair 和 agent-loop 的实现级说明。
+description: validate、check、preflight、export、graph、diff、changed、repair 和 agent-loop 的实现级说明。
 ---
 
 
@@ -23,6 +23,30 @@ pnpm chemd validate experiments/*.chemd
 - `result.reaction`，或 reaction 形态的 `result.ref`。
 - `analysis.ref`、`procedure.ref`、`sample.derived_from` 和 `artifact.ref`。
 - 条件筛选中的 `factor`、`outcome`、`attempt` 和 `result`。
+
+## `pnpm chemd check`
+
+`check` 接收文件或目录，并递归发现 `.chemd` 与 `.chemd.md` 文件。它是普通工作区批量检查和语言 fixture 验收的入口。
+
+```text
+pnpm chemd check experiments --target validate --format json --dry-run
+pnpm chemd check fixtures/language --target run-plan --format text
+```
+
+`--target` 接受 `validate`、`run-plan`、`training` 和 `graph`。target 表示源码必须满足哪个下游契约。`validate` 检查当前语言契约；更严格的 target-specific 检查可以独立增强，不改变源码语法。
+
+JSON report schema 为 `chemd-check/v0.1`，包含每个文件的 diagnostics、按 severity 汇总的 totals、target 和 `dryRun` 标记。任一文件存在 error 时退出码为 1。
+
+## `pnpm chemd preflight`
+
+`preflight` 编译单个文件，构建 run plan，并结合实验室 context 执行运行检查。
+
+```text
+pnpm chemd preflight experiment.chemd --mode dry-run
+pnpm chemd preflight experiment.chemd --mode robot-run --context lab.json --format json --dry-run
+```
+
+`--mode` 接受 `dry-run`、`human-run`、`robot-run` 和 `replay-run`。`--context` 指向一个 JSON 文件，可包含 `capabilities`、`devices`、`inventory`、`adapters`、`environment` 和 `safetyRules`。runtime issue 会同时出现在 `preflight.issues` 和 compiler 形状的 diagnostics 中。blocking preflight 以 validation failed 退出。
 
 ## `pnpm chemd export --format json`
 
@@ -96,14 +120,16 @@ pnpm chemd agent-loop experiment.chemd --driver node --driver-arg ./repair-drive
 单使用者工作流：
 
 1. `pnpm chemd validate file.chemd`
-2. `pnpm chemd export file.chemd --format json`
-3. `pnpm chemd export file.chemd --format rag`
+2. `pnpm chemd preflight file.chemd --mode dry-run`
+3. `pnpm chemd export file.chemd --format json`
+4. `pnpm chemd export file.chemd --format rag`
 
 多文档路线工作流：
 
 1. `pnpm chemd validate file-a.chemd file-b.chemd`
-2. `pnpm chemd graph file-a.chemd file-b.chemd --format json`
-3. `pnpm chemd diff before.chemd after.chemd --format json`
+2. `pnpm chemd check experiments --target validate --format json`
+3. `pnpm chemd graph file-a.chemd file-b.chemd --format json`
+4. `pnpm chemd diff before.chemd after.chemd --format json`
 
 自动修复工作流：
 

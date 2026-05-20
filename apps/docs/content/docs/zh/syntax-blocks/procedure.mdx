@@ -3,7 +3,7 @@ title: '`:::procedure` 过程块'
 description: '`:::procedure` 记录实验过程正文、reaction/ref 关联、证据列表和结构化 step。'
 ---
 
-`:::procedure` 支持普通正文、行内 `step:` 和嵌套 `:::step`。
+`:::procedure` 支持普通正文、行内 `step:`、嵌套 `:::step` 和大括号控制流。控制流只能出现在 `:::procedure` 内部；顶级 control 不是 Chemd block。
 
 ## 语法
 
@@ -13,6 +13,7 @@ reaction: rxn-main
 evidence: notebook-p12 | batch-sheet
 step: charge | id=s-charge | inputs=@mol-substrate,@mol-base | solvent=MeCN
 step: heat | id=s-heat | temperature=60 C | duration=3 h | dependsOn=s-charge
+wait: operator-approval | condition=operator.confirmed | timeout=30 min
 The reaction mixture was monitored by TLC.
 :::
 ```
@@ -50,6 +51,53 @@ outputs: sample-product
 ```
 
 嵌套 step header 也接受裸 ID，例如 `:::step s-purify`。如果 header 与字段都没有提供 ID，parser 会生成 `<procedure-id>:sN`。
+
+## 控制流
+
+控制流使用 `:::procedure` 内部的普通行。块级控制使用大括号，单行控制只占一行：
+
+```md
+:::procedure #proc-controls
+step: charge | id=s-charge | inputs=@mat-substrate | outputs=mixture-a
+
+repeat: wash-cycle | count=2 {
+  step: wash | solvent=brine | volume=10 mL
+}
+
+until: monitor-tlc | condition=@ana-tlc.result == complete | max_iterations=4 {
+  step: analyze | id=s-tlc | type=tlc
+}
+
+branch: ph-workup {
+  case: acidic | condition=sensor.ph < 7 {
+    step: quench | id=s-quench-acid | reagent=NaHCO3
+  }
+  default: {
+    step: quench | id=s-quench-default | reagent=NH4Cl
+  }
+}
+
+parallel: workup {
+  path: organic {
+    step: dry | id=s-dry | medium=Na2SO4
+  }
+  path: aqueous {
+    step: store | id=s-store | location=waste
+  }
+}
+
+wait: operator-approval | condition=operator.confirmed | timeout=30 min
+abort_if: unsafe-temperature | condition=sensor.temperature > 80 C
+:::
+```
+
+块级控制包括 `repeat`、`until`、`branch`、`case`、`default`、`parallel` 和 `path`。单行控制包括 `wait` 和 `abort_if`。
+
+控制头格式为 `kind: id | key=value | key=value {`。`default` 没有自定义 ID。`case` 和 `path` 的 ID 必须在同级唯一。`repeat` 必须有正整数 `count`。`until`、`case`、`wait` 和 `abort_if` 必须有结构化 `condition`。
+
+condition 必须可机器解释。它可以用 `@id` 引用已知对象或 step ID，也可以使用 `operator.confirmed`、`sensor.temperature`、`time.elapsed`、`run.status` 这类 runtime namespace。自然语言 condition 会报错，因为无法可靠执行或回放。
+
+`repeat` 会把子步骤展开为生成 step ID，例如 `wash-cycle[1].wash` 和 `wash-cycle[2].wash`。`parallel` 会把 path 中的步骤展开为 `workup.organic.s-dry` 这类 ID。动态控制（`until`、`branch`、`wait`、`abort_if`）保留在 control graph 中，由 runtime preflight 决定是否需要 adapter 或人工确认。
 
 ## 推荐实践案例
 
@@ -94,6 +142,17 @@ Reaction progress was checked by TLC before workup.
 | `W_UNKNOWN_FIELD` | procedure 顶部字段不在 `ref`、`reaction`、`evidence` 内 |
 | `E_STEP_PARAM_MISSING` | `heat`、`cool`、`analyze`、`extract` 等步骤缺少要求参数 |
 | `E_STEP_PARAM_INVALID` | `filter` 使用不允许参数 |
+| `E_STEP_PARAM_TYPE_MISMATCH` | step 参数不符合 schema 类型 |
 | `E_STEP_ID_DUPLICATE` | step ID 重复 |
 | `E_STEP_INVALID_REFERENCE` | `dependsOn` 指向缺失 step |
 | `E_STEP_DEPENDENCY_CYCLE` | step 依赖形成循环 |
+| `E_PROCEDURE_CONTROL_SYNTAX` | control 大括号或 control 行语法非法 |
+| `E_PROCEDURE_CONTROL_UNCLOSED` | control block 缺少闭合大括号 |
+| `E_PROCEDURE_CONTROL_ID` | control 缺少必需 ID |
+| `E_PROCEDURE_CONTROL_ID_DUPLICATE` | control ID 重复，或 step/control ID 冲突 |
+| `E_PROCEDURE_CONTROL_COUNT` | `repeat` count 缺失或非法 |
+| `E_PROCEDURE_CONTROL_BODY` | 需要子内容的 control body 为空 |
+| `E_PROCEDURE_CONTROL_CONDITION` | condition 缺失、为自然语言或引用未知目标 |
+| `E_PROCEDURE_CONTROL_BRANCH` | `branch` 缺少有效 `case`/`default` 结构 |
+| `E_PROCEDURE_CONTROL_PARALLEL` | `parallel` 缺少至少两个 `path` 块 |
+| `W_PROCEDURE_CONTROL_DYNAMIC` | 动态 control 需要 runtime review |

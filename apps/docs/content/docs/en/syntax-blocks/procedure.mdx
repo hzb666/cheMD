@@ -3,7 +3,7 @@ title: '`:::procedure` Procedure Block'
 description: '`:::procedure` records procedure prose, reaction/ref links, evidence lists, and structured steps.'
 ---
 
-`:::procedure` supports prose, inline `step:` lines, and nested `:::step` blocks.
+`:::procedure` supports prose, inline `step:` lines, nested `:::step` blocks, and brace-based control flow. Control flow is valid only inside `:::procedure`; top-level control blocks are not Chemd blocks.
 
 ## Syntax
 
@@ -13,6 +13,7 @@ reaction: rxn-main
 evidence: notebook-p12 | batch-sheet
 step: charge | id=s-charge | inputs=@mol-substrate,@mol-base | solvent=MeCN
 step: heat | id=s-heat | temperature=60 C | duration=3 h | dependsOn=s-charge
+wait: operator-approval | condition=operator.confirmed | timeout=30 min
 The reaction mixture was monitored by TLC.
 :::
 ```
@@ -50,6 +51,53 @@ outputs: sample-product
 ```
 
 The nested step header also accepts a bare ID, such as `:::step s-purify`. If the header and fields do not provide an ID, the parser assigns `<procedure-id>:sN`.
+
+## Control Flow
+
+Control flow uses ordinary lines inside `:::procedure`. Block controls use braces and single-line controls use one line:
+
+```md
+:::procedure #proc-controls
+step: charge | id=s-charge | inputs=@mat-substrate | outputs=mixture-a
+
+repeat: wash-cycle | count=2 {
+  step: wash | solvent=brine | volume=10 mL
+}
+
+until: monitor-tlc | condition=@ana-tlc.result == complete | max_iterations=4 {
+  step: analyze | id=s-tlc | type=tlc
+}
+
+branch: ph-workup {
+  case: acidic | condition=sensor.ph < 7 {
+    step: quench | id=s-quench-acid | reagent=NaHCO3
+  }
+  default: {
+    step: quench | id=s-quench-default | reagent=NH4Cl
+  }
+}
+
+parallel: workup {
+  path: organic {
+    step: dry | id=s-dry | medium=Na2SO4
+  }
+  path: aqueous {
+    step: store | id=s-store | location=waste
+  }
+}
+
+wait: operator-approval | condition=operator.confirmed | timeout=30 min
+abort_if: unsafe-temperature | condition=sensor.temperature > 80 C
+:::
+```
+
+Supported block controls are `repeat`, `until`, `branch`, `case`, `default`, `parallel`, and `path`. Supported line controls are `wait` and `abort_if`.
+
+Control headers use `kind: id | key=value | key=value {`. `default` has no custom ID. `case` and `path` IDs must be unique among siblings. `repeat` requires a positive integer `count`. `until`, `case`, `wait`, and `abort_if` require a structured `condition`.
+
+Conditions must be machine-readable. They can reference known objects or step IDs with `@id`, or runtime namespaces such as `operator.confirmed`, `sensor.temperature`, `time.elapsed`, and `run.status`. Natural-language conditions are errors because they cannot be executed or replayed reliably.
+
+`repeat` expands authored child steps into generated step IDs such as `wash-cycle[1].wash` and `wash-cycle[2].wash`. `parallel` expands path steps into IDs such as `workup.organic.s-dry`. Dynamic controls (`until`, `branch`, `wait`, `abort_if`) stay in the control graph so runtime preflight can require an adapter or manual confirmation.
 
 ## Recommended Practice
 
@@ -94,6 +142,17 @@ Reaction progress was checked by TLC before workup.
 | `W_UNKNOWN_FIELD` | top-level procedure field outside `ref`, `reaction`, and `evidence` |
 | `E_STEP_PARAM_MISSING` | required parameters missing for `heat`, `cool`, `analyze`, or `extract` |
 | `E_STEP_PARAM_INVALID` | `filter` uses a disallowed parameter |
+| `E_STEP_PARAM_TYPE_MISMATCH` | step parameter does not match the schema type |
 | `E_STEP_ID_DUPLICATE` | duplicate step ID |
 | `E_STEP_INVALID_REFERENCE` | `dependsOn` references a missing step |
 | `E_STEP_DEPENDENCY_CYCLE` | step dependency cycle |
+| `E_PROCEDURE_CONTROL_SYNTAX` | unexpected control brace or malformed control line |
+| `E_PROCEDURE_CONTROL_UNCLOSED` | control block is missing a closing brace |
+| `E_PROCEDURE_CONTROL_ID` | control ID is required but missing |
+| `E_PROCEDURE_CONTROL_ID_DUPLICATE` | duplicate control ID or step/control ID collision |
+| `E_PROCEDURE_CONTROL_COUNT` | `repeat` count is missing or invalid |
+| `E_PROCEDURE_CONTROL_BODY` | a control that requires children has an empty body |
+| `E_PROCEDURE_CONTROL_CONDITION` | condition is missing, natural-language, or references an unknown target |
+| `E_PROCEDURE_CONTROL_BRANCH` | `branch` lacks a valid `case`/`default` shape |
+| `E_PROCEDURE_CONTROL_PARALLEL` | `parallel` lacks at least two `path` blocks |
+| `W_PROCEDURE_CONTROL_DYNAMIC` | dynamic control needs runtime review |

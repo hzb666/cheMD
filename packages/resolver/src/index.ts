@@ -42,6 +42,7 @@ const isObjectNode = (node: ChemdNode): node is ObjectNode =>
     "result",
     "analysis",
     "procedure",
+    "trace",
     "observation",
     "sample",
     "artifact",

@@ -97,11 +97,27 @@ description: Chemd parser、resolver、typechecker、compiler 和 runtime 常见
 | `E_STEP_MISSING_FIELD` | step 结构缺少必要字段 |
 | `E_STEP_PARAM_MISSING` | step family 必需参数缺失 |
 | `E_STEP_PARAM_INVALID` | step family 不允许该参数 |
+| `E_STEP_PARAM_TYPE_MISMATCH` | step family 参数值不符合 schema 类型 |
 | `E_STEP_ID_DUPLICATE` | step ID 重复 |
 | `E_STEP_INVALID_REFERENCE` | `dependsOn` 指向不存在 step |
 | `E_STEP_DEPENDENCY_CYCLE` | step 依赖图成环 |
+| `E_PROCEDURE_CONTROL_SYNTAX` | procedure control 大括号或行语法非法 |
+| `E_PROCEDURE_CONTROL_UNCLOSED` | procedure control block 缺少闭合大括号 |
+| `E_PROCEDURE_CONTROL_ID` | procedure control 缺少 ID |
+| `E_PROCEDURE_CONTROL_ID_DUPLICATE` | procedure control ID 重复或与 step 冲突 |
+| `E_PROCEDURE_CONTROL_COUNT` | `repeat` count 缺失或非法 |
+| `E_PROCEDURE_CONTROL_BODY` | 需要子内容的 control body 为空 |
+| `E_PROCEDURE_CONTROL_CONDITION` | control condition 缺失、含义不清或无法解析 |
+| `E_PROCEDURE_CONTROL_BRANCH` | branch control 缺少有效 `case` 或 `default` 结构 |
+| `E_PROCEDURE_CONTROL_PARALLEL` | parallel control 缺少至少两个有效 path |
+| `W_PROCEDURE_CONTROL_DYNAMIC` | 动态 control 需要 runtime review |
 | `E_OBSERVATION_EVENT_INVALID_TYPE` | event type 未实现 |
 | `E_OBSERVATION_LINKED_STEP_MISSING` | event 指向不存在 step |
+| `E_TRACE_PLAN_REFERENCE` | trace block 未引用 procedure plan |
+| `E_TRACE_EVENT_TIME` | trace event 时间不是 ISO datetime 或不单调 |
+| `E_TRACE_EVENT_REFERENCE` | trace event 引用未知 step、control、artifact、analysis 或 result |
+| `E_TRACE_EVENT_PAYLOAD` | trace event payload 缺少必填字段 |
+| `W_TRACE_STEP_STATE` | trace step 状态顺序可疑，或对 replay 非法 |
 | `E501` | procedure lowering 失败 |
 | `E504` | analysis step 未绑定 |
 | `E505` | observation stage 存在歧义 |
@@ -125,6 +141,12 @@ description: Chemd parser、resolver、typechecker、compiler 和 runtime 常见
 | `E701` | run plan 构建失败 |
 | `E_RUNTIME_UNKNOWN_STEP` | runtime step 未识别 |
 | `E_RUNTIME_STEP_NOT_READY` | runtime step 尚未满足执行条件 |
+| `E_RUNTIME_DEVICE_RANGE` | step 参数超出可用设备范围 |
+| `E_RUNTIME_INVENTORY` | 必需库存物料不可用或过期 |
+| `E_RUNTIME_ADAPTER` | robot run 缺少 step 或 control adapter |
+| `E_RUNTIME_CONTROL` | 动态 control 缺少 runtime decision |
+| `E_RUNTIME_RESOURCE_CONFLICT` | parallel control 需要资源冲突审查 |
+| `W_RUNTIME_SAFETY` | safety rule 或 safety tag 需要关注 |
 
 ## 修复顺序
 

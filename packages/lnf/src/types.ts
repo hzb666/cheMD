@@ -3,6 +3,7 @@ import type { V03Diagnostic } from "@chemd/diagnostics";
 import type {
   CanonicalStepNode,
   ObservationEventNode,
+  CanonicalProcedureControlNode,
   StepGraph
 } from "@chemd/step-ontology";
 import type {
@@ -34,6 +35,7 @@ export interface LnfStep {
   evidence?: CanonicalStepNode["evidence"];
   artifacts?: CanonicalStepNode["artifacts"];
   effects?: CanonicalStepNode["effects"];
+  controlPath?: string[];
   source: CanonicalStepNode["source"];
   provenance?: CanonicalStepNode["provenance"];
   sourceNodeId?: string;
@@ -79,6 +81,12 @@ export interface LnfRuntimeSummary {
     startedAt?: string;
     endedAt?: string;
   }>;
+  controlStates: Array<{
+    controlId: string;
+    kind: string;
+    status: string;
+    dynamic: boolean;
+  }>;
 }
 
 export interface LnfStepSourceIndex {
@@ -106,7 +114,9 @@ export interface LnfRuntimePlanSummary {
   documentId: string;
   status: RunPlan["status"];
   stepCount: number;
+  controlCount: number;
   diagnostics: V03Diagnostic[];
+  controls: CanonicalProcedureControlNode[];
   steps: LnfRuntimeStepSummary[];
 }
 
@@ -124,6 +134,7 @@ export interface ChemdLnfCanonical {
     };
     workflow: {
       steps: LnfStep[];
+      controls?: CanonicalProcedureControlNode[];
       observations: ObservationEventNode[];
       diagnostics: V03Diagnostic[];
       stepSources: LnfStepSourceIndex;

@@ -21,7 +21,8 @@ import type {
   ReactionNode,
   ResultNode,
   SourceSpan,
-  SampleNode
+  SampleNode,
+  TraceNode
 } from "@chemd/core";
 import type {
   NormalizedReactionConditions,
@@ -203,6 +204,13 @@ export interface TypedProcedureNarrativeNode extends TypedNodeBase {
   structureHint: "ordered_list" | "paragraph" | "mixed" | "explicit_steps";
 }
 
+export interface TypedTraceNode extends TypedNodeBase {
+  kind: "trace";
+  plan?: ReferenceOrLiteral;
+  mode?: string;
+  eventCount: number;
+}
+
 export interface TypedObservationNarrativeNode extends TypedNodeBase {
   kind: "observation_narrative";
   rawText: string;
@@ -290,6 +298,7 @@ export type TypedSemanticNode =
   | TypedResultNode
   | TypedAnalysisNode
   | TypedProcedureNarrativeNode
+  | TypedTraceNode
   | TypedObservationNarrativeNode
   | TypedStepNode
   | TypedObservationEventNode
@@ -336,6 +345,7 @@ export type ObjectNode =
   | ResultNode
   | AnalysisNode
   | ProcedureNode
+  | TraceNode
   | ObservationNode
   | SampleNode
   | ArtifactNode

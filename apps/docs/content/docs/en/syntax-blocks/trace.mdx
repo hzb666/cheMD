@@ -1,0 +1,102 @@
+---
+title: '`:::trace` Runtime Trace Block'
+description: '`:::trace` records execution events for a compiled procedure plan without rewriting the procedure or result.'
+---
+
+`:::trace` stores authored or imported runtime events. It is linked to a `:::procedure` plan and is validated against the compiled step graph and control graph.
+
+Trace data never changes the source procedure, reaction, or result. It records what happened during execution, replay, or audit so downstream tools can compare authored intent with observed run facts.
+
+## Syntax
+
+```md
+:::trace #run-main
+plan: @proc-main
+mode: human-run
+event: run_started | at=2026-05-20T10:00:00Z
+event: step_started | step=s-charge | at=2026-05-20T10:01:00Z
+event: step_completed | step=s-charge | at=2026-05-20T10:03:00Z
+event: control_entered | control=operator-approval | at=2026-05-20T10:04:00Z
+event: deviation_recorded | step=s-heat | field=temperature | expected=40 C | actual=45 C
+:::
+```
+
+## Fields
+
+| field | required | notes |
+| --- | --- | --- |
+| `plan` | yes | procedure reference; `@proc-main` and `proc-main` are accepted |
+| `mode` | no | `dry-run`, `human-run`, `robot-run`, or `replay-run` |
+| `event` | no | child line syntax for trace events |
+
+The block also preserves ordinary prose as markdown children. Prose can describe import source, operator notes, or external run IDs, but machine-readable events should use `event:`.
+
+## Event Lines
+
+Use `event: type | key=value | key=value`.
+
+Common structural keys are:
+
+| key | meaning |
+| --- | --- |
+| `id`, `event_id` | optional event identifier |
+| `at` | ISO datetime; ordered event times must be monotonic |
+| `step`, `stepId`, `step_id` | step ID from the referenced procedure plan |
+| `control`, `controlId`, `control_id` | control ID from the referenced procedure plan |
+| `artifact` | artifact reference |
+| `analysis` | analysis reference |
+| `result` | result reference |
+
+Other `key=value` pairs are preserved as event payload. For example, `deviation_recorded` requires `field`, `expected`, and `actual`. `resource_consumed` requires either `material` or `resource`, plus `amount`.
+
+## Event Types
+
+Supported runtime trace event types include:
+
+```text
+run_started, run_completed, run_aborted,
+step_started, step_completed, step_failed, step_skipped,
+control_entered, control_completed, control_blocked, control_aborted,
+operator_action, confirmation_granted, manual_override,
+artifact_generated, observation_recorded,
+measurement_recorded, analysis_recorded,
+deviation_recorded, diagnostic_recorded, diagnostic_emitted,
+resource_consumed
+```
+
+The typechecker validates references and payload requirements. Step and control references are scoped to the `plan` procedure; a step ID from another procedure is an error even if it exists elsewhere in the document. Runtime replay then projects events into `LabState` step states, control states, artifacts, observations, diagnostics, deviation counts, and the replayed trace stream.
+
+## Recommended Practice
+
+Keep trace IDs separate from procedure IDs. The procedure describes intent; the trace describes execution facts.
+
+```md
+:::procedure #proc-main
+step: charge | id=s-charge | inputs=@mat-substrate | outputs=mixture-a
+wait: operator-approval | condition=operator.confirmed | timeout=30 min
+step: heat | id=s-heat | temperature=40 C | duration=30 min | dependsOn=s-charge,operator-approval
+:::
+
+:::trace #run-2026-05-20-a
+plan: @proc-main
+mode: human-run
+event: run_started | at=2026-05-20T09:00:00Z
+event: step_started | step=s-charge | at=2026-05-20T09:01:00Z
+event: step_completed | step=s-charge | at=2026-05-20T09:03:00Z
+event: control_entered | control=operator-approval | at=2026-05-20T09:04:00Z
+event: control_completed | control=operator-approval | at=2026-05-20T09:05:00Z
+event: step_started | step=s-heat | at=2026-05-20T09:06:00Z
+event: step_completed | step=s-heat | at=2026-05-20T09:36:00Z
+event: run_completed | at=2026-05-20T09:37:00Z
+:::
+```
+
+## Diagnostics
+
+| code | condition |
+| --- | --- |
+| `E_TRACE_PLAN_REFERENCE` | `plan` does not reference a procedure |
+| `E_TRACE_EVENT_TIME` | `at` is not an ISO datetime or is not monotonic |
+| `E_TRACE_EVENT_REFERENCE` | event references an unknown step, control, artifact, analysis, or result |
+| `E_TRACE_EVENT_PAYLOAD` | event type is missing required payload keys |
+| `W_TRACE_STEP_STATE` | `step_completed` appears before a matching `step_started`; escalates to error in `robot-run` or `replay-run` |

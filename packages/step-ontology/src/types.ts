@@ -1,5 +1,5 @@
 import type { V03Diagnostic } from "@chemd/diagnostics";
-import type { ProvenanceInfo, SourceSpan } from "@chemd/core";
+import type { ProcedureControlKind, ProvenanceInfo, SourceSpan } from "@chemd/core";
 
 export type StepFamily =
   | "charge"
@@ -50,6 +50,8 @@ export interface StepSourceInfo {
 
 export type StepReferenceTargetKind =
   | "molecule"
+  | "material"
+  | "batch"
   | "reaction"
   | "result"
   | "analysis"
@@ -89,9 +91,29 @@ export interface CanonicalStepNode {
   evidence?: string[];
   artifacts?: Array<{ artifactId: string; kind: string }>;
   effects?: StepEffect[];
+  controlPath?: string[];
   source: StepSourceInfo;
   provenance?: ProvenanceInfo;
   loweringConfidence: number;
+}
+
+export interface ProcedureControlSourceInfo {
+  sourceNodeType: "procedure";
+  sourceNodeId?: string;
+  rawText: string;
+  sourceSpan?: SourceSpan;
+  provenance?: ProvenanceInfo;
+}
+
+export interface CanonicalProcedureControlNode {
+  controlId: string;
+  kind: ProcedureControlKind;
+  params: Record<string, unknown>;
+  controlPath: string[];
+  dynamic: boolean;
+  children?: CanonicalProcedureControlNode[];
+  source: ProcedureControlSourceInfo;
+  provenance?: ProvenanceInfo;
 }
 
 export interface ObservationEventNode {
@@ -122,6 +144,7 @@ export interface ProcedureLoweringResult {
   structureHint: "ordered_list" | "paragraph" | "mixed" | "explicit_steps";
   sourceType?: "explicit_steps" | "lowered_prose";
   steps: CanonicalStepNode[];
+  controls?: CanonicalProcedureControlNode[];
   diagnostics: V03Diagnostic[];
   loweringConfidence: number;
 }
@@ -151,6 +174,7 @@ export interface AnalysisLoweringResult {
 
 export interface StepGraph {
   steps: CanonicalStepNode[];
+  controls?: CanonicalProcedureControlNode[];
   procedures: ProcedureLoweringResult[];
   observations: ObservationLoweringResult[];
   diagnostics: V03Diagnostic[];

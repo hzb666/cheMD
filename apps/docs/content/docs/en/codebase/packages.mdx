@@ -31,6 +31,7 @@ pnpm --filter @chemd/compiler typecheck
 | Block grammar or inline syntax | parser tests, resolver indexing, language-service diagnostics, user docs |
 | Reference or template behavior | resolver tests, typechecker typed-reference checks, CLI validation output |
 | Quantity or route semantics | typechecker tests, step ontology lowering, compiler LNF/export results |
+| Step schema, procedure controls, or trace syntax | `@chemd/step-ontology`, `@chemd/runtime-lab`, `@chemd/runtime-trace`, CLI `preflight`, syntax docs |
 | Public compiler result shape | CLI command output, web/desktop callers, exporter-training consumers |
 
 ## Semantic and Runtime Path
@@ -42,12 +43,15 @@ pnpm --filter @chemd/compiler typecheck
 | `@chemd/runtime-trace` | Runtime trace structures and replay helpers |
 | `@chemd/lnf` | Canonical intermediate representation |
 
-`@chemd/step-ontology` is tightly coupled with `@chemd/typechecker`. Explicit steps are converted into canonical steps by the typechecker, while prose procedures are lowered by step ontology. `runtime-lab` uses typed graph and step graph data to build run plans, which the compiler writes into LNF.
+`@chemd/step-ontology` is tightly coupled with `@chemd/typechecker`. Explicit steps are converted into canonical steps by the typechecker, while prose procedures are lowered by step ontology. StepFamily parameter schema also lives here and is consumed by typechecker and runtime packages so required params, aliases, capabilities, confirmation strategy, and safety tags stay aligned.
+
+`runtime-lab` uses typed graph and step graph data to build run plans, including `controls` and `controlStates`. Runtime preflight checks capabilities, device ranges, inventory, safety rules, adapters, dynamic controls, and parallel resource review. `runtime-trace` owns trace event adaptation and replay to `LabState`.
 
 ```bash
 pnpm --filter @chemd/typechecker test
 pnpm --filter @chemd/step-ontology test
 pnpm --filter @chemd/runtime-lab test
+pnpm --filter @chemd/runtime-trace test
 ```
 
 The semantic packages should not parse raw source text directly. They consume AST, resolved document data, typed graph data, or step graph data produced earlier in the pipeline. This keeps syntax concerns in parser/resolver and keeps runtime planning focused on canonical semantic structures.
@@ -111,6 +115,7 @@ Before closing a package-level change, check the matching surfaces:
 | --- | --- |
 | Language syntax | Update parser coverage, resolver/typechecker expectations, compiler outputs, CLI validation, and user docs examples |
 | Diagnostics | Keep code, severity, location, message, and remediation aligned across CLI, language service, web, and desktop |
+| Runtime contracts | Keep StepFamily schema, procedure controls, run plan, preflight issues, trace replay, LNF, and CLI `preflight` in sync |
 | Exports | Verify renderer output, compiler aggregate output, CLI export command, and any app API route that exposes the format |
 | Storage or graph | Check migration/schema shape, repository helpers, graph export contracts, and app/service callers |
 | App support | Keep shared behavior in packages; keep app code focused on UI, routing, permissions, and platform adaptation |

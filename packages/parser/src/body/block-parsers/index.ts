@@ -12,6 +12,7 @@ import { parseObservationBlock } from "./observation";
 import { parseProcedureBlock } from "./procedure";
 import { parseResultBlock } from "./result";
 import { parseSampleBlock } from "./sample";
+import { parseTraceBlock } from "./trace";
 import type { BlockParser, BlockParserContext } from "./types";
 
 const parseUseBlock: BlockParser = ({ headerArg, lines, diagnostics }) => {
@@ -76,6 +77,7 @@ const PARSERS = new Map<string, BlockParser>([
   ["sample", parseSampleBlock],
   ["condition-varies", parseConditionVariesBlock],
   ["procedure", parseProcedureBlock],
+  ["trace", parseTraceBlock],
   ["observation", parseObservationBlock],
   ["use", parseUseBlock],
   ["col", parseColBlock]

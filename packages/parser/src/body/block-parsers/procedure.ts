@@ -1,6 +1,9 @@
 import {
   getAllowedBlockFieldSet,
   type Diagnostic,
+  type ProcedureChildNode,
+  type ProcedureControlKind,
+  type ProcedureControlNode,
   type ProcedureNode,
   type ProcedureStepNode,
   type SourceSpan
@@ -21,6 +24,8 @@ import type { BlockParser } from "./types";
 const PROCEDURE_FIELDS = getAllowedBlockFieldSet("procedure");
 const STEP_LINE_RE = /^\s*step\s*:\s*(.+)$/i;
 const STEP_BLOCK_START_RE = /^\s*:::step(?:\s+(.*))?\s*$/i;
+const CONTROL_BLOCK_START_RE = /^\s*(repeat|until|branch|parallel|case|default|path)\s*:\s*(.*?)\s*\{\s*$/i;
+const CONTROL_LINE_RE = /^\s*(wait|abort_if)\s*:\s*(.+)$/i;
 const STEP_STRUCTURAL_PARAM_KEYS = new Set([
   "id",
   "step_id",
@@ -34,6 +39,7 @@ const STEP_STRUCTURAL_PARAM_KEYS = new Set([
   "evidence",
   "confidence"
 ]);
+const CONTROL_STRUCTURAL_PARAM_KEYS = new Set(["outputs"]);
 
 const splitStepSegments = (value: string): string[] =>
   value
@@ -90,6 +96,9 @@ const splitChildBlockList = (value: string | undefined): string[] | undefined =>
 const removeStructuralParams = (params: Record<string, string>): Record<string, string> =>
   Object.fromEntries(Object.entries(params).filter(([key]) => !STEP_STRUCTURAL_PARAM_KEYS.has(key)));
 
+const removeControlStructuralParams = (params: Record<string, string>): Record<string, string> =>
+  Object.fromEntries(Object.entries(params).filter(([key]) => !CONTROL_STRUCTURAL_PARAM_KEYS.has(key)));
+
 const readChildBlockId = (headerArg: string | undefined): string | undefined => {
   const trimmed = headerArg?.trim() ?? "";
   if (!trimmed) {
@@ -111,11 +120,13 @@ const withStepMetadata = (
   procedureId: string | undefined,
   index: number
 ): ProcedureStepNode => {
+  const generatedStepId = step.stepId === undefined;
   const stepId = step.stepId ?? `${procedureId ?? "procedure"}:s${index + 1}`;
 
   return {
     ...step,
     stepId,
+    ...(generatedStepId ? { generatedStepId } : {}),
     provenance: {
       origin: "author",
       sourceNodeType: "step",
@@ -127,6 +138,22 @@ const withStepMetadata = (
     }
   };
 };
+
+const withControlMetadata = (
+  control: ProcedureControlNode,
+  procedureId: string | undefined
+): ProcedureControlNode => ({
+  ...control,
+  provenance: {
+    origin: "author",
+    sourceNodeType: "procedure",
+    sourceNodeId: procedureId,
+    sourceField: control.kind,
+    ruleId: "parser.author.control",
+    ...(control.sourceSpan ? { sourceSpan: control.sourceSpan } : {}),
+    confidence: 1
+  }
+});
 
 const createStepNode = (
   family: string,
@@ -200,6 +227,49 @@ const parseStepLine = (line: string, sourceSpan: SourceSpan): ProcedureStepNode 
   return createStepNode(family, params, line.trim(), sourceSpan);
 };
 
+const parseControlHeader = (
+  kind: ProcedureControlKind,
+  rawHeader: string
+): Pick<ProcedureControlNode, "controlId" | "params" | "outputs"> => {
+  const segments = splitStepSegments(rawHeader);
+  const [firstSegment = "", ...restSegments] = segments;
+  const firstParam = readStepParam(firstSegment);
+  const paramSegments = firstParam ? segments : restSegments;
+  const params = Object.fromEntries(
+    paramSegments.flatMap((segment) => {
+      const param = readStepParam(segment);
+      return param ? [param] : [];
+    })
+  );
+  const controlId = kind === "default"
+    ? undefined
+    : firstParam ? undefined : firstSegment || undefined;
+  const outputs = readStepList(params, "outputs");
+  const controlParams = removeControlStructuralParams(params);
+
+  return {
+    ...(controlId ? { controlId } : {}),
+    ...(Object.keys(controlParams).length > 0 ? { params: controlParams } : {}),
+    ...(outputs ? { outputs } : {})
+  };
+};
+
+const createControlNode = (
+  kind: ProcedureControlKind,
+  rawHeader: string,
+  raw: string,
+  sourceSpan: SourceSpan,
+  children?: ProcedureChildNode[]
+): ProcedureControlNode => ({
+  type: "control",
+  kind,
+  ...parseControlHeader(kind, rawHeader),
+  ...(children && children.length > 0 ? { children } : {}),
+  raw,
+  authorProvided: true,
+  sourceSpan
+});
+
 const parseNestedStepFields = (
   headerArg: string | undefined,
   lines: string[],
@@ -272,16 +342,44 @@ const parseNestedStepBlock = (
   };
 };
 
-const splitProcedureBodyAndSteps = (
+interface ProcedureChildrenParseResult {
+  bodyLines: string[];
+  children: NonNullable<ProcedureNode["children"]>;
+  controls: ProcedureControlNode[];
+  closed: boolean;
+  nextIndex: number;
+  steps: ProcedureStepNode[];
+}
+
+const createProcedureControlDiagnostic = (
+  diagnostics: Diagnostic[],
+  code: string,
+  message: string,
+  procedureId: string | undefined
+) => {
+  diagnostics.push({
+    code,
+    severity: "error",
+    message,
+    sourceLayer: "parser",
+    sourceNodeType: "procedure",
+    sourceNodeId: procedureId
+  });
+};
+
+const splitProcedureBodyAndChildren = (
   lines: string[],
   diagnostics: Diagnostic[],
-  procedureId: string | undefined
-): { bodyLines: string[]; steps: ProcedureStepNode[]; children: NonNullable<ProcedureNode["children"]> } => {
+  procedureId: string | undefined,
+  startIndex = 0,
+  stopOnBrace = false
+): ProcedureChildrenParseResult => {
   const bodyLines: string[] = [];
   const bodyBuffer: string[] = [];
   const steps: ProcedureStepNode[] = [];
+  const controls: ProcedureControlNode[] = [];
   const children: NonNullable<ProcedureNode["children"]> = [];
-  let index = 0;
+  let index = startIndex;
 
   const flushBodyChild = () => {
     const body = createBodyText(bodyBuffer);
@@ -293,6 +391,22 @@ const splitProcedureBodyAndSteps = (
 
   while (index < lines.length) {
     const line = lines[index];
+    if (line.trim() === "}") {
+      if (stopOnBrace) {
+        flushBodyChild();
+        return { bodyLines, children, controls, steps, nextIndex: index + 1, closed: true };
+      }
+
+      createProcedureControlDiagnostic(
+        diagnostics,
+        "E_PROCEDURE_CONTROL_SYNTAX",
+        "Unexpected procedure control closing brace.",
+        procedureId
+      );
+      index += 1;
+      continue;
+    }
+
     const nestedStep = parseNestedStepBlock(lines, index);
     if (nestedStep) {
       flushBodyChild();
@@ -302,6 +416,54 @@ const splitProcedureBodyAndSteps = (
         children.push(step);
       }
       index = nestedStep.nextIndex;
+      continue;
+    }
+
+    const blockControlMatch = line.match(CONTROL_BLOCK_START_RE);
+    if (blockControlMatch) {
+      flushBodyChild();
+      const nested = splitProcedureBodyAndChildren(lines, diagnostics, procedureId, index + 1, true);
+      if (!nested.closed) {
+        createProcedureControlDiagnostic(
+          diagnostics,
+          "E_PROCEDURE_CONTROL_UNCLOSED",
+          `Procedure control ${blockControlMatch[1]} is missing a closing brace.`,
+          procedureId
+        );
+      }
+      const endIndex = nested.closed ? nested.nextIndex - 1 : Math.max(index, nested.nextIndex - 1);
+      const control = withControlMetadata(
+        createControlNode(
+          blockControlMatch[1].toLowerCase() as ProcedureControlKind,
+          blockControlMatch[2] ?? "",
+          lines.slice(index, endIndex + 1).map((item) => item.trimEnd()).join("\n"),
+          createLineSourceSpan(lines, index, endIndex),
+          nested.children
+        ),
+        procedureId
+      );
+      controls.push(control, ...nested.controls);
+      steps.push(...nested.steps);
+      children.push(control);
+      index = nested.nextIndex;
+      continue;
+    }
+
+    const lineControlMatch = line.match(CONTROL_LINE_RE);
+    if (lineControlMatch) {
+      flushBodyChild();
+      const control = withControlMetadata(
+        createControlNode(
+          lineControlMatch[1].toLowerCase() as ProcedureControlKind,
+          lineControlMatch[2] ?? "",
+          line.trim(),
+          createLineSourceSpan(lines, index)
+        ),
+        procedureId
+      );
+      controls.push(control);
+      children.push(control);
+      index += 1;
       continue;
     }
 
@@ -321,13 +483,13 @@ const splitProcedureBodyAndSteps = (
   }
 
   flushBodyChild();
-  return { bodyLines, steps, children };
+  return { bodyLines, steps, children, controls, nextIndex: index, closed: !stopOnBrace };
 };
 
 export const parseProcedureBlock: BlockParser = ({ headerArg, lines, diagnostics }) => {
   const id = readStructuredBlockId(headerArg, diagnostics);
   const { fieldLines, bodyLines } = splitLeadingFieldLines(lines, PROCEDURE_FIELDS);
-  const parsedBody = splitProcedureBodyAndSteps(bodyLines, diagnostics, id);
+  const parsedBody = splitProcedureBodyAndChildren(bodyLines, diagnostics, id);
   const fields = parseAllowedFields(fieldLines, diagnostics, "procedure", PROCEDURE_FIELDS, {
     listFields: new Set(["evidence"]),
     sourceNodeId: id
@@ -343,6 +505,7 @@ export const parseProcedureBlock: BlockParser = ({ headerArg, lines, diagnostics
     fieldSpans,
     body: createBodyText(parsedBody.bodyLines),
     ...(parsedBody.steps.length > 0 ? { steps: parsedBody.steps } : {}),
+    ...(parsedBody.controls.length > 0 ? { controls: parsedBody.controls } : {}),
     ...(parsedBody.children.length > 0 ? { children: parsedBody.children } : {})
   } as ProcedureNode;
 };

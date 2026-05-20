@@ -20,6 +20,8 @@ const TARGET_KIND_BY_NODE_TYPE: Record<string, ReferenceType["targetKind"]> = {
   reaction: "reaction",
   result: "result",
   analysis: "analysis",
+  procedure: "procedure",
+  trace: "trace",
   sample: "sample",
   artifact: "artifact",
   condition_varies: "condition_varies",

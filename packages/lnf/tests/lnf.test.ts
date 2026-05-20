@@ -229,6 +229,8 @@ describe("canonical LNF builder", () => {
         documentId: "exp-lnf-runtime",
         status: "planned",
         diagnostics: [],
+        controls: [],
+        controlStates: [],
         steps: [{
           stepId: "s1",
           order: 1,
@@ -238,6 +240,7 @@ describe("canonical LNF builder", () => {
           requiredCapabilities: [],
           requiresConfirmation: true,
           confirmationStrategy: "manual_required",
+          safetyTags: [],
           sourceType: "explicit_step",
           source: {
             sourceNodeType: "procedure",
@@ -249,6 +252,7 @@ describe("canonical LNF builder", () => {
       },
       runtimePreflight: {
         blocking: false,
+        issues: [],
         diagnostics: []
       },
       runtimeState: {
@@ -258,6 +262,7 @@ describe("canonical LNF builder", () => {
         status: "running",
         currentStepId: "s1",
         stepStates: [{ stepId: "s1", status: "running", diagnostics: [] }],
+        controlStates: [],
         resources: [],
         artifacts: [],
         observations: [],

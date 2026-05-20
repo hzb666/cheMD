@@ -24,13 +24,16 @@ interface ResolvedStepParams {
   diagnostics: V03Diagnostic[];
 }
 
-const EXPECTED_STEP_INPUT_TARGET_KIND = "molecule";
+const EXPECTED_STEP_INPUT_TARGET_KINDS = new Set(["molecule", "material", "batch"]);
+const EXPECTED_STEP_INPUT_TARGET_KIND = "molecule|material|batch";
 
 const toStepReferenceTargetKind = (
   targetKind: ReferenceType["targetKind"]
 ): StepReferenceTargetKind => {
   switch (targetKind) {
     case "molecule":
+    case "material":
+    case "batch":
     case "reaction":
     case "result":
     case "analysis":
@@ -54,7 +57,7 @@ const toStepInputReference = (reference: ReferenceType): StepInputReference => (
 });
 
 const isValidStepInputReference = (reference: ReferenceType): boolean =>
-  reference.resolved && reference.targetKind === EXPECTED_STEP_INPUT_TARGET_KIND;
+  reference.resolved && EXPECTED_STEP_INPUT_TARGET_KINDS.has(reference.targetKind);
 
 const isValidStepOutputReference = (reference: ReferenceType): boolean =>
   reference.resolved;
@@ -69,7 +72,7 @@ const createTypedReferenceMismatchDiagnostic = (
     code: "E_TYPED_REFERENCE_MISMATCH",
     severity: "error",
     message: field === "inputs"
-      ? `Step input ${raw} must reference a molecule.`
+      ? `Step input ${raw} must reference molecule, material, or batch.`
       : `Step ${field} references a missing object: ${raw}`,
     sourceLayer: "typechecker",
     sourceNodeType: "step",

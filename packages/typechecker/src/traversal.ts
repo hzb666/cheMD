@@ -10,6 +10,7 @@ const OBJECT_TYPES = new Set([
   "result",
   "analysis",
   "procedure",
+  "trace",
   "observation",
   "sample",
   "artifact",

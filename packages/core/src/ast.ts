@@ -33,6 +33,7 @@ export type ObjectSemanticKind =
   | "result"
   | "analysis"
   | "procedure"
+  | "trace"
   | "observation"
   | "sample"
   | "artifact"
@@ -67,7 +68,7 @@ export type FieldSourceSpans = Record<string, SourceSpan>;
 export interface ChemistryFeatureRef {
   featureId: string;
   provider?: string;
-  kind?: "molecule" | "reaction" | "analysis" | "material" | "batch" | "sample" | "artifact";
+  kind?: "molecule" | "reaction" | "analysis" | "material" | "batch" | "sample" | "artifact" | "trace";
   status?: "available" | "pending" | "missing" | "failed";
 }
 
@@ -271,12 +272,43 @@ export interface ProcedureNode extends SourceMappedNode {
   evidence?: string[];
   body?: string;
   steps?: ProcedureStepNode[];
-  children?: Array<ProcedureStepNode | MarkdownNode>;
+  controls?: ProcedureControlNode[];
+  children?: ProcedureChildNode[];
+}
+
+export type ProcedureControlKind =
+  | "repeat"
+  | "until"
+  | "branch"
+  | "parallel"
+  | "case"
+  | "default"
+  | "path"
+  | "wait"
+  | "abort_if";
+
+export type ProcedureChildNode =
+  | ProcedureStepNode
+  | ProcedureControlNode
+  | MarkdownNode;
+
+export interface ProcedureControlNode {
+  type: "control";
+  kind: ProcedureControlKind;
+  controlId?: string;
+  params?: Record<string, string>;
+  outputs?: string[];
+  children?: ProcedureChildNode[];
+  raw?: string;
+  authorProvided?: boolean;
+  sourceSpan?: SourceSpan;
+  provenance?: ProvenanceInfo;
 }
 
 export interface ProcedureStepNode {
   type: "step";
   stepId?: string;
+  generatedStepId?: boolean;
   family: string;
   stage?: string;
   purpose?: string;
@@ -312,6 +344,32 @@ export interface ObservationEventAuthorNode {
   linkedStepId?: string;
   evidence?: string[];
   confidence?: number | Confidence;
+  raw?: string;
+  authorProvided?: boolean;
+  sourceSpan?: SourceSpan;
+  provenance?: ProvenanceInfo;
+}
+
+export interface TraceNode extends SourceMappedNode {
+  type: "trace";
+  id?: string;
+  plan?: string;
+  mode?: string;
+  events?: TraceEventAuthorNode[];
+  children?: Array<TraceEventAuthorNode | MarkdownNode>;
+}
+
+export interface TraceEventAuthorNode {
+  type: "trace_event";
+  eventId?: string;
+  eventType: string;
+  at?: string;
+  stepId?: string;
+  controlId?: string;
+  artifact?: string;
+  analysis?: string;
+  result?: string;
+  params?: Record<string, string>;
   raw?: string;
   authorProvided?: boolean;
   sourceSpan?: SourceSpan;
@@ -419,6 +477,7 @@ export type StructuredNode =
   | ResultNode
   | AnalysisNode
   | ProcedureNode
+  | TraceNode
   | ObservationNode
   | SampleNode
   | ArtifactNode
@@ -435,6 +494,7 @@ export type ObjectNode =
   | ResultNode
   | AnalysisNode
   | ProcedureNode
+  | TraceNode
   | ObservationNode
   | SampleNode
   | ArtifactNode

@@ -91,6 +91,147 @@ describe("runtime lab planner", () => {
       requiresConfirmation: true
     });
   });
+
+  it("checks device range inventory dynamic controls and parallel resources in preflight", () => {
+    const plan = buildRunPlan({
+      documentId: "exp-runtime-preflight",
+      stepGraph: {
+        procedures: [],
+        observations: [],
+        diagnostics: [],
+        steps: [
+          {
+            stepId: "s-heat",
+            family: "heat",
+            params: { temperature: "150 C", duration: "30 min" },
+            inputs: [{ raw: "@mat-base" }],
+            source: {
+              sourceNodeType: "procedure",
+              sourceNodeId: "proc-1",
+              sourceType: "explicit_step",
+              rawText: "step: heat"
+            },
+            loweringConfidence: 1
+          }
+        ],
+        controls: [
+          {
+            controlId: "operator-approval",
+            kind: "wait",
+            params: { condition: "operator.confirmed" },
+            controlPath: ["operator-approval"],
+            dynamic: true,
+            source: {
+              sourceNodeType: "procedure",
+              sourceNodeId: "proc-1",
+              rawText: "wait: operator-approval"
+            }
+          },
+          {
+            controlId: "parallel-workup",
+            kind: "parallel",
+            params: {},
+            controlPath: ["parallel-workup"],
+            dynamic: false,
+            source: {
+              sourceNodeType: "procedure",
+              sourceNodeId: "proc-1",
+              rawText: "parallel: parallel-workup"
+            }
+          }
+        ]
+      }
+    });
+    const preflight = preflightRun(plan, {
+      mode: "robot-run",
+      capabilities: ["heating"],
+      devices: [{ capability: "heating", min: 20, max: 80, unit: "C" }],
+      inventory: { materials: [{ id: "mat-base", available: false }] },
+      adapters: []
+    });
+
+    expect(preflight.blocking).toBe(true);
+    expect(preflight.issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "device_range", stepId: "s-heat", severity: "error" }),
+      expect.objectContaining({ kind: "inventory", stepId: "s-heat", severity: "error" }),
+      expect.objectContaining({ kind: "safety", stepId: "s-heat", severity: "error" }),
+      expect.objectContaining({ kind: "control", controlId: "operator-approval", severity: "error" }),
+      expect.objectContaining({ kind: "resource_conflict", controlId: "parallel-workup", severity: "error" })
+    ]));
+    expect(preflight.diagnostics.map((diagnostic) => diagnostic.code)).toEqual(expect.arrayContaining([
+      "E_RUNTIME_DEVICE_RANGE",
+      "E_RUNTIME_INVENTORY",
+      "W_RUNTIME_SAFETY",
+      "E_RUNTIME_CONTROL",
+      "E_RUNTIME_RESOURCE_CONFLICT"
+    ]));
+  });
+
+  it("applies safety rules for material hazards and control kinds", () => {
+    const plan = buildRunPlan({
+      documentId: "exp-runtime-safety-rules",
+      stepGraph: {
+        procedures: [],
+        observations: [],
+        diagnostics: [],
+        steps: [
+          {
+            stepId: "s-add",
+            family: "add",
+            params: { materials: "@mat-acid" },
+            source: {
+              sourceNodeType: "procedure",
+              sourceNodeId: "proc-1",
+              sourceType: "explicit_step",
+              rawText: "step: add"
+            },
+            loweringConfidence: 1
+          }
+        ],
+        controls: [
+          {
+            controlId: "branch-ph",
+            kind: "branch",
+            params: {},
+            controlPath: ["branch-ph"],
+            dynamic: true,
+            source: {
+              sourceNodeType: "procedure",
+              sourceNodeId: "proc-1",
+              rawText: "branch: branch-ph"
+            }
+          }
+        ]
+      }
+    });
+    const preflight = preflightRun(plan, {
+      mode: "human-run",
+      capabilities: [],
+      inventory: {
+        materials: [{ id: "mat-acid", available: true, hazards: ["acid"] }]
+      },
+      safetyRules: [
+        {
+          ruleId: "acid-review",
+          trigger: { materialHazard: "acid" },
+          severity: "warning",
+          requiresConfirmation: true,
+          message: "Acid handling requires review."
+        },
+        {
+          ruleId: "branch-review",
+          trigger: { controlKind: "branch" },
+          severity: "warning",
+          message: "Branch controls require operator review."
+        }
+      ]
+    });
+
+    expect(preflight.issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "safety", stepId: "s-add", message: "Acid handling requires review." }),
+      expect.objectContaining({ kind: "safety", controlId: "branch-ph", message: "Branch controls require operator review." })
+    ]));
+  });
 });
 
 describe("runtime lab state machine", () => {

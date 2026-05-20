@@ -1,9 +1,9 @@
 ---
 title: 运行预检
-description: Chemd runtime-lab 如何把编译后的步骤转成 run plan、检查能力要求并选择人工确认点。
+description: Chemd runtime-lab 如何把编译后的步骤和控制流转成 run plan、preflight issue、人工确认或 adapter 门禁。
 ---
 
-运行层不改变 Chemd 语法。它消费语言流水线产出的 canonical step graph，并为 dry run、human run、robot run 或 replay 准备 run plan。
+运行层不改变 Chemd 语法。它消费语言流水线产出的 canonical step graph 和 control graph，并为 dry run、human run、robot run 或 replay 准备 run plan。
 
 ## 运行输入
 
@@ -13,6 +13,7 @@ description: Chemd runtime-lab 如何把编译后的步骤转成 run plan、检�
 :::procedure #proc-runtime
 step: cool | id=s-cool | target_temperature=-78 C
 step: add | id=s-add | dependsOn=s-cool | reagent=n-BuLi
+wait: operator-approval | condition=operator.confirmed | timeout=30 min
 step: analyze | id=s-tlc | type=tlc | dependsOn=s-add
 :::
 ```
@@ -31,11 +32,14 @@ const plan = buildRunPlan({
 
 const preflight = preflightRun(plan, {
   mode: "human-run",
-  capabilities: ["cooling", "analytical_tlc"]
+  capabilities: ["cooling", "analytical_tlc"],
+  adapters: [{ adapterId: "manual", supports: ["wait"], available: true }]
 });
 ```
 
 当 runtime diagnostic 中存在 error 级别诊断时，`preflight.blocking` 为 `true`。
+
+run plan 包含 `steps`、`controls`、`controlStates` 和运行时诊断。`wait`、`until`、`branch`、`abort_if` 这类动态控制在 `controlStates` 中初始为 `waiting_adapter`，因为下一步取决于运行状态或操作者输入。
 
 ## 运行模式
 
@@ -64,6 +68,97 @@ const preflight = preflightRun(plan, {
 
 缺失能力会生成 runtime preflight 诊断。
 
+capability、confirmation strategy 和 safety tag 都来自 `@chemd/step-ontology` 的 StepFamily schema。runtime 包不应再维护一套独立 family map。
+
+## CLI Preflight
+
+面向使用者的运行检查通过 CLI：
+
+```text
+chemd preflight experiment.chemd --mode human-run --format text
+chemd preflight experiment.chemd --mode robot-run --context lab.json --format json --dry-run
+```
+
+`--mode` 接受 `dry-run`、`human-run`、`robot-run` 和 `replay-run`。`--format` 接受 `text` 和 `json`。`--dry-run` 只表示报告不会触发真实执行，不会弱化诊断。
+
+JSON report schema 为 `chemd-preflight/v0.1`，结构如下：
+
+```json
+{
+  "schemaVersion": "chemd-preflight/v0.1",
+  "dryRun": true,
+  "filePath": "experiment.chemd",
+  "mode": "robot-run",
+  "preflight": {
+    "blocking": true,
+    "issues": [],
+    "diagnostics": []
+  }
+}
+```
+
+## Context 文件
+
+`--context lab.json` 提供实验室运行状态。该文件会覆盖默认 capabilities，并可包含 adapters、devices、inventory、environment 和 safety rules。
+
+```json
+{
+  "capabilities": ["heating", "cooling", "analytical_tlc"],
+  "devices": [
+    { "capability": "heating", "min": 20, "max": 120, "unit": "C" }
+  ],
+  "inventory": {
+    "materials": [
+      { "id": "mat-substrate", "available": true, "hazards": ["acid"] },
+      { "id": "mat-base", "available": false }
+    ]
+  },
+  "adapters": [
+    { "adapterId": "operator", "supports": ["wait", "abort_if"], "available": true }
+  ],
+  "safetyRules": [
+    {
+      "ruleId": "confirm-quench",
+      "trigger": { "stepFamily": "quench" },
+      "severity": "error",
+      "requiresConfirmation": true,
+      "message": "Quench requires operator confirmation."
+    },
+    {
+      "ruleId": "acid-review",
+      "trigger": { "materialHazard": "acid" },
+      "severity": "warning",
+      "requiresConfirmation": true,
+      "message": "Acid handling requires review."
+    },
+    {
+      "ruleId": "branch-review",
+      "trigger": { "controlKind": "branch" },
+      "severity": "warning",
+      "message": "Branch controls require operator review."
+    }
+  ]
+}
+```
+
+Safety rule 可按 `stepFamily`、`param`、`materialHazard` 或 `controlKind` 触发。`materialHazard` 会从 step 的 `inputs` 或 `materials` 中读取物料 ID，再与 `inventory.materials[].hazards` 匹配。
+
+## Preflight Issues
+
+runtime preflight 同时输出面向人的 `issues` 和 compiler 形状的 `diagnostics`。
+
+| issue kind | diagnostic | 含义 |
+| --- | --- | --- |
+| `capability` | `E605` | 缺少必要 capability |
+| `device_range` | `E_RUNTIME_DEVICE_RANGE` | temperature、pressure、rpm 或 rate 超出设备范围 |
+| `inventory` | `E_RUNTIME_INVENTORY` | 所需输入物料不可用或过期 |
+| `adapter` | `E_RUNTIME_ADAPTER` | robot-run 缺少运行时动作 adapter |
+| `control` | `E_RUNTIME_CONTROL` | 动态 control 需要运行时决策 |
+| `resource_conflict` | `E_RUNTIME_RESOURCE_CONFLICT` | `parallel` 需要资源冲突审查 |
+| `safety` | `W_RUNTIME_SAFETY` | safety rule 或 safety tag 需要关注 |
+
+error 级别 issue 会让 `preflight.blocking` 为 true，并让 CLI 返回退出码 1。只有 warning 时退出码仍为 0，但报告中会保留提示。
+
 ## 确认策略
 
 runtime planner 会为每个 step 选择一种确认策略：
@@ -84,6 +179,7 @@ reaction: rxn-main
 step: charge | id=s-charge | inputs=@mol-substrate | outputs=mixture-a
 step: cool | id=s-cool | target_temperature=-78 C | dependsOn=s-charge
 step: add | id=s-add | reagent=n-BuLi | dependsOn=s-cool
+wait: operator-approval | condition=operator.confirmed | timeout=15 min
 step: analyze | id=s-tlc | type=tlc | dependsOn=s-add
 :::
 ```

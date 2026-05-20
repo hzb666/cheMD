@@ -99,4 +99,59 @@ The mixture stayed clear after workup.
       ]
     });
   });
+
+  it("parses brace-based procedure controls and trace event lines", () => {
+    const document = parseChemd(`---
+id: exp-control-trace
+title: Control trace
+date: 2026-05-20
+---
+
+:::procedure #proc-main
+step: charge | id=s-charge | inputs=@substrate
+repeat: wash-cycle | count=2 {
+  step: wash | solvent=brine | volume=10 mL
+}
+wait: operator-approval | condition=operator.confirmed | timeout=30 min
+:::
+
+:::trace #run-main
+plan: @proc-main
+mode: human-run
+event: run_started | at=2026-05-20T10:00:00Z
+event: step_started | step=s-charge | at=2026-05-20T10:01:00Z
+event: observation_recorded | step=s-charge | text="clear solution"
+:::
+`);
+
+    expect(document.children[0]).toMatchObject({
+      type: "procedure",
+      controls: [
+        expect.objectContaining({
+          type: "control",
+          kind: "repeat",
+          controlId: "wash-cycle",
+          params: { count: "2" },
+          children: [expect.objectContaining({ type: "step", family: "wash" })]
+        }),
+        expect.objectContaining({
+          type: "control",
+          kind: "wait",
+          controlId: "operator-approval",
+          params: { condition: "operator.confirmed", timeout: "30 min" }
+        })
+      ]
+    });
+    expect(document.children[1]).toMatchObject({
+      type: "trace",
+      id: "run-main",
+      plan: "@proc-main",
+      mode: "human-run",
+      events: [
+        expect.objectContaining({ eventType: "run_started", at: "2026-05-20T10:00:00Z" }),
+        expect.objectContaining({ eventType: "step_started", stepId: "s-charge" }),
+        expect.objectContaining({ eventType: "observation_recorded", params: { text: "clear solution" } })
+      ]
+    });
+  });
 });

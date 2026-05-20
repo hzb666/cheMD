@@ -31,6 +31,7 @@ pnpm --filter @chemd/compiler typecheck
 | block grammar 或 inline syntax | parser tests、resolver indexing、language-service diagnostics、使用者文档 |
 | 引用或模板行为 | resolver tests、typechecker typed-reference checks、CLI validation output |
 | 数量或路线语义 | typechecker tests、step ontology lowering、compiler LNF/export results |
+| Step schema、procedure controls 或 trace 语法 | `@chemd/step-ontology`、`@chemd/runtime-lab`、`@chemd/runtime-trace`、CLI `preflight`、语法文档 |
 | compiler 公共结果结构 | CLI command output、web/desktop callers、exporter-training consumers |
 
 ## 语义与运行链路
@@ -42,12 +43,15 @@ pnpm --filter @chemd/compiler typecheck
 | `@chemd/runtime-trace` | runtime trace 数据结构和回放辅助 |
 | `@chemd/lnf` | 规范化中间表示 |
 
-`@chemd/step-ontology` 与 `@chemd/typechecker` 关系紧密。显式 step 由 typechecker 转为 canonical step，正文过程由 step ontology lowering。`runtime-lab` 使用 typed graph 和 step graph 生成运行计划，再由 compiler 写入 LNF。
+`@chemd/step-ontology` 与 `@chemd/typechecker` 关系紧密。显式 step 由 typechecker 转为 canonical step，正文过程由 step ontology lowering。StepFamily 参数 schema 也归属这里，由 typechecker 和 runtime 包共同消费，保证 required params、alias、capability、confirmation strategy 和 safety tag 同源。
+
+`runtime-lab` 使用 typed graph 和 step graph 生成 run plan，包括 `controls` 与 `controlStates`。runtime preflight 检查 capabilities、device ranges、inventory、safety rules、adapters、dynamic controls 和 parallel resource review。`runtime-trace` 负责 trace event adaptation 与 replay 到 `LabState`。
 
 ```bash
 pnpm --filter @chemd/typechecker test
 pnpm --filter @chemd/step-ontology test
 pnpm --filter @chemd/runtime-lab test
+pnpm --filter @chemd/runtime-trace test
 ```
 
 语义包不应直接解析原始源码文本。它们消费前序阶段产出的 AST、resolved document、typed graph 或 step graph。这样可以把语法关注点留在 parser/resolver，把运行计划集中在规范化语义结构上。
@@ -111,6 +115,7 @@ pnpm --filter @chemd/runtime-lab test
 | --- | --- |
 | 语言语法 | 更新 parser coverage、resolver/typechecker 预期、compiler outputs、CLI validation 和使用者文档示例 |
 | Diagnostics | 保持 code、severity、location、message 和 remediation 在 CLI、language service、web、desktop 中一致 |
+| Runtime contracts | 保持 StepFamily schema、procedure controls、run plan、preflight issues、trace replay、LNF 和 CLI `preflight` 同步 |
 | Exports | 验证 renderer output、compiler aggregate output、CLI export command，以及暴露该格式的 app API route |
 | Storage 或 graph | 检查 migration/schema shape、repository helpers、graph export contracts 和 app/service callers |
 | App support | 共享行为保留在 packages；app 代码聚焦 UI、routing、permissions 和 platform adaptation |

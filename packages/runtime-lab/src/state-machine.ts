@@ -8,14 +8,26 @@ import type {
 } from "./index";
 
 export type RuntimeTraceEventType =
+  | "run_started"
+  | "run_completed"
+  | "run_aborted"
   | "step_started"
   | "step_completed"
   | "step_failed"
   | "step_skipped"
+  | "control_entered"
+  | "control_completed"
+  | "control_blocked"
+  | "control_aborted"
   | "operator_action"
   | "confirmation_granted"
   | "artifact_generated"
   | "observation_recorded"
+  | "measurement_recorded"
+  | "analysis_recorded"
+  | "deviation_recorded"
+  | "manual_override"
+  | "resource_consumed"
   | "diagnostic_recorded";
 
 export interface RuntimeStepState {
@@ -41,6 +53,7 @@ export interface RuntimeTraceEvent {
   type: RuntimeTraceEventType;
   timestamp: string;
   stepId?: string;
+  controlId?: string;
   operatorId?: string;
   message?: string;
   artifact?: RuntimeArtifactRecord;
@@ -75,6 +88,7 @@ const getInitialStepStatus = (step: RuntimeStep): RuntimeStepStatus => {
 const cloneState = (state: LabState): LabState => ({
   ...state,
   stepStates: state.stepStates.map((step) => ({ ...step, diagnostics: [...step.diagnostics] })),
+  controlStates: state.controlStates.map((control) => ({ ...control })),
   resources: state.resources.map((resource) => ({ ...resource })),
   artifacts: state.artifacts.map((artifact) => ({ ...artifact })),
   observations: state.observations.map((observation) => ({ ...observation })),
@@ -302,7 +316,8 @@ const refreshReadySteps = (state: LabState, plan: RunPlan): LabState => ({
 const areDependenciesCompleted = (state: LabState, step: RuntimeStep): boolean =>
   (step.dependsOn ?? []).every((dependency) => {
     const dependencyState = findStepState(state, dependency);
-    return dependencyState?.status === "completed";
+    const controlState = state.controlStates.find((control) => control.controlId === dependency);
+    return dependencyState?.status === "completed" || controlState?.status === "completed";
   });
 
 const selectCurrentStepId = (state: LabState): string | undefined =>

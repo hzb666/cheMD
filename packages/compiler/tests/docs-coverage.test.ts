@@ -50,6 +50,7 @@ const parserFieldCoverage = (): Record<string, string[]> => {
     sample: getCanonicalBlockFields("sample"),
     "condition-varies": getCanonicalBlockFields("condition-varies"),
     procedure: getCanonicalBlockFields("procedure"),
+    trace: getCanonicalBlockFields("trace"),
     step: getCanonicalBlockFields("step"),
     observation: getCanonicalBlockFields("observation"),
     event: getCanonicalBlockFields("event"),

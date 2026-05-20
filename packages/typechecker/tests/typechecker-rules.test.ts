@@ -294,7 +294,7 @@ event: color_change | id=e-color | color=yellow | linkedStep=s-add
             })
           })],
           params: expect.objectContaining({
-            material: expect.objectContaining({
+            materials: expect.objectContaining({
               kind: "reference",
               refId: "substrate",
               targetKind: "molecule",

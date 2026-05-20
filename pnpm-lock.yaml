@@ -289,6 +289,9 @@ importers:
       '@chemd/core':
         specifier: workspace:*
         version: link:../core
+      '@chemd/runtime-lab':
+        specifier: workspace:*
+        version: link:../runtime-lab
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
