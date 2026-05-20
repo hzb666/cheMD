@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-3.md`
-- **Total Sessions**: 117
+- **Total Sessions**: 118
 - **Last Active**: 2026-05-20
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-3.md` | ~1192 | Active |
+| `journal-3.md` | ~1226 | Active |
 | `journal-2.md` | ~1956 | Archived |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
@@ -31,6 +31,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 118 | 2026-05-20 | Procedure runtime trace | `da831b1` | `trellis/language-contract-p0` |
 | 117 | 2026-05-20 | Condition outcome analysis schemas | `af27f77` | `trellis/language-contract-p0` |
 | 116 | 2026-05-20 | Quantity material reaction semantics | `795f477` | `trellis/language-contract-p0` |
 | 115 | 2026-05-20 | Language contract and schema registry | `91b9884` | `trellis/language-contract-p0` |

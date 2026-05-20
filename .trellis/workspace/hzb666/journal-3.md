@@ -1190,3 +1190,37 @@ Implemented plan sections 5.4-5.5: factor/outcome/attempt condition DSL, TLC lan
 ### Next Steps
 
 - None - task complete
+
+
+## Session 118: Procedure runtime trace
+
+**Date**: 2026-05-20
+**Task**: Procedure runtime trace
+**Package**: runtime-lab
+**Branch**: `trellis/language-contract-p0`
+
+### Summary
+
+Implemented plan sections 6.1-6.4: StepFamily schema contract, brace-based procedure controls, runtime preflight context/CLI, source-authored trace validation, replay to LabState, docs, fixtures, and tests. Verification: pnpm typecheck; pnpm test; chemd validate/check fixtures; preflight smoke; docs coverage. Lint remains blocked by existing ESLint 10.4.0 scopeManager.addGlobals runtime error.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `da831b1` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
