@@ -15,7 +15,8 @@ import type {
 import {
   classifyReactionConditions,
   classifyTlcAnalysis,
-  getQuantityUnit
+  getQuantityUnit,
+  normalizeAnalysis
 } from "@chemd/core";
 import { createV03Diagnostic, type V03Diagnostic } from "@chemd/diagnostics";
 
@@ -663,6 +664,147 @@ export const buildResultNode = (
   return output;
 };
 
+const hasLegacyTlcLaneFields = (node: AnalysisNode): boolean =>
+  Object.keys(node).some((key) => /^p\d+$/.test(key));
+
+const hasTlcLaneInput = (node: AnalysisNode): boolean =>
+  Boolean(node.tlcLanes?.length) || hasLegacyTlcLaneFields(node);
+
+const analysisKindValue = (node: AnalysisNode): string | undefined =>
+  normalizeAnalysisType(node.type_name)?.value;
+
+const createAnalysisDiagnostic = (
+  code: string,
+  message: string,
+  node: AnalysisNode,
+  field: string,
+  facts: Record<string, unknown> = {}
+): V03Diagnostic =>
+  createTypedDiagnostic(code, message, node, field, facts);
+
+const validateTlcAnalysis = (node: AnalysisNode, output: BuiltTypedNode): void => {
+  const normalizedTlc = classifyTlcAnalysis(node);
+  for (const lane of normalizedTlc?.lanes ?? []) {
+    if (lane.lane_role === "custom" && !lane.lane_label_raw.startsWith("@")) {
+      output.diagnostics.push(createAnalysisDiagnostic(
+        "E_TLC_LABEL_UNKNOWN",
+        `TLC lane label must be a built-in role or object reference: ${lane.lane_label_raw}`,
+        node,
+        "lane",
+        { lane_label: lane.lane_label_raw }
+      ));
+    }
+
+    for (const spot of lane.spots) {
+      if (spot.label_raw && !spot.role && !spot.ref) {
+        output.diagnostics.push(createAnalysisDiagnostic(
+          "E_TLC_LABEL_UNKNOWN",
+          `TLC spot label must be a built-in role or object reference: ${spot.label_raw}`,
+          node,
+          "spot",
+          { spot_label: spot.label_raw }
+        ));
+      }
+      if (spot.is_reference && !spot.source_spot_id) {
+        output.diagnostics.push(createAnalysisDiagnostic(
+          spot.role === "unknown" ? "E_TLC_UNKNOWN_REFERENCE" : "E_TLC_SPOT_REFERENCE",
+          `TLC spot reference could not be resolved uniquely: ${spot.label_raw ?? spot.ref ?? spot.raw}`,
+          node,
+          "spot",
+          { spot_label: spot.label_raw, ref: spot.ref, role: spot.role }
+        ));
+      }
+      if (!spot.is_reference && spot.rf !== undefined && !spot.role && !spot.ref && (lane.lane_role === "reaction_mixture" || lane.lane_role === "custom")) {
+        output.diagnostics.push(createAnalysisDiagnostic(
+          "E_TLC_SPOT_LABEL_REQUIRED",
+          "TLC spot on a mixed or custom lane requires an explicit role or object reference.",
+          node,
+          "spot",
+          { lane_label: lane.lane_label_raw, raw: spot.raw }
+        ));
+      }
+    }
+  }
+};
+
+const validateParsedAnalysis = (node: AnalysisNode, output: BuiltTypedNode): void => {
+  const kind = analysisKindValue(node);
+  const hasLane = hasTlcLaneInput(node);
+  const hasPeak = Boolean(node.peaks?.length);
+  const hasIon = Boolean(node.ions?.length);
+
+  if (!kind) {
+    return;
+  }
+
+  if (kind === "tlc") {
+    if (hasPeak || hasIon || node.spectrum) {
+      output.diagnostics.push(createAnalysisDiagnostic(
+        "E_ANALYSIS_FIELD_FOR_TYPE",
+        "TLC analysis cannot contain spectrum, peak, or ion fields.",
+        node,
+        "type",
+        { analysis_type: kind }
+      ));
+    }
+    validateTlcAnalysis(node, output);
+    return;
+  }
+
+  if (hasLane) {
+    output.diagnostics.push(createAnalysisDiagnostic(
+      "E_ANALYSIS_FIELD_FOR_TYPE",
+      `Analysis type ${kind} cannot contain TLC lane fields.`,
+      node,
+      "lane",
+      { analysis_type: kind }
+    ));
+  }
+
+  const normalized = normalizeAnalysis(node);
+  if (kind === "nmr") {
+    if (hasIon) {
+      output.diagnostics.push(createAnalysisDiagnostic("E_ANALYSIS_FIELD_FOR_TYPE", "NMR analysis cannot contain ion fields.", node, "ion"));
+    }
+    const nmr = normalized?.kind === "nmr" ? normalized : undefined;
+    for (const peak of nmr?.peaks ?? []) {
+      if (peak.shift === undefined && peak.minShift === undefined) {
+        output.diagnostics.push(createAnalysisDiagnostic("E_ANALYSIS_PEAK_SYNTAX", `NMR peak lacks a chemical shift: ${peak.raw}`, node, "peak", { raw: peak.raw }));
+      }
+    }
+    if (nmr?.spectrum?.frequency && node.frequency && normalizeRefId(node.frequency) !== nmr.spectrum.frequency.raw) {
+      output.diagnostics.push(createAnalysisDiagnostic("E_ANALYSIS_SPECTRUM_CONFLICT", "NMR spectrum frequency conflicts with explicit frequency field.", node, "frequency"));
+    }
+    if (nmr?.spectrum?.solvent && node.solvent && normalizeRefId(node.solvent) !== nmr.spectrum.solvent) {
+      output.diagnostics.push(createAnalysisDiagnostic("E_ANALYSIS_SPECTRUM_CONFLICT", "NMR spectrum solvent conflicts with explicit solvent field.", node, "solvent"));
+    }
+    return;
+  }
+
+  if (["hplc", "uplc", "gc"].includes(kind) && hasIon) {
+    output.diagnostics.push(createAnalysisDiagnostic("E_ANALYSIS_FIELD_FOR_TYPE", `${kind} analysis cannot contain ion fields.`, node, "ion"));
+  }
+  if (["hplc", "uplc", "gc", "gcms", "lcms"].includes(kind)) {
+    const chrom = normalized && "peaks" in normalized ? normalized.peaks : [];
+    for (const peak of chrom) {
+      if (!("retentionTime" in peak) || !peak.retentionTime) {
+        output.diagnostics.push(createAnalysisDiagnostic("E_ANALYSIS_PEAK_SYNTAX", `Chromatography peak lacks retention time: ${peak.raw}`, node, "peak", { raw: peak.raw }));
+      }
+    }
+  }
+  if (kind === "lcms" && hasPeak && !hasIon) {
+    output.diagnostics.push(createAnalysisDiagnostic("E_ANALYSIS_ION_REQUIRED", "LCMS analysis with peaks must include ion fields.", node, "ion"));
+  }
+  if (["gcms", "lcms", "ms", "hrms"].includes(kind)) {
+    const ions = normalized && "ions" in normalized ? normalized.ions : [];
+    for (const ion of ions) {
+      if (ion.mz === undefined) {
+        output.diagnostics.push(createAnalysisDiagnostic("E_ANALYSIS_ION_SYNTAX", `MS ion lacks m/z: ${ion.raw}`, node, "ion", { raw: ion.raw }));
+      }
+    }
+  }
+};
+
 export const buildAnalysisNode = (
   node: AnalysisNode,
   context: BuildNodeContext
@@ -674,13 +816,23 @@ export const buildAnalysisNode = (
     sourceNodeId: node.id,
     field: "ref"
   }, context.externalTargetIndex);
+  const artifacts = resolveReferenceList(node.artifacts ?? [], context.objectIndex, {
+    sourceNodeType: "analysis",
+    sourceNodeId: node.id,
+    field: "artifact",
+    expectedTargetKind: "artifact"
+  }, context.externalTargetIndex);
+  const normalizedAnalysis = normalizeAnalysis(node);
 
-  output.diagnostics.push(...reference.diagnostics);
+  output.diagnostics.push(...reference.diagnostics, ...artifacts.diagnostics);
+  validateParsedAnalysis(node, output);
   output.node = {
     ...output.node,
     ...(analysisType ? { analysisType } : {}),
-    normalizedTlc: classifyTlcAnalysis(node) ?? null,
+    normalizedAnalysis: normalizedAnalysis ?? null,
+    normalizedTlc: normalizedAnalysis?.kind === "tlc" ? normalizedAnalysis.tlc : classifyTlcAnalysis(node) ?? null,
     ...(reference.value ? { ref: reference.value } : {}),
+    ...(artifacts.values.length > 0 ? { artifacts: artifacts.values } : {}),
     result: node.result,
     instrument: node.instrument,
     method: node.method,
@@ -770,6 +922,100 @@ export const buildArtifactNode = (
   return output;
 };
 
+const resultOutcomeValue = (node: ObjectNode | undefined, field: string): string | undefined => {
+  if (!node || node.type !== "result") {
+    return undefined;
+  }
+
+  const result = node as ResultNode;
+  switch (field) {
+    case "yield":
+      return result.yield;
+    case "conversion":
+      return result.conversion;
+    case "selectivity":
+      return result.selectivity;
+    case "purity":
+      return result.purity;
+    default:
+      return undefined;
+  }
+};
+
+const normalizeComparableValue = (value: string | undefined): string | undefined =>
+  value?.trim().replace(/\s+/g, " ");
+
+const findResultForReaction = (
+  reactionRef: string | undefined,
+  objectIndex: Map<string, ObjectNode>
+): ResultNode | undefined => {
+  if (!reactionRef) {
+    return undefined;
+  }
+
+  const reactionId = normalizeRefId(reactionRef);
+  const results = [...new Set(objectIndex.values())].filter((candidate): candidate is ResultNode =>
+    candidate.type === "result" && normalizeRefId(candidate.reaction ?? candidate.ref ?? "") === reactionId
+  );
+  return results.length === 1 ? results[0] : undefined;
+};
+
+const validateConditionOutcomes = (
+  node: ConditionVariesNode,
+  context: BuildNodeContext
+): V03Diagnostic[] => {
+  const diagnostics: V03Diagnostic[] = [];
+  const standardResult = findResultForReaction(node.standard, context.objectIndex);
+
+  for (const outcome of node.outcomes ?? []) {
+    const inferred = resultOutcomeValue(standardResult, outcome.field);
+    if (
+      inferred
+      && outcome.baseline
+      && normalizeComparableValue(inferred) !== normalizeComparableValue(outcome.baseline)
+    ) {
+      diagnostics.push(createTypedDiagnostic(
+        "E_CONDITION_BASELINE_CONFLICT",
+        `Outcome baseline conflicts with standard result field ${outcome.field}.`,
+        node,
+        "outcome",
+        { outcome: outcome.field, baseline: outcome.baseline, inferred }
+      ));
+    }
+  }
+
+  for (const attempt of node.attempts ?? []) {
+    for (const outcome of node.outcomes ?? []) {
+      if (!attempt.outcomes || attempt.outcomes[outcome.field] === undefined) {
+        diagnostics.push(createTypedDiagnostic(
+          "E_CONDITION_OUTCOME_MISSING",
+          `Attempt ${attempt.id} is missing outcome ${outcome.field}.`,
+          node,
+          outcome.field,
+          { attempt_id: attempt.id, outcome: outcome.field }
+        ));
+      }
+    }
+
+    const resultId = attempt.result ? normalizeRefId(attempt.result) : undefined;
+    const resultNode = resultId ? context.objectIndex.get(resultId) : undefined;
+    for (const [field, value] of Object.entries(attempt.outcomes ?? {})) {
+      const resultValue = resultOutcomeValue(resultNode, field);
+      if (resultValue && normalizeComparableValue(resultValue) !== normalizeComparableValue(value)) {
+        diagnostics.push(createTypedDiagnostic(
+          "E_CONDITION_OUTCOME_CONFLICT",
+          `Attempt outcome conflicts with linked result field ${field}.`,
+          node,
+          `${attempt.id}.${field}`,
+          { attempt_id: attempt.id, outcome: field, value, result_value: resultValue }
+        ));
+      }
+    }
+  }
+
+  return diagnostics;
+};
+
 export const buildConditionVariesNode = (
   node: ConditionVariesNode,
   context: BuildNodeContext
@@ -802,11 +1048,18 @@ export const buildConditionVariesNode = (
     }, context.externalTargetIndex).diagnostics
   ]);
 
-  output.diagnostics.push(...reaction.diagnostics, ...standard.diagnostics, ...attemptDiagnostics);
+  output.diagnostics.push(
+    ...reaction.diagnostics,
+    ...standard.diagnostics,
+    ...attemptDiagnostics,
+    ...validateConditionOutcomes(node, context)
+  );
   output.node = {
     ...output.node,
     ...(reaction.value ? { reaction: reaction.value } : {}),
     ...(standard.value ? { standard: standard.value } : {}),
+    factors: node.factors,
+    outcomes: node.outcomes,
     condition: node.condition,
     varyFields: node.varyFields,
     changes: node.changes,

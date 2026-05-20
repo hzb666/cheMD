@@ -25,6 +25,7 @@ import type {
 } from "@chemd/core";
 import type {
   NormalizedReactionConditions,
+  NormalizedAnalysis,
   NormalizedTlcAnalysis
 } from "@chemd/core";
 import type { V03Diagnostic } from "@chemd/diagnostics";
@@ -70,7 +71,7 @@ export interface BoundedStringValue<KnownValue extends string = string> {
   value: KnownValue | string;
 }
 
-export type AnalysisTypeLabel = "tlc" | "nmr" | "hplc" | "lcms" | "gcms";
+export type AnalysisTypeLabel = "tlc" | "nmr" | "hplc" | "uplc" | "gc" | "lcms" | "gcms" | "ms" | "hrms" | "ir" | "uv";
 export type AnalysisTypeValue = BoundedStringValue<AnalysisTypeLabel>;
 
 export type AtmosphereLabel = "nitrogen" | "argon" | "air" | "oxygen" | "inert";
@@ -185,8 +186,10 @@ export interface TypedResultNode extends TypedNodeBase {
 export interface TypedAnalysisNode extends TypedNodeBase {
   kind: "analysis";
   analysisType?: AnalysisTypeValue;
+  normalizedAnalysis?: NormalizedAnalysis | null;
   normalizedTlc?: NormalizedTlcAnalysis | null;
   ref?: ReferenceOrLiteral;
+  artifacts?: ReferenceOrLiteral[];
   result?: string;
   instrument?: string;
   method?: string;
@@ -270,6 +273,8 @@ export interface TypedConditionVariesNode extends TypedNodeBase {
   kind: "condition_varies";
   reaction?: ReferenceOrLiteral;
   standard?: ReferenceOrLiteral;
+  factors?: ConditionVariesNode["factors"];
+  outcomes?: ConditionVariesNode["outcomes"];
   condition?: ConditionVariesNode["condition"];
   varyFields?: ConditionVariesNode["varyFields"];
   changes: ConditionVariesNode["changes"];

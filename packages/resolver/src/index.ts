@@ -146,7 +146,7 @@ const buildTemplateIndex = (children: ChemdNode[], diagnostics: Diagnostic[]): R
 };
 
 const getRequiredFields = (node: ObjectNode): string[] | undefined => {
-  if (node.type === "analysis" && node.type_name?.toLowerCase() === "tlc") {
+  if (node.type === "analysis") {
     return ["type_name"];
   }
 

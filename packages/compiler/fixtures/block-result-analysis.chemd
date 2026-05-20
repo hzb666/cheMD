@@ -48,9 +48,13 @@ type: tlc
 ref: rxn-main
 time: 45 min
 eluent: petroleum ether/ethyl acetate 4:1
-p1: sm 0.60
-p2: rxn 0.28 ^3(4) | sm 0.60 v1
-p3: product 0.28
+lane: sm
+spot: 0.60
+lane: rxn
+spot: 0.28 ^3(4) product
+spot: 0.60 v1 sm
+lane: prod
+spot: 0.28
 :::
 
 :::analysis #ana-hplc

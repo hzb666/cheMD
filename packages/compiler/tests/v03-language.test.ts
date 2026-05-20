@@ -123,7 +123,7 @@ describe("chemd-lang v0.3 compiler integration", () => {
     expect(diagnostics).toHaveLength(0);
     expect(result.trainingExport.semantic_layer.condition_variations[0]).toMatchObject({
       original_id: "cv-coupling-screen",
-      standard_ref_raw: "rxn-standard",
+      standard_ref_raw: "@rxn-standard",
       attempt_entity_ids: expect.arrayContaining([
         "cva::exp-golden-suzuki-screen::cv-coupling-screen.var1",
         "cva::exp-golden-suzuki-screen::cv-coupling-screen.var2"
@@ -133,13 +133,13 @@ describe("chemd-lang v0.3 compiler integration", () => {
       expect.arrayContaining([
         expect.objectContaining({
           original_id: "cv-coupling-screen.var1",
-          reaction_ref_raw: "rxn-var1",
-          result_ref_raw: "res-var1"
+          reaction_ref_raw: "@rxn-var1",
+          result_ref_raw: "@res-var1"
         }),
         expect.objectContaining({
           original_id: "cv-coupling-screen.var2",
-          reaction_ref_raw: "rxn-var2",
-          result_ref_raw: "res-var2"
+          reaction_ref_raw: "@rxn-var2",
+          result_ref_raw: "@res-var2"
         })
       ])
     );
@@ -283,7 +283,7 @@ describe("chemd-lang v0.3 compiler integration", () => {
     expect(result.trainingExport.semantic_layer.condition_variations).toEqual(expect.arrayContaining([
       expect.objectContaining({
         original_id: "cv-screen",
-        standard_ref_raw: "rxn-standard",
+        standard_ref_raw: "@rxn-standard",
         attempt_entity_ids: expect.arrayContaining([
           "cva::exp-condition-screen::cv-screen.var1",
           "cva::exp-condition-screen::cv-screen.var2"

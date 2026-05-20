@@ -31,17 +31,17 @@ data: Main peak at 6.4 min with trace impurity.
 :::
 ```
 
-## TLC Lanes: `p1`, `p2`, `p3`
+## TLC Lanes
 
-Fields matching `p` followed by digits are accepted by `LANE_FIELD_PATTERN`. TLC lane values are preserved as strings.
+TLC uses explicit `lane:` sections. A lane can contain `spot:`, `mess:`, `base:`, or `none`. A one-token `spot:` such as `spot: sm` references a known spot from another lane; unresolved or conflicting references are errors.
 
 ## Generic NMR and HPLC Analysis
 
-Generic analysis records use `type`, `ref`, `time`, `instrument`, `solvent`, `frequency`, `method`, `result`, `data`, and `notes`. The parser does not restrict `type` to an enum.
+NMR records use `spectrum:` plus `peak:` lines. HPLC, UPLC, and GC use `peak:` lines. LCMS and GCMS use both `peak:` and `ion:` lines.
 
 ## Required Analysis Fields and TLC Defaults
 
-Generic analysis requires `type_name` and `data`. `type: tlc` requires only `type_name`. TLC records receive default `plate: silica gel GF254` and `visualization: UV 254 nm` when those fields are absent.
+Analysis requires `type_name`. TLC records receive default `plate: silica gel GF254` and `visualization: UV 254 nm` when those fields are absent.
 
 ## Result Typecheck Inventory
 
@@ -51,9 +51,9 @@ Linked result validation has two checks. `product` must appear in the linked rea
 
 ## Analysis Typecheck Inventory
 
-The analysis `type` field is stored as `type_name` in the AST. The typechecker recognizes `tlc`, `nmr`, `hplc`, `lcms`, `lc-ms`, `gcms`, and `gc-ms` through `normalizeAnalysisType`. Unmatched values are retained as extensions.
+The analysis `type` field is stored as `type_name` in the AST. The typechecker recognizes `tlc`, `nmr`, `hplc`, `uplc`, `gc`, `lcms`, `lc-ms`, `gcms`, `gc-ms`, `ms`, `hrms`, `ir`, `uv`, and `uv-vis` through `normalizeAnalysisType`. Unmatched values are retained as extensions.
 
-TLC analysis is classified through `classifyTlcAnalysis`. Lane fields such as `p1`, `p2`, and `p3` retain raw values and participate with `eluent`, `plate`, and `visualization` in normalized TLC output.
+TLC analysis is classified through `classifyTlcAnalysis`. `lane:`, `spot:`, `mess:`, `base:`, and `none` participate with `eluent`, `plate`, and `visualization` in normalized TLC output.
 
 ## Best Practice Example
 
@@ -74,8 +74,10 @@ type: tlc
 ref: rxn-main
 result: res-main
 eluent: petroleum ether/ethyl acetate 5:1
-p1: substrate, Rf 0.62
-p2: product, Rf 0.31
+lane: sm
+spot: 0.62 starting_material
+lane: prod
+spot: 0.31 product
 data: product spot observed, starting material consumed
 :::
 
@@ -84,7 +86,7 @@ type: hplc
 ref: res-main
 instrument: Agilent 1260
 method: C18 gradient
-data: purity 98% by area normalization
+peak: 6.4 min (98 %, product)
 :::
 ```
 

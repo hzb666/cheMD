@@ -44,12 +44,11 @@ The resolver currently checks these object requirements:
 | --- | --- |
 | molecule | `smiles` |
 | reaction | `reactants`, `products` |
-| analysis | `type_name`, `data` |
-| TLC analysis | `type_name` |
+| analysis | `type_name` |
 | sample | `name` |
 | artifact | `kind`, `path` |
 
-TLC analysis is identified by `type: tlc`. The parser adds `plate: silica gel GF254` and `visualization: UV 254 nm` defaults. The resolver relaxes the `data` requirement for TLC analysis.
+TLC analysis is identified by `type: tlc`. The parser adds `plate: silica gel GF254` and `visualization: UV 254 nm` defaults.
 
 ## Quantity and Status Checks
 

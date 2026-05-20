@@ -158,6 +158,15 @@ export const BLOCK_SCHEMAS: readonly BlockSchema[] = [
       field("solvent"),
       field("frequency"),
       field("method"),
+      field("artifact", { aliases: ["artifacts"], aliasListModes: { artifacts: "pipe" }, list: true, listMode: "repeat" }),
+      field("spectrum"),
+      field("lane", { list: true, listMode: "repeat" }),
+      field("spot", { list: true, listMode: "repeat" }),
+      field("mess", { list: true, listMode: "repeat" }),
+      field("base", { list: true, listMode: "repeat" }),
+      field("none", { list: true, listMode: "repeat" }),
+      field("peak", { list: true, listMode: "repeat" }),
+      field("ion", { list: true, listMode: "repeat" }),
       field("data"),
       field("notes")
     ],
@@ -200,6 +209,9 @@ export const BLOCK_SCHEMAS: readonly BlockSchema[] = [
     fields: [
       field("reaction"),
       field("standard"),
+      field("factor", { list: true, listMode: "repeat" }),
+      field("outcome", { list: true, listMode: "repeat" }),
+      field("attempt", { list: true, listMode: "repeat" }),
       field("condition"),
       field("varies"),
       field("notes")

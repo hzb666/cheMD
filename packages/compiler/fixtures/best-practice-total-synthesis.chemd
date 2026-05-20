@@ -78,9 +78,13 @@ plate: silica gel GF254
 visualization: UV 254 nm
 result: starting material mostly consumed, product spot dominant
 data: TLC monitoring before workup.
-p1: sm 0.36
-p2: crude 0.58 | sm-trace(0.37)
-p3: product-std 0.57
+lane: sm
+spot: 0.36
+lane: rxn
+spot: 0.58 product
+spot: 0.37 sm
+lane: prod
+spot: 0.57
 :::
 
 :::sample #sample-batch-step-07

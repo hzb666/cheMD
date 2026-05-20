@@ -64,9 +64,13 @@ plate: silica gel GF254
 visualization: UV 254 nm
 result: starting material nearly consumed, major product spot observed
 data: TLC plate taken during reaction monitoring.
-p1: sm 0.71
-p2: crude 0.46 | sm-trace(0.72)
-p3: product-std 0.45
+lane: sm
+spot: 0.71
+lane: rxn
+spot: 0.46 product
+spot: 0.72 sm
+lane: prod
+spot: 0.45
 :::
 
 :::analysis #ana-nmr-main

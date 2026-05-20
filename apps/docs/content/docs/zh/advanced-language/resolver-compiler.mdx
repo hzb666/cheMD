@@ -101,7 +101,7 @@ Primary reaction: @reaction
 
 ## 必填字段校验
 
-当前 resolver 必填字段为 material `molecule`，batch `source`，普通 analysis `type_name` 和 `data`，TLC analysis `type_name`，sample `name`，artifact `kind` 和 `path`。molecule identity 与 reaction participant 存在性由 typechecker 校验。
+当前 resolver 必填字段为 material `molecule`，batch `source`，analysis `type_name`，sample `name`，artifact `kind` 和 `path`。molecule identity 与 reaction participant 存在性由 typechecker 校验。
 
 ```md
 :::chemd #mol-missing-identity
@@ -118,7 +118,7 @@ kind: nmr
 :::
 ```
 
-这些块语法可被 parser 接受。analysis 与 artifact 的缺失字段由 resolver 诊断；molecule identity 与 reaction participant 缺失由 typechecker 诊断。TLC analysis 只要求 `type`；其他 analysis 还要求 `data`。
+这些块语法可被 parser 接受。analysis 与 artifact 的缺失字段由 resolver 诊断；molecule identity 与 reaction participant 缺失由 typechecker 诊断。analysis 要求 `type`。
 
 ## 模板索引与展开
 

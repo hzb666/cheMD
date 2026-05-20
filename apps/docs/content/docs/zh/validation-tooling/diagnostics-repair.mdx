@@ -58,12 +58,11 @@ resolver 必填字段：
 | --- | --- |
 | molecule | `smiles` |
 | reaction | `reactants`、`products` |
-| analysis | `type_name`、`data` |
-| TLC analysis | `type_name` |
+| analysis | `type_name` |
 | sample | `name` |
 | artifact | `kind`、`path` |
 
-analysis 的 `type` 字段在 AST 中保存为 `type_name`。TLC analysis 在 parser 中补入默认 `plate` 与 `visualization`，resolver 对 TLC 放宽 `data` 要求。
+analysis 的 `type` 字段在 AST 中保存为 `type_name`。TLC analysis 在 parser 中补入默认 `plate` 与 `visualization`。
 
 ## 模板参数错误
 

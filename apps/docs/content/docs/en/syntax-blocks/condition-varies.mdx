@@ -1,77 +1,72 @@
 ---
 title: '`:::condition-varies` Condition Screening Block'
-description: '`:::condition-varies` represents standard conditions, varied fields, candidate attempts, results, and notes.'
+description: '`:::condition-varies` declares factors, outcomes, and attempt sections for condition screening.'
 ---
 
-`:::condition-varies` accepts arbitrary condition fields. Fixed meta fields are `reaction`, `standard`, `condition`, `varies`, and `notes`.
+`:::condition-varies` records a condition screen as declared factors, declared outcomes, and one or more attempt sections. Declarations must appear before the first `attempt:`.
 
-## Single Delta Form
-
-```md
-:::condition-varies #cv-solvent
-reaction: rxn-variant
-standard: rxn-standard
-solvent: THF -> MeCN
-temperature: 25 C -> 40 C
-notes: solvent and temperature screen
-:::
-```
-
-`field: A -> B` and `field: A => B` produce deltas. A field without an arrow stores only the raw value.
-
-## Parallel Attempt Form
+## Syntax
 
 ```md
 :::condition-varies #cv-screen
-standard: rxn-standard
-condition: solvent=THF | temperature=25 C | catalyst=Pd
-varies: solvent | temperature
-var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
-res1: res-var1
-note1: higher yield, minor impurity
-var2: reaction=rxn-var2 | mode=override | solvent=DMSO | temperature=60 C | catalyst=Ni
-res2: res-var2
-note2: trace product by TLC
+standard: @rxn-standard
+
+factor: solvent | baseline=THF
+factor: temperature | baseline=25 C
+factor: catalyst | baseline=Pd(PPh3)4
+
+outcome: yield | baseline=68 %
+outcome: conversion | baseline=85 %
+
+attempt: var1
+result: @res-var1
+solvent: MeCN
+temperature: 40 C
+yield: 72 %
+conversion: 90 %
+note: Higher conversion while keeping same catalyst.
+
+attempt: var2
+solvent: DMF
+temperature: 60 C
+catalyst: Pd(dppf)Cl2
+yield: 45 %
+conversion: 70 %
 :::
 ```
+
+`attempt:` opens a section. Ordinary fields after it belong to that attempt until the next `attempt:` or the end of the block. Blank lines do not affect ownership.
 
 ## Fields
 
 | field | notes |
 | --- | --- |
-| `reaction` | reaction linked to the variation |
-| `standard` | standard reaction |
-| `condition` | baseline condition, `field=value | field=value` |
-| `varies` | varied field list |
-| `notes` | notes |
-| `varN` | attempt N, where N is numeric |
-| `resN` | result for attempt N |
-| `noteN` | note for attempt N |
-| other fields | top-level condition deltas |
+| `standard` | baseline reaction reference |
+| `reaction` | optional variation-level reaction link; attempt-level `reaction` is preferred |
+| `factor` | varied or controlled input, with optional `baseline=` |
+| `outcome` | measured output, with optional baseline |
+| `attempt` | attempt id and optional header params |
+| `result` | optional result block reference for the current attempt |
+| `note` / `notes` | current attempt note |
+| `condition` / `varies` | reserved legacy field names; do not use as factor/outcome names |
 
-Inside `varN`, supported meta fields are `id`, `reaction`, `ref`, `result`, `res`, `note`, `notes`, and `mode`; other assignments become condition changes. `mode=override`, `mode=full`, and `mode=replace` normalize to `override`; other modes are `partial`. A `partial` attempt inherits unchanged baseline fields from `condition`.
+Factor and outcome names must be declared before use, cannot overlap, and cannot use reserved names such as `standard`, `factor`, `outcome`, `attempt`, `result`, `note`, or `notes`.
 
-## Required Fields and Defaults
+## Semantics
 
-The block has no resolver-required fields. Attempt ID defaults to `varN`. A `partial` attempt expands unchanged baseline fields into attempt condition with candidate equal to baseline.
+If a factor is omitted inside an attempt, that attempt inherits the factor baseline. If an outcome is declared, every attempt must provide that outcome. Outcome baseline can describe the standard result; when a linked standard/result block provides the same value and conflicts with the explicit baseline, validation reports an error.
 
-## Recommended Practice
-
-Condition screens should declare the standard reaction, each variation reaction, and each result explicitly. `varies` should contain only the dimensions compared in the screen.
-
-```md
-:::condition-varies #cv-base-screen
-standard: rxn-standard
-condition: solvent=THF | temperature=25 C | base=K2CO3 | catalyst=Pd(PPh3)4
-varies: solvent | temperature
-var1: id=screen-meCN-40 | reaction=rxn-meCN-40 | solvent=MeCN | temperature=40 C
-res1: res-meCN-40
-note1: best conversion in first pass
-var2: id=screen-dioxane-90 | reaction=rxn-dioxane-90 | solvent=dioxane/water | temperature=90 C
-res2: res-dioxane-90
-:::
-```
+`result: @res-id` is optional. If present, it must reference a result block. Attempt outcome values must not conflict with the linked result fields.
 
 ## Diagnostics
 
-The parser accepts arbitrary condition fields in `condition-varies`, so condition names do not produce `W_UNKNOWN_FIELD`. Invalid IDs still produce `E_INVALID_ID`. Reference semantics are handled by the typechecker and export layers.
+| code | condition |
+| --- | --- |
+| `E_CONDITION_DSL_DECLARATION` | duplicate or reserved factor/outcome name |
+| `E_CONDITION_DSL_ORDER` | declarations appear after an attempt |
+| `E_CONDITION_ATTEMPT_ID` | missing or duplicate attempt id |
+| `E_CONDITION_ATTEMPT_UNKNOWN_FIELD` | attempt field was not declared |
+| `E_CONDITION_ATTEMPT_DUPLICATE_FIELD` | attempt repeats a factor/outcome |
+| `E_CONDITION_OUTCOME_MISSING` | attempt omits a declared outcome |
+| `E_CONDITION_BASELINE_CONFLICT` | declared baseline conflicts with inferred standard result |
+| `E_CONDITION_OUTCOME_CONFLICT` | attempt outcome conflicts with linked result |

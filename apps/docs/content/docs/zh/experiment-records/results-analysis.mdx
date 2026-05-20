@@ -31,17 +31,17 @@ data: Main peak at 6.4 min with trace impurity.
 :::
 ```
 
-## TLC lane：`p1`、`p2`、`p3`
+## TLC lane
 
-`p` 加数字的字段由 `LANE_FIELD_PATTERN` 接受。TLC lane 值作为字符串保留。
+TLC 使用显式 `lane:` section。lane 内可以写 `spot:`、`mess:`、`base:` 或 `none`。只有一个 label 的 `spot:`，例如 `spot: sm`，表示引用其他 lane 中已确定的 spot；无法解析或存在冲突时会报错。
 
 ## NMR / HPLC 等通用分析写法
 
-非 TLC 分析使用通用字段：`type`、`ref`、`time`、`instrument`、`solvent`、`frequency`、`method`、`result`、`data` 和 `notes`。解析器不限制 `type` 的枚举。
+NMR 使用 `spectrum:` 与 `peak:` 行。HPLC、UPLC、GC 使用 `peak:` 行。LCMS 与 GCMS 使用 `peak:` 和 `ion:` 行。
 
 ## analysis 必填字段与 TLC 默认值
 
-普通 analysis 需要 `type_name` 和 `data`。`type: tlc` 时只要求 `type_name`。TLC 缺少 `plate` 时默认 `silica gel GF254`，缺少 `visualization` 时默认 `UV 254 nm`。
+analysis 需要 `type_name`。TLC 缺少 `plate` 时默认 `silica gel GF254`，缺少 `visualization` 时默认 `UV 254 nm`。
 
 ## result 类型检查清单
 
@@ -51,9 +51,9 @@ result 与 linked reaction 的关系校验包含两类：`product` 必须出现�
 
 ## analysis 类型检查清单
 
-analysis 的 `type` 在 AST 中保存为 `type_name`，typechecker 通过 `normalizeAnalysisType` 识别 `tlc`、`nmr`、`hplc`、`lcms`、`lc-ms`、`gcms` 和 `gc-ms`。未命中 alias 的 type 作为 extension 保存。
+analysis 的 `type` 在 AST 中保存为 `type_name`，typechecker 通过 `normalizeAnalysisType` 识别 `tlc`、`nmr`、`hplc`、`uplc`、`gc`、`lcms`、`lc-ms`、`gcms`、`gc-ms`、`ms`、`hrms`、`ir`、`uv` 和 `uv-vis`。未命中 alias 的 type 作为 extension 保存。
 
-TLC analysis 会通过 `classifyTlcAnalysis` 构建 normalized TLC 数据。`p1`、`p2`、`p3` 等 lane 字段保留原值，并与 `eluent`、`plate`、`visualization` 共同参与 TLC 结构化输出。
+TLC analysis 会通过 `classifyTlcAnalysis` 构建 normalized TLC 数据。`lane:`、`spot:`、`mess:`、`base:`、`none` 与 `eluent`、`plate`、`visualization` 共同参与 TLC 结构化输出。
 
 ## 推荐实践示例
 
@@ -74,8 +74,10 @@ type: tlc
 ref: rxn-main
 result: res-main
 eluent: petroleum ether/ethyl acetate 5:1
-p1: substrate, Rf 0.62
-p2: product, Rf 0.31
+lane: sm
+spot: 0.62 starting_material
+lane: prod
+spot: 0.31 product
 data: product spot observed, starting material consumed
 :::
 
@@ -84,7 +86,7 @@ type: hplc
 ref: res-main
 instrument: Agilent 1260
 method: C18 gradient
-data: purity 98% by area normalization
+peak: 6.4 min (98 %, product)
 :::
 ```
 

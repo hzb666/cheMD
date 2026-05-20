@@ -8,6 +8,7 @@ import type {
   MarkdownNode,
   MaterialNode,
   MoleculeNode,
+  NormalizedAnalysis,
   ReactionNode,
   ResultNode,
   SampleNode
@@ -32,6 +33,7 @@ import type {
   ExportedResultV1,
   ExportedSampleV1,
   NumericWithUnit,
+  ParsedMeasurementV1,
   ReactionParticipantV1,
   SemanticLayerV1
 } from "./types";
@@ -375,6 +377,53 @@ const createParticipant = (
       };
 };
 
+const buildParsedMeasurements = (
+  normalized: NormalizedAnalysis | null | undefined
+): ParsedMeasurementV1[] | undefined => {
+  if (!normalized) {
+    return undefined;
+  }
+
+  const measurements: ParsedMeasurementV1[] = [];
+  if (normalized.kind === "tlc") {
+    for (const lane of normalized.tlc.lanes) {
+      for (const spot of lane.spots) {
+        if (spot.rf !== undefined && spot.rf !== null) {
+          measurements.push({ measurement_type: "tlc_rf", raw: spot.raw, value: spot.rf, unit: "Rf" });
+        }
+      }
+    }
+  }
+  if (normalized.kind === "nmr") {
+    for (const peak of normalized.peaks) {
+      const value = peak.shift ?? peak.maxShift ?? peak.minShift;
+      measurements.push({ measurement_type: "nmr_shift", raw: peak.raw, value: value ?? null, unit: "ppm" });
+    }
+  }
+  if ("peaks" in normalized && normalized.kind !== "nmr") {
+    for (const peak of normalized.peaks) {
+      if ("retentionTime" in peak) {
+        measurements.push({
+          measurement_type: "retention_time",
+          raw: peak.raw,
+          value: peak.retentionTime?.value ?? null,
+          unit: peak.retentionTime?.unit ?? null
+        });
+      }
+      if ("areaPercent" in peak && peak.areaPercent !== undefined) {
+        measurements.push({ measurement_type: "area_percent", raw: peak.raw, value: peak.areaPercent, unit: "%" });
+      }
+    }
+  }
+  if ("ions" in normalized) {
+    for (const ion of normalized.ions) {
+      measurements.push({ measurement_type: "mz", raw: ion.raw, value: ion.mz ?? null, unit: "m/z" });
+    }
+  }
+
+  return measurements.length > 0 ? measurements : undefined;
+};
+
 interface BuildReactionInput {
   documentId: string;
   node: ReactionNode;
@@ -518,7 +567,10 @@ const buildAnalysis = (
   method: node.method,
   data_raw: node.data,
   notes: node.notes,
+  artifact_refs_raw: node.artifacts,
+  normalized_analysis: typedAnalysis?.normalizedAnalysis ?? null,
   normalized_tlc: typedAnalysis?.normalizedTlc ?? null,
+  parsed_measurements: buildParsedMeasurements(typedAnalysis?.normalizedAnalysis),
   text_for_embedding: compactText(node.type_name, node.instrument, node.method, node.data, node.notes)
 });
 
@@ -594,6 +646,16 @@ const buildConditionVaries = (
   ...createEntityBase("condition_varies", node),
   reaction_ref_raw: node.reaction,
   standard_ref_raw: node.standard,
+  factors: node.factors?.map((variable) => ({
+    field: variable.field,
+    raw: variable.raw,
+    baseline_raw: variable.baseline
+  })),
+  outcomes: node.outcomes?.map((variable) => ({
+    field: variable.field,
+    raw: variable.raw,
+    baseline_raw: variable.baseline
+  })),
   condition: node.condition?.map((variable) => ({
     field: variable.field,
     raw: variable.raw,
@@ -633,6 +695,8 @@ const buildConditionVariationAttempts = (
     mode: attempt.mode ?? "partial",
     reaction_ref_raw: attempt.reaction,
     result_ref_raw: attempt.result,
+    factors: attempt.factors,
+    outcomes: attempt.outcomes,
     condition: attempt.condition.map(exportConditionDelta),
     changes: attempt.changes.map(exportConditionDelta),
     note: attempt.note,

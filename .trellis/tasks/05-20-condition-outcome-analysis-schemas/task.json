@@ -3,7 +3,7 @@
   "name": "condition-outcome-analysis-schemas",
   "title": "Condition outcome and analysis schemas",
   "description": "Implement plan chapters 5.4-5.5: factor/outcome/attempt DSL, TLC lane/spot semantics, NMR/HPLC/LCMS/GCMS structured analysis schemas and templates.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": "parser",

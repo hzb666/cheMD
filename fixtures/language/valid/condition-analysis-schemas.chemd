@@ -1,0 +1,78 @@
+---
+id: fixture-condition-analysis-schemas
+title: Condition and analysis schemas fixture
+date: 2026-05-20
+primary_reaction: rxn-standard
+primary_result: res-var1
+primary_sample: sample-crude
+primary_analysis: ana-lcms
+---
+
+:::chemd #rxn-standard
+kind: reaction
+name: baseline reaction
+reactant: substrate
+product: product
+:::
+
+:::result #res-standard
+reaction: @rxn-standard
+product: product
+status: success
+yield: 68 %
+conversion: 85 %
+:::
+
+:::result #res-var1
+reaction: @rxn-standard
+product: product
+status: success
+yield: 72 %
+conversion: 90 %
+:::
+
+:::sample #sample-crude
+name: Crude sample
+ref: @rxn-standard
+:::
+
+:::artifact #art-lcms
+kind: lcms
+ref: @sample-crude
+path: data/lcms/sample-crude.mzML
+:::
+
+:::condition-varies #cv-screen
+standard: @rxn-standard
+factor: solvent | baseline=THF
+factor: temperature | baseline=25 C
+outcome: yield | baseline=68 %
+outcome: conversion | baseline=85 %
+
+attempt: var1
+result: @res-var1
+solvent: MeCN
+temperature: 40 C
+yield: 72 %
+conversion: 90 %
+:::
+
+:::analysis #ana-tlc
+type: tlc
+ref: @sample-crude
+lane: sm | source=@rxn-standard
+spot: 0.62
+lane: rxn | source=@sample-crude
+spot: sm
+spot: 0.31 ^3(4) product
+mess: 0.55 (3)
+:::
+
+:::analysis #ana-lcms
+type: lcms
+ref: @sample-crude
+method: @lcms-method-a
+artifact: @art-lcms
+peak: 6.4 min (97 %, product)
+ion: m/z 124.1 ([M+H]+, product)
+:::

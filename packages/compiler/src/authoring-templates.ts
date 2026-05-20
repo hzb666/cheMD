@@ -506,11 +506,16 @@ const buildConditionScreenTemplate = (
       text: [
         `:::condition-varies #${conditionId}`,
         `standard: ${standardId}`,
-        "condition: solvent=THF | temperature=25 C",
-        "varies: solvent | temperature",
-        `var1: reaction=${fallbackCandidate} | solvent=MeCN | temperature=40 C`,
-        "res1: res-var1",
-        "note1: conversion improved",
+        "factor: solvent | baseline=THF",
+        "factor: temperature | baseline=25 C",
+        "outcome: conversion | baseline=85 %",
+        "attempt: var1",
+        `reaction: ${fallbackCandidate}`,
+        "result: @res-var1",
+        "solvent: MeCN",
+        "temperature: 40 C",
+        "conversion: 90 %",
+        "note: conversion improved",
         ":::"
       ].join("\n")
     }

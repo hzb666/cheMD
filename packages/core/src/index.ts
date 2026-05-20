@@ -1,5 +1,6 @@
 export * from "./ast";
 export * from "./ast-factories";
+export * from "./analysis-normalization";
 export * from "./diagnostics";
 export * from "./language/contract";
 export * from "./render-overrides";

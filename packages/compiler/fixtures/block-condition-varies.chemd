@@ -73,14 +73,25 @@ yield: 12 %
 :::
 
 :::condition-varies #cv-screen
-standard: rxn-standard
-condition: solvent=THF | temperature=25 C | catalyst=Pd(PPh3)4
-varies: solvent | temperature | catalyst
-var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
-res1: res-var1
-note1: best conversion in the screen
-var2: reaction=rxn-var2 | mode=override | solvent=DMF | temperature=60 C | catalyst=Pd(dppf)Cl2
-res2: res-var2
-note2: override catalyst gave low conversion
+standard: @rxn-standard
+factor: solvent | baseline=THF
+factor: temperature | baseline=25 C
+factor: catalyst | baseline=Pd(PPh3)4
+outcome: yield | baseline=35 %
+attempt: var1
+reaction: @rxn-var1
+result: @res-var1
+solvent: MeCN
+temperature: 40 C
+yield: 76 %
+note: best conversion in the screen
+attempt: var2
+reaction: @rxn-var2
+result: @res-var2
+solvent: DMF
+temperature: 60 C
+catalyst: Pd(dppf)Cl2
+yield: 12 %
+note: override catalyst gave low conversion
 notes: screening record with one inherited and one override attempt
 :::

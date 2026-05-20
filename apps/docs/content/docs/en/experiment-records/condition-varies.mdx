@@ -1,234 +1,91 @@
 ---
 title: Condition Screens
-description: '`:::condition-varies`, baselines, attempts, result pairing, and attempt references.'
+description: '`:::condition-varies`, factors, outcomes, attempts, and result pairing.'
 ---
 
+## Condition Screen Model
 
-## `:::condition-varies` Model
-
-`:::condition-varies` produces a `ConditionVariesNode` with AST type `condition_varies`. The field set is open, and the parser normalizes standard fields and attempt fields into structured arrays.
+`:::condition-varies` records a screen as declared factors, declared outcomes, and attempt sections. Declare all `factor:` and `outcome:` lines before the first `attempt:`. Fields after an `attempt:` belong to that attempt until the next `attempt:`.
 
 ```md
 :::condition-varies #cv-solvent
-reaction: rxn-screen
-standard: rxn-baseline
-condition: solvent=THF | temperature=25 C | base=K2CO3
-varies: solvent | temperature
-var1: id=attempt-mecn-40 | reaction=rxn-mecn-40 | solvent=MeCN | temperature=40 C
-res1: res-mecn-40
-note1: clean conversion by TLC
-:::
-```
+standard: @rxn-baseline
 
-`reaction` identifies the screen-level reaction or record. `standard` identifies the baseline reaction. `condition` stores baseline variables. `varN`, `resN`, and `noteN` are paired by their numeric suffixes.
+factor: solvent | baseline=THF
+factor: temperature | baseline=25 C
+outcome: yield | baseline=68 %
+outcome: conversion | baseline=85 %
 
-## `standard`
-
-`standard` stores the standard reaction ID. Fixtures use it to point at the baseline reaction.
-
-```md
-:::chemd #rxn-baseline
-kind: reaction
-reactants: mol-a | mol-b
-products: mol-p
-solvent: THF
-temperature: 25 C
-:::
-
-:::condition-varies #cv-base
-standard: rxn-baseline
-condition: solvent=THF | temperature=25 C
-varies: solvent
-:::
-```
-
-The typechecker validates `standard` as a reaction reference. Missing targets and non-reaction targets produce typed reference diagnostics.
-
-## `condition` Baseline
-
-`condition` is parsed into baseline variables from `field=value` segments. Separators can be `|` or `,`.
-
-```md
-:::condition-varies #cv-base-condition
-condition: solvent=THF | temperature=25 C, base=K2CO3
-varies: solvent | base
-:::
-```
-
-Use `|` for multi-field conditions when possible. Commas are also supported, but `|` is more stable when method notes or solvent systems contain commas.
-
-## `varies`
-
-`varies` is parsed into `varyFields` and declares the screened dimensions.
-
-```md
-:::condition-varies #cv-dimensions
-condition: solvent=THF | temperature=25 C | catalyst=none
-varies: solvent | temperature | catalyst
-var1: id=attempt-dmf | solvent=DMF
-var2: id=attempt-60c | temperature=60 C
-var3: id=attempt-pd | catalyst=Pd(PPh3)4
-:::
-```
-
-`varies` is the explicit dimension list. Attempt fields can still contain additional condition keys; those keys are preserved on the attempt but are not listed as declared screen dimensions.
-
-## `varN` Attempt Syntax
-
-`var1`, `var2`, and similar fields produce attempts. Attempt values support `reaction=rxn-var1`; the first bare value can also provide the reaction.
-
-```md
-:::condition-varies #cv-attempts
-condition: solvent=THF | temperature=25 C
-varies: solvent | temperature
-var1: rxn-mecn-40 | id=attempt-mecn-40 | solvent=MeCN | temperature=40 C
-var2: id=attempt-dmf-60 | reaction=rxn-dmf-60 | solvent=DMF | temperature=60 C
-:::
-```
-
-The first attempt uses bare value `rxn-mecn-40` as the reaction. The second uses explicit `reaction=rxn-dmf-60`. Both forms produce an attempt reaction in the AST.
-
-Arrow changes are also supported:
-
-```md
-:::condition-varies #cv-arrow
-condition: solvent=THF | temperature=25 C
-varies: solvent | temperature
-var1: id=attempt-mecn | solvent: THF -> MeCN | temperature: 25 C => 40 C
-:::
-```
-
-The left side is the baseline value and the right side is the candidate value. The parsed attempt condition stores the candidate value.
-
-## `resN` and `noteN`
-
-`res1` and `note1` are merged into the matching attempt as `result` and `note`. Attempt-local `result`, `res`, `note`, and `notes` provide the same data.
-
-```md
-:::result #res-mecn-40
-status: success
-yield: 71 %
-conversion: 95 %
-:::
-
-:::condition-varies #cv-results
-condition: solvent=THF | temperature=25 C
-varies: solvent
-var1: id=attempt-mecn-40 | reaction=rxn-mecn-40 | solvent=MeCN
-res1: res-mecn-40
-note1: isolated after column chromatography
-var2: id=attempt-dmf | reaction=rxn-dmf | solvent=DMF | result=res-dmf | notes=slower conversion
-:::
-```
-
-`resN` and `noteN` keep the attempt body focused on condition changes. Inline `result` and `notes` work well for compact screening tables.
-
-## `mode=override`
-
-Attempt `mode` values `override`, `full`, and `replace` are stored as `mode: "override"`. Other mode values are treated as partial. Partial attempts inherit baseline conditions.
-
-```md
-:::condition-varies #cv-mode
-condition: solvent=THF | temperature=25 C | base=K2CO3
-varies: solvent | temperature | base
-var1: id=attempt-partial | solvent=MeCN
-var2: id=attempt-full | mode=override | solvent=DMF | temperature=80 C
-:::
-```
-
-`attempt-partial` inherits `temperature=25 C` and `base=K2CO3`. `attempt-full` is stored as a full candidate and only keeps fields explicitly provided by the attempt.
-
-## `@cv-screen.var1` Attempt References
-
-The resolver field reader has special handling for `condition_varies`. `@cv-screen.var1` returns the attempt with ID `var1`.
-
-```md
-:::condition-varies #cv-screen
-condition: solvent=THF
-varies: solvent
-var1: id=attempt-mecn | reaction=rxn-mecn | solvent=MeCN
-:::
-
-Attempt summary: @cv-screen.var1
-```
-
-The field name must match the attempt ID. With explicit `id=attempt-mecn`, use `@cv-screen.attempt-mecn`; without an explicit ID, use generated keys such as `var1` and `var2`.
-
-## Organizing Condition Screens with Reactions and Results
-
-Create separate reactions and results for baseline and attempts, then connect them through `condition-varies`. This structure keeps each attempt exportable as condition variation data.
-
-```md
-:::chemd #mol-a
-kind: molecule
-smiles: CCO
-name: alcohol substrate
-:::
-
-:::chemd #mol-p
-kind: molecule
-smiles: CC=O
-name: oxidized product
-:::
-
-:::chemd #rxn-baseline
-kind: reaction
-reactants: mol-a
-products: mol-p
-solvent: THF
-temperature: 25 C
-:::
-
-:::chemd #rxn-mecn-40
-kind: reaction
-reactants: mol-a
-products: mol-p
+attempt: mecn-40
+reaction: @rxn-mecn-40
+result: @res-mecn-40
 solvent: MeCN
 temperature: 40 C
+yield: 72 %
+conversion: 90 %
+note: clean conversion by TLC
 :::
+```
 
+`standard` points to the baseline reaction. A factor without an attempt value inherits its baseline. A declared outcome must be present in every attempt.
+
+## Factors and Outcomes
+
+`factor:` names inputs or controlled variables. `outcome:` names measured outputs such as `yield`, `conversion`, `ee`, or purity. Names must be declared once, cannot overlap, and cannot use reserved section fields such as `standard`, `factor`, `outcome`, `attempt`, `reaction`, `result`, `note`, or `notes`.
+
+```md
+factor: solvent | baseline=THF
+factor: catalyst | baseline=Pd(PPh3)4
+outcome: yield | baseline=68 %
+outcome: ee | baseline=92 %
+```
+
+The baseline on an outcome describes the standard result. If Chemd can infer the standard result and the declared baseline conflicts with that result, validation reports an error rather than guessing.
+
+## Attempts
+
+Each `attempt:` opens one attempt. Use stable attempt IDs because references such as `@cv-solvent.mecn-40` resolve through the attempt ID.
+
+```md
+attempt: dmf-60
+reaction: @rxn-dmf-60
+result: @res-dmf-60
+solvent: DMF
+temperature: 60 C
+yield: 45 %
+conversion: 70 %
+```
+
+`result:` is optional, but when present it must reference a result block. Attempt outcome values must not conflict with the linked result fields.
+
+## Organizing Reactions and Results
+
+Declare baseline and attempt reactions as normal `:::chemd` reaction objects. Store rich result data in `:::result`, then link that result from the attempt.
+
+```md
 :::result #res-mecn-40
-ref: rxn-mecn-40
+reaction: @rxn-mecn-40
+product: @product
 status: success
-yield: 71 %
+yield: 72 %
+conversion: 90 %
 :::
 
 :::condition-varies #cv-oxidation
-reaction: rxn-baseline
-standard: rxn-baseline
-condition: solvent=THF | temperature=25 C
-varies: solvent | temperature
-var1: id=attempt-mecn-40 | reaction=rxn-mecn-40 | solvent=MeCN | temperature=40 C
-res1: res-mecn-40
+standard: @rxn-baseline
+factor: solvent | baseline=THF
+outcome: yield | baseline=68 %
+
+attempt: mecn-40
+reaction: @rxn-mecn-40
+result: @res-mecn-40
+solvent: MeCN
+yield: 72 %
 :::
 ```
 
-This organization gives reactions, results, and condition attempts stable IDs. Graph export can build screen tables, result nodes, and reaction-route edges from those IDs.
+This keeps the screen table compact while preserving reaction and result objects for graph, export, and validation.
 
-## Attempt Parsing Inventory
+## Diagnostics
 
-`condition` and `varN` changes support two forms: `field=value` and `baseline -> candidate` or `baseline => candidate`. `mode=override`, `mode=full`, and `mode=replace` normalize to override; other mode values normalize to partial. Partial attempts inherit baseline condition values and override matching keys with changes.
-
-Attempt meta fields include `id`, `reaction`, `ref`, `result`, `res`, `note`, `notes`, and `mode`. `reaction` can come from `reaction`, `ref`, or the first bare segment. `resN` and `noteN` merge into the matching numbered attempt.
-
-The typechecker requires `reaction` and `standard` to target reactions, and attempt `result` to target a result. Target-kind mismatches produce `E_TYPED_REFERENCE_MISMATCH`.
-
-## Best Practice Example
-
-For screening records, declare baseline and variation reactions as normal `:::chemd` reaction objects. Store each attempt outcome in a `:::result` block and connect it with `resN`.
-
-```md
-:::condition-varies #cv-solvent-temperature
-standard: rxn-baseline
-condition: solvent=THF | temperature=25 C | base=K2CO3
-varies: solvent | temperature
-var1: id=screen-mecn-40 | reaction=rxn-mecn-40 | solvent=MeCN | temperature=40 C
-res1: res-mecn-40
-note1: best isolated yield in the first screen
-var2: id=screen-dmf-60 | reaction=rxn-dmf-60 | mode=override | solvent=DMF | temperature=60 C | base=Cs2CO3
-res2: res-dmf-60
-note2: full condition replacement
-:::
-```
-
-Use `mode=override` only when the attempt represents a full condition replacement. Omit `mode` for partial attempts that inherit unchanged baseline fields.
+Chemd treats ambiguous or meaning-changing screen data as errors. Duplicate declarations, reserved names, declarations after attempts, missing attempt IDs, unknown attempt fields, duplicate attempt values, missing outcomes, and conflicts with linked result fields all produce errors.

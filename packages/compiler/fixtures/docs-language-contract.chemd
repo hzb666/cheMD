@@ -79,9 +79,13 @@ type: tlc
 ref: rxn-main
 time: 1 h
 eluent: petroleum ether/ethyl acetate 3:1
-p1: sm 0.62
-p2: rxn 0.31 ^3(4) | sm 0.62 v1
-p3: product 0.30
+lane: sm
+spot: 0.62
+lane: rxn
+spot: 0.31 ^3(4) product
+spot: 0.62 v1 sm
+lane: prod
+spot: 0.30
 :::
 
 :::analysis #ana-hplc
@@ -131,12 +135,23 @@ instrument: Agilent 1260
 :::
 
 :::condition-varies #cv-temperature
-standard: rxn-main
-condition: solvent=MeOH | temperature=25 C | atmosphere=nitrogen
-varies: temperature | time
-var1: reaction=rxn-var1 | temperature=0 C | time=2 h
-res1: res-var1
-note1: lower temperature reduces conversion
+standard: @rxn-main
+factor: solvent | baseline=MeOH
+factor: temperature | baseline=25 C
+factor: atmosphere | baseline=nitrogen
+factor: time | baseline=1 h
+outcome: yield | baseline=82 %
+outcome: conversion | baseline=94 %
+outcome: purity | baseline=98 %
+attempt: var1
+reaction: @rxn-var1
+result: @res-var1
+temperature: 0 C
+time: 2 h
+yield: 64 %
+conversion: 75 %
+purity: 92 %
+note: lower temperature reduces conversion
 notes: one-variable temperature screen
 :::
 

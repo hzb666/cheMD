@@ -57,8 +57,14 @@ analysis `type` 在 AST 中保存为 `type_name`。typechecker 识别以下分�
 | `tlc` | `tlc` |
 | `nmr` | `nmr` |
 | `hplc` | `hplc` |
+| `uplc` | `uplc` |
+| `gc` | `gc` |
 | `lcms`、`lc-ms` | `lcms` |
 | `gcms`、`gc-ms` | `gcms` |
+| `ms` | `ms` |
+| `hrms` | `hrms` |
+| `ir` | `ir` |
+| `uv`、`uv-vis` | `uv` |
 
 未命中别名的值作为 extension 保留。该设计允许使用者记录项目专用分析方法。
 
@@ -78,7 +84,7 @@ reaction `atmosphere` 在 typechecker 中归一化为 known 或 extension。
 
 ## TLC 泳道
 
-TLC 归一化会按数字顺序读取 `p1`、`p2`、`p3` 等字段。lane 文本使用 `|` 拆分为 lane label 与 spot 项。
+TLC 归一化按源码顺序读取显式 `lane:` section。每个 lane 内可包含 `spot:`、`mess:`、`base:` 或 `none` 行。
 
 支持 lane label：
 
@@ -89,20 +95,22 @@ TLC 归一化会按数字顺序读取 `p1`、`p2`、`p3` 等字段。lane 文本
 | `int`、`intermediate` | `intermediate` |
 | `rxn`、`reaction` | `reaction` |
 | 数字 | `trial` |
-| 其他 | `custom` |
+| `blank` | `blank` |
+| `unknown` | `unknown` |
 
 支持 spot 与区域：
 
 | 写法 | 语义 |
 | --- | --- |
-| `0.52` | Rf spot |
+| `spot: 0.52 starting_material` | 带确定 label 的 Rf spot |
 | `0.52 ^3(4)` | 上箭头形状，size rank 3，intensity rank 4 |
 | `0.31 v2` | 下箭头形状，size rank 2 |
-| `base` | lane 有 baseline spot |
+| `spot: sm` | 引用唯一已知 spot |
+| `base: 0.52 product` | lane 有 baseline spot |
 | `none` | lane 无 spot |
-| `mess`、`mess(0.45)` | 拖尾或混乱区域 |
+| `mess: 0.45` | 拖尾或混乱区域 |
 
-rank 值被限制在 1 到 5。无法识别的 spot 项会被忽略。
+rank 值被限制在 1 到 5。未知 label、歧义引用、混合 lane 中未标注的 spot 都会报错。
 
 ```md
 :::analysis #ana-tlc
@@ -110,9 +118,15 @@ type: tlc
 ref: rxn-main
 time: 2 h
 eluent: petroleum ether/ethyl acetate 5:1
-p1: sm 0.62 | base
-p2: rxn 0.31 ^3(4) | mess(0.55) | sm 0.62 v1
-p3: product 0.30
+lane: sm
+spot: 0.62 starting_material
+base: 0.62 starting_material
+lane: rxn
+spot: sm
+spot: 0.31 ^3(4) product
+mess: 0.55
+lane: prod
+spot: 0.30 product
 :::
 ```
 

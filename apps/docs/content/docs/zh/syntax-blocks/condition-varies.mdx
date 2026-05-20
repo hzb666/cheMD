@@ -1,77 +1,72 @@
 ---
 title: '`:::condition-varies` 条件筛选块'
-description: '`:::condition-varies` 表达标准条件、变化字段、候选 attempt、结果和备注。'
+description: '`:::condition-varies` 用 factor、outcome 和 attempt section 记录条件筛选。'
 ---
 
-`:::condition-varies` 允许任意条件字段，固定元字段包括 `reaction`、`standard`、`condition`、`varies` 和 `notes`。
+`:::condition-varies` 用声明式结构记录条件筛选：先声明 factor，再声明 outcome，然后写一个或多个 attempt section。所有声明必须在第一个 `attempt:` 之前出现。
 
-## 单一变化写法
-
-```md
-:::condition-varies #cv-solvent
-reaction: rxn-variant
-standard: rxn-standard
-solvent: THF -> MeCN
-temperature: 25 C -> 40 C
-notes: solvent and temperature screen
-:::
-```
-
-`field: A -> B` 或 `field: A => B` 会生成 delta。没有箭头时保存 raw 值。
-
-## 并行 attempt 写法
+## 语法
 
 ```md
 :::condition-varies #cv-screen
-standard: rxn-standard
-condition: solvent=THF | temperature=25 C | catalyst=Pd
-varies: solvent | temperature
-var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
-res1: res-var1
-note1: higher yield, minor impurity
-var2: reaction=rxn-var2 | mode=override | solvent=DMSO | temperature=60 C | catalyst=Ni
-res2: res-var2
-note2: trace product by TLC
+standard: @rxn-standard
+
+factor: solvent | baseline=THF
+factor: temperature | baseline=25 C
+factor: catalyst | baseline=Pd(PPh3)4
+
+outcome: yield | baseline=68 %
+outcome: conversion | baseline=85 %
+
+attempt: var1
+result: @res-var1
+solvent: MeCN
+temperature: 40 C
+yield: 72 %
+conversion: 90 %
+note: Higher conversion while keeping same catalyst.
+
+attempt: var2
+solvent: DMF
+temperature: 60 C
+catalyst: Pd(dppf)Cl2
+yield: 45 %
+conversion: 70 %
 :::
 ```
+
+`attempt:` 会开启一个 section。它之后的普通字段都属于当前 attempt，直到下一个 `attempt:` 或块结束。空行只影响可读性，不影响归属。
 
 ## 字段
 
 | 字段 | 说明 |
 | --- | --- |
-| `reaction` | 当前 variation 关联 reaction |
-| `standard` | 标准 reaction |
-| `condition` | 基线条件，格式为 `field=value | field=value` |
-| `varies` | 变化字段列表 |
-| `notes` | 备注 |
-| `varN` | 第 N 个 attempt，N 为数字 |
-| `resN` | 第 N 个 attempt 的 result |
-| `noteN` | 第 N 个 attempt 的备注 |
-| 其他字段 | 顶层变化 delta |
+| `standard` | 基线 reaction 引用 |
+| `reaction` | 可选的 variation 级 reaction 关联；优先在 attempt 内写 `reaction` |
+| `factor` | 输入变量或控制变量，可带 `baseline=` |
+| `outcome` | 输出指标，可带 baseline |
+| `attempt` | attempt id，可带少量 header 参数 |
+| `result` | 当前 attempt 的可选 result 引用 |
+| `note` / `notes` | 当前 attempt 备注 |
+| `condition` / `varies` | 保留字段名；不要作为 factor/outcome 名称 |
 
-`varN` 内部支持 `id`、`reaction`、`ref`、`result`、`res`、`note`、`notes`、`mode` 以及任意条件字段。`mode=override`、`mode=full` 和 `mode=replace` 都归一化为 `override`；其他 mode 为 `partial`。`partial` 会继承 `condition` 中未变化的基线条件。
+factor 和 outcome 名称必须先声明、不能重名，也不能使用 `standard`、`factor`、`outcome`、`attempt`、`result`、`note`、`notes` 等保留字段。
 
-## 必填与默认值
+## 语义
 
-该块没有 resolver 必填字段。attempt ID 默认使用 `varN`。`partial` attempt 会把未变化的基线字段写入 attempt condition，candidate 等于 baseline。
+attempt 缺少某个 factor 时，表示沿用该 factor 的 baseline。声明了 outcome 后，每个 attempt 都必须写对应结果。outcome baseline 可描述 standard 结果；如果标准 result 可推断出同一字段且与显式 baseline 冲突，会报错。
 
-## 推荐实践案例
-
-条件筛选应显式声明 standard reaction、每个 variation reaction 和 result。`varies` 只列实际比较维度。
-
-```md
-:::condition-varies #cv-base-screen
-standard: rxn-standard
-condition: solvent=THF | temperature=25 C | base=K2CO3 | catalyst=Pd(PPh3)4
-varies: solvent | temperature
-var1: id=screen-meCN-40 | reaction=rxn-meCN-40 | solvent=MeCN | temperature=40 C
-res1: res-meCN-40
-note1: best conversion in first pass
-var2: id=screen-dioxane-90 | reaction=rxn-dioxane-90 | solvent=dioxane/water | temperature=90 C
-res2: res-dioxane-90
-:::
-```
+`result: @res-id` 可省略。若写出，必须引用 result block。attempt 内 outcome 与 linked result 的同名字段不能冲突。
 
 ## 诊断
 
-`condition-varies` parser 接受任意条件字段，因此未知条件字段不会产生 `W_UNKNOWN_FIELD`。ID 非法仍产生 `E_INVALID_ID`。引用关系在 typechecker 和导出层中解析。
+| 诊断码 | 条件 |
+| --- | --- |
+| `E_CONDITION_DSL_DECLARATION` | factor/outcome 名称重复或使用保留字段 |
+| `E_CONDITION_DSL_ORDER` | 声明写在 attempt 之后 |
+| `E_CONDITION_ATTEMPT_ID` | attempt id 缺失或重复 |
+| `E_CONDITION_ATTEMPT_UNKNOWN_FIELD` | attempt 字段未声明 |
+| `E_CONDITION_ATTEMPT_DUPLICATE_FIELD` | attempt 重复写同一 factor/outcome |
+| `E_CONDITION_OUTCOME_MISSING` | attempt 缺少已声明 outcome |
+| `E_CONDITION_BASELINE_CONFLICT` | baseline 与 standard result 冲突 |
+| `E_CONDITION_OUTCOME_CONFLICT` | attempt outcome 与 linked result 冲突 |

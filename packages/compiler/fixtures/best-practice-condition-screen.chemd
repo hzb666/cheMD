@@ -82,15 +82,32 @@ purity: 61 %
 :::
 
 :::condition-varies #cv-screen
-standard: rxn-standard
-condition: solvent=THF | temperature=25 C | catalyst=Pd(PPh3)4
-varies: solvent | temperature | catalyst
-var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
-res1: res-var1
-note1: Higher conversion with the baseline catalyst.
-var2: reaction=rxn-var2 | mode=override | solvent=DMF | temperature=60 C | catalyst=Pd(dppf)Cl2
-res2: res-var2
-note2: Full override lowers conversion and purity.
+standard: @rxn-standard
+factor: solvent | baseline=THF
+factor: temperature | baseline=25 C
+factor: catalyst | baseline=Pd(PPh3)4
+outcome: yield | baseline=70 %
+outcome: conversion | baseline=90 %
+outcome: purity | baseline=95 %
+attempt: var1
+reaction: @rxn-var1
+result: @res-var1
+solvent: MeCN
+temperature: 40 C
+yield: 78 %
+conversion: 96 %
+purity: 97 %
+note: Higher conversion with the baseline catalyst.
+attempt: var2
+reaction: @rxn-var2
+result: @res-var2
+solvent: DMF
+temperature: 60 C
+catalyst: Pd(dppf)Cl2
+yield: 18 %
+conversion: 25 %
+purity: 61 %
+note: Full override lowers conversion and purity.
 :::
 
 :::analysis #ana-tlc-var1
@@ -102,9 +119,13 @@ plate: silica gel GF254
 visualization: UV 254 nm
 result: one major product spot with trace starting material
 data: TLC plate after 2 h for var1.
-p1: sm 0.78
-p2: crude-var1 0.52 | sm-trace(0.79)
-p3: product-std 0.50
+lane: sm
+spot: 0.78
+lane: rxn
+spot: 0.52 product
+spot: 0.79 sm
+lane: prod
+spot: 0.50
 :::
 
 :::observation #obs-var2

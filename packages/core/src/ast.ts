@@ -225,6 +225,20 @@ export interface ResultNode extends SourceMappedNode {
   notes?: string; ref?: string; reaction?: string; product?: string;
 }
 
+export interface TlcLaneEntryNode {
+  kind: "spot" | "mess" | "base" | "none";
+  raw: string;
+  sourceSpan?: SourceSpan;
+}
+
+export interface TlcLaneNode {
+  id: string;
+  label: string;
+  params?: Record<string, string>;
+  entries: TlcLaneEntryNode[];
+  sourceSpan?: SourceSpan;
+}
+
 export type AnalysisNode = SourceMappedNode & {
   type: "analysis";
   id?: string;
@@ -239,6 +253,12 @@ export type AnalysisNode = SourceMappedNode & {
   solvent?: string;
   frequency?: string;
   method?: string;
+  artifact?: string;
+  artifacts?: string[];
+  spectrum?: string;
+  peaks?: string[];
+  ions?: string[];
+  tlcLanes?: TlcLaneNode[];
   data?: string;
   notes?: string;
 } & Partial<Record<`p${number}`, string>>;
@@ -337,6 +357,7 @@ export interface ConditionVariationVariable {
   field: string;
   raw: string;
   baseline?: string;
+  quantityClass?: string;
 }
 
 export type ConditionVariationAttemptMode = "partial" | "override";
@@ -348,6 +369,8 @@ export interface ConditionVariationAttempt {
   reaction?: string;
   result?: string;
   note?: string;
+  factors?: Record<string, string>;
+  outcomes?: Record<string, string>;
   changes: ConditionVariationDelta[];
   condition: ConditionVariationDelta[];
 }
@@ -357,6 +380,8 @@ export interface ConditionVariesNode extends SourceMappedNode {
   id?: string;
   reaction?: string;
   standard?: string;
+  factors?: ConditionVariationVariable[];
+  outcomes?: ConditionVariationVariable[];
   condition?: ConditionVariationVariable[];
   varyFields?: string[];
   changes: ConditionVariationDelta[];

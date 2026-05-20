@@ -28,22 +28,6 @@ const collectFiles = (directory: string): string[] =>
 const extractQuotedValues = (source: string): string[] =>
   Array.from(source.matchAll(/["']([^"']+)["']/g), (match) => match[1] ?? "");
 
-const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-const extractSetValues = (source: string, name: string): string[] => {
-  const pattern = new RegExp(
-    `const\\s+${escapeRegExp(name)}\\s*=\\s*new\\s+Set(?:<[^>]+>)?\\s*\\(\\s*\\[([\\s\\S]*?)\\]\\s*\\)`,
-    "m"
-  );
-  const match = source.match(pattern);
-
-  if (!match) {
-    throw new Error(`Cannot find Set literal ${name}`);
-  }
-
-  return extractQuotedValues(match[1] ?? "");
-};
-
 const extractParserRegistryBlocks = (): string[] => {
   const source = readWorkspaceFile("packages", "parser", "src", "body", "block-parsers", "index.ts");
   const registry = source.match(/const\s+PARSERS\s*=\s*new\s+Map[\s\S]*?\(\s*\[([\s\S]*?)\]\s*\)/m);
@@ -58,22 +42,13 @@ const extractParserRegistryBlocks = (): string[] => {
 const uniqueSorted = (values: string[]): string[] => Array.from(new Set(values)).sort();
 
 const parserFieldCoverage = (): Record<string, string[]> => {
-  const blockParserRoot = ["packages", "parser", "src", "body", "block-parsers"];
-  const conditionVaries = readWorkspaceFile(...blockParserRoot, "condition-varies.ts");
-
   return {
     chemd: getCanonicalBlockFields("chemd"),
     result: getCanonicalBlockFields("result"),
-    analysis: [...getCanonicalBlockFields("analysis"), "p1"],
+    analysis: getCanonicalBlockFields("analysis"),
     artifact: getCanonicalBlockFields("artifact"),
     sample: getCanonicalBlockFields("sample"),
-    "condition-varies": [
-      ...getCanonicalBlockFields("condition-varies"),
-      ...extractSetValues(conditionVaries, "ATTEMPT_META_FIELDS"),
-      "varN",
-      "resN",
-      "noteN"
-    ],
+    "condition-varies": getCanonicalBlockFields("condition-varies"),
     procedure: getCanonicalBlockFields("procedure"),
     step: getCanonicalBlockFields("step"),
     observation: getCanonicalBlockFields("observation"),

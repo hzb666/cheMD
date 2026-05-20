@@ -115,18 +115,22 @@ time: 2 h
 eluent: PE/EA = 4:1
 result: one major product spot with trace starting material
 data: TLC plate after 2 h.
-p1: sm 0.78
-p2: crude 0.52 | sm-trace(0.79)
-p3: product-std 0.50
+lane: sm
+spot: 0.78 starting_material
+lane: rxn
+spot: 0.52 product
+spot: 0.79 starting_material
+lane: prod
+spot: 0.50 product
 :::
 ```
 
-字段：`type`、`ref`、`time`、`eluent`、`plate`、`visualization`、`result`、`instrument`、`solvent`、`frequency`、`method`、`data`、`notes`，以及 `p1`、`p2` 等 TLC lane 字段。
+字段：`type`、`ref`、`time`、`eluent`、`plate`、`visualization`、`result`、`instrument`、`solvent`、`frequency`、`method`、`data`、`notes`、`artifact`、`artifacts`、`spectrum`、`lane`、`spot`、`mess`、`base`、`none`、`peak`、`ion`。
 
 resolver 必填校验：
 
-- 普通 analysis 需要 `type` 和 `data`。
-- TLC analysis 需要 `type`；`plate` 和 `visualization` 可由默认值补齐。
+- analysis 需要 `type`。
+- TLC analysis 的 `plate` 和 `visualization` 可由默认值补齐。
 
 ## `:::sample`
 

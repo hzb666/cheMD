@@ -34,10 +34,17 @@ const ANALYSIS_TYPE_ALIASES: Record<string, AnalysisTypeLabel> = {
   tlc: "tlc",
   nmr: "nmr",
   hplc: "hplc",
+  uplc: "uplc",
+  gc: "gc",
   lcms: "lcms",
   "lc-ms": "lcms",
   gcms: "gcms",
-  "gc-ms": "gcms"
+  "gc-ms": "gcms",
+  ms: "ms",
+  hrms: "hrms",
+  ir: "ir",
+  uv: "uv",
+  "uv-vis": "uv"
 };
 
 const ATMOSPHERE_ALIASES: Record<string, AtmosphereLabel> = {

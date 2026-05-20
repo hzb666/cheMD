@@ -75,4 +75,4 @@ resolver 的第一步是收集对象节点。对象来源包含顶层 children�
 
 模板展开分三步：构建 template index，校验 `:::use` 参数，替换模板 body 中的参数引用。限制包含最大深度 32 和最大展开节点数 2000。重复模板名、未知模板、缺少参数、类型不匹配、循环和展开超限均产生诊断。
 
-condition-varies attempt 具有特殊字段读取逻辑。`@cv-screen.var1` 这类引用会先定位父级 condition-varies 对象，再在 `attempts` 中查找 attempt ID。
+condition-varies attempt 具有特殊字段读取逻辑。`@cv-screen.mecn-40` 这类引用会先定位父级 condition-varies 对象，再在 `attempts` 中查找同名 attempt ID。

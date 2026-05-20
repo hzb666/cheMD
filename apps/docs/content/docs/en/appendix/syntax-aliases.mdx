@@ -52,22 +52,23 @@ The primary reaction used @reaction.solvent and gave @result.yield.
 | --- | --- | --- | --- |
 | `ref` | reaction association | `:::result` | Treated as the reaction link when `reaction` is absent. |
 | `reaction` | reaction association | `:::result` | Explicit reaction link; preferred when the relationship should be clear. |
-| `ref` | attempt reaction | `varN` in `:::condition-varies` | Equivalent to `reaction` inside an attempt segment. |
-| first bare segment | attempt reaction | `varN` in `:::condition-varies` | `var1: rxn-a | solvent=MeCN` links attempt `var1` to `rxn-a`. |
-| `res` | attempt result | `varN` in `:::condition-varies` | Equivalent to `result` inside an attempt segment. |
-| `resN` | attempt result | `:::condition-varies` top-level field | `res1` attaches a result to `var1`. |
-| `note` / `notes` | attempt note | `varN` in `:::condition-varies` | Both forms populate the attempt note. |
-| `noteN` | attempt note | `:::condition-varies` top-level field | `note1` attaches a note to `var1`. |
-| `full` / `replace` | `override` mode | `varN` in `:::condition-varies` | These mode values normalize to override behavior. |
+| `note` / `notes` | attempt note | `:::condition-varies` attempt section | Both forms populate the current attempt note. |
+| first segment after `attempt:` | attempt ID | `:::condition-varies` | `attempt: mecn-40` opens attempt `mecn-40`. |
 
 ```md
 :::condition-varies #screen-main
 standard: rxn-standard
-condition: solvent=MeCN | temperature=40 C
-var1: rxn-var1 | solvent=DMF | res=res-var1 | note=cleaner profile
-res2: res-var2
-note2: trace product by TLC
-var2: reaction=rxn-var2 | mode=replace | temperature=60 C
+factor: solvent | baseline=MeCN
+factor: temperature | baseline=40 C
+outcome: yield | baseline=68 %
+
+attempt: dmf-60
+reaction: rxn-var1
+result: res-var1
+solvent: DMF
+temperature: 60 C
+yield: 72 %
+note: cleaner profile
 :::
 ```
 

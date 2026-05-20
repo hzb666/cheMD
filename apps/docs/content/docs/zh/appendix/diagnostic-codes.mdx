@@ -22,6 +22,13 @@ description: Chemd parser、resolver、typechecker、compiler 和 runtime 常见
 | `W_UNKNOWN_FIELD` | 字段不在块允许集合内 |
 | `E_INVALID_LIST_ITEM` | 列表字段包含空项 |
 | `W_UNSAFE_LINK_HREF` | Markdown 链接 href 未通过安全策略 |
+| `E_TLC_LANE_REQUIRED` | TLC lane item 出现在 `lane:` 之前 |
+| `E_CONDITION_DSL_FIELD` | 条件筛选包含非法 section 字段 |
+| `E_CONDITION_DSL_ORDER` | 条件筛选声明写在 attempt 之后 |
+| `E_CONDITION_ATTEMPT_ID` | 条件筛选 attempt ID 缺失或重复 |
+| `E_CONDITION_DSL_DECLARATION` | 条件筛选 factor/outcome 声明非法 |
+| `E_CONDITION_ATTEMPT_DUPLICATE_FIELD` | attempt 重复填写已声明的 factor 或 outcome |
+| `E_CONDITION_ATTEMPT_UNKNOWN_FIELD` | attempt 字段未声明为 factor 或 outcome |
 
 ## `:::chemd`
 
@@ -65,6 +72,18 @@ description: Chemd parser、resolver、typechecker、compiler 和 runtime 常见
 | `E_STOICHIOMETRY_LIMITING` | limiting reactant 规则被破坏 |
 | `E_STOICHIOMETRY_QUANTITY_MISSING` | 化学计量 participant 缺少 amount 或 equivalent |
 | `E_RESULT_REACTION_CONFLICT` | result 与 linked reaction 字段冲突 |
+| `E_TLC_LABEL_UNKNOWN` | TLC spot 或 lane label 不是支持的内置 label |
+| `E_TLC_SPOT_REFERENCE` | TLC spot 引用无法唯一解析 |
+| `E_TLC_UNKNOWN_REFERENCE` | TLC `unknown` 引用无法解析为已知 spot |
+| `E_TLC_SPOT_LABEL_REQUIRED` | 混合 TLC lane 中存在未标注 spot |
+| `E_ANALYSIS_FIELD_FOR_TYPE` | analysis 字段与声明的 analysis 类型不兼容 |
+| `E_ANALYSIS_PEAK_SYNTAX` | analysis peak 无法按声明类型解析 |
+| `E_ANALYSIS_SPECTRUM_CONFLICT` | NMR spectrum 元数据与显式字段冲突 |
+| `E_ANALYSIS_ION_REQUIRED` | LCMS/GCMS 有 peak 但缺少 ion 数据 |
+| `E_ANALYSIS_ION_SYNTAX` | MS ion 行缺少 m/z 值 |
+| `E_CONDITION_OUTCOME_MISSING` | attempt 缺少已声明 outcome |
+| `E_CONDITION_BASELINE_CONFLICT` | outcome baseline 与 standard result 冲突 |
+| `E_CONDITION_OUTCOME_CONFLICT` | attempt outcome 与 linked result 冲突 |
 | `E_DERIVED_EXPRESSION_INVALID` | 派生表达式非法 |
 | `W_REACTION_ROUTE_MISMATCH` | reaction route 前驱路线不一致 |
 | `E_REACTION_ROUTE_CYCLE` | reaction route 成环 |

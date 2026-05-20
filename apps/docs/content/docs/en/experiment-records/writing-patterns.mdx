@@ -85,16 +85,22 @@ yield: 48 %
 
 ## Condition Screen Record
 
-A condition screen should contain a baseline reaction, attempt reactions, attempt results, and `condition-varies`. `varN` connects the attempt reaction, and `resN` connects the attempt result.
+A condition screen should contain a baseline reaction, attempt reactions, attempt results, and `condition-varies`. Declare factors and outcomes first, then write each attempt as its own section.
 
 ```md
 :::condition-varies #cv-base
 standard: rxn-baseline
-condition: solvent=THF | temperature=25 C
-varies: solvent | temperature
-var1: id=attempt-mecn-40 | reaction=rxn-mecn-40 | solvent=MeCN | temperature=40 C
-res1: res-mecn-40
-note1: highest conversion in the first screen
+factor: solvent | baseline=THF
+factor: temperature | baseline=25 C
+outcome: conversion | baseline=85 %
+
+attempt: attempt-mecn-40
+reaction: rxn-mecn-40
+result: res-mecn-40
+solvent: MeCN
+temperature: 40 C
+conversion: 90 %
+note: highest conversion in the first screen
 :::
 ```
 
@@ -102,15 +108,17 @@ The screen table should preserve baseline conditions and declared dimensions. Us
 
 ## Analysis-Driven Record
 
-Analysis-driven records connect `:::analysis` to a reaction, result, or condition attempt. TLC uses `pN` lanes. HPLC and NMR use `instrument`, `method`, `result`, and `data`.
+Analysis-driven records connect `:::analysis` to a reaction, result, sample, or condition attempt. TLC uses `lane:` sections. HPLC and LCMS use structured `peak:` and `ion:` lines. NMR uses `spectrum:` and literature-style `peak:` lines.
 
 ```md
 :::analysis #ana-tlc-screen
 type: tlc
 ref: cv-base.attempt-mecn-40
 eluent: petroleum ether/ethyl acetate 4:1
-p1: sm rf=0.20 ^ (2)
-p2: product rf=0.55 v (4)
+lane: sm
+spot: 0.20 ^(2) starting_material
+lane: rxn
+spot: 0.55 v(4) product
 result: product spot dominant after 2 h
 :::
 
@@ -119,7 +127,7 @@ type: hplc
 ref: res-main
 instrument: Agilent 1260 Infinity II
 method: C18 gradient 10-90% MeCN
-data: reports/hplc/main-product.pdf
+peak: 6.4 min (96 %, product)
 result: purity 96 %
 :::
 ```

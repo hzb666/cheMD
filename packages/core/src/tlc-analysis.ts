@@ -5,19 +5,28 @@ export type TlcLaneRole =
   | "starting_material"
   | "product"
   | "intermediate"
-  | "reaction"
+  | "reaction_mixture"
+  | "blank"
+  | "impurity"
+  | "unknown"
   | "trial"
   | "custom";
 
 export type TlcSpotShape = "circle" | "up" | "down";
 
 export interface NormalizedTlcSpot {
+  spot_id?: string;
   raw: string;
-  rf_raw: string;
-  rf: number;
+  rf_raw?: string;
+  rf?: number | null;
   shape: TlcSpotShape;
   size_rank?: number | null;
   intensity_rank?: number | null;
+  label_raw?: string;
+  role?: TlcLaneRole;
+  ref?: string;
+  is_reference?: boolean;
+  source_spot_id?: string;
 }
 
 export interface NormalizedTlcMessRegion {
@@ -33,6 +42,7 @@ export interface NormalizedTlcLane {
   lane_label_raw: string;
   lane_role: TlcLaneRole;
   lane_index?: number | null;
+  lane_params?: Record<string, string>;
   has_base: boolean;
   is_none: boolean;
   spots: NormalizedTlcSpot[];
@@ -53,8 +63,18 @@ const ITEM_START_PATTERN = /^(?:none|base|mess(?:\([^)]+\))?|-?\d+(?:\.\d+)?)$/i
 const MARKER_PATTERN = /^(?<shape>[\^v]?)(?<size>\d+)?(?:\((?<intensity>\d+)\))?$/;
 const MESS_PATTERN = /^mess(?:\((?<rf>-?\d+(?:\.\d+)?)\))?$/i;
 const RF_PATTERN = /^-?\d+(?:\.\d+)?$/;
+const TLC_ROLE_ALIASES: Array<{ pattern: RegExp; role: TlcLaneRole }> = [
+  { pattern: /^(sm|startingmaterial)(\d+)?$/, role: "starting_material" },
+  { pattern: /^(prod|pd|product)(\d+)?$/, role: "product" },
+  { pattern: /^(int|intermediate)(\d+)?$/, role: "intermediate" },
+  { pattern: /^(rxn|reaction|reactionmixture)(\d+)?$/, role: "reaction_mixture" },
+  { pattern: /^(blank)(\d+)?$/, role: "blank" },
+  { pattern: /^(impurity)(\d+)?$/, role: "impurity" },
+  { pattern: /^(unk|unknown)(\d+)?$/, role: "unknown" }
+];
 
 const normalizeToken = (value: string): string => value.trim().replace(/\s+/g, " ");
+const normalizeRoleToken = (raw: string): string => raw.toLowerCase().replace(/[\s_-]+/g, "");
 
 const parseNumericWithUnit = (
   value: string,
@@ -123,7 +143,7 @@ const parseMarker = (
 };
 
 const classifyLaneLabel = (raw: string): { lane_role: TlcLaneRole; lane_index?: number | null } => {
-  const normalized = raw.toLowerCase().replace(/[\s_-]+/g, "");
+  const normalized = normalizeRoleToken(raw);
 
   if (/^\d+$/.test(normalized)) {
     return {
@@ -132,14 +152,7 @@ const classifyLaneLabel = (raw: string): { lane_role: TlcLaneRole; lane_index?: 
     };
   }
 
-  const aliases: Array<{ pattern: RegExp; role: TlcLaneRole }> = [
-    { pattern: /^(sm|startingmaterial)(\d+)?$/, role: "starting_material" },
-    { pattern: /^(pd|product)(\d+)?$/, role: "product" },
-    { pattern: /^(int|intermediate)(\d+)?$/, role: "intermediate" },
-    { pattern: /^(rxn|reaction)(\d+)?$/, role: "reaction" }
-  ];
-
-  for (const alias of aliases) {
+  for (const alias of TLC_ROLE_ALIASES) {
     const match = normalized.match(alias.pattern);
     if (!match) {
       continue;
@@ -195,6 +208,55 @@ const parseSpotItem = (raw: string): NormalizedTlcSpot | undefined => {
     raw,
     rf_raw: rfToken,
     rf: Number(rfToken),
+    ...parseMarker(marker)
+  };
+};
+
+const parseLabelTarget = (raw: string | undefined): Pick<NormalizedTlcSpot, "label_raw" | "role" | "ref"> => {
+  const label = raw?.trim();
+  if (!label) {
+    return {};
+  }
+  if (label.startsWith("@")) {
+    return { label_raw: label, ref: label.slice(1) };
+  }
+
+  const normalized = normalizeRoleToken(label);
+  const role = TLC_ROLE_ALIASES.find((alias) => alias.pattern.test(normalized))?.role;
+  return role ? { label_raw: label, role } : { label_raw: label };
+};
+
+const parseStructuredSpot = (
+  raw: string,
+  lane: { lane_id: string; lane_role: TlcLaneRole },
+  index: number
+): NormalizedTlcSpot => {
+  const tokens = normalizeToken(raw).split(/\s+/).filter(Boolean);
+  const [head, second, ...rest] = tokens;
+  const hasRf = Boolean(head && RF_PATTERN.test(head));
+  const markerCandidate = hasRf && second && MARKER_PATTERN.test(second) ? second : undefined;
+  const labelTokens = hasRf
+    ? tokens.slice(markerCandidate ? 2 : 1)
+    : tokens;
+  const inheritedLabel = labelTokens.length === 0 && lane.lane_role !== "reaction_mixture" && lane.lane_role !== "custom"
+    ? { role: lane.lane_role }
+    : parseLabelTarget(labelTokens.join(" "));
+
+  return {
+    spot_id: `${lane.lane_id}.spot${index + 1}`,
+    raw,
+    ...(hasRf ? { rf_raw: head, rf: Number(head) } : { is_reference: true }),
+    ...parseMarker(markerCandidate),
+    ...inheritedLabel
+  };
+};
+
+const parseStructuredMess = (raw: string): NormalizedTlcMessRegion => {
+  const tokens = normalizeToken(raw).split(/\s+/).filter(Boolean);
+  const [head, marker] = tokens;
+  return {
+    raw,
+    ...(head && RF_PATTERN.test(head) ? { rf_raw: head, rf: Number(head) } : {}),
     ...parseMarker(marker)
   };
 };
@@ -255,7 +317,7 @@ const normalizeLane = (laneId: string, raw: string): NormalizedTlcLane => {
 
     const spot = parseSpotItem(normalizedItem);
     if (spot) {
-      spots.push(spot);
+      spots.push({ spot_id: `${laneId}.spot${spots.length + 1}`, ...spot });
     }
   }
 
@@ -269,6 +331,85 @@ const normalizeLane = (laneId: string, raw: string): NormalizedTlcLane => {
   };
 };
 
+const normalizeStructuredLane = (lane: NonNullable<AnalysisNode["tlcLanes"]>[number]): NormalizedTlcLane => {
+  const parsedLabel = classifyLaneLabel(lane.label);
+  let hasBase = false;
+  let isNone = false;
+  const spots: NormalizedTlcSpot[] = [];
+  const messRegions: NormalizedTlcMessRegion[] = [];
+
+  for (const entry of lane.entries) {
+    if (entry.kind === "none") {
+      isNone = true;
+      continue;
+    }
+    if (entry.kind === "base") {
+      hasBase = true;
+      if (entry.raw.trim()) {
+        spots.push({
+          ...parseStructuredSpot(entry.raw, { lane_id: lane.id, lane_role: parsedLabel.lane_role }, spots.length),
+          raw: entry.raw
+        });
+      }
+      continue;
+    }
+    if (entry.kind === "mess") {
+      messRegions.push(parseStructuredMess(entry.raw));
+      continue;
+    }
+    spots.push(parseStructuredSpot(entry.raw, { lane_id: lane.id, lane_role: parsedLabel.lane_role }, spots.length));
+  }
+
+  return {
+    lane_id: lane.id,
+    lane_label_raw: lane.label,
+    ...parsedLabel,
+    ...(lane.params ? { lane_params: lane.params } : {}),
+    has_base: hasBase,
+    is_none: isNone,
+    ...(isNone ? { spots: [], mess_regions: [] } : { spots, mess_regions: messRegions })
+  };
+};
+
+const spotTargetKey = (spot: NormalizedTlcSpot): string | undefined =>
+  spot.ref ? `ref:${spot.ref}` : spot.role ? `role:${spot.role}` : undefined;
+
+const resolveSpotReferences = (lanes: NormalizedTlcLane[]): NormalizedTlcLane[] => {
+  const standards = new Map<string, NormalizedTlcSpot[]>();
+  for (const lane of lanes) {
+    for (const spot of lane.spots) {
+      if (spot.rf === undefined || spot.rf === null || spot.is_reference) {
+        continue;
+      }
+      const key = spotTargetKey(spot) ?? (lane.lane_role !== "reaction_mixture" && lane.lane_role !== "custom" ? `role:${lane.lane_role}` : undefined);
+      if (!key) {
+        continue;
+      }
+      standards.set(key, [...standards.get(key) ?? [], spot]);
+    }
+  }
+
+  return lanes.map((lane) => ({
+    ...lane,
+    spots: lane.spots.map((spot) => {
+      if (!spot.is_reference) {
+        return spot;
+      }
+      const key = spotTargetKey(spot);
+      const [standard] = key ? standards.get(key) ?? [] : [];
+      return key && standard && (standards.get(key)?.length ?? 0) === 1
+        ? {
+            ...standard,
+            spot_id: spot.spot_id,
+            raw: spot.raw,
+            is_reference: true,
+            source_spot_id: standard.spot_id
+          }
+        : spot;
+    })
+  }));
+};
+
 const collectLaneEntries = (node: AnalysisNode): Array<[string, string]> =>
   Object.entries(node)
     .filter(([key, value]) => LANE_KEY_PATTERN.test(key) && typeof value === "string" && value.length > 0)
@@ -279,7 +420,9 @@ export const classifyTlcAnalysis = (node: AnalysisNode): NormalizedTlcAnalysis |
     return undefined;
   }
 
-  const lanes = collectLaneEntries(node).map(([laneId, raw]) => normalizeLane(laneId, raw));
+  const lanes = node.tlcLanes?.length
+    ? node.tlcLanes.map(normalizeStructuredLane)
+    : collectLaneEntries(node).map(([laneId, raw]) => normalizeLane(laneId, raw));
   const normalizedPlate = normalizeToken(node.plate ?? DEFAULT_TLC_PLATE);
   const normalizedVisualization = normalizeToken(node.visualization ?? DEFAULT_TLC_VISUALIZATION);
 
@@ -303,6 +446,6 @@ export const classifyTlcAnalysis = (node: AnalysisNode): NormalizedTlcAnalysis |
       raw: node.visualization ?? DEFAULT_TLC_VISUALIZATION,
       normalized: normalizedVisualization
     },
-    lanes
+    lanes: resolveSpotReferences(lanes)
   };
 };

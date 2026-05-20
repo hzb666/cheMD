@@ -83,22 +83,24 @@ Template expansion substitutes parameter values into the template body. `ref<kin
 
 ## Condition-Screen Attempt References
 
-Attempts produced by `:::condition-varies` can be referenced with `@screen.var1`. Attempt data comes from `varN`, while result and note data come from `resN` and `noteN`.
+Attempts produced by `:::condition-varies` can be referenced with `@screen.attempt-id`. Attempt data comes from the matching `attempt:` section.
 
 ```md
 :::condition-varies #screen-base
 reaction: @rxn-main
-condition: solvent=MeCN ;; temperature=60 C
-varies: solvent
-var1: solvent=DMF
-res1: yield=72 %
-note1: cleaner TLC
+factor: solvent | baseline=MeCN
+outcome: yield | baseline=68 %
+
+attempt: dmf
+solvent: DMF
+yield: 72 %
+note: cleaner TLC
 :::
 
-The first screen attempt is @screen-base.var1.
+The first screen attempt is @screen-base.dmf.
 ```
 
-This reference is useful for screen narratives. To include a screen outcome in the result graph, create a `:::result` block and assign it from the attempt with `result=@res-id`.
+This reference is useful for screen narratives. To include a screen outcome in the result graph, create a `:::result` block and assign it from the attempt with `result: @res-id`.
 
 ## Best Practice
 

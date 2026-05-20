@@ -83,22 +83,24 @@ method: HPLC
 
 ## 条件筛选 Attempt 引用
 
-`:::condition-varies` 生成的 attempt 可通过 `@screen.var1` 形式引用。attempt 字段来自 `varN` 行，结果与备注来自 `resN`、`noteN` 行。
+`:::condition-varies` 生成的 attempt 可通过 `@screen.attempt-id` 形式引用。attempt 数据来自同名 `attempt:` section。
 
 ```md
 :::condition-varies #screen-base
 reaction: @rxn-main
-condition: solvent=MeCN ;; temperature=60 C
-varies: solvent
-var1: solvent=DMF
-res1: yield=72 %
-note1: cleaner TLC
+factor: solvent | baseline=MeCN
+outcome: yield | baseline=68 %
+
+attempt: dmf
+solvent: DMF
+yield: 72 %
+note: cleaner TLC
 :::
 
-The first screen attempt is @screen-base.var1.
+The first screen attempt is @screen-base.dmf.
 ```
 
-该引用用于叙述筛选矩阵。需要把筛选结果纳入结果图时，应同时建立 `:::result` 并在 attempt 中写 `result=@res-id`。
+该引用用于叙述筛选矩阵。需要把筛选结果纳入结果图时，应同时建立 `:::result` 并在 attempt 中写 `result: @res-id`。
 
 ## 最佳实践
 

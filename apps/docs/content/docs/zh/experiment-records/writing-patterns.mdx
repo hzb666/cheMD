@@ -85,16 +85,22 @@ yield: 48 %
 
 ## 条件筛选记录
 
-条件筛选记录应建立 baseline reaction、attempt reaction、attempt result 和 `condition-varies`。`varN` 连接 attempt reaction，`resN` 连接 attempt result。
+条件筛选记录应建立 baseline reaction、attempt reaction、attempt result 和 `condition-varies`。先声明 factor 和 outcome，再把每次尝试写成独立 attempt section。
 
 ```md
 :::condition-varies #cv-base
 standard: rxn-baseline
-condition: solvent=THF | temperature=25 C
-varies: solvent | temperature
-var1: id=attempt-mecn-40 | reaction=rxn-mecn-40 | solvent=MeCN | temperature=40 C
-res1: res-mecn-40
-note1: highest conversion in the first screen
+factor: solvent | baseline=THF
+factor: temperature | baseline=25 C
+outcome: conversion | baseline=85 %
+
+attempt: attempt-mecn-40
+reaction: rxn-mecn-40
+result: res-mecn-40
+solvent: MeCN
+temperature: 40 C
+conversion: 90 %
+note: highest conversion in the first screen
 :::
 ```
 
@@ -102,15 +108,17 @@ note1: highest conversion in the first screen
 
 ## 分析驱动记录
 
-分析驱动记录用 `:::analysis` 连接 reaction、result 或 condition attempt。TLC 使用 `pN` lane。HPLC、NMR 等分析使用 `instrument`、`method`、`result` 和 `data`。
+分析驱动记录用 `:::analysis` 连接 reaction、result、sample 或 condition attempt。TLC 使用 `lane:` section。HPLC 与 LCMS 使用结构化 `peak:` 和 `ion:` 行。NMR 使用 `spectrum:` 和文献式 `peak:` 行。
 
 ```md
 :::analysis #ana-tlc-screen
 type: tlc
 ref: cv-base.attempt-mecn-40
 eluent: petroleum ether/ethyl acetate 4:1
-p1: sm rf=0.20 ^ (2)
-p2: product rf=0.55 v (4)
+lane: sm
+spot: 0.20 ^(2) starting_material
+lane: rxn
+spot: 0.55 v(4) product
 result: product spot dominant after 2 h
 :::
 
@@ -119,7 +127,7 @@ type: hplc
 ref: res-main
 instrument: Agilent 1260 Infinity II
 method: C18 gradient 10-90% MeCN
-data: reports/hplc/main-product.pdf
+peak: 6.4 min (96 %, product)
 result: purity 96 %
 :::
 ```

@@ -88,24 +88,40 @@ time: 3 h
 ```md
 :::condition-varies #cv-screen
 standard: rxn-standard
-condition: solvent=THF | temperature=25 C | catalyst=Pd(PPh3)4
-varies: solvent | temperature | catalyst
-var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
-res1: res-var1
-note1: Higher conversion with the baseline catalyst.
-var2: reaction=rxn-var2 | mode=override | solvent=DMF | temperature=60 C | catalyst=Pd(dppf)Cl2
-res2: res-var2
-note2: Full override lowers conversion and purity.
+factor: solvent | baseline=THF
+factor: temperature | baseline=25 C
+factor: catalyst | baseline=Pd(PPh3)4
+outcome: conversion | baseline=82 %
+outcome: purity | baseline=91 %
+
+attempt: var1
+reaction: rxn-var1
+result: res-var1
+solvent: MeCN
+temperature: 40 C
+conversion: 90 %
+purity: 94 %
+note: Higher conversion with the baseline catalyst.
+
+attempt: var2
+reaction: rxn-var2
+result: res-var2
+solvent: DMF
+temperature: 60 C
+catalyst: Pd(dppf)Cl2
+conversion: 60 %
+purity: 80 %
+note: Full condition replacement lowers conversion and purity.
 :::
 ```
 
 解析规则：
 
-- `condition` 被解析为基线变量。
-- `varN` 被解析为 attempt。
-- `resN` 和 `noteN` 绑定到同编号 attempt。
-- `mode=override` 表示该 attempt 使用完整覆盖条件。
-- 未标记 override 的 attempt 会继承未变化的基线条件。
+- `factor` 声明基线变量。
+- `outcome` 声明每个 attempt 必须给出的测量值。
+- `attempt` 开启 section，后续 factor/outcome 字段都归属该 attempt。
+- `result` 和 `note` 绑定到当前 attempt。
+- 缺省 factor 值会继承 factor baseline。
 
 ## 过程步骤
 

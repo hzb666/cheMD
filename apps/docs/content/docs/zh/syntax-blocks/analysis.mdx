@@ -1,112 +1,90 @@
 ---
 title: '`:::analysis` 分析块'
-description: '`:::analysis` 记录 TLC、NMR、HPLC 等分析信息，支持 TLC lane 字段和默认 plate/visualization。'
+description: '`:::analysis` 用类型化字段记录 TLC、NMR、色谱和质谱证据。'
 ---
 
-`:::analysis` 记录分析证据，并生成 `analysis` 节点。
+`:::analysis` 记录分析证据。必填字段是 `type`；不同 `type` 决定允许的结构化字段和诊断边界。
 
-## 语法
+## 公共字段
+
+| 字段 | 说明 |
+| --- | --- |
+| `type` | `tlc`、`nmr`、`hplc`、`uplc`、`gc`、`lcms`、`gcms`、`ms`、`hrms`、`ir`、`uv` |
+| `ref` | 指向 sample、reaction、result、condition screen 或 attempt |
+| `time` | 采样或分析时间 |
+| `eluent` / `plate` / `visualization` | TLC 方法信息 |
+| `method` | method/profile 引用或方法名称 |
+| `instrument` | 仪器名称 |
+| `solvent` / `frequency` | 未写在 `spectrum` 中的 NMR 元数据 |
+| `result` | 关联 result id 或简短解释 |
+| `artifact` / `artifacts` | 原始数据 artifact 引用 |
+| `data` | 无类型化字段时的非结构化兜底 |
+| `notes` | 备注 |
+
+## TLC
 
 ```md
-:::analysis #ana-tlc-main
+:::analysis #ana-tlc
 type: tlc
-ref: rxn-main
-result: res-main
-eluent: petroleum ether/ethyl acetate 5:1
-p1: substrate, Rf 0.62
-p2: product, Rf 0.31
-data: product spot observed, starting material consumed
+ref: @sample-crude
+method: @tlc-method-pe-ea-5-1
+
+lane: sm | source=@mat-aryl
+spot: 0.62
+
+lane: rxn | source=@sample-crude
+spot: sm
+spot: 0.31 ^3(4) product
+mess: 0.55 (3)
+
+lane: prod | source=@sample-product
+spot: 0.30
 :::
 ```
 
-## 字段
+`lane:` 开启一条 lane。后续 `spot`、`mess`、`base`、`none` 都归属当前 lane，直到下一个 `lane:`。lane label 和 spot label 必须是内置 role 或对象引用。内置 role 包括 `sm`、`rxn`、`prod`、`int`、`blank`、`impurity`、`unknown` / `unk`。
 
-| 字段 | 必填 | 说明 |
-| --- | --- | --- |
-| `type` | 条件必填 | 写入 AST 的 `type_name`，普通 analysis 必填 |
-| `ref` | 否 | 分析目标，可指向 reaction、sample、result 或 condition variation |
-| `time` | 否 | 采样或分析时间 |
-| `eluent` | 否 | TLC 展开剂等分析条件 |
-| `plate` | 否 | TLC 板材 |
-| `visualization` | 否 | 可视化方式 |
-| `result` | 否 | 关联 result ID |
-| `instrument` | 否 | 仪器 |
-| `solvent` | 否 | NMR 等分析溶剂 |
-| `frequency` | 否 | NMR 频率 |
-| `method` | 否 | HPLC、LCMS 等方法说明 |
-| `data` | 条件必填 | 普通 analysis 必填；`type: tlc` 时可省略 |
-| `notes` | 否 | 分析说明 |
-| `p1`、`p2`、`pN` | 否 | TLC lane 字段，N 为数字 |
+`spot: sm` 引用已知标准 spot，不是引用整条 lane。它只复用该 spot 的 Rf 和 marker 等点位事实，不继承 lane 参数。没有候选、候选不唯一或目标冲突都会报错。`unknown` 只能和 Rf 一起使用，例如 `spot: 0.42 unknown`。
 
-## 必填与默认值
-
-resolver 对普通 analysis 要求 `type_name` 和 `data`。当 `type_name` 为 `tlc` 时，只要求 `type_name`。TLC 默认值由 parser 设置：
-
-| 字段 | 默认值 |
-| --- | --- |
-| `plate` | `silica gel GF254` |
-| `visualization` | `UV 254 nm` |
-
-## TLC Lane 语法
-
-TLC lane 字段名必须匹配 `p\d+`。core 归一化器按字段数字顺序读取 lane。lane 文本用 `|` 分隔。第一个片段通常包含 lane label 和第一个 spot，其余片段为 spot、baseline 或 mess region。
+## NMR
 
 ```md
-p1: sm 0.62 | base
-p2: rxn 0.31 ^3(4) | mess(0.55) | sm 0.62 v1
-p3: product 0.30
+:::analysis #ana-nmr
+type: nmr
+ref: @sample-purified
+spectrum: 1H NMR (400 MHz, CDCl3)
+peak: 7.68-7.59 (m, 2H, ArCH)
+peak: 3.56 (tt, J = 9.1, 6.0 Hz, 1H, CH(C=O))
+artifact: @art-nmr
+:::
 ```
 
-lane label 支持 `sm`、`starting material`、`product`、`pd`、`int`、`intermediate`、`rxn`、`reaction` 和数字试验编号。未命中这些形态时归为 `custom`。
+`spectrum:` 提供谱图级元数据。`peak:` 使用常见文献格式：`化学位移或范围 (形状, 耦合常数?, 积分?, 归属?)`。缺省项保留为空；无法解析化学位移是 error。
 
-spot 项支持：
+## 色谱与质谱
 
-| 写法 | 说明 |
-| --- | --- |
-| `0.52` | Rf spot |
-| `0.52 ^3(4)` | 上箭头形状，size rank 3，intensity rank 4 |
-| `0.31 v2` | 下箭头形状，size rank 2 |
-| `base` | lane 含 baseline spot |
-| `none` | lane 无 spot |
-| `mess`、`mess(0.45)` | 拖尾或混乱区域 |
+```md
+:::analysis #ana-lcms
+type: lcms
+method: @lcms-esi-pos
+peak: 6.4 min (97 %, product)
+ion: m/z 124.1 ([M+H]+, product)
+:::
+```
 
-rank 值会限制在 1 到 5。无法识别的 spot 项不会进入 normalized TLC 输出。
+HPLC/UPLC/GC 的 `peak:` 使用 `retention-time (area %, component)`。LCMS 和 GCMS 可同时写 `peak:` 与 `ion:`。MS/HRMS 使用 `ion:`。LCMS 只有 peak 没有 ion 会报错，因为会丢失质谱含义。
 
 ## 诊断
 
 | 诊断码 | 条件 |
 | --- | --- |
-| `E_INVALID_ID` | 块 ID 非法 |
-| `W_UNKNOWN_FIELD` | 非允许字段且不匹配 `p\d+` |
-| `E_MISSING_REQUIRED_FIELD` | 普通 analysis 缺少 `type_name` 或 `data` |
-
-## 推荐实践案例
-
-TLC 分析应把 lane、展开剂、目标和结论写清楚。`ref` 保存分析目标，`result` 保存结果关联。
-
-```md
-:::analysis #ana-tlc-main
-type: tlc
-ref: rxn-main
-result: res-main
-time: 3 h
-eluent: petroleum ether/ethyl acetate 5:1
-p1: substrate standard, Rf 0.62
-p2: reaction mixture, product Rf 0.31, substrate absent
-data: TLC indicates full conversion to product
-notes: visualization under UV 254 nm
-:::
-```
-
-NMR 等通用分析应显式提供 `data`。
-
-```md
-:::analysis #ana-nmr-product
-type: nmr
-ref: sample-product
-instrument: Bruker 400
-solvent: CDCl3
-frequency: 400 MHz
-data: 1H NMR matches expected aromatic pattern
-:::
-```
+| `E_TLC_LANE_REQUIRED` | `spot`、`mess`、`base` 或 `none` 出现在 `lane` 之前 |
+| `E_TLC_LABEL_UNKNOWN` | TLC lane 或 spot label 不是 role 或引用 |
+| `E_TLC_SPOT_REFERENCE` | label-only spot 无法解析到唯一标准 spot |
+| `E_TLC_UNKNOWN_REFERENCE` | `spot: unknown` 没有 Rf，也没有确定身份 |
+| `E_TLC_SPOT_LABEL_REQUIRED` | 混合或自定义 lane 的 spot 缺少 label |
+| `E_ANALYSIS_FIELD_FOR_TYPE` | 字段不适用于当前 analysis type |
+| `E_ANALYSIS_SPECTRUM_CONFLICT` | NMR spectrum 与显式字段冲突 |
+| `E_ANALYSIS_PEAK_SYNTAX` | peak 缺少必要化学位移或保留时间 |
+| `E_ANALYSIS_ION_REQUIRED` | LCMS peak 缺少 ion |
+| `E_ANALYSIS_ION_SYNTAX` | ion 缺少 m/z |

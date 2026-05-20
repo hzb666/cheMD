@@ -52,22 +52,23 @@ The primary reaction used @reaction.solvent and gave @result.yield.
 | --- | --- | --- | --- |
 | `ref` | reaction association | `:::result` | 当 `reaction` 缺省时，作为 reaction link 处理。 |
 | `reaction` | reaction association | `:::result` | 显式 reaction link；需要关系清晰时推荐使用。 |
-| `ref` | attempt reaction | `:::condition-varies` 的 `varN` | 在 attempt 片段中等价于 `reaction`。 |
-| 第一个裸 segment | attempt reaction | `:::condition-varies` 的 `varN` | `var1: rxn-a | solvent=MeCN` 会把 `var1` 关联到 `rxn-a`。 |
-| `res` | attempt result | `:::condition-varies` 的 `varN` | 在 attempt 片段中等价于 `result`。 |
-| `resN` | attempt result | `:::condition-varies` 顶层字段 | `res1` 会把 result 关联到 `var1`。 |
-| `note` / `notes` | attempt note | `:::condition-varies` 的 `varN` | 两种写法都会写入 attempt note。 |
-| `noteN` | attempt note | `:::condition-varies` 顶层字段 | `note1` 会把 note 关联到 `var1`。 |
-| `full` / `replace` | `override` mode | `:::condition-varies` 的 `varN` | 这些 mode 值会归一化为 override 行为。 |
+| `note` / `notes` | attempt note | `:::condition-varies` attempt section | 两种写法都会写入当前 attempt note。 |
+| `attempt:` 后第一个 segment | attempt ID | `:::condition-varies` | `attempt: mecn-40` 开启 attempt `mecn-40`。 |
 
 ```md
 :::condition-varies #screen-main
 standard: rxn-standard
-condition: solvent=MeCN | temperature=40 C
-var1: rxn-var1 | solvent=DMF | res=res-var1 | note=cleaner profile
-res2: res-var2
-note2: trace product by TLC
-var2: reaction=rxn-var2 | mode=replace | temperature=60 C
+factor: solvent | baseline=MeCN
+factor: temperature | baseline=40 C
+outcome: yield | baseline=68 %
+
+attempt: dmf-60
+reaction: rxn-var1
+result: res-var1
+solvent: DMF
+temperature: 60 C
+yield: 72 %
+note: cleaner profile
 :::
 ```
 

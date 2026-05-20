@@ -46,17 +46,17 @@ Default list fields are `reactants`, `products`, `reactant`, `product`, `reac`, 
 - `:::material` fields: `molecule`, `supplier`, `lot`, `purity`, `density`, `storage`, `notes`, and `chemistry_features`.
 - `:::batch` fields: `source`, `molecule`, `state`, `mass`, `purity`, `artifacts`, `notes`, and `chemistry_features`.
 - `:::result` fields: `status`, `yield`, `conversion`, `selectivity`, `isolated_mass`, `product_state`, `purity`, `notes`, `ref`, `reaction`, and `product`.
-- `:::analysis` fields: `type`, `ref`, `time`, `eluent`, `plate`, `visualization`, `result`, `instrument`, `solvent`, `frequency`, `method`, `data`, `notes`, and `p1` through `pN`.
+- `:::analysis` fields: `type`, `ref`, `time`, `eluent`, `plate`, `visualization`, `result`, `instrument`, `solvent`, `frequency`, `method`, `data`, `notes`, `artifact`, `artifacts`, `spectrum`, `lane`, `spot`, `mess`, `base`, `none`, `peak`, and `ion`.
 - `:::sample` fields: `name`, `sample_id`, `batch`, `purity`, `supplier`, `notes`, `ref`, `derived_from`, `aliquot_of`, `batch_of`, `artifacts`, and `chemistry_features`.
 - `:::artifact` fields: `kind`, `ref`, `path`, `checksum`, `instrument`, `notes`, and `chemistry_features`.
-- `:::condition-varies` fields: `reaction`, `standard`, `condition`, `varies`, `varN`, `resN`, `noteN`, and `notes`.
+- `:::condition-varies` fields: `reaction`, `standard`, `condition`, `varies`, `factor`, `outcome`, `attempt`, `result`, `note`, `notes`, and declared attempt fields.
 - `:::procedure` fields: `ref`, `reaction`, and `evidence`, with `step:` lines and nested `:::step` blocks.
 - `:::observation` fields: `ref`, with `event:` lines and nested `:::event` blocks.
 - `:::col` syntax: column count comes from the header argument, such as `:::col-2` or `:::col 2`; children are written as `col:` lines, and each child can contain Markdown or braced structured content.
 
 ## Resolver and Typechecker Features
 
-The resolver builds an object index, checks duplicate IDs, resolves inline references, resolves primary aliases, expands templates, and validates required fields. Required fields are material `molecule`, batch `source`, analysis `type_name` and `data`, sample `name`, and artifact `kind` and `path`. Molecule identity and reaction participant presence are enforced by the typechecker. TLC analysis only requires `type_name`.
+The resolver builds an object index, checks duplicate IDs, resolves inline references, resolves primary aliases, expands templates, and validates required fields. Required fields are material `molecule`, batch `source`, analysis `type_name`, sample `name`, and artifact `kind` and `path`. Molecule identity and reaction participant presence are enforced by the typechecker.
 
 The typechecker builds the typed semantic graph, step graph, quantity normalization, typed reference checks, result relationship checks, sample relationship checks, reaction route checks, reaction participant stoichiometry checks, and observation event link checks. Quantity units cover amount, mass, volume, temperature, time, pressure, concentration, equivalent, percent, rate, rpm, and pH. Percent values outside 0 to 100 produce `E402`; unparseable quantities and compact number-unit syntax produce `E403`; non-canonical unit casing produces `W_QUANTITY_UNIT_CASING`.
 

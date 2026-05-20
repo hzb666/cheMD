@@ -90,9 +90,9 @@ type: uv-vis
     });
     expect(extensionAnalysis).toMatchObject({
       analysisType: {
-        kind: "extension",
+        kind: "known",
         raw: "uv-vis",
-        value: "uv-vis"
+        value: "uv"
       }
     });
   });

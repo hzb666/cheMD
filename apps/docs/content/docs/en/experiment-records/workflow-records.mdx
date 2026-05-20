@@ -88,24 +88,40 @@ This structure supports graph export and route aggregation. Users declare upstre
 ```md
 :::condition-varies #cv-screen
 standard: rxn-standard
-condition: solvent=THF | temperature=25 C | catalyst=Pd(PPh3)4
-varies: solvent | temperature | catalyst
-var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
-res1: res-var1
-note1: Higher conversion with the baseline catalyst.
-var2: reaction=rxn-var2 | mode=override | solvent=DMF | temperature=60 C | catalyst=Pd(dppf)Cl2
-res2: res-var2
-note2: Full override lowers conversion and purity.
+factor: solvent | baseline=THF
+factor: temperature | baseline=25 C
+factor: catalyst | baseline=Pd(PPh3)4
+outcome: conversion | baseline=82 %
+outcome: purity | baseline=91 %
+
+attempt: var1
+reaction: rxn-var1
+result: res-var1
+solvent: MeCN
+temperature: 40 C
+conversion: 90 %
+purity: 94 %
+note: Higher conversion with the baseline catalyst.
+
+attempt: var2
+reaction: rxn-var2
+result: res-var2
+solvent: DMF
+temperature: 60 C
+catalyst: Pd(dppf)Cl2
+conversion: 60 %
+purity: 80 %
+note: Full condition replacement lowers conversion and purity.
 :::
 ```
 
 Parsing rules:
 
-- `condition` becomes baseline variables.
-- `varN` becomes an attempt.
-- `resN` and `noteN` bind to the attempt with the same number.
-- `mode=override` marks the attempt as a full condition override.
-- Attempts without override inherit unchanged baseline conditions.
+- `factor` declares baseline variables.
+- `outcome` declares measured values that every attempt must provide.
+- `attempt` opens a section and owns following factor/outcome fields.
+- `result` and `note` bind to the current attempt.
+- Missing factor values inherit the factor baseline.
 
 ## Procedure Steps
 

@@ -58,12 +58,11 @@ Resolver required fields:
 | --- | --- |
 | molecule | `smiles` |
 | reaction | `reactants`, `products` |
-| analysis | `type_name`, `data` |
-| TLC analysis | `type_name` |
+| analysis | `type_name` |
 | sample | `name` |
 | artifact | `kind`, `path` |
 
-The analysis `type` field is stored as `type_name` in the AST. TLC analysis receives parser defaults for `plate` and `visualization`, and the resolver relaxes the `data` requirement for TLC.
+The analysis `type` field is stored as `type_name` in the AST. TLC analysis receives parser defaults for `plate` and `visualization`.
 
 ## Template Parameter Errors
 

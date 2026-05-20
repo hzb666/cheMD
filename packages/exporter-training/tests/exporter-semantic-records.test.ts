@@ -85,6 +85,56 @@ name: ethanol
     expect(record.semantic_layer.molecules[0]).not.toMatchObject({ smiles: "64-17-5" });
   });
 
+  it("exports structured condition outcomes and analysis measurements", () => {
+    const document = resolveChemd(parseChemd(`---
+id: exp-structured-analysis-export
+title: Structured analysis export
+date: 2026-05-20
+---
+
+:::result #res-var1
+yield: 72 %
+:::
+
+:::condition-varies #cv-screen
+factor: solvent | baseline=THF
+outcome: yield | baseline=68 %
+attempt: var1
+result: @res-var1
+solvent: MeCN
+yield: 72 %
+:::
+
+:::analysis #ana-lcms
+type: lcms
+peak: 6.4 min (97 %, product)
+ion: m/z 124.1 ([M+H]+, product)
+:::
+`));
+    const checked = typecheckDocument(document);
+    const record = exportTrainingRecordFromDocument(document, {
+      stepGraph: checked.stepGraph,
+      typedGraph: checked.typedGraph,
+      exportedAt: "2026-05-20T00:00:00.000Z"
+    });
+
+    expect(record.semantic_layer.condition_variations[0]).toMatchObject({
+      factors: [expect.objectContaining({ field: "solvent", baseline_raw: "THF" })],
+      outcomes: [expect.objectContaining({ field: "yield", baseline_raw: "68 %" })]
+    });
+    expect(record.semantic_layer.condition_variation_attempts[0]).toMatchObject({
+      factors: { solvent: "MeCN" },
+      outcomes: { yield: "72 %" }
+    });
+    expect(record.semantic_layer.analyses[0]).toMatchObject({
+      normalized_analysis: expect.objectContaining({ kind: "lcms" }),
+      parsed_measurements: expect.arrayContaining([
+        expect.objectContaining({ measurement_type: "retention_time", value: 6.4 }),
+        expect.objectContaining({ measurement_type: "mz", value: 124.1 })
+      ])
+    });
+  });
+
   it("exports material, batch, and structured reaction participant links", () => {
     const document = resolveChemd(parseChemd(`---
 id: exp-export-material-batch

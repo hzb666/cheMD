@@ -115,18 +115,22 @@ time: 2 h
 eluent: PE/EA = 4:1
 result: one major product spot with trace starting material
 data: TLC plate after 2 h.
-p1: sm 0.78
-p2: crude 0.52 | sm-trace(0.79)
-p3: product-std 0.50
+lane: sm
+spot: 0.78 starting_material
+lane: rxn
+spot: 0.52 product
+spot: 0.79 starting_material
+lane: prod
+spot: 0.50 product
 :::
 ```
 
-Fields: `type`, `ref`, `time`, `eluent`, `plate`, `visualization`, `result`, `instrument`, `solvent`, `frequency`, `method`, `data`, `notes`, plus TLC lane fields such as `p1` and `p2`.
+Fields: `type`, `ref`, `time`, `eluent`, `plate`, `visualization`, `result`, `instrument`, `solvent`, `frequency`, `method`, `data`, `notes`, `artifact`, `artifacts`, `spectrum`, `lane`, `spot`, `mess`, `base`, `none`, `peak`, and `ion`.
 
 Resolver required-field validation:
 
-- A general analysis requires `type` and `data`.
-- A TLC analysis requires `type`; `plate` and `visualization` can be supplied by defaults.
+- An analysis requires `type`.
+- A TLC analysis can receive `plate` and `visualization` from defaults.
 
 ## `:::sample`
 

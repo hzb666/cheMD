@@ -22,6 +22,13 @@ The following reference lists common diagnostics by source and purpose. Use it t
 | `W_UNKNOWN_FIELD` | Field is outside the allowed set for the block |
 | `E_INVALID_LIST_ITEM` | List field contains an empty item |
 | `W_UNSAFE_LINK_HREF` | Markdown link href fails the safe-href policy |
+| `E_TLC_LANE_REQUIRED` | TLC lane item appears before a `lane:` line |
+| `E_CONDITION_DSL_FIELD` | Condition screen contains an invalid section field |
+| `E_CONDITION_DSL_ORDER` | Condition screen declarations appear after attempts |
+| `E_CONDITION_ATTEMPT_ID` | Condition screen attempt ID is missing or duplicated |
+| `E_CONDITION_DSL_DECLARATION` | Condition screen factor/outcome declaration is invalid |
+| `E_CONDITION_ATTEMPT_DUPLICATE_FIELD` | Attempt repeats a declared factor or outcome field |
+| `E_CONDITION_ATTEMPT_UNKNOWN_FIELD` | Attempt field was not declared as a factor or outcome |
 
 ## `:::chemd`
 
@@ -65,6 +72,18 @@ The following reference lists common diagnostics by source and purpose. Use it t
 | `E_STOICHIOMETRY_LIMITING` | Limiting reactant rules are violated |
 | `E_STOICHIOMETRY_QUANTITY_MISSING` | Stoichiometric participant is missing amount or equivalent |
 | `E_RESULT_REACTION_CONFLICT` | Result conflicts with linked reaction fields |
+| `E_TLC_LABEL_UNKNOWN` | TLC spot or lane label is not a supported built-in label |
+| `E_TLC_SPOT_REFERENCE` | TLC spot reference cannot be resolved uniquely |
+| `E_TLC_UNKNOWN_REFERENCE` | TLC `unknown` reference cannot resolve to a known spot |
+| `E_TLC_SPOT_LABEL_REQUIRED` | Mixed TLC lane contains an unlabeled spot |
+| `E_ANALYSIS_FIELD_FOR_TYPE` | Analysis field is incompatible with the declared analysis type |
+| `E_ANALYSIS_PEAK_SYNTAX` | Analysis peak cannot be parsed for the declared analysis type |
+| `E_ANALYSIS_SPECTRUM_CONFLICT` | NMR spectrum metadata conflicts with explicit fields |
+| `E_ANALYSIS_ION_REQUIRED` | LCMS/GCMS analysis has peaks but no ion data |
+| `E_ANALYSIS_ION_SYNTAX` | MS ion line lacks an m/z value |
+| `E_CONDITION_OUTCOME_MISSING` | Attempt is missing a declared outcome |
+| `E_CONDITION_BASELINE_CONFLICT` | Declared outcome baseline conflicts with standard result |
+| `E_CONDITION_OUTCOME_CONFLICT` | Attempt outcome conflicts with linked result |
 | `E_DERIVED_EXPRESSION_INVALID` | Invalid derived expression |
 | `W_REACTION_ROUTE_MISMATCH` | Previous reaction route mismatch |
 | `E_REACTION_ROUTE_CYCLE` | Reaction route cycle |

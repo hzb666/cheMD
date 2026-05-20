@@ -101,7 +101,7 @@ When `rxn-missing` does not exist, the resolver emits `E_INVALID_PRIMARY_REFEREN
 
 ## Required Field Validation
 
-Current resolver-required fields are material `molecule`, batch `source`, generic analysis `type_name` and `data`, TLC analysis `type_name`, sample `name`, and artifact `kind` plus `path`. Molecule identity and reaction participant presence are typechecker rules.
+Current resolver-required fields are material `molecule`, batch `source`, analysis `type_name`, sample `name`, and artifact `kind` plus `path`. Molecule identity and reaction participant presence are typechecker rules.
 
 ```md
 :::chemd #mol-missing-identity
@@ -118,7 +118,7 @@ kind: nmr
 :::
 ```
 
-These blocks are syntactically accepted by the parser. Missing analysis and artifact fields are reported by the resolver; missing molecule identity and reaction participants are reported by the typechecker. TLC analysis only requires `type`; other analysis blocks also require `data`.
+These blocks are syntactically accepted by the parser. Missing analysis and artifact fields are reported by the resolver; missing molecule identity and reaction participants are reported by the typechecker. Analysis blocks require `type`.
 
 ## Template Index and Expansion
 

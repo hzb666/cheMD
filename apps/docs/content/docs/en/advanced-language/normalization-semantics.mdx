@@ -57,8 +57,14 @@ Analysis `type` is stored in the AST as `type_name`. The typechecker recognizes 
 | `tlc` | `tlc` |
 | `nmr` | `nmr` |
 | `hplc` | `hplc` |
+| `uplc` | `uplc` |
+| `gc` | `gc` |
 | `lcms`, `lc-ms` | `lcms` |
 | `gcms`, `gc-ms` | `gcms` |
+| `ms` | `ms` |
+| `hrms` | `hrms` |
+| `ir` | `ir` |
+| `uv`, `uv-vis` | `uv` |
 
 Values outside this alias set are preserved as extensions, allowing project-specific analytical methods.
 
@@ -78,7 +84,7 @@ Other values are preserved as extensions without diagnostics.
 
 ## TLC Lane
 
-TLC normalization reads fields such as `p1`, `p2`, and `p3` in numeric order. Lane text is split by `|` into a lane label and spot items.
+TLC normalization reads explicit `lane:` sections in source order. Each lane can contain `spot:`, `mess:`, `base:`, or `none` lines.
 
 Supported lane labels:
 
@@ -89,20 +95,22 @@ Supported lane labels:
 | `int`, `intermediate` | `intermediate` |
 | `rxn`, `reaction` | `reaction` |
 | number | `trial` |
-| other | `custom` |
+| `blank` | `blank` |
+| `unknown` | `unknown` |
 
 Supported spots and regions:
 
 | Syntax | Semantics |
 | --- | --- |
-| `0.52` | Rf spot |
+| `spot: 0.52 starting_material` | Rf spot with a known label |
 | `0.52 ^3(4)` | up shape, size rank 3, intensity rank 4 |
 | `0.31 v2` | down shape, size rank 2 |
-| `base` | lane has a baseline spot |
+| `spot: sm` | reference to a unique known spot |
+| `base: 0.52 product` | lane has a baseline spot |
 | `none` | lane has no spots |
-| `mess`, `mess(0.45)` | tailing or messy region |
+| `mess: 0.45` | tailing or messy region |
 
-Rank values are clamped to 1 through 5. Unrecognized spot items are ignored.
+Rank values are clamped to 1 through 5. Unknown labels, ambiguous references, and mixed lanes with unlabeled spots are errors.
 
 ```md
 :::analysis #ana-tlc
@@ -110,9 +118,15 @@ type: tlc
 ref: rxn-main
 time: 2 h
 eluent: petroleum ether/ethyl acetate 5:1
-p1: sm 0.62 | base
-p2: rxn 0.31 ^3(4) | mess(0.55) | sm 0.62 v1
-p3: product 0.30
+lane: sm
+spot: 0.62 starting_material
+base: 0.62 starting_material
+lane: rxn
+spot: sm
+spot: 0.31 ^3(4) product
+mess: 0.55
+lane: prod
+spot: 0.30 product
 :::
 ```
 

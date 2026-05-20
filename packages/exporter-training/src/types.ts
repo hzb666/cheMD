@@ -1,4 +1,4 @@
-import type { NormalizedTlcAnalysis, SourceSpan } from "@chemd/core";
+import type { NormalizedAnalysis, NormalizedTlcAnalysis, SourceSpan } from "@chemd/core";
 import type { ChemdLnf } from "@chemd/lnf";
 import type { CanonicalStepNode, ObservationEventNode } from "@chemd/step-ontology";
 
@@ -292,6 +292,8 @@ export interface ExportedAnalysisV1 extends ExportedEntityBase {
   method?: string;
   data_raw?: string;
   notes?: string;
+  artifact_refs_raw?: string[];
+  normalized_analysis?: NormalizedAnalysis | null;
   normalized_tlc?: NormalizedTlcAnalysis | null;
   parsed_measurements?: ParsedMeasurementV1[];
   text_for_embedding?: string;
@@ -349,6 +351,8 @@ export interface ExportedConditionVariationAttemptV1 extends ExportedEntityBase 
   mode?: ExportedConditionVariationAttemptModeV1;
   reaction_ref_raw?: string;
   result_ref_raw?: string;
+  factors?: Record<string, string>;
+  outcomes?: Record<string, string>;
   condition: ExportedConditionVariationDeltaV1[];
   changes: ExportedConditionVariationDeltaV1[];
   note?: string;
@@ -359,6 +363,8 @@ export interface ExportedConditionVaryV1 extends ExportedEntityBase {
   source_node_type: "condition_varies";
   reaction_ref_raw?: string;
   standard_ref_raw?: string;
+  factors?: ExportedConditionVariationVariableV1[];
+  outcomes?: ExportedConditionVariationVariableV1[];
   condition?: ExportedConditionVariationVariableV1[];
   vary_fields?: string[];
   changes: ExportedConditionVariationDeltaV1[];
