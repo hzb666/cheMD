@@ -422,7 +422,17 @@ Validation:
 
 ### Main Changes
 
-(Add details)
+- Implemented the current Chemd experiment language contract across parser,
+  typechecker, compiler assistance, CLI diagnostics, semantic rendering,
+  language service, LNF, workspace diagnostics, and training export.
+- Updated app/docs user manuals in English and Chinese with examples for
+  `material`, `batch`, `reac`/`prod`, inferred `kind`, participant
+  quantities, temperature programs, `condition-varies`, TLC, NMR,
+  HPLC/LCMS, `trace`, and procedure control flow including `until`.
+- Updated developer docs for parser/compiler/resolver/package behavior.
+- Renamed public diagnostic repair docs to diagnostic fix docs and removed
+  old repair/legacy/compatibility public wording.
+- Removed legacy block quick-fix surfaces from the language layer.
 
 ### Git Commits
 
@@ -432,7 +442,17 @@ Validation:
 
 ### Testing
 
-- [OK] (Add test results)
+- [OK] `pnpm typecheck` passed across 27 packages.
+- [OK] `pnpm test` passed across turbo package tests, script tests, and
+  Python service tests.
+- [OK] `pnpm --filter @chemd/docs typecheck` passed.
+- [OK] `pnpm --filter @chemd/language-service test` passed.
+- [OK] `pnpm --filter @chemd/language-service typecheck` passed.
+- [OK] `pnpm --filter @chemd/semantic-rendering test` passed.
+- [OK] `pnpm --filter @chemd/desktop typecheck` passed.
+- [OK] `git diff --check` passed with line-ending warnings only.
+- [WARN] `pnpm lint` is blocked by ESLint 10 runtime error
+  `scopeManager.addGlobals is not a function` before file diagnostics.
 
 ### Status
 
