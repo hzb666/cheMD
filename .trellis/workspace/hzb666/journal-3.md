@@ -1088,3 +1088,37 @@ Completed a desktop workspace performance slice: moved workspace IO behind block
 ### Next Steps
 
 - None - task complete
+
+
+## Session 115: Language contract and schema registry
+
+**Date**: 2026-05-20
+**Task**: Language contract and schema registry
+**Package**: core
+**Branch**: `trellis/language-contract-p0`
+
+### Summary
+
+Stage 1 implemented the current language contract, schema registry, kind inference policy, CLI check command, conformance fixtures, docs sync, and validation updates.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `91b9884` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
