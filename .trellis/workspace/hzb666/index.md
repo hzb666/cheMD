@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-3.md`
-- **Total Sessions**: 115
+- **Total Sessions**: 116
 - **Last Active**: 2026-05-20
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-3.md` | ~1124 | Active |
+| `journal-3.md` | ~1158 | Active |
 | `journal-2.md` | ~1956 | Archived |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
@@ -31,6 +31,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 116 | 2026-05-20 | Quantity material reaction semantics | `795f477` | `trellis/language-contract-p0` |
 | 115 | 2026-05-20 | Language contract and schema registry | `91b9884` | `trellis/language-contract-p0` |
 | 114 | 2026-05-18 | Desktop workspace explorer and IDE surface polish | `3f8de85d540785ac21ae1212d621e4e500ab2048` | `develop` |
 | 113 | 2026-05-17 | Regression review and test hardening | `2ceb3fe77f` | `develop` |

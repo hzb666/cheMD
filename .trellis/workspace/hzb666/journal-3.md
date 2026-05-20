@@ -1122,3 +1122,37 @@ Stage 1 implemented the current language contract, schema registry, kind inferen
 ### Next Steps
 
 - None - task complete
+
+
+## Session 116: Quantity material reaction semantics
+
+**Date**: 2026-05-20
+**Task**: Quantity material reaction semantics
+**Package**: typechecker
+**Branch**: `trellis/language-contract-p0`
+
+### Summary
+
+Implemented quantity v2, material/batch nodes, reaction participant stoichiometry, diagnostics, docs, fixtures, and exporter/language-service propagation for plan sections 5.1-5.3.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `795f477` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
