@@ -1,6 +1,6 @@
 ---
 title: Compiler and Export Pipeline
-description: Compiler package dependencies, entrypoints, fixtures, repair, and input-assistance support.
+description: Compiler package dependencies, entrypoints, fixtures, safe-fix loop, and input-assistance support.
 ---
 
 Compiler implementation lives in `packages/compiler`. Entrypoints include `packages/compiler/src/index.ts` and Node-specific entrypoint `packages/compiler/src/node.ts`.
@@ -49,9 +49,8 @@ Related source files include:
 - `authoring-minimal-sets.ts`
 - `authoring-templates.ts`
 - `quick-fix.ts`
-- `repair-loop.ts`
 
-These files carry diagnostics, template suggestions, quick fixes, and repair loop capabilities.
+These files carry diagnostics, template suggestions, quick fixes, and the internal safe-fix loop implementation.
 
 ## Compile Pipeline Order
 
@@ -59,15 +58,28 @@ These files carry diagnostics, template suggestions, quick fixes, and repair loo
 
 `CompileResult` exposes document, diagnostics, renderOptions, renderAdapterPayload, typedSemanticGraph, stepGraph, runPlan, runtimePreflight, lnf, ragExport, trainingUnderstanding, trainingExport, authoringAssistance, diagnosis, html, json, and docxBridge.
 
-## Diagnostics and Repair Entrypoints
+## Diagnostics and Safe-Fix Entrypoints
 
-`buildCompilerDiagnosis` partitions diagnostics into safe fixes, required inputs, and manual review items, then provides next actions. `applyCompilerDiagnosisSafeFixes` applies safe fixes in order. `runChemdRepairLoop` repeats local compilation and safe-fix application. `runChemdAgentLoop` calls an external agent driver after the repair loop.
+`buildCompilerDiagnosis` partitions diagnostics into safe fixes, required inputs, and manual review items, then provides next actions. `applyCompilerDiagnosisSafeFixes` applies safe fixes in order. The public CLI surface is `chemd fix`; internally, the safe-fix implementation repeats local compilation and safe-fix application before `runChemdAgentLoop` calls an external agent driver.
 
 ```bash
-pnpm chemd repair draft.chemd --format json
-pnpm chemd repair draft.chemd --write
+pnpm chemd fix draft.chemd --format json
+pnpm chemd fix draft.chemd --write
 ```
 
 ## Export Entrypoints
 
 HTML comes from `@chemd/renderer-html`. JSON comes from `@chemd/renderer-json` and includes the typed graph. DOCX bridge comes from `@chemd/renderer-docx` and receives the render adapter payload. Training, RAG, and graph index exports come from `@chemd/exporter-training`.
+
+## Current Language Semantics
+
+Compiler-facing tests and fixtures should cover these language surfaces together:
+
+- `:::chemd` kind inference, `mol` / `reac` aliases, structured `reactant` / `product` participants, and optional `rxn_smiles` inference from participant molecules.
+- `:::material` and `:::batch` objects as physical inventory/batch layers referenced by reaction participants.
+- `:::analysis` TLC lane/spot shorthand, label-only spot references, NMR `spectrum` / `peak` lines, MS `peak` / `ion` lines, and artifact references.
+- `:::condition-varies` factor/outcome/attempt sections with declared baselines and per-attempt outcome values.
+- `:::procedure` explicit steps plus control-flow lines and brace blocks: `repeat`, `until`, `branch`, `parallel`, `case`, `default`, `path`, `wait`, and `abort_if`.
+- `:::trace` authored runtime events and governance diagnostics that block sanitized non-audit training projections when required.
+
+When a compiler result changes, inspect both user-facing exports and developer-facing semantic structures: diagnostics, typed semantic graph, step graph, run plan, LNF, RAG export, training understanding, and language-service consumers.

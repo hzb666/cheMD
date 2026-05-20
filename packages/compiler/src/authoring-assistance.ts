@@ -14,8 +14,6 @@ import type {
 
 const CONDITION_FIELDS = ["solvent", "temperature", "catalyst", "time", "atmosphere"] as const;
 
-const uniqueStrings = (values: string[]): string[] => Array.from(new Set(values.filter(Boolean)));
-
 const hasMetaValue = (document: ChemdDocument, field: string): boolean =>
   typeof document.meta[field] === "string" && document.meta[field].trim().length > 0;
 
@@ -66,31 +64,22 @@ const createDocumentSuggestion = (input: {
   }
 });
 
-const buildReactionBaselineLine = (
+const buildReactionBaselineLines = (
   semanticLayer: ChemdTrainingExportV2["semantic_layer"],
   standardId: string | undefined
-): string | undefined => {
-  const reaction = semanticLayer.reactions.find((item) => item.original_id === standardId);
+): string[] => {
+  const normalizedStandardId = normalizeRef(standardId);
+  const reaction = semanticLayer.reactions.find((item) => item.original_id === normalizedStandardId);
   if (!reaction) {
-    return undefined;
+    return [];
   }
 
-  const fields = CONDITION_FIELDS.flatMap((field) => {
+  return CONDITION_FIELDS.flatMap((field) => {
     const rawValue = reaction[`${field}_raw` as keyof typeof reaction];
     return typeof rawValue === "string" && rawValue.trim()
-      ? [`${field}=${rawValue.trim()}`]
+      ? [`factor: ${field} | baseline=${rawValue.trim()}`]
       : [];
   });
-
-  return fields.length > 0 ? `condition: ${fields.join(" | ")}` : undefined;
-};
-
-const buildVaryFieldsLine = (node: ConditionVariesNode): string | undefined => {
-  const fields = uniqueStrings((node.attempts ?? []).flatMap((attempt) =>
-    attempt.changes.map((change) => change.field)
-  ));
-
-  return fields.length > 0 ? `varies: ${fields.join(" | ")}` : undefined;
 };
 
 const getDocumentPrimaryReactionId = (document: ChemdDocument): string | undefined => {
@@ -347,13 +336,11 @@ const buildSingleConditionVariationSuggestions = (input: {
 }): AuthoringSuggestion[] => {
   const blockId = input.node.id;
   const inferredStandardId = inferConditionStandardId(input);
-  const baselineLine = buildReactionBaselineLine(input.semanticLayer, input.node.standard);
-  const varyFieldsLine = buildVaryFieldsLine(input.node);
+  const baselineLines = buildReactionBaselineLines(input.semanticLayer, input.node.standard);
 
   return [
     createConditionStandardSuggestion(input.node, inferredStandardId),
-    createConditionBaselineSuggestion(input.node, baselineLine),
-    createConditionVariesSuggestion(input.node, varyFieldsLine),
+    createConditionBaselineSuggestion(input.node, baselineLines),
     ...buildAttemptResultSuggestions(input.semanticLayer, blockId)
   ].filter((value): value is AuthoringSuggestion => Boolean(value));
 };
@@ -364,7 +351,7 @@ const inferConditionStandardId = (input: {
   reactionIds: string[];
 }): string | undefined => {
   const attemptReactionIds = new Set((input.node.attempts ?? []).flatMap((attempt) =>
-    attempt.reaction ? [attempt.reaction] : []
+    normalizeRef(attempt.reaction) ? [normalizeRef(attempt.reaction) as string] : []
   ));
   const unusedReactionIds = input.reactionIds.filter((reactionId) => !attemptReactionIds.has(reactionId));
 
@@ -386,7 +373,7 @@ const createConditionStandardSuggestion = (
         patch: {
           kind: "insert_field_line",
           blockId: node.id,
-          line: `standard: ${inferredStandardId}`
+          line: `standard: @${inferredStandardId}`
         },
         category: "inheritance"
       })
@@ -394,41 +381,24 @@ const createConditionStandardSuggestion = (
 
 const createConditionBaselineSuggestion = (
   node: ConditionVariesNode,
-  baselineLine: string | undefined
+  baselineLines: string[]
 ): AuthoringSuggestion | null =>
-  !node.condition?.length && baselineLine && node.id
+  !node.factors?.length && baselineLines.length > 0 && node.id
     ? createSuggestion({
         suggestion_id: `suggest-condition-baseline-${node.id}`,
-        title: `为 ${node.id} 补 condition baseline`,
-        description: "从 standard reaction 的已写条件生成一行 baseline 继承声明。",
+        title: `为 ${node.id} 补 factor baseline`,
+        description: "从 standard reaction 的已写条件生成 factor baseline 声明。",
         target_block_id: node.id,
         patch: {
-          kind: "insert_field_line",
-          blockId: node.id,
-          line: baselineLine,
-          anchorFields: ["standard", "reaction"]
+          kind: "batch",
+          patches: baselineLines.map((line) => ({
+            kind: "insert_field_line",
+            blockId: node.id as string,
+            line,
+            anchorFields: ["standard"]
+          }))
         },
         category: "inheritance"
-      })
-    : null;
-
-const createConditionVariesSuggestion = (
-  node: ConditionVariesNode,
-  varyFieldsLine: string | undefined
-): AuthoringSuggestion | null =>
-  !node.varyFields?.length && varyFieldsLine && node.id
-    ? createSuggestion({
-        suggestion_id: `suggest-condition-varies-${node.id}`,
-        title: `为 ${node.id} 补 varies`,
-        description: "从各 varN 的变化字段差分生成 varies 声明。",
-        target_block_id: node.id,
-        patch: {
-          kind: "insert_field_line",
-          blockId: node.id,
-          line: varyFieldsLine,
-          anchorFields: ["reaction", "standard", "condition"]
-        },
-        category: "structure"
       })
     : null;
 
@@ -455,8 +425,9 @@ const createAttemptResultSuggestion = (
     return [];
   }
 
+  const attemptReactionRef = normalizeRef(attempt.reaction_ref_raw);
   const matches = semanticLayer.results.filter((result) =>
-    (result.ref_raw ?? result.reaction_ref_raw) === attempt.reaction_ref_raw
+    normalizeRef(result.ref_raw ?? result.reaction_ref_raw) === attemptReactionRef
   );
   const resultId = matches.length === 1 ? matches[0]?.original_id : undefined;
 
@@ -464,13 +435,13 @@ const createAttemptResultSuggestion = (
     ? [createSuggestion({
         suggestion_id: `suggest-condition-result-${attempt.original_id}`,
         title: `为 ${attempt.original_id} 绑定结果`,
-        description: "该尝试的 reaction 已唯一匹配到一个 result，可补 resN。",
+        description: "该尝试的 reaction 已唯一匹配到一个 result，可补 result。",
         target_block_id: blockId,
         patch: {
           kind: "insert_field_line",
           blockId,
-          line: `res${attempt.attempt_id.replace(/^var/i, "")}: ${resultId}`,
-          anchorFields: [attempt.attempt_id]
+          line: `result: @${resultId}`,
+          anchorFields: ["attempt"]
         }
       })].filter((value): value is AuthoringSuggestion => Boolean(value))
     : [];

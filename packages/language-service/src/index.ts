@@ -5,12 +5,15 @@ export {
   getChemdReferenceCompletions
 } from "./completion-references";
 export {
-  getChemdDefinition
+  getChemdDefinition,
+  getChemdDefinitionResult
 } from "./definition";
 export type {
   ChemdDefinitionContext,
+  ChemdDefinitionDiagnostic,
   ChemdDefinitionLocation,
   ChemdDefinitionRequest,
+  ChemdDefinitionResult,
   ChemdDefinitionTarget
 } from "./definition";
 export {
@@ -19,6 +22,8 @@ export {
 export type {
   ChemdHoverContext,
   ChemdHoverDiagnostic,
+  ChemdHoverInteropStatus,
+  ChemdHoverQuantity,
   ChemdHoverReferenceTarget,
   ChemdHoverRequest,
   ChemdHoverResult,

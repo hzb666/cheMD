@@ -9,7 +9,7 @@ Resolver 实现位于 `packages/resolver/src/index.ts`。该包依赖 `@chemd/co
 
 ### Object index
 
-resolver 遍历 `document.children`，把带 ID 的对象节点加入索引。对象类型包括 molecule、reaction、result、analysis、procedure、observation、sample、artifact 和 condition-varies。
+resolver 遍历 `document.children`，把带 ID 的对象节点加入索引。对象类型包括 molecule、material、batch、reaction、result、analysis、procedure、trace、observation、sample、artifact 和 condition-varies。
 
 ### Duplicate ID
 
@@ -57,7 +57,7 @@ The result yield was @result.yield.
 
 :::use result-line
 result_ref: @res-main
-result: res-main
+result: @res-main
 :::
 ```
 
@@ -65,7 +65,7 @@ result: res-main
 
 ### Required fields
 
-resolver 校验 molecule、reaction、analysis、sample 和 artifact 的必填字段。
+resolver 校验 material、batch、analysis、sample 和 artifact 的必填字段。molecule identity 与 reaction participant 存在性由后续 typechecker 校验。
 
 ## 实现细节清单
 
@@ -73,6 +73,37 @@ resolver 的第一步是收集对象节点。对象来源包含顶层 children�
 
 引用解析覆盖 Markdown inline token 和结构化字段。`@meta.field` 从 `document.meta` 读取；`@param.field` 从模板调用参数读取；`@alias.field` 先通过 `PRIMARY_ALIAS_FIELDS` 找到 frontmatter 的 `primary_*`，再读取目标对象字段；`@id` 与 `@id.field` 通过对象索引读取。
 
+新的语言对象共用同一对象索引行为。reaction participant 可在 typechecker 中解析 material 和 batch ID；trace 的 `plan` 引用解析到 procedure；condition-varies attempt 引用会把已声明 attempt ID 暴露为类似字段的目标。
+
 模板展开分三步：构建 template index，校验 `:::use` 参数，替换模板 body 中的参数引用。限制包含最大深度 32 和最大展开节点数 2000。重复模板名、未知模板、缺少参数、类型不匹配、循环和展开超限均产生诊断。
 
 condition-varies attempt 具有特殊字段读取逻辑。`@cv-screen.mecn-40` 这类引用会先定位父级 condition-varies 对象，再在 `attempts` 中查找同名 attempt ID。
+
+对象索引示例：
+
+```md
+:::chemd #mol-a
+smiles: CCO
+:::
+
+:::material #mat-a
+molecule: @mol-a
+supplier: Sigma
+:::
+
+:::batch #batch-a
+source: @res-main
+molecule: @mol-a
+mass: 120 mg
+:::
+
+:::procedure #proc-main
+step: charge | id=s-charge | inputs=@mat-a
+:::
+
+:::trace #trace-main
+plan: @proc-main
+mode: human-run
+event: step_started | step=s-charge | at=2026-05-20T10:00:00Z
+:::
+```

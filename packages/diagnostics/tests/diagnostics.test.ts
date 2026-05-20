@@ -47,14 +47,6 @@ describe("v0.3 diagnostics registry", () => {
   });
 
   it("classifies chemd surface policy diagnostics and quick fixes", () => {
-    const legacyDiagnostic = createV03Diagnostic({
-      code: "W_LEGACY_BLOCK_KIND",
-      severity: "warning",
-      message: "Legacy molecule block should be migrated to chemd",
-      sourceLayer: "parser",
-      sourceNodeType: "molecule",
-      sourceNodeId: "legacy-mol"
-    });
     const missingKindDiagnostic = createV03Diagnostic({
       code: "W_CHEMD_KIND_AMBIGUOUS",
       severity: "error",
@@ -69,11 +61,6 @@ describe("v0.3 diagnostics registry", () => {
       defaultSeverity: "error"
     });
     expect(getDiagnosticSpec("E_CHEMD_KIND_CONFLICT")?.band).toBe("syntax");
-    expect(getLegacyDiagnosticBand("W_LEGACY_BLOCK_KIND")).toBe("syntax");
-    expect(buildQuickFixes(legacyDiagnostic)[0]).toMatchObject({
-      kind: "convert_legacy_block",
-      title: expect.stringContaining("chemd")
-    });
     expect(buildQuickFixes(missingKindDiagnostic)[0]).toMatchObject({
       kind: "insert_chemd_kind"
     });

@@ -45,6 +45,32 @@ Unit-bearing quantities require a space between value and unit. `78 %` and `1.0 
 | sample | `purity` | `percent` |
 | step params | `amount`, `mass`, `volume`, `temperature`, `target_temperature`, `duration`, `time`, `pressure`, `concentration`, `equivalent`, `equivalents`, `percent`, `rate`, `rpm`, `ph` | matching class |
 
+## Examples
+
+Reaction participants can omit `amount=` when the segment carries an amount unit. Equivalents can use `eq`, `equiv`, or `equiv=...`. The limiting reactant must provide both amount and equivalent.
+
+```md
+:::chemd #rxn-main
+reactant: @mat-substrate | 1.00 mmol | 1.0 eq | limiting=true
+reactant: @mol-base | equiv=1.2
+reac: @mol-catalyst | 0.05 eq
+product: @mol-product
+temperature: r.t. -> 80 C over 30 min
+pressure: 1 bar
+:::
+```
+
+Step parameters use the same parser. Rate and pH values are structured quantities, so they can participate in runtime preflight and typed graph output.
+
+```md
+:::procedure #proc-quantity
+step: add | id=s-add | reagent=@mat-base | volume=2.0 mL | rate=0.5 mL/min
+step: mix | id=s-stir | rpm=600 rpm | duration=30 min
+step: observe | id=s-ph | ph=pH 7.2
+step: heat | id=s-heat | temperature=r.t. -> 80 C over 30 min
+:::
+```
+
 ## Template Parameters
 
 `quantity<class>` uses the resolver unit set for shape validation. Unclassified `quantity` accepts any supported quantity unit.

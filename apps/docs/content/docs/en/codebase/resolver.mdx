@@ -9,7 +9,7 @@ Resolver implementation lives in `packages/resolver/src/index.ts`. The package d
 
 ### Object Index
 
-The resolver traverses `document.children` and adds ID-bearing object nodes to an index. Object types include molecule, reaction, result, analysis, procedure, observation, sample, artifact, and condition-varies.
+The resolver traverses `document.children` and adds ID-bearing object nodes to an index. Object types include molecule, material, batch, reaction, result, analysis, procedure, trace, observation, sample, artifact, and condition-varies.
 
 ### Duplicate ID
 
@@ -57,7 +57,7 @@ The result yield was @result.yield.
 
 :::use result-line
 result_ref: @res-main
-result: res-main
+result: @res-main
 :::
 ```
 
@@ -65,7 +65,7 @@ result: res-main
 
 ### Required Fields
 
-The resolver validates required fields for molecule, reaction, analysis, sample, and artifact nodes.
+The resolver validates required fields for material, batch, analysis, sample, and artifact nodes. Molecule identity and reaction participant presence are enforced later by the typechecker.
 
 ## Implementation Detail Inventory
 
@@ -73,6 +73,37 @@ The resolver first collects object nodes. Sources include top-level children, `c
 
 Reference resolution covers Markdown inline tokens and structured fields. `@meta.field` reads `document.meta`; `@param.field` reads template call parameters; `@alias.field` maps through `PRIMARY_ALIAS_FIELDS` to the matching frontmatter `primary_*` field, then reads the target object field; `@id` and `@id.field` read through the object index.
 
+Current object-index behavior is shared by new language objects. Reaction participants can resolve material and batch IDs later in the typechecker, trace `plan` references resolve to procedures, and condition-varies attempt references expose declared attempt IDs as field-like targets.
+
 Template expansion has three stages: build the template index, validate `:::use` arguments, and substitute parameter references in template body. Limits include maximum depth 32 and maximum expanded node count 2000. Duplicate template names, unknown templates, missing parameters, type mismatches, cycles, and expansion limits all produce diagnostics.
 
 Condition-varies attempts have specialized field access. References such as `@cv-screen.var1` locate the parent condition-varies object, then look up the attempt ID in `attempts`.
+
+Example index shape:
+
+```md
+:::chemd #mol-a
+smiles: CCO
+:::
+
+:::material #mat-a
+molecule: @mol-a
+supplier: Sigma
+:::
+
+:::batch #batch-a
+source: @res-main
+molecule: @mol-a
+mass: 120 mg
+:::
+
+:::procedure #proc-main
+step: charge | id=s-charge | inputs=@mat-a
+:::
+
+:::trace #trace-main
+plan: @proc-main
+mode: human-run
+event: step_started | step=s-charge | at=2026-05-20T10:00:00Z
+:::
+```

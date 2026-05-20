@@ -9,7 +9,7 @@ description: '`:::observation` records observation prose and can contain structu
 
 ```md
 :::observation #obs-main
-ref: rxn-main
+ref: @rxn-main
 event: color_change | id=e-color | color=deep red | linkedStep=s-add | confidence=0.8
 The mixture turned deep red after n-BuLi addition.
 :::
@@ -29,7 +29,7 @@ Events support inline `event:` syntax and nested `:::event` blocks. Explicit eve
 
 ```md
 :::observation #obs-workup
-ref: rxn-main
+ref: @rxn-main
 
 :::event #e-precipitate
 type: precipitation
@@ -62,7 +62,7 @@ Record structured changes as events and keep descriptive detail in prose.
 
 ```md
 :::observation #obs-main
-ref: rxn-main
+ref: @rxn-main
 event: color_change | id=e-color | stage=reaction | timepoint=after addition | color=orange | linkedStep=s-add | evidence=photo-1
 event: gas_evolution | id=e-gas | severity=low | linkedStep=s-quench
 Mixture became orange after addition. Mild bubbling occurred during quench.

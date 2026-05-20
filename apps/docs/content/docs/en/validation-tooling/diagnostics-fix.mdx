@@ -1,6 +1,6 @@
 ---
-title: Diagnostics and Repair Manual
-description: Frontmatter, structured block, reference, typecheck, template, input assistance, and repair loop diagnostics.
+title: Diagnostics and Fix Manual
+description: Frontmatter, structured block, reference, typecheck, template, input assistance, and safe-fix loop diagnostics.
 ---
 
 
@@ -22,23 +22,23 @@ Date diagnostics have two layers. `W_NON_ISO_FRONTMATTER_DATE` indicates shape o
 
 ## Invalid Block IDs
 
-Block IDs must match `^[a-zA-Z][a-zA-Z0-9_-]*$`. Invalid IDs produce `E_INVALID_ID`. The rule applies to `:::chemd #id`, `:::result #id`, `:::analysis #id`, `:::sample #id`, `:::artifact #id`, `:::procedure #id`, `:::observation #id`, and `:::condition-varies #id`.
+Block IDs must match `^[a-zA-Z][a-zA-Z0-9_-]*$`. Invalid IDs produce `E_INVALID_ID`. The rule applies to `:::chemd #id`, `:::material #id`, `:::batch #id`, `:::result #id`, `:::analysis #id`, `:::sample #id`, `:::artifact #id`, `:::procedure #id`, `:::observation #id`, `:::trace #id`, and `:::condition-varies #id`.
 
 ## Unknown Fields
 
-Fields outside the allowed set for a block produce `W_UNKNOWN_FIELD`. The parser drops unknown fields. Fixes should use implemented fields; supplemental information can use `notes`, `caption`, `conditions`, or scalar project metadata.
+Fields outside the allowed set for a block produce `W_UNKNOWN_FIELD` with error severity. The parser drops unknown fields. Fixes should use implemented fields; supplemental information can use `notes`, `caption`, `conditions`, or scalar project metadata.
 
 Example: `:::result` accepts `isolated_mass`; it does not implement a `mass` field. Writing `mass: 30 mg` produces `W_UNKNOWN_FIELD`, and the result node does not store that value.
 
 ## Empty List Items
 
-List fields support `|` and comma separators. Consecutive separators, trailing separators, and empty string items produce `E_INVALID_LIST_ITEM`. Common list fields include `reactants`, `products`, `conditions`, `prev`, `artifacts`, `chemistry_features`, step `inputs`, step `outputs`, step `dependsOn`, and event `evidence`.
+List fields support `|` and comma separators. Consecutive separators, trailing separators, and empty string items produce `E_INVALID_LIST_ITEM`. Common list fields include `reactant`, `product`, `reac`, `prod`, `reactants`, `products`, `conditions`, `prev`, `artifacts`, `chemistry_features`, step `inputs`, step `outputs`, step `dependsOn`, and event `evidence`.
 
 ## Unresolved References
 
 The resolver handles inline references, object field references, primary aliases, template parameter references, and condition screen attempt references. Unresolved objects or fields produce `W_UNRESOLVED_REFERENCE`. The typechecker adds target-kind checks for semantic fields, with mismatches producing `E_TYPED_REFERENCE_MISMATCH`.
 
-Reference repair path:
+Reference fix path:
 
 - Check that the target object ID exists.
 - Check that `@id.field` names a real AST field.
@@ -56,11 +56,13 @@ Resolver required fields:
 
 | object | required fields |
 | --- | --- |
-| molecule | `smiles` |
-| reaction | `reactants`, `products` |
+| material | `molecule` |
+| batch | `source` |
 | analysis | `type_name` |
 | sample | `name` |
 | artifact | `kind`, `path` |
+
+The typechecker enforces molecule identity and reaction participant semantics. A molecule needs at least one identity field such as `name`, `smiles`, `canonical_smiles`, `cas`, `inchi`, `inchikey`, `formula`, `mw`, `role`, or `caption`. A reaction needs at least one reactant and one product, and structured participants may reference molecules, materials, or batches.
 
 The analysis `type` field is stored as `type_name` in the AST. TLC analysis receives parser defaults for `plate` and `visualization`.
 
@@ -68,7 +70,7 @@ The analysis `type` field is stored as `type_name` in the AST. TLC analysis rece
 
 Template diagnostics cover indexing, expansion, and parameter types. `E_UNKNOWN_TEMPLATE` means `:::use` cannot find the template. `E_TEMPLATE_PARAM_MISSING` means a call omits a required argument. `E_TEMPLATE_PARAM_TYPE_MISMATCH` means `ref<kind>` or `quantity<class>` does not match the supplied value. `E_TEMPLATE_CYCLE` means recursive template expansion. `E_TEMPLATE_EXPANSION_LIMIT` means expansion depth exceeds 32 or expanded nodes exceed 2000.
 
-`ref<kind>` supports molecule, reaction, result, analysis, procedure, observation, sample, artifact, and condition_varies. `quantity<class>` supports amount, mass, volume, temperature, time, pressure, concentration, equivalent, and percent.
+`ref<kind>` supports molecule, reaction, result, analysis, procedure, observation, sample, artifact, and condition_varies. `quantity<class>` supports amount, mass, volume, temperature, time, pressure, concentration, equivalent, percent, rate, rpm, and pH.
 
 ## Primary Reference Errors
 
@@ -85,9 +87,18 @@ The typechecker emits v0.3 diagnostics. Common diagnostics:
 | `E306` | result `status` outside success, partial, failed, unknown aliases |
 | `E_TYPED_REFERENCE_MISMATCH` | reference target kind differs from field expectation |
 | `E_RESULT_REACTION_CONFLICT` | result yield, conversion, or selectivity differs from the linked reaction |
+| `E_REACTION_PARTICIPANT_REQUIRED` | reaction is missing a reactant or product |
+| `E_REACTION_PARTICIPANT_SYNTAX` | structured participant facts appear on plural list aliases |
+| `E_REACTION_PARTICIPANT_REFERENCE` | reaction participant points to an unsupported or missing target |
+| `E_STOICHIOMETRY_LIMITING` | zero or multiple limiting reactants, or limiting reactant lacks amount and equivalent |
+| `E_STOICHIOMETRY_QUANTITY_MISSING` | reactant with stoichiometry semantics lacks amount or equivalent |
+| `E_INTEROP_RXN_SMILES_UNVERIFIED` | explicit reaction structure cannot be checked against participants |
+| `E_INTEROP_RXN_SMILES_PARTICIPANT_CONFLICT` | explicit reaction structure conflicts with participant identities |
 | `E_STEP_INVALID_FAMILY` | step family outside the implemented set |
 | `E_STEP_PARAM_MISSING` | required family parameter is missing |
 | `E_STEP_PARAM_INVALID` | family-disallowed parameter appears |
+| `E_PROCEDURE_CONTROL_SYNTAX` | procedure control-flow syntax is malformed |
+| `E_PROCEDURE_CONTROL_REFERENCE` | control-flow path or dependency reference is invalid |
 | `E_STEP_ID_DUPLICATE` | duplicate explicit step ID |
 | `E_STEP_INVALID_REFERENCE` | `dependsOn` targets a missing step |
 | `E_STEP_DEPENDENCY_CYCLE` | step dependency graph contains a cycle |
@@ -97,13 +108,13 @@ The typechecker emits v0.3 diagnostics. Common diagnostics:
 | `E_REACTION_ROUTE_CYCLE` | reaction route graph contains a cycle |
 | `W_REACTION_ROUTE_ORPHAN` | route contains an isolated reaction |
 
-## Quick Fixes and Repair Loop
+## Quick Fixes and Safe-Fix Loop
 
-Current quick fix kinds are `apply_authoring_patch` and `insert_chemd_kind`. `insert_chemd_kind` applies to `chemd` kind inference diagnostics. `apply_authoring_patch` carries safe repair suggestions produced by compiler input assistance.
+Current quick fix kinds are `apply_authoring_patch` and `insert_chemd_kind`. `insert_chemd_kind` applies to `chemd` kind inference diagnostics. `apply_authoring_patch` carries safe fix suggestions produced by compiler input assistance.
 
-`runChemdRepairLoop` defaults to a maximum of 5 iterations. Each iteration compiles, builds diagnosis, applies safe fixes, and recompiles. Stop reasons include clean, max iterations, stalled, and diagnosis status. `--write` writes back only when the repaired source is clean and changed.
+The CLI exposes this as `chemd fix`. The safe-fix loop defaults to a maximum of 5 iterations. Each iteration compiles, builds diagnosis, applies safe fixes, and recompiles. Stop reasons include clean, max iterations, stalled, and diagnosis status. `--write` writes back only when the fixed source is clean and changed.
 
 ## Agent Loop Diagnostic Closure
 
-`runChemdAgentLoop` invokes an external driver after the deterministic repair loop. The driver receives source, diagnostics, and iteration history, then returns `rewrite` or `stop`. Stop reasons include clean, max iterations, repair max iterations, repair stalled, agent stalled, and diagnosis status. This workflow covers input problems beyond standalone quick fixes.
+`chemd agent-loop` invokes an external driver after the deterministic safe-fix loop. The driver receives source, diagnostics, and iteration history, then returns `rewrite` or `stop`. Stop reasons include clean, max iterations, fix max iterations, fix stalled, agent stalled, and diagnosis status. This workflow covers input problems beyond standalone quick fixes.
 

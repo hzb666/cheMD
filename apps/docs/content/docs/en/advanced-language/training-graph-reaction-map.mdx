@@ -63,27 +63,25 @@ Graph-ready records connect route, result, procedure, observation, sample, and a
 
 ```md
 :::chemd #rxn-step-1
-kind: reaction
 route: route-a
-reactants: @mol-a
-products: @mol-b
+reactant: @mol-a | 1.0 mmol | 1.0 eq | limiting=true
+product: @mol-b
 :::
 
 :::chemd #rxn-step-2
-kind: reaction
 route: route-a
 prev: @rxn-step-1
-reactants: @mol-b
-products: @mol-c
+reactant: @mol-b | 1.0 mmol | 1.0 eq | limiting=true
+product: @mol-c
 :::
 
 :::procedure #proc-step-2
-reaction: rxn-step-2
+reaction: @rxn-step-2
 step: add | id=s-add | inputs=@mol-b | outputs=mixture-step-2
 :::
 
 :::observation #obs-step-2
-ref: rxn-step-2
+ref: @rxn-step-2
 event: color_change | id=e-color | linkedStep=s-add | color=yellow
 :::
 ```

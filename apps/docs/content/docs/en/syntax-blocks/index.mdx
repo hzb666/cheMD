@@ -16,6 +16,7 @@ description: A user-oriented block manual for Chemd users, with fields, constrai
 | `:::procedure` | experimental procedure | `procedure` |
 | `:::step` | nested procedure step | `step` |
 | `:::observation` | observation record | `observation` |
+| `:::trace` | runtime trace record | `trace` |
 | `:::event` | nested observation event | `event` |
 | `:::sample` | sample record | `sample` |
 | `:::artifact` | spectra, images, files, and attachments | `artifact` |
@@ -50,19 +51,16 @@ primary_result: res-main
 ---
 
 :::chemd #mol-substrate
-kind: molecule
 name: substrate
 smiles: CCO
 :::
 
 :::chemd #mol-product
-kind: molecule
 name: product
 smiles: CC=O
 :::
 
 :::chemd #rxn-main
-kind: reaction
 reactant: @mol-substrate | 1.00 mmol | 1.0 eq | limiting=true
 product: @mol-product
 solvent: MeCN
@@ -71,8 +69,8 @@ time: 3 h
 :::
 
 :::result #res-main
-reaction: rxn-main
-product: mol-product
+reaction: @rxn-main
+product: @mol-product
 status: success
 yield: 74 %
 :::

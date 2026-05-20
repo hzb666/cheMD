@@ -35,7 +35,7 @@ Reaction @reaction.name used @param.amount of material. Result @result.yield was
 | --- | --- |
 | `string` | default type |
 | `ref<kind>` | reference type; kind supports `molecule`, `reaction`, `result`, `analysis`, `procedure`, `observation`, `sample`, `artifact`, and `condition_varies` |
-| `quantity<class>` | quantity type; class supports the resolver quantity classes such as amount, mass, volume, temperature, time, pressure, concentration, equivalent, and percent |
+| `quantity<class>` | quantity type; class supports amount, mass, volume, temperature, time, pressure, concentration, equivalent, percent, rate, rpm, and pH |
 | `quantity` | any supported quantity |
 
 Unknown parameter types fall back to `string`. Invalid parameter names are ignored. Parameter names start with a letter or `_` and then allow letters, digits, and `_`.

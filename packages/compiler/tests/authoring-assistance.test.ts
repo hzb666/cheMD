@@ -113,7 +113,8 @@ yield: 81 %
 
 :::condition-varies #cv-screen
 standard: rxn-standard
-var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
+attempt: var1
+reaction: rxn-var1
 :::
 `;
     const result = compileChemd(source);
@@ -121,24 +122,23 @@ var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
 
     expect(assistance.suggestions).toEqual(expect.arrayContaining([
       expect.objectContaining({ suggestion_id: "suggest-condition-baseline-cv-screen" }),
-      expect.objectContaining({ suggestion_id: "suggest-condition-varies-cv-screen" }),
       expect.objectContaining({ suggestion_id: "suggest-condition-result-cv-screen.var1" })
     ]));
     expect(assistance.minimal_sets).toContainEqual(expect.objectContaining({
       checklist_id: "condition-optimization",
       status: "fixable_by_suggestion",
-      inferable_items: expect.arrayContaining(["cv-screen.condition"])
+      inferable_items: expect.arrayContaining(["cv-screen.factor"])
     }));
 
-    const variesSuggestion = assistance.suggestions.find((item) =>
-      item.suggestion_id === "suggest-condition-varies-cv-screen"
+    const baselineSuggestion = assistance.suggestions.find((item) =>
+      item.suggestion_id === "suggest-condition-baseline-cv-screen"
     );
 
-    expect(variesSuggestion).toBeDefined();
+    expect(baselineSuggestion).toBeDefined();
     expect(applyAuthoringSuggestion(
       source,
-      variesSuggestion as NonNullable<typeof variesSuggestion>
-    )).toContain("varies: solvent | temperature");
+      baselineSuggestion as NonNullable<typeof baselineSuggestion>
+    )).toContain("factor: solvent | baseline=THF");
   });
 
   it("infers condition standard from the only reaction not used by attempts", () => {
@@ -165,7 +165,8 @@ temperature: 40 C
 :::
 
 :::condition-varies #cv-screen
-var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
+attempt: var1
+reaction: rxn-var1
 :::
 `;
     const result = compileChemd(source);
@@ -178,8 +179,9 @@ var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
       source,
       standardSuggestion as NonNullable<typeof standardSuggestion>
     )).toContain(`:::condition-varies #cv-screen
-standard: rxn-standard
-var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C`);
+standard: @rxn-standard
+attempt: var1
+reaction: rxn-var1`);
   });
 
   it("infers result refs and primary reaction from unique product ownership", () => {
@@ -329,8 +331,10 @@ solvent: MeCN
 
 :::condition-varies #cv-screen
 standard: rxn-standard
-varies: solvent
-var1: reaction=rxn-var1 | solvent=MeCN
+factor: solvent | baseline=THF
+attempt: var1
+reaction: rxn-var1
+solvent: MeCN
 :::
 
 :::analysis #ana-attempt
@@ -371,7 +375,7 @@ ref: @cv-screen.var1`);
       scaffold as NonNullable<typeof scaffold>
     );
 
-    expect(nextSource).toContain("res1: res-1");
+    expect(nextSource).toContain("result: @res-1");
     expect(nextSource).toContain(":::result #res-1");
     expect(nextSource).toContain("ref: rxn-var1");
     expect(nextSource.match(/:::analysis #/g)).toHaveLength(1);

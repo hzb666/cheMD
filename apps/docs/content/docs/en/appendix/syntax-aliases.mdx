@@ -5,21 +5,43 @@ description: Chemd field aliases, inline aliases, and accepted shorthand fields.
 
 This page lists aliases and shorthand fields accepted by the current Chemd parser and resolver. Prefer the canonical field when writing new documents unless the shorthand is already part of a compact pattern.
 
+## `kind` Value Aliases
+
+| Alias | Canonical value | Applies to | Notes |
+| --- | --- | --- | --- |
+| `mol` | `molecule` | `kind` in `:::chemd` | Official compact value. |
+| `reac` | `reaction` | `kind` in `:::chemd` | Official compact value. |
+
+```md
+:::chemd #mol-solvent
+kind: mol
+smiles: CCO
+:::
+
+:::chemd #rxn-main
+kind: reac
+reactant: @mol-a | 1.0 mmol | 1.0 eq | limiting=true
+product: @mol-b
+:::
+```
+
 ## Reaction Fields
 
 | Alias or shorthand | Canonical field | Applies to | Notes |
 | --- | --- | --- | --- |
-| `reactants` | `reactants` | `:::chemd` reaction | Canonical reactant list. |
-| `reactant` | `reactants` | `:::chemd` reaction | Singular shorthand for the reactant list. |
-| `reac` | `reactants` | `:::chemd` reaction | Compact shorthand. It has read priority over `reactant` and `reactants`. |
-| `products` | `products` | `:::chemd` reaction | Canonical product list. |
-| `product` | `products` | `:::chemd` reaction | Singular shorthand for the product list. |
-| `prod` | `products` | `:::chemd` reaction | Compact shorthand. It has read priority over `product` and `products`. |
+| `reactant` | `reactant` | `:::chemd` reaction | Repeatable structured participant field. |
+| `reac` | `reactant` | `:::chemd` reaction | Compact repeatable participant field. |
+| `reactants` | `reactant` | `:::chemd` reaction | Simple `|` list alias; do not include amount, equivalents, or `limiting=true`. |
+| `product` | `product` | `:::chemd` reaction | Repeatable structured participant field. |
+| `prod` | `product` | `:::chemd` reaction | Compact repeatable participant field. |
+| `products` | `product` | `:::chemd` reaction | Simple `|` list alias; do not include result quantities. |
+| `reaction_smiles` | `rxn_smiles` | `:::chemd` reaction | Reaction structure alias. Explicit values must match participants. |
 
 ```md
 :::chemd #rxn-main
 kind: reaction
-reac: @mol-a | @mol-b
+reac: @mol-a | 1.0 mmol | 1.0 eq | limiting=true
+reac: @mol-b | 1.2 eq
 prod: @mol-c
 :::
 ```
@@ -57,14 +79,14 @@ The primary reaction used @reaction.solvent and gave @result.yield.
 
 ```md
 :::condition-varies #screen-main
-standard: rxn-standard
+standard: @rxn-standard
 factor: solvent | baseline=MeCN
 factor: temperature | baseline=40 C
 outcome: yield | baseline=68 %
 
 attempt: dmf-60
-reaction: rxn-var1
-result: res-var1
+reaction: @rxn-var1
+result: @res-var1
 solvent: DMF
 temperature: 60 C
 yield: 72 %

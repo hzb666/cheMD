@@ -10,7 +10,7 @@ description: '`:::artifact` 记录谱图、图片、原始数据文件和其他�
 ```md
 :::artifact #art-nmr-product
 kind: nmr_spectrum
-ref: sample-product
+ref: @sample-product
 path: data/nmr/product-1h.pdf
 checksum: sha256:abc123
 instrument: Bruker 400
@@ -41,7 +41,7 @@ resolver 要求 `kind` 和 `path`。parser 不设置默认值。
 ```md
 :::artifact #art-hplc-product
 kind: hplc_chromatogram
-ref: res-main
+ref: @res-main
 path: data/hplc/product-purity.pdf
 checksum: sha256:9d5e
 instrument: Agilent 1260

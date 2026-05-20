@@ -12,7 +12,7 @@ Chemd 的错误检查分布在 parser、resolver、typechecker 和 compiler。�
 | parser | frontmatter、行内 token、结构化块字段和列表语法 | 语法与字段诊断 |
 | resolver | 对象索引、重复 ID、引用、primary、模板展开、必填字段 | 未解析引用与缺失字段诊断 |
 | typechecker | 数量、状态、引用类型、步骤图、观察事件、路线图 | 语义与关系诊断 |
-| compiler | 编译入口、quick fix、repair loop、agent loop | diagnosis 摘要与修复动作 |
+| compiler | 编译入口、quick fix、safe-fix loop、agent loop | diagnosis 摘要与 fix 动作 |
 
 ## Frontmatter 检查
 
@@ -24,17 +24,17 @@ Chemd 的错误检查分布在 parser、resolver、typechecker 和 compiler。�
 
 ## 块语法检查
 
-结构化块必须使用 `:::type` 起始行和 `:::` 结束行。未闭合块产生 `W_UNTERMINATED_BLOCK`。未知块产生 `W_UNKNOWN_BLOCK`。
+结构化块必须使用 `:::type` 起始行和 `:::` 结束行。未闭合块产生 `W_UNTERMINATED_BLOCK`。未知块产生 error severity 的 `W_UNKNOWN_BLOCK`。
 
 块 ID 必须匹配 `^[a-zA-Z][a-zA-Z0-9_-]*$`。非法 ID 产生 `E_INVALID_ID`。字段名必须以小写字母开头，后续允许小写字母、数字和下划线。
 
-字段不在当前块允许集合内时产生 `W_UNKNOWN_FIELD`。列表字段中的空项产生 `E_INVALID_LIST_ITEM`。
+字段不在当前块允许集合内时产生 error severity 的 `W_UNKNOWN_FIELD`。列表字段中的空项产生 `E_INVALID_LIST_ITEM`。
 
 ## 引用检查
 
 resolver 对 `@id`、`@id.field`、primary alias、`@meta.field`、`@param.field` 和 condition-screen attempt 引用执行解析。目标缺失或字段缺失时产生 `W_UNRESOLVED_REFERENCE`。
 
-typechecker 对语义字段执行类型检查。reaction 的 `reactants` 与 `products` 必须指向 molecule。result 的 `reaction` 必须指向 reaction。sample 的 `artifacts` 必须指向 artifact。类型不匹配产生 `E_TYPED_REFERENCE_MISMATCH`。
+typechecker 对语义字段执行类型检查。结构化 reaction participant 可以指向 molecule、material 或 batch。result 的 `reaction` 必须指向 reaction。sample 的 `artifacts` 必须指向 artifact。类型不匹配产生 `E_TYPED_REFERENCE_MISMATCH`。
 
 ## 必填字段检查
 
@@ -42,17 +42,23 @@ resolver 当前检查的对象必填字段如下：
 
 | 对象 | 必填字段 |
 | --- | --- |
-| molecule | `smiles` |
-| reaction | `reactants`、`products` |
+| material | `molecule` |
+| batch | `source` |
 | analysis | `type_name` |
 | sample | `name` |
 | artifact | `kind`、`path` |
+
+molecule identity 和 reaction participant 存在性由 typechecker 检查。molecule 至少需要一个身份字段。reaction 至少需要一个 reactant 和一个 product。
 
 TLC analysis 由 `type: tlc` 识别，并在 parser 阶段补入 `plate: silica gel GF254` 与 `visualization: UV 254 nm` 默认值。
 
 ## 数量与状态检查
 
-typechecker 解析 molecule、reaction、result、sample 和 step 中的数量字段。无法按字段类别解析时产生 `E403`。percent 字段超出 0 到 100 时产生 `E402`。
+typechecker 解析 reaction、result、sample、material、batch 和 step 中的数量字段。无法按字段类别解析时产生 `E403`。percent 字段超出 0 到 100 时产生 `E402`。
+
+带单位数量必须在数值和单位之间保留空格。`1.0 mmol`、`1.2 eq` 和 `78 %` 合法；`1.0mmol`、`1.2eq` 和 `78%` 是 error。`rt` 与 `r.t.` 表示室温。`r.t. -> 80 C over 30 min` 这类 temperature program 使用同一套 temperature parser。单位大小写不规范但可归一时会产生 warning。
+
+reaction participant 的化学计量是语义检查。只要任一 reactant 写了 amount、equivalent、mass、volume 或 `limiting=true`，就必须且只能有一个 `limiting=true`。limiting reactant 必须同时具有 amount 与 equivalent。其他有化学计量语义的 reactant 至少需要 amount 或 equivalent。
 
 result `status` 支持 `success`、`complete`、`completed`、`done`、`partial`、`partial_conversion`、`failed`、`fail`、`unknown` 等别名。非法状态产生 `E306`，并归一化为 `unknown`。
 
@@ -67,6 +73,8 @@ resolver 建立模板索引。重复模板名产生 `E_DUPLICATE_TEMPLATE`。未
 ## Step 与 Event 检查
 
 step family 必须在实现集合内。未知 family 产生 `E_STEP_INVALID_FAMILY`。`heat` 需要 temperature、target_temperature 或 duration。`cool` 需要 temperature、target_temperature 或 method。`analyze` 需要 analysisType、analysis_type 或 type。`extract` 需要 solvent。
+
+procedure 控制流只在 `:::procedure` 内检查。`repeat`、`until`、`branch`、`parallel`、`case`、`default`、`path`、`wait` 和 `abort_if` 必须符合当前 grammar。控制语法错误、缺少 condition、branch path 重复、path/dependency target 无法解析都会产生 procedure-control 诊断。
 
 step ID 重复产生 `E_STEP_ID_DUPLICATE`。`dependsOn` 指向不存在 step 时产生 `E_STEP_INVALID_REFERENCE`。依赖图成环产生 `E_STEP_DEPENDENCY_CYCLE`。
 

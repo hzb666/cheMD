@@ -70,7 +70,6 @@ data: product spot observed
 ```md
 :::col 3
 col: {:::chemd #mol-a
-kind: molecule
 smiles: CCO
 :::
 :::}
@@ -140,26 +139,23 @@ event: color_change from colorless to yellow
 
 ```md
 :::chemd #mol-layout-substrate
-kind: molecule
 smiles: CCO
 :::
 
 :::chemd #mol-layout-product
-kind: molecule
 smiles: CC=O
 :::
 
 :::chemd #rxn-layout
-kind: reaction
-reactants: @mol-layout-substrate
-products: @mol-layout-product
+reactant: @mol-layout-substrate | 1.0 mmol | 1.0 eq | limiting=true
+product: @mol-layout-product
 :::
 
 :::col 2
 col: Reaction @rxn-layout used @mol-layout-substrate.
 col: {:::result #res-layout
-reaction: rxn-layout
-product: mol-layout-product
+reaction: @rxn-layout
+product: @mol-layout-product
 status: success
 yield: 72 %
 :::

@@ -12,7 +12,7 @@ Chemd error checking is distributed across parser, resolver, typechecker, and co
 | parser | frontmatter, inline tokens, structured block fields, list syntax | syntax and field diagnostics |
 | resolver | object index, duplicate IDs, references, primary aliases, template expansion, required fields | unresolved-reference and missing-field diagnostics |
 | typechecker | quantities, status, typed references, step graph, observation events, reaction routes | semantic and relationship diagnostics |
-| compiler | compile entry, quick fixes, repair loop, agent loop | diagnosis summaries and repair actions |
+| compiler | compile entry, quick fixes, safe-fix loop, agent loop | diagnosis summaries and fix actions |
 
 ## Frontmatter Checks
 
@@ -24,17 +24,17 @@ Chemd error checking is distributed across parser, resolver, typechecker, and co
 
 ## Block Syntax Checks
 
-Structured blocks use a `:::type` opening line and a `:::` closing line. Unterminated blocks produce `W_UNTERMINATED_BLOCK`. Unknown blocks produce `W_UNKNOWN_BLOCK`.
+Structured blocks use a `:::type` opening line and a `:::` closing line. Unterminated blocks produce `W_UNTERMINATED_BLOCK`. Unknown blocks produce `W_UNKNOWN_BLOCK` with error severity.
 
 Block IDs must match `^[a-zA-Z][a-zA-Z0-9_-]*$`. Invalid IDs produce `E_INVALID_ID`. Field names must start with a lowercase letter, followed by lowercase letters, digits, or underscores.
 
-Fields outside the allowed set for the block produce `W_UNKNOWN_FIELD`. Empty items in list fields produce `E_INVALID_LIST_ITEM`.
+Fields outside the allowed set for the block produce `W_UNKNOWN_FIELD` with error severity. Empty items in list fields produce `E_INVALID_LIST_ITEM`.
 
 ## Reference Checks
 
 The resolver checks `@id`, `@id.field`, primary aliases, `@meta.field`, `@param.field`, and condition-screen attempt references. Missing targets or missing fields produce `W_UNRESOLVED_REFERENCE`.
 
-The typechecker validates semantic field types. Reaction `reactants` and `products` must point to molecules. Result `reaction` must point to a reaction. Sample `artifacts` must point to artifacts. Type mismatches produce `E_TYPED_REFERENCE_MISMATCH`.
+The typechecker validates semantic field types. Structured reaction participants may point to molecules, materials, or batches. Result `reaction` must point to a reaction. Sample `artifacts` must point to artifacts. Type mismatches produce `E_TYPED_REFERENCE_MISMATCH`.
 
 ## Required Field Checks
 
@@ -42,17 +42,23 @@ The resolver currently checks these object requirements:
 
 | Object | Required fields |
 | --- | --- |
-| molecule | `smiles` |
-| reaction | `reactants`, `products` |
+| material | `molecule` |
+| batch | `source` |
 | analysis | `type_name` |
 | sample | `name` |
 | artifact | `kind`, `path` |
+
+Molecule identity and reaction participant presence are checked by the typechecker. A molecule needs at least one identity field. A reaction needs at least one reactant and one product.
 
 TLC analysis is identified by `type: tlc`. The parser adds `plate: silica gel GF254` and `visualization: UV 254 nm` defaults.
 
 ## Quantity and Status Checks
 
-The typechecker parses quantity fields on molecules, reactions, results, samples, and steps. Values that cannot be parsed for the target field class produce `E403`. Percent values outside 0 to 100 produce `E402`.
+The typechecker parses quantity fields on reactions, results, samples, materials, batches, and steps. Values that cannot be parsed for the target field class produce `E403`. Percent values outside 0 to 100 produce `E402`.
+
+Unit-bearing quantities require a space between value and unit. `1.0 mmol`, `1.2 eq`, and `78 %` are valid; `1.0mmol`, `1.2eq`, and `78%` are errors. `rt` and `r.t.` are room-temperature shorthand. Temperature programs such as `r.t. -> 80 C over 30 min` use the same temperature parser. Non-canonical unit casing produces a warning when it can be normalized.
+
+Reaction participant stoichiometry is semantic. If any reactant has amount, equivalent, mass, volume, or `limiting=true`, exactly one reactant must be `limiting=true`. The limiting reactant must have both amount and equivalent. Other stoichiometric reactants need at least amount or equivalent.
 
 Result `status` supports aliases such as `success`, `complete`, `completed`, `done`, `partial`, `partial_conversion`, `failed`, `fail`, and `unknown`. Invalid status values produce `E306` and normalize to `unknown`.
 
@@ -67,6 +73,8 @@ Recursive templates produce `E_TEMPLATE_CYCLE`. Expansion depth over 32 or total
 ## Step and Event Checks
 
 Step family must be implemented. Unknown family values produce `E_STEP_INVALID_FAMILY`. `heat` requires temperature, target_temperature, or duration. `cool` requires temperature, target_temperature, or method. `analyze` requires analysisType, analysis_type, or type. `extract` requires solvent.
+
+Procedure control flow is checked inside `:::procedure`. `repeat`, `until`, `branch`, `parallel`, `case`, `default`, `path`, `wait`, and `abort_if` must follow the implemented grammar. Malformed controls, missing conditions, duplicate branch paths, and unresolved path/dependency targets produce procedure-control diagnostics.
 
 Duplicate step IDs produce `E_STEP_ID_DUPLICATE`. Missing `dependsOn` targets produce `E_STEP_INVALID_REFERENCE`. Dependency cycles produce `E_STEP_DEPENDENCY_CYCLE`.
 

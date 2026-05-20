@@ -70,14 +70,25 @@ yield: 12 %
 
 :::condition-varies #cv-screen
 standard: rxn-standard
-condition: solvent=THF | temperature=25 C | catalyst=Pd
-varies: solvent | temperature
-var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
-res1: res-var1
-note1: Better yield but impurity visible.
-var2: reaction=rxn-var2 | mode=override | solvent=DMSO | temperature=60 C | catalyst=Ni
-res2: res-var2
-note2: Low conversion by TLC.
+factor: solvent | baseline=THF
+factor: temperature | baseline=25 C
+factor: catalyst | baseline=Pd
+outcome: yield | baseline=40 %
+attempt: var1
+reaction: rxn-var1
+result: res-var1
+solvent: MeCN
+temperature: 40 C
+yield: 78 %
+note: Better yield but impurity visible.
+attempt: var2 | mode=override
+reaction: rxn-var2
+result: res-var2
+solvent: DMSO
+temperature: 60 C
+catalyst: Ni
+yield: 12 %
+note: Low conversion by TLC.
 :::
 
 :::analysis #tlc-var1
@@ -111,7 +122,7 @@ event: color_change | id=e-var1 | timepoint=after heating | severity=low | confi
       condition: expect.arrayContaining([
         expect.objectContaining({ field: "solvent", baseline_raw: "THF" })
       ]),
-      vary_fields: ["solvent", "temperature"],
+      vary_fields: ["solvent", "temperature", "catalyst"],
       attempt_entity_ids: [
         "cva::exp-condition-attempts::cv-screen.var1",
         "cva::exp-condition-attempts::cv-screen.var2"

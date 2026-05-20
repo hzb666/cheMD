@@ -23,7 +23,7 @@ interface AgentLoopDriverRequestPayload {
   source: string;
   diagnosis: ChemdAgentLoopAgentRequest["diagnosis"];
   diagnostics: ChemdAgentLoopAgentRequest["diagnostics"];
-  repair: {
+  fix: {
     changed: boolean;
     finalDiagnosis: ChemdAgentLoopAgentRequest["repairResult"]["finalResult"]["diagnosis"];
     stoppedReason: ChemdAgentLoopAgentRequest["repairResult"]["stoppedReason"];
@@ -32,7 +32,7 @@ interface AgentLoopDriverRequestPayload {
   history: Array<{
     iteration: number;
     diagnosisStatus: string;
-    repairStoppedReason: string;
+    fixStoppedReason: string;
     safeFixCount: number;
     agentAction?: "rewrite" | "stop";
     agentChangedSource?: boolean;
@@ -53,7 +53,7 @@ const buildRequestPayload = (
   source: request.source,
   diagnosis: request.diagnosis,
   diagnostics: request.diagnostics,
-  repair: {
+  fix: {
     changed: request.repairResult.changed,
     finalDiagnosis: request.repairResult.finalResult.diagnosis,
     stoppedReason: request.repairResult.stoppedReason,
@@ -62,7 +62,7 @@ const buildRequestPayload = (
   history: request.history.map((entry) => ({
     iteration: entry.iteration,
     diagnosisStatus: entry.repairResult.finalResult.diagnosis.status,
-    repairStoppedReason: entry.repairResult.stoppedReason,
+    fixStoppedReason: entry.repairResult.stoppedReason,
     safeFixCount: entry.repairResult.totalAppliedSafeFixes.length,
     ...(entry.agentResponse
       ? {

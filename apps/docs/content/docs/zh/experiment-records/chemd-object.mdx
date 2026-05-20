@@ -10,7 +10,6 @@ description: '`:::chemd` 的 molecule、reaction、类型推断、字段、数�
 
 ```md
 :::chemd #mol-aryl
-kind: molecule
 name: aryl bromide
 smiles: Brc1ccccc1
 role: substrate
@@ -40,7 +39,6 @@ formula: C6H5Br
 
 ```md
 :::chemd #rxn-main
-kind: reaction
 name: Suzuki coupling
 reactant: @mat-aryl-lot-a | 1.00 mmol | 1.0 eq | limiting=true
 reactant: @mol-boron | 1.5 eq
@@ -99,6 +97,9 @@ reaction 字段集合由 schema registry 固定。可重复的单数 participant
 | `yield` | AST 字符串，result 关系校验会与 result yield 比对 |
 | `conversion` | AST 字符串，result 关系校验会与 result conversion 比对 |
 | `selectivity` | AST 字符串，result 关系校验会与 result selectivity 比对 |
+| `rxn_smiles` / `reaction_smiles` | 可选 reaction structure；显式值必须在 participant 身份可用时与其一致 |
+
+`rxn_smiles` 可省略。当每个 participant 都解析到带 `smiles` 或 `canonical_smiles` 的 molecule 时，typed graph 可以从 participant 推断 reaction structure。如果显式值无法验证或与 participant 冲突，typechecker 会报告 interop error。
 
 ## Participant 引用写法
 
@@ -106,17 +107,11 @@ reaction 字段集合由 schema registry 固定。可重复的单数 participant
 
 ```md
 reactant: @mat-aryl-lot-a | 1.00 mmol | 1.0 eq | limiting=true
-reactant: mol-boron | 1.5 eq
+reactant: @mol-boron | 1.5 eq
 product: @mol-product
 ```
 
-解析错误示例：
-
-```md
-reactants: @mol-a | 1.0 mmol
-```
-
-在复数列表别名上写结构化 participant 事实会产生 `E_REACTION_PARTICIPANT_SYNTAX`。尾部分隔符产生空列表项，诊断码为 `E_INVALID_LIST_ITEM`。
+复数列表别名不能携带 amount 或 equivalent 这类结构化 participant 事实，否则产生 `E_REACTION_PARTICIPANT_SYNTAX`。尾部分隔符产生空列表项，诊断码为 `E_INVALID_LIST_ITEM`。
 
 ## `route` / `prev` 路线关系
 
@@ -141,21 +136,18 @@ molecule 与 reaction 对象应写在下游 result、analysis、procedure、samp
 
 ```md
 :::chemd #mol-substrate
-kind: molecule
 name: benzyl alcohol
 smiles: OCc1ccccc1
 role: substrate
 :::
 
 :::chemd #mol-product
-kind: molecule
 name: benzaldehyde
 smiles: O=Cc1ccccc1
 role: product
 :::
 
 :::chemd #rxn-oxidation
-kind: reaction
 name: benzyl alcohol oxidation
 route: route-oxidation
 reactant: @mol-substrate | 1.00 mmol | 1.0 eq | limiting=true

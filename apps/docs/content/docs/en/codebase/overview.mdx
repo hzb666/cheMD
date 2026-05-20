@@ -30,7 +30,7 @@ The workspace is intentionally split into applications and reusable packages:
 apps/*      Product surfaces and documentation
 packages/*  Reusable language, rendering, export, runtime, and integration packages
 services/*  Python service processes used by web or desktop integration
-scripts/*   Root-level automation, smoke checks, migration helpers, and release gates
+scripts/*   Root-level automation, smoke checks, schema helpers, and release gates
 ```
 
 The root package exposes high-level commands, while each workspace package keeps its own `build`, `test`, and `typecheck` scripts. `turbo.json` wires package-level tasks so dependency packages run before the packages that consume them.
@@ -70,7 +70,7 @@ When a behavior appears in both CLI and app surfaces, the shared package should 
 
 ## Scripts
 
-The `scripts` directory contains development startup, PostgreSQL, desktop smoke, diagnostics bundle, and migration scripts. Root `package.json` exposes selected scripts as `pnpm` commands.
+The `scripts` directory contains development startup, PostgreSQL, desktop smoke, diagnostics bundle, and schema-management scripts. Root `package.json` exposes selected scripts as `pnpm` commands.
 
 ## Change Orientation
 

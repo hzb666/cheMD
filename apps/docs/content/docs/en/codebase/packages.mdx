@@ -83,7 +83,7 @@ Rendering consumes the resolved document, render options, and typed graph. Expor
 
 | Package | Responsibility |
 | --- | --- |
-| `@chemd/cli` | validate, export, graph, diff, changed, repair, and agent-loop |
+| `@chemd/cli` | validate, export, graph, diff, changed, fix, and agent-loop |
 | `@chemd/language-service` | Editor language service |
 | `@chemd/domain-templates` | Shared starter `.chemd` template catalog |
 | `@chemd/workspace-index` | Workspace document indexing |
@@ -99,11 +99,11 @@ These packages serve CLI, web, desktop, and backend integration. `@chemd/diagnos
 
 | Package | Common entrypoints | Verification focus |
 | --- | --- | --- |
-| `@chemd/cli` | command modules and `packages/cli/bin/chemd.mjs` | command output, exit codes, repair/agent-loop workflows |
+| `@chemd/cli` | command modules and `packages/cli/bin/chemd.mjs` | command output, exit codes, fix/agent-loop workflows |
 | `@chemd/language-service` | language service exports | schema-driven completion, editor diagnostics, incremental feedback |
 | `@chemd/domain-templates` | catalog exports | template IDs, generated source validity, CLI `templates`/`new` output |
 | `@chemd/workspace-index` | workspace indexing APIs | multi-file discovery, graph input, changed-file behavior |
-| `@chemd/storage-postgres` | schema and repository helpers | migration compatibility, record shape, Graph/RAG persistence |
+| `@chemd/storage-postgres` | schema and repository helpers | schema shape, record shape, Graph/RAG persistence |
 | `@chemd/diagnostics` | diagnostic builders and data model | stable diagnostic codes, severity, locations, remediation text |
 
 ## Package Boundaries
@@ -120,6 +120,6 @@ Before closing a package-level change, check the matching surfaces:
 | Diagnostics | Keep code, severity, location, message, and remediation aligned across CLI, language service, web, and desktop |
 | Runtime contracts | Keep StepFamily schema, procedure controls, run plan, preflight issues, trace replay, LNF, and CLI `preflight` in sync |
 | Exports | Verify renderer output, compiler aggregate output, CLI export command, and any app API route that exposes the format |
-| Storage or graph | Check migration/schema shape, repository helpers, graph export contracts, and app/service callers |
+| Storage or graph | Check schema shape, repository helpers, graph export contracts, and app/service callers |
 | App support | Keep shared behavior in packages; keep app code focused on UI, routing, permissions, and platform adaptation |
 

@@ -8,6 +8,10 @@ import type {
   ChemdSourceRange,
   ChemdSymbol
 } from "./types";
+import type {
+  ChemdWorkspaceSymbol,
+  ChemdWorkspaceSymbolIndex
+} from "./workspace-symbol-types";
 
 export interface ChemdDefinitionRequest {
   source: string;
@@ -19,6 +23,7 @@ export interface ChemdDefinitionRequest {
 
 export interface ChemdDefinitionContext {
   compileOutput?: ChemdLanguageCompileOutput;
+  workspaceSymbolIndex?: ChemdWorkspaceSymbolIndex;
 }
 
 export interface ChemdDefinitionTarget {
@@ -36,19 +41,45 @@ export interface ChemdDefinitionLocation {
   target: ChemdDefinitionTarget;
 }
 
+export interface ChemdDefinitionDiagnostic {
+  code: "E_DEFINITION_AMBIGUOUS";
+  severity: "error";
+  message: string;
+  range: ChemdSourceRange;
+  targetText: string;
+  targetSymbolIds: string[];
+}
+
+export interface ChemdDefinitionResult {
+  locations: ChemdDefinitionLocation[];
+  diagnostics: ChemdDefinitionDiagnostic[];
+}
+
 export const getChemdDefinition = (
   request: ChemdDefinitionRequest,
   context: ChemdDefinitionContext = {}
 ): ChemdDefinitionLocation[] => {
-  const compileOutput = context.compileOutput;
-  if (!compileOutput) {
-    return [];
-  }
+  return getChemdDefinitionResult(request, context).locations;
+};
 
+export const getChemdDefinitionResult = (
+  request: ChemdDefinitionRequest,
+  context: ChemdDefinitionContext = {}
+): ChemdDefinitionResult => {
   const position = resolveEditorPosition(request);
   const token = findTokenAtPosition(request.source, position);
-  const symbol = token ? findSymbol(compileOutput.symbols, token.symbolId) : undefined;
-  return symbol ? [createLocation(request, symbol)] : [];
+  if (!token) {
+    return { locations: [], diagnostics: [] };
+  }
+
+  const symbol = context.compileOutput
+    ? findSymbol(context.compileOutput.symbols, token.symbolId)
+    : undefined;
+  if (symbol) {
+    return { locations: [createLocation(request, symbol)], diagnostics: [] };
+  }
+
+  return findWorkspaceLocations(token.symbolId, token.range, context.workspaceSymbolIndex);
 };
 
 const findSymbol = (
@@ -68,6 +99,54 @@ const createLocation = (
   target: {
     symbolId: symbol.id,
     label: symbol.label,
+    kind: symbol.kind,
+    sourceNodeType: symbol.sourceNodeType
+  }
+});
+
+const findWorkspaceLocations = (
+  symbolId: string,
+  tokenRange: ChemdSourceRange,
+  index: ChemdWorkspaceSymbolIndex | undefined
+): ChemdDefinitionResult => {
+  if (!index) {
+    return { locations: [], diagnostics: [] };
+  }
+
+  const matches = index.symbols.filter((symbol) => symbol.localId === symbolId || symbol.name === symbolId);
+  if (matches.length === 0) {
+    return { locations: [], diagnostics: [] };
+  }
+
+  if (matches.length > 1) {
+    return {
+      locations: [],
+      diagnostics: [{
+        code: "E_DEFINITION_AMBIGUOUS",
+        severity: "error",
+        message: `Ambiguous workspace reference: ${symbolId}`,
+        range: tokenRange,
+        targetText: symbolId,
+        targetSymbolIds: matches.map((symbol) => symbol.id)
+      }]
+    };
+  }
+
+  return {
+    locations: [createWorkspaceLocation(matches[0])],
+    diagnostics: []
+  };
+};
+
+const createWorkspaceLocation = (
+  symbol: ChemdWorkspaceSymbol
+): ChemdDefinitionLocation => ({
+  uri: symbol.documentUri,
+  range: symbol.range,
+  sourceSpan: symbol.range,
+  target: {
+    symbolId: symbol.localId,
+    label: symbol.name,
     kind: symbol.kind,
     sourceNodeType: symbol.sourceNodeType
   }

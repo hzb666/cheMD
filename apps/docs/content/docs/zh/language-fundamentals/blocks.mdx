@@ -27,7 +27,7 @@ solvent: MeCN ;; temperature: 40 C ;; time: 2 h
 
 列表字段使用 `|` 分隔。默认列表字段为 `reactant`、`product`、`reac`、`prod`、`reactants`、`products`、`conditions` 和 `params`；`:::chemd` 额外把 `prev` 作为列表字段。空列表项产生 `E_INVALID_LIST_ITEM`。
 
-每个块解析器声明自己的允许字段集合。未知字段产生 `W_UNKNOWN_FIELD`，该字段不会写入解析节点。
+每个块解析器声明自己的允许字段集合。未知字段产生 error 级 `W_UNKNOWN_FIELD` 诊断，该字段不会写入解析节点。
 
 ## 支持的块
 
@@ -36,9 +36,12 @@ solvent: MeCN ;; temperature: 40 C ;; time: 2 h
 | 块 | AST 类型 | 用途 |
 | --- | --- | --- |
 | `:::chemd` | `molecule` 或 `reaction` | 分子和反应的统一使用者输入表面 |
+| `:::material` | `material` | 购买或库存物料，关联 molecule |
+| `:::batch` | `batch` | 实验中生成、分装或纯化得到的批次 |
 | `:::result` | `result` | 结果、产率、纯度和状态 |
 | `:::analysis` | `analysis` | TLC、NMR、HPLC 等分析记录 |
 | `:::procedure` | `procedure` | 操作步骤和步骤依赖 |
+| `:::trace` | `trace` | 运行或手写事件记录 |
 | `:::observation` | `observation` | 观察事件 |
 | `:::sample` | `sample` | 样品、批次和派生关系 |
 | `:::artifact` | `artifact` | 文件、谱图、图片和外部证据 |
@@ -47,7 +50,7 @@ solvent: MeCN ;; temperature: 40 C ;; time: 2 h
 | `:::use` | `use` | 模板调用 |
 | `:::col` | `col` | 多列布局节点 |
 
-未知块产生 `W_UNKNOWN_BLOCK`。
+未知块产生 error 级 `W_UNKNOWN_BLOCK` 诊断。
 
 ## `:::chemd`
 
@@ -74,14 +77,15 @@ atmosphere: nitrogen
 :::
 ```
 
-分子字段：`smiles`、`inchi`、`inchikey`、`cas`、`name`、`role`、`caption`、`formula`、`amount`、`equivalents`、`chemistry_features`。
+分子字段：`smiles`、`canonical_smiles`、`inchi`、`inchikey`、`cas`、`name`、`role`、`caption`、`formula`、`mw`、`chemistry_features`。
 
 反应字段：`reactant`、`product`、`reac`、`prod`、`reactants`、`products`、`rxn_smiles`、`reaction_smiles`、`conditions`、`route`、`prev`、`reagents`、`catalyst`、`solvent`、`temperature`、`time`、`pressure`、`atmosphere`、`yield`、`conversion`、`selectivity`、`caption`、`chemistry_features`。
 
-resolver 必填校验：
+校验规则：
 
-- molecule 需要 `smiles`。
+- molecule 至少需要一个身份字段。
 - reaction 在别名归一化后至少需要一个 reactant 和一个 product。
+- molecule 上的 `amount` 和 `equivalents` 是 error；反应用量应写到 reaction participant 上。
 
 ## `:::result`
 
@@ -89,7 +93,7 @@ resolver 必填校验：
 
 ```md
 :::result #res-main
-ref: rxn-main
+ref: @rxn-main
 product: @mol-product
 status: success
 yield: 78 %
@@ -109,18 +113,18 @@ notes: Best balance of conversion and purity.
 ```md
 :::analysis #ana-tlc-main
 type: tlc
-ref: rxn-main
+ref: @rxn-main
 time: 2 h
 eluent: PE/EA = 4:1
 result: one major product spot with trace starting material
 data: TLC plate after 2 h.
 lane: sm
-spot: 0.78 starting_material
+spot: 0.78 sm
 lane: rxn
-spot: 0.52 product
-spot: 0.79 starting_material
+spot: 0.52 prod
+spot: 0.79 sm
 lane: prod
-spot: 0.50 product
+spot: 0.50 prod
 :::
 ```
 
@@ -137,7 +141,7 @@ resolver 必填校验：
 
 ```md
 :::sample #sample-product-var1
-ref: res-var1
+ref: @res-var1
 name: purified product from var1
 derived_from: sample-batch-var1
 purity: 97 %
@@ -156,7 +160,7 @@ resolver 必填校验：sample 需要 `name`。
 ```md
 :::artifact #art-nmr-var1
 kind: nmr_spectrum
-ref: res-var1
+ref: @res-var1
 path: data/nmr/var1.pdf
 checksum: sha256:var1nmr
 instrument: Bruker 400

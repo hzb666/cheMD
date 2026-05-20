@@ -69,7 +69,50 @@ Parameter validation:
 
 Procedure-level `evidence` records evidence for the procedure block. Step-level `evidence` is stored as a string array and feeds evidence edges in the step graph. `confidence` stores user-provided confidence for explicit steps; the typechecker defaults explicit steps to 1 when it is absent.
 
-Quantity-like step parameters use the shared quantity parser: `amount`, `mass`, `volume`, `temperature`, `target_temperature`, `duration`, `time`, `pressure`, `concentration`, `equivalent`, `equivalents`, and `percent`.
+Quantity-like step parameters use the shared quantity parser: `amount`, `mass`, `volume`, `temperature`, `target_temperature`, `duration`, `time`, `pressure`, `concentration`, `equivalent`, `equivalents`, `percent`, `rate`, `rpm`, and `ph`.
+
+## Procedure Control Flow
+
+Control flow is written inside `:::procedure` with the same line-oriented style as `step:`. Use braces for nested control bodies. `repeat` is statically expanded into concrete steps, while `until`, `branch`, `wait`, and `abort_if` stay as dynamic controls in the control graph. `parallel` statically records each path and is checked by runtime preflight for resource conflicts.
+
+```md
+:::procedure #proc-controlled
+reaction: @rxn-main
+
+step: charge | id=s-charge | inputs=@mat-substrate | outputs=mixture-a
+
+repeat: wash-cycle | count=2 {
+  step: wash | solvent=brine | volume=10 mL
+}
+
+until: monitor-tlc | condition=@ana-tlc.result == complete | max_iterations=4 {
+  step: analyze | id=s-tlc-check | type=tlc
+}
+
+branch: ph-workup {
+  case: acidic | condition=sensor.ph < 7 {
+    step: add | reagent=NaHCO3(aq) | rate=0.5 mL/min
+  }
+  default: neutral {
+    step: hold | duration=0 min | note=skip neutralization
+  }
+}
+
+parallel: workup {
+  path: organic {
+    step: dry | medium=Na2SO4
+  }
+  path: aqueous {
+    step: store | location=waste
+  }
+}
+
+wait: operator-approval | condition=operator.confirmed | timeout=30 min
+abort_if: unsafe-temperature | condition=sensor.temperature > 80 C
+:::
+```
+
+Control conditions should be machine-checkable. References such as `@ana-tlc` must resolve, and bare prose conditions are errors because the runtime cannot decide them reliably.
 
 ## `:::observation` Blocks
 
@@ -104,13 +147,30 @@ Events write `linkedStepId` through `linkedStep` or `linked_step`. The typecheck
 
 Prose lowering is implemented by `@chemd/step-ontology`. Procedure lowering detects sentence patterns for charge, purge, cool, heat, quench, add, hold, extract, dry, concentrate, separate_layers, filter, sample, analyze, and observe. Observation lowering detects color change, precipitation, and gas evolution. Lowering emits warnings to identify semantics inferred from prose.
 
+## Runtime Trace
+
+Use `:::trace` when a run, replay, or imported device log needs to record what actually happened. Trace events point at the procedure plan, step IDs, and control IDs; they do not rewrite the procedure or result.
+
+```md
+:::trace #run-main
+plan: @proc-controlled
+mode: human-run
+event: run_started | at=2026-05-20T09:00:00Z
+event: step_started | step=s-charge | at=2026-05-20T09:01:00Z
+event: control_entered | control=operator-approval | at=2026-05-20T09:04:00Z
+event: control_completed | control=operator-approval | at=2026-05-20T09:05:00Z
+event: deviation_recorded | step=s-tlc-check | field=iteration_count | expected=1 | actual=3
+event: run_completed | at=2026-05-20T09:40:00Z
+:::
+```
+
 ## Best Practice Example
 
 Use explicit steps and events when graph export, runtime preflight, or evidence export needs stable structure. Keep prose for narrative context.
 
 ```md
 :::procedure #proc-main
-reaction: rxn-main
+reaction: @rxn-main
 evidence: notebook-p12
 step: charge | id=s-charge | inputs=@mol-substrate | outputs=mixture-a
 step: heat | id=s-heat | temperature=60 C | duration=3 h | dependsOn=s-charge
@@ -118,7 +178,7 @@ step: analyze | id=s-tlc | analysisType=tlc | dependsOn=s-heat
 :::
 
 :::observation #obs-main
-ref: rxn-main
+ref: @rxn-main
 event: color_change | id=e-color | stage=reaction | linkedStep=s-heat | color=yellow | evidence=photo-1
 event: gas_evolution | id=e-gas | severity=low | linkedStep=s-charge
 Mixture became yellow during heating.

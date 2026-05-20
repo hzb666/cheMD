@@ -18,17 +18,26 @@ inchikey: LFQSCWFLJHTTHZ-UHFFFAOYSA-N
 :::
 ```
 
-reaction structure 使用 `rxn_smiles`。`reaction_smiles` 是字段别名，并在 AST、typed graph 和 training export 中归一为 `rxn_smiles`。
+reaction structure 可以可选写 `rxn_smiles`。`reaction_smiles` 是字段别名，并在 AST、typed graph 和 training export 中归一为 `rxn_smiles`。participants 已经带有 molecule identity 时，它不是必填字段。
 
 ```md
+:::chemd #mol-ethanol
+smiles: CCO
+:::
+
+:::chemd #mol-acetaldehyde
+smiles: CC=O
+:::
+
 :::chemd #rxn-main
-reaction_smiles: CCO.O=O>>CC=O.O
+reaction_smiles: CCO>>CC=O
 reactant: @mol-ethanol | 1.0 mmol | 1.0 eq | limiting=true
-product: acetaldehyde
+product: @mol-acetaldehyde
 :::
 ```
 
 外部结构字段不能替代 participant。仍应显式写 `reactant` 和 `product`，这样物料流和化学计量可检查。
+当省略 `rxn_smiles` 且每个 participant 都能解析到带简单 `smiles` 或 `canonical_smiles` 的 molecule 时，typed graph 可以从 reactant/product 两侧推断 RXN SMILES。当 `rxn_smiles` 与 participants 同时存在时，Chemd 会用 participant 的 molecule identity 核对 RXN SMILES 两侧。明确不一致是 error；participant 无法解析或缺少 molecule identity 也是 error，因为显式结构声明无法被核实。
 
 ## Adapter 边界
 
@@ -62,7 +71,7 @@ governance:
 
 `chemd export --format training` 返回 sanitized training understanding，省略 raw source、source span、artifact path、material supplier/lot 和 sample supplier。`chemd export --format training-full` 返回完整 audit artifact，并在 `source_layer.audit_only_fields` 列出不进入 sanitized projection 的字段。
 
-`chemd export --format rag` 只有在 `allowed_uses` 包含 `rag` 且 governance 不 blocking 时才输出 chunks。`pii_status: present` 会阻断非 audit projection，直到记录被 redacted。
+`chemd export --format rag` 只有在 `allowed_uses` 包含 `rag` 且 governance 不 blocking 时才输出 chunks。`pii_status: present`、audit-only governance、缺少 RAG 权限，或非 audit 使用下关闭 sanitization，都会阻断非 audit projection，直到记录被 redacted 或治理声明被修正。
 
 ```bash
 pnpm chemd check experiment.chemd --target training --format json

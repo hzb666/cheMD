@@ -171,6 +171,89 @@ product: product
     ]));
   });
 
+  it("fails closed when rxn_smiles conflicts with participant identities", () => {
+    const result = check(`---
+id: exp-rxn-smiles-conflict
+title: RXN smiles conflict
+date: 2026-05-20
+---
+
+:::chemd #mol-a
+smiles: CCO
+:::
+
+:::chemd #mol-b
+smiles: CC=O
+:::
+
+:::chemd #rxn-main
+rxn_smiles: C.C>>CC
+reactant: @mol-a
+product: @mol-b
+:::
+`);
+
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: "E_INTEROP_RXN_SMILES_PARTICIPANT_CONFLICT",
+        sourceField: "rxn_smiles"
+      })
+    ]));
+  });
+
+  it("fails closed when rxn_smiles participant identities cannot be verified", () => {
+    const result = check(`---
+id: exp-rxn-smiles-unverified
+title: RXN smiles unverified
+date: 2026-05-20
+---
+
+:::chemd #rxn-main
+rxn_smiles: CCO>>CC=O
+reactant: substrate
+product: product
+:::
+`);
+
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: "E_INTEROP_RXN_SMILES_UNVERIFIED",
+        sourceField: "rxn_smiles"
+      })
+    ]));
+  });
+
+  it("infers rxn_smiles from participant molecule identities when omitted", () => {
+    const result = check(`---
+id: exp-rxn-smiles-infer
+title: RXN smiles infer
+date: 2026-05-20
+---
+
+:::chemd #mol-a
+smiles: CCO
+:::
+
+:::chemd #mol-b
+smiles: CC=O
+:::
+
+:::chemd #rxn-main
+reactant: @mol-a
+product: @mol-b
+:::
+`);
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.typedGraph.nodes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: "reaction",
+        nodeId: "rxn-main",
+        rxn_smiles: "CCO>>CC=O"
+      })
+    ]));
+  });
+
   it("resolves material and batch participants with stoichiometry", () => {
     const result = check(`---
 id: exp-material-stoich

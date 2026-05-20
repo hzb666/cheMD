@@ -4,10 +4,11 @@ import type { WorkspaceIndexDiagnostic, WorkspaceReference } from "./types";
 const createDiagnostic = (
   code: string,
   message: string,
-  range: ChemdSourceRange
+  range: ChemdSourceRange,
+  severity: ChemdEditorDiagnostic["severity"] = "error"
 ): ChemdEditorDiagnostic => ({
   code,
-  severity: "warning",
+  severity,
   message,
   range,
   quickFixes: []

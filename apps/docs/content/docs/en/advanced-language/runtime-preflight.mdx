@@ -13,6 +13,9 @@ Runtime preflight starts from procedure steps. Keep step IDs stable when later o
 :::procedure #proc-runtime
 step: cool | id=s-cool | target_temperature=-78 C
 step: add | id=s-add | dependsOn=s-cool | reagent=n-BuLi
+until: monitor-tlc | condition=@ana-tlc.result == complete | max_iterations=4 {
+  step: analyze | id=s-tlc-check | type=tlc
+}
 wait: operator-approval | condition=operator.confirmed | timeout=30 min
 step: analyze | id=s-tlc | type=tlc | dependsOn=s-add
 :::
@@ -40,6 +43,47 @@ const preflight = preflightRun(plan, {
 `preflight.blocking` becomes `true` when an error-level runtime diagnostic is emitted.
 
 The run plan carries `steps`, `controls`, `controlStates`, and runtime diagnostics. Dynamic controls such as `wait`, `until`, `branch`, and `abort_if` start as `waiting_adapter` in `controlStates` because their next action depends on runtime state or operator input.
+
+## Control Flow in Preflight
+
+Runtime preflight receives the control graph produced from `:::procedure`. `repeat` is already expanded into fixed steps. `parallel` preserves its paths and may produce `resource_conflict` issues. `until`, `branch`, `wait`, and `abort_if` require runtime state, an adapter, or an operator decision.
+
+```md
+:::procedure #proc-runtime-controls
+reaction: @rxn-main
+step: charge | id=s-charge | inputs=@mat-substrate | outputs=mixture-a
+
+repeat: wash-cycle | count=2 {
+  step: wash | solvent=brine | volume=10 mL
+}
+
+until: tlc-complete | condition=@ana-tlc.result == complete | max_iterations=4 {
+  step: analyze | id=s-tlc-check | type=tlc
+}
+
+branch: temperature-response {
+  case: overheated | condition=sensor.temperature > 80 C {
+    step: cool | target_temperature=25 C
+  }
+  default: normal {
+    step: hold | duration=10 min
+  }
+}
+
+parallel: workup {
+  path: organic {
+    step: dry | medium=Na2SO4
+  }
+  path: aqueous {
+    step: store | location=waste
+  }
+}
+
+abort_if: unsafe-pressure | condition=sensor.pressure > 2 bar
+:::
+```
+
+For `robot-run`, every dynamic control must have an available adapter for the relevant action. For `human-run`, missing adapters are still surfaced, but operator-facing gates remain valid as manual decisions.
 
 ## Modes
 
@@ -175,7 +219,7 @@ Runtime-ready procedure records use explicit step IDs, dependency links, and ste
 
 ```md
 :::procedure #proc-runtime-ready
-reaction: rxn-main
+reaction: @rxn-main
 step: charge | id=s-charge | inputs=@mol-substrate | outputs=mixture-a
 step: cool | id=s-cool | target_temperature=-78 C | dependsOn=s-charge
 step: add | id=s-add | reagent=n-BuLi | dependsOn=s-cool

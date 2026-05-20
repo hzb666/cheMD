@@ -201,6 +201,162 @@ const createInteropDiagnostic = (
 const hasMoleculeIdentity = (node: MoleculeNode): boolean =>
   Boolean(node.name || node.smiles || node.cas || node.inchi || node.inchikey || node.canonical_smiles || node.formula || node.mw);
 
+const getMoleculeSmiles = (
+  node: MoleculeNode | undefined
+): string | undefined =>
+  node?.canonical_smiles?.trim() || node?.smiles?.trim() || undefined;
+
+const resolveObjectReference = (
+  value: string | ReferenceOrLiteral | undefined,
+  objectIndex: Map<string, ObjectNode>
+): ObjectNode | undefined => {
+  if (!value) {
+    return undefined;
+  }
+
+  if (typeof value === "string") {
+    return objectIndex.get(normalizeRefId(value));
+  }
+
+  return value.kind === "reference" && value.resolved
+    ? objectIndex.get(value.refId)
+    : undefined;
+};
+
+const resolveParticipantSmiles = (
+  participant: TypedReactionParticipant,
+  objectIndex: Map<string, ObjectNode>
+): string | undefined => {
+  const target = resolveObjectReference(participant.reference, objectIndex);
+  if (!target) {
+    return undefined;
+  }
+
+  if (target.type === "molecule") {
+    return getMoleculeSmiles(target);
+  }
+
+  if (target.type === "material") {
+    const molecule = resolveObjectReference(target.molecule, objectIndex);
+    return molecule?.type === "molecule" ? getMoleculeSmiles(molecule) : undefined;
+  }
+
+  if (target.type === "batch") {
+    const molecule = resolveObjectReference(target.molecule, objectIndex);
+    return molecule?.type === "molecule" ? getMoleculeSmiles(molecule) : undefined;
+  }
+
+  return undefined;
+};
+
+const splitRxnSmilesComponents = (
+  rxnSmiles: string
+): { reactants: string[]; products: string[] } | undefined => {
+  const [reactantSide, productSide, extra] = rxnSmiles.trim().split(">>");
+  if (extra !== undefined || !reactantSide || !productSide) {
+    return undefined;
+  }
+
+  const splitSide = (side: string): string[] =>
+    side.split(".").map((component) => component.trim()).filter(Boolean);
+
+  const reactants = splitSide(reactantSide);
+  const products = splitSide(productSide);
+
+  return reactants.length > 0 && products.length > 0
+    ? { reactants, products }
+    : undefined;
+};
+
+const sortComponents = (values: string[]): string[] => [...values].sort((left, right) => left.localeCompare(right));
+
+const sameComponents = (
+  left: string[],
+  right: string[]
+): boolean => {
+  const leftSorted = sortComponents(left);
+  const rightSorted = sortComponents(right);
+  return leftSorted.length === rightSorted.length
+    && leftSorted.every((value, index) => value === rightSorted[index]);
+};
+
+const validateRxnSmilesParticipants = (
+  node: ReactionNode,
+  participants: TypedReactionParticipant[],
+  objectIndex: Map<string, ObjectNode>
+): V03Diagnostic[] => {
+  if (!node.rxn_smiles) {
+    return [];
+  }
+
+  const parsed = splitRxnSmilesComponents(node.rxn_smiles);
+  if (!parsed) {
+    return [];
+  }
+
+  return (["reactant", "product"] as const).flatMap((role) => {
+    const roleParticipants = participants.filter((participant) => participant.role === role);
+    if (roleParticipants.length === 0) {
+      return [];
+    }
+
+    const identities = roleParticipants.map((participant) => ({
+      participant,
+      smiles: resolveParticipantSmiles(participant, objectIndex)
+    }));
+    const missing = identities.filter((identity) => !identity.smiles);
+    if (missing.length > 0) {
+      return [createTypedDiagnostic(
+        "E_INTEROP_RXN_SMILES_UNVERIFIED",
+        `RXN SMILES ${role} side cannot be verified against all participants.`,
+        node,
+        "rxn_smiles",
+        {
+          role,
+          participant_ids: missing.map((identity) => identity.participant.id)
+        }
+      )];
+    }
+
+    const participantComponents = identities.map((identity) => identity.smiles as string);
+    const rxnComponents = role === "reactant" ? parsed.reactants : parsed.products;
+    return sameComponents(participantComponents, rxnComponents)
+      ? []
+      : [createTypedDiagnostic(
+          "E_INTEROP_RXN_SMILES_PARTICIPANT_CONFLICT",
+          `RXN SMILES ${role} side conflicts with reaction participants.`,
+          node,
+          "rxn_smiles",
+          {
+            role,
+            rxn_smiles_components: sortComponents(rxnComponents),
+            participant_components: sortComponents(participantComponents)
+          }
+        )];
+  });
+};
+
+const inferRxnSmilesFromParticipants = (
+  participants: TypedReactionParticipant[],
+  objectIndex: Map<string, ObjectNode>
+): string | undefined => {
+  const buildSide = (role: "reactant" | "product"): string[] | undefined => {
+    const roleParticipants = participants.filter((participant) => participant.role === role);
+    if (roleParticipants.length === 0) {
+      return undefined;
+    }
+
+    const smiles = roleParticipants.map((participant) => resolveParticipantSmiles(participant, objectIndex));
+    return smiles.every((value): value is string => typeof value === "string" && value.length > 0 && !value.includes("."))
+      ? smiles
+      : undefined;
+  };
+
+  const reactants = buildSide("reactant");
+  const products = buildSide("product");
+  return reactants && products ? `${reactants.join(".")}>>${products.join(".")}` : undefined;
+};
+
 const isAllowedBatchSource = (value: ReferenceOrLiteral | undefined): boolean =>
   !value
   || value.kind !== "reference"
@@ -618,6 +774,10 @@ export const buildReactionNode = (
     rawValues: node.prev ?? [],
     sourceNodeId: node.id
   });
+  const rxnSmilesDiagnostics = node.rxn_smiles
+    ? validateRxnSmilesSurface(node.rxn_smiles).map((item) => createInteropDiagnostic(item, node, "rxn_smiles"))
+    : [];
+  const inferredRxnSmiles = inferRxnSmilesFromParticipants(participants, context.objectIndex);
 
   output.quantities.push(...reactants.quantities, ...products.quantities);
   output.diagnostics.push(
@@ -625,15 +785,16 @@ export const buildReactionNode = (
     ...products.diagnostics,
     ...stoichiometryDiagnostics,
     ...prev.diagnostics,
-    ...(node.rxn_smiles
-      ? validateRxnSmilesSurface(node.rxn_smiles).map((item) => createInteropDiagnostic(item, node, "rxn_smiles"))
-      : [])
+    ...rxnSmilesDiagnostics,
+    ...(rxnSmilesDiagnostics.some((diagnostic) => diagnostic.severity === "error")
+      ? []
+      : validateRxnSmilesParticipants(node, participants, context.objectIndex))
   );
 
   output.node = {
     ...output.node,
     route: node.route,
-    rxn_smiles: node.rxn_smiles,
+    rxn_smiles: node.rxn_smiles ?? inferredRxnSmiles,
     prev: prev.values,
     next: [],
     reactants: reactants.references,

@@ -1,5 +1,4 @@
 import {
-  getAllowedBlockFieldSet,
   type ConditionVariationAttempt,
   type ConditionVariationAttemptMode,
   type ConditionVariationDelta,
@@ -7,16 +6,10 @@ import {
   type ConditionVariesNode
 } from "@chemd/core";
 
-import { parseKeyValueLine, parseKeyValueLines, pickFirstStringValue } from "../parse-body-shared";
+import { parseKeyValueLine } from "../parse-body-shared";
 import { parseAllowedFieldSpans, readStructuredBlockId } from "./common";
 import type { BlockParser } from "./types";
 
-const CONDITION_VARIES_META_FIELDS = getAllowedBlockFieldSet("condition-varies");
-const DELTA_SEPARATOR_PATTERN = /^(.*?)\s*(?:->|=>)\s*(.*?)$/;
-const ATTEMPT_FIELD_PATTERN = /^var(\d+)$/;
-const RESULT_FIELD_PATTERN = /^res(\d+)$/;
-const NOTE_FIELD_PATTERN = /^note(\d+)$/;
-const ATTEMPT_META_FIELDS = new Set(["id", "reaction", "ref", "result", "res", "note", "notes", "mode"]);
 const RESERVED_CONDITION_DSL_FIELDS = new Set([
   "reaction",
   "standard",
@@ -29,14 +22,16 @@ const RESERVED_CONDITION_DSL_FIELDS = new Set([
   "note",
   "notes"
 ]);
-
-const readString = (value: string | string[] | undefined): string | undefined => {
-  if (Array.isArray(value)) {
-    return value.join(" | ").trim() || undefined;
-  }
-
-  return value?.trim() || undefined;
-};
+const CONDITION_VARIES_FIELD_SPANS = new Set([
+  "reaction",
+  "standard",
+  "factor",
+  "outcome",
+  "attempt",
+  "result",
+  "note",
+  "notes"
+]);
 
 const splitSegments = (value: string): string[] =>
   value
@@ -62,74 +57,6 @@ const parseAssignments = (value: string): { fields: Record<string, string>; bare
     },
     { fields: {} as Record<string, string>, bare: [] as string[] }
   );
-
-const parseConditionDelta = (field: string, value: string): ConditionVariationDelta => {
-  const matched = value.match(DELTA_SEPARATOR_PATTERN);
-  if (!matched) {
-    return { field, raw: value };
-  }
-
-  const baseline = matched[1].trim();
-  const candidate = matched[2].trim();
-
-  return {
-    field,
-    raw: value,
-    ...(baseline ? { baseline } : {}),
-    ...(candidate ? { candidate } : {})
-  };
-};
-
-const createAttemptDelta = (
-  field: string,
-  value: string,
-  baseline: ConditionVariationVariable[]
-): ConditionVariationDelta => {
-  const parsed = parseConditionDelta(field, value);
-  if (parsed.baseline || parsed.candidate) {
-    return parsed;
-  }
-
-  const baselineValue = baseline.find((variable) => variable.field === field)?.baseline;
-  return {
-    ...parsed,
-    ...(baselineValue ? { baseline: baselineValue } : {}),
-    candidate: value
-  };
-};
-
-const parseConditionVariable = (segment: string): ConditionVariationVariable => {
-  const assignment = splitAssignment(segment);
-  if (!assignment) {
-    return { field: segment, raw: segment };
-  }
-
-  const [field, baseline] = assignment;
-  return { field, raw: segment, baseline };
-};
-
-const parseConditionVariables = (value: string | undefined): ConditionVariationVariable[] | undefined => {
-  const variables = value ? splitSegments(value).map(parseConditionVariable) : [];
-  return variables.length > 0 ? variables : undefined;
-};
-
-const parseVaryFields = (value: string | undefined): string[] | undefined => {
-  const fields = value ? splitSegments(value) : [];
-  return fields.length > 0 ? fields : undefined;
-};
-
-const isAttemptAuxiliaryField = (field: string): boolean =>
-  ATTEMPT_FIELD_PATTERN.test(field) || RESULT_FIELD_PATTERN.test(field) || NOTE_FIELD_PATTERN.test(field);
-
-const buildChanges = (fields: Record<string, string | string[]>): ConditionVariationDelta[] =>
-  Object.entries(fields).flatMap(([field, value]) => {
-    if (CONDITION_VARIES_META_FIELDS.has(field) || isAttemptAuxiliaryField(field)) {
-      return [];
-    }
-
-    const raw = readString(value);
-    return raw ? [parseConditionDelta(field, raw)] : [];
-  });
 
 const readAttemptMode = (raw: string | undefined): ConditionVariationAttemptMode | undefined => {
   if (!raw) {
@@ -157,73 +84,6 @@ const createAttemptCondition = (
 
   return [...inherited, ...changes];
 };
-
-const readAttemptReaction = (parsed: ReturnType<typeof parseAssignments>): string | undefined =>
-  parsed.fields.reaction ?? parsed.fields.ref ?? parsed.bare[0];
-
-const readAttemptResult = (
-  index: string,
-  fields: Record<string, string | string[]>,
-  parsed: ReturnType<typeof parseAssignments>
-): string | undefined =>
-  readString(fields[`res${index}`]) ?? parsed.fields.result ?? parsed.fields.res;
-
-const readAttemptNote = (
-  index: string,
-  fields: Record<string, string | string[]>,
-  parsed: ReturnType<typeof parseAssignments>
-): string | undefined =>
-  readString(fields[`note${index}`]) ?? parsed.fields.note ?? parsed.fields.notes;
-
-const buildAttempt = (
-  key: string,
-  raw: string,
-  fields: Record<string, string | string[]>,
-  baseline: ConditionVariationVariable[]
-): ConditionVariationAttempt => {
-  const index = key.match(ATTEMPT_FIELD_PATTERN)?.[1] ?? "";
-  const parsed = parseAssignments(raw);
-  const mode = readAttemptMode(parsed.fields.mode);
-  const changes = Object.entries(parsed.fields).flatMap(([field, value]) =>
-    ATTEMPT_META_FIELDS.has(field) ? [] : [createAttemptDelta(field, value, baseline)]
-  );
-  const reaction = readAttemptReaction(parsed);
-  const result = readAttemptResult(index, fields, parsed);
-  const note = readAttemptNote(index, fields, parsed);
-
-  return {
-    id: parsed.fields.id ?? key,
-    raw,
-    ...(mode ? { mode } : {}),
-    ...(reaction ? { reaction } : {}),
-    ...(result ? { result } : {}),
-    ...(note ? { note } : {}),
-    changes,
-    condition: createAttemptCondition(mode, baseline, changes)
-  };
-};
-
-const buildAttempts = (
-  fields: Record<string, string | string[]>,
-  baseline: ConditionVariationVariable[] = []
-): ConditionVariationAttempt[] | undefined => {
-  const attempts = Object.entries(fields).flatMap(([field, value]) => {
-    if (!ATTEMPT_FIELD_PATTERN.test(field)) {
-      return [];
-    }
-
-    const raw = readString(value);
-    return raw ? [buildAttempt(field, raw, fields, baseline)] : [];
-  });
-
-  return attempts.length > 0 ? attempts : undefined;
-};
-
-const hasSectionDslSyntax = (lines: string[]): boolean =>
-  lines.some((line) => {
-    const parsed = parseKeyValueLine(line.trim());
-    return parsed ? ["factor", "outcome", "attempt"].includes(parsed.key) : false;
-  });
 
 const createConditionDiagnostic = (
   diagnostics: Parameters<BlockParser>[0]["diagnostics"],
@@ -297,17 +157,18 @@ const createAttemptFromSection = (
   factors: ConditionVariationVariable[],
   values: Record<string, string>,
   outcomes: Record<string, string>,
-  meta: { reaction?: string; result?: string; note?: string }
+  meta: { reaction?: string; result?: string; note?: string; mode?: ConditionVariationAttemptMode }
 ): ConditionVariationAttempt => ({
   id,
   raw: header,
+  ...(meta.mode ? { mode: meta.mode } : {}),
   ...(meta.reaction ? { reaction: meta.reaction } : {}),
   ...(meta.result ? { result: meta.result } : {}),
   ...(meta.note ? { note: meta.note } : {}),
   factors: values,
   outcomes,
   changes: buildChangesFromFactors(factors, values),
-  condition: buildConditionFromFactors(factors, values)
+  condition: createAttemptCondition(meta.mode, factors, buildChangesFromFactors(factors, values))
 });
 
 const parseConditionDslBlock = (
@@ -322,7 +183,7 @@ const parseConditionDslBlock = (
   let reaction: string | undefined;
   let notes: string | undefined;
   let current:
-    | { id: string; header: string; factors: Record<string, string>; outcomes: Record<string, string>; meta: { reaction?: string; result?: string; note?: string } }
+    | { id: string; header: string; factors: Record<string, string>; outcomes: Record<string, string>; meta: { reaction?: string; result?: string; note?: string; mode?: ConditionVariationAttemptMode } }
     | undefined;
 
   const finishAttempt = () => {
@@ -364,6 +225,7 @@ const parseConditionDslBlock = (
       finishAttempt();
       const [attemptId, ...segments] = splitSegments(rawValue);
       const assignments = parseAssignments(segments.join("|"));
+      const mode = readAttemptMode(assignments.fields.mode);
       if (!attemptId) {
         createConditionDiagnostic(diagnostics, id, "E_CONDITION_ATTEMPT_ID", "attempt requires an id.", "attempt");
         return;
@@ -378,6 +240,7 @@ const parseConditionDslBlock = (
         factors: {},
         outcomes: {},
         meta: {
+          ...(mode ? { mode } : {}),
           ...(assignments.fields.reaction ? { reaction: assignments.fields.reaction } : {}),
           ...(assignments.fields.result ? { result: assignments.fields.result } : {})
         }
@@ -497,39 +360,11 @@ const parseConditionDslBlock = (
     })),
     attempts: attempts.length > 0 ? attempts : undefined,
     notes,
-    fieldSpans: parseAllowedFieldSpans(lines, CONDITION_VARIES_META_FIELDS, "condition-varies", {
-      allowExtraField: () => true
-    })
+    fieldSpans: parseAllowedFieldSpans(lines, CONDITION_VARIES_FIELD_SPANS)
   };
 };
 
 export const parseConditionVariesBlock: BlockParser = ({ headerArg, lines, diagnostics }) => {
   const id = readStructuredBlockId(headerArg, diagnostics);
-  if (hasSectionDslSyntax(lines)) {
-    return parseConditionDslBlock(id, lines, diagnostics);
-  }
-
-  const fields = parseKeyValueLines(lines, diagnostics, {
-    allowField: () => true,
-    listFields: new Set(),
-    blockTypeForDiagnostics: "condition-varies"
-  });
-  const fieldSpans = parseAllowedFieldSpans(lines, CONDITION_VARIES_META_FIELDS, "condition-varies", {
-    allowExtraField: () => true
-  });
-  const condition = parseConditionVariables(pickFirstStringValue(fields, ["condition"]));
-  const attempts = buildAttempts(fields, condition);
-
-  return {
-    type: "condition_varies",
-    id,
-    reaction: pickFirstStringValue(fields, ["reaction"]),
-    standard: pickFirstStringValue(fields, ["standard"]),
-    condition,
-    varyFields: parseVaryFields(pickFirstStringValue(fields, ["varies"])),
-    changes: buildChanges(fields),
-    attempts,
-    notes: pickFirstStringValue(fields, ["notes"]),
-    fieldSpans
-  } as ConditionVariesNode;
+  return parseConditionDslBlock(id, lines, diagnostics);
 };

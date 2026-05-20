@@ -1,6 +1,6 @@
 ---
 title: CLI 与验证工作流
-description: validate、check、preflight、export、graph、diff、changed、repair 和 agent-loop 的实现级说明。
+description: validate、check、preflight、export、graph、diff、changed、fix 和 agent-loop 的实现级说明。
 ---
 
 
@@ -115,26 +115,26 @@ pnpm chemd diff before.chemd after.chemd --format json
 
 diff 会遍历顶层对象、`col.children` 和 template body，适合审阅反应字段、结果字段、样品字段和过程结构变化。
 
-## `pnpm chemd repair`
+## `pnpm chemd fix`
 
-`repair` 运行 deterministic repair loop。默认最大迭代次数为 5，可通过 `--max-iterations` 调整。输出 schema version 为 `chemd-repair/v0.1`。`--write` 只在修复后 diagnosis 为 clean 且源码变化时写回原文件。
+`fix` 运行 deterministic safe-fix loop。默认最大迭代次数为 5，可通过 `--max-iterations` 调整。输出 schema version 为 `chemd-fix/v0.1`。`--write` 只在修复后 diagnosis 为 clean 且源码变化时写回原文件。
 
 ```text
-pnpm chemd repair experiment.chemd --format json
-pnpm chemd repair experiment.chemd --write
+pnpm chemd fix experiment.chemd --format json
+pnpm chemd fix experiment.chemd --write
 ```
 
-repair loop 仅应用 safe fixes，主要覆盖 `insert_chemd_kind` 和 `apply_authoring_patch`。需要使用者补充事实的诊断会保留为 required input 或 manual review。
+fix loop 仅应用 safe fixes，主要覆盖 `insert_chemd_kind` 和 `apply_authoring_patch`。需要使用者补充事实的诊断会保留为 required input 或 manual review。
 
 ## `pnpm chemd agent-loop`
 
-`agent-loop` 要求 `--driver <cmd>`。CLI 先运行 repair loop，再将源码、diagnosis 和迭代历史交给外部 driver。driver 可返回 `rewrite` 或 `stop`。输出 schema version 为 `chemd-agent-loop/v0.1`。
+`agent-loop` 要求 `--driver <cmd>`。CLI 先运行 safe-fix loop，再将源码、diagnosis 和迭代历史交给外部 driver。driver 可返回 `rewrite` 或 `stop`。输出 schema version 为 `chemd-agent-loop/v0.1`。
 
 ```text
-pnpm chemd agent-loop experiment.chemd --driver node --driver-arg ./repair-driver.mjs --format json
+pnpm chemd agent-loop experiment.chemd --driver node --driver-arg ./fix-driver.mjs --format json
 ```
 
-可用选项包含 `--max-iterations`、`--max-repair-iterations`、`--driver-arg`、`--format` 和 `--write`。停止原因覆盖 clean、max iterations、repair max iterations、repair stalled、agent stalled 和 diagnosis status。
+可用选项包含 `--max-iterations`、`--max-fix-iterations`、`--driver-arg`、`--format` 和 `--write`。停止原因覆盖 clean、max iterations、fix max iterations、fix stalled、agent stalled 和 diagnosis status。
 
 ## 推荐本地校验顺序
 
@@ -152,11 +152,11 @@ pnpm chemd agent-loop experiment.chemd --driver node --driver-arg ./repair-drive
 3. `pnpm chemd graph file-a.chemd file-b.chemd --format json`
 4. `pnpm chemd diff before.chemd after.chemd --format json`
 
-自动修复工作流：
+自动 fix 工作流：
 
-1. `pnpm chemd repair file.chemd --format json`
+1. `pnpm chemd fix file.chemd --format json`
 2. 审阅 safe fixes 与 manual review items
-3. `pnpm chemd repair file.chemd --write`
+3. `pnpm chemd fix file.chemd --write`
 4. `pnpm chemd validate file.chemd`
 
 ## `pnpm chemd changed`
@@ -168,6 +168,6 @@ pnpm chemd changed --format json
 pnpm chemd changed --base origin/main --format text
 ```
 
-已删除文件跳过验证。新增文件和 untracked 文件只输出验证结果，语义 diff 标记为 new file。已修改文件会读取 base ref 中的旧版本，并生成 semantic diff。该命令用于 CI、pre-commit 和批量验证入口。
+已删除文件跳过验证。新增文件和 untracked 文件只输出验证结果，语义 diff 标记为 new file。已修改文件会读取 base ref 中的版本，并生成 semantic diff。该命令用于 CI、pre-commit 和批量验证入口。
 
 

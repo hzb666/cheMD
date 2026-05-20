@@ -48,13 +48,13 @@ const PREFLIGHT_OPTIONS = new Set<CliOption>(["context", "dry-run", "format", "m
 const TEMPLATES_OPTIONS = new Set<CliOption>(["json"]);
 const NEW_OPTIONS = new Set<CliOption>(["dry-run", "out"]);
 const CHANGED_OPTIONS = new Set<CliOption>(["base", "format"]);
-const REPAIR_OPTIONS = new Set<CliOption>(["format", "max-iterations", "write"]);
+const FIX_OPTIONS = new Set<CliOption>(["format", "max-iterations", "write"]);
 const AGENT_LOOP_OPTIONS = new Set<CliOption>([
   "driver",
   "driver-arg",
   "format",
   "max-iterations",
-  "max-repair-iterations",
+  "max-fix-iterations",
   "write"
 ]);
 
@@ -73,8 +73,8 @@ const usage = [
   "  chemd graph <file...> [--format text|json]",
   "  chemd diff <old-file> <new-file> [--format text|json]",
   "  chemd changed [--base <ref>] [--format text|json]",
-  "  chemd repair <file> [--format text|json] [--max-iterations <n>] [--write]",
-  "  chemd agent-loop <file> --driver <cmd> [--driver-arg <arg> ...] [--format text|json] [--max-iterations <n>] [--max-repair-iterations <n>] [--write]"
+  "  chemd fix <file> [--format text|json] [--max-iterations <n>] [--write]",
+  "  chemd agent-loop <file> --driver <cmd> [--driver-arg <arg> ...] [--format text|json] [--max-iterations <n>] [--max-fix-iterations <n>] [--write]"
 ].join("\n");
 
 type ExportFormat = "json" | "lnf" | "rag" | "training" | "training-full";
@@ -88,8 +88,8 @@ type CliOption =
   | "dry-run"
   | "format"
   | "json"
+  | "max-fix-iterations"
   | "max-iterations"
-  | "max-repair-iterations"
   | "mode"
   | "out"
   | "target"
@@ -138,10 +138,10 @@ type CliCommand =
       filePath: string;
       format: TextFormat;
       maxIterations: number;
-      maxRepairIterations: number;
+      maxFixIterations: number;
       write: boolean;
     }
-  | { type: "repair"; filePath: string; format: TextFormat; maxIterations: number; write: boolean };
+  | { type: "fix"; filePath: string; format: TextFormat; maxIterations: number; write: boolean };
 
 interface RunOptions {
   compileChemd?: CompileChemd;
@@ -202,7 +202,7 @@ interface ChangedReport {
   files: ChangedFileReport[];
 }
 
-interface RepairReportIteration {
+interface FixReportIteration {
   iteration: number;
   diagnosisStatus: ChemdRepairLoopResult["finalResult"]["diagnosis"]["status"];
   summary: ChemdRepairLoopResult["finalResult"]["diagnosis"]["summary"];
@@ -215,13 +215,13 @@ interface RepairReportIteration {
   }>;
 }
 
-interface RepairReport {
-  schemaVersion: "chemd-repair/v0.1";
+interface FixReport {
+  schemaVersion: "chemd-fix/v0.1";
   changed: boolean;
   filePath: string;
   finalDiagnosis: ChemdRepairLoopResult["finalResult"]["diagnosis"];
   finalSource: string;
-  iterations: RepairReportIteration[];
+  iterations: FixReportIteration[];
   maxIterations: number;
   stoppedReason: ChemdRepairLoopResult["stoppedReason"];
   writeRequested: boolean;
@@ -230,8 +230,8 @@ interface RepairReport {
 
 interface AgentLoopReportIteration {
   iteration: number;
-  repairDiagnosisStatus: ChemdAgentLoopResult["finalResult"]["diagnosis"]["status"];
-  repairStoppedReason: ChemdRepairLoopResult["stoppedReason"];
+  fixDiagnosisStatus: ChemdAgentLoopResult["finalResult"]["diagnosis"]["status"];
+  fixStoppedReason: ChemdRepairLoopResult["stoppedReason"];
   summary: ChemdAgentLoopResult["finalResult"]["diagnosis"]["summary"];
   appliedSafeFixes: Array<{
     fixId: string;
@@ -255,7 +255,7 @@ interface AgentLoopReport {
   finalSource: string;
   iterations: AgentLoopReportIteration[];
   maxIterations: number;
-  maxRepairIterations: number;
+  maxFixIterations: number;
   stoppedReason: ChemdAgentLoopResult["stoppedReason"];
   writeRequested: boolean;
   wroteFile: boolean;
@@ -339,7 +339,7 @@ const readInlineOptionValue = (arg: string, optionName: CliOption): string => {
 
 const parsePositiveIntegerOption = (
   value: string,
-  optionName: "max-iterations" | "max-repair-iterations"
+  optionName: "max-iterations" | "max-fix-iterations"
 ): number => {
   if (!/^\d+$/.test(value)) {
     throw new CliUsageError(`Option --${optionName} must be a positive integer.`);
@@ -399,7 +399,7 @@ const assignCommandOption = (
     format?: string;
     json: boolean;
     maxIterations?: number;
-    maxRepairIterations?: number;
+    maxFixIterations?: number;
     mode?: string;
     out?: string;
     target?: string;
@@ -433,10 +433,10 @@ const assignCommandOption = (
     case "max-iterations":
       state.maxIterations = parsePositiveIntegerOption(option.value ?? "", "max-iterations");
       return;
-    case "max-repair-iterations":
-      state.maxRepairIterations = parsePositiveIntegerOption(
+    case "max-fix-iterations":
+      state.maxFixIterations = parsePositiveIntegerOption(
         option.value ?? "",
-        "max-repair-iterations"
+        "max-fix-iterations"
       );
       return;
     case "mode":
@@ -467,7 +467,7 @@ const parseCommandArgs = (args: string[], allowedOptions: ReadonlySet<CliOption>
     format?: string;
     json: boolean;
     maxIterations?: number;
-    maxRepairIterations?: number;
+    maxFixIterations?: number;
     mode?: string;
     out?: string;
     target?: string;
@@ -506,7 +506,7 @@ const parseCommandArgs = (args: string[], allowedOptions: ReadonlySet<CliOption>
     format: state.format,
     json: state.json,
     maxIterations: state.maxIterations,
-    maxRepairIterations: state.maxRepairIterations,
+    maxFixIterations: state.maxFixIterations,
     mode: state.mode,
     out: state.out,
     positional,
@@ -654,22 +654,22 @@ const parseChangedArgs = (args: string[]): CliCommand => {
   return { type: "changed", base, format: asTextFormat(format, "Changed") };
 };
 
-const parseRepairArgs = (args: string[]): CliCommand => {
+const parseFixArgs = (args: string[]): CliCommand => {
   const {
     format = "text",
     maxIterations = 5,
     positional,
     write
-  } = parseCommandArgs(args, REPAIR_OPTIONS);
+  } = parseCommandArgs(args, FIX_OPTIONS);
 
   if (positional.length !== 1) {
-    throw new CliUsageError("Repair requires exactly one file path.");
+    throw new CliUsageError("Fix requires exactly one file path.");
   }
 
   return {
-    type: "repair",
+    type: "fix",
     filePath: positional[0],
-    format: asTextFormat(format, "Repair"),
+    format: asTextFormat(format, "Fix"),
     maxIterations,
     write
   };
@@ -681,7 +681,7 @@ const parseAgentLoopArgs = (args: string[]): CliCommand => {
     driverArgs,
     format = "text",
     maxIterations = 5,
-    maxRepairIterations = 5,
+    maxFixIterations = 5,
     positional,
     write
   } = parseCommandArgs(args, AGENT_LOOP_OPTIONS);
@@ -701,7 +701,7 @@ const parseAgentLoopArgs = (args: string[]): CliCommand => {
     filePath: positional[0],
     format: asTextFormat(format, "Agent loop"),
     maxIterations,
-    maxRepairIterations,
+    maxFixIterations,
     write
   };
 };
@@ -749,8 +749,8 @@ export const parseChemdCliArgs = (argv: string[]): CliCommand => {
     return parseChangedArgs(rest);
   }
 
-  if (command === "repair") {
-    return parseRepairArgs(rest);
+  if (command === "fix") {
+    return parseFixArgs(rest);
   }
 
   if (command === "agent-loop") {
@@ -806,15 +806,7 @@ const getTargetDiagnostics = (
     return result.diagnostics ?? [];
   }
 
-  const governanceDiagnostics = result.trainingExport.quality_layer.governance_quality.diagnostics
-    .map((diagnostic): Diagnostic => ({
-      code: diagnostic.code,
-      severity: diagnostic.severity,
-      message: diagnostic.message,
-      sourceLayer: "exporter-training",
-      sourceNodeType: "document",
-      sourceField: "governance"
-    }));
+  const governanceDiagnostics = getTrainingGovernanceDiagnostics(result);
   const reviewDiagnostic: Diagnostic[] = result.trainingExport.quality_layer.training_quality.review_required
     ? [{
         code: "W_TRAINING_REVIEW_REQUIRED",
@@ -834,6 +826,37 @@ const getTargetDiagnostics = (
     ...governanceDiagnostics,
     ...reviewDiagnostic
   ];
+};
+
+const getTrainingGovernanceDiagnostics = (
+  result: CompileResult
+): Diagnostic[] =>
+  result.trainingExport.quality_layer.governance_quality.diagnostics
+    .map((diagnostic): Diagnostic => ({
+      code: diagnostic.code,
+      severity: diagnostic.severity,
+      message: diagnostic.message,
+      sourceLayer: "exporter-training",
+      sourceNodeType: "document",
+      sourceField: "governance"
+    }));
+
+const getExportDiagnostics = (
+  result: CompileResult,
+  format: ExportFormat
+): Diagnostic[] => {
+  if (format === "training") {
+    return getTargetDiagnostics(result, "training");
+  }
+
+  if (format === "rag") {
+    return [
+      ...(result.diagnostics ?? []),
+      ...getTrainingGovernanceDiagnostics(result)
+    ];
+  }
+
+  return result.diagnostics ?? [];
 };
 
 const sumDiagnosticCounts = (reports: ValidationReport[]): DiagnosticCounts =>
@@ -885,6 +908,19 @@ const writeErrorsIfPresent = (
   stderr: CliWriter
 ): boolean => {
   const diagnostics = result.diagnostics ?? [];
+  if (!hasErrorDiagnostics(diagnostics)) {
+    return false;
+  }
+
+  writeDiagnosticResult(stderr, filePath, diagnostics);
+  return true;
+};
+
+const writeDiagnosticsErrorsIfPresent = (
+  filePath: string,
+  diagnostics: Diagnostic[],
+  stderr: CliWriter
+): boolean => {
   if (!hasErrorDiagnostics(diagnostics)) {
     return false;
   }
@@ -1109,7 +1145,8 @@ const exportFile = (
 ): number => {
   const source = readSource(command.filePath, options.cwd);
   const result = compileChemd(source);
-  if (writeErrorsIfPresent(command.filePath, result, options.stderr)) {
+  const diagnostics = getExportDiagnostics(result, command.format);
+  if (writeDiagnosticsErrorsIfPresent(command.filePath, diagnostics, options.stderr)) {
     return EXIT_VALIDATION_FAILED;
   }
 
@@ -1387,13 +1424,13 @@ const changedFiles = (
   return hasChangedValidationErrors(report) ? EXIT_VALIDATION_FAILED : EXIT_OK;
 };
 
-const toRepairReport = (
-  command: Extract<CliCommand, { type: "repair" }>,
+const toFixReport = (
+  command: Extract<CliCommand, { type: "fix" }>,
   filePath: string,
   result: ChemdRepairLoopResult,
   wroteFile: boolean
-): RepairReport => ({
-  schemaVersion: "chemd-repair/v0.1",
+): FixReport => ({
+  schemaVersion: "chemd-fix/v0.1",
   changed: result.changed,
   filePath,
   finalDiagnosis: result.finalResult.diagnosis,
@@ -1416,9 +1453,9 @@ const toRepairReport = (
   wroteFile
 });
 
-const formatRepairText = (report: RepairReport): string => {
+const formatFixText = (report: FixReport): string => {
   const lines = [
-    `Repair ${report.filePath}`,
+    `Fix ${report.filePath}`,
     `  stopped: ${report.stoppedReason}`,
     `  final status: ${report.finalDiagnosis.status}`,
     `  iterations: ${report.iterations.length}/${report.maxIterations}`,
@@ -1446,37 +1483,37 @@ const formatRepairText = (report: RepairReport): string => {
   }
 
   if (!report.writeRequested && report.changed && report.finalDiagnosis.status === "clean") {
-    lines.push("  repaired source:");
+    lines.push("  fixed source:");
     lines.push(report.finalSource);
   }
 
   return lines.join("\n");
 };
 
-const repairFile = (
-  command: Extract<CliCommand, { type: "repair" }>,
+const fixFile = (
+  command: Extract<CliCommand, { type: "fix" }>,
   runChemdRepairLoop: RunChemdRepairLoop,
   options: NormalizedRunOptions
 ): number => {
   const source = readSource(command.filePath, options.cwd);
-  const repairResult = runChemdRepairLoop(source, {
+  const fixResult = runChemdRepairLoop(source, {
     maxIterations: command.maxIterations
   });
   const shouldWrite = command.write
-    && repairResult.changed
-    && repairResult.finalResult.diagnosis.status === "clean";
+    && fixResult.changed
+    && fixResult.finalResult.diagnosis.status === "clean";
 
   if (shouldWrite) {
-    writeSource(command.filePath, options.cwd, repairResult.finalSource);
+    writeSource(command.filePath, options.cwd, fixResult.finalSource);
   }
 
-  const report = toRepairReport(command, command.filePath, repairResult, shouldWrite);
+  const report = toFixReport(command, command.filePath, fixResult, shouldWrite);
   const output = command.format === "json"
     ? JSON.stringify(report, null, 2)
-    : formatRepairText(report);
+    : formatFixText(report);
 
   options.stdout.write(`${output}\n`);
-  return repairResult.finalResult.diagnosis.status === "clean"
+  return fixResult.finalResult.diagnosis.status === "clean"
     ? EXIT_OK
     : EXIT_VALIDATION_FAILED;
 };
@@ -1494,8 +1531,8 @@ const toAgentLoopReport = (
   finalSource: result.finalSource,
   iterations: result.iterations.map((iteration) => ({
     iteration: iteration.iteration,
-    repairDiagnosisStatus: iteration.repairResult.finalResult.diagnosis.status,
-    repairStoppedReason: iteration.repairResult.stoppedReason,
+    fixDiagnosisStatus: iteration.repairResult.finalResult.diagnosis.status,
+    fixStoppedReason: iteration.repairResult.stoppedReason,
     summary: iteration.repairResult.finalResult.diagnosis.summary,
     appliedSafeFixes: iteration.repairResult.totalAppliedSafeFixes.map((fix) => ({
       fixId: fix.fixId,
@@ -1515,7 +1552,7 @@ const toAgentLoopReport = (
       : {})
   })),
   maxIterations: command.maxIterations,
-  maxRepairIterations: command.maxRepairIterations,
+  maxFixIterations: command.maxFixIterations,
   stoppedReason: result.stoppedReason,
   writeRequested: command.write,
   wroteFile
@@ -1557,7 +1594,7 @@ const formatAgentLoopIteration = (iteration: AgentLoopReportIteration): string[]
     ? `; agent=${iteration.agentResponse.action}${iteration.agentResponse.changedSource ? " changed" : " unchanged"}`
     : "";
   const lines = [
-    `  - iteration ${iteration.iteration}: repair=${iteration.repairStoppedReason}; diagnosis=${iteration.repairDiagnosisStatus}${agentLine}`
+    `  - iteration ${iteration.iteration}: fix=${iteration.fixStoppedReason}; diagnosis=${iteration.fixDiagnosisStatus}${agentLine}`
   ];
 
   if (iteration.agentResponse?.note) {
@@ -1573,7 +1610,7 @@ const formatAgentLoopText = (report: AgentLoopReport): string => {
     `  stopped: ${report.stoppedReason}`,
     `  final status: ${report.finalDiagnosis.status}`,
     `  iterations: ${report.iterations.length}/${report.maxIterations}`,
-    `  repair max iterations: ${report.maxRepairIterations}`,
+    `  fix max iterations: ${report.maxFixIterations}`,
     `  changed: ${report.changed ? "yes" : "no"}`,
     `  wrote file: ${report.wroteFile ? "yes" : "no"}`,
     `  final diagnostics: ${report.finalDiagnosis.summary.errorCount} error(s), ${report.finalDiagnosis.summary.warningCount} warning(s), ${report.finalDiagnosis.summary.infoCount} info`,
@@ -1610,7 +1647,7 @@ const agentLoopFile = async (
   const agentLoopResult = await runChemdAgentLoop(source, {
     agent: driver,
     maxIterations: command.maxIterations,
-    repairMaxIterations: command.maxRepairIterations
+    repairMaxIterations: command.maxFixIterations
   });
   const shouldWrite = command.write
     && agentLoopResult.changed
@@ -1687,8 +1724,8 @@ const executeCommand = (
     return Promise.resolve(changedFiles(command, services.compileChemd, options));
   }
 
-  if (command.type === "repair") {
-    return Promise.resolve(repairFile(command, services.runChemdRepairLoop, options));
+  if (command.type === "fix") {
+    return Promise.resolve(fixFile(command, services.runChemdRepairLoop, options));
   }
 
   return agentLoopFile(command, services.runChemdAgentLoop, options);

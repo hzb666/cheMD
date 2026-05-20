@@ -27,7 +27,7 @@ pnpm chemd new analytical/hplc-purity --out hplc.chemd --dry-run
 - `electrochemistry/electrochemical-reaction`
 - `photochemistry/photoredox`
 
-每个 catalog entry 都在测试中按当前语言契约编译。模板只使用当前语法：没有 language/version 字段，没有旧 block 名，也没有兼容性 header。
+每个 catalog entry 都在测试中按当前语言契约编译。模板使用语言手册中的当前语法：`:::chemd` 对象、必要时的 material/batch 记录、结构化 reaction participant、类型化 analysis block、condition screen section、procedure controls 和 trace events。
 
 ## 模板内部复用
 

@@ -10,7 +10,7 @@ description: sample、artifact、样品来源、附件字段和证据链组织�
 
 ```md
 :::sample #sample-crude-main
-ref: rxn-main
+ref: @rxn-main
 name: Crude reaction mixture after aqueous workup
 sample_id: CR-2026-001
 batch: batch-main-001
@@ -27,20 +27,20 @@ notes: Brown oil before purification
 
 ```md
 :::sample #sample-batch-var1
-ref: rxn-var1
+ref: @rxn-var1
 name: Isolated product batch from var1
 batch: batch-var1
 :::
 
 :::sample #sample-aliquot-var1
-ref: rxn-var1
+ref: @rxn-var1
 name: TLC aliquot from var1
 aliquot_of: sample-batch-var1
 artifacts: art-tlc-var1
 :::
 
 :::sample #sample-nmr-var1
-ref: res-var1
+ref: @res-var1
 name: NMR tube sample from isolated product
 derived_from: sample-batch-var1
 batch_of: batch-var1
@@ -70,7 +70,7 @@ artifacts: art-nmr-1h | art-nmr-13c | art-hplc-report
 ```md
 :::artifact #art-nmr-1h
 kind: nmr
-ref: sample-characterized
+ref: @sample-characterized
 path: data/nmr/CR-2026-001-1H.jdx
 instrument: Bruker Avance 400
 notes: 1H NMR in CDCl3
@@ -86,7 +86,7 @@ artifact 字段包括 `kind`、`ref`、`path`、`checksum`、`instrument`、`not
 ```md
 :::artifact #art-hplc-report
 kind: hplc
-ref: ana-hplc-main
+ref: @ana-hplc-main
 path: reports/hplc/main-product.pdf
 checksum: sha256:2b6f1c7f0d9e4c0a
 instrument: Agilent 1260 Infinity II
@@ -102,14 +102,14 @@ notes: Exported integration report
 
 ```md
 :::result #res-main
-ref: rxn-main
+ref: @rxn-main
 status: success
 yield: 68 %
 purity: 96 %
 :::
 
 :::sample #sample-main
-ref: res-main
+ref: @res-main
 name: Purified main product
 derived_from: sample-crude-main
 artifacts: art-nmr-1h | art-hplc-report
@@ -117,7 +117,7 @@ artifacts: art-nmr-1h | art-hplc-report
 
 :::analysis #ana-hplc-main
 type: hplc
-ref: sample-main
+ref: @sample-main
 instrument: Agilent 1260 Infinity II
 method: C18 gradient 10-90% MeCN
 result: purity 96 %
@@ -126,7 +126,7 @@ data: reports/hplc/main-product.pdf
 
 :::artifact #art-hplc-report
 kind: hplc
-ref: ana-hplc-main
+ref: @ana-hplc-main
 path: reports/hplc/main-product.pdf
 instrument: Agilent 1260 Infinity II
 :::
@@ -140,7 +140,7 @@ sample 用于记录实物身份和来源，artifact 用于记录文件证据，�
 
 ```md
 :::sample #sample-purified
-ref: res-main
+ref: @res-main
 name: Purified product
 sample_id: P-2026-0519-01
 derived_from: rxn-main
@@ -149,7 +149,7 @@ artifacts: art-nmr-1h | art-hplc-report
 
 :::artifact #art-nmr-1h
 kind: nmr
-ref: sample-purified
+ref: @sample-purified
 path: data/nmr/product-1h.jdx
 checksum: sha256:9c8a7f1e
 instrument: Bruker Avance 400

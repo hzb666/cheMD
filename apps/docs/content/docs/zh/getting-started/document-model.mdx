@@ -84,12 +84,13 @@ ID 必须匹配 `[a-zA-Z][a-zA-Z0-9_-]*`。解析器在 `readStructuredBlockId` 
 块内字段采用 `key: value`。字段名以小写字母开始，后续支持小写字母、数字和下划线。
 
 ```md
-reactants: @mol-aryl | @mol-boron
-products: @mol-product
+reactant: @mol-aryl | 1.0 mmol | 1.0 eq | limiting=true
+reac: @mol-boron | 1.2 eq
+product: @mol-product
 conditions: Cu catalyst | air | 80 C | 4 h
 ```
 
-列表字段使用 `|` 分隔。当前列表字段包括 `reactants`、`products`、`reactant`、`product`、`reac`、`prod`、`conditions`、`params`，以及 `:::chemd` 中的 `prev`。
+列表字段使用 `|` 分隔。当前列表字段包括 `reactants`、`products`、`reactant`、`product`、`reac`、`prod`、`conditions`、`params`，以及 `:::chemd` 中的 `prev`。reaction participant 推荐使用单数结构化字段 `reactant` / `product` 或紧凑别名 `reac` / `prod`；复数别名只是简单列表，不承载 amount、equivalent、mass、volume 或 `limiting=true`。
 
 同一物理行可以用 `;;` 写多个字段段。该写法适合紧凑记录，但长实验记录推荐每行一个字段。
 

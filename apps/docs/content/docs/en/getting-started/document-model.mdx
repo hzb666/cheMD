@@ -84,12 +84,13 @@ IDs must match `[a-zA-Z][a-zA-Z0-9_-]*`. The parser enforces this rule in `readS
 Block fields use `key: value`. Field names start with a lowercase letter and may continue with lowercase letters, digits, and underscores.
 
 ```md
-reactants: @mol-aryl | @mol-boron
-products: @mol-product
+reactant: @mol-aryl | 1.0 mmol | 1.0 eq | limiting=true
+reac: @mol-boron | 1.2 eq
+product: @mol-product
 conditions: Cu catalyst | air | 80 C | 4 h
 ```
 
-List fields use `|` as the separator. Current list fields include `reactants`, `products`, `reactant`, `product`, `reac`, `prod`, `conditions`, `params`, and `prev` inside `:::chemd`.
+List fields use `|` as the separator. Current list fields include `reactants`, `products`, `reactant`, `product`, `reac`, `prod`, `conditions`, `params`, and `prev` inside `:::chemd`. For reaction participants, prefer the singular structured fields `reactant` / `product` or compact aliases `reac` / `prod`; plural aliases are simple lists and should not carry amount, equivalent, mass, volume, or `limiting=true`.
 
 Multiple field segments can share one physical line with `;;`. This form is useful for compact notes. Longer experiment records are clearer with one field per line.
 

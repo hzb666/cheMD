@@ -7,9 +7,9 @@ description: Chemd 语言、校验、CLI 和导出能力的字段级索引。
 
 ## 语言输入面
 
-Chemd 接收 Markdown 正文、YAML frontmatter、`:::` 结构化块、模板块、列布局块、行内引用、行内化学表达式、行内代码和 Markdown 链接。支持的结构化块名称包含 `chemd`、`material`、`batch`、`result`、`analysis`、`artifact`、`sample`、`condition-varies`、`procedure`、`observation`、`use` 和 `col`。`template` 使用 `bind`、`params`、`description` 和 `body` 头部字段。
+Chemd 接收 Markdown 正文、YAML frontmatter、`:::` 结构化块、模板块、列布局块、行内引用、行内化学表达式、行内代码和 Markdown 链接。支持的结构化块名称包含 `chemd`、`material`、`batch`、`result`、`analysis`、`artifact`、`sample`、`condition-varies`、`procedure`、`trace`、`observation`、`use` 和 `col`。`template` 使用 `bind`、`params`、`description` 和 `body` 头部字段。
 
-未知结构化块产生 `W_UNKNOWN_BLOCK`。
+未知结构化块产生 error 级 `W_UNKNOWN_BLOCK` 诊断。
 
 ## Frontmatter 特性
 
@@ -42,15 +42,16 @@ Chemd 接收 Markdown 正文、YAML frontmatter、`:::` 结构化块、模板块
 
 - `:::chemd`：通过 `kind` 或字段形状生成 molecule 或 reaction。缺少 `kind` 时按 reaction participant 字段或 molecule identity 字段推断；无法稳定推断时产生 `W_CHEMD_KIND_AMBIGUOUS` error。
 - molecule 字段：`smiles`、`canonical_smiles`、`cas`、`inchi`、`inchikey`、`name`、`role`、`caption`、`formula`、`mw`、`chemistry_features`。
-- reaction 字段：`name`、`reactant`、`product`、`reac`、`prod`、`reactants`、`products`、`conditions`、`route`、`prev`、`reagents`、`catalyst`、`solvent`、`temperature`、`time`、`pressure`、`atmosphere`、`yield`、`conversion`、`selectivity`、`equation`、`rxn_smiles`、`caption`、`chemistry_features`。
+- reaction 字段：`name`、`reactant`、`product`、`reac`、`prod`、`reactants`、`products`、`conditions`、`route`、`prev`、`reagents`、`catalyst`、`solvent`、`temperature`、`time`、`pressure`、`atmosphere`、`yield`、`conversion`、`selectivity`、`equation`、`rxn_smiles`、`reaction_smiles`、`caption`、`chemistry_features`。
 - `:::material` 字段：`molecule`、`supplier`、`lot`、`purity`、`density`、`storage`、`notes`、`chemistry_features`。
 - `:::batch` 字段：`source`、`molecule`、`state`、`mass`、`purity`、`artifacts`、`notes`、`chemistry_features`。
 - `:::result` 字段：`status`、`yield`、`conversion`、`selectivity`、`isolated_mass`、`product_state`、`purity`、`notes`、`ref`、`reaction`、`product`。
 - `:::analysis` 字段：`type`、`ref`、`time`、`eluent`、`plate`、`visualization`、`result`、`instrument`、`solvent`、`frequency`、`method`、`data`、`notes`、`artifact`、`artifacts`、`spectrum`、`lane`、`spot`、`mess`、`base`、`none`、`peak`、`ion`。
 - `:::sample` 字段：`name`、`sample_id`、`batch`、`purity`、`supplier`、`notes`、`ref`、`derived_from`、`aliquot_of`、`batch_of`、`artifacts`、`chemistry_features`。
 - `:::artifact` 字段：`kind`、`ref`、`path`、`checksum`、`instrument`、`notes`、`chemistry_features`。
-- `:::condition-varies` 字段：`reaction`、`standard`、`condition`、`varies`、`factor`、`outcome`、`attempt`、`result`、`note`、`notes`，以及已声明的 attempt 字段。
-- `:::procedure` 字段：`ref`、`reaction`、`evidence`，并接收 `step:` 行和嵌套 `:::step`。
+- `:::condition-varies` 字段：`reaction`、`standard`、`factor`、`outcome`、`attempt`、`result`、`note`、`notes`，以及已声明的 attempt 字段。
+- `:::procedure` 字段：`ref`、`reaction`、`evidence`，并接收 `step:` 行、嵌套 `:::step`，以及 `repeat`、`until`、`branch`、`parallel`、`wait`、`abort_if` 控制行。
+- `:::trace` 字段：`plan` 和 `mode`，并接收手写 `event:` 行。
 - `:::observation` 字段：`ref`，并接收 `event:` 行和嵌套 `:::event`。
 - `:::col` 语法：列数来自 header 参数，例如 `:::col-2` 或 `:::col 2`；子项写作 `col:` 行，子项可包含 Markdown 或括号包裹的结构化内容。
 
@@ -76,4 +77,4 @@ typechecker 构建 typed semantic graph、step graph、数量单位归一化、�
 
 `compileChemd` 的主链路为 parse、resolve、typecheck、render profile resolution、runtime run plan、runtime preflight、LNF、training export、RAG export、training understanding、input assistance、input-assistance diagnostics、diagnosis、HTML、JSON 和 DOCX bridge。
 
-CLI 命令包含 `validate`、`export`、`graph`、`diff`、`changed`、`repair` 和 `agent-loop`。`export` 格式包含 `json`、`lnf`、`rag`、`training` 和 `training-full`。`graph`、`diff`、`changed`、`repair` 和 `agent-loop` 的文本输出格式支持 `text` 与 `json`。
+CLI 命令包含 `validate`、`export`、`graph`、`diff`、`changed`、`fix` 和 `agent-loop`。`export` 格式包含 `json`、`lnf`、`rag`、`training` 和 `training-full`。`graph`、`diff`、`changed`、`fix` 和 `agent-loop` 的文本输出格式支持 `text` 与 `json`。

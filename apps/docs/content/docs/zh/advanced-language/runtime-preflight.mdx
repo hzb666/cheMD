@@ -13,6 +13,9 @@ description: Chemd runtime-lab 如何把编译后的步骤和控制流转成 run
 :::procedure #proc-runtime
 step: cool | id=s-cool | target_temperature=-78 C
 step: add | id=s-add | dependsOn=s-cool | reagent=n-BuLi
+until: monitor-tlc | condition=@ana-tlc.result == complete | max_iterations=4 {
+  step: analyze | id=s-tlc-check | type=tlc
+}
 wait: operator-approval | condition=operator.confirmed | timeout=30 min
 step: analyze | id=s-tlc | type=tlc | dependsOn=s-add
 :::
@@ -40,6 +43,47 @@ const preflight = preflightRun(plan, {
 当 runtime diagnostic 中存在 error 级别诊断时，`preflight.blocking` 为 `true`。
 
 run plan 包含 `steps`、`controls`、`controlStates` 和运行时诊断。`wait`、`until`、`branch`、`abort_if` 这类动态控制在 `controlStates` 中初始为 `waiting_adapter`，因为下一步取决于运行状态或操作者输入。
+
+## 控制流预检
+
+运行预检接收 `:::procedure` 生成的 control graph。`repeat` 已经展开为固定 step。`parallel` 会保留 path，并可能生成 `resource_conflict` issue。`until`、`branch`、`wait` 和 `abort_if` 需要运行状态、adapter 或操作者决策。
+
+```md
+:::procedure #proc-runtime-controls
+reaction: @rxn-main
+step: charge | id=s-charge | inputs=@mat-substrate | outputs=mixture-a
+
+repeat: wash-cycle | count=2 {
+  step: wash | solvent=brine | volume=10 mL
+}
+
+until: tlc-complete | condition=@ana-tlc.result == complete | max_iterations=4 {
+  step: analyze | id=s-tlc-check | type=tlc
+}
+
+branch: temperature-response {
+  case: overheated | condition=sensor.temperature > 80 C {
+    step: cool | target_temperature=25 C
+  }
+  default: normal {
+    step: hold | duration=10 min
+  }
+}
+
+parallel: workup {
+  path: organic {
+    step: dry | medium=Na2SO4
+  }
+  path: aqueous {
+    step: store | location=waste
+  }
+}
+
+abort_if: unsafe-pressure | condition=sensor.pressure > 2 bar
+:::
+```
+
+`robot-run` 要求每个 dynamic control 都有可用 adapter。`human-run` 仍会显示缺失 adapter 的提示，但面向操作者的门禁可以作为人工决策继续保留。
 
 ## 运行模式
 
@@ -175,7 +219,7 @@ runtime planner 会为每个 step 选择一种确认策略：
 
 ```md
 :::procedure #proc-runtime-ready
-reaction: rxn-main
+reaction: @rxn-main
 step: charge | id=s-charge | inputs=@mol-substrate | outputs=mixture-a
 step: cool | id=s-cool | target_temperature=-78 C | dependsOn=s-charge
 step: add | id=s-add | reagent=n-BuLi | dependsOn=s-cool

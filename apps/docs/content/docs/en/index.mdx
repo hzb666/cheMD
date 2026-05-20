@@ -30,7 +30,7 @@ Users should read Getting Started and Language Fundamentals before using the blo
 | Check a block field or default | Structured Block Reference |
 | Model a real experiment | Experiment Record Modeling |
 | Use templates, references, expressions, layout, or workspace semantics | Advanced Language Features |
-| Validate, export, repair, or inspect diagnostics | Validation, Diagnostics, and Tooling |
+| Validate, export, fix, or inspect diagnostics | Validation, Diagnostics, and Tooling |
 | Extend the implementation or integrate tooling | Codebase Guide |
 | Look up aliases, units, and diagnostic codes | Appendix |
 
@@ -48,31 +48,28 @@ primary_result: res-main
 ---
 
 :::chemd #mol-acid
-kind: molecule
 name: benzoic acid
 smiles: O=C(O)c1ccccc1
 role: substrate
 :::
 
 :::chemd #mol-alcohol
-kind: molecule
 name: ethanol
 smiles: CCO
 role: coupling_partner
 :::
 
 :::chemd #mol-product
-kind: molecule
 name: ethyl benzoate
 smiles: CCOC(=O)c1ccccc1
 role: product
 :::
 
 :::chemd #rxn-main
-kind: reaction
 name: Fischer esterification
-reactants: @mol-acid | @mol-alcohol
-products: @mol-product
+reactant: @mol-acid | 1.0 mmol | 1.0 eq | limiting=true
+reactant: @mol-alcohol | 5.0 mL
+product: @mol-product
 catalyst: H2SO4
 solvent: ethanol
 temperature: 78 C
@@ -80,7 +77,7 @@ time: 4 h
 :::
 
 :::result #res-main
-ref: rxn-main
+reaction: @rxn-main
 product: @mol-product
 status: success
 yield: 76 %

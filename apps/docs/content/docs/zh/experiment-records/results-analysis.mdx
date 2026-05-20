@@ -14,7 +14,7 @@ description: '`:::result`、`:::analysis`、TLC lane、通用分析和必填字�
 
 ## `yield`、`conversion`、`selectivity`、`purity`
 
-这些字段按字符串保存，解析器不执行单位或百分比语义校验。下游导出层按原始字段值构建训练和 RAG 数据。
+这些字段在 AST 中保留原文，随后由 typechecker 按 percent quantity 解析。百分数必须在数值和单位之间保留空格，例如 `82 %`；`82%` 这类紧凑写法是 error。
 
 ## `:::analysis` 分析块
 
@@ -23,10 +23,10 @@ description: '`:::result`、`:::analysis`、TLC lane、通用分析和必填字�
 ```md
 :::analysis #ana-hplc-main
 type: hplc
-ref: res-main
+ref: @res-main
 method: HPLC area normalization
 instrument: Agilent 1260
-result: 97% area product peak
+peak: 6.4 min (97 %, product)
 data: Main peak at 6.4 min with trace impurity.
 :::
 ```
@@ -61,32 +61,55 @@ result 应连接 reaction 和 product，analysis 应连接 result 或 sample。�
 
 ```md
 :::result #res-main
-reaction: rxn-main
-product: mol-product
+reaction: @rxn-main
+product: @mol-product
 status: success
 yield: 82 %
+isolated_mass: 120 mg
 purity: 98 %
 notes: isolated after silica gel chromatography
 :::
 
 :::analysis #ana-tlc-main
 type: tlc
-ref: rxn-main
-result: res-main
+ref: @res-main
 eluent: petroleum ether/ethyl acetate 5:1
+plate: silica gel GF254
+visualization: UV 254 nm
 lane: sm
-spot: 0.62 starting_material
+spot: 0.62
+lane: rxn
+spot: sm
+spot: 0.31 ^3(4) prod
 lane: prod
-spot: 0.31 product
-data: product spot observed, starting material consumed
+spot: 0.31
+result: product spot observed, starting material consumed
+:::
+
+:::analysis #ana-nmr-product
+type: nmr
+ref: @sample-product
+spectrum: 1H NMR (400 MHz, CDCl3)
+peak: 7.68-7.59 (m, 2H, ArCH)
+peak: 7.14-7.03 (m, 2H, ArCH)
+peak: 3.56 (tt, J = 9.1, 6.0 Hz, 1H, CH(C=O))
+artifact: @art-nmr-1h
 :::
 
 :::analysis #ana-hplc-product
 type: hplc
-ref: res-main
+ref: @res-main
 instrument: Agilent 1260
 method: C18 gradient
 peak: 6.4 min (98 %, product)
+:::
+
+:::analysis #ana-lcms-product
+type: lcms
+ref: @sample-product
+method: ESI positive
+peak: 6.4 min (98 %, product)
+ion: m/z 321.1234 [M+H]+
 :::
 ```
 

@@ -446,7 +446,11 @@ path: data/result.pdf
 :::condition-varies #cv-local
 reaction: ext-doc#rxn-main
 standard: ext-doc#rxn-standard
-var1: reaction=ext-doc#rxn-variant | result=ext-doc#res-variant | solvent=MeCN
+factor: solvent | baseline=THF
+attempt: var1
+reaction: ext-doc#rxn-variant
+result: ext-doc#res-variant
+solvent: MeCN
 :::
 
 :::analysis #ana-local

@@ -148,6 +148,9 @@ describe("semantic render tree", () => {
         unknown_type: "future_cluster_map"
       }
     });
-    expect(tree.warnings.some((warning) => warning.code === "semantic_rendering.unknown_node_type")).toBe(true);
+    expect(tree.diagnostics).toContainEqual(expect.objectContaining({
+      code: "semantic_rendering.unknown_node_type",
+      severity: "error"
+    }));
   });
 });

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildChemdWorkspaceSymbolIndex,
   compileChemdForEditor,
   getChemdDefinition,
+  getChemdDefinitionResult,
   getChemdHover
 } from "../src/index";
 
@@ -34,6 +36,11 @@ kind: reaction
 reactants: @mol-main
 products: product-main
 :::
+
+:::result #res-main
+status: success
+yield: 72 %
+:::
 `;
 
 describe("getChemdHover", () => {
@@ -47,13 +54,34 @@ describe("getChemdHover", () => {
       symbol: {
         id: "mol-main",
         kind: "molecule",
-        sourceNodeType: "molecule"
+        sourceNodeType: "molecule",
+        interopStatus: {
+          fields: ["smiles"],
+          verified: false,
+          diagnostics: []
+        }
       },
       sourceLine: {
         line: 7,
         text: ":::chemd #mol-main"
       }
     });
+  });
+
+  it("returns canonical quantity details from typed graph", () => {
+    const marked = source.replace("#res-main", "#res|-main");
+    const request = withCursor(marked);
+    const compileOutput = compileChemdForEditor({ source: request.source });
+    const hover = getChemdHover(request, { compileOutput });
+
+    expect(hover?.symbol?.canonicalQuantities).toEqual([
+      expect.objectContaining({
+        field: "yield",
+        raw: "72 %",
+        canonicalValue: 72,
+        canonicalUnit: "percent"
+      })
+    ]);
   });
 
   it("returns diagnostics at the current position without throwing", () => {
@@ -166,5 +194,45 @@ describe("getChemdDefinition", () => {
 
     expect(getChemdDefinition(request)).toEqual([]);
     expect(getChemdDefinition(request, { compileOutput })).toEqual([]);
+  });
+
+  it("returns a workspace definition when the current document has no local symbol", () => {
+    const marked = "ref: @rxn-other|";
+    const request = withCursor(marked);
+    const workspaceSymbolIndex = buildChemdWorkspaceSymbolIndex([{
+      documentUri: "file:///workspace/other.chemd",
+      source: source.replace("#rxn-main", "#rxn-other")
+    }]);
+    const definitions = getChemdDefinition(request, { workspaceSymbolIndex });
+
+    expect(definitions).toEqual([expect.objectContaining({
+      uri: "file:///workspace/other.chemd",
+      target: expect.objectContaining({
+        symbolId: "rxn-other",
+        kind: "reaction"
+      })
+    })]);
+  });
+
+  it("reports ambiguous workspace definitions", () => {
+    const request = withCursor("ref: @shared-rxn|");
+    const workspaceSymbolIndex = buildChemdWorkspaceSymbolIndex([
+      {
+        documentUri: "file:///workspace/a.chemd",
+        source: source.replace("#rxn-main", "#shared-rxn")
+      },
+      {
+        documentUri: "file:///workspace/b.chemd",
+        source: source.replace("#rxn-main", "#shared-rxn")
+      }
+    ]);
+    const result = getChemdDefinitionResult(request, { workspaceSymbolIndex });
+
+    expect(result.locations).toEqual([]);
+    expect(result.diagnostics).toEqual([expect.objectContaining({
+      code: "E_DEFINITION_AMBIGUOUS",
+      severity: "error",
+      targetText: "shared-rxn"
+    })]);
   });
 });

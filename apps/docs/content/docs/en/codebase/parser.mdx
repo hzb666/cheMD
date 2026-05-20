@@ -44,29 +44,41 @@ This layer splits body content into Markdown nodes and structured block nodes.
 `packages/parser/src/body/block-parsers/index.ts` registers the currently parsed blocks:
 
 - `chemd`
+- `material`
+- `batch`
 - `result`
 - `analysis`
 - `artifact`
 - `sample`
 - `condition-varies`
 - `procedure`
+- `trace`
 - `observation`
 - `use`
 - `col`
 
 ### Field Parsing
 
-Field parsing uses `parseKeyValueLine` and `parseKeyValueLines`. Unknown fields are filtered by `parseAllowedFields` and produce `W_UNKNOWN_FIELD`.
+Field parsing uses `parseKeyValueLine` and `parseKeyValueLines`. Unknown fields are filtered by `parseAllowedFields` and produce `W_UNKNOWN_FIELD` with error severity.
 
 ```md
 :::chemd #rxn-main
-kind: reaction ;; solvent: MeCN ;; temperature: 60 C
-reactants: @mol-a | @mol-b
-products: @mol-c
+solvent: MeCN ;; temperature: 60 C
+reactant: @mol-a | 1.0 mmol | 1.0 eq | limiting=true
+reac: @mol-b | 1.2 eq
+product: @mol-c
 :::
 ```
 
-The parser splits `;;` into separate field segments and splits configured list fields such as `reactants` with `|`.
+The parser splits `;;` into separate field segments and splits configured list fields such as `reactants` with `|`. Structured participant fields use single-field lines (`reactant`, `product`, `reac`, `prod`) so amount, equivalent, mass, volume, and `limiting=true` remain attached to the intended participant. Plural aliases (`reactants`, `products`) are simple list aliases only.
+
+### Current Block Grammar Notes
+
+- The `chemd` parser emits molecule or reaction nodes by explicit `kind`, `kind` value aliases (`mol`, `reac`), or stable field-shape inference. Reaction participants are parsed from canonical `reactant` / `product` fields and compact aliases `reac` / `prod`.
+- The `analysis` parser handles typed TLC, NMR, chromatography, and MS records. TLC lines are stateful: `lane:` opens the current lane, then `spot`, `mess`, `base`, and `none` lines attach to that lane. NMR uses `spectrum:` metadata lines plus compact `peak:` lines.
+- The `condition-varies` parser accepts only declared `factor`, declared `outcome`, and `attempt` sections. Declaration lines must appear before the first attempt.
+- The `procedure` parser accepts `step:` lines, nested `:::step` blocks, and procedure-local control flow: `repeat`, `until`, `branch`, `parallel`, `case`, `default`, `path`, `wait`, and `abort_if`. Brace-delimited controls are parsed inside `:::procedure`; they are not top-level Chemd blocks.
+- The `trace` parser records authored runtime `event:` lines under a trace object and is paired with runtime-trace replay code later in the pipeline.
 
 ### Inline Tokenizers
 
@@ -83,8 +95,8 @@ These tokenizers record token data, source text, and location. Business-level re
 
 `parseChildren` is the main body parsing loop. It buffers consecutive ordinary lines into Markdown nodes, flushes the Markdown buffer when it sees a `:::` block start, then dispatches structured blocks. `template` is handled directly by `parseChildren`; other blocks go through `parseStructuredBlock` and then the block parser registry.
 
-`parse-body-shared.ts` contains common syntax handling: block type matching, block line collection, field line parsing, list value parsing, `;;` multi-field splitting, `col:` child support, and Markdown node creation. Field keys start with a lowercase letter. Empty list items produce `E_INVALID_LIST_ITEM`. Keys outside the allowed field set produce `W_UNKNOWN_FIELD`.
+`parse-body-shared.ts` contains common syntax handling: block type matching, block line collection, field line parsing, list value parsing, `;;` multi-field splitting, `col:` child support, and Markdown node creation. Field keys start with a lowercase letter. Empty list items produce `E_INVALID_LIST_ITEM`. Keys outside the allowed field set produce error-severity `W_UNKNOWN_FIELD`.
 
-`parse-structured-block.ts` produces `W_UNKNOWN_BLOCK` for unknown blocks.
+`parse-structured-block.ts` produces error-severity `W_UNKNOWN_BLOCK` for unknown blocks.
 
 Inline tokenizers currently cover references, inline chemistry, inline code, and Markdown links. The reference tokenizer recognizes `@id` and `@id.field`; the inline chemistry tokenizer recognizes `:chem[...]`; the link tokenizer validates href safety and emits `W_UNSAFE_LINK_HREF` for unsafe href values.

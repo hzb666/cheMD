@@ -57,11 +57,18 @@ yield: 78 %
 :::
 
 :::condition-varies #cv-solvent-temperature
-reaction: rxn-variant
-standard: rxn-standard
-solvent: THF -> MeCN
-temperature: 25 C -> 40 C
-notes: Candidate improves yield under warmer MeCN conditions.
+standard: @rxn-standard
+factor: solvent | baseline=THF
+factor: temperature | baseline=25 C
+outcome: yield | baseline=40 %
+
+attempt: var1
+reaction: @rxn-variant
+result: @res-variant
+solvent: MeCN
+temperature: 40 C
+yield: 78 %
+note: Candidate improves yield under warmer MeCN conditions.
 :::
 `));
     const checked = typecheckDocument(document);
@@ -82,26 +89,33 @@ notes: Candidate improves yield under warmer MeCN conditions.
     }));
     expect(record.semantic_layer.condition_variations[0]).toMatchObject({
       original_id: "cv-solvent-temperature",
-      reaction_ref_raw: "rxn-variant",
-      standard_ref_raw: "rxn-standard",
-      changes: [
-        { field: "solvent", baseline_raw: "THF", candidate_raw: "MeCN" },
-        { field: "temperature", baseline_raw: "25 C", candidate_raw: "40 C" }
+      standard_ref_raw: "@rxn-standard",
+      condition: [
+        { field: "solvent", baseline_raw: "THF" },
+        { field: "temperature", baseline_raw: "25 C" }
+      ],
+      vary_fields: ["solvent", "temperature"],
+      attempt_entity_ids: [
+        "cva::exp-condition-varies::cv-solvent-temperature.var1"
       ]
     });
     expect(relationTypes).toEqual(expect.arrayContaining([
-      "condition_variation_targets_reaction",
-      "condition_variation_compares_standard"
+      "condition_variation_compares_standard",
+      "condition_variation_has_attempt",
+      "condition_variation_attempt_targets_reaction",
+      "condition_variation_attempt_has_result"
     ]));
-    expect(understanding.entities.condition_variations[0]).toMatchObject({
-      entity_id: "cv::exp-condition-varies::cv-solvent-temperature",
+    expect(record.semantic_layer.condition_variation_attempts[0]).toMatchObject({
+      entity_id: "cva::exp-condition-varies::cv-solvent-temperature.var1",
+      reaction_ref_raw: "@rxn-variant",
+      result_ref_raw: "@res-variant",
       changes: expect.arrayContaining([
         expect.objectContaining({ field: "solvent", candidate_raw: "MeCN" })
       ])
     });
     expect(understanding.resolved_references).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        source_entity_type: "condition_varies",
+        source_entity_type: "condition_variation_attempt",
         source_field: "reaction",
         target_original_id: "rxn-variant"
       }),
@@ -114,6 +128,7 @@ notes: Candidate improves yield under warmer MeCN conditions.
     expect(understanding.experiment_logic.condition_variations[0]).toMatchObject({
       logic_source: "explicit",
       confidence: "high",
+      condition_variation_attempt_entity_id: "cva::exp-condition-varies::cv-solvent-temperature.var1",
       reaction_entity_id: "rxn::exp-condition-varies::rxn-variant",
       standard_reaction_entity_id: "rxn::exp-condition-varies::rxn-standard"
     });

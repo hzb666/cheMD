@@ -61,7 +61,7 @@ const parseBraceColChild = (
       pushError(diagnostics, "W_UNTERMINATED_BRACE_BLOCK", "Unterminated brace block inside col block");
     }
 
-    // legacy brace block 继续走同一套 structured block 解析，避免旧语法立即失效。
+    // Brace child blocks reuse the normal structured-block parser.
     const parsed = parseChildren(braceBlockLines, diagnostics, 0, false, options);
     return {
       children: parsed.children,

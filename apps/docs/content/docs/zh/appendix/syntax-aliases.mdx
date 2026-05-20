@@ -5,21 +5,43 @@ description: Chemd 字段别名、行内别名和可接受的简写字段。
 
 本页列出当前 Chemd parser 与 resolver 接受的字段别名和简写。新文档建议优先使用规范字段；紧凑写作场景可使用已实现的简写。
 
+## `kind` 值别名
+
+| 别名 | 规范值 | 适用位置 | 说明 |
+| --- | --- | --- | --- |
+| `mol` | `molecule` | `:::chemd` 的 `kind` | 官方紧凑值。 |
+| `reac` | `reaction` | `:::chemd` 的 `kind` | 官方紧凑值。 |
+
+```md
+:::chemd #mol-solvent
+kind: mol
+smiles: CCO
+:::
+
+:::chemd #rxn-main
+kind: reac
+reactant: @mol-a | 1.0 mmol | 1.0 eq | limiting=true
+product: @mol-b
+:::
+```
+
 ## Reaction 字段别名
 
 | 别名或简写 | 规范字段 | 适用位置 | 说明 |
 | --- | --- | --- | --- |
-| `reactants` | `reactants` | `:::chemd` reaction | 反应物列表规范字段。 |
-| `reactant` | `reactants` | `:::chemd` reaction | 反应物列表的单数简写。 |
-| `reac` | `reactants` | `:::chemd` reaction | 紧凑简写。读取优先级高于 `reactant` 和 `reactants`。 |
-| `products` | `products` | `:::chemd` reaction | 产物列表规范字段。 |
-| `product` | `products` | `:::chemd` reaction | 产物列表的单数简写。 |
-| `prod` | `products` | `:::chemd` reaction | 紧凑简写。读取优先级高于 `product` 和 `products`。 |
+| `reactant` | `reactant` | `:::chemd` reaction | 可重复的结构化 participant 字段。 |
+| `reac` | `reactant` | `:::chemd` reaction | 紧凑的可重复 participant 字段。 |
+| `reactants` | `reactant` | `:::chemd` reaction | 简单 `|` 列表别名；不要写 amount、equiv 或 `limiting=true`。 |
+| `product` | `product` | `:::chemd` reaction | 可重复的结构化 participant 字段。 |
+| `prod` | `product` | `:::chemd` reaction | 紧凑的可重复 participant 字段。 |
+| `products` | `product` | `:::chemd` reaction | 简单 `|` 列表别名；不要写结果数量。 |
+| `reaction_smiles` | `rxn_smiles` | `:::chemd` reaction | reaction structure 别名。显式值必须与 participant 一致。 |
 
 ```md
 :::chemd #rxn-main
 kind: reaction
-reac: @mol-a | @mol-b
+reac: @mol-a | 1.0 mmol | 1.0 eq | limiting=true
+reac: @mol-b | 1.2 eq
 prod: @mol-c
 :::
 ```
@@ -57,14 +79,14 @@ The primary reaction used @reaction.solvent and gave @result.yield.
 
 ```md
 :::condition-varies #screen-main
-standard: rxn-standard
+standard: @rxn-standard
 factor: solvent | baseline=MeCN
 factor: temperature | baseline=40 C
 outcome: yield | baseline=68 %
 
 attempt: dmf-60
-reaction: rxn-var1
-result: res-var1
+reaction: @rxn-var1
+result: @res-var1
 solvent: DMF
 temperature: 60 C
 yield: 72 %

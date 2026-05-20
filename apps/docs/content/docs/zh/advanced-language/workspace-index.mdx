@@ -45,7 +45,7 @@ Chemd 本地对象 ID 只在单个文档内有作用域。workspace index 会把
 
 ## 推荐实践示例
 
-workspace tooling 应为每个打开的 `.chemd` 或兼容 `.chemd.md` 源文件提供稳定 URI。局部 ID 可以跨文件重复，因为 workspace index 会按 document URI 建立作用域。
+workspace tooling 应为每个打开的 `.chemd` 源文件提供稳定 URI。局部 ID 可以跨文件重复，因为 workspace index 会按 document URI 建立作用域。
 
 ```ts
 import { buildWorkspaceSymbolIndex } from "@chemd/workspace-index";

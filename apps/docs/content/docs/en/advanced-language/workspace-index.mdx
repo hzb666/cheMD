@@ -37,7 +37,7 @@ If multiple symbols would produce the same workspace symbol ID, later entries re
 
 The index extracts reference candidates from each source document and resolves them against collected symbols. Compile failures do not stop extraction; the failed document is marked `status: "failed"` and a diagnostic is attached.
 
-This makes the index suitable for partially invalid workspaces. Editors can still show available symbols and unresolved reference diagnostics while the author is repairing a file.
+This makes the index suitable for partially invalid workspaces. Editors can still show available symbols and unresolved reference diagnostics while the author is fixing a file.
 
 ## Determinism
 
@@ -45,7 +45,7 @@ Documents, symbols, and diagnostics are sorted before output. The index also has
 
 ## Best Practice Example
 
-Workspace tooling should pass every open `.chemd` or compatible `.chemd.md` source with a stable URI. Local IDs can repeat across files because the workspace index scopes them by document URI.
+Workspace tooling should pass every open `.chemd` source with a stable URI. Local IDs can repeat across files because the workspace index scopes them by document URI.
 
 ```ts
 import { buildWorkspaceSymbolIndex } from "@chemd/workspace-index";

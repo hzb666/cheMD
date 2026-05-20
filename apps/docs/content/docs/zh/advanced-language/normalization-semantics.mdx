@@ -15,19 +15,18 @@ Chemd 会对 reaction 条件执行轻量归一化。输入来自 reaction 的 `c
 | `solvent` | 识别 EtOH、MeOH、H2O、DCM、THF、MeCN、DMF、DMSO、toluene、EtOAc 等别名 |
 | `catalyst` | 显式字段优先；未写时从 `conditions` 中匹配包含 catalyst 的文本 |
 | `atmosphere` | 识别 N2、nitrogen、Ar、argon、air、O2、oxygen |
-| `temperature` | 解析 `C`、`°C`、`K`、`F` |
+| `temperature` | 解析 `C`、`°C`、`K`、`F`、室温 shorthand `rt` / `r.t.` 和 temperature program |
 | `time` | 解析 `h`、`hr`、`hrs`、`min`、`mins` |
 | `pressure` | 解析 `bar`、`atm`、`psi` |
 | `reagents` | 显式 `reagents` 按 `|` 拆分，并追加未被其他条件消费的 `conditions` 项 |
 
 ```md
 :::chemd #rxn-main
-kind: reaction
-reactants: @mol-a
-products: @mol-b
+reactant: @mol-a | 1.0 mmol | 1.0 eq | limiting=true
+product: @mol-b
 conditions: MeCN | 60 C | 3 h | N2 | Pd catalyst | K2CO3
 solvent: MeCN
-temperature: 60 C
+temperature: r.t. -> 60 C over 30 min
 time: 3 h
 atmosphere: N2
 :::
@@ -93,7 +92,7 @@ TLC 归一化按源码顺序读取显式 `lane:` section。每个 lane 内可包
 | `sm`、`starting material` | `starting_material` |
 | `pd`、`product` | `product` |
 | `int`、`intermediate` | `intermediate` |
-| `rxn`、`reaction` | `reaction` |
+| `rxn`、`reaction`、`reaction mixture` | `reaction_mixture` |
 | 数字 | `trial` |
 | `blank` | `blank` |
 | `unknown` | `unknown` |
@@ -102,7 +101,7 @@ TLC 归一化按源码顺序读取显式 `lane:` section。每个 lane 内可包
 
 | 写法 | 语义 |
 | --- | --- |
-| `spot: 0.52 starting_material` | 带确定 label 的 Rf spot |
+| `spot: 0.52 sm` | 带确定 label 的 Rf spot |
 | `0.52 ^3(4)` | 上箭头形状，size rank 3，intensity rank 4 |
 | `0.31 v2` | 下箭头形状，size rank 2 |
 | `spot: sm` | 引用唯一已知 spot |
@@ -115,18 +114,18 @@ rank 值被限制在 1 到 5。未知 label、歧义引用、混合 lane 中未�
 ```md
 :::analysis #ana-tlc
 type: tlc
-ref: rxn-main
+ref: @rxn-main
 time: 2 h
 eluent: petroleum ether/ethyl acetate 5:1
 lane: sm
-spot: 0.62 starting_material
+spot: 0.62 sm
 base: 0.62 starting_material
 lane: rxn
 spot: sm
-spot: 0.31 ^3(4) product
+spot: 0.31 ^3(4) prod
 mess: 0.55
 lane: prod
-spot: 0.30 product
+spot: 0.30 prod
 :::
 ```
 
@@ -136,7 +135,7 @@ typechecker 使用 result 的 `reaction` 字段；缺少该字段时使用 `ref`
 
 当 result 关联 reaction 后，typechecker 检查：
 
-- `product` 是否出现在 linked reaction 的 `products` 列表中。
+- `product` 是否出现在 linked reaction 的 products 中。
 - result 的 `yield`、`conversion`、`selectivity` 是否与 linked reaction 同名字段一致。
 
 product 不属于 reaction product 时产生 `E_TYPED_REFERENCE_MISMATCH`。指标不一致时产生 `E_RESULT_REACTION_CONFLICT`。

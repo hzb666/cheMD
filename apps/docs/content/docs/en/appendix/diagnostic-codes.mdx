@@ -16,10 +16,9 @@ The following reference lists common diagnostics by source and purpose. Use it t
 | `W_INVALID_FRONTMATTER_DATE_VALUE` | Date shape is valid but calendar value is invalid |
 | `W_INVALID_FRONTMATTER_LINE` | Frontmatter line cannot be parsed |
 | `E_INVALID_ID` | Block ID violates the ID rule |
-| `W_LEGACY_BLOCK_KIND` | Legacy `:::molecule` or `:::reaction` surface is detected |
-| `W_UNKNOWN_BLOCK` | Block type is not implemented |
+| `W_UNKNOWN_BLOCK` | Block type is not implemented; emitted with error severity |
 | `W_UNTERMINATED_BLOCK` | Structured block is not closed |
-| `W_UNKNOWN_FIELD` | Field is outside the allowed set for the block |
+| `W_UNKNOWN_FIELD` | Field is outside the allowed set for the block; emitted with error severity |
 | `E_INVALID_LIST_ITEM` | List field contains an empty item |
 | `W_UNSAFE_LINK_HREF` | Markdown link href fails the safe-href policy |
 | `E_TLC_LANE_REQUIRED` | TLC lane item appears before a `lane:` line |
@@ -70,6 +69,8 @@ The following reference lists common diagnostics by source and purpose. Use it t
 | `E_INTEROP_INCHI_FORMAT` | InChI identity field does not start with `InChI=` |
 | `E_INTEROP_INCHIKEY_FORMAT` | InChIKey does not match the standard 14-10-1 segment format |
 | `E_INTEROP_RXN_SMILES_PARSE` | RXN SMILES field does not contain a valid `reactants>>products` surface |
+| `E_INTEROP_RXN_SMILES_UNVERIFIED` | RXN SMILES cannot be verified against all participant identities |
+| `E_INTEROP_RXN_SMILES_PARTICIPANT_CONFLICT` | RXN SMILES conflicts with reaction participant identities |
 | `E_REACTION_PARTICIPANT_MISSING` | Reaction is missing a reactant or product participant |
 | `E_REACTION_PARTICIPANT_SYNTAX` | Structured participant facts use an invalid surface |
 | `E_REACTION_PARTICIPANT_PRODUCT_QUANTITY` | Product participant contains an invalid quantity |
@@ -80,7 +81,7 @@ The following reference lists common diagnostics by source and purpose. Use it t
 | `E_TLC_SPOT_REFERENCE` | TLC spot reference cannot be resolved uniquely |
 | `E_TLC_UNKNOWN_REFERENCE` | TLC `unknown` reference cannot resolve to a known spot |
 | `E_TLC_SPOT_LABEL_REQUIRED` | Mixed TLC lane contains an unlabeled spot |
-| `E_ANALYSIS_FIELD_FOR_TYPE` | Analysis field is incompatible with the declared analysis type |
+| `E_ANALYSIS_FIELD_FOR_TYPE` | Analysis field does not match the declared analysis type |
 | `E_ANALYSIS_PEAK_SYNTAX` | Analysis peak cannot be parsed for the declared analysis type |
 | `E_ANALYSIS_SPECTRUM_CONFLICT` | NMR spectrum metadata conflicts with explicit fields |
 | `E_ANALYSIS_ION_REQUIRED` | LCMS/GCMS analysis has peaks but no ion data |
@@ -127,13 +128,13 @@ The following reference lists common diagnostics by source and purpose. Use it t
 
 | Code | Meaning |
 | --- | --- |
-| `E_INTEROP_RXN_SMILES_MISSING` | Reaction structure export was requested without `rxn_smiles` |
+| `E_INTEROP_RXN_SMILES_MISSING` | A downstream interop adapter requested an explicit reaction structure that cannot be inferred |
 | `W_INTEROP_UNVERIFIED_IDENTITY` | Multiple molecule identity fields are present without an external consistency verifier |
 | `W_INTEROP_PLACEHOLDER_NOT_COMPLIANT` | External standard export is a placeholder mapping, not a validator-backed compliant export |
 | `E_TRAINING_PII_PRESENT` | Governance marks PII present, so only audit/full export is allowed |
-| `W_TRAINING_RAG_NOT_ALLOWED` | `allowed_uses` does not include `rag` |
-| `W_TRAINING_AUDIT_ONLY` | Governance allows audit use only |
-| `W_TRAINING_SANITIZATION_DISABLED` | Non-audit training use is allowed while sanitization is disabled |
+| `W_TRAINING_RAG_NOT_ALLOWED` | `allowed_uses` does not include `rag`; blocks non-audit projection |
+| `W_TRAINING_AUDIT_ONLY` | Governance allows audit use only; blocks non-audit projection |
+| `W_TRAINING_SANITIZATION_DISABLED` | Non-audit training use is allowed while sanitization is disabled; blocks sanitized projection |
 | `W_TRAINING_REVIEW_REQUIRED` | Training export has review-required quality or governance conditions |
 | `E501` | Procedure lowering failed |
 | `E504` | Analysis step is unbound |
@@ -152,8 +153,8 @@ The following reference lists common diagnostics by source and purpose. Use it t
 | `W_COL_COUNT_MISMATCH` | `col:` child count differs from column count |
 | `W_INVALID_COL_CHILD` | Invalid child line inside `:::col` |
 | `W_UNTERMINATED_BRACE_BLOCK` | `col: { ... }` content is not closed |
-| `W_AUTHORING_FIX_AVAILABLE` | Compiler can provide a safe repair suggestion |
-| `W_AUTHORING_INPUT_REQUIRED` | Repair requires user input |
+| `W_AUTHORING_FIX_AVAILABLE` | Compiler can provide a safe fix suggestion |
+| `W_AUTHORING_INPUT_REQUIRED` | Fix requires user input |
 | `E605` | Runtime capability is required but missing |
 | `E701` | Run plan build failed |
 | `E_RUNTIME_UNKNOWN_STEP` | Runtime step is unknown |
@@ -165,7 +166,7 @@ The following reference lists common diagnostics by source and purpose. Use it t
 | `E_RUNTIME_RESOURCE_CONFLICT` | Parallel control requires resource conflict review |
 | `W_RUNTIME_SAFETY` | Safety rule or safety tag requires attention |
 
-## Repair Order
+## Fix Order
 
 Fix errors before warnings. A stable order is frontmatter, block IDs, unknown fields, required fields, references, template parameters, quantities, step dependencies, and route graph diagnostics.
 

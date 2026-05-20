@@ -68,7 +68,7 @@ describe("canonical LNF builder", () => {
     });
   });
 
-  it("indexes explicit/lowered source ids and reports migration summaries", () => {
+  it("indexes explicit/lowered source ids and reports syntax summary counts", () => {
     const lnf = buildCanonicalLnf({
       document: {
         id: "exp-lnf-source",
@@ -129,11 +129,10 @@ describe("canonical LNF builder", () => {
         ]
       },
       diagnostics: [{
-        code: "W_UNKNOWN_BLOCK",
-        severity: "warning",
-        message: "legacy block",
-        sourceNodeType: "molecule",
-        facts: { legacy_block_kind: "molecule" }
+        code: "W_CHEMD_KIND_AMBIGUOUS",
+        severity: "error",
+        message: "chemd kind cannot be inferred",
+        sourceNodeType: "chemd"
       }]
     });
 
@@ -142,7 +141,8 @@ describe("canonical LNF builder", () => {
       loweredStepIds: ["s2"],
       observationEvents: [{ observationId: "obs-main", eventId: "obs-main::event-1" }]
     });
-    expect(lnf.experiment.quality.migration.legacyBlockCount).toBe(1);
+    expect(lnf.experiment.quality.migration.legacyBlockCount).toBe(0);
+    expect(lnf.experiment.quality.migration.missingKindCount).toBe(1);
   });
 
   it("preserves semantic graph, step provenance, and runtime summaries", () => {

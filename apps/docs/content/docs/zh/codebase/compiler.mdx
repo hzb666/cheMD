@@ -1,6 +1,6 @@
 ---
 title: Compiler 与导出链路
-description: compiler 包的依赖、入口、fixtures、repair 和 input-assistance 支持。
+description: compiler 包的依赖、入口、fixtures、safe-fix loop 和 input-assistance 支持。
 ---
 
 Compiler 实现位于 `packages/compiler`。包入口包括 `packages/compiler/src/index.ts` 和 Node 专用入口 `packages/compiler/src/node.ts`。
@@ -49,9 +49,8 @@ if (result.diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
 - `authoring-minimal-sets.ts`
 - `authoring-templates.ts`
 - `quick-fix.ts`
-- `repair-loop.ts`
 
-这些文件承载诊断、模板建议、quick fix 和 repair loop 能力。
+这些文件承载诊断、模板建议、quick fix 和内部 safe-fix loop 实现。
 
 ## 编译管线顺序
 
@@ -59,15 +58,28 @@ if (result.diagnostics.some((diagnostic) => diagnostic.severity === "error")) {
 
 `CompileResult` 暴露 document、diagnostics、renderOptions、renderAdapterPayload、typedSemanticGraph、stepGraph、runPlan、runtimePreflight、lnf、ragExport、trainingUnderstanding、trainingExport、authoringAssistance、diagnosis、html、json 和 docxBridge。
 
-## 诊断与修复入口
+## 诊断与 safe-fix 入口
 
-`buildCompilerDiagnosis` 把 diagnostics 分成 safe fixes、required inputs 和 manual review items，并给出 next actions。`applyCompilerDiagnosisSafeFixes` 按顺序应用 safe fixes。`runChemdRepairLoop` 在本地重复编译和应用 safe fixes。`runChemdAgentLoop` 在 repair loop 之后调用外部 agent driver。
+`buildCompilerDiagnosis` 把 diagnostics 分成 safe fixes、required inputs 和 manual review items，并给出 next actions。`applyCompilerDiagnosisSafeFixes` 按顺序应用 safe fixes。公共 CLI 表面是 `chemd fix`；内部 safe-fix 实现会重复本地编译与 safe-fix 应用，然后由 `runChemdAgentLoop` 调用外部 agent driver。
 
 ```bash
-pnpm chemd repair draft.chemd --format json
-pnpm chemd repair draft.chemd --write
+pnpm chemd fix draft.chemd --format json
+pnpm chemd fix draft.chemd --write
 ```
 
 ## 导出入口
 
 HTML 来自 `@chemd/renderer-html`。JSON 来自 `@chemd/renderer-json`，并带 typed graph。DOCX bridge 来自 `@chemd/renderer-docx`，并接收 render adapter payload。training、RAG 和 graph index 来自 `@chemd/exporter-training`。
+
+## 当前语言语义
+
+compiler-facing 测试和 fixtures 应同步覆盖这些语言表面：
+
+- `:::chemd` kind 推断、`mol` / `reac` 别名、结构化 `reactant` / `product` participant，以及可从 participant molecule 推断的可选 `rxn_smiles`。
+- `:::material` 和 `:::batch` 作为 physical inventory / batch 层，并可被 reaction participant 引用。
+- `:::analysis` TLC lane/spot 简写、label-only spot 引用、NMR `spectrum` / `peak` 行、MS `peak` / `ion` 行和 artifact 引用。
+- `:::condition-varies` factor/outcome/attempt section、baseline 和每个 attempt 的 outcome 值。
+- `:::procedure` 显式 step，以及 `repeat`、`until`、`branch`、`parallel`、`case`、`default`、`path`、`wait`、`abort_if` 控制流行和大括号 block。
+- `:::trace` authored runtime event，以及 governance 诊断在需要时阻断 sanitized non-audit training projection。
+
+compiler result 变化时，需要同时检查使用者可见导出和开发者可见语义结构：diagnostics、typed semantic graph、step graph、run plan、LNF、RAG export、training understanding 与 language-service consumers。

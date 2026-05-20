@@ -121,19 +121,19 @@ products: @c
     );
   });
 
-  it("does not parse legacy molecule and reaction blocks as semantic nodes", () => {
+  it("treats molecule and reaction blocks as unknown block types", () => {
     const document = parseChemd(`---
-id: exp-legacy
-title: Legacy surface
+id: exp-unknown-blocks
+title: Unknown surface blocks
 date: 2026-04-17
 ---
 
-:::molecule #legacy-mol
+:::molecule #mol-main
 smiles: CCO
 :::
 
-:::reaction #legacy-rxn
-reactants: @legacy-mol
+:::reaction #rxn-main
+reactants: @mol-main
 products: @product
 :::
 `);
@@ -145,17 +145,13 @@ products: @product
           code: "W_UNKNOWN_BLOCK",
           message: "Unknown block type: molecule",
           sourceNodeType: "molecule",
-          sourceNodeId: "legacy-mol",
-          facts: expect.objectContaining({ legacy_block_kind: "molecule" }),
-          quickFixes: [expect.objectContaining({ kind: "convert_legacy_block" })]
+          sourceNodeId: "mol-main"
         }),
         expect.objectContaining({
           code: "W_UNKNOWN_BLOCK",
           message: "Unknown block type: reaction",
           sourceNodeType: "reaction",
-          sourceNodeId: "legacy-rxn",
-          facts: expect.objectContaining({ legacy_block_kind: "reaction" }),
-          quickFixes: [expect.objectContaining({ kind: "convert_legacy_block" })]
+          sourceNodeId: "rxn-main"
         })
       ])
     );
@@ -202,7 +198,7 @@ name: ethanol
     expect(document.children[0]).not.toMatchObject({ smiles: "64-17-5" });
   });
 
-  it("parses condition-varies blocks with structured deltas", () => {
+  it("rejects legacy condition-varies flat deltas", () => {
     const document = parseChemd(`---
 id: exp-condition-varies
 title: Condition varies
@@ -223,12 +219,13 @@ notes: Solvent and temperature screen.
       id: "cv-solvent",
       reaction: "rxn-variant",
       standard: "rxn-standard",
-      changes: [
-        { field: "solvent", raw: "THF -> MeCN", baseline: "THF", candidate: "MeCN" },
-        { field: "temperature", raw: "25 C -> 40 C", baseline: "25 C", candidate: "40 C" }
-      ],
+      changes: [],
       notes: "Solvent and temperature screen."
     });
+    expect(document.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "E_CONDITION_DSL_FIELD", sourceField: "solvent" }),
+      expect.objectContaining({ code: "E_CONDITION_DSL_FIELD", sourceField: "temperature" })
+    ]));
   });
 
   it("parses condition-varies blocks with parallel attempts", () => {
@@ -240,14 +237,25 @@ date: 2026-04-23
 
 :::condition-varies #cv-screen
 standard: rxn-standard
-condition: solvent=THF | temperature=25 C | catalyst=Pd
-varies: solvent | temperature
-var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
-res1: res-var1
-note1: Higher yield but more impurity.
-var2: reaction=rxn-var2 | mode=override | solvent=DMSO | temperature=60 C | catalyst=Ni
-res2: res-var2
-note2: Trace product by TLC.
+factor: solvent | baseline=THF
+factor: temperature | baseline=25 C
+factor: catalyst | baseline=Pd
+outcome: yield | baseline=40 %
+attempt: var1
+reaction: rxn-var1
+result: res-var1
+solvent: MeCN
+temperature: 40 C
+yield: 78 %
+note: Higher yield but more impurity.
+attempt: var2 | mode=override
+reaction: rxn-var2
+result: res-var2
+solvent: DMSO
+temperature: 60 C
+catalyst: Ni
+yield: 12 %
+note: Trace product by TLC.
 :::
 `);
 
@@ -260,13 +268,14 @@ note2: Trace product by TLC.
         { field: "temperature", baseline: "25 C" },
         { field: "catalyst", baseline: "Pd" }
       ],
-      varyFields: ["solvent", "temperature"],
+      varyFields: ["solvent", "temperature", "catalyst"],
       attempts: [
         expect.objectContaining({
           id: "var1",
           reaction: "rxn-var1",
           result: "res-var1",
           note: "Higher yield but more impurity.",
+          outcomes: { yield: "78 %" },
           condition: expect.arrayContaining([
             expect.objectContaining({ field: "catalyst", candidate: "Pd" }),
             expect.objectContaining({ field: "solvent", candidate: "MeCN" })
@@ -278,6 +287,7 @@ note2: Trace product by TLC.
           reaction: "rxn-var2",
           result: "res-var2",
           note: "Trace product by TLC.",
+          outcomes: { yield: "12 %" },
           condition: expect.arrayContaining([
             expect.objectContaining({ field: "solvent", candidate: "DMSO" })
           ])

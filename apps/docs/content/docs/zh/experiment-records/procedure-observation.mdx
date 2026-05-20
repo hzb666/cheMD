@@ -69,7 +69,50 @@ temperature: 0 C
 
 procedure 顶层 `evidence` 表达过程块的证据来源。step 级 `evidence` 保存为字符串数组，用于 step graph 的证据边。`confidence` 表达显式 step 的使用者置信度；缺省时 typechecker 对显式 step 使用 1。
 
-step 参数中的数量字段会进入统一数量解析：`amount`、`mass`、`volume`、`temperature`、`target_temperature`、`duration`、`time`、`pressure`、`concentration`、`equivalent`、`equivalents` 和 `percent`。
+step 参数中的数量字段会进入统一数量解析：`amount`、`mass`、`volume`、`temperature`、`target_temperature`、`duration`、`time`、`pressure`、`concentration`、`equivalent`、`equivalents`、`percent`、`rate`、`rpm` 和 `ph`。
+
+## procedure 控制流
+
+控制流写在 `:::procedure` 内部，和 `step:` 一样使用行式语法；有子步骤时用大括号。`repeat` 会静态展开为具体 step，`until`、`branch`、`wait` 和 `abort_if` 保留为 dynamic control 进入 control graph。`parallel` 会静态记录每条 path，运行预检再检查资源冲突。
+
+```md
+:::procedure #proc-controlled
+reaction: @rxn-main
+
+step: charge | id=s-charge | inputs=@mat-substrate | outputs=mixture-a
+
+repeat: wash-cycle | count=2 {
+  step: wash | solvent=brine | volume=10 mL
+}
+
+until: monitor-tlc | condition=@ana-tlc.result == complete | max_iterations=4 {
+  step: analyze | id=s-tlc-check | type=tlc
+}
+
+branch: ph-workup {
+  case: acidic | condition=sensor.ph < 7 {
+    step: add | reagent=NaHCO3(aq) | rate=0.5 mL/min
+  }
+  default: neutral {
+    step: hold | duration=0 min | note=skip neutralization
+  }
+}
+
+parallel: workup {
+  path: organic {
+    step: dry | medium=Na2SO4
+  }
+  path: aqueous {
+    step: store | location=waste
+  }
+}
+
+wait: operator-approval | condition=operator.confirmed | timeout=30 min
+abort_if: unsafe-temperature | condition=sensor.temperature > 80 C
+:::
+```
+
+control condition 必须能被机器判断。`@ana-tlc` 这类引用必须可解析；自然语言条件会报错，因为 runtime 无法可靠决定下一步。
 
 ## `:::observation` 观察块
 
@@ -104,13 +147,30 @@ event 通过 `linkedStep` 或 `linked_step` 写入 `linkedStepId`。typechecker 
 
 正文 lowering 由 `@chemd/step-ontology` 执行。procedure lowering 可识别 charge、purge、cool、heat、quench、add、hold、extract、dry、concentrate、separate_layers、filter、sample、analyze 和 observe 等句式；observation lowering 可识别 color change、precipitation 和 gas evolution 等事件。lowering 会产生 warning，用于提示该语义来自正文推断。
 
+## runtime trace
+
+真实运行、回放或外部设备日志需要记录实际发生了什么时，使用 `:::trace`。trace event 指向 procedure plan、step ID 和 control ID，不会改写 procedure 或 result。
+
+```md
+:::trace #run-main
+plan: @proc-controlled
+mode: human-run
+event: run_started | at=2026-05-20T09:00:00Z
+event: step_started | step=s-charge | at=2026-05-20T09:01:00Z
+event: control_entered | control=operator-approval | at=2026-05-20T09:04:00Z
+event: control_completed | control=operator-approval | at=2026-05-20T09:05:00Z
+event: deviation_recorded | step=s-tlc-check | field=iteration_count | expected=1 | actual=3
+event: run_completed | at=2026-05-20T09:40:00Z
+:::
+```
+
 ## 推荐实践示例
 
 需要稳定 graph、runtime preflight 或 evidence export 时，procedure 使用显式 step，observation 使用显式 event，并通过 `linkedStep` 连接。
 
 ```md
 :::procedure #proc-main
-reaction: rxn-main
+reaction: @rxn-main
 evidence: notebook-p12
 step: charge | id=s-charge | inputs=@mol-substrate | outputs=mixture-a
 step: heat | id=s-heat | temperature=60 C | duration=3 h | dependsOn=s-charge
@@ -118,7 +178,7 @@ step: analyze | id=s-tlc | analysisType=tlc | dependsOn=s-heat
 :::
 
 :::observation #obs-main
-ref: rxn-main
+ref: @rxn-main
 event: color_change | id=e-color | stage=reaction | linkedStep=s-heat | color=yellow | evidence=photo-1
 event: gas_evolution | id=e-gas | severity=low | linkedStep=s-charge
 Mixture became yellow during heating.

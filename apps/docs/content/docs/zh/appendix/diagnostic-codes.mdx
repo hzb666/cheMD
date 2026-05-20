@@ -16,10 +16,9 @@ description: Chemd parser、resolver、typechecker、compiler 和 runtime 常见
 | `W_INVALID_FRONTMATTER_DATE_VALUE` | 日期格式匹配但日历值非法 |
 | `W_INVALID_FRONTMATTER_LINE` | frontmatter 行无法解析 |
 | `E_INVALID_ID` | 块 ID 不符合规则 |
-| `W_LEGACY_BLOCK_KIND` | 检测到旧式 `:::molecule` 或 `:::reaction` 输入表面 |
-| `W_UNKNOWN_BLOCK` | 块类型未实现 |
+| `W_UNKNOWN_BLOCK` | 块类型未实现；以 error severity 报告 |
 | `W_UNTERMINATED_BLOCK` | 结构化块未闭合 |
-| `W_UNKNOWN_FIELD` | 字段不在块允许集合内 |
+| `W_UNKNOWN_FIELD` | 字段不在块允许集合内；以 error severity 报告 |
 | `E_INVALID_LIST_ITEM` | 列表字段包含空项 |
 | `W_UNSAFE_LINK_HREF` | Markdown 链接 href 未通过安全策略 |
 | `E_TLC_LANE_REQUIRED` | TLC lane item 出现在 `lane:` 之前 |
@@ -70,6 +69,8 @@ description: Chemd parser、resolver、typechecker、compiler 和 runtime 常见
 | `E_INTEROP_INCHI_FORMAT` | InChI 身份字段没有以 `InChI=` 开头 |
 | `E_INTEROP_INCHIKEY_FORMAT` | InChIKey 不符合标准 14-10-1 分段格式 |
 | `E_INTEROP_RXN_SMILES_PARSE` | RXN SMILES 字段不是有效 `reactants>>products` 表面 |
+| `E_INTEROP_RXN_SMILES_UNVERIFIED` | RXN SMILES 无法根据全部 participant 身份验证 |
+| `E_INTEROP_RXN_SMILES_PARTICIPANT_CONFLICT` | RXN SMILES 与 reaction participant 身份冲突 |
 | `E_REACTION_PARTICIPANT_MISSING` | reaction 缺少 reactant 或 product participant |
 | `E_REACTION_PARTICIPANT_SYNTAX` | 结构化 participant 事实使用了非法表面语法 |
 | `E_REACTION_PARTICIPANT_PRODUCT_QUANTITY` | product participant 含有非法数量 |
@@ -80,7 +81,7 @@ description: Chemd parser、resolver、typechecker、compiler 和 runtime 常见
 | `E_TLC_SPOT_REFERENCE` | TLC spot 引用无法唯一解析 |
 | `E_TLC_UNKNOWN_REFERENCE` | TLC `unknown` 引用无法解析为已知 spot |
 | `E_TLC_SPOT_LABEL_REQUIRED` | 混合 TLC lane 中存在未标注 spot |
-| `E_ANALYSIS_FIELD_FOR_TYPE` | analysis 字段与声明的 analysis 类型不兼容 |
+| `E_ANALYSIS_FIELD_FOR_TYPE` | analysis 字段与声明的 analysis 类型不匹配 |
 | `E_ANALYSIS_PEAK_SYNTAX` | analysis peak 无法按声明类型解析 |
 | `E_ANALYSIS_SPECTRUM_CONFLICT` | NMR spectrum 元数据与显式字段冲突 |
 | `E_ANALYSIS_ION_REQUIRED` | LCMS/GCMS 有 peak 但缺少 ion 数据 |
@@ -127,13 +128,13 @@ description: Chemd parser、resolver、typechecker、compiler 和 runtime 常见
 
 | 诊断码 | 含义 |
 | --- | --- |
-| `E_INTEROP_RXN_SMILES_MISSING` | 请求导出 reaction structure，但缺少 `rxn_smiles` |
+| `E_INTEROP_RXN_SMILES_MISSING` | 下游 interop adapter 需要显式 reaction structure，但无法推断 |
 | `W_INTEROP_UNVERIFIED_IDENTITY` | 同一 molecule 有多个身份字段，但没有外部 verifier 证明一致 |
 | `W_INTEROP_PLACEHOLDER_NOT_COMPLIANT` | 外部标准导出只是 placeholder mapping，不是 validator-backed compliant export |
 | `E_TRAINING_PII_PRESENT` | governance 标记 PII present，因此只允许 audit/full export |
-| `W_TRAINING_RAG_NOT_ALLOWED` | `allowed_uses` 不包含 `rag` |
-| `W_TRAINING_AUDIT_ONLY` | governance 仅允许 audit 用途 |
-| `W_TRAINING_SANITIZATION_DISABLED` | 允许非 audit training use，但 sanitization 被禁用 |
+| `W_TRAINING_RAG_NOT_ALLOWED` | `allowed_uses` 不包含 `rag`；阻断 non-audit projection |
+| `W_TRAINING_AUDIT_ONLY` | governance 仅允许 audit 用途；阻断 non-audit projection |
+| `W_TRAINING_SANITIZATION_DISABLED` | 允许 non-audit training use，但 sanitization 被禁用；阻断 sanitized projection |
 | `W_TRAINING_REVIEW_REQUIRED` | training export 存在需要 review 的质量或 governance 条件 |
 | `E501` | procedure lowering 失败 |
 | `E504` | analysis step 未绑定 |
@@ -152,8 +153,8 @@ description: Chemd parser、resolver、typechecker、compiler 和 runtime 常见
 | `W_COL_COUNT_MISMATCH` | `col:` 子项数量与列数不一致 |
 | `W_INVALID_COL_CHILD` | `:::col` 子项行非法 |
 | `W_UNTERMINATED_BRACE_BLOCK` | `col: { ... }` 内容未闭合 |
-| `W_AUTHORING_FIX_AVAILABLE` | compiler 可提供安全修复建议 |
-| `W_AUTHORING_INPUT_REQUIRED` | 修复需要使用者输入 |
+| `W_AUTHORING_FIX_AVAILABLE` | compiler 可提供安全 fix 建议 |
+| `W_AUTHORING_INPUT_REQUIRED` | fix 需要使用者输入 |
 | `E605` | runtime 缺少必需 capability |
 | `E701` | run plan 构建失败 |
 | `E_RUNTIME_UNKNOWN_STEP` | runtime step 未识别 |

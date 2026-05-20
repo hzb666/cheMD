@@ -10,7 +10,7 @@ Chemd experiment records are centered on object relations. Prose can carry narra
 A one-step record usually contains:
 
 - `:::chemd` objects for molecules and the main reaction.
-- One `:::result` that points to the main reaction through `ref`.
+- One `:::result` that points to the main reaction through `reaction`.
 - One `:::procedure` that points to the main reaction through `reaction` or `ref`.
 - One or more `:::analysis`, `:::sample`, and `:::artifact` blocks.
 
@@ -24,24 +24,21 @@ primary_result: res-main
 ---
 
 :::chemd #mol-acid
-kind: molecule
 name: benzoic acid
 smiles: O=C(O)c1ccccc1
 role: substrate
 :::
 
 :::chemd #mol-product
-kind: molecule
 name: ethyl benzoate
 smiles: CCOC(=O)c1ccccc1
 role: product
 :::
 
 :::chemd #rxn-main
-kind: reaction
 name: Fischer esterification
-reactants: @mol-acid
-products: @mol-product
+reactant: @mol-acid | 1.0 mmol | 1.0 eq | limiting=true
+product: @mol-product
 catalyst: H2SO4
 solvent: ethanol
 temperature: 78 C
@@ -49,7 +46,7 @@ time: 4 h
 :::
 
 :::result #res-main
-ref: rxn-main
+reaction: @rxn-main
 product: @mol-product
 status: success
 yield: 76 %
@@ -66,12 +63,11 @@ Route relations are written on reaction fields:
 
 ```md
 :::chemd #rxn-step-07
-kind: reaction
 name: C7 hydroxyl protection
 route: route-taxol-a
 prev: rxn-step-06
-reactants: @mol-step-06
-products: @mol-step-07
+reactant: @mol-step-06 | 1.0 mmol | 1.0 eq | limiting=true
+product: @mol-step-07
 reagents: TBSCl | imidazole
 solvent: DMF
 temperature: 25 C
@@ -87,7 +83,7 @@ This structure supports graph export and route aggregation. Users declare upstre
 
 ```md
 :::condition-varies #cv-screen
-standard: rxn-standard
+standard: @rxn-standard
 factor: solvent | baseline=THF
 factor: temperature | baseline=25 C
 factor: catalyst | baseline=Pd(PPh3)4
@@ -95,8 +91,8 @@ outcome: conversion | baseline=82 %
 outcome: purity | baseline=91 %
 
 attempt: var1
-reaction: rxn-var1
-result: res-var1
+reaction: @rxn-var1
+result: @res-var1
 solvent: MeCN
 temperature: 40 C
 conversion: 90 %
@@ -104,8 +100,8 @@ purity: 94 %
 note: Higher conversion with the baseline catalyst.
 
 attempt: var2
-reaction: rxn-var2
-result: res-var2
+reaction: @rxn-var2
+result: @res-var2
 solvent: DMF
 temperature: 60 C
 catalyst: Pd(dppf)Cl2
@@ -129,8 +125,8 @@ Parsing rules:
 
 ```md
 :::procedure #proc-var1
-ref: rxn-var1
-reaction: rxn-var1
+ref: @rxn-var1
+reaction: @rxn-var1
 evidence: notebook-24,photo-var1
 step: charge | id=s-charge-var1 | stage=charging | inputs=@mol-aryl,@mol-boron | confidence=0.97
 step: heat | id=s-heat-var1 | stage=reaction | temperature=40 C | duration=2 h | dependsOn=s-charge-var1 | confidence=0.95
@@ -160,22 +156,21 @@ For routine experiments, use one main reaction, one main result, explicit proced
 
 ```md
 :::chemd #rxn-main
-kind: reaction
-reactants: @mol-substrate
-products: @mol-product
+reactant: @mol-substrate | 1.0 mmol | 1.0 eq | limiting=true
+product: @mol-product
 solvent: MeCN
 temperature: 60 C
 :::
 
 :::result #res-main
-reaction: rxn-main
-product: mol-product
+reaction: @rxn-main
+product: @mol-product
 status: success
 yield: 76 %
 :::
 
 :::procedure #proc-main
-reaction: rxn-main
+reaction: @rxn-main
 step: charge | id=s-charge | inputs=@mol-substrate | outputs=mixture-a
 step: analyze | id=s-tlc | analysisType=tlc | dependsOn=s-charge
 :::

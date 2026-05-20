@@ -18,34 +18,31 @@ primary_result: res-main
 ---
 
 :::chemd #substrate
-kind: molecule
 smiles: CCO
 name: ethanol
 :::
 
 :::chemd #product
-kind: molecule
 smiles: CC=O
 name: acetaldehyde
 :::
 
 :::chemd #rxn-main
-kind: reaction
-reactants: substrate
-products: product
+reactant: @substrate | 1.0 mmol | 1.0 eq | limiting=true
+product: @product
 solvent: DCM
 temperature: 0 C
 time: 2 h
 :::
 
 :::result #res-main
-ref: rxn-main
+reaction: @rxn-main
 status: success
 yield: 62 %
 :::
 
 :::procedure #proc-main
-reaction: rxn-main
+reaction: @rxn-main
 step: add | id=s-add-oxidant | reagent=oxidant | temperature=0 C | mode=dropwise
 step: hold | id=s-hold | duration=2 h | dependsOn=s-add-oxidant
 step: quench | id=s-quench | reagent=sodium sulfite | dependsOn=s-hold
@@ -60,22 +57,20 @@ The total synthesis fixture uses multiple reactions and expresses route relation
 
 ```md
 :::chemd #rxn-step-1
-kind: reaction
-reactants: starting-material
-products: intermediate-1
+reactant: @starting-material | 1.0 mmol | 1.0 eq | limiting=true
+product: @intermediate-1
 route: route-a
 :::
 
 :::chemd #rxn-step-2
-kind: reaction
-reactants: intermediate-1
-products: final-product
+reactant: @intermediate-1 | 1.0 mmol | 1.0 eq | limiting=true
+product: @final-product
 route: route-a
 prev: rxn-step-1
 :::
 
 :::result #res-step-2
-ref: rxn-step-2
+reaction: @rxn-step-2
 status: success
 yield: 48 %
 :::
@@ -89,14 +84,14 @@ A condition screen should contain a baseline reaction, attempt reactions, attemp
 
 ```md
 :::condition-varies #cv-base
-standard: rxn-baseline
+standard: @rxn-baseline
 factor: solvent | baseline=THF
 factor: temperature | baseline=25 C
 outcome: conversion | baseline=85 %
 
 attempt: attempt-mecn-40
-reaction: rxn-mecn-40
-result: res-mecn-40
+reaction: @rxn-mecn-40
+result: @res-mecn-40
 solvent: MeCN
 temperature: 40 C
 conversion: 90 %
@@ -113,18 +108,18 @@ Analysis-driven records connect `:::analysis` to a reaction, result, sample, or 
 ```md
 :::analysis #ana-tlc-screen
 type: tlc
-ref: cv-base.attempt-mecn-40
+ref: @cv-base.attempt-mecn-40
 eluent: petroleum ether/ethyl acetate 4:1
 lane: sm
-spot: 0.20 ^(2) starting_material
+spot: 0.20 ^(2) sm
 lane: rxn
-spot: 0.55 v(4) product
+spot: 0.55 v(4) prod
 result: product spot dominant after 2 h
 :::
 
 :::analysis #ana-hplc-product
 type: hplc
-ref: res-main
+ref: @res-main
 instrument: Agilent 1260 Infinity II
 method: C18 gradient 10-90% MeCN
 peak: 6.4 min (96 %, product)
@@ -140,13 +135,13 @@ Sample tracking uses `derived_from`, `aliquot_of`, and `batch_of` for lineage. `
 
 ```md
 :::sample #sample-crude
-ref: rxn-main
+ref: @rxn-main
 name: Crude reaction mixture
 batch: batch-main
 :::
 
 :::sample #sample-purified
-ref: res-main
+ref: @res-main
 name: Purified main product
 derived_from: sample-crude
 batch_of: batch-main
@@ -163,7 +158,7 @@ Artifact evidence uses `kind`, `ref`, `path`, optional `checksum`, and optional 
 ```md
 :::artifact #art-nmr-1h
 kind: nmr
-ref: sample-purified
+ref: @sample-purified
 path: data/nmr/product-1h.jdx
 checksum: sha256:9c8a7f1e
 instrument: Bruker Avance 400
@@ -186,9 +181,8 @@ primary_reaction: rxn-route-a-step-2
 ---
 
 :::chemd #rxn-route-a-step-2
-kind: reaction
-reactants: intermediate-1
-products: final-product
+reactant: @intermediate-1 | 1.0 mmol | 1.0 eq | limiting=true
+product: @final-product
 route: route-a
 prev: route-a-step-1#rxn-route-a-step-1
 :::
@@ -210,24 +204,21 @@ primary_result: res-main
 ---
 
 :::chemd #mol-start
-kind: molecule
 smiles: CCO
 :::
 
 :::chemd #mol-product
-kind: molecule
 smiles: CC=O
 :::
 
 :::chemd #rxn-main
-kind: reaction
-reactants: @mol-start
-products: @mol-product
+reactant: @mol-start | 1.0 mmol | 1.0 eq | limiting=true
+product: @mol-product
 :::
 
 :::result #res-main
-reaction: rxn-main
-product: mol-product
+reaction: @rxn-main
+product: @mol-product
 status: success
 yield: 70 %
 :::

@@ -39,13 +39,8 @@ const chemdMolecule = ["molecule"] satisfies ChemdSemanticKind[];
 const chemdReaction = ["reaction"] satisfies ChemdSemanticKind[];
 
 const pNumberField: PatternFieldSchema = {
-  description: "Legacy TLC lane field pN",
+  description: "TLC lane field pN",
   pattern: /^p\d+$/
-};
-
-const conditionAuxiliaryField: PatternFieldSchema = {
-  description: "Legacy condition attempt/result/note fields",
-  pattern: /^(?:var|res|note)\d+$/
 };
 
 export const CHEMD_KIND_VALUE_ALIASES: Record<string, ChemdSemanticKind> = {
@@ -219,12 +214,8 @@ export const BLOCK_SCHEMAS: readonly BlockSchema[] = [
       field("factor", { list: true, listMode: "repeat" }),
       field("outcome", { list: true, listMode: "repeat" }),
       field("attempt", { list: true, listMode: "repeat" }),
-      field("condition"),
-      field("varies"),
       field("notes")
-    ],
-    patternFields: [conditionAuxiliaryField],
-    allowsArbitraryFields: true
+    ]
   },
   {
     blockType: "procedure",

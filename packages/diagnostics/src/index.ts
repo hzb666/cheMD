@@ -14,7 +14,6 @@ export type DiagnosticSourceLayer =
 export type QuickFixKind =
   | "replace_text"
   | "insert_field"
-  | "convert_legacy_block"
   | "insert_chemd_kind"
   | "insert_step_skeleton"
   | "split_procedure_to_steps"
@@ -67,7 +66,6 @@ export interface DiagnosticSpec {
 }
 
 const DIAGNOSTIC_SPECS: DiagnosticSpec[] = [
-  { code: "W_LEGACY_BLOCK_KIND", band: "syntax", title: "Legacy surface block", defaultSeverity: "warning" },
   { code: "W_UNKNOWN_BLOCK", band: "syntax", title: "Unknown block", defaultSeverity: "error" },
   { code: "W_CHEMD_KIND_AMBIGUOUS", band: "syntax", title: "Ambiguous chemd kind", defaultSeverity: "error" },
   { code: "E_CHEMD_KIND_CONFLICT", band: "syntax", title: "Conflicting chemd kind", defaultSeverity: "error" },
@@ -115,7 +113,6 @@ const DIAGNOSTIC_SPECS: DiagnosticSpec[] = [
 const LEGACY_BANDS: Record<string, DiagnosticBand> = {
   E_INVALID_ID: "syntax",
   E_DUPLICATE_ID: "syntax",
-  W_LEGACY_BLOCK_KIND: "syntax",
   W_CHEMD_KIND_AMBIGUOUS: "syntax",
   E_CHEMD_KIND_CONFLICT: "syntax",
   E_STEP_INVALID_FAMILY: "procedure",
@@ -174,26 +171,6 @@ const createProcedureQuickFix = (): QuickFix => ({
   kind: "split_procedure_sentence"
 });
 
-const createLegacyBlockQuickFix = (diagnostic: V03Diagnostic): QuickFix => ({
-  title: "Convert this legacy block to canonical chemd syntax",
-  kind: "convert_legacy_block",
-  patch: {
-    source_node_type: diagnostic.sourceNodeType,
-    source_node_id: diagnostic.sourceNodeId
-  }
-});
-
-const isLegacySurfaceDiagnostic = (diagnostic: V03Diagnostic): boolean =>
-  diagnostic.code === "W_LEGACY_BLOCK_KIND"
-  || (
-    diagnostic.code === "W_UNKNOWN_BLOCK"
-    && (
-      diagnostic.sourceNodeType === "molecule"
-      || diagnostic.sourceNodeType === "reaction"
-      || typeof diagnostic.facts?.legacy_block_kind === "string"
-    )
-  );
-
 const createInsertChemdKindQuickFix = (
   diagnostic: V03Diagnostic,
   kind: "molecule" | "reaction"
@@ -218,10 +195,6 @@ export const buildQuickFixes = (diagnostic: V03Diagnostic): QuickFix[] => {
 
   if (diagnostic.code === "W805") {
     return [createProcedureQuickFix()];
-  }
-
-  if (isLegacySurfaceDiagnostic(diagnostic)) {
-    return [createLegacyBlockQuickFix(diagnostic)];
   }
 
   if (diagnostic.code === "W_CHEMD_KIND_AMBIGUOUS") {

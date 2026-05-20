@@ -158,6 +158,24 @@ const createSymbolMarkdown = (
   if (symbol.sourceNodeType) {
     lines.push(`source: \`${symbol.sourceNodeType}\``);
   }
+  if (symbol.canonicalQuantities?.length) {
+    lines.push("");
+    lines.push("quantities:");
+    for (const quantity of symbol.canonicalQuantities) {
+      const canonical = quantity.canonicalValue !== undefined && quantity.canonicalUnit
+        ? `${quantity.canonicalValue} ${quantity.canonicalUnit}`
+        : quantity.raw;
+      lines.push(`- \`${quantity.field ?? "quantity"}\`: ${canonical}`);
+    }
+  }
+  if (symbol.interopStatus) {
+    lines.push("");
+    lines.push(`interop: \`${symbol.interopStatus.verified ? "verified" : "unverified"}\``);
+    lines.push(`fields: \`${symbol.interopStatus.fields.join(", ")}\``);
+    if (symbol.interopStatus.diagnostics.length > 0) {
+      lines.push(`diagnostics: \`${symbol.interopStatus.diagnostics.join(", ")}\``);
+    }
+  }
 
   return lines.join("\n");
 };

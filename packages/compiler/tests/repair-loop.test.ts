@@ -136,39 +136,46 @@ yield: 72 %
     ]));
   });
 
-  it("canonicalizes condition screen standard, baseline, varies, and result pairing", () => {
+  it("canonicalizes current condition screen standard, factor baseline, and result pairing", () => {
     const source = `---
 id: exp-repair-loop-condition
 title: Repair loop condition
 date: 2026-04-24
 ---
 
+:::chemd #substrate
+smiles: CCO
+:::
+
+:::chemd #product
+smiles: CC=O
+:::
+
 :::chemd #rxn-standard
-kind: reaction
-reactants: substrate
-products: product
+reactant: @substrate | 1.0 mmol | 1.0 eq | limiting=true
+product: @product
 solvent: THF
 temperature: 25 C
 catalyst: Pd
 :::
 
 :::chemd #rxn-var1
-kind: reaction
-reactants: substrate
-products: product
+reactant: @substrate | 1.0 mmol | 1.0 eq | limiting=true
+product: @product
 solvent: MeCN
 temperature: 40 C
 catalyst: Pd
 :::
 
 :::result #res-var1
-ref: rxn-var1
+ref: @rxn-var1
 status: success
 yield: 81 %
 :::
 
 :::condition-varies #cv-screen
-var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
+attempt: var1
+reaction: @rxn-var1
 :::
 `;
     const result = runChemdRepairLoop(source, {
@@ -176,15 +183,15 @@ var1: reaction=rxn-var1 | solvent=MeCN | temperature=40 C
     });
 
     expect(result.stoppedReason).toBe("clean");
-    expect(result.finalSource).toContain("standard: rxn-standard");
-    expect(result.finalSource).toContain("condition: solvent=THF | temperature=25 C | catalyst=Pd");
-    expect(result.finalSource).toContain("varies: solvent | temperature");
-    expect(result.finalSource).toContain("res1: res-var1");
+    expect(result.finalSource).toContain("standard: @rxn-standard");
+    expect(result.finalSource).toContain("factor: solvent | baseline=THF");
+    expect(result.finalSource).toContain("factor: temperature | baseline=25 C");
+    expect(result.finalSource).toContain("factor: catalyst | baseline=Pd");
+    expect(result.finalSource).toContain("result: @res-var1");
     expect(result.totalAppliedSafeFixes).toEqual(expect.arrayContaining([
       expect.objectContaining({ sourceNodeId: "cv-screen", sourceField: "standard" }),
-      expect.objectContaining({ sourceNodeId: "cv-screen", sourceField: "condition" }),
-      expect.objectContaining({ sourceNodeId: "cv-screen", sourceField: "varies" }),
-      expect.objectContaining({ sourceNodeId: "cv-screen", sourceField: "res1" })
+      expect.objectContaining({ sourceNodeId: "cv-screen", sourceField: "factor" }),
+      expect.objectContaining({ sourceNodeId: "cv-screen", sourceField: "result" })
     ]));
   });
 });

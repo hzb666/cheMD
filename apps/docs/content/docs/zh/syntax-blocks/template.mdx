@@ -35,7 +35,7 @@ Reaction @reaction.name used @param.amount of material. Result @result.yield was
 | --- | --- |
 | `string` | 默认类型；省略类型时使用 |
 | `ref<kind>` | 引用类型，kind 支持 `molecule`、`reaction`、`result`、`analysis`、`procedure`、`observation`、`sample`、`artifact`、`condition_varies` |
-| `quantity<class>` | 数量类型，class 支持 amount、mass、volume、temperature、time、pressure、concentration、equivalent、percent 等 resolver 单位集合 |
+| `quantity<class>` | 数量类型，class 支持 amount、mass、volume、temperature、time、pressure、concentration、equivalent、percent、rate、rpm 和 pH |
 | `quantity` | 任意受支持数量 |
 
 未知参数类型按 `string` 处理。非法参数名会被忽略。参数名必须以字母或 `_` 开头，后续允许字母、数字和 `_`。

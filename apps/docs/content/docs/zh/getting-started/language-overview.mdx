@@ -8,7 +8,7 @@ description: Chemd 源文件、AST、编译输出和当前语言面的实现边�
 
 Chemd 源文件由 frontmatter、Markdown 正文和结构化块组成。解析结果的根节点为 `ChemdDocument`，包含 `meta`、`children`、`diagnostics`、可选 `source` 和可选 `renderSelection`。
 
-`children` 可以包含 Markdown 节点和结构化节点。结构化节点覆盖分子、反应、结果、分析、过程、观察、样品、附件、条件筛选、模板调用和列布局。
+`children` 可以包含 Markdown 节点和结构化节点。结构化节点覆盖分子、反应、物料、批次、结果、分析、过程、运行追踪、观察、样品、附件、条件筛选、模板调用和列布局。
 
 ## 使用者输入层、AST 层、编译输出层
 
@@ -16,7 +16,7 @@ Chemd 源文件由 frontmatter、Markdown 正文和结构化块组成。解析�
 
 ## 当前实现支持的语言面
 
-正文解析器注册的结构化块为 `chemd`、`result`、`analysis`、`artifact`、`sample`、`condition-varies`、`procedure`、`observation`、`use` 和 `col`。模板块由正文解析流程识别并生成 `template` 节点。
+正文解析器注册的结构化块为 `chemd`、`material`、`batch`、`result`、`analysis`、`artifact`、`sample`、`condition-varies`、`procedure`、`trace`、`observation`、`use` 和 `col`。模板块由正文解析流程识别并生成 `template` 节点。
 
 当前语义使用者输入表面使用 `:::chemd` 统一表达 molecule 和 reaction。
 
@@ -32,12 +32,11 @@ date: 2026-04-24
 ---
 
 :::chemd #mol-main
-kind: molecule
 name: ethanol
 smiles: CCO
 :::
 ```
 
-该示例满足 frontmatter 必需字段和 molecule 的 `smiles` 必填校验。
+该示例满足 frontmatter 必需字段和 molecule 身份字段校验。
 
 

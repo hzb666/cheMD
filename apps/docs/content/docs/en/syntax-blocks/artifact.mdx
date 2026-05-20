@@ -10,7 +10,7 @@ description: '`:::artifact` records spectra, images, raw data files, and other e
 ```md
 :::artifact #art-nmr-product
 kind: nmr_spectrum
-ref: sample-product
+ref: @sample-product
 path: data/nmr/product-1h.pdf
 checksum: sha256:abc123
 instrument: Bruker 400
@@ -41,7 +41,7 @@ Artifacts should use stable IDs. `kind` should describe the file role, and `ref`
 ```md
 :::artifact #art-hplc-product
 kind: hplc_chromatogram
-ref: res-main
+ref: @res-main
 path: data/hplc/product-purity.pdf
 checksum: sha256:9d5e
 instrument: Agilent 1260

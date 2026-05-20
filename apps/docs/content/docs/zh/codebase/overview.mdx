@@ -30,7 +30,7 @@ packages:
 apps/*      产品界面和文档站点
 packages/*  可复用语言、渲染、导出、运行时和集成包
 services/*  供 web 或 desktop 集成的 Python 服务进程
-scripts/*   根级自动化、smoke 检查、迁移辅助和发布门禁
+scripts/*   根级自动化、smoke 检查、schema 辅助和发布门禁
 ```
 
 根级 package 暴露高层命令，各 workspace package 保留自己的 `build`、`test` 和 `typecheck` 脚本。`turbo.json` 负责串联包级任务，让依赖包先于消费它们的包执行。
@@ -70,7 +70,7 @@ scripts/*   根级自动化、smoke 检查、迁移辅助和发布门禁
 
 ## 脚本目录
 
-`scripts` 包含开发启动、PostgreSQL、桌面 smoke、诊断打包和迁移脚本。根级 `package.json` 将部分脚本暴露为 `pnpm` 命令。
+`scripts` 包含开发启动、PostgreSQL、桌面 smoke、诊断打包和 schema 管理脚本。根级 `package.json` 将部分脚本暴露为 `pnpm` 命令。
 
 ## 修改定位
 

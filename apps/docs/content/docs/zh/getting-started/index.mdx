@@ -22,33 +22,30 @@ primary_result: res-main
 ---
 
 :::chemd #mol-a
-kind: molecule
 name: substrate A
 smiles: CCO
 :::
 
 :::chemd #mol-b
-kind: molecule
 name: product B
 smiles: CC=O
 :::
 
 :::chemd #rxn-main
-kind: reaction
-reactants: @mol-a
-products: @mol-b
+reactant: @mol-a | 1.0 mmol | 1.0 eq | limiting=true
+product: @mol-b
 temperature: 25 C
 time: 1 h
 :::
 
 :::result #res-main
-ref: rxn-main
+reaction: @rxn-main
 product: @mol-b
 status: success
 yield: 65 %
 :::
 ```
 
-该样例覆盖当前 resolver 的核心必填项：文档 `id`、`title`、`date`，molecule 的 `smiles`，reaction 的 `reactants` 与 `products`。
+该样例覆盖核心字段：文档 `id`、`title`、`date`，molecule identity，reaction participant，以及与 reaction 相连的 result。
 
 

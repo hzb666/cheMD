@@ -27,7 +27,7 @@ The parser also supports `;;` multi-field lines. Each segment is parsed as a fie
 
 List fields use `|` separators. Default list fields are `reactant`, `product`, `reac`, `prod`, `reactants`, `products`, `conditions`, and `params`; `:::chemd` also treats `prev` as a list field. Empty list items produce `E_INVALID_LIST_ITEM`.
 
-Each block parser declares an allowed field set. Unknown fields produce `W_UNKNOWN_FIELD` and are omitted from the parsed node.
+Each block parser declares an allowed field set. Unknown fields produce an error-level `W_UNKNOWN_FIELD` diagnostic and are omitted from the parsed node.
 
 ## Supported Blocks
 
@@ -36,9 +36,12 @@ The body parser currently supports these structured block forms. Most entries ar
 | Block | AST Type | Purpose |
 | --- | --- | --- |
 | `:::chemd` | `molecule` or `reaction` | Unified usage surface for molecules and reactions |
+| `:::material` | `material` | Purchased or inventory material linked to a molecule |
+| `:::batch` | `batch` | Physical batch produced, split, or purified during work |
 | `:::result` | `result` | Outcome, yield, purity, and status |
 | `:::analysis` | `analysis` | TLC, NMR, HPLC, and other analysis records |
 | `:::procedure` | `procedure` | Procedure steps and dependencies |
+| `:::trace` | `trace` | Runtime or authored run events |
 | `:::observation` | `observation` | Observation events |
 | `:::sample` | `sample` | Samples, batches, and lineage |
 | `:::artifact` | `artifact` | Files, spectra, images, and external evidence |
@@ -47,7 +50,7 @@ The body parser currently supports these structured block forms. Most entries ar
 | `:::use` | `use` | Template invocation |
 | `:::col` | `col` | Multi-column layout node |
 
-Unknown blocks produce `W_UNKNOWN_BLOCK`.
+Unknown blocks produce an error-level `W_UNKNOWN_BLOCK` diagnostic.
 
 ## `:::chemd`
 
@@ -74,14 +77,15 @@ atmosphere: nitrogen
 :::
 ```
 
-Molecule fields: `smiles`, `inchi`, `inchikey`, `cas`, `name`, `role`, `caption`, `formula`, `amount`, `equivalents`, `chemistry_features`.
+Molecule fields: `smiles`, `canonical_smiles`, `inchi`, `inchikey`, `cas`, `name`, `role`, `caption`, `formula`, `mw`, and `chemistry_features`.
 
 Reaction fields: `reactant`, `product`, `reac`, `prod`, `reactants`, `products`, `rxn_smiles`, `reaction_smiles`, `conditions`, `route`, `prev`, `reagents`, `catalyst`, `solvent`, `temperature`, `time`, `pressure`, `atmosphere`, `yield`, `conversion`, `selectivity`, `caption`, `chemistry_features`.
 
-Resolver required-field validation:
+Validation:
 
-- A molecule requires `smiles`.
+- A molecule requires at least one identity field.
 - A reaction requires at least one reactant and at least one product after alias normalization.
+- Molecule `amount` and `equivalents` are errors; write reaction usage on participants.
 
 ## `:::result`
 
@@ -89,7 +93,7 @@ A result block records the experimental outcome. Both `ref` and `reaction` can c
 
 ```md
 :::result #res-main
-ref: rxn-main
+ref: @rxn-main
 product: @mol-product
 status: success
 yield: 78 %
@@ -109,18 +113,18 @@ An analysis block records instrument or observation-based analysis. The field `t
 ```md
 :::analysis #ana-tlc-main
 type: tlc
-ref: rxn-main
+ref: @rxn-main
 time: 2 h
 eluent: PE/EA = 4:1
 result: one major product spot with trace starting material
 data: TLC plate after 2 h.
 lane: sm
-spot: 0.78 starting_material
+spot: 0.78 sm
 lane: rxn
-spot: 0.52 product
-spot: 0.79 starting_material
+spot: 0.52 prod
+spot: 0.79 sm
 lane: prod
-spot: 0.50 product
+spot: 0.50 prod
 :::
 ```
 
@@ -137,7 +141,7 @@ A sample block expresses sample identity, lineage, and linked artifacts.
 
 ```md
 :::sample #sample-product-var1
-ref: res-var1
+ref: @res-var1
 name: purified product from var1
 derived_from: sample-batch-var1
 purity: 97 %
@@ -156,7 +160,7 @@ An artifact block expresses spectra, images, reports, and other evidence files.
 ```md
 :::artifact #art-nmr-var1
 kind: nmr_spectrum
-ref: res-var1
+ref: @res-var1
 path: data/nmr/var1.pdf
 checksum: sha256:var1nmr
 instrument: Bruker 400

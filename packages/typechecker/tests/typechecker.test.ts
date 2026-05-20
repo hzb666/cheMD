@@ -346,8 +346,11 @@ ref: ext-doc#ana-main
 :::condition-varies #cv-main
 reaction: ext-doc#rxn-main
 standard: ext-doc#rxn-standard
-var1: reaction=ext-doc#rxn-variant | solvent=MeCN
-res1: ext-doc#res-main
+factor: solvent | baseline=THF
+attempt: var1
+reaction: ext-doc#rxn-variant
+result: ext-doc#res-main
+solvent: MeCN
 :::
 `));
 

@@ -9,7 +9,7 @@ description: '`:::observation` 记录实验观察正文，并可包含结构化 
 
 ```md
 :::observation #obs-main
-ref: rxn-main
+ref: @rxn-main
 event: color_change | id=e-color | color=deep red | linkedStep=s-add | confidence=0.8
 The mixture turned deep red after n-BuLi addition.
 :::
@@ -29,7 +29,7 @@ The mixture turned deep red after n-BuLi addition.
 
 ```md
 :::observation #obs-workup
-ref: rxn-main
+ref: @rxn-main
 
 :::event #e-precipitate
 type: precipitation
@@ -62,7 +62,7 @@ A white solid appeared after water addition.
 
 ```md
 :::observation #obs-main
-ref: rxn-main
+ref: @rxn-main
 event: color_change | id=e-color | stage=reaction | timepoint=after addition | color=orange | linkedStep=s-add | evidence=photo-1
 event: gas_evolution | id=e-gas | severity=low | linkedStep=s-quench
 Mixture became orange after addition. Mild bubbling occurred during quench.

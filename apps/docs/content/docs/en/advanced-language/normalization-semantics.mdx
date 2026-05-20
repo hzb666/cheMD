@@ -15,19 +15,18 @@ Chemd normalizes reaction conditions from `conditions`, `reagents`, `catalyst`, 
 | `solvent` | Recognizes aliases such as EtOH, MeOH, H2O, DCM, THF, MeCN, DMF, DMSO, toluene, and EtOAc |
 | `catalyst` | Explicit field has priority; otherwise text containing catalyst is matched from `conditions` |
 | `atmosphere` | Recognizes N2, nitrogen, Ar, argon, air, O2, and oxygen |
-| `temperature` | Parses `C`, `°C`, `K`, and `F` |
+| `temperature` | Parses `C`, `°C`, `K`, `F`, room-temperature shorthand `rt` / `r.t.`, and temperature programs |
 | `time` | Parses `h`, `hr`, `hrs`, `min`, and `mins` |
 | `pressure` | Parses `bar`, `atm`, and `psi` |
 | `reagents` | Splits explicit `reagents` by `|` and appends unconsumed `conditions` entries |
 
 ```md
 :::chemd #rxn-main
-kind: reaction
-reactants: @mol-a
-products: @mol-b
+reactant: @mol-a | 1.0 mmol | 1.0 eq | limiting=true
+product: @mol-b
 conditions: MeCN | 60 C | 3 h | N2 | Pd catalyst | K2CO3
 solvent: MeCN
-temperature: 60 C
+temperature: r.t. -> 60 C over 30 min
 time: 3 h
 atmosphere: N2
 :::
@@ -93,7 +92,7 @@ Supported lane labels:
 | `sm`, `starting material` | `starting_material` |
 | `pd`, `product` | `product` |
 | `int`, `intermediate` | `intermediate` |
-| `rxn`, `reaction` | `reaction` |
+| `rxn`, `reaction`, `reaction mixture` | `reaction_mixture` |
 | number | `trial` |
 | `blank` | `blank` |
 | `unknown` | `unknown` |
@@ -102,7 +101,7 @@ Supported spots and regions:
 
 | Syntax | Semantics |
 | --- | --- |
-| `spot: 0.52 starting_material` | Rf spot with a known label |
+| `spot: 0.52 sm` | Rf spot with a known label |
 | `0.52 ^3(4)` | up shape, size rank 3, intensity rank 4 |
 | `0.31 v2` | down shape, size rank 2 |
 | `spot: sm` | reference to a unique known spot |
@@ -115,18 +114,18 @@ Rank values are clamped to 1 through 5. Unknown labels, ambiguous references, an
 ```md
 :::analysis #ana-tlc
 type: tlc
-ref: rxn-main
+ref: @rxn-main
 time: 2 h
 eluent: petroleum ether/ethyl acetate 5:1
 lane: sm
-spot: 0.62 starting_material
+spot: 0.62 sm
 base: 0.62 starting_material
 lane: rxn
 spot: sm
-spot: 0.31 ^3(4) product
+spot: 0.31 ^3(4) prod
 mess: 0.55
 lane: prod
-spot: 0.30 product
+spot: 0.30 prod
 :::
 ```
 
@@ -136,7 +135,7 @@ The typechecker uses result `reaction`; when it is absent, it uses `ref`. The ta
 
 After a result is linked to a reaction, the typechecker checks:
 
-- Whether `product` appears in the linked reaction `products` list.
+- Whether `product` appears in the linked reaction products.
 - Whether result `yield`, `conversion`, and `selectivity` match same-name fields on the linked reaction.
 
 A product outside the reaction products produces `E_TYPED_REFERENCE_MISMATCH`. Metric disagreement produces `E_RESULT_REACTION_CONFLICT`.

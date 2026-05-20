@@ -9,7 +9,7 @@ description: '`:::procedure` records procedure prose, reaction/ref links, eviden
 
 ```md
 :::procedure #proc-main
-reaction: rxn-main
+reaction: @rxn-main
 evidence: notebook-p12 | batch-sheet
 step: charge | id=s-charge | inputs=@mol-substrate,@mol-base | solvent=MeCN
 step: heat | id=s-heat | temperature=60 C | duration=3 h | dependsOn=s-charge
@@ -54,7 +54,7 @@ The nested step header also accepts a bare ID, such as `:::step s-purify`. If th
 
 ## Control Flow
 
-Control flow uses ordinary lines inside `:::procedure`. Block controls use braces and single-line controls use one line:
+Control flow uses ordinary lines inside `:::procedure`. Block controls use braces. Single-line controls use one line. Control blocks are not top-level Chemd blocks.
 
 ```md
 :::procedure #proc-controls
@@ -93,11 +93,185 @@ abort_if: unsafe-temperature | condition=sensor.temperature > 80 C
 
 Supported block controls are `repeat`, `until`, `branch`, `case`, `default`, `parallel`, and `path`. Supported line controls are `wait` and `abort_if`.
 
-Control headers use `kind: id | key=value | key=value {`. `default` has no custom ID. `case` and `path` IDs must be unique among siblings. `repeat` requires a positive integer `count`. `until`, `case`, `wait`, and `abort_if` require a structured `condition`.
+### Control Header Grammar
 
-Conditions must be machine-readable. They can reference known objects or step IDs with `@id`, or runtime namespaces such as `operator.confirmed`, `sensor.temperature`, `time.elapsed`, and `run.status`. Natural-language conditions are errors because they cannot be executed or replayed reliably.
+Block controls use this shape:
 
-`repeat` expands authored child steps into generated step IDs such as `wash-cycle[1].wash` and `wash-cycle[2].wash`. `parallel` expands path steps into IDs such as `workup.organic.s-dry`. Dynamic controls (`until`, `branch`, `wait`, `abort_if`) stay in the control graph so runtime preflight can require an adapter or manual confirmation.
+```md
+kind: control-id | key=value | key=value {
+  step: ...
+}
+```
+
+Line controls use this shape:
+
+```md
+kind: control-id | key=value | key=value
+```
+
+The first non-`key=value` segment is the control ID. `default` is the only control that does not take a custom ID. Top-level controls (`repeat`, `until`, `branch`, `parallel`, `wait`, `abort_if`) require IDs. `case` and `path` IDs must be unique among siblings. Step IDs and canonical control IDs must not collide.
+
+| control | form | required params | static behavior |
+| --- | --- | --- | --- |
+| `repeat` | block | `count` | statically expands child steps `count` times |
+| `until` | block | `condition` | dynamic control, body is kept under the control |
+| `branch` | block | at least one `case` and one final `default` | dynamic control |
+| `case` | block inside `branch` | `condition` | branch child |
+| `default` | block inside `branch` | no `condition` | final fallback branch |
+| `parallel` | block | at least two `path` blocks | statically expands path steps |
+| `path` | block inside `parallel` | non-empty body | parallel child |
+| `wait` | line | `condition` | dynamic gate |
+| `abort_if` | line | `condition` | dynamic stop condition |
+
+All `key=value` fields are preserved as control parameters, except `outputs`, which is stored as control outputs. This lets templates and runtime tooling inspect values such as `timeout=30 min`, `max_iterations=6`, `resource=rotavap`, or `reason=exotherm`.
+
+### Condition Expressions
+
+Conditions must be structured. They are accepted when they are either a runtime boolean namespace, or contain a comparison/logical operator:
+
+```md
+condition=operator.confirmed
+condition=sensor.temperature > 80 C
+condition=@ana-tlc.result == complete
+condition=@sample-crude exists
+condition=run.status != aborted and time.elapsed < 2 h
+```
+
+Supported runtime namespaces are `operator.*`, `sensor.*`, `time.*`, and `run.*`. Supported operator tokens include `==`, `!=`, `<`, `<=`, `>`, `>=`, `exists`, `in`, `matches`, `and`, `or`, and `not`. Any `@id` reference inside a condition must point to a known object or a known step/control ID in scope. Natural-language conditions such as `condition=wait until TLC is good` are errors because runtime replay cannot evaluate them.
+
+### IDs and Dependencies
+
+`repeat` expands authored child steps into generated step IDs such as `wash-cycle[1].wash` and `wash-cycle[2].wash`. If a repeated child step has an explicit ID, the ID is still prefixed by the iteration. Repeated iterations are chained in the step graph so the second iteration follows the first.
+
+`parallel` expands path steps into IDs such as `workup.organic.s-dry`. Each path starts from the same incoming dependency set, then the downstream graph joins after the path last steps.
+
+Dynamic controls (`until`, `branch`, `wait`, `abort_if`) stay in the control graph. They are not flattened into a fixed linear step sequence, because their selected body or stopping point depends on runtime state. Runtime preflight can therefore require an adapter or manual confirmation. A later step can depend on a dynamic control ID:
+
+```md
+wait: operator-approval | condition=operator.confirmed | timeout=30 min
+step: heat | id=s-heat | temperature=40 C | dependsOn=operator-approval
+```
+
+### Invalid Patterns
+
+```md
+:::until #bad
+condition: operator.confirmed
+:::
+```
+
+Control flow is not a top-level block.
+
+```md
+until: monitor | condition=wait until TLC is clean {
+  step: analyze | type=tlc
+}
+```
+
+Natural-language conditions are errors.
+
+```md
+parallel: workup {
+  path: organic {
+    step: dry | medium=Na2SO4
+  }
+}
+```
+
+`parallel` needs at least two non-empty paths.
+
+### `repeat`
+
+Use `repeat` when the same child steps run a fixed number of times.
+
+```md
+repeat: wash-cycle | count=3 {
+  step: wash | solvent=brine | volume=10 mL
+  step: separate_layers | outputs=organic-layer
+}
+```
+
+`count` must be a positive integer. Empty repeat bodies are errors.
+
+Use `repeat` for deterministic loops such as washing three times, evaporating two fractions, or repeating a fixed rinse. Do not use `repeat` when the stopping point depends on a measurement; use `until` instead.
+
+### `until`
+
+Use `until` when the procedure repeats until a measurable condition is true.
+
+```md
+until: monitor-complete | condition=@ana-tlc.status == complete | max_iterations=6 {
+  step: analyze | id=s-tlc-check | type=tlc
+  step: hold | duration=15 min
+}
+```
+
+`condition` is required. `max_iterations` is optional syntax, but omitting it produces a dynamic-control warning because runtime review must decide the stopping boundary.
+
+Use `until` for measurement-driven loops such as TLC monitoring, pH adjustment, gas uptake, pressure stabilization, or repeated sampling. The control body describes the action performed on each check. Because the final number of cycles is not known statically, the body is not expanded into fixed step IDs in the static graph.
+
+`max_iterations` should be present whenever the loop could otherwise run indefinitely:
+
+```md
+until: ph-neutral | condition=sensor.ph >= 6.5 and sensor.ph <= 7.5 | max_iterations=8 {
+  step: add | reagent=NaHCO3 solution | volume=1 mL
+  step: mix | duration=1 min
+}
+```
+
+### `branch`
+
+Use `branch` when exactly one path should be selected from runtime state or a measured fact.
+
+```md
+branch: ph-workup {
+  case: acidic | condition=sensor.ph < 7 {
+    step: quench | id=s-quench-acid | reagent=NaHCO3
+  }
+  case: basic | condition=sensor.ph > 9 {
+    step: quench | id=s-quench-base | reagent=NH4Cl
+  }
+  default: {
+    step: quench | id=s-quench-default | reagent=water
+  }
+}
+```
+
+A branch requires at least one `case` and exactly one final `default`. Each `case` requires a structured condition.
+
+Use `branch` when the procedure has alternative workups or safety responses. `default` must be the final child block and must not define `condition`; it is the fallback path when no `case` condition matches.
+
+### `parallel`
+
+Use `parallel` when independent paths can be prepared as concurrent work.
+
+```md
+parallel: workup {
+  path: organic {
+    step: dry | id=s-dry | medium=Na2SO4
+  }
+  path: aqueous {
+    step: store | id=s-store-aq | location=waste
+  }
+}
+```
+
+`parallel` requires at least two non-empty `path` blocks. Runtime preflight can report resource conflicts for shared devices, inventory, or operator attention.
+
+Use `parallel` only for paths that can start from the same incoming state. Do not put order-dependent steps into different paths; keep those as sequential `step:` lines or put them inside one `path`.
+
+### `wait` and `abort_if`
+
+Use `wait` for a runtime gate and `abort_if` for a stop condition.
+
+```md
+wait: operator-approval | condition=operator.confirmed | timeout=30 min
+abort_if: unsafe-temperature | condition=sensor.temperature > 80 C
+```
+
+Both controls require `condition`. In `robot-run`, missing adapters for these controls are blocking runtime errors.
+
+`wait` can model approval, sensor readiness, elapsed time, or external completion. `abort_if` should describe a condition that stops the run, such as unsafe temperature, pressure, missing material, or failed analysis. Keep the condition executable and put explanatory text in a nearby Markdown sentence or `notes` field.
 
 ## Recommended Practice
 
@@ -105,7 +279,7 @@ Procedure records should use stable step IDs and explicit material flow. `inputs
 
 ```md
 :::procedure #proc-main
-reaction: rxn-main
+reaction: @rxn-main
 evidence: notebook-p12 | balance-log
 
 :::step #s-charge

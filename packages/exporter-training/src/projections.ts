@@ -3973,9 +3973,96 @@ const buildTrainingWarnings = (
   ...record.learning_layer.prediction_instances.flatMap((instance) => instance.usability.warnings)
 ];
 
+const isTrainingProjectionBlocked = (record: ChemdTrainingExportV2): boolean =>
+  record.quality_layer.governance_quality.blocking;
+
+const getTrainingExclusionReasons = (record: ChemdTrainingExportV2): string[] =>
+  record.quality_layer.training_quality.exclusion_reasons ?? [];
+
+const buildBlockedTrainingUnderstanding = (
+  record: ChemdTrainingExportV2
+): ChemdTrainingUnderstandingV1 => {
+  const exclusionReasons = getTrainingExclusionReasons(record);
+  const governanceWarnings = record.quality_layer.governance_quality.diagnostics
+    .map((diagnostic) => diagnostic.code);
+
+  return {
+    schema_version: "chemd-training-understanding/v0.1",
+    document: record.document,
+    governance: record.governance,
+    entities: {
+      molecules: [],
+      materials: [],
+      reactions: [],
+      results: [],
+      analyses: [],
+      samples: [],
+      artifacts: [],
+      condition_variations: [],
+      condition_variation_attempts: [],
+      narrative_blocks: []
+    },
+    relations: [],
+    resolved_references: [],
+    procedure_logic: {
+      procedure_to_steps: [],
+      observation_to_events: []
+    },
+    experiment_logic: {
+      primary_entities: [],
+      outcomes: [],
+      design_contexts: [],
+      outcome_quality: [],
+      reaction_taxonomy: [],
+      expert_routing: [],
+      intent_hypotheses: [],
+      condition_variations: [],
+      variable_logic: [],
+      causal_links: [],
+      material_flow_graph: { nodes: [], edges: [] },
+      step_dependencies: [],
+      optimization_trajectories: [],
+      failure_signals: [],
+      reaction_routes: [],
+      implicit_condition_facts: [],
+      evidence_links: [],
+      evidence_interpretations: [],
+      sample_lineage: [],
+      sample_profiles: [],
+      artifact_profiles: []
+    },
+    knowledge_graph: {
+      nodes: [],
+      edges: [],
+      field_evidence: [],
+      missing_logic: []
+    },
+    lora_generation_hints: {
+      recommended_tasks: [],
+      blocked_tasks: [
+        createTaskHint("consistency_check", "Governance blocks non-audit training projection.")
+      ],
+      split_hint: {
+        document_id: record.document.document_id,
+        date: record.document.date
+      }
+    },
+    quality: {
+      usable_for_training: false,
+      confidence_score: record.quality_layer.training_quality.confidence_score,
+      warnings: uniqueStrings([...governanceWarnings, ...exclusionReasons]),
+      ...(exclusionReasons.length > 0 ? { exclusion_reasons: exclusionReasons } : {})
+    }
+  };
+};
+
 export const buildTrainingUnderstandingFromRecord = (
   record: ChemdTrainingExportV2
 ): ChemdTrainingUnderstandingV1 => {
+  if (isTrainingProjectionBlocked(record)) {
+    return buildBlockedTrainingUnderstanding(record);
+  }
+
   const entityByOriginalId = buildEntityIndex(record);
   const resolvedReferences = buildResolvedReferences(record, entityByOriginalId, buildEntityIdIndex(record));
   const primaryEntities = buildPrimaryEntities(record, entityByOriginalId);
@@ -4096,11 +4183,12 @@ export const buildTrainingUnderstandingFromRecord = (
       resolvedReferences
     }),
     quality: {
-      usable_for_training: !record.quality_layer.parse_quality.has_errors,
+      usable_for_training: !record.quality_layer.parse_quality.has_errors
+        && getTrainingExclusionReasons(record).length === 0,
       confidence_score: record.quality_layer.training_quality.confidence_score,
       warnings: buildTrainingWarnings(record, resolvedReferences, missingLogic),
-      ...(record.quality_layer.training_quality.exclusion_reasons
-        ? { exclusion_reasons: record.quality_layer.training_quality.exclusion_reasons }
+      ...(getTrainingExclusionReasons(record).length > 0
+        ? { exclusion_reasons: getTrainingExclusionReasons(record) }
         : {})
     }
   };

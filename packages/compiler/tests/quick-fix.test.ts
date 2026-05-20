@@ -71,32 +71,6 @@ smiles: CCO
     })).toBe(source);
   });
 
-  it("converts a targeted legacy molecule block to canonical chemd syntax", () => {
-    const source = `:::molecule #legacy-mol
-smiles: CCO
-:::`;
-    const diagnostic: DiagnosticWithQuickFixes = {
-      code: "W_UNKNOWN_BLOCK",
-      severity: "warning",
-      message: "Unknown block type: molecule",
-      sourceNodeType: "molecule",
-      sourceNodeId: "legacy-mol",
-      facts: { legacy_block_kind: "molecule" }
-    };
-
-    expect(applyDiagnosticQuickFix(source, diagnostic, {
-      title: "Convert this legacy block to canonical chemd syntax",
-      kind: "convert_legacy_block",
-      patch: {
-        source_node_type: "molecule",
-        source_node_id: "legacy-mol"
-      }
-    })).toBe(`:::chemd #legacy-mol
-kind: molecule
-smiles: CCO
-:::`);
-  });
-
   it("applies a conservative authoring patch quick fix", () => {
     const source = `:::result #res-main
 status: success

@@ -116,7 +116,7 @@ export const buildGovernanceDiagnostics = (
   if (!allowedUses.has("rag")) {
     diagnostics.push(createGovernanceDiagnostic(
       "W_TRAINING_RAG_NOT_ALLOWED",
-      "warning",
+      "error",
       "RAG projection is not allowed by governance.allowed_uses."
     ));
   }
@@ -124,7 +124,7 @@ export const buildGovernanceDiagnostics = (
   if (!nonAuditAllowed) {
     diagnostics.push(createGovernanceDiagnostic(
       "W_TRAINING_AUDIT_ONLY",
-      "warning",
+      "error",
       "Governance allows audit only; sanitized training projections are not eligible."
     ));
   }
@@ -132,7 +132,7 @@ export const buildGovernanceDiagnostics = (
   if (governance.sanitization_policy === "none" && nonAuditAllowed) {
     diagnostics.push(createGovernanceDiagnostic(
       "W_TRAINING_SANITIZATION_DISABLED",
-      "warning",
+      "error",
       "Non-audit training use is allowed while sanitization_policy is none."
     ));
   }

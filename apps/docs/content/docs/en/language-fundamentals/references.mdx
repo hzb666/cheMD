@@ -13,7 +13,7 @@ Object references use `@id`.
 The selected entry is @rxn-var1.
 ```
 
-The resolver looks up `rxn-var1` in the object index. The object index includes ID-bearing molecule, reaction, result, analysis, procedure, observation, sample, artifact, and condition-varies nodes.
+The resolver looks up `rxn-var1` in the object index. The object index includes ID-bearing molecule, material, batch, reaction, result, analysis, procedure, trace, observation, sample, artifact, and condition-varies nodes.
 
 ## Object Field References
 
@@ -70,21 +70,21 @@ A `condition_varies` node exposes attempts through field lookup.
 
 ```md
 :::condition-varies #cv-screen
-standard: rxn-standard
+standard: @rxn-standard
 factor: solvent | baseline=THF
 factor: temperature | baseline=25 C
 outcome: yield | baseline=68 %
 
 attempt: var1
-reaction: rxn-var1
-result: res-var1
+reaction: @rxn-var1
+result: @res-var1
 solvent: MeCN
 temperature: 40 C
 yield: 72 %
 
 attempt: var2
-reaction: rxn-var2
-result: res-var2
+reaction: @rxn-var2
+result: @res-var2
 solvent: DMF
 temperature: 60 C
 yield: 45 %

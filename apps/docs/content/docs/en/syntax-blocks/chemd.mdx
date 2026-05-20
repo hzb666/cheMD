@@ -31,7 +31,6 @@ kind: reaction
 reactant: @mat-substrate-lot-a | 1.00 mmol | 1.0 eq | limiting=true
 reactant: @mol-base | equiv=1.2
 product: @mol-product
-rxn_smiles: CCO.N>>CCN
 solvent: MeCN
 temperature: r.t. -> 60 C over 30 min
 time: overnight
@@ -40,6 +39,29 @@ atmosphere: nitrogen
 ```
 
 Participant targets may be `molecule`, `material`, or `batch`. Amount can be written as `amount=1.0 mmol` or the shorter `1.0 mmol`. Equivalents can be written as `equiv=1.2`, `equiv=1.2 eq`, or `1.2 eq`. If any reactant has amount, equivalent, mass, volume, or `limiting=true`, exactly one reactant must be `limiting=true`. The limiting reactant must provide both amount and equivalent. Other stoichiometric reactants need at least amount or equivalent. Product participants cannot carry expected or isolated quantities; put outcome data in `:::result`.
+
+`rxn_smiles` is optional. When every participant points to a molecule with `smiles` or `canonical_smiles`, the typed graph can infer `rxn_smiles` from the participant identities. If you write `rxn_smiles` or its alias `reaction_smiles`, it must match the participant identities; a mismatch or unverifiable side is an error.
+
+```md
+:::chemd #mol-ethanol
+name: ethanol
+smiles: CCO
+:::
+
+:::chemd #mol-acetaldehyde
+name: acetaldehyde
+smiles: CC=O
+:::
+
+:::chemd #rxn-oxidation
+reactant: @mol-ethanol | 1.0 mmol | 1.0 eq | limiting=true
+product: @mol-acetaldehyde
+solvent: DCM
+temperature: r.t.
+:::
+```
+
+In this example, the reaction structure can be inferred as `CCO>>CC=O`.
 
 ## Material and Batch
 
@@ -112,6 +134,8 @@ Unit-bearing quantities require a space between number and unit: `78 %`, `1.0 mm
 | `E_INTEROP_INCHI_FORMAT` | InChI identity field does not start with `InChI=` |
 | `E_INTEROP_INCHIKEY_FORMAT` | InChIKey identity field does not use the standard segment format |
 | `E_INTEROP_RXN_SMILES_PARSE` | reaction structure field is not a valid RXN SMILES surface |
+| `E_INTEROP_RXN_SMILES_UNVERIFIED` | reaction structure cannot be verified against participant identities |
+| `E_INTEROP_RXN_SMILES_PARTICIPANT_CONFLICT` | reaction structure conflicts with participant identities |
 | `E_REACTION_PARTICIPANT_SYNTAX` | structured participant facts are written on plural list aliases |
 | `E_TYPED_REFERENCE_MISMATCH` | reference target has the wrong type |
 | `E_STOICHIOMETRY_LIMITING` | limiting reactant rules are violated |

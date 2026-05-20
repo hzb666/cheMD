@@ -9,8 +9,8 @@ description: '`:::result` records outcome status, yield, conversion, selectivity
 
 ```md
 :::result #res-main
-reaction: rxn-main
-product: mol-product
+reaction: @rxn-main
+product: @mol-product
 status: success
 yield: 82 %
 conversion: 95 %
@@ -56,8 +56,8 @@ Connect reaction, product, and result explicitly. Keep yield in a structured fie
 
 ```md
 :::result #res-main
-reaction: rxn-main
-product: mol-biaryl
+reaction: @rxn-main
+product: @mol-biaryl
 status: success
 yield: 82 %
 conversion: 96 %
@@ -73,7 +73,7 @@ For condition screening, use stable result IDs and reference them from the curre
 
 ```md
 :::result #res-var1
-reaction: rxn-var1
+reaction: @rxn-var1
 status: partial
 yield: 38 %
 notes: starting material remained by TLC

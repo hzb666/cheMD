@@ -83,7 +83,7 @@ pnpm --filter @chemd/runtime-trace test
 
 | 包 | 职责 |
 | --- | --- |
-| `@chemd/cli` | validate、export、graph、diff、changed、repair、agent-loop |
+| `@chemd/cli` | validate、export、graph、diff、changed、fix、agent-loop |
 | `@chemd/language-service` | 编辑器语言服务 |
 | `@chemd/domain-templates` | 共享 `.chemd` 起始模板 catalog |
 | `@chemd/workspace-index` | workspace 文档索引能力 |
@@ -99,11 +99,11 @@ pnpm --filter @chemd/runtime-trace test
 
 | 包 | 常见入口 | 验证重点 |
 | --- | --- | --- |
-| `@chemd/cli` | command modules 与 `packages/cli/bin/chemd.mjs` | command output、exit codes、repair/agent-loop workflows |
+| `@chemd/cli` | command modules 与 `packages/cli/bin/chemd.mjs` | command output、exit codes、fix/agent-loop workflows |
 | `@chemd/language-service` | language service exports | schema-driven completion、editor diagnostics、incremental feedback |
 | `@chemd/domain-templates` | catalog exports | template ID、生成源码有效性、CLI `templates`/`new` 输出 |
 | `@chemd/workspace-index` | workspace indexing APIs | 多文件发现、graph input、changed-file behavior |
-| `@chemd/storage-postgres` | schema 与 repository helpers | migration compatibility、record shape、Graph/RAG persistence |
+| `@chemd/storage-postgres` | schema 与 repository helpers | schema shape、record shape、Graph/RAG persistence |
 | `@chemd/diagnostics` | diagnostic builders 与 data model | stable diagnostic codes、severity、locations、remediation text |
 
 ## 包间边界
@@ -120,6 +120,6 @@ pnpm --filter @chemd/runtime-trace test
 | Diagnostics | 保持 code、severity、location、message 和 remediation 在 CLI、language service、web、desktop 中一致 |
 | Runtime contracts | 保持 StepFamily schema、procedure controls、run plan、preflight issues、trace replay、LNF 和 CLI `preflight` 同步 |
 | Exports | 验证 renderer output、compiler aggregate output、CLI export command，以及暴露该格式的 app API route |
-| Storage 或 graph | 检查 migration/schema shape、repository helpers、graph export contracts 和 app/service callers |
+| Storage 或 graph | 检查 schema shape、repository helpers、graph export contracts 和 app/service callers |
 | App support | 共享行为保留在 packages；app 代码聚焦 UI、routing、permissions 和 platform adaptation |
 

@@ -93,8 +93,10 @@ solvent: MeCN
 
 :::condition-varies #cv-screen
 standard: rxn-standard
-varies: solvent
-var1: reaction=rxn-var1 | solvent=MeCN
+factor: solvent | baseline=THF
+attempt: var1
+reaction: rxn-var1
+solvent: MeCN
 :::
 
 :::analysis #ana-attempt

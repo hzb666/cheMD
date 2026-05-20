@@ -14,7 +14,7 @@ description: '`:::result`, `:::analysis`, TLC lanes, generic analysis, and requi
 
 ## `yield`, `conversion`, `selectivity`, and `purity`
 
-These fields are stored as strings. The parser does not validate units or percent syntax. Export layers consume the preserved field values.
+These fields preserve the authored text in the AST, then the typechecker parses them as percent quantities. Percent values require a space before the unit, for example `82 %`. Compact forms such as `82%` are errors.
 
 ## `:::analysis`
 
@@ -23,10 +23,10 @@ These fields are stored as strings. The parser does not validate units or percen
 ```md
 :::analysis #ana-hplc-main
 type: hplc
-ref: res-main
+ref: @res-main
 method: HPLC area normalization
 instrument: Agilent 1260
-result: 97% area product peak
+peak: 6.4 min (97 %, product)
 data: Main peak at 6.4 min with trace impurity.
 :::
 ```
@@ -61,32 +61,55 @@ Connect the result to the reaction and product, then connect analyses to the res
 
 ```md
 :::result #res-main
-reaction: rxn-main
-product: mol-product
+reaction: @rxn-main
+product: @mol-product
 status: success
 yield: 82 %
+isolated_mass: 120 mg
 purity: 98 %
 notes: isolated after silica gel chromatography
 :::
 
 :::analysis #ana-tlc-main
 type: tlc
-ref: rxn-main
-result: res-main
+ref: @res-main
 eluent: petroleum ether/ethyl acetate 5:1
+plate: silica gel GF254
+visualization: UV 254 nm
 lane: sm
-spot: 0.62 starting_material
+spot: 0.62
+lane: rxn
+spot: sm
+spot: 0.31 ^3(4) prod
 lane: prod
-spot: 0.31 product
-data: product spot observed, starting material consumed
+spot: 0.31
+result: product spot observed, starting material consumed
+:::
+
+:::analysis #ana-nmr-product
+type: nmr
+ref: @sample-product
+spectrum: 1H NMR (400 MHz, CDCl3)
+peak: 7.68-7.59 (m, 2H, ArCH)
+peak: 7.14-7.03 (m, 2H, ArCH)
+peak: 3.56 (tt, J = 9.1, 6.0 Hz, 1H, CH(C=O))
+artifact: @art-nmr-1h
 :::
 
 :::analysis #ana-hplc-product
 type: hplc
-ref: res-main
+ref: @res-main
 instrument: Agilent 1260
 method: C18 gradient
 peak: 6.4 min (98 %, product)
+:::
+
+:::analysis #ana-lcms-product
+type: lcms
+ref: @sample-product
+method: ESI positive
+peak: 6.4 min (98 %, product)
+ion: m/z 321.1234 [M+H]+
 :::
 ```
 

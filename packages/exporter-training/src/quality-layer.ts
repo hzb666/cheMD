@@ -32,15 +32,7 @@ const countLowConfidenceLoweredSteps = (learningLayer: LearningLayerV1): number 
 
 const countMigrationDiagnostics = (diagnostics: Diagnostic[]): number =>
   diagnostics.filter((diagnostic) =>
-    ["W_LEGACY_BLOCK_KIND", "W_CHEMD_KIND_AMBIGUOUS", "E_CHEMD_KIND_CONFLICT"].includes(diagnostic.code)
-    || (
-      diagnostic.code === "W_UNKNOWN_BLOCK"
-      && (
-        diagnostic.sourceNodeType === "molecule"
-        || diagnostic.sourceNodeType === "reaction"
-        || typeof diagnostic.facts?.legacy_block_kind === "string"
-      )
-    )
+    ["W_CHEMD_KIND_AMBIGUOUS", "E_CHEMD_KIND_CONFLICT"].includes(diagnostic.code)
   ).length;
 
 const hasAllowedUse = (governance: DataGovernanceInfo, use: "rag" | "sft" | "eval" | "regression"): boolean =>

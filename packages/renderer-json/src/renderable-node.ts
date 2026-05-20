@@ -71,7 +71,7 @@ const FIELD_KEYS_BY_TYPE: Record<string, string[]> = {
   observation: ["id", "ref", "body", "events"],
   sample: ["id", "name", "sample_id", "batch", "purity", "notes"],
   artifact: ["id", "kind", "path", "checksum", "instrument", "notes"],
-  condition_varies: ["id", "reaction", "standard", "condition", "changes", "attempts", "notes"],
+  condition_varies: ["id", "reaction", "standard", "factors", "outcomes", "condition", "changes", "attempts", "notes"],
   use: ["template", "values"]
 };
 

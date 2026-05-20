@@ -65,9 +65,9 @@ smiles: CCO
 :::
 `;
 
-const repairableSource = `---
-id: exp-cli-repair
-title: CLI Repair
+const fixableSource = `---
+id: exp-cli-fix
+title: CLI Fix
 date: 2026-04-24
 ---
 
@@ -88,9 +88,9 @@ result: one major spot
 :::
 `;
 
-const repairNeedsInputSource = `---
-id: exp-cli-repair-input
-title: CLI Repair Input
+const fixNeedsInputSource = `---
+id: exp-cli-fix-input
+title: CLI Fix Input
 date: 2026-04-24
 ---
 
@@ -266,7 +266,7 @@ const createGitRunner = ({
   return { status: 1, stdout: "", stderr: `unexpected git args: ${args.join(" ")}` };
 };
 
-describe("chemd cli help validation export and repair", () => {
+describe("chemd cli help validation export and fix", () => {
   it("runs package bin help through the local TypeScript loader", () => {
     const result = spawnSync(process.execPath, ["bin/chemd.mjs", "--help"], {
       cwd: packageRoot,
@@ -298,9 +298,9 @@ describe("chemd cli help validation export and repair", () => {
     expect(result.stdout).toContain("E_CHEMD_KIND_CONFLICT");
   });
 
-  it("repairs deterministic safe fixes and prints the clean source in text mode", async () => {
-    const result = await runInTempDir(["repair", "repair.chemd"], {
-      "repair.chemd": repairableSource
+  it("applies deterministic safe fixes and prints the clean source in text mode", async () => {
+    const result = await runInTempDir(["fix", "fix.chemd"], {
+      "fix.chemd": fixableSource
     });
 
     expect(result.exitCode).toBe(EXIT_OK);
@@ -310,14 +310,14 @@ describe("chemd cli help validation export and repair", () => {
     expect(result.stderr).toBe("");
   });
 
-  it("writes the repaired source back to disk when --write is set", async () =>
+  it("writes the fixed source back to disk when --write is set", async () =>
     withTempDir(async (dir) => {
-      const filePath = path.join(dir, "repair.chemd");
-      writeFileSync(filePath, repairableSource);
+      const filePath = path.join(dir, "fix.chemd");
+      writeFileSync(filePath, fixableSource);
 
       const stdout = createWriter();
       const stderr = createWriter();
-      const exitCode = await runChemdCli(["repair", "repair.chemd", "--write"], {
+      const exitCode = await runChemdCli(["fix", "fix.chemd", "--write"], {
         cwd: dir,
         stderr,
         stdout
@@ -329,15 +329,15 @@ describe("chemd cli help validation export and repair", () => {
       expect(stderr.value).toBe("");
     }));
 
-  it("emits a structured non-clean repair report when authored facts are still required", async () => {
+  it("emits a structured non-clean fix report when authored facts are still required", async () => {
     const result = await runInTempDir(
-      ["repair", "repair-input.chemd", "--format", "json"],
-      { "repair-input.chemd": repairNeedsInputSource }
+      ["fix", "fix-input.chemd", "--format", "json"],
+      { "fix-input.chemd": fixNeedsInputSource }
     );
     const payload = JSON.parse(result.stdout);
 
     expect(result.exitCode).toBe(EXIT_VALIDATION_FAILED);
-    expect(payload.schemaVersion).toBe("chemd-repair/v0.1");
+    expect(payload.schemaVersion).toBe("chemd-fix/v0.1");
     expect(payload.finalDiagnosis.status).toBe("needs_author_input");
     expect(payload.finalDiagnosis.requiredInputs).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -348,10 +348,10 @@ describe("chemd cli help validation export and repair", () => {
     expect(result.stderr).toBe("");
   });
 
-  it("rejects invalid repair iteration limits", async () => {
+  it("rejects invalid fix iteration limits", async () => {
     const result = await runInTempDir(
-      ["repair", "repair.chemd", "--max-iterations", "0"],
-      { "repair.chemd": repairableSource }
+      ["fix", "fix.chemd", "--max-iterations", "0"],
+      { "fix.chemd": fixableSource }
     );
 
     expect(result.exitCode).toBe(EXIT_USAGE);
@@ -450,6 +450,38 @@ name: patient sample
       expect.objectContaining({ code: "E_TRAINING_PII_PRESENT" }),
       expect.objectContaining({ code: "W_TRAINING_RAG_NOT_ALLOWED" })
     ]));
+  });
+
+  it("blocks non-audit training export when governance is blocking", async () => {
+    const result = await runInTempDir(["export", "governance.chemd", "--format", "training"], {
+      "governance.chemd": `---
+id: exp-cli-governance-export
+title: CLI Governance Export
+date: 2026-05-20
+governance:
+  pii_status: present
+  allowed_uses: [audit]
+---
+
+:::sample #sample-main
+name: patient sample
+:::
+`
+    });
+
+    expect(result.exitCode).toBe(EXIT_VALIDATION_FAILED);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("E_TRAINING_PII_PRESENT");
+    expect(result.stderr).toContain("W_TRAINING_AUDIT_ONLY");
+  });
+
+  it("fixes deterministic safe fixes through the user-facing command", async () => {
+    const result = await runInTempDir(["fix", "fix.chemd"], {
+      "fix.chemd": fixableSource
+    });
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(result.stdout).toMatch(/safe fixes applied: 5/);
   });
 
   it("lists and instantiates domain templates", async () =>
@@ -653,7 +685,7 @@ describe("chemd cli agent loop", () => {
   it("runs agent-loop through an external driver and emits a clean JSON report", async () =>
     withTempDir(async (dir) => {
       const filePath = path.join(dir, "agent.chemd");
-      writeFileSync(filePath, repairNeedsInputSource);
+      writeFileSync(filePath, fixNeedsInputSource);
 
       const stdout = createWriter();
       const stderr = createWriter();
@@ -688,7 +720,7 @@ describe("chemd cli agent loop", () => {
   it("writes the final clean source back to disk when agent-loop uses --write", async () =>
     withTempDir(async (dir) => {
       const filePath = path.join(dir, "agent-write.chemd");
-      writeFileSync(filePath, repairNeedsInputSource);
+      writeFileSync(filePath, fixNeedsInputSource);
 
       const stdout = createWriter();
       const stderr = createWriter();
@@ -715,7 +747,7 @@ describe("chemd cli agent loop", () => {
   it("returns unresolved diagnosis when the external driver declines to rewrite", async () =>
     withTempDir(async (dir) => {
       const filePath = path.join(dir, "agent-stop.chemd");
-      writeFileSync(filePath, repairNeedsInputSource);
+      writeFileSync(filePath, fixNeedsInputSource);
 
       const stdout = createWriter();
       const stderr = createWriter();
@@ -751,7 +783,7 @@ describe("chemd cli agent loop", () => {
   it("passes dash-prefixed arguments to the external agent-loop driver", async () =>
     withTempDir(async (dir) => {
       const filePath = path.join(dir, "agent-dash.chemd");
-      writeFileSync(filePath, repairNeedsInputSource);
+      writeFileSync(filePath, fixNeedsInputSource);
 
       const stdout = createWriter();
       const stderr = createWriter();
@@ -785,7 +817,7 @@ describe("chemd cli agent loop", () => {
   it("rejects agent-loop invocations without a driver", async () => {
     const result = await runInTempDir(
       ["agent-loop", "agent.chemd"],
-      { "agent.chemd": repairNeedsInputSource }
+      { "agent.chemd": fixNeedsInputSource }
     );
 
     expect(result.exitCode).toBe(EXIT_USAGE);

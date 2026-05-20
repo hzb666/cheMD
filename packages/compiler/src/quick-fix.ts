@@ -7,7 +7,6 @@ import type { AuthoringPatch } from "./authoring-types";
 export type DiagnosticQuickFix = QuickFix | CoreDiagnosticQuickFix;
 export type DiagnosticWithQuickFixes = Diagnostic;
 
-const LEGACY_BLOCK_KINDS = new Set(["molecule", "reaction"]);
 const REACTION_FIELD_KEYS = new Set(["reac", "reactant", "reactants", "prod", "product", "products"]);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -118,17 +117,6 @@ const readTargetNodeId = (
     ?? diagnostic.nodeId;
 };
 
-const readTargetLegacyKind = (
-  diagnostic: DiagnosticWithQuickFixes,
-  quickFix: DiagnosticQuickFix
-): "molecule" | "reaction" | undefined => {
-  const patch = readPatch(quickFix);
-  const sourceNodeType = readString(patch, "source_node_type")
-    ?? diagnostic.sourceNodeType
-    ?? (typeof diagnostic.facts?.legacy_block_kind === "string" ? diagnostic.facts.legacy_block_kind : undefined);
-  return sourceNodeType === "molecule" || sourceNodeType === "reaction" ? sourceNodeType : undefined;
-};
-
 const findChemdBlock = (
   lines: string[],
   targetNodeId: string | undefined
@@ -150,37 +138,6 @@ const findChemdBlock = (
     }
 
     return { headerIndex: index, endIndex };
-  }
-
-  return undefined;
-};
-
-const findLegacyBlock = (
-  lines: string[],
-  targetNodeId: string | undefined,
-  targetKind: "molecule" | "reaction"
-): { headerArg: string | undefined; headerIndex: number; endIndex: number } | undefined => {
-  if (!targetNodeId) {
-    return undefined;
-  }
-
-  for (let index = 0; index < lines.length; index += 1) {
-    const header = readBlockHeader(lines[index]);
-    if (!header || header.type !== targetKind || !LEGACY_BLOCK_KINDS.has(header.type)) {
-      continue;
-    }
-
-    const headerArg = header.arg;
-    if (readHeaderId(headerArg) !== targetNodeId) {
-      continue;
-    }
-
-    let endIndex = index + 1;
-    while (endIndex < lines.length && !isChemdClose(lines[endIndex])) {
-      endIndex += 1;
-    }
-
-    return { headerArg, headerIndex: index, endIndex };
   }
 
   return undefined;
@@ -218,36 +175,6 @@ const applyInsertChemdKind = (
   return nextLines.join(eol);
 };
 
-const applyConvertLegacyBlock = (
-  source: string,
-  diagnostic: DiagnosticWithQuickFixes,
-  quickFix: DiagnosticQuickFix
-): string => {
-  const legacyKind = readTargetLegacyKind(diagnostic, quickFix);
-  const targetNodeId = readTargetNodeId(diagnostic, quickFix);
-  if (!legacyKind || !targetNodeId) {
-    return source;
-  }
-
-  const eol = source.includes("\r\n") ? "\r\n" : "\n";
-  const lines = splitSourceLines(source);
-  const block = findLegacyBlock(lines, targetNodeId, legacyKind);
-  if (!block) {
-    return source;
-  }
-
-  const bodyLines = lines.slice(block.headerIndex + 1, block.endIndex);
-  const nextLines = [...lines];
-  nextLines[block.headerIndex] = block.headerArg?.trim()
-    ? `:::chemd ${block.headerArg.trim()}`
-    : ":::chemd";
-  if (!bodyLines.some((line) => readFieldKey(line)?.toLowerCase() === "kind")) {
-    nextLines.splice(block.headerIndex + 1, 0, `kind: ${legacyKind}`);
-  }
-
-  return nextLines.join(eol);
-};
-
 export const applyDiagnosticQuickFix = (
   source: string,
   diagnostic: DiagnosticWithQuickFixes,
@@ -259,10 +186,6 @@ export const applyDiagnosticQuickFix = (
 
   if (quickFix.kind === "insert_chemd_kind") {
     return applyInsertChemdKind(source, diagnostic, quickFix);
-  }
-
-  if (quickFix.kind === "convert_legacy_block") {
-    return applyConvertLegacyBlock(source, diagnostic, quickFix);
   }
 
   return source;

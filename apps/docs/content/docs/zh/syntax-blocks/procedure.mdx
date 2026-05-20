@@ -9,7 +9,7 @@ description: '`:::procedure` 记录实验过程正文、reaction/ref 关联、�
 
 ```md
 :::procedure #proc-main
-reaction: rxn-main
+reaction: @rxn-main
 evidence: notebook-p12 | batch-sheet
 step: charge | id=s-charge | inputs=@mol-substrate,@mol-base | solvent=MeCN
 step: heat | id=s-heat | temperature=60 C | duration=3 h | dependsOn=s-charge
@@ -54,7 +54,7 @@ outputs: sample-product
 
 ## 控制流
 
-控制流使用 `:::procedure` 内部的普通行。块级控制使用大括号，单行控制只占一行：
+控制流使用 `:::procedure` 内部的普通行。块级控制使用大括号，单行控制只占一行。control 不是顶级 Chemd block。
 
 ```md
 :::procedure #proc-controls
@@ -93,11 +93,185 @@ abort_if: unsafe-temperature | condition=sensor.temperature > 80 C
 
 块级控制包括 `repeat`、`until`、`branch`、`case`、`default`、`parallel` 和 `path`。单行控制包括 `wait` 和 `abort_if`。
 
-控制头格式为 `kind: id | key=value | key=value {`。`default` 没有自定义 ID。`case` 和 `path` 的 ID 必须在同级唯一。`repeat` 必须有正整数 `count`。`until`、`case`、`wait` 和 `abort_if` 必须有结构化 `condition`。
+### 控制头语法
 
-condition 必须可机器解释。它可以用 `@id` 引用已知对象或 step ID，也可以使用 `operator.confirmed`、`sensor.temperature`、`time.elapsed`、`run.status` 这类 runtime namespace。自然语言 condition 会报错，因为无法可靠执行或回放。
+块级 control 使用以下形态：
 
-`repeat` 会把子步骤展开为生成 step ID，例如 `wash-cycle[1].wash` 和 `wash-cycle[2].wash`。`parallel` 会把 path 中的步骤展开为 `workup.organic.s-dry` 这类 ID。动态控制（`until`、`branch`、`wait`、`abort_if`）保留在 control graph 中，由 runtime preflight 决定是否需要 adapter 或人工确认。
+```md
+kind: control-id | key=value | key=value {
+  step: ...
+}
+```
+
+单行 control 使用以下形态：
+
+```md
+kind: control-id | key=value | key=value
+```
+
+第一个非 `key=value` 片段是 control ID。只有 `default` 不接受自定义 ID。顶层 control（`repeat`、`until`、`branch`、`parallel`、`wait`、`abort_if`）必须有 ID。`case` 与 `path` 的 ID 必须在同级唯一。step ID 与 canonical control ID 不能冲突。
+
+| control | 写法 | 必需参数 | 静态行为 |
+| --- | --- | --- | --- |
+| `repeat` | 块 | `count` | 按 `count` 静态展开子步骤 |
+| `until` | 块 | `condition` | 动态 control，body 保留在 control 下 |
+| `branch` | 块 | 至少一个 `case` 和一个最后的 `default` | 动态 control |
+| `case` | `branch` 内部块 | `condition` | branch 子分支 |
+| `default` | `branch` 内部块 | 不能写 `condition` | fallback 分支 |
+| `parallel` | 块 | 至少两个 `path` 块 | 静态展开各 path 步骤 |
+| `path` | `parallel` 内部块 | 非空 body | parallel 子路径 |
+| `wait` | 单行 | `condition` | 动态门禁 |
+| `abort_if` | 单行 | `condition` | 动态停止条件 |
+
+所有 `key=value` 会保存为 control 参数；其中 `outputs` 会单独保存为 control outputs。这样模板和 runtime tooling 可以读取 `timeout=30 min`、`max_iterations=6`、`resource=rotavap` 或 `reason=exotherm` 等参数。
+
+### Condition 表达式
+
+condition 必须是结构化表达式。满足以下任一条件即可：它是 runtime boolean namespace，或包含比较/逻辑操作符。
+
+```md
+condition=operator.confirmed
+condition=sensor.temperature > 80 C
+condition=@ana-tlc.result == complete
+condition=@sample-crude exists
+condition=run.status != aborted and time.elapsed < 2 h
+```
+
+支持的 runtime namespace 为 `operator.*`、`sensor.*`、`time.*` 和 `run.*`。支持的操作符 token 包括 `==`、`!=`、`<`、`<=`、`>`、`>=`、`exists`、`in`、`matches`、`and`、`or` 和 `not`。condition 中的 `@id` 必须指向已知对象，或当前作用域内已知 step/control ID。`condition=wait until TLC is good` 这类自然语言是 error，因为 runtime replay 无法判断真假。
+
+### ID 与依赖行为
+
+`repeat` 会把子步骤展开为生成 step ID，例如 `wash-cycle[1].wash` 和 `wash-cycle[2].wash`。如果 repeated child step 有显式 ID，也会加上 iteration 前缀。重复轮次在 step graph 中顺序串联，因此第二轮会接在第一轮之后。
+
+`parallel` 会把 path 中的步骤展开为 `workup.organic.s-dry` 这类 ID。每条 path 从同一 incoming dependency set 开始，然后在 downstream graph 中汇合。
+
+动态控制（`until`、`branch`、`wait`、`abort_if`）保留在 control graph 中。它们不会被展开成固定线性 step sequence，因为选中 body 或停止点取决于运行时状态。因此 runtime preflight 可以要求 adapter 或人工确认。后续 step 可以依赖动态 control ID：
+
+```md
+wait: operator-approval | condition=operator.confirmed | timeout=30 min
+step: heat | id=s-heat | temperature=40 C | dependsOn=operator-approval
+```
+
+### 错误写法
+
+```md
+:::until #bad
+condition: operator.confirmed
+:::
+```
+
+control flow 不是顶级 block。
+
+```md
+until: monitor | condition=wait until TLC is clean {
+  step: analyze | type=tlc
+}
+```
+
+自然语言 condition 是 error。
+
+```md
+parallel: workup {
+  path: organic {
+    step: dry | medium=Na2SO4
+  }
+}
+```
+
+`parallel` 至少需要两个非空 path。
+
+### `repeat`
+
+固定次数重复同一组子步骤时使用 `repeat`。
+
+```md
+repeat: wash-cycle | count=3 {
+  step: wash | solvent=brine | volume=10 mL
+  step: separate_layers | outputs=organic-layer
+}
+```
+
+`count` 必须是正整数。repeat body 为空会报错。
+
+固定重复次数的洗涤、蒸发多份馏分、重复冲洗等适合 `repeat`。如果停止点取决于测量结果，不要用 `repeat`，改用 `until`。
+
+### `until`
+
+需要重复执行，直到某个可测条件成立时使用 `until`。
+
+```md
+until: monitor-complete | condition=@ana-tlc.status == complete | max_iterations=6 {
+  step: analyze | id=s-tlc-check | type=tlc
+  step: hold | duration=15 min
+}
+```
+
+`condition` 必填。`max_iterations` 是可选语法，但省略时会产生 dynamic-control warning，因为 runtime review 必须决定停止边界。
+
+TLC 监测、pH 调整、气体吸收、压力稳定或重复取样这类“测量驱动循环”适合 `until`。control body 描述每轮检查执行的动作。由于最终循环次数不是静态已知，body 不会在静态 graph 中展开为固定 step ID。
+
+只要循环有可能无界，就应写 `max_iterations`：
+
+```md
+until: ph-neutral | condition=sensor.ph >= 6.5 and sensor.ph <= 7.5 | max_iterations=8 {
+  step: add | reagent=NaHCO3 solution | volume=1 mL
+  step: mix | duration=1 min
+}
+```
+
+### `branch`
+
+需要根据运行状态或测量事实选择唯一分支时使用 `branch`。
+
+```md
+branch: ph-workup {
+  case: acidic | condition=sensor.ph < 7 {
+    step: quench | id=s-quench-acid | reagent=NaHCO3
+  }
+  case: basic | condition=sensor.ph > 9 {
+    step: quench | id=s-quench-base | reagent=NH4Cl
+  }
+  default: {
+    step: quench | id=s-quench-default | reagent=water
+  }
+}
+```
+
+branch 至少需要一个 `case`，并且必须有且只有一个最后的 `default`。每个 `case` 都必须有结构化 condition。
+
+有替代 workup、补救路径或安全响应时使用 `branch`。`default` 必须是最后一个子块，并且不能定义 `condition`；它表示没有任何 `case` 命中时的 fallback。
+
+### `parallel`
+
+多个独立路径可以并行准备时使用 `parallel`。
+
+```md
+parallel: workup {
+  path: organic {
+    step: dry | id=s-dry | medium=Na2SO4
+  }
+  path: aqueous {
+    step: store | id=s-store-aq | location=waste
+  }
+}
+```
+
+`parallel` 至少需要两个非空 `path` 块。runtime preflight 可针对共享设备、库存或人工操作报告资源冲突。
+
+只有能从同一 incoming state 同时启动的路径才应放入 `parallel`。有顺序依赖的步骤不要拆到不同 path；应继续写成顺序 `step:`，或放在同一个 `path` 内。
+
+### `wait` 与 `abort_if`
+
+运行门禁使用 `wait`，停止条件使用 `abort_if`。
+
+```md
+wait: operator-approval | condition=operator.confirmed | timeout=30 min
+abort_if: unsafe-temperature | condition=sensor.temperature > 80 C
+```
+
+两者都必须有 `condition`。在 `robot-run` 中，缺少这些 control 的 adapter 会成为 blocking runtime error。
+
+`wait` 可表达人工确认、传感器就绪、等待时间或外部流程完成。`abort_if` 应表达会停止运行的条件，例如温度危险、压力异常、物料缺失或分析失败。condition 保持可执行，解释性文字放在附近 Markdown 句子或 `notes` 中。
 
 ## 推荐实践案例
 
@@ -105,7 +279,7 @@ condition 必须可机器解释。它可以用 `@id` 引用已知对象或 step 
 
 ```md
 :::procedure #proc-main
-reaction: rxn-main
+reaction: @rxn-main
 evidence: notebook-p12 | balance-log
 
 :::step #s-charge

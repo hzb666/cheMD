@@ -100,25 +100,10 @@ const countDiagnostics = (
   code: string
 ): number => diagnostics.filter((diagnostic) => diagnostic.code === code).length;
 
-const isLegacyUnknownBlockDiagnostic = (diagnostic: Diagnostic | V03Diagnostic): boolean =>
-  diagnostic.code === "W_UNKNOWN_BLOCK"
-  && (
-    diagnostic.sourceNodeType === "molecule"
-    || diagnostic.sourceNodeType === "reaction"
-    || typeof diagnostic.facts?.legacy_block_kind === "string"
-  );
-
-const countLegacyBlockDiagnostics = (
-  diagnostics: Array<Diagnostic | V03Diagnostic>
-): number =>
-  diagnostics.filter((diagnostic) =>
-    diagnostic.code === "W_LEGACY_BLOCK_KIND" || isLegacyUnknownBlockDiagnostic(diagnostic)
-  ).length;
-
 const buildMigrationSummary = (
   diagnostics: Array<Diagnostic | V03Diagnostic>
 ): LnfMigrationSummary => ({
-  legacyBlockCount: countLegacyBlockDiagnostics(diagnostics),
+  legacyBlockCount: 0,
   missingKindCount: countDiagnostics(diagnostics, "W_CHEMD_KIND_AMBIGUOUS"),
   conflictCount: countDiagnostics(diagnostics, "E_CHEMD_KIND_CONFLICT")
 });

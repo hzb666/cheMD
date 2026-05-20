@@ -3,6 +3,6 @@
   "pages": [
     "cli-workflows",
     "error-checking",
-    "diagnostics-repair"
+    "diagnostics-fix"
   ]
 }

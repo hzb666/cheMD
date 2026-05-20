@@ -1,6 +1,6 @@
 ---
-title: 诊断与修复手册
-description: frontmatter、结构化块、引用、类型检查、模板、input assistance 和 repair loop 诊断。
+title: 诊断与 fix 手册
+description: frontmatter、结构化块、引用、类型检查、模板、input assistance 和 safe-fix loop 诊断。
 ---
 
 
@@ -22,17 +22,17 @@ date: 2026-04-24
 
 ## 非法块 ID
 
-块 ID 必须匹配 `^[a-zA-Z][a-zA-Z0-9_-]*$`。非法 ID 产生 `E_INVALID_ID`。该规则适用于 `:::chemd #id`、`:::result #id`、`:::analysis #id`、`:::sample #id`、`:::artifact #id`、`:::procedure #id`、`:::observation #id` 和 `:::condition-varies #id`。
+块 ID 必须匹配 `^[a-zA-Z][a-zA-Z0-9_-]*$`。非法 ID 产生 `E_INVALID_ID`。该规则适用于 `:::chemd #id`、`:::material #id`、`:::batch #id`、`:::result #id`、`:::analysis #id`、`:::sample #id`、`:::artifact #id`、`:::procedure #id`、`:::observation #id`、`:::trace #id` 和 `:::condition-varies #id`。
 
 ## 未知字段
 
-字段不在对应 block 的允许集合内时产生 `W_UNKNOWN_FIELD`。parser 会丢弃未知字段。修复应优先使用已实现字段；补充型信息可放入 `notes`、`caption`、`conditions` 或项目自定义 frontmatter 标量。
+字段不在对应 block 的允许集合内时产生 error severity 的 `W_UNKNOWN_FIELD`。parser 会丢弃未知字段。修复应优先使用已实现字段；补充型信息可放入 `notes`、`caption`、`conditions` 或项目自定义 frontmatter 标量。
 
 示例：`:::result` 接收 `isolated_mass`，未实现 `mass` 字段。写成 `mass: 30 mg` 会产生 `W_UNKNOWN_FIELD`，并且结果节点不会保存该值。
 
 ## 空列表项
 
-列表字段支持 `|` 与逗号分隔。连续分隔符、尾部分隔符和空字符串项产生 `E_INVALID_LIST_ITEM`。常见字段包含 `reactants`、`products`、`conditions`、`prev`、`artifacts`、`chemistry_features`、step `inputs`、step `outputs`、step `dependsOn` 和 event `evidence`。
+列表字段支持 `|` 与逗号分隔。连续分隔符、尾部分隔符和空字符串项产生 `E_INVALID_LIST_ITEM`。常见字段包含 `reactant`、`product`、`reac`、`prod`、`reactants`、`products`、`conditions`、`prev`、`artifacts`、`chemistry_features`、step `inputs`、step `outputs`、step `dependsOn` 和 event `evidence`。
 
 ## 未解析引用
 
@@ -56,11 +56,13 @@ resolver 必填字段：
 
 | 对象 | 必填字段 |
 | --- | --- |
-| molecule | `smiles` |
-| reaction | `reactants`、`products` |
+| material | `molecule` |
+| batch | `source` |
 | analysis | `type_name` |
 | sample | `name` |
 | artifact | `kind`、`path` |
+
+typechecker 会检查 molecule identity 和 reaction participant 语义。molecule 至少需要一个身份字段，例如 `name`、`smiles`、`canonical_smiles`、`cas`、`inchi`、`inchikey`、`formula`、`mw`、`role` 或 `caption`。reaction 至少需要一个 reactant 和一个 product，结构化 participant 可以引用 molecule、material 或 batch。
 
 analysis 的 `type` 字段在 AST 中保存为 `type_name`。TLC analysis 在 parser 中补入默认 `plate` 与 `visualization`。
 
@@ -68,7 +70,7 @@ analysis 的 `type` 字段在 AST 中保存为 `type_name`。TLC analysis 在 pa
 
 模板诊断覆盖索引、展开和参数类型。`E_UNKNOWN_TEMPLATE` 表示 `:::use` 找不到模板。`E_TEMPLATE_PARAM_MISSING` 表示调用缺少必需参数。`E_TEMPLATE_PARAM_TYPE_MISMATCH` 表示 `ref<kind>` 或 `quantity<class>` 与传入值不匹配。`E_TEMPLATE_CYCLE` 表示模板递归。`E_TEMPLATE_EXPANSION_LIMIT` 表示展开深度超过 32 或展开节点超过 2000。
 
-`ref<kind>` 支持 molecule、reaction、result、analysis、procedure、observation、sample、artifact 和 condition_varies。`quantity<class>` 支持 amount、mass、volume、temperature、time、pressure、concentration、equivalent 和 percent。
+`ref<kind>` 支持 molecule、reaction、result、analysis、procedure、observation、sample、artifact 和 condition_varies。`quantity<class>` 支持 amount、mass、volume、temperature、time、pressure、concentration、equivalent、percent、rate、rpm 和 pH。
 
 ## primary 引用错误
 
@@ -85,9 +87,18 @@ typechecker 生成 v0.3 diagnostics。常见类型检查诊断：
 | `E306` | result `status` 不在 success、partial、failed、unknown 等 alias 内 |
 | `E_TYPED_REFERENCE_MISMATCH` | 引用目标类型与字段要求不一致 |
 | `E_RESULT_REACTION_CONFLICT` | result 与 linked reaction 的 yield、conversion 或 selectivity 不一致 |
+| `E_REACTION_PARTICIPANT_REQUIRED` | reaction 缺少 reactant 或 product |
+| `E_REACTION_PARTICIPANT_SYNTAX` | 复数列表别名上写了结构化 participant 事实 |
+| `E_REACTION_PARTICIPANT_REFERENCE` | reaction participant 指向缺失或不支持的目标 |
+| `E_STOICHIOMETRY_LIMITING` | 没有或存在多个 limiting reactant，或 limiting reactant 缺少 amount 和 equivalent |
+| `E_STOICHIOMETRY_QUANTITY_MISSING` | 有化学计量语义的 reactant 缺少 amount 或 equivalent |
+| `E_INTEROP_RXN_SMILES_UNVERIFIED` | 显式 reaction structure 无法根据 participant 身份验证 |
+| `E_INTEROP_RXN_SMILES_PARTICIPANT_CONFLICT` | 显式 reaction structure 与 participant 身份冲突 |
 | `E_STEP_INVALID_FAMILY` | step family 未在实现集合内 |
 | `E_STEP_PARAM_MISSING` | family 必需参数缺失 |
 | `E_STEP_PARAM_INVALID` | family 禁止的参数出现 |
+| `E_PROCEDURE_CONTROL_SYNTAX` | procedure 控制流语法不合法 |
+| `E_PROCEDURE_CONTROL_REFERENCE` | 控制流 path 或 dependency 引用不合法 |
 | `E_STEP_ID_DUPLICATE` | 显式 step ID 重复 |
 | `E_STEP_INVALID_REFERENCE` | `dependsOn` 指向不存在 step |
 | `E_STEP_DEPENDENCY_CYCLE` | step dependency 形成循环 |
@@ -97,13 +108,13 @@ typechecker 生成 v0.3 diagnostics。常见类型检查诊断：
 | `E_REACTION_ROUTE_CYCLE` | reaction route 形成循环 |
 | `W_REACTION_ROUTE_ORPHAN` | route 内存在孤立 reaction |
 
-## quick fix 与 repair loop
+## quick fix 与 safe-fix loop
 
-当前 quick fix kind 包含 `apply_authoring_patch` 和 `insert_chemd_kind`。`insert_chemd_kind` 用于 `chemd` 类型推断相关诊断。`apply_authoring_patch` 携带 compiler input assistance 生成的安全修复建议。
+当前 quick fix kind 包含 `apply_authoring_patch` 和 `insert_chemd_kind`。`insert_chemd_kind` 用于 `chemd` 类型推断相关诊断。`apply_authoring_patch` 携带 compiler input assistance 生成的安全 fix 建议。
 
-`runChemdRepairLoop` 默认最多迭代 5 次。每轮编译、构建 diagnosis、应用 safe fixes、重新编译。停止原因包含 clean、max iterations、stalled 和 diagnosis status。`--write` 只在修复后 clean 且源码变化时写回。
+CLI 暴露为 `chemd fix`。safe-fix loop 默认最多迭代 5 次。每轮编译、构建 diagnosis、应用 safe fixes、重新编译。停止原因包含 clean、max iterations、stalled 和 diagnosis status。`--write` 只在 fixed source clean 且源码变化时写回。
 
 ## agent loop 诊断闭环
 
-`runChemdAgentLoop` 在 deterministic repair loop 后调用外部 driver。driver 接收源码、诊断和迭代历史，并返回 `rewrite` 或 `stop`。停止原因包含 clean、max iterations、repair max iterations、repair stalled、agent stalled 和 diagnosis status。该流程用于自动修复无法由 quick fix 独立覆盖的输入问题。
+`chemd agent-loop` 在 deterministic safe-fix loop 后调用外部 driver。driver 接收源码、诊断和迭代历史，并返回 `rewrite` 或 `stop`。停止原因包含 clean、max iterations、fix max iterations、fix stalled、agent stalled 和 diagnosis status。该流程用于自动修复无法由 quick fix 独立覆盖的输入问题。
 

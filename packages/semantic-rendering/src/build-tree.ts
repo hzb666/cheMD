@@ -183,7 +183,7 @@ const buildUnknownDiagnostic = (
   record: PlainRecord
 ): ChemdNodeDiagnosticV1 => ({
   code: "semantic_rendering.unknown_node_type",
-  severity: "warning",
+  severity: "error",
   message: `Unknown Chemd node type: ${typeof record.type === "string" ? record.type : "missing"}`,
   node_id: nodeId
 });

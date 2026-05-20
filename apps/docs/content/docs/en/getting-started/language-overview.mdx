@@ -8,7 +8,7 @@ description: Chemd source files, AST layers, compiler outputs, and the implement
 
 A Chemd source consists of frontmatter, Markdown prose, and structured blocks. The parsed root node is `ChemdDocument`, with `meta`, `children`, `diagnostics`, optional `source`, and optional `renderSelection`.
 
-`children` can contain Markdown nodes and structured nodes. Structured nodes cover molecules, reactions, results, analyses, procedures, observations, samples, artifacts, condition screens, template calls, and column layout.
+`children` can contain Markdown nodes and structured nodes. Structured nodes cover molecules, reactions, materials, batches, results, analyses, procedures, runtime traces, observations, samples, artifacts, condition screens, template calls, and column layout.
 
 ## User Input, AST, and Compiler Output Layers
 
@@ -16,7 +16,7 @@ The user input layer contains YAML frontmatter, Markdown text, and `:::` structu
 
 ## Current Implemented Language Surface
 
-The body parser registers `chemd`, `result`, `analysis`, `artifact`, `sample`, `condition-varies`, `procedure`, `observation`, `use`, and `col`. Template blocks are recognized by the body parsing flow and produce `template` nodes.
+The body parser registers `chemd`, `material`, `batch`, `result`, `analysis`, `artifact`, `sample`, `condition-varies`, `procedure`, `trace`, `observation`, `use`, and `col`. Template blocks are recognized by the body parsing flow and produce `template` nodes.
 
 The current semantic usage surface uses `:::chemd` for both molecule and reaction records.
 
@@ -32,12 +32,11 @@ date: 2026-04-24
 ---
 
 :::chemd #mol-main
-kind: molecule
 name: ethanol
 smiles: CCO
 :::
 ```
 
-This example satisfies required frontmatter and the molecule `smiles` requirement.
+This example satisfies required frontmatter and the molecule identity requirement.
 
 

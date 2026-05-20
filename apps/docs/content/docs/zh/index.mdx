@@ -32,7 +32,7 @@ Chemd 源文件使用 `.chemd` 扩展名。文档主体采用 Markdown 正文，
 | 查询块字段或默认值 | 结构化块参考 |
 | 建模真实实验记录 | 实验记录建模 |
 | 使用模板、引用、表达式、布局或工作区语义 | 高级语言特性 |
-| 校验、导出、修复或查看诊断 | 验证、诊断与工具链 |
+| 校验、导出、fix 或查看诊断 | 验证、诊断与工具链 |
 | 扩展实现或集成工具 | 代码库导览 |
 | 查询别名、单位和诊断码 | 附录 |
 
@@ -50,31 +50,28 @@ primary_result: res-main
 ---
 
 :::chemd #mol-acid
-kind: molecule
 name: benzoic acid
 smiles: O=C(O)c1ccccc1
 role: substrate
 :::
 
 :::chemd #mol-alcohol
-kind: molecule
 name: ethanol
 smiles: CCO
 role: coupling_partner
 :::
 
 :::chemd #mol-product
-kind: molecule
 name: ethyl benzoate
 smiles: CCOC(=O)c1ccccc1
 role: product
 :::
 
 :::chemd #rxn-main
-kind: reaction
 name: Fischer esterification
-reactants: @mol-acid | @mol-alcohol
-products: @mol-product
+reactant: @mol-acid | 1.0 mmol | 1.0 eq | limiting=true
+reactant: @mol-alcohol | 5.0 mL
+product: @mol-product
 catalyst: H2SO4
 solvent: ethanol
 temperature: 78 C
@@ -82,7 +79,7 @@ time: 4 h
 :::
 
 :::result #res-main
-ref: rxn-main
+reaction: @rxn-main
 product: @mol-product
 status: success
 yield: 76 %

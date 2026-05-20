@@ -45,6 +45,32 @@ Chemd 会保留原始数量文本，并在校验时为支持的数量类别计�
 | sample | `purity` | `percent` |
 | step params | `amount`、`mass`、`volume`、`temperature`、`target_temperature`、`duration`、`time`、`pressure`、`concentration`、`equivalent`、`equivalents`、`percent`、`rate`、`rpm`、`ph` | 对应类别 |
 
+## 示例
+
+reaction participant 中，带 amount 单位的段可以省略 `amount=`。equivalent 可以写 `eq`、`equiv` 或 `equiv=...`。limiting reactant 必须同时有 amount 和 equivalent。
+
+```md
+:::chemd #rxn-main
+reactant: @mat-substrate | 1.00 mmol | 1.0 eq | limiting=true
+reactant: @mol-base | equiv=1.2
+reac: @mol-catalyst | 0.05 eq
+product: @mol-product
+temperature: r.t. -> 80 C over 30 min
+pressure: 1 bar
+:::
+```
+
+step 参数复用同一套解析器。rate 与 pH 是结构化数量，因此可进入 runtime preflight 和 typed graph 输出。
+
+```md
+:::procedure #proc-quantity
+step: add | id=s-add | reagent=@mat-base | volume=2.0 mL | rate=0.5 mL/min
+step: mix | id=s-stir | rpm=600 rpm | duration=30 min
+step: observe | id=s-ph | ph=pH 7.2
+step: heat | id=s-heat | temperature=r.t. -> 80 C over 30 min
+:::
+```
+
 ## 模板参数
 
 `quantity<class>` 使用 resolver 单位集合执行形态检查。`quantity` 不带类别时，接受任意实现支持的数量单位。

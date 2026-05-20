@@ -112,7 +112,7 @@ export const buildAuthoringMinimalSets = (
     ? createMinimalSet({
         checklist_id: "condition-optimization",
         title: "条件优化记录",
-        description: "多反应筛选或 condition-varies 记录应显式标明 standard、baseline 与 attempt 结果配对。",
+        description: "多反应筛选或 condition-varies 记录应显式标明 standard、factor baseline 与 attempt 结果配对。",
         missing_items: [
           ...(semanticLayer.condition_variations.length === 0 ? ["condition-varies 块"] : []),
           ...semanticLayer.condition_variations.flatMap((variation) =>
@@ -127,9 +127,9 @@ export const buildAuthoringMinimalSets = (
             && suggestions.some((item) => item.target_block_id === variation.original_id)
             ? [`${variation.original_id}.standard`]
             : []),
-          ...(!variation.condition?.length
+          ...(!variation.factors?.length
             && suggestions.some((item) => item.suggestion_id.includes(`baseline-${variation.original_id}`))
-            ? [`${variation.original_id}.condition`]
+            ? [`${variation.original_id}.factor`]
             : [])
         ]),
         suggestion_ids: suggestions

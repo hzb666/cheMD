@@ -13,7 +13,7 @@ Chemd 的 Markdown 正文会保留原始文本，并额外提取引用、行内�
 The selected entry is @rxn-var1.
 ```
 
-resolver 在对象索引中查找 `rxn-var1`。对象索引来自所有带 ID 的 molecule、reaction、result、analysis、procedure、observation、sample、artifact 和 condition-varies 节点。
+resolver 在对象索引中查找 `rxn-var1`。对象索引来自所有带 ID 的 molecule、material、batch、reaction、result、analysis、procedure、trace、observation、sample、artifact 和 condition-varies 节点。
 
 ## 对象字段引用
 
@@ -70,21 +70,21 @@ resolver 从 `document.meta` 读取字段。未声明字段会产生未解析引
 
 ```md
 :::condition-varies #cv-screen
-standard: rxn-standard
+standard: @rxn-standard
 factor: solvent | baseline=THF
 factor: temperature | baseline=25 C
 outcome: yield | baseline=68 %
 
 attempt: var1
-reaction: rxn-var1
-result: res-var1
+reaction: @rxn-var1
+result: @res-var1
 solvent: MeCN
 temperature: 40 C
 yield: 72 %
 
 attempt: var2
-reaction: rxn-var2
-result: res-var2
+reaction: @rxn-var2
+result: @res-var2
 solvent: DMF
 temperature: 60 C
 yield: 45 %

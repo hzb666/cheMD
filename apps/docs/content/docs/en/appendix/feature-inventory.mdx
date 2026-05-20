@@ -7,9 +7,9 @@ This inventory summarizes the language features available to Chemd users. Use it
 
 ## Language Input Surface
 
-Chemd accepts Markdown prose, YAML frontmatter, `:::` structured blocks, template blocks, column layout blocks, inline references, inline chemistry expressions, inline code, and Markdown links. Supported structured block names include `chemd`, `material`, `batch`, `result`, `analysis`, `artifact`, `sample`, `condition-varies`, `procedure`, `observation`, `use`, and `col`. `template` uses the header fields `bind`, `params`, `description`, and `body`.
+Chemd accepts Markdown prose, YAML frontmatter, `:::` structured blocks, template blocks, column layout blocks, inline references, inline chemistry expressions, inline code, and Markdown links. Supported structured block names include `chemd`, `material`, `batch`, `result`, `analysis`, `artifact`, `sample`, `condition-varies`, `procedure`, `trace`, `observation`, `use`, and `col`. `template` uses the header fields `bind`, `params`, `description`, and `body`.
 
-Unknown structured blocks produce `W_UNKNOWN_BLOCK`.
+Unknown structured blocks produce an error-level `W_UNKNOWN_BLOCK` diagnostic.
 
 ## Frontmatter Features
 
@@ -42,15 +42,16 @@ Default list fields are `reactants`, `products`, `reactant`, `product`, `reac`, 
 
 - `:::chemd`: produces molecule or reaction by `kind` or field shape. Missing `kind` is inferred from reaction participant fields or molecule identity fields; unstable inference produces a `W_CHEMD_KIND_AMBIGUOUS` error.
 - Molecule fields: `smiles`, `canonical_smiles`, `cas`, `inchi`, `inchikey`, `name`, `role`, `caption`, `formula`, `mw`, and `chemistry_features`.
-- Reaction fields: `name`, `reactant`, `product`, `reac`, `prod`, `reactants`, `products`, `conditions`, `route`, `prev`, `reagents`, `catalyst`, `solvent`, `temperature`, `time`, `pressure`, `atmosphere`, `yield`, `conversion`, `selectivity`, `equation`, `rxn_smiles`, `caption`, and `chemistry_features`.
+- Reaction fields: `name`, `reactant`, `product`, `reac`, `prod`, `reactants`, `products`, `conditions`, `route`, `prev`, `reagents`, `catalyst`, `solvent`, `temperature`, `time`, `pressure`, `atmosphere`, `yield`, `conversion`, `selectivity`, `equation`, `rxn_smiles`, `reaction_smiles`, `caption`, and `chemistry_features`.
 - `:::material` fields: `molecule`, `supplier`, `lot`, `purity`, `density`, `storage`, `notes`, and `chemistry_features`.
 - `:::batch` fields: `source`, `molecule`, `state`, `mass`, `purity`, `artifacts`, `notes`, and `chemistry_features`.
 - `:::result` fields: `status`, `yield`, `conversion`, `selectivity`, `isolated_mass`, `product_state`, `purity`, `notes`, `ref`, `reaction`, and `product`.
 - `:::analysis` fields: `type`, `ref`, `time`, `eluent`, `plate`, `visualization`, `result`, `instrument`, `solvent`, `frequency`, `method`, `data`, `notes`, `artifact`, `artifacts`, `spectrum`, `lane`, `spot`, `mess`, `base`, `none`, `peak`, and `ion`.
 - `:::sample` fields: `name`, `sample_id`, `batch`, `purity`, `supplier`, `notes`, `ref`, `derived_from`, `aliquot_of`, `batch_of`, `artifacts`, and `chemistry_features`.
 - `:::artifact` fields: `kind`, `ref`, `path`, `checksum`, `instrument`, `notes`, and `chemistry_features`.
-- `:::condition-varies` fields: `reaction`, `standard`, `condition`, `varies`, `factor`, `outcome`, `attempt`, `result`, `note`, `notes`, and declared attempt fields.
-- `:::procedure` fields: `ref`, `reaction`, and `evidence`, with `step:` lines and nested `:::step` blocks.
+- `:::condition-varies` fields: `reaction`, `standard`, `factor`, `outcome`, `attempt`, `result`, `note`, `notes`, and declared attempt fields.
+- `:::procedure` fields: `ref`, `reaction`, and `evidence`, with `step:` lines, nested `:::step` blocks, and control lines `repeat`, `until`, `branch`, `parallel`, `wait`, and `abort_if`.
+- `:::trace` fields: `plan` and `mode`, with authored `event:` lines.
 - `:::observation` fields: `ref`, with `event:` lines and nested `:::event` blocks.
 - `:::col` syntax: column count comes from the header argument, such as `:::col-2` or `:::col 2`; children are written as `col:` lines, and each child can contain Markdown or braced structured content.
 
@@ -76,4 +77,4 @@ Template expansion has maximum depth 32 and maximum expanded node count 2000. Cy
 
 `compileChemd` executes parse, resolve, typecheck, render profile resolution, runtime run plan, runtime preflight, LNF, training export, RAG export, training understanding, input assistance, input-assistance diagnostics, diagnosis, HTML, JSON, and DOCX bridge.
 
-CLI commands include `validate`, `export`, `graph`, `diff`, `changed`, `repair`, and `agent-loop`. `export` formats include `json`, `lnf`, `rag`, `training`, and `training-full`. Text output formats for `graph`, `diff`, `changed`, `repair`, and `agent-loop` support `text` and `json`.
+CLI commands include `validate`, `export`, `graph`, `diff`, `changed`, `fix`, and `agent-loop`. `export` formats include `json`, `lnf`, `rag`, `training`, and `training-full`. Text output formats for `graph`, `diff`, `changed`, `fix`, and `agent-loop` support `text` and `json`.

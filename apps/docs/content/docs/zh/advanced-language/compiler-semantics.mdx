@@ -23,7 +23,7 @@ Markdown 节点保存原始文本，并附带四类 token：
 
 ## 字段过滤与诊断
 
-每个结构化块声明允许字段集合。未注册字段会产生 `W_UNKNOWN_FIELD`，并且不会进入该节点。
+每个结构化块声明允许字段集合。未注册字段会产生 error-severity `W_UNKNOWN_FIELD`，并且不会进入该节点。
 
 ```md
 :::result #res-main
@@ -64,13 +64,13 @@ resolver 当前校验以下对象：
 
 | 类型 | 必填字段 |
 | --- | --- |
-| molecule | `smiles` |
-| reaction | `reactants`, `products` |
+| material | `molecule` |
+| batch | `source` |
 | analysis | `type_name` |
 | sample | `name` |
 | artifact | `kind`, `path` |
 
-result、procedure、observation 和 condition-varies 当前没有通用必填字段校验。实际工作流仍建议写入 `ref` 或 `reaction` 关联。
+molecule identity 和 reaction participant 存在性由 typechecker 检查。molecule 至少需要一个 identity 字段。reaction 至少需要一个 reactant 和一个 product。result、procedure、observation、trace 和 condition-varies 当前没有通用 resolver 必填字段校验；实际工作流仍建议在需要连接其他对象时写入 `ref` 或 `reaction` 关联。
 
 ## primary 引用校验
 
@@ -111,29 +111,26 @@ primary_result: res-main
 ---
 
 :::chemd #mol-substrate
-kind: molecule
 smiles: CCO
 name: ethanol
 :::
 
 :::chemd #mol-product
-kind: molecule
 smiles: CC=O
 name: acetaldehyde
 :::
 
 :::chemd #rxn-main
-kind: reaction
-reactants: @mol-substrate
-products: @mol-product
+reactant: @mol-substrate | 1.0 mmol | 1.0 eq | limiting=true
+product: @mol-product
 solvent: MeCN
 temperature: 60 C
 time: 3 h
 :::
 
 :::result #res-main
-reaction: rxn-main
-product: mol-product
+reaction: @rxn-main
+product: @mol-product
 status: success
 yield: 74 %
 notes: isolated after chromatography

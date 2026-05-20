@@ -29,10 +29,16 @@ step: heat | temp
 
 This suggests `temperature=` from the `heat` StepFamily schema.
 
+## Hover and Definition
+
+Hover uses the current compiler output. Symbol hover can include canonical quantities from the typed graph, quantity provenance when present, and interop status for `smiles`, `inchi`, `inchikey`, and `rxn_smiles` fields. Reference hover reports the resolved target and whether the token was explicit (`@id`) or bare.
+
+Definition lookup first checks current-document symbols. If the current document has no target, editor integrations can pass a workspace symbol index; a single workspace match returns that document location, while multiple matches are reported as an ambiguity error.
+
 ## Alias and Kind Rules
 
 `kind: mol` and `kind: reac` are official value aliases and normalize to molecule/reaction. Stable omission of `kind` produces no diagnostic. Ambiguous omission remains an error, but the language service does not add a quick fix that guesses molecule or reaction for the user.
 
 ## Quick Fix Boundary
 
-Quick fixes are proposals. They should use range edits when possible. Whole-document replacement is reserved for explicit codemods such as deterministic repair. Editor integrations must show compiler diagnostics as-is and must not downgrade severity locally.
+Quick fixes are proposals. They should use range edits when possible. Whole-document replacement is reserved for explicit codemods and safe-fix workflows. Editor integrations must show compiler diagnostics as-is and must not downgrade severity locally.

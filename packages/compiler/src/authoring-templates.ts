@@ -373,8 +373,8 @@ const buildAttemptResultLinkPatch = (
 ): AuthoringPatch => ({
   kind: "insert_field_line",
   blockId: variationId,
-  line: `res${attemptId.replace(/^var/i, "")}: ${resultId}`,
-  anchorFields: [attemptId]
+  line: `result: @${resultId}`,
+  anchorFields: ["attempt"]
 });
 
 const buildAttemptScaffoldTemplate = (input: {

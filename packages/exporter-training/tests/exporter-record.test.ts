@@ -422,6 +422,11 @@ notes: audit only
       pii_status: "present",
       allowed_uses: ["audit"]
     });
+    expect(understanding.entities.samples).toEqual([]);
+    expect(understanding.quality).toMatchObject({
+      usable_for_training: false,
+      exclusion_reasons: expect.arrayContaining(["governance_blocking"])
+    });
   });
 });
 

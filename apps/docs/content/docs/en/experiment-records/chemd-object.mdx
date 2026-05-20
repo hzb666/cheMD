@@ -10,7 +10,6 @@ description: 'Molecules, reactions, inference, fields, quantities, and route rel
 
 ```md
 :::chemd #mol-aryl
-kind: molecule
 name: aryl bromide
 smiles: Brc1ccccc1
 role: substrate
@@ -40,7 +39,6 @@ Field reference:
 
 ```md
 :::chemd #rxn-main
-kind: reaction
 name: Suzuki coupling
 reactant: @mat-aryl-lot-a | 1.00 mmol | 1.0 eq | limiting=true
 reactant: @mol-boron | 1.5 eq
@@ -99,6 +97,9 @@ Reaction fields are limited by the schema registry. Repeated singular participan
 | `yield` | AST string compared against linked result yield |
 | `conversion` | AST string compared against linked result conversion |
 | `selectivity` | AST string compared against linked result selectivity |
+| `rxn_smiles` / `reaction_smiles` | optional reaction structure; explicit values must match participant identities when they are available |
+
+`rxn_smiles` is optional. When every participant resolves to a molecule with `smiles` or `canonical_smiles`, the typed graph can infer the reaction structure from participants. If an explicit value is present but cannot be verified or conflicts with participants, the typechecker reports an interop error.
 
 ## Participant References
 
@@ -106,17 +107,11 @@ Reaction fields are limited by the schema registry. Repeated singular participan
 
 ```md
 reactant: @mat-aryl-lot-a | 1.00 mmol | 1.0 eq | limiting=true
-reactant: mol-boron | 1.5 eq
+reactant: @mol-boron | 1.5 eq
 product: @mol-product
 ```
 
-Invalid list example:
-
-```md
-reactants: @mol-a | 1.0 mmol
-```
-
-Structured participant facts on plural list aliases produce `E_REACTION_PARTICIPANT_SYNTAX`. A trailing separator creates an empty list item and produces `E_INVALID_LIST_ITEM`.
+Plural list aliases cannot carry structured participant facts such as amount or equivalent segments. That produces `E_REACTION_PARTICIPANT_SYNTAX`. A trailing separator creates an empty list item and produces `E_INVALID_LIST_ITEM`.
 
 ## `route` and `prev` Route Relationships
 
@@ -141,21 +136,18 @@ Declare molecule and reaction objects before downstream result, analysis, proced
 
 ```md
 :::chemd #mol-substrate
-kind: molecule
 name: benzyl alcohol
 smiles: OCc1ccccc1
 role: substrate
 :::
 
 :::chemd #mol-product
-kind: molecule
 name: benzaldehyde
 smiles: O=Cc1ccccc1
 role: product
 :::
 
 :::chemd #rxn-oxidation
-kind: reaction
 name: benzyl alcohol oxidation
 route: route-oxidation
 reactant: @mol-substrate | 1.00 mmol | 1.0 eq | limiting=true

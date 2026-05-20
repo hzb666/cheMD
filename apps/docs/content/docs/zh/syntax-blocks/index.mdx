@@ -16,6 +16,7 @@ description: 面向 Chemd 使用者的结构化块使用手册，每一种块独
 | `:::procedure` | 实验过程 | `procedure` |
 | `:::step` | `procedure` 内部步骤 | `step` |
 | `:::observation` | 观察记录 | `observation` |
+| `:::trace` | 运行 trace 记录 | `trace` |
 | `:::event` | `observation` 内部事件 | `event` |
 | `:::sample` | 样品记录 | `sample` |
 | `:::artifact` | 文件、谱图、图片等附件 | `artifact` |
@@ -50,19 +51,16 @@ primary_result: res-main
 ---
 
 :::chemd #mol-substrate
-kind: molecule
 name: substrate
 smiles: CCO
 :::
 
 :::chemd #mol-product
-kind: molecule
 name: product
 smiles: CC=O
 :::
 
 :::chemd #rxn-main
-kind: reaction
 reactant: @mol-substrate | 1.00 mmol | 1.0 eq | limiting=true
 product: @mol-product
 solvent: MeCN
@@ -71,8 +69,8 @@ time: 3 h
 :::
 
 :::result #res-main
-reaction: rxn-main
-product: mol-product
+reaction: @rxn-main
+product: @mol-product
 status: success
 yield: 74 %
 :::

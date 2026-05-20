@@ -11,7 +11,6 @@ The resolver walks children and `col.children`, collecting object nodes with IDs
 ```md
 :::col 2
 col: {:::chemd #mol-a
-kind: molecule
 smiles: CCO
 :::
 :::}
@@ -30,7 +29,6 @@ Duplicate object IDs produce `E_DUPLICATE_ID`. Duplicate template names produce 
 
 ```md
 :::chemd #dup
-kind: molecule
 smiles: CCO
 :::
 
@@ -68,9 +66,8 @@ primary_reaction: rxn-main
 ---
 
 :::chemd #rxn-main
-kind: reaction
-reactant: mol-a
-product: mol-p
+reactant: @mol-a | 1.0 mmol | 1.0 eq | limiting=true
+product: @mol-p
 temperature: 25 C
 :::
 
@@ -105,12 +102,10 @@ Current resolver-required fields are material `molecule`, batch `source`, analys
 
 ```md
 :::chemd #mol-missing-identity
-kind: molecule
 :::
 
 :::chemd #rxn-missing-products
-kind: reaction
-reactant: mol-a
+reactant: @mol-a | 1.0 mmol | 1.0 eq | limiting=true
 :::
 
 :::artifact #art-missing-path
@@ -136,7 +131,7 @@ status: success
 :::
 
 :::use result-line
-result: res-main
+result: @res-main
 :::
 ```
 
@@ -201,24 +196,21 @@ primary_result: res-main
 ---
 
 :::chemd #mol-a
-kind: molecule
 smiles: CCO
 :::
 
 :::chemd #mol-p
-kind: molecule
 smiles: CC=O
 :::
 
 :::chemd #rxn-main
-kind: reaction
-reactant: @mol-a
+reactant: @mol-a | 1.0 mmol | 1.0 eq | limiting=true
 product: @mol-p
 :::
 
 :::result #res-main
-reaction: rxn-main
-product: mol-p
+reaction: @rxn-main
+product: @mol-p
 status: success
 yield: 80 %
 :::

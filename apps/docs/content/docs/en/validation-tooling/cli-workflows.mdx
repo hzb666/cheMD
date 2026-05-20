@@ -1,6 +1,6 @@
 ---
 title: CLI and Validation Workflows
-description: Implementation-level reference for validate, check, preflight, export, graph, diff, changed, repair, and agent-loop.
+description: Implementation-level reference for validate, check, preflight, export, graph, diff, changed, fix, and agent-loop.
 ---
 
 
@@ -115,26 +115,26 @@ pnpm chemd diff before.chemd after.chemd --format json
 
 Diff traverses top-level objects, `col.children`, and template body, making it suitable for reviewing reaction, result, sample, and procedure structure changes.
 
-## `pnpm chemd repair`
+## `pnpm chemd fix`
 
-`repair` runs the deterministic repair loop. The default maximum iteration count is 5 and can be changed with `--max-iterations`. Output schema version is `chemd-repair/v0.1`. `--write` writes back only when the repaired diagnosis is clean and the source changed.
+`fix` runs the deterministic safe-fix loop. The default maximum iteration count is 5 and can be changed with `--max-iterations`. Output schema version is `chemd-fix/v0.1`. `--write` writes back only when the fixed diagnosis is clean and the source changed.
 
 ```text
-pnpm chemd repair experiment.chemd --format json
-pnpm chemd repair experiment.chemd --write
+pnpm chemd fix experiment.chemd --format json
+pnpm chemd fix experiment.chemd --write
 ```
 
-The repair loop applies only safe fixes, mainly `insert_chemd_kind` and `apply_authoring_patch`. Diagnostics requiring user facts remain as required input or manual review.
+The fix loop applies only safe fixes, mainly `insert_chemd_kind` and `apply_authoring_patch`. Diagnostics requiring user facts remain as required input or manual review.
 
 ## `pnpm chemd agent-loop`
 
-`agent-loop` requires `--driver <cmd>`. The CLI runs the repair loop first, then sends source, diagnosis, and iteration history to the external driver. The driver can return `rewrite` or `stop`. Output schema version is `chemd-agent-loop/v0.1`.
+`agent-loop` requires `--driver <cmd>`. The CLI runs the safe-fix loop first, then sends source, diagnosis, and iteration history to the external driver. The driver can return `rewrite` or `stop`. Output schema version is `chemd-agent-loop/v0.1`.
 
 ```text
-pnpm chemd agent-loop experiment.chemd --driver node --driver-arg ./repair-driver.mjs --format json
+pnpm chemd agent-loop experiment.chemd --driver node --driver-arg ./fix-driver.mjs --format json
 ```
 
-Options include `--max-iterations`, `--max-repair-iterations`, `--driver-arg`, `--format`, and `--write`. Stop reasons cover clean, max iterations, repair max iterations, repair stalled, agent stalled, and diagnosis status.
+Options include `--max-iterations`, `--max-fix-iterations`, `--driver-arg`, `--format`, and `--write`. Stop reasons cover clean, max iterations, fix max iterations, fix stalled, agent stalled, and diagnosis status.
 
 ## Recommended Local Validation Order
 
@@ -152,11 +152,11 @@ Multi-document route workflow:
 3. `pnpm chemd graph file-a.chemd file-b.chemd --format json`
 4. `pnpm chemd diff before.chemd after.chemd --format json`
 
-Automated repair workflow:
+Automated fix workflow:
 
-1. `pnpm chemd repair file.chemd --format json`
+1. `pnpm chemd fix file.chemd --format json`
 2. Review safe fixes and manual review items
-3. `pnpm chemd repair file.chemd --write`
+3. `pnpm chemd fix file.chemd --write`
 4. `pnpm chemd validate file.chemd`
 
 ## `pnpm chemd changed`

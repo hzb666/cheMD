@@ -12,6 +12,9 @@ import type {
   ChemdSymbol
 } from "./types";
 
+type TypedNode = NonNullable<ChemdLanguageCompileOutput["result"]>["typedSemanticGraph"]["nodes"][number];
+type TypedQuantity = NonNullable<ChemdLanguageCompileOutput["result"]>["typedSemanticGraph"]["quantities"][number];
+
 export interface ChemdHoverRequest {
   source: string;
   documentUri?: string;
@@ -29,6 +32,23 @@ export interface ChemdHoverSymbol {
   kind: string;
   range: ChemdSourceRange;
   sourceNodeType?: string;
+  canonicalQuantities?: ChemdHoverQuantity[];
+  interopStatus?: ChemdHoverInteropStatus;
+}
+
+export interface ChemdHoverQuantity {
+  field?: string;
+  raw: string;
+  valueKind?: string;
+  canonicalValue?: number;
+  canonicalUnit?: string;
+  provenance?: string;
+}
+
+export interface ChemdHoverInteropStatus {
+  fields: string[];
+  verified: boolean;
+  diagnostics: string[];
 }
 
 export interface ChemdHoverDiagnostic {
@@ -67,7 +87,7 @@ export const getChemdHover = (
   }
 
   const position = resolveEditorPosition(request);
-  const symbol = findSymbolAtPosition(compileOutput.symbols, position);
+  const symbol = findSymbolAtPosition(compileOutput, position);
   const diagnostic = findDiagnosticAtPosition(compileOutput.diagnostics, position);
   const referenceTarget = findReferenceTarget(request, compileOutput, position);
   if (!symbol && !diagnostic && !referenceTarget) {
@@ -78,12 +98,12 @@ export const getChemdHover = (
 };
 
 const findSymbolAtPosition = (
-  symbols: readonly ChemdSymbol[],
+  compileOutput: ChemdLanguageCompileOutput,
   position: ChemdEditorPosition
 ): ChemdHoverSymbol | undefined =>
-  symbols.filter((symbol) => rangeContainsPosition(symbol.range, position))
+  compileOutput.symbols.filter((symbol) => rangeContainsPosition(symbol.range, position))
     .sort(compareSymbols)
-    .map(toHoverSymbol)[0];
+    .map((symbol) => toHoverSymbol(symbol, compileOutput))[0];
 
 const findDiagnosticAtPosition = (
   diagnostics: readonly ChemdEditorDiagnostic[],
@@ -103,7 +123,7 @@ const findReferenceTarget = (
     ? compileOutput.symbols.find((item) => item.id === token.symbolId)
     : undefined;
   return token && symbol ? {
-    ...toHoverSymbol(symbol),
+    ...toHoverSymbol(symbol, compileOutput),
     tokenRange: token.range,
     explicitReference: token.explicitReference
   } : undefined;
@@ -133,13 +153,76 @@ const createHoverResult = (
   referenceTarget
 });
 
-const toHoverSymbol = (symbol: ChemdSymbol): ChemdHoverSymbol => ({
-  id: symbol.id,
-  label: symbol.label,
-  kind: symbol.kind,
-  range: symbol.range,
-  sourceNodeType: symbol.sourceNodeType
+const toHoverSymbol = (
+  symbol: ChemdSymbol,
+  compileOutput: ChemdLanguageCompileOutput
+): ChemdHoverSymbol => {
+  const typedNode = findTypedNode(compileOutput, symbol.id);
+  const canonicalQuantities = findCanonicalQuantities(compileOutput, symbol.id);
+  const interopStatus = typedNode ? buildInteropStatus(compileOutput, typedNode) : undefined;
+
+  return {
+    id: symbol.id,
+    label: symbol.label,
+    kind: symbol.kind,
+    range: symbol.range,
+    sourceNodeType: symbol.sourceNodeType,
+    ...(canonicalQuantities.length > 0 ? { canonicalQuantities } : {}),
+    ...(interopStatus ? { interopStatus } : {})
+  };
+};
+
+const findTypedNode = (
+  compileOutput: ChemdLanguageCompileOutput,
+  nodeId: string
+): TypedNode | undefined =>
+  compileOutput.status === "ok"
+    ? compileOutput.result.typedSemanticGraph.nodes.find((node) => node.nodeId === nodeId)
+    : undefined;
+
+const findCanonicalQuantities = (
+  compileOutput: ChemdLanguageCompileOutput,
+  nodeId: string
+): ChemdHoverQuantity[] =>
+  compileOutput.status === "ok"
+    ? compileOutput.result.typedSemanticGraph.quantities
+      .filter((quantity) => quantity.sourceNodeId === nodeId)
+      .map(toHoverQuantity)
+    : [];
+
+const toHoverQuantity = (quantity: TypedQuantity): ChemdHoverQuantity => ({
+  field: quantity.sourceField,
+  raw: quantity.raw,
+  valueKind: quantity.valueKind,
+  canonicalValue: quantity.canonicalValue,
+  canonicalUnit: quantity.canonicalUnit,
+  provenance: quantity.provenance?.source
 });
+
+const buildInteropStatus = (
+  compileOutput: ChemdLanguageCompileOutput,
+  typedNode: TypedNode
+): ChemdHoverInteropStatus | undefined => {
+  const record = typedNode as unknown as Record<string, unknown>;
+  const fields = ["smiles", "inchi", "inchikey", "rxn_smiles"]
+    .filter((field) => typeof record[field] === "string" && String(record[field]).trim().length > 0);
+  if (fields.length === 0) {
+    return undefined;
+  }
+
+  const diagnostics = compileOutput.diagnostics
+    .filter((diagnostic) =>
+      diagnostic.sourceNodeId === typedNode.nodeId
+      && diagnostic.code.includes("INTEROP")
+    )
+    .map((diagnostic) => diagnostic.code);
+
+  return {
+    fields,
+    verified: false,
+    diagnostics
+  };
+};
 
 const toHoverDiagnostic = (
   diagnostic: ChemdEditorDiagnostic

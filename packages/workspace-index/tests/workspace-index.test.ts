@@ -201,6 +201,7 @@ describe("buildWorkspaceSymbolIndex", () => {
         documentUri: "file:///workspace/route-a.chemd",
         diagnostic: expect.objectContaining({
           code: "W_WORKSPACE_REFERENCE_UNRESOLVED",
+          severity: "error",
           message: expect.stringContaining("missing-product")
         })
       })
@@ -252,6 +253,7 @@ describe("buildWorkspaceSymbolIndex", () => {
         documentUri: "file:///bad.chemd",
         diagnostic: expect.objectContaining({
           code: "E_WORKSPACE_COMPILE_FAILED",
+          severity: "error",
           message: "compile failed for bad document"
         })
       })
