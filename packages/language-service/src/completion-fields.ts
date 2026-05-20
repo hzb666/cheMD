@@ -1,4 +1,13 @@
-import { getCanonicalBlockFields } from "@chemd/core";
+import {
+  getBlockChildLineFields,
+  getCompletionBlockFieldSchemas,
+  type BlockFieldSchema
+} from "@chemd/core";
+import {
+  STEP_FAMILIES,
+  getStepFamilySchema,
+  type StepFamily
+} from "@chemd/step-ontology";
 
 import type {
   ChemdCompletionBlockKind,
@@ -8,83 +17,47 @@ import type {
 
 const commonFields = ["kind", "name", "caption"];
 
-const moleculeFieldNames = new Set([
-  "kind",
-  "name",
-  "smiles",
-  "cas",
-  "inchi",
-  "inchikey",
-  "canonical_smiles",
-  "formula",
-  "mw",
-  "role",
-  "caption"
-]);
-const reactionFieldNames = new Set([
-  "kind",
-  "name",
-  "route",
-  "prev",
-  "reactant",
-  "product",
-  "equation",
-  "rxn_smiles",
-  "conditions",
-  "reagents",
-  "catalyst",
-  "solvent",
-  "temperature",
-  "time",
-  "pressure",
-  "atmosphere",
-  "yield",
-  "conversion",
-  "selectivity",
-  "caption"
-]);
+interface FieldCompletionEntry {
+  aliasOf?: string;
+  name: string;
+  schema?: BlockFieldSchema;
+}
 
-const filterChemdFields = (allowed: ReadonlySet<string>): string[] =>
-  getCanonicalBlockFields("chemd").filter((field) => allowed.has(field));
-
-const fieldRegistry: Record<Exclude<ChemdCompletionBlockKind, "unknown">, string[]> = {
-  molecule: filterChemdFields(moleculeFieldNames),
-  reaction: filterChemdFields(reactionFieldNames),
-  material: getCanonicalBlockFields("material"),
-  batch: getCanonicalBlockFields("batch"),
-  result: getCanonicalBlockFields("result"),
-  procedure: [...getCanonicalBlockFields("procedure"), "step"],
-  step: getCanonicalBlockFields("step"),
-  template: getCanonicalBlockFields("template"),
-  use: getCanonicalBlockFields("use"),
-  condition_varies: [
-    ...getCanonicalBlockFields("condition-varies"),
-    "var1",
-    "res1",
-    "note1"
-  ]
-};
+interface StepParamCompletionEntry {
+  aliasOf?: string;
+  detail: string;
+  name: string;
+}
 
 export const getChemdFieldCompletions = (
   context: ChemdCompletionContext
 ): ChemdCompletionItem[] => {
+  if (context.stepParam) {
+    return getStepParamCompletions(context);
+  }
+
   const block = context.block;
   if (!block || !context.isFieldKeyPosition) {
     return [];
   }
 
-  return getFieldsForKind(block.kind)
-    .filter((field) => !block.fields.has(field))
-    .filter((field) => field.startsWith(context.fieldPrefix))
-    .map((field, index) => ({
-      id: `field.chemd.${block.kind}.${field}`,
-      label: `${field}:`,
+  return getFieldsForKind(block.kind, context.fieldPrefix)
+    .filter((entry) => !block.fields.has(entry.aliasOf ?? entry.name))
+    .filter((entry) => entry.name.startsWith(context.fieldPrefix))
+    .map((entry, index) => ({
+      id: `field.chemd.${block.kind}.${entry.name}`,
+      label: `${entry.name}:`,
       kind: "field",
-      insertText: `${field}: `,
+      insertText: `${entry.name}: `,
       insertTextFormat: "plain",
-      detail: `${block.kind} field`,
-      sortText: `${String(index).padStart(2, "0")}-${field}`,
-      filterText: field,
+      detail: entry.aliasOf ? `alias of ${entry.aliasOf}` : `${block.kind} field`,
+      sortText: `${entry.aliasOf ? "1" : "0"}-${String(index).padStart(2, "0")}-${entry.name}`,
+      filterText: entry.name,
+      data: {
+        type: "field",
+        canonicalName: entry.aliasOf ?? entry.name,
+        ...(entry.aliasOf ? { aliasOf: entry.aliasOf } : {})
+      },
       range: {
         ...context.range,
         startColumn: Math.max(1, context.position.column - context.fieldPrefix.length)
@@ -92,10 +65,83 @@ export const getChemdFieldCompletions = (
     }));
 };
 
-const getFieldsForKind = (kind: ChemdCompletionBlockKind): string[] => {
-  if (kind !== "unknown") {
-    return fieldRegistry[kind];
+const getFieldsForKind = (
+  kind: ChemdCompletionBlockKind,
+  prefix: string
+): FieldCompletionEntry[] => {
+  if (kind === "unknown") {
+    return commonFields.map((name) => ({ name }));
   }
 
-  return commonFields;
+  const { blockType, semanticKind } = getSchemaContext(kind);
+  const fields = getCompletionBlockFieldSchemas(blockType, semanticKind);
+  const canonicalEntries = fields.map((schema) => ({ name: schema.name, schema }));
+  const aliasEntries = prefix.length === 0
+    ? []
+    : fields.flatMap((schema) =>
+        schema.aliases?.map((alias) => ({ name: alias, aliasOf: schema.name, schema })) ?? []
+      );
+  const childEntries = getBlockChildLineFields(blockType).map((name) => ({ name }));
+
+  return [...canonicalEntries, ...childEntries, ...aliasEntries];
+};
+
+const getSchemaContext = (
+  kind: Exclude<ChemdCompletionBlockKind, "unknown">
+): { blockType: string; semanticKind?: "molecule" | "reaction" } => {
+  if (kind === "molecule" || kind === "reaction") {
+    return { blockType: "chemd", semanticKind: kind };
+  }
+
+  return {
+    blockType: kind === "condition_varies" ? "condition-varies" : kind
+  };
+};
+
+const getStepParamCompletions = (
+  context: ChemdCompletionContext
+): ChemdCompletionItem[] => {
+  const stepParam = context.stepParam;
+  if (!stepParam || !STEP_FAMILIES.has(stepParam.family as StepFamily)) {
+    return [];
+  }
+
+  const schema = getStepFamilySchema(stepParam.family as StepFamily);
+  const prefix = stepParam.prefix;
+  const canonicalEntries: StepParamCompletionEntry[] = schema.params.map((param) => ({
+    name: param.name,
+    detail: `${schema.family} parameter`
+  }));
+  const aliasEntries: StepParamCompletionEntry[] = prefix.length === 0
+    ? []
+    : schema.params.flatMap((param) =>
+        param.aliases?.map((alias) => ({
+          name: alias,
+          aliasOf: param.name,
+          detail: `alias of ${param.name}`
+        })) ?? []
+      );
+
+  return [...canonicalEntries, ...aliasEntries]
+    .filter((entry) => !stepParam.usedParams.has(entry.aliasOf ?? entry.name))
+    .filter((entry) => entry.name.startsWith(prefix))
+    .map((entry, index) => ({
+      id: `field.step.${schema.family}.${entry.name}`,
+      label: `${entry.name}=`,
+      kind: "field",
+      insertText: `${entry.name}=`,
+      insertTextFormat: "plain",
+      detail: entry.detail,
+      sortText: `${entry.aliasOf ? "1" : "0"}-${String(index).padStart(2, "0")}-${entry.name}`,
+      filterText: entry.name,
+      data: {
+        type: "field",
+        canonicalName: entry.aliasOf ?? entry.name,
+        ...(entry.aliasOf ? { aliasOf: entry.aliasOf } : {})
+      },
+      range: {
+        ...context.range,
+        startColumn: Math.max(1, context.position.column - prefix.length)
+      }
+    }));
 };

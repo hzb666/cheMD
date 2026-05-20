@@ -19,7 +19,7 @@ mw: 88.11 g/mol
 :::
 ```
 
-身份字段包括 `name`、`smiles`、`canonical_smiles`、`cas`、`inchi`、`inchikey`、`formula`、`mw`、`role`、`caption` 和 `chemistry_features`。typechecker 要求 molecule 至少具备一个身份字段。molecule 上的 `amount` 和 `equivalents` 会产生 error。
+身份字段包括 `name`、`smiles`、`canonical_smiles`、`cas`、`inchi`、`inchikey`、`formula`、`mw`、`role`、`caption` 和 `chemistry_features`。typechecker 要求 molecule 至少具备一个身份字段。`inchi` 必须以 `InChI=` 开头，`inchikey` 必须是标准大写 14-10-1 分段格式。molecule 上的 `amount` 和 `equivalents` 会产生 error。
 
 ## Reaction Participant
 
@@ -31,6 +31,7 @@ kind: reaction
 reactant: @mat-substrate-lot-a | 1.00 mmol | 1.0 eq | limiting=true
 reactant: @mol-base | equiv=1.2
 product: @mol-product
+rxn_smiles: CCO.N>>CCN
 solvent: MeCN
 temperature: r.t. -> 60 C over 30 min
 time: overnight
@@ -86,12 +87,12 @@ purity: 84 %
 | `temperature` / `time` / `pressure` | 不适用 | 可选 | 类型化数量 |
 | `atmosphere` | 不适用 | 可选 | `nitrogen`、`argon`、`air`、`oxygen`、`inert` 或扩展值 |
 | `yield` / `conversion` / `selectivity` | 不适用 | 可选 | reaction 级结果提示；result 仍是权威结果 |
-| `equation` / `rxn_smiles` | 不适用 | 可选 | reaction 身份字符串 |
+| `equation` / `rxn_smiles` | 不适用 | 可选 | reaction 身份字符串；`reaction_smiles` 是 `rxn_smiles` 的别名 |
 | `chemistry_features` | 可选 | 可选 | `|` 或 `,` 分隔的 feature ID |
 
 ## 类型推断
 
-parser 通过 `reactant`、`product`、`reac`、`prod`、`reactants` 或 `products` 推断 reaction。通过 `smiles`、`cas`、`inchi`、`inchikey`、`canonical_smiles`、`formula` 或 `mw` 等身份字段推断 molecule。推断不稳定、显式 `kind` 非法或字段形状冲突时都是 error。
+parser 通过 participant 字段和 reaction-only 字段推断 reaction，例如 `reactant`、`product`、`rxn_smiles`、`reaction_smiles`、`solvent`、`temperature`、`time`、`yield` 或 `conversion`。通过 `smiles`、`cas`、`inchi`、`inchikey`、`canonical_smiles`、`formula` 或 `mw` 等身份字段推断 molecule。推断不稳定、显式 `kind` 非法或字段形状冲突时都是 error。
 
 ## 数量表面语法
 
@@ -107,6 +108,10 @@ parser 通过 `reactant`、`product`、`reac`、`prod`、`reactants` 或 `produc
 | `E_CHEMD_KIND_CONFLICT` | `kind` 非法，或显式类型与字段形状冲突 |
 | `E_MOLECULE_IDENTITY_MISSING` | molecule 没有身份字段 |
 | `E_MOLECULE_REACTION_QUANTITY` | molecule 写了反应用量 |
+| `E_INTEROP_SMILES_PARSE` | SMILES 身份字段不是可解析的单 token |
+| `E_INTEROP_INCHI_FORMAT` | InChI 身份字段没有以 `InChI=` 开头 |
+| `E_INTEROP_INCHIKEY_FORMAT` | InChIKey 身份字段不是标准分段格式 |
+| `E_INTEROP_RXN_SMILES_PARSE` | reaction structure 字段不是有效 RXN SMILES 表面 |
 | `E_REACTION_PARTICIPANT_SYNTAX` | 在复数列表别名上写了结构化 participant 事实 |
 | `E_TYPED_REFERENCE_MISMATCH` | 引用目标类型错误 |
 | `E_STOICHIOMETRY_LIMITING` | limiting reactant 规则被破坏 |

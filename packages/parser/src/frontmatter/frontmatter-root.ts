@@ -32,6 +32,8 @@ interface ApplyFrontmatterMapContext {
   seenKeys: Set<string>;
 }
 
+const OBJECT_FRONTMATTER_KEYS = new Set(["render_overrides", "governance"]);
+
 export const reportYamlDocumentErrors = (
   errors: Array<{ pos?: [number, number?]; message: string }>,
   lineCounter: LineCounter,
@@ -87,7 +89,12 @@ const readRenderOverridesValue = (
       lines
     );
 
-    if (overrideItem.value && (isMap(overrideItem.value) || isSeq(overrideItem.value))) {
+    const unsupportedNestedValue = overrideItem.value && (
+      isMap(overrideItem.value)
+      || (isSeq(overrideItem.value) && (key !== "governance" || !overrideItem.value.flow))
+    );
+
+    if (unsupportedNestedValue) {
       diagnostics.push(
         createFrontmatterDiagnostic({
           code: "E_INVALID_FRONTMATTER_VALUE",
@@ -139,7 +146,7 @@ const hasUnsupportedScalarValue = (
 ): boolean => {
   if (
     context.key === "tags"
-    || context.key === "render_overrides"
+    || OBJECT_FRONTMATTER_KEYS.has(context.key)
     || !context.valueNode
     || !isScalar(context.valueNode)
   ) {
@@ -176,7 +183,7 @@ const hasUnsupportedNestedValue = (
     lineText: string;
   }
 ): boolean => {
-  if (context.key === "tags" || context.key === "render_overrides" || !context.valueNode) {
+  if (context.key === "tags" || OBJECT_FRONTMATTER_KEYS.has(context.key) || !context.valueNode) {
     return false;
   }
 

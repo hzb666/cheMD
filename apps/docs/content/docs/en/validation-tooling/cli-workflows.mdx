@@ -33,7 +33,7 @@ pnpm chemd check experiments --target validate --format json --dry-run
 pnpm chemd check fixtures/language --target run-plan --format text
 ```
 
-`--target` accepts `validate`, `run-plan`, `training`, and `graph`. The target controls which downstream contract the source must satisfy. `validate` checks the current language contract; stricter target-specific checks can be added without changing the source syntax.
+`--target` accepts `validate`, `run-plan`, `training`, and `graph`. The target controls which downstream contract the source must satisfy. `validate` checks the current language contract; `training` also reports governance diagnostics such as PII present, RAG not allowed, audit-only records, sanitization disabled, and review-required export quality.
 
 The JSON report schema is `chemd-check/v0.1`. It includes per-file diagnostics, totals by severity, the target, and the `dryRun` flag. Exit code is 1 when any file has an error.
 
@@ -66,13 +66,34 @@ pnpm chemd export experiment.chemd --format rag
 
 ## `--format training`
 
-`training` outputs training understanding. `training-full` outputs `ChemdTrainingExportV2`. `lnf` outputs canonical LNF.
+`training` outputs sanitized training understanding. `training-full` outputs `ChemdTrainingExportV2` with audit-only source and source-span data. `lnf` outputs canonical LNF.
 
 | format | source | purpose |
 | --- | --- | --- |
 | `lnf` | `result.lnf` | canonical intermediate representation |
 | `training` | `result.trainingUnderstanding` | training and graph-index summary |
 | `training-full` | `result.trainingExport` | full training record and audit data |
+
+`training` and `rag` include document-level `governance`. `training-full` additionally includes `source_layer.audit_only_fields`, raw source context, and full source snapshots. Artifact paths, material supplier/lot, and sample supplier are audit-only by default and are omitted from the sanitized training understanding.
+
+## `pnpm chemd templates`
+
+`templates` lists domain template IDs from `@chemd/domain-templates`. Use `--json` for structured output or pass an ID for details.
+
+```text
+pnpm chemd templates
+pnpm chemd templates --json
+pnpm chemd templates organic-synthesis/suzuki-screen
+```
+
+## `pnpm chemd new`
+
+`new` renders a domain template into a `.chemd` file. `--out` is required. `--dry-run` prints the generated source instead of writing.
+
+```text
+pnpm chemd new organic-synthesis/suzuki-screen --out exp.chemd
+pnpm chemd new analytical/hplc-purity --out hplc.chemd --dry-run
+```
 
 ## `pnpm chemd graph`
 

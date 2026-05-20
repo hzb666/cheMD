@@ -1,0 +1,34 @@
+---
+title: Domain Template Catalog
+description: Shared starter templates for synthesis, analytical, polymer, electrochemistry, and photochemistry records.
+---
+
+Domain templates create complete `.chemd` files. They are different from in-file `:::template` and `:::use`, which reuse fragments inside one source document.
+
+The shared catalog lives in `@chemd/domain-templates`. CLI, web, and desktop callers should read this package instead of copying template text.
+
+```bash
+pnpm chemd templates
+pnpm chemd templates --json
+pnpm chemd templates organic-synthesis/suzuki-screen
+pnpm chemd new organic-synthesis/suzuki-screen --out exp.chemd
+pnpm chemd new analytical/hplc-purity --out hplc.chemd --dry-run
+```
+
+## Current Template IDs
+
+- `organic-synthesis/suzuki-screen`
+- `organic-synthesis/amide-coupling`
+- `organic-synthesis/oxidation`
+- `organic-synthesis/reduction`
+- `polymer/polymerization`
+- `analytical/nmr-only`
+- `analytical/hplc-purity`
+- `electrochemistry/electrochemical-reaction`
+- `photochemistry/photoredox`
+
+Every catalog entry is compiled by tests under the current language contract. Templates use current syntax only: no language/version fields, no legacy block names, and no compatibility-only headers.
+
+## Reuse Inside Templates
+
+Catalog templates may include ordinary Chemd `:::template` blocks when a common sentence, method note, or TLC lane note should be reused inside the generated file. Method/profile references should be represented as normal objects or references, for example an HPLC method artifact referenced by `analysis.method`.

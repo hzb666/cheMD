@@ -6,10 +6,12 @@ const snippets: Array<Omit<ChemdCompletionItem, "range">> = [{
   kind: "snippet",
   insertText: [
     ":::chemd #rxn-${1:id}",
-    "kind: reaction",
-    "reactants: ${2:@mol-a}",
-    "products: ${3:@mol-b}",
-    "conditions: ${4:solvent | temperature | time}",
+    "reactant: ${2:@mol-a} | ${3:1.0 mmol} | ${4:1.0 eq} | limiting=true",
+    "reactant: ${5:@mol-b} | ${6:1.2 eq}",
+    "product: ${7:@mol-c}",
+    "solvent: ${8:MeCN}",
+    "temperature: ${9:r.t.}",
+    "time: ${10:2 h}",
     ":::"
   ].join("\n"),
   insertTextFormat: "snippet",
@@ -21,7 +23,6 @@ const snippets: Array<Omit<ChemdCompletionItem, "range">> = [{
   kind: "snippet",
   insertText: [
     ":::chemd #mol-${1:id}",
-    "kind: molecule",
     "name: ${2:name}",
     "smiles: ${3:SMILES}",
     ":::"

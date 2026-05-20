@@ -1,0 +1,73 @@
+---
+title: Interoperability and Training Governance
+description: External chemistry identity fields, adapter boundaries, and governance rules for sanitized training/RAG exports.
+---
+
+Chemd keeps external standards at the boundary. The language stores stable identity fields in the typed graph; `@chemd/interoperability` owns adapter contracts and validation helpers.
+
+## Structure Identity
+
+Molecule identity accepts `smiles`, `inchi`, and `inchikey`. `inchikey` must use the standard uppercase 14-10-1 segment shape. `inchi` must start with `InChI=`. Surface failures are errors because downstream identity matching would be unreliable.
+
+```md
+:::chemd #mol-product
+name: product A
+smiles: CCO
+inchi: InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3
+inchikey: LFQSCWFLJHTTHZ-UHFFFAOYSA-N
+:::
+```
+
+Reaction structure uses `rxn_smiles`. `reaction_smiles` is a field alias and is normalized to `rxn_smiles` in AST, typed graph, and training export.
+
+```md
+:::chemd #rxn-main
+reaction_smiles: CCO.O=O>>CC=O.O
+reactant: @mol-ethanol | 1.0 mmol | 1.0 eq | limiting=true
+product: acetaldehyde
+:::
+```
+
+External structure fields do not replace participants. Keep `reactant` and `product` fields explicit so material flow and stoichiometry remain inspectable.
+
+## Adapter Boundary
+
+`@chemd/interoperability` exposes a single `InteropAdapter<TInput, TOutput>` contract:
+
+```ts
+export interface InteropAdapter<TInput, TOutput> {
+  format: string;
+  direction: "import" | "export";
+  convert(input: TInput, context: InteropContext): InteropResult<TOutput>;
+}
+```
+
+The first implementation layer covers InChI/InChIKey/RXN SMILES surface validation, molecule identity projection, reaction structure projection, and AnIML-like placeholder mapping. AnIML/Allotrope placeholder output is explicitly `compliant: false` until a validator-backed exporter exists. SiLA belongs to runtime adapters, not language fields.
+
+## Governance Frontmatter
+
+Governance belongs to the document/export quality layer. It is not copied to every entity unless an entity needs a stricter override later.
+
+```yaml
+governance:
+  confidentiality: internal
+  review_status: human_reviewed
+  allowed_uses: [rag, eval, regression, audit]
+  pii_status: none
+```
+
+`allowed_uses` can contain `rag`, `sft`, `eval`, `regression`, and `audit`. When no governance block is present, the workspace policy defaults to internal, no PII, machine parsed, and all local uses allowed.
+
+## Sanitized Versus Audit
+
+`chemd export --format training` returns sanitized training understanding. It omits raw source, source spans, artifact paths, material supplier/lot, and sample supplier. `chemd export --format training-full` returns the full audit artifact with `source_layer.audit_only_fields` listing the fields that are not part of sanitized projection.
+
+`chemd export --format rag` emits chunks only when `allowed_uses` includes `rag` and governance is not blocking. `pii_status: present` blocks non-audit projection until the record is redacted.
+
+```bash
+pnpm chemd check experiment.chemd --target training --format json
+pnpm chemd export experiment.chemd --format training
+pnpm chemd export experiment.chemd --format training-full
+```
+
+`check --target training` adds exporter diagnostics for `review_required`, PII, missing RAG permission, audit-only records, and disabled sanitization.

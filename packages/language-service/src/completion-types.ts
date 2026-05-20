@@ -39,8 +39,15 @@ export interface ChemdReferenceCompletionData {
   symbolKind: string;
 }
 
+export interface ChemdFieldCompletionData {
+  type: "field";
+  canonicalName: string;
+  aliasOf?: string;
+}
+
 export type ChemdCompletionItemData =
-  | ChemdReferenceCompletionData;
+  | ChemdReferenceCompletionData
+  | ChemdFieldCompletionData;
 
 export interface ChemdCompletionItem {
   id: string;
@@ -68,10 +75,16 @@ export type ChemdCompletionBlockKind =
   | "batch"
   | "reaction"
   | "result"
+  | "analysis"
   | "procedure"
+  | "trace"
+  | "observation"
   | "step"
+  | "event"
   | "template"
   | "use"
+  | "sample"
+  | "artifact"
   | "condition_varies"
   | "unknown";
 
@@ -92,6 +105,11 @@ export interface ChemdCompletionContext {
   isFieldValuePosition: boolean;
   fieldKey?: string;
   fieldPrefix: string;
+  stepParam?: {
+    family: string;
+    prefix: string;
+    usedParams: Set<string>;
+  };
   block?: {
     type: string;
     id?: string;

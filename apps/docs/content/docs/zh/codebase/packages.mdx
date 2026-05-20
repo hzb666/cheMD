@@ -13,6 +13,7 @@ description: packages 目录中已存在包的职责边界、入口、数据流�
 | `@chemd/parser` | `packages/parser/src/index.ts` | frontmatter、body、block、inline token 解析 |
 | `@chemd/resolver` | `packages/resolver/src/index.ts` | 对象索引、引用解析、模板展开、primary 校验、必填字段校验 |
 | `@chemd/typechecker` | `packages/typechecker/src/index.ts` | typed semantic graph、数量归一化、类型化引用、路线和 step 检查 |
+| `@chemd/interoperability` | `packages/interoperability/src/index.ts` | 外部 identity 与 structure adapter contract、校验 helper |
 | `@chemd/compiler` | `packages/compiler/src/index.ts` | 聚合 parse、resolve、typecheck、render、export、diagnosis |
 
 这条链路是 Chemd 语言的主执行路径。`parser` 只负责把源码转成 AST 与 parser diagnostics；`resolver` 增加跨节点语义；`typechecker` 生成 typed semantic graph 和 step graph；`compiler` 负责组合所有阶段并产出 HTML、JSON、DOCX bridge、LNF、RAG 和 training 数据。
@@ -64,9 +65,9 @@ pnpm --filter @chemd/runtime-trace test
 | `@chemd/renderer-html` | HTML 预览渲染 |
 | `@chemd/renderer-json` | JSON 渲染 |
 | `@chemd/renderer-docx` | DOCX bridge 渲染 |
-| `@chemd/exporter-training` | training export、RAG export、graph index、reaction intelligence contract |
+| `@chemd/exporter-training` | training export、RAG export、graph index、governance quality、reaction intelligence contract |
 
-渲染链路使用 resolved document、render options 和 typed graph。导出链路使用 resolved document、typed graph、step graph 和 LNF。training export 是 RAG export 与 training understanding 的上游。
+渲染链路使用 resolved document、render options 和 typed graph。导出链路使用 resolved document、typed graph、step graph 和 LNF。training export 是 RAG export 与 training understanding 的上游。Governance 是 document-level export metadata；sanitized projection 省略 audit-only source 字段，`training-full` 保留它们。
 
 ### 输出归属
 
@@ -84,6 +85,7 @@ pnpm --filter @chemd/runtime-trace test
 | --- | --- |
 | `@chemd/cli` | validate、export、graph、diff、changed、repair、agent-loop |
 | `@chemd/language-service` | 编辑器语言服务 |
+| `@chemd/domain-templates` | 共享 `.chemd` 起始模板 catalog |
 | `@chemd/workspace-index` | workspace 文档索引能力 |
 | `@chemd/storage-postgres` | PostgreSQL schema、records、Graph/RAG 存储 |
 | `@chemd/reaction-map` | reaction graph 与 intelligence contract |
@@ -98,7 +100,8 @@ pnpm --filter @chemd/runtime-trace test
 | 包 | 常见入口 | 验证重点 |
 | --- | --- | --- |
 | `@chemd/cli` | command modules 与 `packages/cli/bin/chemd.mjs` | command output、exit codes、repair/agent-loop workflows |
-| `@chemd/language-service` | language service exports | editor diagnostics、completion-safe parsing、incremental feedback |
+| `@chemd/language-service` | language service exports | schema-driven completion、editor diagnostics、incremental feedback |
+| `@chemd/domain-templates` | catalog exports | template ID、生成源码有效性、CLI `templates`/`new` 输出 |
 | `@chemd/workspace-index` | workspace indexing APIs | 多文件发现、graph input、changed-file behavior |
 | `@chemd/storage-postgres` | schema 与 repository helpers | migration compatibility、record shape、Graph/RAG persistence |
 | `@chemd/diagnostics` | diagnostic builders 与 data model | stable diagnostic codes、severity、locations、remediation text |

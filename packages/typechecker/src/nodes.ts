@@ -20,6 +20,13 @@ import {
   normalizeAnalysis
 } from "@chemd/core";
 import { createV03Diagnostic, type V03Diagnostic } from "@chemd/diagnostics";
+import {
+  validateInChI,
+  validateInChIKey,
+  validateRxnSmilesSurface,
+  validateSmilesSurface,
+  type InteropDiagnostic
+} from "@chemd/interoperability";
 
 import {
   normalizeAnalysisType,
@@ -169,6 +176,26 @@ const createTypedDiagnostic = (
     sourceNodeId: node.id,
     sourceField: field,
     facts: { field, ...facts }
+  });
+
+const createInteropDiagnostic = (
+  diagnostic: InteropDiagnostic,
+  node: ObjectNode,
+  fallbackField: string
+): V03Diagnostic =>
+  createV03Diagnostic({
+    code: diagnostic.code,
+    severity: diagnostic.severity,
+    message: diagnostic.message,
+    sourceLayer: "typechecker",
+    sourceNodeType: node.type,
+    sourceNodeId: node.id,
+    sourceField: diagnostic.field ?? fallbackField,
+    facts: {
+      field: diagnostic.field ?? fallbackField,
+      interop_source: "interoperability",
+      ...(diagnostic.facts ?? {})
+    }
   });
 
 const hasMoleculeIdentity = (node: MoleculeNode): boolean =>
@@ -463,7 +490,12 @@ export const buildMoleculeNode = (
     : undefined;
 
   output.diagnostics.push(
-    ...[identityWarning, legacyAmountDiagnostic].filter((item): item is V03Diagnostic => Boolean(item))
+    ...[identityWarning, legacyAmountDiagnostic].filter((item): item is V03Diagnostic => Boolean(item)),
+    ...(node.smiles ? validateSmilesSurface(node.smiles).map((item) => createInteropDiagnostic(item, node, "smiles")) : []),
+    ...(node.inchi ? validateInChI(node.inchi).map((item) => createInteropDiagnostic(item, node, "inchi")) : []),
+    ...(node.inchikey
+      ? validateInChIKey(node.inchikey).map((item) => createInteropDiagnostic(item, node, "inchikey"))
+      : [])
   );
 
   output.node = {
@@ -592,12 +624,16 @@ export const buildReactionNode = (
     ...reactants.diagnostics,
     ...products.diagnostics,
     ...stoichiometryDiagnostics,
-    ...prev.diagnostics
+    ...prev.diagnostics,
+    ...(node.rxn_smiles
+      ? validateRxnSmilesSurface(node.rxn_smiles).map((item) => createInteropDiagnostic(item, node, "rxn_smiles"))
+      : [])
   );
 
   output.node = {
     ...output.node,
     route: node.route,
+    rxn_smiles: node.rxn_smiles,
     prev: prev.values,
     next: [],
     reactants: reactants.references,

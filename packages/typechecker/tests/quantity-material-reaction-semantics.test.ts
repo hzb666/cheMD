@@ -107,6 +107,70 @@ step: add | id=s-add | volume=1 ml
 });
 
 describe("material, batch, and reaction participant semantics", () => {
+  it("normalizes reaction_smiles alias and validates interop identity fields", () => {
+    const result = check(`---
+id: exp-interop
+title: Interop
+date: 2026-05-20
+---
+
+:::chemd #mol-a
+name: ethanol
+smiles: CCO
+inchi: InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3
+inchikey: LFQSCWFLJHTTHZ-UHFFFAOYSA-N
+:::
+
+:::chemd #mol-b
+name: acetaldehyde
+smiles: CC=O
+:::
+
+:::chemd #rxn-main
+reaction_smiles: CCO>>CC=O
+reactant: @mol-a | 1.0 mmol | 1.0 eq | limiting=true
+product: @mol-b
+:::
+`);
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.typedGraph.nodes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: "reaction",
+        nodeId: "rxn-main",
+        rxn_smiles: "CCO>>CC=O"
+      })
+    ]));
+  });
+
+  it("fails closed for invalid InChI and RXN SMILES surfaces", () => {
+    const result = check(`---
+id: exp-bad-interop
+title: Bad interop
+date: 2026-05-20
+---
+
+:::chemd #mol-a
+smiles: C C O
+inchi: bad-inchi
+inchikey: bad-key
+:::
+
+:::chemd #rxn-main
+rxn_smiles: CCO
+reactant: @mol-a | 1.0 mmol | 1.0 eq | limiting=true
+product: product
+:::
+`);
+
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "E_INTEROP_SMILES_PARSE", sourceField: "smiles" }),
+      expect.objectContaining({ code: "E_INTEROP_INCHI_FORMAT", sourceField: "inchi" }),
+      expect.objectContaining({ code: "E_INTEROP_INCHIKEY_FORMAT", sourceField: "inchikey" }),
+      expect.objectContaining({ code: "E_INTEROP_RXN_SMILES_PARSE", sourceField: "rxn_smiles" })
+    ]));
+  });
+
   it("resolves material and batch participants with stoichiometry", () => {
     const result = check(`---
 id: exp-material-stoich

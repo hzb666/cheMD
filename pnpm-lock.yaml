@@ -289,6 +289,9 @@ importers:
       '@chemd/core':
         specifier: workspace:*
         version: link:../core
+      '@chemd/domain-templates':
+        specifier: workspace:*
+        version: link:../domain-templates
       '@chemd/runtime-lab':
         specifier: workspace:*
         version: link:../runtime-lab
@@ -346,6 +349,12 @@ importers:
         specifier: workspace:*
         version: link:../core
 
+  packages/domain-templates:
+    devDependencies:
+      '@chemd/compiler':
+        specifier: workspace:*
+        version: link:../compiler
+
   packages/exporter-training:
     dependencies:
       '@chemd/core':
@@ -367,6 +376,8 @@ importers:
         specifier: workspace:*
         version: link:../typechecker
 
+  packages/interoperability: {}
+
   packages/language-service:
     dependencies:
       '@chemd/compiler':
@@ -375,6 +386,9 @@ importers:
       '@chemd/core':
         specifier: workspace:*
         version: link:../core
+      '@chemd/step-ontology':
+        specifier: workspace:*
+        version: link:../step-ontology
 
   packages/lnf:
     dependencies:
@@ -514,6 +528,9 @@ importers:
       '@chemd/diagnostics':
         specifier: workspace:*
         version: link:../diagnostics
+      '@chemd/interoperability':
+        specifier: workspace:*
+        version: link:../interoperability
       '@chemd/parser':
         specifier: workspace:*
         version: link:../parser

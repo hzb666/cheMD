@@ -12,7 +12,9 @@ training exporter 构建 `ChemdTrainingExportV2`。记录分为四层：
 - `source_layer`：文档身份、source span 和解析源上下文。
 - `semantic_layer`：molecule、reaction、result、analysis、sample、artifact、condition、procedure、observation 和 route。
 - `learning_layer`：retrieval chunk、resolved reference、任务导向投影，以及 procedure 或 observation logic。
-- `quality_layer`：diagnostic、missing logic、conflict、confidence 和导出质量信号。
+- `quality_layer`：diagnostic、missing logic、conflict、confidence、governance quality 和导出质量信号。
+
+顶层 `governance` 记录控制 sanitized projection。`training` 与 `rag` 使用 sanitized 数据；`training-full` 保留 audit-only source context，并在 `source_layer.audit_only_fields` 列出 audit-only 字段。
 
 ```bash
 pnpm chemd export ./examples/example.chemd --format training
@@ -27,7 +29,7 @@ pnpm chemd export ./examples/example.chemd --format rag
 graph 命令会编译多个文档，并构建 schema version 为 `chemd-training-graph-index/v0.1` 的 graph index。
 
 ```bash
-pnpm chemd graph ./corpus --out ./graph-index.json
+pnpm chemd graph ./corpus --format json > ./graph-index.json
 ```
 
 graph index 来自编译后的 training understanding。它不是 compiler `CompileResult` 的一部分。

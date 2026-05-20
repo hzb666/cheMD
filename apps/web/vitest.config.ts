@@ -24,6 +24,7 @@ export default defineConfig({
       "@chemd/parser": `${repoRoot}/packages/parser/src/index.ts`,
       "@chemd/diagnostics": `${repoRoot}/packages/diagnostics/src/index.ts`,
       "@chemd/step-ontology": `${repoRoot}/packages/step-ontology/src/index.ts`,
+      "@chemd/interoperability": `${repoRoot}/packages/interoperability/src/index.ts`,
       "@chemd/typechecker": `${repoRoot}/packages/typechecker/src/index.ts`,
       "@chemd/runtime-lab": `${repoRoot}/packages/runtime-lab/src/index.ts`,
       "@chemd/runtime-trace": `${repoRoot}/packages/runtime-trace/src/index.ts`,

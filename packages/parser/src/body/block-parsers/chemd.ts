@@ -48,7 +48,24 @@ const hasReactionShape = (fields: Record<string, string | string[]>): boolean =>
   return reactants.length > 0
     || products.length > 0
     || "reactant" in fields
-    || "product" in fields;
+    || "product" in fields
+    || [
+      "route",
+      "prev",
+      "equation",
+      "rxn_smiles",
+      "conditions",
+      "reagents",
+      "catalyst",
+      "solvent",
+      "temperature",
+      "time",
+      "pressure",
+      "atmosphere",
+      "yield",
+      "conversion",
+      "selectivity"
+    ].some((fieldName) => fieldName in fields);
 };
 
 const hasMoleculeShape = (fields: Record<string, string | string[]>): boolean =>
@@ -229,18 +246,6 @@ const reportAmbiguousKind = (
   id: string | undefined,
   diagnostics: Parameters<BlockParser>[0]["diagnostics"]
 ) => {
-  const quickFixes = id
-    ? (["molecule", "reaction"] as const).map((kind) => ({
-        title: `Insert kind: ${kind} in this chemd block`,
-        kind: "insert_chemd_kind" as const,
-        patch: {
-          source_node_type: "chemd",
-          source_node_id: id,
-          kind
-        }
-      }))
-    : [];
-
   diagnostics.push({
     code: "W_CHEMD_KIND_AMBIGUOUS",
     severity: "error",
@@ -248,8 +253,7 @@ const reportAmbiguousKind = (
     nodeId: id,
     sourceLayer: "parser",
     sourceNodeType: "chemd",
-    sourceNodeId: id,
-    ...(quickFixes.length > 0 ? { quickFixes } : {})
+    sourceNodeId: id
   });
 };
 

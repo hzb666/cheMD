@@ -43,7 +43,7 @@ name: Draft molecule
 `;
 
 describe("compileChemdForEditor", () => {
-  it("maps compiler diagnostics and exposes patch proposals", () => {
+  it("maps compiler diagnostics without ambiguous kind patch proposals", () => {
     const output = compileChemdForEditor({
       source: ambiguousKindSource
     });
@@ -56,21 +56,13 @@ describe("compileChemdForEditor", () => {
     expect(diagnostic).toMatchObject({
       code: "W_CHEMD_KIND_AMBIGUOUS",
       severity: "error",
-      sourceNodeId: "mol-main"
-    });
-    expect(diagnostic?.quickFixes[0]).toMatchObject({
-      diagnosticCode: "W_CHEMD_KIND_AMBIGUOUS",
-      sourceRange: expect.objectContaining({
+      sourceNodeId: "mol-main",
+      range: expect.objectContaining({
         startLine: expect.any(Number),
         startColumn: expect.any(Number)
-      }),
-      patch: {
-        beforeHash: expect.any(String),
-        edits: [expect.objectContaining({
-          replacement: expect.stringContaining("kind: molecule")
-        })]
-      }
+      })
     });
+    expect(diagnostic?.quickFixes).toEqual([]);
   });
 
   it("builds outline, symbols, and Monaco payloads without Monaco dependency", () => {
@@ -178,18 +170,14 @@ describe("compileChemdForEditor", () => {
     });
   });
 
-  it("keeps quick fixes as proposals and leaves source untouched", () => {
+  it("leaves source untouched when no quick fix proposals exist", () => {
     const originalSource = ambiguousKindSource;
     const output = compileChemdForEditor({
       source: ambiguousKindSource
     });
-    const proposal = output.diagnostics
-      .flatMap((diagnostic) => diagnostic.quickFixes)[0];
 
     expect(ambiguousKindSource).toBe(originalSource);
-    expect(proposal.patch.beforeHash).toEqual(expect.any(String));
-    expect(proposal.patch.edits[0].replacement).not.toBe(ambiguousKindSource);
-    expect(proposal.patch.edits[0].replacement).toContain("kind: molecule");
+    expect(output.diagnostics.flatMap((diagnostic) => diagnostic.quickFixes)).toEqual([]);
   });
 
   it("keeps empty and incomplete documents inside stable editor ranges", () => {

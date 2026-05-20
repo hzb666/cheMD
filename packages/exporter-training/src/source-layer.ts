@@ -1,6 +1,7 @@
 import type { ChemdDocument, ChemdNode } from "@chemd/core";
 
 import type { ExportedDiagnostic, SourceLayerV1, SourceNodeSnapshot } from "./types";
+import { TRAINING_AUDIT_ONLY_FIELDS } from "./governance";
 
 const toRecord = (value: unknown): Record<string, unknown> => {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -56,5 +57,6 @@ export const buildSourceLayer = (document: ChemdDocument): SourceLayerV1 => ({
   ...(typeof document.source === "string" ? { raw_source: document.source, resolved_source: document.source } : {}),
   raw_meta: toRecord(document.meta),
   raw_children: document.children.map((node, nodeIndex) => createSourceSnapshot(node, nodeIndex)),
-  diagnostics: document.diagnostics.map((diagnostic) => createExportedDiagnostic(diagnostic))
+  diagnostics: document.diagnostics.map((diagnostic) => createExportedDiagnostic(diagnostic)),
+  audit_only_fields: TRAINING_AUDIT_ONLY_FIELDS
 });

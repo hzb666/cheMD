@@ -4,6 +4,7 @@ import type { StepGraph } from "@chemd/step-ontology";
 import { buildTypedSemanticGraph, type TypedSemanticGraph } from "@chemd/typechecker";
 
 import { buildLearningLayer } from "./learning-layer";
+import { buildDataGovernanceInfo } from "./governance";
 import { buildQualityLayer } from "./quality-layer";
 import { buildSemanticLayer } from "./semantic-layer";
 import { buildSourceLayer } from "./source-layer";
@@ -70,6 +71,7 @@ export const exportTrainingRecordFromDocument = (
   const exportId = options.exportId ?? `export::${document.meta.id}::${fingerprint}`;
   const documentInfo = toDocumentInfo(document);
   const sourceLayer = buildSourceLayer(document);
+  const governance = buildDataGovernanceInfo(document.meta);
   const typedGraph = options.typedGraph ?? buildTypedSemanticGraph(document);
   const baseSemanticLayer = buildSemanticLayer(document, {
     typedGraph
@@ -84,7 +86,7 @@ export const exportTrainingRecordFromDocument = (
     semanticLayer,
     stepGraph: options.stepGraph
   });
-  const qualityLayer = buildQualityLayer(document.diagnostics, learningLayer);
+  const qualityLayer = buildQualityLayer(document.diagnostics, learningLayer, governance);
 
   return {
     schema_version: "chemd-training-export/v0.2",
@@ -103,6 +105,7 @@ export const exportTrainingRecordFromDocument = (
       ]
     },
     document: documentInfo,
+    governance,
     source_layer: sourceLayer,
     semantic_layer: semanticLayer,
     learning_layer: learningLayer,

@@ -207,8 +207,15 @@ describe("training export artifacts and projections", () => {
     expect(record.learning_layer.retrieval_chunks).toContainEqual(expect.objectContaining({
       chunk_type: "artifact_notes",
       source_entity_ids: ["art::exp-export-artifacts::spec-main"],
-      text: expect.stringContaining("data/nmr/spec-main.pdf")
+      text: expect.not.stringContaining("data/nmr/spec-main.pdf")
     }));
+    expect(record.governance).toMatchObject({
+      allowed_uses: expect.arrayContaining(["rag", "audit"]),
+      source: "workspace_policy"
+    });
+    expect(record.source_layer.audit_only_fields).toEqual(expect.arrayContaining([
+      "semantic_layer.artifacts.path"
+    ]));
     expect(record.quality_layer.training_quality).toMatchObject({
       sft_eligible: expect.any(Boolean),
       eval_eligible: expect.any(Boolean),
@@ -216,6 +223,7 @@ describe("training export artifacts and projections", () => {
       review_required: expect.any(Boolean)
     });
     expect(understanding.entities.artifacts[0]).not.toHaveProperty("field_source_spans");
+    expect(understanding.entities.artifacts[0]).not.toHaveProperty("path");
     expect(understanding.knowledge_graph.field_evidence).toContainEqual(expect.objectContaining({
       subject_entity_id: "res::exp-export-artifacts::res-main",
       field: "yield_percent",
@@ -380,6 +388,39 @@ describe("training export artifacts and projections", () => {
     expect(materialFlowInput).not.toHaveProperty("step_dependencies");
     expect(evidenceInterpretationInput).toMatchObject({
       task: "evidence_interpretation"
+    });
+  });
+
+  it("gates sanitized projections by governance", () => {
+    const document = resolveChemd(parseChemd(`---
+id: exp-governance
+title: Governance
+date: 2026-05-20
+governance:
+  pii_status: present
+  allowed_uses: [audit]
+---
+
+:::sample #sample-main
+name: patient sample
+notes: audit only
+:::
+`));
+    const record = exportTrainingRecordFromDocument(document, {
+      exportedAt: "2026-05-20T00:00:00.000Z"
+    });
+    const understanding = buildTrainingUnderstandingFromRecord(record);
+
+    expect(record.quality_layer.governance_quality).toMatchObject({
+      blocking: true,
+      diagnostics: expect.arrayContaining([
+        expect.objectContaining({ code: "E_TRAINING_PII_PRESENT" }),
+        expect.objectContaining({ code: "W_TRAINING_RAG_NOT_ALLOWED" })
+      ])
+    });
+    expect(understanding.governance).toMatchObject({
+      pii_status: "present",
+      allowed_uses: ["audit"]
     });
   });
 });

@@ -10,6 +10,8 @@ import type {
   ExportedConditionVariationAttemptV1,
   ExportedConditionVaryV1,
   ExportedDocumentInfo,
+  DataGovernanceInfo,
+  ExportedMaterialV1,
   ExportedMarkdownBlockV1,
   ExportedMoleculeV1,
   ExportedReactionV1,
@@ -35,6 +37,7 @@ export type ChemdRagChunkV1 = Omit<RetrievalChunkV1, "raw_text">;
 export interface ChemdRagExportV1 {
   schema_version: "chemd-rag-export/v0.1";
   document: ExportedDocumentInfo;
+  governance: DataGovernanceInfo;
   chunks: ChemdRagChunkV1[];
   quality: {
     rag_eligible: boolean;
@@ -47,8 +50,9 @@ export type TrainingMoleculeV1 = Omit<ExportedMoleculeV1, SourceMetadataKeys>;
 export type TrainingReactionV1 = Omit<ExportedReactionV1, SourceMetadataKeys>;
 export type TrainingResultV1 = Omit<ExportedResultV1, SourceMetadataKeys>;
 export type TrainingAnalysisV1 = Omit<ExportedAnalysisV1, SourceMetadataKeys>;
-export type TrainingSampleV1 = Omit<ExportedSampleV1, SourceMetadataKeys>;
-export type TrainingArtifactV1 = Omit<ExportedArtifactV1, SourceMetadataKeys>;
+export type TrainingMaterialV1 = Omit<ExportedMaterialV1, SourceMetadataKeys | "supplier" | "lot">;
+export type TrainingSampleV1 = Omit<ExportedSampleV1, SourceMetadataKeys | "supplier">;
+export type TrainingArtifactV1 = Omit<ExportedArtifactV1, SourceMetadataKeys | "path">;
 export type TrainingConditionVaryV1 = Omit<ExportedConditionVaryV1, SourceMetadataKeys>;
 export type TrainingConditionVariationAttemptV1 = Omit<ExportedConditionVariationAttemptV1, SourceMetadataKeys>;
 export type TrainingNarrativeBlockV1 = Pick<
@@ -58,6 +62,7 @@ export type TrainingNarrativeBlockV1 = Pick<
 
 export interface TrainingUnderstandingEntitiesV1 {
   molecules: TrainingMoleculeV1[];
+  materials: TrainingMaterialV1[];
   reactions: TrainingReactionV1[];
   results: TrainingResultV1[];
   analyses: TrainingAnalysisV1[];
@@ -484,6 +489,7 @@ export interface TrainingEvidenceInterpretationV1 {
 export type TrainingKnowledgeNodeType =
   | "document"
   | "molecule"
+  | "material"
   | "reaction"
   | "result"
   | "analysis"
@@ -648,6 +654,7 @@ export interface TrainingExperimentLogicV1 {
 export interface ChemdTrainingUnderstandingV1 {
   schema_version: "chemd-training-understanding/v0.1";
   document: ExportedDocumentInfo & { summary?: string };
+  governance: DataGovernanceInfo;
   canonical_summary?: TrainingCanonicalSummaryV1;
   entities: TrainingUnderstandingEntitiesV1;
   relations: ExportedRelationV1[];

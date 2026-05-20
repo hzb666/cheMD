@@ -1,0 +1,38 @@
+---
+title: Language Service Contracts
+description: Editor completion, reference assistance, and quick-fix boundaries for the current language service package.
+---
+
+`@chemd/language-service` is the shared editor API for web and desktop. It does not own a second schema. Field completion reads the core block schema registry, step parameter completion reads StepFamily schemas, and diagnostics come from compiler/typechecker facts.
+
+## Completion Sources
+
+- Block snippets provide common `:::chemd`, `:::result`, and `:::procedure` starts.
+- Field completions come from `@chemd/core` block schemas.
+- `:::chemd` molecule/reaction fields are filtered by schema `completionKinds`.
+- Procedure step parameters come from `@chemd/step-ontology` StepFamily schemas.
+- Reference completion reads current document symbols and workspace symbol indexes.
+
+Examples:
+
+```md
+:::chemd #rxn-main
+reaction_
+```
+
+This can suggest `reaction_smiles:` as an alias of canonical `rxn_smiles`. With no alias prefix, canonical fields are suggested first and aliases are not used to flood the list.
+
+```md
+:::procedure #proc-main
+step: heat | temp
+```
+
+This suggests `temperature=` from the `heat` StepFamily schema.
+
+## Alias and Kind Rules
+
+`kind: mol` and `kind: reac` are official value aliases and normalize to molecule/reaction. Stable omission of `kind` produces no diagnostic. Ambiguous omission remains an error, but the language service does not add a quick fix that guesses molecule or reaction for the user.
+
+## Quick Fix Boundary
+
+Quick fixes are proposals. They should use range edits when possible. Whole-document replacement is reserved for explicit codemods such as deterministic repair. Editor integrations must show compiler diagnostics as-is and must not downgrade severity locally.

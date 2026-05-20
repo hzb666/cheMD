@@ -3,7 +3,7 @@
   "name": "interop-governance-language-service-templates",
   "title": "Interop governance language service and templates",
   "description": "Implement plan chapters 8-14: interoperability contracts, governance/sanitized training projection, schema-driven language service, domain templates, docs and final CLI acceptance.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": "web",

@@ -1,6 +1,7 @@
 export * from "./types";
 export * from "./projection-types";
 export * from "./export-record";
+export * from "./governance";
 export * from "./projections";
 export * from "./task-projections";
 export * from "./campaign-projections";

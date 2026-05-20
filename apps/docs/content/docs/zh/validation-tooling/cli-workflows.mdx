@@ -33,7 +33,7 @@ pnpm chemd check experiments --target validate --format json --dry-run
 pnpm chemd check fixtures/language --target run-plan --format text
 ```
 
-`--target` 接受 `validate`、`run-plan`、`training` 和 `graph`。target 表示源码必须满足哪个下游契约。`validate` 检查当前语言契约；更严格的 target-specific 检查可以独立增强，不改变源码语法。
+`--target` 接受 `validate`、`run-plan`、`training` 和 `graph`。target 表示源码必须满足哪个下游契约。`validate` 检查当前语言契约；`training` 还会报告 governance diagnostics，例如 PII present、RAG not allowed、audit-only record、sanitization disabled 和 review-required export quality。
 
 JSON report schema 为 `chemd-check/v0.1`，包含每个文件的 diagnostics、按 severity 汇总的 totals、target 和 `dryRun` 标记。任一文件存在 error 时退出码为 1。
 
@@ -66,13 +66,34 @@ pnpm chemd export experiment.chemd --format rag
 
 ## `--format training`
 
-`training` 输出 training understanding。`training-full` 输出 `ChemdTrainingExportV2`。`lnf` 输出 canonical LNF。三者对应的用途不同：
+`training` 输出 sanitized training understanding。`training-full` 输出带 audit-only source 和 source-span 数据的 `ChemdTrainingExportV2`。`lnf` 输出 canonical LNF。三者对应的用途不同：
 
 | format | 输出来源 | 用途 |
 | --- | --- | --- |
 | `lnf` | `result.lnf` | 规范化中间表示 |
 | `training` | `result.trainingUnderstanding` | 训练与图索引摘要 |
 | `training-full` | `result.trainingExport` | 完整训练记录与 audit 数据 |
+
+`training` 和 `rag` 都包含 document-level `governance`。`training-full` 额外包含 `source_layer.audit_only_fields`、raw source context 和完整 source snapshot。artifact path、material supplier/lot 和 sample supplier 默认是 audit-only，不进入 sanitized training understanding。
+
+## `pnpm chemd templates`
+
+`templates` 从 `@chemd/domain-templates` 列出领域模板 ID。`--json` 输出结构化列表；传入 ID 时输出详情。
+
+```text
+pnpm chemd templates
+pnpm chemd templates --json
+pnpm chemd templates organic-synthesis/suzuki-screen
+```
+
+## `pnpm chemd new`
+
+`new` 把领域模板渲染为 `.chemd` 文件。必须提供 `--out`。`--dry-run` 只打印生成源码，不写文件。
+
+```text
+pnpm chemd new organic-synthesis/suzuki-screen --out exp.chemd
+pnpm chemd new analytical/hplc-purity --out hplc.chemd --dry-run
+```
 
 ## `pnpm chemd graph`
 

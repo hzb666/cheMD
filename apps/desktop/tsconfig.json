@@ -9,6 +9,8 @@
     "moduleResolution": "Bundler",
     "noEmit": true,
     "paths": {
+      "@chemd/interoperability": ["../../packages/interoperability/src/index.ts"],
+      "@chemd/step-ontology": ["../../packages/step-ontology/src/index.ts"],
       "@/*": ["./src/*"]
     },
     "types": ["vite/client"]

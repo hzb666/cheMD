@@ -4,9 +4,21 @@ import type {
   ChemdCompletionRequest,
   ChemdEditorPosition
 } from "./completion-types";
+import {
+  getCompletionBlockFields,
+  isKnownBlockType,
+  normalizeChemdKind,
+  resolveBlockField
+} from "@chemd/core";
 
-const reactionFields = new Set(["reactant", "product", "reac", "prod", "reactants", "products", "route", "prev", "reagents"]);
-const moleculeFields = new Set(["smiles", "cas", "inchi", "inchikey", "canonical_smiles", "formula", "mw"]);
+const moleculeCompletionFields = new Set(getCompletionBlockFields("chemd", "molecule"));
+const reactionCompletionFields = new Set(getCompletionBlockFields("chemd", "reaction"));
+const moleculeOnlyFields = new Set(
+  [...moleculeCompletionFields].filter((field) => !reactionCompletionFields.has(field))
+);
+const reactionOnlyFields = new Set(
+  [...reactionCompletionFields].filter((field) => !moleculeCompletionFields.has(field))
+);
 
 const splitSourceLines = (source: string): string[] =>
   source.split("\n").map((line) => (line.endsWith("\r") ? line.slice(0, -1) : line));
@@ -23,6 +35,7 @@ export const getChemdCompletionContext = (
   const range = createCompletionRange(position, tokenPrefix.length);
   const block = findOpenBlock(lines, position.line);
   const field = readFieldAtCursor(linePrefix);
+  const stepParam = readStepParamContext(linePrefix);
 
   return {
     source: request.source,
@@ -42,6 +55,7 @@ export const getChemdCompletionContext = (
     isFieldValuePosition: Boolean(block) && field.hasColon,
     fieldKey: field.key,
     fieldPrefix: field.hasColon ? "" : field.key ?? tokenPrefix,
+    stepParam,
     block
   };
 };
@@ -112,7 +126,9 @@ const findOpenBlock = (
     }
     const field = readFieldLine(line);
     if (open && field) {
-      open.fields.set(field.key, field.value.trim());
+      const schemaBlockType = toSchemaBlockType(open.type);
+      const canonicalField = resolveBlockField(schemaBlockType, field.key)?.canonicalName ?? field.key;
+      open.fields.set(canonicalField, field.value.trim());
     }
   }
 
@@ -130,16 +146,17 @@ const inferBlockKind = (
   fields: Map<string, string>
 ): ChemdCompletionBlockKind => {
   if (blockType !== "chemd") {
-    return isKnownBlockKind(blockType) ? blockType : "unknown";
+    return isKnownCompletionBlockKind(blockType) ? blockType : "unknown";
   }
   const explicitKind = fields.get("kind");
-  if (explicitKind === "molecule" || explicitKind === "reaction") {
-    return explicitKind;
+  const normalizedKind = explicitKind ? normalizeChemdKind(explicitKind) : undefined;
+  if (normalizedKind) {
+    return normalizedKind;
   }
-  if ([...fields.keys()].some((field) => reactionFields.has(field))) {
+  if ([...fields.keys()].some((field) => reactionOnlyFields.has(field))) {
     return "reaction";
   }
-  if ([...fields.keys()].some((field) => moleculeFields.has(field))) {
+  if ([...fields.keys()].some((field) => moleculeOnlyFields.has(field))) {
     return "molecule";
   }
 
@@ -149,19 +166,28 @@ const inferBlockKind = (
 const normalizeBlockType = (type: string): string =>
   type === "condition-varies" ? "condition_varies" : type;
 
-const isKnownBlockKind = (type: string): type is ChemdCompletionBlockKind =>
+const toSchemaBlockType = (type: string): string =>
+  type === "condition_varies" ? "condition-varies" : type;
+
+const isKnownCompletionBlockKind = (type: string): type is ChemdCompletionBlockKind =>
   [
     "molecule",
     "material",
     "batch",
     "reaction",
     "result",
+    "analysis",
     "procedure",
+    "trace",
+    "observation",
     "step",
+    "event",
     "template",
     "use",
+    "sample",
+    "artifact",
     "condition_varies"
-  ].includes(type);
+  ].includes(type) || isKnownBlockType(toSchemaBlockType(type));
 
 const readFieldAtCursor = (linePrefix: string): { hasColon: boolean; key?: string } => {
   const colonIndex = linePrefix.indexOf(":");
@@ -214,6 +240,40 @@ const isUseHeaderPrefix = (linePrefix: string): boolean => {
 const isStepFamilyPrefix = (linePrefix: string): boolean => {
   const field = readFieldLine(linePrefix);
   return field?.key === "step" && !field.value.includes("|");
+};
+
+const readStepParamContext = (
+  linePrefix: string
+): ChemdCompletionContext["stepParam"] => {
+  const field = readFieldLine(linePrefix);
+  if (field?.key !== "step" || !field.value.includes("|")) {
+    return undefined;
+  }
+
+  const segments = field.value.split("|").map((segment) => segment.trim());
+  const family = segments[0]?.split(/\s+/)[0]?.trim();
+  if (!family) {
+    return undefined;
+  }
+
+  const usedParams = new Set<string>();
+  for (const segment of segments.slice(1, -1)) {
+    const equalsIndex = segment.indexOf("=");
+    if (equalsIndex > 0) {
+      usedParams.add(segment.slice(0, equalsIndex).trim());
+    }
+  }
+
+  const current = segments[segments.length - 1] ?? "";
+  if (current.includes("=")) {
+    return undefined;
+  }
+
+  return {
+    family,
+    prefix: current,
+    usedParams
+  };
 };
 
 const readBlockId = (headerArg: string | undefined): string | undefined => {

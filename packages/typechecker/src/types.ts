@@ -155,6 +155,7 @@ export interface StoichiometrySummary {
 export interface TypedReactionNode extends TypedNodeBase {
   kind: "reaction";
   route?: string;
+  rxn_smiles?: string;
   prev: ReferenceOrLiteral[];
   next: ReferenceType[];
   reactants: ReferenceOrLiteral[];

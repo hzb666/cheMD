@@ -12,6 +12,13 @@ import type {
 } from "@chemd/compiler";
 import type { Diagnostic } from "@chemd/core";
 import {
+  getDomainTemplate,
+  listDomainTemplates,
+  renderDomainTemplate,
+  type DomainTemplate,
+  type DomainTemplateSummary
+} from "@chemd/domain-templates";
+import {
   DEFAULT_RUNTIME_CAPABILITIES,
   preflightRun,
   type RuntimeContext,
@@ -38,6 +45,8 @@ const VALIDATE_OPTIONS = new Set<CliOption>(["dry-run"]);
 const FORMAT_OPTION = new Set<CliOption>(["format"]);
 const CHECK_OPTIONS = new Set<CliOption>(["dry-run", "format", "target"]);
 const PREFLIGHT_OPTIONS = new Set<CliOption>(["context", "dry-run", "format", "mode"]);
+const TEMPLATES_OPTIONS = new Set<CliOption>(["json"]);
+const NEW_OPTIONS = new Set<CliOption>(["dry-run", "out"]);
 const CHANGED_OPTIONS = new Set<CliOption>(["base", "format"]);
 const REPAIR_OPTIONS = new Set<CliOption>(["format", "max-iterations", "write"]);
 const AGENT_LOOP_OPTIONS = new Set<CliOption>([
@@ -59,6 +68,8 @@ const usage = [
   "  chemd check <path...> [--target validate|run-plan|training|graph] [--format text|json] [--dry-run]",
   "  chemd preflight <file> [--mode dry-run|human-run|robot-run|replay-run] [--context lab.json] [--format text|json] [--dry-run]",
   "  chemd export <file> --format json|lnf|rag|training|training-full",
+  "  chemd templates [template-id] [--json]",
+  "  chemd new <template-id> --out <file> [--dry-run]",
   "  chemd graph <file...> [--format text|json]",
   "  chemd diff <old-file> <new-file> [--format text|json]",
   "  chemd changed [--base <ref>] [--format text|json]",
@@ -76,9 +87,11 @@ type CliOption =
   | "driver-arg"
   | "dry-run"
   | "format"
+  | "json"
   | "max-iterations"
   | "max-repair-iterations"
   | "mode"
+  | "out"
   | "target"
   | "write";
 type CompileChemd = (source: string, options?: CompileOptions) => CompileResult;
@@ -113,6 +126,8 @@ type CliCommand =
   | { type: "check"; dryRun: boolean; format: TextFormat; paths: string[]; target: CheckTarget }
   | { type: "preflight"; contextPath?: string; dryRun: boolean; filePath: string; format: TextFormat; mode: RuntimeMode }
   | { type: "export"; filePath: string; format: ExportFormat }
+  | { type: "templates"; json: boolean; templateId?: string }
+  | { type: "new"; dryRun: boolean; outPath: string; templateId: string }
   | { type: "graph"; filePaths: string[]; format: TextFormat }
   | { type: "diff"; beforePath: string; afterPath: string; format: TextFormat }
   | { type: "changed"; base: string; format: TextFormat }
@@ -350,7 +365,7 @@ const parseOptionToken = (args: string[], index: number): ParsedOptionToken | un
     return undefined;
   }
 
-  if (arg === "--write" || arg === "--dry-run") {
+  if (arg === "--write" || arg === "--dry-run" || arg === "--json") {
     return { consumedNext: false, name: arg.slice(2) as CliOption };
   }
 
@@ -382,9 +397,11 @@ const assignCommandOption = (
     driverArgs: string[];
     dryRun: boolean;
     format?: string;
+    json: boolean;
     maxIterations?: number;
     maxRepairIterations?: number;
     mode?: string;
+    out?: string;
     target?: string;
     write: boolean;
   }
@@ -394,6 +411,9 @@ const assignCommandOption = (
   switch (option.name) {
     case "format":
       state.format = option.value;
+      return;
+    case "json":
+      state.json = true;
       return;
     case "base":
       state.base = option.value;
@@ -422,6 +442,9 @@ const assignCommandOption = (
     case "mode":
       state.mode = option.value;
       return;
+    case "out":
+      state.out = option.value;
+      return;
     case "target":
       state.target = option.value;
       return;
@@ -442,14 +465,17 @@ const parseCommandArgs = (args: string[], allowedOptions: ReadonlySet<CliOption>
     driverArgs: string[];
     dryRun: boolean;
     format?: string;
+    json: boolean;
     maxIterations?: number;
     maxRepairIterations?: number;
     mode?: string;
+    out?: string;
     target?: string;
     write: boolean;
   } = {
     driverArgs: [],
     dryRun: false,
+    json: false,
     write: false
   };
 
@@ -478,9 +504,11 @@ const parseCommandArgs = (args: string[], allowedOptions: ReadonlySet<CliOption>
     driverArgs: state.driverArgs,
     dryRun: state.dryRun,
     format: state.format,
+    json: state.json,
     maxIterations: state.maxIterations,
     maxRepairIterations: state.maxRepairIterations,
     mode: state.mode,
+    out: state.out,
     positional,
     target: state.target,
     write: state.write
@@ -544,6 +572,39 @@ const parseExportArgs = (args: string[]): CliCommand => {
   }
 
   return { type: "export", filePath: positional[0], format: asExportFormat(format) };
+};
+
+const parseTemplatesArgs = (args: string[]): CliCommand => {
+  const { json, positional } = parseCommandArgs(args, TEMPLATES_OPTIONS);
+
+  if (positional.length > 1) {
+    throw new CliUsageError("Templates accepts at most one template id.");
+  }
+
+  return {
+    type: "templates",
+    json,
+    ...(positional[0] ? { templateId: positional[0] } : {})
+  };
+};
+
+const parseNewArgs = (args: string[]): CliCommand => {
+  const { dryRun, out, positional } = parseCommandArgs(args, NEW_OPTIONS);
+
+  if (positional.length !== 1) {
+    throw new CliUsageError("New requires exactly one template id.");
+  }
+
+  if (!out) {
+    throw new CliUsageError("New requires --out <file>.");
+  }
+
+  return {
+    type: "new",
+    dryRun,
+    outPath: out,
+    templateId: positional[0]
+  };
 };
 
 const parseDiffArgs = (args: string[]): CliCommand => {
@@ -668,6 +729,14 @@ export const parseChemdCliArgs = (argv: string[]): CliCommand => {
     return parseExportArgs(rest);
   }
 
+  if (command === "templates") {
+    return parseTemplatesArgs(rest);
+  }
+
+  if (command === "new") {
+    return parseNewArgs(rest);
+  }
+
   if (command === "graph") {
     return parseGraphArgs(rest);
   }
@@ -728,6 +797,44 @@ const countDiagnostics = (diagnostics: Diagnostic[]): DiagnosticCounts => ({
 
 const hasErrorDiagnostics = (diagnostics: Diagnostic[]): boolean =>
   countDiagnostics(diagnostics).error > 0;
+
+const getTargetDiagnostics = (
+  result: CompileResult,
+  target: CheckTarget
+): Diagnostic[] => {
+  if (target !== "training") {
+    return result.diagnostics ?? [];
+  }
+
+  const governanceDiagnostics = result.trainingExport.quality_layer.governance_quality.diagnostics
+    .map((diagnostic): Diagnostic => ({
+      code: diagnostic.code,
+      severity: diagnostic.severity,
+      message: diagnostic.message,
+      sourceLayer: "exporter-training",
+      sourceNodeType: "document",
+      sourceField: "governance"
+    }));
+  const reviewDiagnostic: Diagnostic[] = result.trainingExport.quality_layer.training_quality.review_required
+    ? [{
+        code: "W_TRAINING_REVIEW_REQUIRED",
+        severity: "warning",
+        message: "Training export requires review before non-audit reuse.",
+        sourceLayer: "exporter-training",
+        sourceNodeType: "document",
+        sourceField: "governance",
+        facts: {
+          review_reasons: result.trainingExport.quality_layer.training_quality.review_reasons ?? []
+        }
+      }]
+    : [];
+
+  return [
+    ...(result.diagnostics ?? []),
+    ...governanceDiagnostics,
+    ...reviewDiagnostic
+  ];
+};
 
 const sumDiagnosticCounts = (reports: ValidationReport[]): DiagnosticCounts =>
   reports.reduce<DiagnosticCounts>(
@@ -851,7 +958,7 @@ const checkPaths = (
   const files = collectCheckFilePaths(command.paths, options.cwd).map((filePath) => {
     const source = readSource(filePath, options.cwd);
     const result = compileChemd(source);
-    const diagnostics = result.diagnostics ?? [];
+    const diagnostics = getTargetDiagnostics(result, command.target);
 
     return {
       filePath: path.relative(options.cwd, filePath) || filePath,
@@ -1009,6 +1116,65 @@ const exportFile = (
   const payload = selectExportPayload(result, command.format);
 
   options.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
+  return EXIT_OK;
+};
+
+const formatTemplateSummary = (template: DomainTemplateSummary): string =>
+  `${template.id}  ${template.title} (${template.feature})`;
+
+const formatTemplateDetail = (template: DomainTemplate): string => [
+  `${template.id}`,
+  `  title: ${template.title}`,
+  `  category: ${template.category}`,
+  `  feature: ${template.feature}`,
+  `  description: ${template.description}`
+].join("\n");
+
+const templatesCommand = (
+  command: Extract<CliCommand, { type: "templates" }>,
+  options: NormalizedRunOptions
+): number => {
+  if (command.templateId) {
+    const template = getDomainTemplate(command.templateId);
+    if (!template) {
+      throw new CliUsageError(`Unknown template: ${command.templateId}`);
+    }
+
+    options.stdout.write(
+      command.json
+        ? `${JSON.stringify(template, null, 2)}\n`
+        : `${formatTemplateDetail(template)}\n`
+    );
+    return EXIT_OK;
+  }
+
+  const templates = listDomainTemplates();
+  options.stdout.write(
+    command.json
+      ? `${JSON.stringify(templates, null, 2)}\n`
+      : `${templates.map(formatTemplateSummary).join("\n")}\n`
+  );
+  return EXIT_OK;
+};
+
+const newFromTemplate = (
+  command: Extract<CliCommand, { type: "new" }>,
+  options: NormalizedRunOptions
+): number => {
+  let source: string;
+  try {
+    source = renderDomainTemplate(command.templateId);
+  } catch {
+    throw new CliUsageError(`Unknown template: ${command.templateId}`);
+  }
+
+  if (command.dryRun) {
+    options.stdout.write(source);
+    return EXIT_OK;
+  }
+
+  writeSource(command.outPath, options.cwd, source);
+  options.stdout.write(`Created ${command.outPath} from ${command.templateId}\n`);
   return EXIT_OK;
 };
 
@@ -1494,6 +1660,14 @@ const executeCommand = (
 
   if (command.type === "export") {
     return Promise.resolve(exportFile(command, services.compileChemd, options));
+  }
+
+  if (command.type === "templates") {
+    return Promise.resolve(templatesCommand(command, options));
+  }
+
+  if (command.type === "new") {
+    return Promise.resolve(newFromTemplate(command, options));
   }
 
   if (command.type === "graph") {

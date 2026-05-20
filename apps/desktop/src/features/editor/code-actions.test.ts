@@ -4,6 +4,7 @@ import type { editor, languages } from "monaco-editor";
 
 import {
   compileChemdForEditor,
+  type ChemdEditorDiagnostic,
   toMonacoMarker
 } from "@chemd/language-service";
 import {
@@ -106,15 +107,50 @@ describe("chemd Monaco code action provider", () => {
     if (!diagnostic) {
       throw new Error("Expected W_CHEMD_KIND_AMBIGUOUS diagnostic");
     }
+    const diagnosticWithQuickFixes: ChemdEditorDiagnostic = {
+      ...diagnostic,
+      quickFixes: [
+        {
+          id: "test:declare-molecule",
+          title: "Declare molecule kind",
+          diagnosticCode: diagnostic.code,
+          sourceRange: diagnostic.range,
+          patch: {
+            beforeHash: "before-molecule",
+            edits: [{
+              range: diagnostic.range,
+              replacement: `${source}\nkind: molecule\n`
+            }]
+          }
+        },
+        {
+          id: "test:declare-reaction",
+          title: "Declare reaction kind",
+          diagnosticCode: diagnostic.code,
+          sourceRange: diagnostic.range,
+          patch: {
+            beforeHash: "before-reaction",
+            edits: [{
+              range: diagnostic.range,
+              replacement: `${source}\nkind: reaction\n`
+            }]
+          }
+        }
+      ]
+    };
+    const outputWithQuickFixes = {
+      ...compileOutput,
+      diagnostics: [diagnosticWithQuickFixes]
+    };
 
-    updateChemdCodeActionOutput(documentUri, compileOutput);
+    updateChemdCodeActionOutput(documentUri, outputWithQuickFixes);
     const result = await providers[0].provideCodeActions(
       model,
       requestRange,
-      createContext([toMonacoMarker(diagnostic) as editor.IMarkerData]),
+      createContext([toMonacoMarker(diagnosticWithQuickFixes) as editor.IMarkerData]),
       {} as never
     );
-    cleanupChemdCodeActionOutput(documentUri, compileOutput);
+    cleanupChemdCodeActionOutput(documentUri, outputWithQuickFixes);
     const cleanedResult = await providers[0].provideCodeActions(
       model,
       requestRange,
@@ -128,17 +164,17 @@ describe("chemd Monaco code action provider", () => {
     expect(cleanedResult?.actions).toEqual([]);
     expect(result?.actions).toHaveLength(2);
     expect(result?.actions[0]).toMatchObject({
-      title: diagnostic.quickFixes[0].title,
+      title: diagnosticWithQuickFixes.quickFixes[0].title,
       kind: "quickfix",
       data: expect.objectContaining({
-        id: diagnostic.quickFixes[0].id
+        id: diagnosticWithQuickFixes.quickFixes[0].id
       })
     });
     expect(result?.actions[1]).toMatchObject({
-      title: diagnostic.quickFixes[1].title,
+      title: diagnosticWithQuickFixes.quickFixes[1].title,
       kind: "quickfix",
       data: expect.objectContaining({
-        id: diagnostic.quickFixes[1].id
+        id: diagnosticWithQuickFixes.quickFixes[1].id
       })
     });
 
@@ -151,8 +187,8 @@ describe("chemd Monaco code action provider", () => {
       },
       metadata: {
         needsConfirmation: false,
-        label: diagnostic.quickFixes[0].title,
-        description: expect.stringContaining(diagnostic.quickFixes[0].patch.beforeHash)
+        label: diagnosticWithQuickFixes.quickFixes[0].title,
+        description: expect.stringContaining(diagnosticWithQuickFixes.quickFixes[0].patch.beforeHash)
       }
     });
   });

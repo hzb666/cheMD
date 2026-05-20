@@ -1,6 +1,10 @@
 import type { Diagnostic } from "@chemd/core";
 
-import type { LearningLayerV1, QualityLayerV1 } from "./types";
+import {
+  buildGovernanceDiagnostics,
+  TRAINING_AUDIT_ONLY_FIELDS
+} from "./governance";
+import type { DataGovernanceInfo, LearningLayerV1, QualityLayerV1 } from "./types";
 
 const getParseQuality = (diagnostics: Diagnostic[]): QualityLayerV1["parse_quality"] => {
   const counts = {
@@ -39,9 +43,20 @@ const countMigrationDiagnostics = (diagnostics: Diagnostic[]): number =>
     )
   ).length;
 
-export const buildQualityLayer = (diagnostics: Diagnostic[], learningLayer: LearningLayerV1): QualityLayerV1 => {
+const hasAllowedUse = (governance: DataGovernanceInfo, use: "rag" | "sft" | "eval" | "regression"): boolean =>
+  governance.allowed_uses?.includes(use) === true;
+
+export const buildQualityLayer = (
+  diagnostics: Diagnostic[],
+  learningLayer: LearningLayerV1,
+  governance: DataGovernanceInfo
+): QualityLayerV1 => {
   const parseQuality = getParseQuality(diagnostics);
-  const ragEligible = learningLayer.retrieval_chunks.length > 0;
+  const governanceDiagnostics = buildGovernanceDiagnostics(governance);
+  const governanceBlocking = governanceDiagnostics.some((diagnostic) => diagnostic.severity === "error");
+  const ragEligible = learningLayer.retrieval_chunks.length > 0
+    && hasAllowedUse(governance, "rag")
+    && !governanceBlocking;
   const predictionEligible = learningLayer.prediction_instances.some(
     (instance) =>
       instance.usability.usable_for_classification ||
@@ -54,6 +69,14 @@ export const buildQualityLayer = (diagnostics: Diagnostic[], learningLayer: Lear
 
   if (!ragEligible) {
     exclusionReasons.push("no_retrieval_chunks");
+  }
+
+  if (!hasAllowedUse(governance, "rag")) {
+    exclusionReasons.push("allowed_uses_missing_rag");
+  }
+
+  if (governanceBlocking) {
+    exclusionReasons.push("governance_blocking");
   }
 
   if (!predictionEligible) {
@@ -78,7 +101,21 @@ export const buildQualityLayer = (diagnostics: Diagnostic[], learningLayer: Lear
     reviewReasons.push("parse_errors");
   }
 
+  if (parseQuality.diagnostic_counts.warning > 0) {
+    reviewReasons.push("parse_warnings");
+  }
+
+  if (governanceDiagnostics.length > 0) {
+    reviewReasons.push("governance_review");
+  }
+
   return {
+    governance_quality: {
+      audit_only_fields: TRAINING_AUDIT_ONLY_FIELDS,
+      blocking: governanceBlocking,
+      diagnostics: governanceDiagnostics,
+      sanitized_projection: governance.sanitization_policy !== "none"
+    },
     parse_quality: parseQuality,
     normalization_quality: {
       normalized_fields: [],
@@ -87,9 +124,19 @@ export const buildQualityLayer = (diagnostics: Diagnostic[], learningLayer: Lear
     training_quality: {
       rag_eligible: ragEligible,
       prediction_eligible: predictionEligible,
-      sft_eligible: ragEligible && !parseQuality.has_errors && lowConfidenceLoweredSteps === 0,
-      eval_eligible: predictionEligible && !parseQuality.has_errors && lowConfidenceLoweredSteps === 0,
-      regression_eligible: predictionEligible && parseQuality.diagnostic_counts.error === 0,
+      sft_eligible: hasAllowedUse(governance, "sft")
+        && ragEligible
+        && !parseQuality.has_errors
+        && lowConfidenceLoweredSteps === 0,
+      eval_eligible: hasAllowedUse(governance, "eval")
+        && predictionEligible
+        && !parseQuality.has_errors
+        && lowConfidenceLoweredSteps === 0
+        && !governanceBlocking,
+      regression_eligible: hasAllowedUse(governance, "regression")
+        && predictionEligible
+        && parseQuality.diagnostic_counts.error === 0
+        && !governanceBlocking,
       review_required: reviewReasons.length > 0,
       confidence_score: getConfidenceScore(
         parseQuality.diagnostic_counts.warning + lowConfidenceLoweredSteps,

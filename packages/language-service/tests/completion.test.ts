@@ -30,15 +30,21 @@ describe("getChemdCompletions", () => {
         label: "chemd reaction",
         kind: "snippet",
         insertTextFormat: "snippet",
-        insertText: expect.stringContaining("kind: reaction")
+        insertText: expect.stringContaining("reactant: ${2:@mol-a}")
       }),
       expect.objectContaining({
         id: "snippet.chemd.molecule",
         label: "chemd molecule",
         kind: "snippet",
-        insertText: expect.stringContaining("kind: molecule")
+        insertText: expect.stringContaining("smiles: ${3:SMILES}")
       })
     ]));
+    const reactionSnippet = items.find((item) => item.id === "snippet.chemd.reaction");
+    const moleculeSnippet = items.find((item) => item.id === "snippet.chemd.molecule");
+    expect(reactionSnippet?.insertText).not.toContain("kind:");
+    expect(reactionSnippet?.insertText).not.toContain("reactants:");
+    expect(reactionSnippet?.insertText).not.toContain("products:");
+    expect(moleculeSnippet?.insertText).not.toContain("kind:");
   });
 
   it("suggests kind values inside chemd blocks", () => {
@@ -64,6 +70,17 @@ stage: |
     expect(labelsFor(`:::procedure #proc-main
 step: hea|
 :::`)).toEqual(["heat"]);
+  });
+
+  it("suggests step parameters from the StepFamily schema", () => {
+    const source = `:::procedure #proc-main
+step: heat | temp
+:::`;
+
+    expect(getChemdCompletions({
+      source,
+      cursorOffset: source.indexOf("temp") + "temp".length
+    }).items.map((item) => item.label)).toEqual(["temperature="]);
   });
 
   it("filters current-document references by field context", () => {
@@ -120,11 +137,31 @@ kind: reaction
     expect(labels).toEqual(expect.arrayContaining([
       "reactant:",
       "product:",
+      "rxn_smiles:",
       "route:"
     ]));
     expect(labels).not.toContain("reactants:");
     expect(labels).not.toContain("products:");
     expect(labels).not.toContain("kind:");
+  });
+
+  it("offers field aliases only when the alias prefix is typed", () => {
+    const items = getChemdCompletions(withCursor(`:::chemd #rxn-main
+kind: reaction
+reaction_|
+:::`)).items;
+
+    expect(items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        label: "reaction_smiles:",
+        detail: "alias of rxn_smiles",
+        data: {
+          type: "field",
+          canonicalName: "rxn_smiles",
+          aliasOf: "rxn_smiles"
+        }
+      })
+    ]));
   });
 
   it("suggests molecule block fields", () => {

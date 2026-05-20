@@ -291,6 +291,31 @@ const assignTagsValue = ({
   return currentSelection;
 };
 
+const assignGovernanceValue = ({
+  value,
+  meta,
+  diagnostics,
+  lineIndex,
+  currentSelection
+}: Pick<
+  AssignFrontmatterValueContext,
+  "value" | "meta" | "diagnostics" | "lineIndex" | "currentSelection"
+>) => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    pushDiagnostic({
+      diagnostics,
+      code: "E_INVALID_FRONTMATTER_VALUE",
+      message: "Invalid frontmatter value for governance: expected a one-level object",
+      lineIndex,
+      key: "governance"
+    });
+    return currentSelection;
+  }
+
+  meta.governance = value as Record<string, unknown>;
+  return currentSelection;
+};
+
 const assignScalarValue = ({
   key,
   value,
@@ -334,6 +359,10 @@ export const assignFrontmatterValue = (context: AssignFrontmatterValueContext): 
 
   if (context.key === "tags") {
     return assignTagsValue(context);
+  }
+
+  if (context.key === "governance") {
+    return assignGovernanceValue(context);
   }
 
   return assignScalarValue(context);

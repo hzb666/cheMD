@@ -29,6 +29,7 @@ import type {
   TrainingMaterialFlowGraphV1,
   TrainingMaterialFlowNodeTypeV1,
   TrainingMaterialFlowNodeV1,
+  TrainingMaterialV1,
   TrainingMissingLogicV1,
   TrainingMoleculeV1,
   TrainingNarrativeBlockV1,
@@ -62,6 +63,7 @@ import type {
   ExportedConditionVariationAttemptV1,
   ExportedConditionVaryV1,
   ExportedEntityBase,
+  ExportedMaterialV1,
   ExportedMoleculeV1,
   ExportedReactionV1,
   ExportedRelationV1,
@@ -71,6 +73,7 @@ import type {
 
 type ObjectEntity =
   | ExportedMoleculeV1
+  | ExportedMaterialV1
   | ExportedAnalysisV1
   | ExportedResultV1
   | ExportedSampleV1
@@ -178,7 +181,11 @@ interface RelationMaterialFlowSpec {
   reverse?: boolean;
 }
 
-const RAG_EXCLUSION_REASONS = new Set(["no_retrieval_chunks"]);
+const RAG_EXCLUSION_REASONS = new Set([
+  "no_retrieval_chunks",
+  "allowed_uses_missing_rag",
+  "governance_blocking"
+]);
 const SAMPLE_LINEAGE_RELATIONS = new Set<ExportedRelationV1["relation_type"]>([
   "sample_derived_from_reaction",
   "sample_related_to_molecule",
@@ -372,6 +379,24 @@ const stripRagChunk = (chunk: ChemdTrainingExportV2["learning_layer"]["retrieval
   return cleanChunk;
 };
 
+const stripTrainingMaterial = (material: ExportedMaterialV1): TrainingMaterialV1 => {
+  const stripped = stripSourceFields(material) as Omit<ExportedMaterialV1, SourceStrippedKey>;
+  const { supplier: _supplier, lot: _lot, ...cleanMaterial } = stripped;
+  return cleanMaterial;
+};
+
+const stripTrainingSample = (sample: ExportedSampleV1): TrainingSampleV1 => {
+  const stripped = stripSourceFields(sample) as Omit<ExportedSampleV1, SourceStrippedKey>;
+  const { supplier: _supplier, ...cleanSample } = stripped;
+  return cleanSample;
+};
+
+const stripTrainingArtifact = (artifact: ExportedArtifactV1): TrainingArtifactV1 => {
+  const stripped = stripSourceFields(artifact) as Omit<ExportedArtifactV1, SourceStrippedKey>;
+  const { path: _path, ...cleanArtifact } = stripped;
+  return cleanArtifact;
+};
+
 const getRagExclusionReasons = (record: ChemdTrainingExportV2): string[] | undefined => {
   const reasons = record.quality_layer.training_quality.exclusion_reasons
     ?.filter((reason) => RAG_EXCLUSION_REASONS.has(reason));
@@ -380,14 +405,17 @@ const getRagExclusionReasons = (record: ChemdTrainingExportV2): string[] | undef
 };
 
 export const buildRagExportFromTrainingRecord = (record: ChemdTrainingExportV2): ChemdRagExportV1 => {
-  const chunks = record.learning_layer.retrieval_chunks.map(stripRagChunk);
+  const ragAllowed = record.governance.allowed_uses?.includes("rag") === true
+    && !record.quality_layer.governance_quality.blocking;
+  const chunks = ragAllowed ? record.learning_layer.retrieval_chunks.map(stripRagChunk) : [];
 
   return {
     schema_version: "chemd-rag-export/v0.1",
     document: record.document,
+    governance: record.governance,
     chunks,
     quality: {
-      rag_eligible: record.quality_layer.training_quality.rag_eligible,
+      rag_eligible: ragAllowed && record.quality_layer.training_quality.rag_eligible,
       chunk_count: chunks.length,
       ...(getRagExclusionReasons(record) ? { exclusion_reasons: getRagExclusionReasons(record) } : {})
     }
@@ -4010,14 +4038,16 @@ export const buildTrainingUnderstandingFromRecord = (
       ...record.document,
       ...(getDocumentSummary(record) ? { summary: getDocumentSummary(record) } : {})
     },
+    governance: record.governance,
     ...(canonicalSummary ? { canonical_summary: canonicalSummary } : {}),
     entities: {
       molecules: record.semantic_layer.molecules.map(stripSourceFields) as TrainingMoleculeV1[],
+      materials: record.semantic_layer.materials.map(stripTrainingMaterial),
       reactions: record.semantic_layer.reactions.map(stripSourceFields) as TrainingReactionV1[],
       results: record.semantic_layer.results.map(stripSourceFields) as TrainingResultV1[],
       analyses: record.semantic_layer.analyses.map(stripSourceFields) as TrainingAnalysisV1[],
-      samples: record.semantic_layer.samples.map(stripSourceFields) as TrainingSampleV1[],
-      artifacts: record.semantic_layer.artifacts.map(stripSourceFields) as TrainingArtifactV1[],
+      samples: record.semantic_layer.samples.map(stripTrainingSample),
+      artifacts: record.semantic_layer.artifacts.map(stripTrainingArtifact),
       condition_variations: record.semantic_layer.condition_variations.map(stripSourceFields) as TrainingConditionVaryV1[],
       condition_variation_attempts: record.semantic_layer.condition_variation_attempts.map(stripSourceFields) as TrainingConditionVariationAttemptV1[],
       narrative_blocks: buildNarrativeBlocks(record)

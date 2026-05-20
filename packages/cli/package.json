@@ -12,6 +12,7 @@
   "dependencies": {
     "@chemd/compiler": "workspace:*",
     "@chemd/core": "workspace:*",
+    "@chemd/domain-templates": "workspace:*",
     "@chemd/runtime-lab": "workspace:*",
     "typescript": "^6.0.3"
   },

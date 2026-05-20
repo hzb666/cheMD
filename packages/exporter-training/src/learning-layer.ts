@@ -317,7 +317,6 @@ const buildRetrievalChunks = (
       sample.sample_code,
       sample.batch,
       sample.ref_raw ? `ref ${sample.ref_raw}` : undefined,
-      sample.supplier,
       sample.purity_raw,
       sample.notes
     );
@@ -342,7 +341,6 @@ const buildRetrievalChunks = (
     const text = compactText(
       artifact.artifact_kind,
       artifact.ref_raw ? `ref ${artifact.ref_raw}` : undefined,
-      artifact.path,
       artifact.instrument,
       artifact.notes
     );

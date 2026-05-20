@@ -27,6 +27,9 @@
       "@chemd/step-ontology": [
         "../../packages/step-ontology/src/index.ts"
       ],
+      "@chemd/interoperability": [
+        "../../packages/interoperability/src/index.ts"
+      ],
       "@chemd/typechecker": [
         "../../packages/typechecker/src/index.ts"
       ],

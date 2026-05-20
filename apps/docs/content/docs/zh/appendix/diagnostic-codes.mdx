@@ -66,6 +66,10 @@ description: Chemd parser、resolver、typechecker、compiler 和 runtime 常见
 | `E_TYPED_REFERENCE_MISMATCH` | 引用目标类型不匹配 |
 | `E_MOLECULE_IDENTITY_MISSING` | molecule 缺少身份字段 |
 | `E_MOLECULE_REACTION_QUANTITY` | 反应用量写在 molecule 上 |
+| `E_INTEROP_SMILES_PARSE` | SMILES 身份字段表面解析失败 |
+| `E_INTEROP_INCHI_FORMAT` | InChI 身份字段没有以 `InChI=` 开头 |
+| `E_INTEROP_INCHIKEY_FORMAT` | InChIKey 不符合标准 14-10-1 分段格式 |
+| `E_INTEROP_RXN_SMILES_PARSE` | RXN SMILES 字段不是有效 `reactants>>products` 表面 |
 | `E_REACTION_PARTICIPANT_MISSING` | reaction 缺少 reactant 或 product participant |
 | `E_REACTION_PARTICIPANT_SYNTAX` | 结构化 participant 事实使用了非法表面语法 |
 | `E_REACTION_PARTICIPANT_PRODUCT_QUANTITY` | product participant 含有非法数量 |
@@ -118,6 +122,19 @@ description: Chemd parser、resolver、typechecker、compiler 和 runtime 常见
 | `E_TRACE_EVENT_REFERENCE` | trace event 引用未知 step、control、artifact、analysis 或 result |
 | `E_TRACE_EVENT_PAYLOAD` | trace event payload 缺少必填字段 |
 | `W_TRACE_STEP_STATE` | trace step 状态顺序可疑，或对 replay 非法 |
+
+## Interoperability 与 Training Governance
+
+| 诊断码 | 含义 |
+| --- | --- |
+| `E_INTEROP_RXN_SMILES_MISSING` | 请求导出 reaction structure，但缺少 `rxn_smiles` |
+| `W_INTEROP_UNVERIFIED_IDENTITY` | 同一 molecule 有多个身份字段，但没有外部 verifier 证明一致 |
+| `W_INTEROP_PLACEHOLDER_NOT_COMPLIANT` | 外部标准导出只是 placeholder mapping，不是 validator-backed compliant export |
+| `E_TRAINING_PII_PRESENT` | governance 标记 PII present，因此只允许 audit/full export |
+| `W_TRAINING_RAG_NOT_ALLOWED` | `allowed_uses` 不包含 `rag` |
+| `W_TRAINING_AUDIT_ONLY` | governance 仅允许 audit 用途 |
+| `W_TRAINING_SANITIZATION_DISABLED` | 允许非 audit training use，但 sanitization 被禁用 |
+| `W_TRAINING_REVIEW_REQUIRED` | training export 存在需要 review 的质量或 governance 条件 |
 | `E501` | procedure lowering 失败 |
 | `E504` | analysis step 未绑定 |
 | `E505` | observation stage 存在歧义 |

@@ -9,6 +9,7 @@
   "dependencies": {
     "@chemd/core": "workspace:*",
     "@chemd/diagnostics": "workspace:*",
+    "@chemd/interoperability": "workspace:*",
     "@chemd/parser": "workspace:*",
     "@chemd/resolver": "workspace:*",
     "@chemd/step-ontology": "workspace:*"

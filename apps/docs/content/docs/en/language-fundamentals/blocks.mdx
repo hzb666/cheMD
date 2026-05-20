@@ -25,7 +25,7 @@ solvent: MeCN ;; temperature: 40 C ;; time: 2 h
 
 The parser also supports `;;` multi-field lines. Each segment is parsed as a field, while spans still point to the physical line.
 
-List fields use `|` separators. Default list fields are `reactants`, `products`, `reactant`, `product`, `reac`, `prod`, `conditions`, and `params`; `:::chemd` also treats `prev` as a list field. Empty list items produce `E_INVALID_LIST_ITEM`.
+List fields use `|` separators. Default list fields are `reactant`, `product`, `reac`, `prod`, `reactants`, `products`, `conditions`, and `params`; `:::chemd` also treats `prev` as a list field. Empty list items produce `E_INVALID_LIST_ITEM`.
 
 Each block parser declares an allowed field set. Unknown fields produce `W_UNKNOWN_FIELD` and are omitted from the parsed node.
 
@@ -51,21 +51,20 @@ Unknown blocks produce `W_UNKNOWN_BLOCK`.
 
 ## `:::chemd`
 
-`:::chemd` is the unified block for molecules and reactions. `kind: molecule` creates a molecule node. `kind: reaction` creates a reaction node. When `kind` is omitted, the parser infers the node type from `reactants` or `products` and records an inference diagnostic.
+`:::chemd` is the unified block for molecules and reactions. `kind: molecule` and `kind: reaction` are allowed, including aliases such as `mol` and `reac`, but they are optional when fields make the meaning clear. A block with reaction-shaped fields such as `reactant`, `product`, `reac`, `prod`, `rxn_smiles`, `solvent`, or `temperature` is inferred as a reaction. A block with molecule identity fields such as `smiles`, `inchi`, `inchikey`, `cas`, `formula`, or `role` is inferred as a molecule. Ambiguous or conflicting shapes are errors.
 
 ```md
 :::chemd #mol-aryl
-kind: molecule
 name: aryl bromide
 smiles: Brc1ccccc1
 role: substrate
 :::
 
 :::chemd #rxn-main
-kind: reaction
 name: Suzuki coupling
-reactants: @mol-aryl | @mol-boron
-products: @mol-product
+reactant: @mol-aryl | 1.0 mmol | 1.0 eq | limiting=true
+reactant: @mol-boron | 1.2 eq
+product: @mol-product
 reagents: K3PO4
 catalyst: Pd(PPh3)4
 solvent: MeCN
@@ -75,14 +74,14 @@ atmosphere: nitrogen
 :::
 ```
 
-Molecule fields: `smiles`, `cas`, `name`, `role`, `caption`, `formula`, `amount`, `equivalents`, `chemistry_features`.
+Molecule fields: `smiles`, `inchi`, `inchikey`, `cas`, `name`, `role`, `caption`, `formula`, `amount`, `equivalents`, `chemistry_features`.
 
-Reaction fields: `reactants`, `products`, `reactant`, `product`, `reac`, `prod`, `conditions`, `route`, `prev`, `reagents`, `catalyst`, `solvent`, `temperature`, `time`, `pressure`, `atmosphere`, `yield`, `conversion`, `selectivity`, `caption`, `chemistry_features`.
+Reaction fields: `reactant`, `product`, `reac`, `prod`, `reactants`, `products`, `rxn_smiles`, `reaction_smiles`, `conditions`, `route`, `prev`, `reagents`, `catalyst`, `solvent`, `temperature`, `time`, `pressure`, `atmosphere`, `yield`, `conversion`, `selectivity`, `caption`, `chemistry_features`.
 
 Resolver required-field validation:
 
 - A molecule requires `smiles`.
-- A reaction requires non-empty `reactants` and non-empty `products`.
+- A reaction requires at least one reactant and at least one product after alias normalization.
 
 ## `:::result`
 

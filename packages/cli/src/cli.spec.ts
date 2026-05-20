@@ -397,6 +397,7 @@ describe("chemd cli help validation export and repair", () => {
 
     expect(result.exitCode).toBe(EXIT_OK);
     expect(payload.schema_version).toBe("chemd-training-understanding/v0.1");
+    expect(payload.governance.allowed_uses).toContain("rag");
     expect(payload.source_layer).toBeUndefined();
   });
 
@@ -408,6 +409,7 @@ describe("chemd cli help validation export and repair", () => {
 
     expect(result.exitCode).toBe(EXIT_OK);
     expect(payload.schema_version).toBe("chemd-rag-export/v0.1");
+    expect(payload.governance.allowed_uses).toContain("rag");
     expect(payload.chunks.length).toBeGreaterThan(0);
     expect(payload.learning_layer).toBeUndefined();
   });
@@ -420,8 +422,65 @@ describe("chemd cli help validation export and repair", () => {
 
     expect(result.exitCode).toBe(EXIT_OK);
     expect(payload.schema_version).toBe("chemd-training-export/v0.2");
+    expect(payload.governance.source).toBe("workspace_policy");
+    expect(payload.source_layer.audit_only_fields).toContain("source_layer.raw_source");
     expect(payload.source_layer).toBeDefined();
   });
+
+  it("reports training governance diagnostics through check --target training", async () => {
+    const result = await runInTempDir(["check", "governance.chemd", "--target", "training", "--format", "json"], {
+      "governance.chemd": `---
+id: exp-cli-governance
+title: CLI Governance
+date: 2026-05-20
+governance:
+  pii_status: present
+  allowed_uses: [audit]
+---
+
+:::sample #sample-main
+name: patient sample
+:::
+`
+    });
+    const payload = JSON.parse(result.stdout);
+
+    expect(result.exitCode).toBe(EXIT_VALIDATION_FAILED);
+    expect(payload.files[0].diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "E_TRAINING_PII_PRESENT" }),
+      expect.objectContaining({ code: "W_TRAINING_RAG_NOT_ALLOWED" })
+    ]));
+  });
+
+  it("lists and instantiates domain templates", async () =>
+    withTempDir(async (dir) => {
+      const stdout = createWriter();
+      const stderr = createWriter();
+      const listCode = await runChemdCli(["templates", "--json"], { cwd: dir, stderr, stdout });
+      const templates = JSON.parse(stdout.value);
+
+      expect(listCode).toBe(EXIT_OK);
+      expect(templates).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: "organic-synthesis/suzuki-screen" })
+      ]));
+
+      const newStdout = createWriter();
+      const newStderr = createWriter();
+      const newCode = await runChemdCli([
+        "new",
+        "organic-synthesis/suzuki-screen",
+        "--out",
+        "exp.chemd"
+      ], {
+        cwd: dir,
+        stderr: newStderr,
+        stdout: newStdout
+      });
+
+      expect(newCode).toBe(EXIT_OK);
+      expect(readFileSync(path.join(dir, "exp.chemd"), "utf8")).toContain(":::condition-varies");
+      expect(newStderr.value).toBe("");
+    }));
 
   it("rejects unsupported export formats", async () => {
     const result = await runInTempDir(["export", "valid.chemd", "--format", "xml"], {

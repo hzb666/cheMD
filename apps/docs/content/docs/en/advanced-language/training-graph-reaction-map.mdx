@@ -12,7 +12,9 @@ The training exporter builds `ChemdTrainingExportV2`. The record is organized in
 - `source_layer`: document identity, source spans, and parsed-source context.
 - `semantic_layer`: molecules, reactions, results, analyses, samples, artifacts, conditions, procedures, observations, and routes.
 - `learning_layer`: retrieval chunks, resolved references, task-oriented projections, and procedure or observation logic.
-- `quality_layer`: diagnostics, missing logic, conflicts, confidence, and export quality signals.
+- `quality_layer`: diagnostics, missing logic, conflicts, confidence, governance quality, and export quality signals.
+
+The top-level `governance` record controls sanitized projections. `training` and `rag` use sanitized data. `training-full` keeps audit-only source context and lists audit-only fields in `source_layer.audit_only_fields`.
 
 ```bash
 pnpm chemd export ./examples/example.chemd --format training
@@ -27,7 +29,7 @@ Use `training` when a compact training understanding is enough. Use `training-fu
 The graph command compiles multiple documents and builds a graph index with schema version `chemd-training-graph-index/v0.1`.
 
 ```bash
-pnpm chemd graph ./corpus --out ./graph-index.json
+pnpm chemd graph ./corpus --format json > ./graph-index.json
 ```
 
 The graph index is built from training understandings after compilation. It is not part of the compiler `CompileResult`.

@@ -4,6 +4,7 @@ export interface BlockFieldSchema {
   name: string;
   aliases?: string[];
   aliasListModes?: Record<string, "pipe" | "repeat">;
+  completionKinds?: ChemdSemanticKind[];
   list?: boolean;
   listMode?: "pipe" | "repeat";
   values?: Record<string, string>;
@@ -33,6 +34,10 @@ const field = (
   options: Omit<BlockFieldSchema, "name"> = {}
 ): BlockFieldSchema => ({ name, ...options });
 
+const chemdCommon = ["molecule", "reaction"] satisfies ChemdSemanticKind[];
+const chemdMolecule = ["molecule"] satisfies ChemdSemanticKind[];
+const chemdReaction = ["reaction"] satisfies ChemdSemanticKind[];
+
 const pNumberField: PatternFieldSchema = {
   description: "Legacy TLC lane field pN",
   pattern: /^p\d+$/
@@ -55,47 +60,49 @@ export const BLOCK_SCHEMAS: readonly BlockSchema[] = [
     blockType: "chemd",
     nodeType: "chemd",
     fields: [
-      field("kind", { values: CHEMD_KIND_VALUE_ALIASES }),
-      field("smiles"),
-      field("cas"),
-      field("inchi"),
-      field("inchikey"),
-      field("canonical_smiles"),
-      field("name"),
-      field("role"),
-      field("caption"),
-      field("formula"),
-      field("mw"),
+      field("kind", { values: CHEMD_KIND_VALUE_ALIASES, completionKinds: chemdCommon }),
+      field("smiles", { completionKinds: chemdMolecule }),
+      field("cas", { completionKinds: chemdMolecule }),
+      field("inchi", { completionKinds: chemdMolecule }),
+      field("inchikey", { completionKinds: chemdMolecule }),
+      field("canonical_smiles", { completionKinds: chemdMolecule }),
+      field("name", { completionKinds: chemdCommon }),
+      field("role", { completionKinds: chemdMolecule }),
+      field("caption", { completionKinds: chemdCommon }),
+      field("formula", { completionKinds: chemdMolecule }),
+      field("mw", { completionKinds: chemdMolecule }),
       field("amount"),
       field("equivalents", { aliases: ["equiv"] }),
       field("reactant", {
         aliases: ["reac", "reactants"],
         aliasListModes: { reactants: "pipe" },
+        completionKinds: chemdReaction,
         list: true,
         listMode: "repeat"
       }),
       field("product", {
         aliases: ["prod", "products"],
         aliasListModes: { products: "pipe" },
+        completionKinds: chemdReaction,
         list: true,
         listMode: "repeat"
       }),
-      field("conditions", { list: true }),
-      field("route"),
-      field("prev", { list: true }),
-      field("equation"),
-      field("rxn_smiles"),
-      field("reagents"),
-      field("catalyst"),
-      field("solvent"),
-      field("temperature"),
-      field("time"),
-      field("pressure"),
-      field("atmosphere"),
-      field("yield"),
-      field("conversion"),
-      field("selectivity"),
-      field("chemistry_features", { list: true })
+      field("conditions", { completionKinds: chemdReaction, list: true }),
+      field("route", { completionKinds: chemdReaction }),
+      field("prev", { completionKinds: chemdReaction, list: true }),
+      field("equation", { completionKinds: chemdReaction }),
+      field("rxn_smiles", { aliases: ["reaction_smiles"], completionKinds: chemdReaction }),
+      field("reagents", { completionKinds: chemdReaction }),
+      field("catalyst", { completionKinds: chemdReaction }),
+      field("solvent", { completionKinds: chemdReaction }),
+      field("temperature", { completionKinds: chemdReaction }),
+      field("time", { completionKinds: chemdReaction }),
+      field("pressure", { completionKinds: chemdReaction }),
+      field("atmosphere", { completionKinds: chemdReaction }),
+      field("yield", { completionKinds: chemdReaction }),
+      field("conversion", { completionKinds: chemdReaction }),
+      field("selectivity", { completionKinds: chemdReaction }),
+      field("chemistry_features", { completionKinds: chemdCommon, list: true })
     ]
   },
   {
@@ -326,6 +333,29 @@ export const normalizeChemdKind = (raw: string): ChemdSemanticKind | undefined =
 
 export const getCanonicalBlockFields = (blockType: string): string[] =>
   getBlockSchema(blockType)?.fields.map((item) => item.name) ?? [];
+
+export const getBlockFieldSchemas = (blockType: string): BlockFieldSchema[] =>
+  [...(getBlockSchema(blockType)?.fields ?? [])];
+
+export const getBlockChildLineFields = (blockType: string): string[] =>
+  [...(getBlockSchema(blockType)?.childLineFields ?? [])];
+
+export const getCompletionBlockFieldSchemas = (
+  blockType: string,
+  kind?: ChemdSemanticKind
+): BlockFieldSchema[] => {
+  const fields = getBlockFieldSchemas(blockType);
+  if (blockType !== "chemd" || !kind) {
+    return fields;
+  }
+
+  return fields.filter((item) => item.completionKinds?.includes(kind) === true);
+};
+
+export const getCompletionBlockFields = (
+  blockType: string,
+  kind?: ChemdSemanticKind
+): string[] => getCompletionBlockFieldSchemas(blockType, kind).map((item) => item.name);
 
 export const getAllowedBlockFieldSet = (blockType: string): Set<string> =>
   new Set(getCanonicalBlockFields(blockType));

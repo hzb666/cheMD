@@ -66,6 +66,10 @@ The following reference lists common diagnostics by source and purpose. Use it t
 | `E_TYPED_REFERENCE_MISMATCH` | Reference target type mismatch |
 | `E_MOLECULE_IDENTITY_MISSING` | Molecule has no identity field |
 | `E_MOLECULE_REACTION_QUANTITY` | Reaction usage quantity is written on a molecule |
+| `E_INTEROP_SMILES_PARSE` | SMILES identity field fails surface parsing |
+| `E_INTEROP_INCHI_FORMAT` | InChI identity field does not start with `InChI=` |
+| `E_INTEROP_INCHIKEY_FORMAT` | InChIKey does not match the standard 14-10-1 segment format |
+| `E_INTEROP_RXN_SMILES_PARSE` | RXN SMILES field does not contain a valid `reactants>>products` surface |
 | `E_REACTION_PARTICIPANT_MISSING` | Reaction is missing a reactant or product participant |
 | `E_REACTION_PARTICIPANT_SYNTAX` | Structured participant facts use an invalid surface |
 | `E_REACTION_PARTICIPANT_PRODUCT_QUANTITY` | Product participant contains an invalid quantity |
@@ -118,6 +122,19 @@ The following reference lists common diagnostics by source and purpose. Use it t
 | `E_TRACE_EVENT_REFERENCE` | Trace event references an unknown step, control, artifact, analysis, or result |
 | `E_TRACE_EVENT_PAYLOAD` | Trace event payload is missing required fields |
 | `W_TRACE_STEP_STATE` | Trace step state order is suspicious or invalid for replay |
+
+## Interoperability and Training Governance
+
+| Code | Meaning |
+| --- | --- |
+| `E_INTEROP_RXN_SMILES_MISSING` | Reaction structure export was requested without `rxn_smiles` |
+| `W_INTEROP_UNVERIFIED_IDENTITY` | Multiple molecule identity fields are present without an external consistency verifier |
+| `W_INTEROP_PLACEHOLDER_NOT_COMPLIANT` | External standard export is a placeholder mapping, not a validator-backed compliant export |
+| `E_TRAINING_PII_PRESENT` | Governance marks PII present, so only audit/full export is allowed |
+| `W_TRAINING_RAG_NOT_ALLOWED` | `allowed_uses` does not include `rag` |
+| `W_TRAINING_AUDIT_ONLY` | Governance allows audit use only |
+| `W_TRAINING_SANITIZATION_DISABLED` | Non-audit training use is allowed while sanitization is disabled |
+| `W_TRAINING_REVIEW_REQUIRED` | Training export has review-required quality or governance conditions |
 | `E501` | Procedure lowering failed |
 | `E504` | Analysis step is unbound |
 | `E505` | Observation stage is ambiguous |

@@ -61,19 +61,10 @@ name: Draft node
       expect.objectContaining({
         code: "W_CHEMD_KIND_AMBIGUOUS",
         severity: "error",
-        nodeId: "draft",
-        quickFixes: expect.arrayContaining([
-          expect.objectContaining({
-            kind: "insert_chemd_kind",
-            patch: expect.objectContaining({ kind: "molecule" })
-          }),
-          expect.objectContaining({
-            kind: "insert_chemd_kind",
-            patch: expect.objectContaining({ kind: "reaction" })
-          })
-        ])
+        nodeId: "draft"
       })
     );
+    expect(document.diagnostics[0]).not.toHaveProperty("quickFixes");
   });
 
   it("accepts official kind value aliases", () => {

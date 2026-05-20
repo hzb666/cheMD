@@ -25,7 +25,7 @@ solvent: MeCN ;; temperature: 40 C ;; time: 2 h
 
 解析器也支持 `;;` 多字段行。每个片段会按字段解析，但 span 仍指向同一物理行。
 
-列表字段使用 `|` 分隔。默认列表字段为 `reactants`、`products`、`reactant`、`product`、`reac`、`prod`、`conditions` 和 `params`；`:::chemd` 额外把 `prev` 作为列表字段。空列表项产生 `E_INVALID_LIST_ITEM`。
+列表字段使用 `|` 分隔。默认列表字段为 `reactant`、`product`、`reac`、`prod`、`reactants`、`products`、`conditions` 和 `params`；`:::chemd` 额外把 `prev` 作为列表字段。空列表项产生 `E_INVALID_LIST_ITEM`。
 
 每个块解析器声明自己的允许字段集合。未知字段产生 `W_UNKNOWN_FIELD`，该字段不会写入解析节点。
 
@@ -51,21 +51,20 @@ solvent: MeCN ;; temperature: 40 C ;; time: 2 h
 
 ## `:::chemd`
 
-`:::chemd` 是分子和反应的统一块。`kind: molecule` 生成 molecule 节点，`kind: reaction` 生成 reaction 节点。省略 `kind` 时，解析器根据 `reactants` 或 `products` 形状推断节点类型，并记录推断诊断。
+`:::chemd` 是分子和反应的统一块。`kind: molecule` 和 `kind: reaction` 仍然允许，也支持 `mol`、`reac` 等别名；但当字段已经能表达含义时可以省略。包含 `reactant`、`product`、`reac`、`prod`、`rxn_smiles`、`solvent` 或 `temperature` 等反应形字段时推断为 reaction。包含 `smiles`、`inchi`、`inchikey`、`cas`、`formula` 或 `role` 等分子身份字段时推断为 molecule。形状不明确或互相冲突时是 error。
 
 ```md
 :::chemd #mol-aryl
-kind: molecule
 name: aryl bromide
 smiles: Brc1ccccc1
 role: substrate
 :::
 
 :::chemd #rxn-main
-kind: reaction
 name: Suzuki coupling
-reactants: @mol-aryl | @mol-boron
-products: @mol-product
+reactant: @mol-aryl | 1.0 mmol | 1.0 eq | limiting=true
+reactant: @mol-boron | 1.2 eq
+product: @mol-product
 reagents: K3PO4
 catalyst: Pd(PPh3)4
 solvent: MeCN
@@ -75,14 +74,14 @@ atmosphere: nitrogen
 :::
 ```
 
-分子字段：`smiles`、`cas`、`name`、`role`、`caption`、`formula`、`amount`、`equivalents`、`chemistry_features`。
+分子字段：`smiles`、`inchi`、`inchikey`、`cas`、`name`、`role`、`caption`、`formula`、`amount`、`equivalents`、`chemistry_features`。
 
-反应字段：`reactants`、`products`、`reactant`、`product`、`reac`、`prod`、`conditions`、`route`、`prev`、`reagents`、`catalyst`、`solvent`、`temperature`、`time`、`pressure`、`atmosphere`、`yield`、`conversion`、`selectivity`、`caption`、`chemistry_features`。
+反应字段：`reactant`、`product`、`reac`、`prod`、`reactants`、`products`、`rxn_smiles`、`reaction_smiles`、`conditions`、`route`、`prev`、`reagents`、`catalyst`、`solvent`、`temperature`、`time`、`pressure`、`atmosphere`、`yield`、`conversion`、`selectivity`、`caption`、`chemistry_features`。
 
 resolver 必填校验：
 
 - molecule 需要 `smiles`。
-- reaction 需要非空 `reactants` 和非空 `products`。
+- reaction 在别名归一化后至少需要一个 reactant 和一个 product。
 
 ## `:::result`
 

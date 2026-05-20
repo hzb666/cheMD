@@ -8,10 +8,21 @@ export interface ChemdTrainingExportV2 {
   exported_at: string;
   generator: ExportGeneratorInfo;
   document: ExportedDocumentInfo;
+  governance: DataGovernanceInfo;
   source_layer: SourceLayerV1;
   semantic_layer: SemanticLayerV1;
   learning_layer: LearningLayerV1;
   quality_layer: QualityLayerV1;
+}
+
+export interface DataGovernanceInfo {
+  confidentiality?: "public" | "internal" | "restricted";
+  license?: string;
+  pii_status?: "none" | "redacted" | "present";
+  review_status?: "machine_parsed" | "human_reviewed" | "expert_verified";
+  allowed_uses?: Array<"rag" | "sft" | "eval" | "regression" | "audit">;
+  sanitization_policy?: "default" | "strict" | "none";
+  source?: "frontmatter" | "workspace_policy" | "export_override";
 }
 
 export interface ExportGeneratorInfo {
@@ -42,6 +53,7 @@ export interface SourceLayerV1 {
   raw_meta: Record<string, unknown>;
   raw_children: SourceNodeSnapshot[];
   diagnostics: ExportedDiagnostic[];
+  audit_only_fields?: string[];
 }
 
 export interface SourceNodeSnapshot {
@@ -224,6 +236,7 @@ export interface NormalizedOutcomeHintsV1 {
 export interface ExportedReactionV1 extends ExportedEntityBase {
   source_node_type: "reaction";
   route_raw?: string;
+  rxn_smiles?: string;
   prev_refs_raw?: string[];
   resolved_prev_refs_raw?: string[];
   next_refs_raw?: string[];
@@ -635,7 +648,15 @@ export interface TrainingQualityV1 {
   exclusion_reasons?: string[];
 }
 
+export interface GovernanceQualityV1 {
+  audit_only_fields: string[];
+  blocking: boolean;
+  diagnostics: ExportedDiagnostic[];
+  sanitized_projection: boolean;
+}
+
 export interface QualityLayerV1 {
+  governance_quality: GovernanceQualityV1;
   parse_quality: ParseQualityV1;
   normalization_quality: NormalizationQualityV1;
   training_quality: TrainingQualityV1;

@@ -454,6 +454,7 @@ const buildReaction = (input: BuildReactionInput): ExportedReactionV1 => {
     ...createEntityBase("reaction", node),
     ...(isPrimary ? { is_primary: true } : {}),
     route_raw: node.route,
+    rxn_smiles: node.rxn_smiles,
     prev_refs_raw: node.prev,
     resolved_prev_refs_raw: typedReaction?.prev
       .filter((reference): reference is typeof reference & { kind: "reference"; refId: string } =>
@@ -486,6 +487,7 @@ const buildReaction = (input: BuildReactionInput): ExportedReactionV1 => {
     text_for_embedding: compactText(
       node.name,
       node.caption,
+      node.rxn_smiles,
       compactConditions?.join(" "),
       node.solvent,
       node.catalyst,

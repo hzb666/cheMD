@@ -10,6 +10,9 @@
     "resolver-compiler",
     "compiler-semantics",
     "runtime-preflight",
+    "interoperability-governance",
+    "language-service",
+    "domain-templates",
     "workspace-index",
     "training-graph-reaction-map"
   ]

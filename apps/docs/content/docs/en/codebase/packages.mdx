@@ -13,6 +13,7 @@ The following reference lists actual packages under `packages`. Responsibility n
 | `@chemd/parser` | `packages/parser/src/index.ts` | Frontmatter, body, block, and inline token parsing |
 | `@chemd/resolver` | `packages/resolver/src/index.ts` | Object index, reference resolution, template expansion, primary validation, required-field validation |
 | `@chemd/typechecker` | `packages/typechecker/src/index.ts` | Typed semantic graph, quantity normalization, typed references, route checks, step checks |
+| `@chemd/interoperability` | `packages/interoperability/src/index.ts` | External identity and structure adapter contracts, validation helpers |
 | `@chemd/compiler` | `packages/compiler/src/index.ts` | Aggregates parse, resolve, typecheck, render, export, and diagnosis |
 
 This path is the main Chemd language execution path. `parser` converts source into AST plus parser diagnostics; `resolver` adds cross-node semantics; `typechecker` produces the typed semantic graph and step graph; `compiler` composes all stages and emits HTML, JSON, DOCX bridge, LNF, RAG, and training data.
@@ -64,9 +65,9 @@ The semantic packages should not parse raw source text directly. They consume AS
 | `@chemd/renderer-html` | HTML preview rendering |
 | `@chemd/renderer-json` | JSON rendering |
 | `@chemd/renderer-docx` | DOCX bridge rendering |
-| `@chemd/exporter-training` | Training export, RAG export, graph index, reaction intelligence contracts |
+| `@chemd/exporter-training` | Training export, RAG export, graph index, governance quality, reaction intelligence contracts |
 
-Rendering consumes the resolved document, render options, and typed graph. Export consumes the resolved document, typed graph, step graph, and LNF. Training export is the upstream source for RAG export and training understanding.
+Rendering consumes the resolved document, render options, and typed graph. Export consumes the resolved document, typed graph, step graph, and LNF. Training export is the upstream source for RAG export and training understanding. Governance is document-level export metadata; sanitized projections omit audit-only source fields while `training-full` preserves them.
 
 ### Output Ownership
 
@@ -84,6 +85,7 @@ Rendering consumes the resolved document, render options, and typed graph. Expor
 | --- | --- |
 | `@chemd/cli` | validate, export, graph, diff, changed, repair, and agent-loop |
 | `@chemd/language-service` | Editor language service |
+| `@chemd/domain-templates` | Shared starter `.chemd` template catalog |
 | `@chemd/workspace-index` | Workspace document indexing |
 | `@chemd/storage-postgres` | PostgreSQL schema, records, Graph/RAG storage |
 | `@chemd/reaction-map` | Reaction graph and intelligence contracts |
@@ -98,7 +100,8 @@ These packages serve CLI, web, desktop, and backend integration. `@chemd/diagnos
 | Package | Common entrypoints | Verification focus |
 | --- | --- | --- |
 | `@chemd/cli` | command modules and `packages/cli/bin/chemd.mjs` | command output, exit codes, repair/agent-loop workflows |
-| `@chemd/language-service` | language service exports | editor diagnostics, completion-safe parsing, incremental feedback |
+| `@chemd/language-service` | language service exports | schema-driven completion, editor diagnostics, incremental feedback |
+| `@chemd/domain-templates` | catalog exports | template IDs, generated source validity, CLI `templates`/`new` output |
 | `@chemd/workspace-index` | workspace indexing APIs | multi-file discovery, graph input, changed-file behavior |
 | `@chemd/storage-postgres` | schema and repository helpers | migration compatibility, record shape, Graph/RAG persistence |
 | `@chemd/diagnostics` | diagnostic builders and data model | stable diagnostic codes, severity, locations, remediation text |

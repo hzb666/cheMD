@@ -286,7 +286,7 @@ note2: Trace product by TLC.
     });
   });
 
-  it("attaches quick fixes when chemd kind is ambiguous", () => {
+  it("reports ambiguous chemd kind without kind insertion quick fixes", () => {
     const document = parseChemd(`---
 id: exp-ambiguous-kind-fix
 title: Ambiguous kind quick fix
@@ -301,19 +301,10 @@ name: draft
     expect(document.diagnostics).toContainEqual(
       expect.objectContaining({
         code: "W_CHEMD_KIND_AMBIGUOUS",
-        severity: "error",
-        quickFixes: expect.arrayContaining([
-          expect.objectContaining({
-            kind: "insert_chemd_kind",
-            patch: expect.objectContaining({ kind: "molecule" })
-          }),
-          expect.objectContaining({
-            kind: "insert_chemd_kind",
-            patch: expect.objectContaining({ kind: "reaction" })
-          })
-        ])
+        severity: "error"
       })
     );
+    expect(document.diagnostics[0]).not.toHaveProperty("quickFixes");
   });
 
 });

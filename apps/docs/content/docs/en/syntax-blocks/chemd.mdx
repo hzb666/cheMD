@@ -19,7 +19,7 @@ mw: 88.11 g/mol
 :::
 ```
 
-Identity fields include `name`, `smiles`, `canonical_smiles`, `cas`, `inchi`, `inchikey`, `formula`, `mw`, `role`, `caption`, and `chemistry_features`. At least one identity field is required by the typechecker. `amount` and `equivalents` on a molecule produce an error.
+Identity fields include `name`, `smiles`, `canonical_smiles`, `cas`, `inchi`, `inchikey`, `formula`, `mw`, `role`, `caption`, and `chemistry_features`. At least one identity field is required by the typechecker. `inchi` must start with `InChI=`, and `inchikey` must use the standard uppercase 14-10-1 segment format. `amount` and `equivalents` on a molecule produce an error.
 
 ## Reaction Participants
 
@@ -31,6 +31,7 @@ kind: reaction
 reactant: @mat-substrate-lot-a | 1.00 mmol | 1.0 eq | limiting=true
 reactant: @mol-base | equiv=1.2
 product: @mol-product
+rxn_smiles: CCO.N>>CCN
 solvent: MeCN
 temperature: r.t. -> 60 C over 30 min
 time: overnight
@@ -86,12 +87,12 @@ purity: 84 %
 | `temperature` / `time` / `pressure` | not applicable | optional | typed quantities |
 | `atmosphere` | not applicable | optional | `nitrogen`, `argon`, `air`, `oxygen`, `inert`, or extension |
 | `yield` / `conversion` / `selectivity` | not applicable | optional | reaction-level outcome hints; result remains authoritative |
-| `equation` / `rxn_smiles` | not applicable | optional | reaction identity strings |
+| `equation` / `rxn_smiles` | not applicable | optional | reaction identity strings; `reaction_smiles` is an alias of `rxn_smiles` |
 | `chemistry_features` | optional | optional | feature IDs separated by `|` or `,` |
 
 ## Type Inference
 
-The parser infers reaction from `reactant`, `product`, `reac`, `prod`, `reactants`, or `products`. It infers molecule from identity fields such as `smiles`, `cas`, `inchi`, `inchikey`, `canonical_smiles`, `formula`, or `mw`. Unstable inference, invalid explicit `kind`, or field-shape conflict is an error.
+The parser infers reaction from participant fields and reaction-only fields such as `reactant`, `product`, `rxn_smiles`, `reaction_smiles`, `solvent`, `temperature`, `time`, `yield`, or `conversion`. It infers molecule from identity fields such as `smiles`, `cas`, `inchi`, `inchikey`, `canonical_smiles`, `formula`, or `mw`. Unstable inference, invalid explicit `kind`, or field-shape conflict is an error.
 
 ## Quantity Surface
 
@@ -107,6 +108,10 @@ Unit-bearing quantities require a space between number and unit: `78 %`, `1.0 mm
 | `E_CHEMD_KIND_CONFLICT` | invalid `kind`, or explicit kind conflicts with field shape |
 | `E_MOLECULE_IDENTITY_MISSING` | molecule has no identity field |
 | `E_MOLECULE_REACTION_QUANTITY` | molecule contains reaction usage quantity |
+| `E_INTEROP_SMILES_PARSE` | SMILES identity field cannot be parsed as a single token |
+| `E_INTEROP_INCHI_FORMAT` | InChI identity field does not start with `InChI=` |
+| `E_INTEROP_INCHIKEY_FORMAT` | InChIKey identity field does not use the standard segment format |
+| `E_INTEROP_RXN_SMILES_PARSE` | reaction structure field is not a valid RXN SMILES surface |
 | `E_REACTION_PARTICIPANT_SYNTAX` | structured participant facts are written on plural list aliases |
 | `E_TYPED_REFERENCE_MISMATCH` | reference target has the wrong type |
 | `E_STOICHIOMETRY_LIMITING` | limiting reactant rules are violated |

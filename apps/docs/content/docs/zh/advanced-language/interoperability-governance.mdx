@@ -1,0 +1,73 @@
+---
+title: 互操作与训练治理
+description: 外部化学身份字段、adapter 边界，以及 sanitized training/RAG export 的治理规则。
+---
+
+Chemd 把外部标准放在边界层。语言本身只在 typed graph 中保存稳定身份字段；`@chemd/interoperability` 负责 adapter contract 和表面校验 helper。
+
+## 结构身份
+
+molecule identity 支持 `smiles`、`inchi` 和 `inchikey`。`inchikey` 必须是标准大写 14-10-1 分段格式。`inchi` 必须以 `InChI=` 开头。表面格式错误是 error，因为下游身份匹配会变得不可靠。
+
+```md
+:::chemd #mol-product
+name: product A
+smiles: CCO
+inchi: InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3
+inchikey: LFQSCWFLJHTTHZ-UHFFFAOYSA-N
+:::
+```
+
+reaction structure 使用 `rxn_smiles`。`reaction_smiles` 是字段别名，并在 AST、typed graph 和 training export 中归一为 `rxn_smiles`。
+
+```md
+:::chemd #rxn-main
+reaction_smiles: CCO.O=O>>CC=O.O
+reactant: @mol-ethanol | 1.0 mmol | 1.0 eq | limiting=true
+product: acetaldehyde
+:::
+```
+
+外部结构字段不能替代 participant。仍应显式写 `reactant` 和 `product`，这样物料流和化学计量可检查。
+
+## Adapter 边界
+
+`@chemd/interoperability` 暴露单一 `InteropAdapter<TInput, TOutput>` contract：
+
+```ts
+export interface InteropAdapter<TInput, TOutput> {
+  format: string;
+  direction: "import" | "export";
+  convert(input: TInput, context: InteropContext): InteropResult<TOutput>;
+}
+```
+
+当前第一层实现覆盖 InChI/InChIKey/RXN SMILES 表面校验、molecule identity projection、reaction structure projection 和 AnIML-like placeholder mapping。AnIML/Allotrope placeholder 输出在有 validator-backed exporter 前只能标记 `compliant: false`。SiLA 属于 runtime adapter，不进入语言字段。
+
+## Governance Frontmatter
+
+governance 属于 document/export quality layer，不默认复制到每个 entity。只有后续需要 entity 级权限不同于 document 级时，才加 entity override。
+
+```yaml
+governance:
+  confidentiality: internal
+  review_status: human_reviewed
+  allowed_uses: [rag, eval, regression, audit]
+  pii_status: none
+```
+
+`allowed_uses` 可包含 `rag`、`sft`、`eval`、`regression` 和 `audit`。未写 governance 时，workspace policy 默认为 internal、无 PII、machine parsed，且允许本地所有用途。
+
+## Sanitized 与 Audit
+
+`chemd export --format training` 返回 sanitized training understanding，省略 raw source、source span、artifact path、material supplier/lot 和 sample supplier。`chemd export --format training-full` 返回完整 audit artifact，并在 `source_layer.audit_only_fields` 列出不进入 sanitized projection 的字段。
+
+`chemd export --format rag` 只有在 `allowed_uses` 包含 `rag` 且 governance 不 blocking 时才输出 chunks。`pii_status: present` 会阻断非 audit projection，直到记录被 redacted。
+
+```bash
+pnpm chemd check experiment.chemd --target training --format json
+pnpm chemd export experiment.chemd --format training
+pnpm chemd export experiment.chemd --format training-full
+```
+
+`check --target training` 会额外报告 `review_required`、PII、RAG 权限缺失、audit-only 记录和 sanitization disabled 相关诊断。
