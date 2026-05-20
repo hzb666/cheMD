@@ -13,7 +13,6 @@
     "interoperability-governance",
     "language-service",
     "domain-templates",
-    "workspace-index",
-    "training-graph-reaction-map"
+    "workspace-index"
   ]
 }

@@ -182,7 +182,7 @@ export interface SemanticFlowEdge {
   id: string;
   sourceId: string;
   targetId: string;
-  kind: "document_order" | "contains" | "reactant" | "product" | "evidence";
+  kind: "document_order" | "contains" | "reactant" | "product" | "evidence" | "semantic_relation";
   label: string;
 }
 
@@ -524,14 +524,17 @@ const semanticFlowLaneByNodeType: Record<ChemdRenderableNodeV1["node_type"], Sem
   ChemdAnalysisNode: "analysis",
   ChemdArtifactNode: "results",
   ChemdColumnNode: "source",
-  ChemdConditionNode: "procedure",
+  ChemdConditionAttemptNode: "reaction",
+  ChemdConditionNode: "reaction",
   ChemdDocumentNode: "source",
   ChemdEvidenceNode: "evidence",
   ChemdListNode: "source",
   ChemdMaterialNode: "materials",
   ChemdBatchNode: "materials",
   ChemdMoleculeNode: "materials",
+  ChemdObservationEventNode: "evidence",
   ChemdParagraphNode: "source",
+  ChemdProcedureControlNode: "procedure",
   ChemdProcedureNode: "procedure",
   ChemdProcedureStepNode: "procedure",
   ChemdReactionNode: "reaction",
@@ -540,6 +543,8 @@ const semanticFlowLaneByNodeType: Record<ChemdRenderableNodeV1["node_type"], Sem
   ChemdSectionNode: "source",
   ChemdTableNode: "source",
   ChemdTemplateNode: "source",
+  ChemdTraceEventNode: "source",
+  ChemdTraceNode: "source",
   ChemdUnknownNode: "evidence"
 };
 
@@ -579,7 +584,9 @@ const isFlowNode = (node: ChemdRenderableNodeV1): boolean =>
   node.node_type !== "ChemdParagraphNode"
   && node.node_type !== "ChemdListNode"
   && node.node_type !== "ChemdTableNode"
-  && node.node_type !== "ChemdColumnNode";
+  && node.node_type !== "ChemdColumnNode"
+  && node.node_type !== "ChemdTraceNode"
+  && node.node_type !== "ChemdTraceEventNode";
 
 const semanticFlowNode = (
   node: ChemdRenderableNodeV1,
@@ -649,42 +656,115 @@ const addContainsEdges = (
   });
 };
 
-const stringList = (value: unknown): string[] =>
-  Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+type ReferenceEdgeDirection = "from_reference" | "to_reference";
 
-const addReactionMaterialEdges = (
+interface ReferenceEdgeRule {
+  nodeType: ChemdRenderableNodeV1["node_type"];
+  field: string;
+  direction: ReferenceEdgeDirection;
+  kind: SemanticFlowEdge["kind"];
+  label: string;
+}
+
+const referenceEdgeRules: ReferenceEdgeRule[] = [
+  { nodeType: "ChemdReactionNode", field: "reactants", direction: "from_reference", kind: "reactant", label: "reactant" },
+  { nodeType: "ChemdReactionNode", field: "products", direction: "to_reference", kind: "product", label: "product" },
+  { nodeType: "ChemdProcedureNode", field: "reaction", direction: "to_reference", kind: "semantic_relation", label: "procedure reaction" },
+  { nodeType: "ChemdProcedureNode", field: "ref", direction: "to_reference", kind: "semantic_relation", label: "procedure ref" },
+  { nodeType: "ChemdProcedureNode", field: "evidence", direction: "to_reference", kind: "evidence", label: "procedure evidence" },
+  { nodeType: "ChemdProcedureStepNode", field: "inputs", direction: "from_reference", kind: "semantic_relation", label: "step input" },
+  { nodeType: "ChemdProcedureStepNode", field: "outputs", direction: "to_reference", kind: "semantic_relation", label: "step output" },
+  { nodeType: "ChemdProcedureStepNode", field: "dependsOn", direction: "from_reference", kind: "semantic_relation", label: "step dependency" },
+  { nodeType: "ChemdProcedureStepNode", field: "evidence", direction: "to_reference", kind: "evidence", label: "step evidence" },
+  { nodeType: "ChemdProcedureControlNode", field: "outputs", direction: "to_reference", kind: "semantic_relation", label: "control output" },
+  { nodeType: "ChemdConditionNode", field: "reaction", direction: "from_reference", kind: "semantic_relation", label: "condition reaction" },
+  { nodeType: "ChemdConditionNode", field: "standard", direction: "from_reference", kind: "semantic_relation", label: "condition standard" },
+  { nodeType: "ChemdConditionAttemptNode", field: "reaction", direction: "from_reference", kind: "semantic_relation", label: "attempt reaction" },
+  { nodeType: "ChemdConditionAttemptNode", field: "result", direction: "to_reference", kind: "semantic_relation", label: "attempt result" },
+  { nodeType: "ChemdResultNode", field: "reaction", direction: "from_reference", kind: "semantic_relation", label: "result reaction" },
+  { nodeType: "ChemdResultNode", field: "product", direction: "from_reference", kind: "semantic_relation", label: "result product" },
+  { nodeType: "ChemdResultNode", field: "ref", direction: "from_reference", kind: "semantic_relation", label: "result ref" },
+  { nodeType: "ChemdAnalysisNode", field: "ref", direction: "from_reference", kind: "semantic_relation", label: "analysis ref" },
+  { nodeType: "ChemdAnalysisNode", field: "result", direction: "from_reference", kind: "semantic_relation", label: "analysis result" },
+  { nodeType: "ChemdAnalysisNode", field: "artifact", direction: "from_reference", kind: "semantic_relation", label: "analysis artifact" },
+  { nodeType: "ChemdAnalysisNode", field: "artifacts", direction: "from_reference", kind: "semantic_relation", label: "analysis artifact" },
+  { nodeType: "ChemdSampleNode", field: "ref", direction: "from_reference", kind: "semantic_relation", label: "sample ref" },
+  { nodeType: "ChemdSampleNode", field: "derived_from", direction: "from_reference", kind: "semantic_relation", label: "sample derived" },
+  { nodeType: "ChemdSampleNode", field: "aliquot_of", direction: "from_reference", kind: "semantic_relation", label: "sample aliquot" },
+  { nodeType: "ChemdSampleNode", field: "batch_of", direction: "from_reference", kind: "semantic_relation", label: "sample batch" },
+  { nodeType: "ChemdSampleNode", field: "artifacts", direction: "to_reference", kind: "semantic_relation", label: "sample artifact" },
+  { nodeType: "ChemdArtifactNode", field: "ref", direction: "from_reference", kind: "semantic_relation", label: "artifact ref" },
+  { nodeType: "ChemdEvidenceNode", field: "ref", direction: "from_reference", kind: "evidence", label: "observation ref" },
+  { nodeType: "ChemdObservationEventNode", field: "linkedStepId", direction: "from_reference", kind: "evidence", label: "event step" },
+  { nodeType: "ChemdObservationEventNode", field: "evidence", direction: "to_reference", kind: "evidence", label: "event evidence" }
+];
+
+const referenceCandidates = (value: unknown): string[] => {
+  if (typeof value === "string") {
+    const referencePart = value.split("|")[0]?.trim() ?? value.trim();
+    return uniqueStrings(referencePart.split(/[,\s]+/u)
+      .map((item) => item.trim().replace(/^[@#]/u, "").replace(/[;:.)\]]+$/u, ""))
+      .filter(Boolean));
+  }
+  if (Array.isArray(value)) {
+    return uniqueStrings(value.flatMap(referenceCandidates));
+  }
+  return [];
+};
+
+const buildNodeLookup = (
+  tree: ChemdSemanticRenderTreeV1,
+  visibleIds: ReadonlySet<string>
+): Map<string, ChemdRenderableNodeV1> => {
+  const lookup = new Map<string, ChemdRenderableNodeV1>();
+  tree.nodes.filter((node) => visibleIds.has(node.node_id)).forEach((node) => {
+    [node.node_id, node.semantic_id, node.original_id].forEach((id) => {
+      if (id) lookup.set(id, node);
+    });
+  });
+  return lookup;
+};
+
+const relationEndpointIds = (
+  node: ChemdRenderableNodeV1,
+  target: ChemdRenderableNodeV1,
+  direction: ReferenceEdgeDirection
+): { sourceId: string; targetId: string } =>
+  direction === "from_reference"
+    ? { sourceId: target.node_id, targetId: node.node_id }
+    : { sourceId: node.node_id, targetId: target.node_id };
+
+const addReferenceEdge = (
+  edges: Map<string, SemanticFlowEdge>,
+  node: ChemdRenderableNodeV1,
+  target: ChemdRenderableNodeV1,
+  rule: ReferenceEdgeRule,
+  ref: string
+): void => {
+  const endpoint = relationEndpointIds(node, target, rule.direction);
+  addFlowEdge(edges, {
+    id: `${rule.kind}:${rule.field}:${endpoint.sourceId}->${endpoint.targetId}:${ref}`,
+    sourceId: endpoint.sourceId,
+    targetId: endpoint.targetId,
+    kind: rule.kind,
+    label: rule.label
+  });
+};
+
+const addSemanticReferenceEdges = (
   edges: Map<string, SemanticFlowEdge>,
   tree: ChemdSemanticRenderTreeV1,
   visibleIds: ReadonlySet<string>
 ): void => {
-  const nodeBySemanticId = new Map(tree.nodes
-    .filter((node) => node.semantic_id && visibleIds.has(node.node_id))
-    .map((node) => [node.semantic_id ?? "", node]));
-
-  tree.nodes
-    .filter((node) => node.node_type === "ChemdReactionNode" && visibleIds.has(node.node_id))
-    .forEach((reaction) => {
-      stringList(reaction.attrs.reactants).forEach((id) => {
-        const source = nodeBySemanticId.get(id);
-        if (source) addFlowEdge(edges, {
-          id: `reactant:${source.node_id}->${reaction.node_id}`,
-          sourceId: source.node_id,
-          targetId: reaction.node_id,
-          kind: "reactant",
-          label: "reactant"
-        });
+  const lookup = buildNodeLookup(tree, visibleIds);
+  for (const node of tree.nodes.filter((item) => visibleIds.has(item.node_id))) {
+    for (const rule of referenceEdgeRules.filter((item) => item.nodeType === node.node_type)) {
+      referenceCandidates(node.attrs[rule.field]).forEach((ref) => {
+        const target = lookup.get(ref);
+        if (target) addReferenceEdge(edges, node, target, rule, ref);
       });
-      stringList(reaction.attrs.products).forEach((id) => {
-        const target = nodeBySemanticId.get(id);
-        if (target) addFlowEdge(edges, {
-          id: `product:${reaction.node_id}->${target.node_id}`,
-          sourceId: reaction.node_id,
-          targetId: target.node_id,
-          kind: "product",
-          label: "product"
-        });
-      });
-    });
+    }
+  }
 };
 
 const semanticFlowMessage = (nodes: readonly SemanticFlowNode[]): string =>
@@ -703,7 +783,7 @@ const buildSemanticFlowDiagram = (
   const edges = new Map<string, SemanticFlowEdge>();
   addDocumentOrderEdges(edges, nodes);
   addContainsEdges(edges, tree.root, visibleIds);
-  addReactionMaterialEdges(edges, tree, visibleIds);
+  addSemanticReferenceEdges(edges, tree, visibleIds);
   return {
     lanes: semanticFlowLanes,
     nodes,

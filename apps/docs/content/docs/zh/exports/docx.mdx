@@ -1,0 +1,63 @@
+---
+title: DOCX Bridge 导出
+description: Markdown-to-DOCX bridge payload 和 Node DOCX 导出行为。
+---
+
+DOCX 导出有两层：
+
+- `compileChemd(source).docxBridge`：app 集成使用的 JSON bridge payload
+- `@chemd/compiler/node` 的 `compileChemdToDocx`：Node 专用路径，通过 Pandoc 写出 `.docx`
+
+bridge 由 `@chemd/renderer-docx` 生成。
+
+## Bridge Payload
+
+bridge payload 包含：
+
+- `document`：document ID、title、date 和渲染后的 Markdown
+- `render`：render profile 和 adapter payload 数据
+- `semantic.typedGraph`：提供 typed graph 时出现
+- `exportHints`：`format: "docx-bridge"` 和 `pipeline: "html-or-markdown-to-docx"`
+
+示例：
+
+```json
+{
+  "document": {
+    "id": "exp-export-example",
+    "title": "Export example",
+    "date": "2026-05-21",
+    "markdown": "# Export example\n\n## Reaction rxn-main\n\n- Reactants: @mol-a..."
+  },
+  "semantic": {
+    "typedGraph": {
+      "documentId": "exp-export-example"
+    }
+  },
+  "exportHints": {
+    "format": "docx-bridge",
+    "pipeline": "html-or-markdown-to-docx"
+  }
+}
+```
+
+## Node DOCX 导出
+
+Node 导出会渲染 DOCX Markdown，写入临时 Markdown 文件，并调用 Pandoc：
+
+```ts
+import { compileChemdToDocx } from "@chemd/compiler/node";
+
+await compileChemdToDocx(source, {
+  outputPath: "report.docx",
+  referenceDocPath: "reference.docx"
+});
+```
+
+`outputPath` 必须以 `.docx` 结尾。可选的 `referenceDocPath` 和 `extraArgs` 会传给 Pandoc。
+
+## 注意
+
+- DOCX bridge 是传输契约，不是最终二进制文件。
+- Node DOCX 路径需要可用的 Pandoc 环境。
+- 浏览器预览使用 HTML；面向文字处理文档时使用 DOCX。

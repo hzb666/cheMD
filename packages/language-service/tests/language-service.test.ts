@@ -6,7 +6,8 @@ import {
   compileChemdLanguageServiceRequest,
   toMonacoCodeActions,
   toMonacoLanguageServiceModel,
-  toMonacoMarker
+  toMonacoMarker,
+  toMonacoSemanticTokensData
 } from "../src/index";
 
 const source = `---
@@ -28,6 +29,16 @@ products: product-main
 :::result #res-main
 status: success
 yield: 78 %
+:::
+
+:::template charge-line
+params: reagent: ref<molecule> | amount: quantity<amount>
+Plain text should stay untagged while @param.reagent uses @param.amount.
+:::
+
+:::use charge-line
+reagent: @mol-main
+amount: 12 mg
 :::
 `;
 
@@ -78,6 +89,41 @@ describe("compileChemdForEditor", () => {
       expect.objectContaining({ id: "rxn-main", kind: "reaction" }),
       expect.objectContaining({ id: "res-main", kind: "result" })
     ]));
+    expect(output.semanticTokens).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: "keyword",
+        range: { startLine: 11, startColumn: 4, endLine: 11, endColumn: 9 },
+        modifiers: expect.arrayContaining(["block"])
+      }),
+      expect.objectContaining({
+        type: "variable",
+        range: { startLine: 11, startColumn: 10, endLine: 11, endColumn: 19 },
+        modifiers: expect.arrayContaining(["declaration", "reaction"])
+      }),
+      expect.objectContaining({
+        type: "property",
+        range: { startLine: 12, startColumn: 1, endLine: 12, endColumn: 5 }
+      }),
+      expect.objectContaining({
+        type: "number",
+        range: { startLine: 19, startColumn: 8, endLine: 19, endColumn: 12 },
+        modifiers: expect.arrayContaining(["quantity"])
+      }),
+      expect.objectContaining({
+        type: "parameter",
+        range: { startLine: 23, startColumn: 9, endLine: 23, endColumn: 16 }
+      }),
+      expect.objectContaining({
+        type: "parameter",
+        range: { startLine: 24, startColumn: 39, endLine: 24, endColumn: 53 },
+        modifiers: expect.arrayContaining(["reference"])
+      })
+    ]));
+    expect(output.semanticTokens.some((token) =>
+      token.range.startLine === 24
+        && token.range.startColumn >= 1
+        && token.range.endColumn <= 11
+    )).toBe(false);
 
     const warning = output.diagnostics.find((item) => item.severity === "warning");
     expect(warning ? toMonacoMarker(warning).severity : undefined).toBe(4);
@@ -89,8 +135,10 @@ describe("compileChemdForEditor", () => {
       markers: expect.any(Array),
       codeActions: expect.any(Array),
       outline: output.outline,
-      symbols: output.symbols
+      symbols: output.symbols,
+      semanticTokens: output.semanticTokens
     });
+    expect(Array.from(toMonacoSemanticTokensData(output.semanticTokens)).length % 5).toBe(0);
   });
 
   it("returns stable failed output when compile throws", () => {

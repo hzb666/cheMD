@@ -35,6 +35,7 @@ const compile: WorkspaceIndexCompileFn = (input): ChemdLanguageCompileSuccess =>
   result: {} as ChemdLanguageCompileSuccess["result"],
   diagnostics: [],
   outline: [],
+  semanticTokens: [],
   symbols: input.documentUri.includes("route-b")
     ? [{ id: "rxn-b", label: "rxn-b", kind: "reaction", range: range(7) }]
     : [{ id: "rxn-a", label: "rxn-a", kind: "reaction", range: range(6) }]

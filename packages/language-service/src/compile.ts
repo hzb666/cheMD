@@ -5,6 +5,7 @@ import {
 } from "@chemd/compiler";
 import { createFailedDiagnostic, mapCompilerDiagnostics } from "./diagnostics";
 import { buildOutline, buildSymbols } from "./outline";
+import { buildChemdSemanticTokens } from "./semantic-tokens";
 import type {
   ChemdLanguageCompileInput,
   ChemdLanguageCompileOutput
@@ -27,6 +28,7 @@ export const compileChemdForEditor = (
 
   try {
     const result = compile(input.source, input.options);
+    const symbols = buildSymbols(result, input.source);
     return {
       status: "ok",
       documentUri: input.documentUri,
@@ -34,7 +36,8 @@ export const compileChemdForEditor = (
       result,
       diagnostics: mapCompilerDiagnostics(input.source, result.diagnostics),
       outline: buildOutline(result, input.source),
-      symbols: buildSymbols(result, input.source)
+      semanticTokens: buildChemdSemanticTokens(input.source, symbols),
+      symbols
     };
   } catch (error: unknown) {
     const message = readErrorMessage(error);
@@ -44,6 +47,7 @@ export const compileChemdForEditor = (
       compiledAt,
       diagnostics: [createFailedDiagnostic(message)],
       outline: [],
+      semanticTokens: buildChemdSemanticTokens(input.source),
       symbols: [],
       error: {
         code: "LS_COMPILE_FAILED",

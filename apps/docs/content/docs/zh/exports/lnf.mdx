@@ -1,0 +1,88 @@
+---
+title: LNF 导出
+description: 面向 runtime、workflow 和 typed experiment facts 的 canonical lab-normal form。
+---
+
+LNF 是 canonical lab-normal form。它通过 CLI export 暴露：
+
+```bash
+pnpm chemd export ./examples/example.chemd --format lnf
+```
+
+schema version 为 `chemd-lnf/v0.5`。
+
+## 输出形状
+
+`ChemdLnf` 包含：
+
+- `experiment.document`：ID、title 和 date
+- `experiment.entities.reactions`：reaction node IDs、participants、raw conditions 和 normalized conditions
+- `experiment.entities.results`：result node IDs、status、outcome quantities 和 notes
+- `experiment.semantic.typedGraph`：typed semantic graph
+- `experiment.semantic.quantities`：normalized quantity records
+- `experiment.workflow.steps`：canonical step nodes，包含 params、inputs、outputs、dependencies、evidence、artifacts、effects、control path、source、provenance、raw text 和 lowering confidence
+- `experiment.workflow.controls`：canonical procedure control nodes
+- `experiment.workflow.observations`：observation event nodes
+- `experiment.workflow.diagnostics`
+- `experiment.workflow.stepSources`：explicit step IDs、lowered step IDs 和 observation-event source index
+- `experiment.runtime`：可用时的 run plan summary、state summary 和 preflight
+- `experiment.quality`：diagnostics 和 migration summary
+
+## 示例
+
+```json
+{
+  "schemaVersion": "chemd-lnf/v0.5",
+  "experiment": {
+    "document": {
+      "id": "exp-export-example",
+      "title": "Export example",
+      "date": "2026-05-21"
+    },
+    "entities": {
+      "reactions": [
+        {
+          "nodeId": "rxn-main",
+          "reactants": ["@mol-a | 1.0 mmol | 1.0 eq | limiting=true"],
+          "products": ["@mol-b"],
+          "conditions": { "solvent": "MeCN", "temperature": "60 C" },
+          "normalizedConditions": {
+            "solvent": { "raw": "MeCN", "normalized": "MeCN" },
+            "temperature": { "raw": "60 C", "value": 60, "unit": "C" }
+          }
+        }
+      ],
+      "results": [
+        {
+          "nodeId": "res-main",
+          "status": "success",
+          "outcome": { "yield": { "raw": "78 %", "value": 78, "unit": "%" } }
+        }
+      ]
+    },
+    "workflow": {
+      "steps": [
+        {
+          "stepId": "s-add",
+          "family": "add",
+          "params": {},
+          "inputs": ["@mol-a"],
+          "outputs": ["mixture-main"],
+          "rawText": "add | id=s-add | inputs=@mol-a | outputs=mixture-main",
+          "loweringConfidence": 1
+        }
+      ],
+      "observations": [
+        { "eventId": "e-color", "eventType": "color_change", "linkedStepId": "s-add" }
+      ],
+      "stepSources": {
+        "explicitStepIds": ["s-add"],
+        "loweredStepIds": [],
+        "observationEvents": [{ "observationId": "obs-main", "eventId": "e-color" }]
+      }
+    }
+  }
+}
+```
+
+消费者需要 runtime/lab semantics，而不是展示 HTML 或宽泛 training projection 时，使用 LNF。

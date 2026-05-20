@@ -1,6 +1,6 @@
 ---
 title: 高级语言特性
-description: Chemd 的引用、模板、派生表达式、布局语法、compiler 语义、运行预检、工作区索引和训练图谱输出。
+description: Chemd 的引用、模板、派生表达式、布局语法、compiler 语义、运行预检和工作区索引。
 ---
 
 这一组章节说明 Chemd 中需要跨块、跨阶段或工具链理解的语言特性。内容以使用者可见行为为主，同时标明 parser、resolver 和 typechecker 的实现边界。
@@ -9,7 +9,7 @@ description: Chemd 的引用、模板、派生表达式、布局语法、compile
 
 1. 先阅读引用和模板，因为它们决定源记录如何复用值。
 2. 再阅读归一化语义和派生表达式，因为它们解释类型化值。
-3. 当源记录需要工具链集成时，再阅读布局、resolver、compiler、runtime、workspace 和 graph 相关主题。
+3. 当源记录需要工具链集成时，再阅读布局、resolver、compiler、runtime 和 workspace 相关主题。
 
 ## 章节
 
@@ -23,5 +23,4 @@ description: Chemd 的引用、模板、派生表达式、布局语法、compile
 - [Compiler 语义路径](/zh/docs/advanced-language/compiler-semantics)：AST 到导出结果的处理链路。
 - [运行预检](/zh/docs/advanced-language/runtime-preflight)：run plan、运行模式、能力要求和人工确认策略。
 - [工作区符号索引](/zh/docs/advanced-language/workspace-index)：面向编辑器与工作区的多文档符号、引用索引。
-- [训练图谱与反应地图](/zh/docs/advanced-language/training-graph-reaction-map)：training export layer、graph index 输出与 reaction map layout。
 

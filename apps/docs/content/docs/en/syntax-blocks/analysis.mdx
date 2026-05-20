@@ -5,21 +5,33 @@ description: '`:::analysis` records TLC, NMR, chromatography, and MS evidence wi
 
 `:::analysis` records analytical evidence. The required field is `type`; type-specific fields determine which parser and diagnostics apply.
 
-## Common Fields
+## Fields
 
-| field | notes |
-| --- | --- |
-| `type` | `tlc`, `nmr`, `hplc`, `uplc`, `gc`, `lcms`, `gcms`, `ms`, `hrms`, `ir`, `uv` |
-| `ref` | target sample, reaction, result, condition screen, or attempt |
-| `time` | sampling or analysis time |
-| `eluent` / `plate` / `visualization` | TLC method facts |
-| `method` | method/profile reference or method name |
-| `instrument` | instrument name |
-| `solvent` / `frequency` | NMR metadata when not embedded in `spectrum` |
-| `result` | linked result id or concise interpretation |
-| `artifact` / `artifacts` | referenced raw data artifacts |
-| `data` | unstructured fallback when no type-specific field applies |
-| `notes` | free notes |
+| field | required | default | notes |
+| --- | --- | --- | --- |
+| `type` | yes | none | `tlc`, `nmr`, `hplc`, `uplc`, `gc`, `lcms`, `gcms`, `ms`, `hrms`, `ir`, `uv`; aliases: `analysis_type`, `analysisType` |
+| `ref` | no | none | target sample, reaction, result, condition screen, or attempt |
+| `time` | no | none | sampling or analysis time; TLC normalization accepts `h`, `hr`, `hrs`, `min`, `mins` |
+| `eluent` | no | none | TLC eluent |
+| `plate` | no | `silica gel GF254` for `type: tlc` | TLC plate material |
+| `visualization` | no | `UV 254 nm` for `type: tlc` | TLC visualization method |
+| `result` | no | none | linked result id or concise interpretation |
+| `instrument` | no | none | instrument name |
+| `solvent` | no | none | NMR solvent or method solvent |
+| `frequency` | no | none | NMR frequency when not embedded in `spectrum` |
+| `method` | no | none | method/profile reference or method name |
+| `artifact` | no | none | repeatable raw data artifact reference; alias `artifacts` accepts `|` lists |
+| `spectrum` | no | none | NMR spectrum-level metadata |
+| `lane` | no | none | TLC structured lane; repeat for each lane |
+| `spot` | no | none | TLC spot for the current `lane` |
+| `mess` | no | none | broad or messy TLC region for the current `lane` |
+| `base` | no | none | marks baseline in the current TLC lane; may include a spot payload |
+| `none` | no | none | marks the current TLC lane as empty |
+| `peak` | no | none | repeatable NMR/chromatography peak |
+| `ion` | no | none | repeatable MS ion |
+| `data` | no | none | unstructured fallback when no type-specific field applies |
+| `notes` | no | none | free notes |
+| `p1`, `p2`, ... | no | none | legacy compact TLC lane fields |
 
 ## TLC
 
@@ -45,6 +57,32 @@ spot: 0.30
 `lane:` opens a lane. `spot`, `mess`, `base`, and `none` belong to the current lane until the next `lane:`. Lane labels and spot labels must be built-in roles or object references. Built-in roles include `sm`, `rxn`, `prod`, `int`, `blank`, `impurity`, and `unknown` / `unk`.
 
 `spot: sm` references a known standard spot, not the lane. It reuses the referenced spot's Rf and marker facts, but not lane-level parameters. Ambiguous or missing standard spots are errors. `unknown` is only valid with an Rf, for example `spot: 0.42 unknown`.
+
+### TLC Spot Markers
+
+TLC spot values use this shape:
+
+```md
+spot: <rf> [marker] [label-or-reference]
+```
+
+The marker is optional. It combines shape, size, and intensity:
+
+| marker part | accepted form | normalized meaning |
+| --- | --- | --- |
+| shape | omitted, `^`, `v` | omitted means `circle`; `^` means `up`; `v` means `down` |
+| size | `1` to `5` after the shape | `size_rank`; values outside the range are clamped to `1..5` |
+| intensity | `(1)` to `(5)` after size or shape | `intensity_rank`; values outside the range are clamped to `1..5` |
+
+Examples:
+
+```md
+spot: 0.31 ^3(4) product
+spot: 0.62 v2 @mol-starting-material
+mess: 0.55 3(2)
+```
+
+`^3(4)` means an upward-shaped spot with size rank `3` and intensity rank `4`. A plain `spot: 0.30` is a circular spot with no size or intensity rank.
 
 ## NMR
 

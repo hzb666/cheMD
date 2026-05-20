@@ -1,0 +1,68 @@
+---
+title: HTML Export
+description: Browser-ready HTML rendering from compiled Chemd documents.
+---
+
+HTML export is the human-facing preview output. It is produced by `@chemd/renderer-html` and exposed on `compileChemd(source).html`.
+
+## What It Contains
+
+The HTML renderer consumes the resolved document, render profile, render adapter payload, and typed graph. It renders:
+
+- document title and metadata
+- Markdown headings, lists, task checkboxes, block quotes, links, inline code, and inline chemistry
+- molecule, material, batch, reaction, result, analysis, procedure, trace, observation, sample, artifact, condition-varies, template, use, and col blocks
+- procedure steps and selected step parameters
+- typed TLC plate visuals when typed graph normalization is available
+- source-safe block IDs and display labels
+
+HTML is for display. Use JSON, LNF, training, or graph exports when downstream systems need stable machine contracts.
+
+## Example
+
+```ts
+import { compileChemd } from "@chemd/compiler";
+
+const result = compileChemd(source);
+const html = result.html;
+```
+
+Representative output slice:
+
+```html
+<article class="chemd-document">
+  <header class="chemd-document-header">
+    <h1>Export example</h1>
+  </header>
+  <section class="chemd-block chemd-block--reaction">
+    <h2>Reaction <span class="chemd-block-id">rxn-main</span></h2>
+    <dl>
+      <dt>Reactants</dt><dd>@mol-a | 1.0 mmol | 1.0 eq | limiting=true</dd>
+      <dt>Products</dt><dd>@mol-b</dd>
+      <dt>Solvent</dt><dd>MeCN</dd>
+      <dt>Temperature</dt><dd>60 C</dd>
+    </dl>
+  </section>
+  <section class="chemd-block chemd-block--procedure">
+    <ol class="chemd-procedure-steps">
+      <li>Step 1: Add</li>
+    </ol>
+  </section>
+</article>
+```
+
+When an analysis has normalized TLC data, HTML can include a TLC plate surface:
+
+```html
+<div class="chemd-tlc-plate">
+  <div class="chemd-tlc-lane" data-lane-id="lane-a">
+    <span class="chemd-tlc-spot" data-shape="circle" data-size-rank="3"></span>
+  </div>
+</div>
+```
+
+## Notes
+
+- The renderer avoids leaking parser-only origin fields such as raw source origin into ordinary display HTML.
+- `col` layout blocks render as layout containers in HTML but are flattened in JSON body serialization.
+- Use render profiles for display options instead of changing source syntax for a specific visual target.

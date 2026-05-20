@@ -32,6 +32,14 @@ export type {
 export {
   getChemdCompletionContext
 } from "./completion-context";
+export {
+  findChemdBlockPathAtLine,
+  findChemdFencePairAtLine,
+  flattenChemdBlockStructure,
+  parseChemdBlockStructure,
+  type ChemdBlockNode,
+  type ChemdFencePair
+} from "./block-structure";
 export type {
   ChemdCompletionBlockKind,
   ChemdCompletionContext,
@@ -96,9 +104,11 @@ export type {
 export type * from "./types";
 export {
   toMonacoCodeActions,
+  chemdSemanticTokensLegend,
   toMonacoLanguageServiceModel,
   toMonacoMarker,
   toMonacoRange,
+  toMonacoSemanticTokensData,
   toMonacoSeverity,
   type MonacoCodeActionLike,
   type MonacoLanguageServiceModel,
@@ -106,6 +116,13 @@ export {
   type MonacoMarkerSeverity,
   type MonacoRangeLike
 } from "./monaco-adapter";
+export {
+  buildChemdSemanticTokens,
+  CHEMD_SEMANTIC_TOKEN_MODIFIERS,
+  CHEMD_SEMANTIC_TOKEN_TYPES,
+  type ChemdSemanticTokenModifier,
+  type ChemdSemanticTokenType
+} from "./semantic-tokens";
 export {
   createSourceHash
 } from "./ranges";

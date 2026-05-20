@@ -29,6 +29,11 @@ import {
   registerChemdNavigationProviders,
   updateChemdNavigationOutput
 } from "./navigation";
+import {
+  cleanupChemdSemanticTokenOutput,
+  registerChemdSemanticProviders,
+  updateChemdSemanticTokenOutput
+} from "./semantic-tokens";
 import type { AppSettings, ResolvedTheme } from "../settings/settings";
 import {
   toChemdModelUri,
@@ -38,8 +43,11 @@ import {
   type MonacoSourceJumpIntent
 } from "./source-path";
 import {
+  findChemdBlockPathAtLine,
+  findChemdFencePairAtLine,
   flattenChemdBlockStructure,
   parseChemdBlockStructure,
+  type ChemdFencePair,
   type ChemdBlockNode,
 } from "./chemd-block-structure";
 
@@ -57,6 +65,9 @@ export const CHEMD_LANGUAGE_ID = "chemd";
 const CHEMD_MARKER_OWNER = "chemd-language-service";
 const CHEMD_LIGHT_THEME_ID = "chemd-desktop-light";
 const CHEMD_DARK_THEME_ID = "chemd-desktop-dark";
+const CHEMD_FENCE_PAIR_LINE_CLASS = "chemd-fence-pair-line";
+const CHEMD_FENCE_PAIR_GLYPH_CLASS = "chemd-fence-pair-glyph";
+const CHEMD_BLOCK_SCOPE_GLYPH_CLASS = "chemd-block-scope-glyph";
 const MONACO_TRANSPARENT_COLOR = "#00000000";
 const EDITOR_FONT_FAMILY = "\"JetBrains Mono\"";
 
@@ -205,40 +216,108 @@ const registerChemdLanguageMetadata = (monaco: Monaco): void => {
   }
 };
 
+export const createChemdLanguageConfiguration = (): languages.LanguageConfiguration => ({
+  comments: { lineComment: "//" },
+  brackets: [["{", "}"], ["[", "]"], ["(", ")"]],
+  autoClosingPairs: [
+    { open: "{", close: "}" },
+    { open: "[", close: "]" },
+    { open: "(", close: ")" },
+    { open: "\"", close: "\"", notIn: ["string", "comment"] },
+    { open: "'", close: "'", notIn: ["string", "comment"] }
+  ],
+  surroundingPairs: [
+    { open: "{", close: "}" },
+    { open: "[", close: "]" },
+    { open: "(", close: ")" },
+    { open: "\"", close: "\"" },
+    { open: "'", close: "'" }
+  ],
+  wordPattern: /#?@?[A-Za-z0-9_.#/-]+/u,
+  folding: {
+    markers: {
+      start: /^\s*:::\s*[a-z][\w-]*(?:\s+.*)?\s*$/iu,
+      end: /^\s*:::\s*$/u
+    }
+  },
+  indentationRules: {
+    increaseIndentPattern: /^\s*:::\s*[a-z][\w-]*(?:\s+.*)?\s*$/iu,
+    decreaseIndentPattern: /^\s*:::\s*$/u
+  }
+});
+
 const configureChemdLanguage = (monaco: Monaco): void => {
-  monaco.languages.setLanguageConfiguration(CHEMD_LANGUAGE_ID, {
-    comments: { lineComment: "//" },
-    brackets: [["{", "}"], ["[", "]"], ["(", ")"]],
-    autoClosingPairs: [
-      { open: "{", close: "}" },
-      { open: "[", close: "]" },
-      { open: "(", close: ")" },
-      { open: "\"", close: "\"" },
-      { open: "'", close: "'" }
-    ]
-  });
+  monaco.languages.setLanguageConfiguration(
+    CHEMD_LANGUAGE_ID,
+    createChemdLanguageConfiguration()
+  );
 };
 
+export const createChemdMonarchTokensProvider = (): languages.IMonarchLanguage => ({
+  defaultToken: "",
+  tokenPostfix: ".chemd",
+  tokenizer: {
+    root: [
+      [/^---$/, "delimiter.frontmatter"],
+      [/^:::\s*$/, "delimiter.block"],
+      [/^:::\s*([a-zA-Z][\w-]*)/, "keyword.block"],
+      [/:chem\[[^\]]*\]/, "string.chem"],
+      [/@[A-Za-z0-9_.#/-]+/, "identifier.reference"],
+      [/#[A-Za-z0-9_-]+/, "identifier.declaration"],
+      [/^\s*[A-Za-z_][\w-]*(?=\s*:)/, "attribute.name"],
+      [/\b(kind|reactants|products|conditions|status|yield|amount|smiles|method|target|result)\b(?=\s*:)/, "attribute.name"],
+      [/\b(error|failed|warning|pending|accepted|ready|ok)\b/, "keyword.status"],
+      [/\b\d+(?:\.\d+)?\s*(?:mg|g|kg|ug|µg|ml|mL|L|M|mM|mol|mmol|eq|%|degC|°C|K|h|min|s|rpm|bar|atm|psi|pH)(?=$|[^\w%°µ])/u, "number.quantity"],
+      [/\/\/.*$/, "comment"],
+      [/"[^"]*"/, "string"],
+      [/'[^']*'/, "string"]
+    ]
+  }
+});
+
 const configureChemdTokens = (monaco: Monaco): void => {
-  monaco.languages.setMonarchTokensProvider(CHEMD_LANGUAGE_ID, {
-    defaultToken: "",
-    tokenizer: {
-      root: [
-        [/^---$/, "delimiter.frontmatter"],
-        [/^:::\s*[a-zA-Z][\w-]*/, "keyword.block"],
-        [/^:::\s*$/, "keyword.block"],
-        [/#[A-Za-z0-9_-]+/, "tag.identifier"],
-        [/^\s*[A-Za-z_][\w-]*(?=\s*:)/, "attribute.name"],
-        [/\b(kind|reactants|products|conditions|status|yield|amount|smiles|method|target|result)\b(?=\s*:)/, "attribute.name"],
-        [/\b(error|failed|warning|pending|accepted|ready|ok)\b/, "keyword.status"],
-        [/\b\d+(?:\.\d+)?\s*(?:mg|g|ml|mL|M|mol|%|degC|h|min)\b/, "number.quantity"],
-        [/\/\/.*$/, "comment"],
-        [/"[^"]*"/, "string"],
-        [/'[^']*'/, "string"]
-      ]
-    }
-  });
+  monaco.languages.setMonarchTokensProvider(
+    CHEMD_LANGUAGE_ID,
+    createChemdMonarchTokensProvider()
+  );
 };
+
+const createFencePairDecorations = (
+  monaco: Monaco,
+  model: editor.ITextModel,
+  pair: ChemdFencePair
+): editor.IModelDeltaDecoration[] =>
+  [...new Set([pair.openLine, pair.closeLine])]
+    .filter((lineNumber) => lineNumber >= 1 && lineNumber <= model.getLineCount())
+    .map((lineNumber) => ({
+      range: new monaco.Range(lineNumber, 1, lineNumber, model.getLineMaxColumn(lineNumber)),
+      options: {
+        className: CHEMD_FENCE_PAIR_LINE_CLASS,
+        isWholeLine: true,
+        linesDecorationsClassName: CHEMD_FENCE_PAIR_GLYPH_CLASS,
+        stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges
+      }
+    }));
+
+const createBlockScopeDecorations = (
+  monaco: Monaco,
+  model: editor.ITextModel,
+  lineNumber: number
+): editor.IModelDeltaDecoration[] =>
+  findChemdBlockPathAtLine(parseChemdBlockStructure(model.getValue()), lineNumber)
+    .map((node) => ({
+      range: new monaco.Range(
+        node.startLine,
+        1,
+        node.endLine,
+        model.getLineMaxColumn(node.endLine)
+      ),
+      options: {
+        isWholeLine: true,
+        linesDecorationsClassName: CHEMD_BLOCK_SCOPE_GLYPH_CLASS,
+        stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges
+      }
+    }));
 
 const createRangeForBlock = (
   monaco: Monaco,
@@ -304,11 +383,20 @@ const defineChemdTheme = (monaco: Monaco): void => {
     inherit: true,
     rules: [
       { token: "delimiter.frontmatter", foreground: "64748b", fontStyle: "bold" },
+      { token: "delimiter.block", foreground: "0f766e", fontStyle: "bold" },
+      { token: "keyword", foreground: "0f766e", fontStyle: "bold" },
       { token: "keyword.block", foreground: "0f766e", fontStyle: "bold" },
-      { token: "tag.identifier", foreground: "7c3aed" },
+      { token: "identifier.declaration", foreground: "7c3aed" },
+      { token: "identifier.reference", foreground: "2563eb" },
+      { token: "variable", foreground: "7c3aed" },
+      { token: "variable.reference", foreground: "2563eb" },
+      { token: "parameter", foreground: "9333ea" },
       { token: "attribute.name", foreground: "1d4ed8" },
+      { token: "property", foreground: "1d4ed8" },
       { token: "keyword.status", foreground: "b45309" },
       { token: "number.quantity", foreground: "047857" },
+      { token: "number", foreground: "047857" },
+      { token: "string.chem", foreground: "0f766e" },
       { token: "comment", foreground: "94a3b8", fontStyle: "italic" },
       { token: "string", foreground: "be123c" }
     ],
@@ -333,11 +421,20 @@ const defineChemdTheme = (monaco: Monaco): void => {
     inherit: true,
     rules: [
       { token: "delimiter.frontmatter", foreground: "94a3b8", fontStyle: "bold" },
+      { token: "delimiter.block", foreground: "2dd4bf", fontStyle: "bold" },
+      { token: "keyword", foreground: "2dd4bf", fontStyle: "bold" },
       { token: "keyword.block", foreground: "2dd4bf", fontStyle: "bold" },
-      { token: "tag.identifier", foreground: "c4b5fd" },
+      { token: "identifier.declaration", foreground: "c4b5fd" },
+      { token: "identifier.reference", foreground: "93c5fd" },
+      { token: "variable", foreground: "c4b5fd" },
+      { token: "variable.reference", foreground: "93c5fd" },
+      { token: "parameter", foreground: "d8b4fe" },
       { token: "attribute.name", foreground: "93c5fd" },
+      { token: "property", foreground: "93c5fd" },
       { token: "keyword.status", foreground: "fbbf24" },
       { token: "number.quantity", foreground: "86efac" },
+      { token: "number", foreground: "86efac" },
+      { token: "string.chem", foreground: "5eead4" },
       { token: "comment", foreground: "64748b", fontStyle: "italic" },
       { token: "string", foreground: "fda4af" }
     ],
@@ -368,6 +465,7 @@ const registerChemdLanguage = (monaco: Monaco): void => {
   registerChemdCodeActionProvider(monaco, CHEMD_LANGUAGE_ID);
   registerChemdCompletionProvider(monaco, CHEMD_LANGUAGE_ID);
   registerChemdNavigationProviders(monaco, CHEMD_LANGUAGE_ID);
+  registerChemdSemanticProviders(monaco, CHEMD_LANGUAGE_ID);
 };
 
 export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemdEditorProps>(function MonacoChemdEditor({
@@ -389,6 +487,7 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
   const cursorDisposableRef = useRef<{ dispose: () => void } | null>(null);
   const blurDisposableRef = useRef<{ dispose: () => void } | null>(null);
   const contentDisposableRef = useRef<{ dispose: () => void } | null>(null);
+  const fencePairDecorationIdsRef = useRef<string[]>([]);
   const undoRedoNotifyTimeoutRef = useRef<number | null>(null);
   const onSaveRef = useRef(onSave);
   const onBlurSaveRef = useRef(onBlurSave);
@@ -407,10 +506,12 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
     updateChemdCodeActionOutput(modelPath, compileOutput);
     updateChemdCompletionOutput(modelPath, compileOutput);
     updateChemdNavigationOutput(modelPath, compileOutput);
+    updateChemdSemanticTokenOutput(modelPath, compileOutput);
     return () => {
       cleanupChemdCodeActionOutput(modelPath, compileOutput);
       cleanupChemdCompletionOutput(modelPath, compileOutput);
       cleanupChemdNavigationOutput(modelPath, compileOutput);
+      cleanupChemdSemanticTokenOutput(modelPath, compileOutput);
     };
   }, [compileOutput, modelPath]);
 
@@ -454,6 +555,7 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
     cursorDisposableRef.current?.dispose();
     blurDisposableRef.current?.dispose();
     contentDisposableRef.current?.dispose();
+    fencePairDecorationIdsRef.current = [];
     if (undoRedoNotifyTimeoutRef.current !== null) {
       window.clearTimeout(undoRedoNotifyTimeoutRef.current);
     }
@@ -499,6 +601,38 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
 
     monaco.editor.setModelMarkers(model, CHEMD_MARKER_OWNER, markers);
   }, [markers]);
+
+  const updateFencePairDecorations = useCallback((lineNumber?: number) => {
+    const editorInstance = editorRef.current;
+    const monaco = monacoRef.current;
+    const model = editorInstance?.getModel();
+
+    if (!editorInstance || !monaco || !model) {
+      return;
+    }
+
+    const currentLine = lineNumber ?? editorInstance.getPosition()?.lineNumber;
+    const pair = currentLine
+      ? findChemdFencePairAtLine(parseChemdBlockStructure(model.getValue()), currentLine)
+      : undefined;
+    if (!currentLine) {
+      fencePairDecorationIdsRef.current = editorInstance.deltaDecorations(
+        fencePairDecorationIdsRef.current,
+        []
+      );
+      return;
+    }
+
+    const decorations = [
+      ...createBlockScopeDecorations(monaco, model, currentLine),
+      ...(pair ? createFencePairDecorations(monaco, model, pair) : [])
+    ];
+
+    fencePairDecorationIdsRef.current = editorInstance.deltaDecorations(
+      fencePairDecorationIdsRef.current,
+      decorations
+    );
+  }, []);
 
   useEffect(() => {
     syncMarkers();
@@ -548,6 +682,7 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
         lineNumber: event.position.lineNumber,
         column: event.position.column
       });
+      updateFencePairDecorations(event.position.lineNumber);
     });
     const position = editorInstance.getPosition();
     if (position) {
@@ -564,10 +699,18 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
     });
     contentDisposableRef.current = editorInstance.onDidChangeModelContent(() => {
       scheduleUndoRedoStateNotification();
+      updateFencePairDecorations();
     });
     notifyUndoRedoState();
     syncMarkers();
-  }, [notifyUndoRedoState, onCursorPositionChange, scheduleUndoRedoStateNotification, syncMarkers]);
+    updateFencePairDecorations();
+  }, [
+    notifyUndoRedoState,
+    onCursorPositionChange,
+    scheduleUndoRedoStateNotification,
+    syncMarkers,
+    updateFencePairDecorations,
+  ]);
 
   useEffect(() => {
     monacoRef.current?.editor.setTheme(monacoThemeId);
@@ -609,6 +752,7 @@ export const MonacoChemdEditor = forwardRef<MonacoChemdEditorHandle, MonacoChemd
     renderWhitespace: "selection",
     padding: { bottom: scrollBottomPadding },
     scrollBeyondLastLine: false,
+    "semanticHighlighting.enabled": true,
     smoothScrolling: true,
     stickyScroll: {
       defaultModel: "foldingProviderModel",

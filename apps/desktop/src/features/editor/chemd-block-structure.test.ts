@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  findChemdFencePairAtLine,
   findChemdBlockPathAtLine,
   flattenChemdBlockStructure,
   parseChemdBlockStructure,
@@ -110,5 +111,25 @@ describe("Chemd editor block structure", () => {
     ]);
     expect(findChemdBlockPathAtLine(roots, 6).map((node) => node.label))
       .toEqual(["procedure proc-main", "step s-heat"]);
+  });
+
+  it("finds matching fenced block delimiters without treating inline children as fences", () => {
+    const roots = parseChemdBlockStructure(inlineSource);
+
+    expect(findChemdFencePairAtLine(roots, 1)).toEqual({
+      blockType: "procedure",
+      label: "procedure proc-main",
+      openLine: 1,
+      closeLine: 7,
+    });
+    expect(findChemdFencePairAtLine(roots, 7)?.openLine).toBe(1);
+    expect(findChemdFencePairAtLine(roots, 3)).toBeUndefined();
+  });
+
+  it("does not synthesize a fence pair for an unclosed block", () => {
+    const roots = parseChemdBlockStructure(":::procedure #open\nstep: charge\n");
+
+    expect(roots[0]?.hasClosingFence).toBe(false);
+    expect(findChemdFencePairAtLine(roots, 1)).toBeUndefined();
   });
 });

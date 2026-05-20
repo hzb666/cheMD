@@ -1,4 +1,5 @@
 import type { CompileOptions, CompileResult } from "@chemd/compiler";
+import type { ChemdSemanticToken } from "./semantic-tokens";
 
 export interface ChemdSourceRange {
   startLine: number;
@@ -74,6 +75,7 @@ interface ChemdLanguageCompileOutputBase {
   compiledAt: string;
   diagnostics: ChemdEditorDiagnostic[];
   outline: ChemdOutlineItem[];
+  semanticTokens: ChemdSemanticToken[];
   symbols: ChemdSymbol[];
 }
 

@@ -1,0 +1,94 @@
+---
+title: Export Outputs
+description: The Chemd export menu, output formats, and when to use each projection.
+---
+
+Chemd exports are projections of one compiled document or a set of compiled documents. They all start from the same parser, resolver, typechecker, step graph, runtime plan, and render profile pipeline, but each format keeps a different amount of structure.
+
+## Format Overview
+
+| Output | Main command or field | Use it for |
+| --- | --- | --- |
+| HTML | `compileChemd(source).html` | Browser preview, web publishing, and human review |
+| JSON + semantic graph | `pnpm chemd export file.chemd --format json` | Structured AST-like output plus typed semantic graph |
+| DOCX bridge | `compileChemd(source).docxBridge` | Markdown-to-DOCX conversion through the Node bridge |
+| LNF | `pnpm chemd export file.chemd --format lnf` | Canonical lab/runtime facts, step graph, controls, and preflight summaries |
+| Training full | `pnpm chemd export file.chemd --format training-full` | Audit-capable source, semantic, learning, and quality layers |
+| Training understanding | `pnpm chemd export file.chemd --format training` | Sanitized training and reasoning projection |
+| RAG | `pnpm chemd export file.chemd --format rag` | Retrieval chunks and search metadata |
+| Graph index | `pnpm chemd graph *.chemd --format json` | Cross-document graph, reaction clusters, and reaction map input |
+
+## Shared Compile Outputs
+
+`compileChemd` returns these export-facing fields:
+
+```ts
+const result = compileChemd(source);
+
+result.html;
+result.json;
+result.docxBridge;
+result.lnf;
+result.ragExport;
+result.trainingUnderstanding;
+result.trainingExport;
+result.typedSemanticGraph;
+result.stepGraph;
+```
+
+The CLI `export` command exposes `json`, `lnf`, `rag`, `training`, and `training-full`. HTML and DOCX are compile/app outputs rather than current CLI `export --format` values. The `graph` command compiles multiple files and builds a graph index from their training understandings.
+
+## Minimal Source Example
+
+The examples in this section use a compact source record:
+
+```md
+---
+id: exp-export-example
+title: Export example
+date: 2026-05-21
+primary_reaction: rxn-main
+primary_result: res-main
+---
+
+:::chemd #mol-a
+name: substrate A
+smiles: CCO
+:::
+
+:::chemd #mol-b
+name: product B
+smiles: CC=O
+:::
+
+:::chemd #rxn-main
+reactant: @mol-a | 1.0 mmol | 1.0 eq | limiting=true
+product: @mol-b
+solvent: MeCN
+temperature: 60 C
+:::
+
+:::result #res-main
+reaction: @rxn-main
+status: success
+yield: 78 %
+:::
+
+:::analysis #nmr-main
+type: nmr
+ref: @res-main
+artifact: @raw-nmr-main
+:::
+
+:::procedure #proc-main
+reaction: @rxn-main
+step: add | id=s-add | inputs=@mol-a | outputs=mixture-main
+:::
+
+:::observation #obs-main
+ref: @rxn-main
+event: color_change | id=e-color | linkedStep=s-add | evidence=@nmr-main | color=yellow
+:::
+```
+
+Use the following pages for the detailed structures and examples.

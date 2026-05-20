@@ -1,0 +1,238 @@
+---
+title: 图谱与 Reaction Map 导出
+description: Knowledge graph、material flow、graph index、reaction map 和 reaction intelligence 输出。
+---
+
+图谱输出来自 training understanding。它们描述单文档内部关系和跨文档关系。
+
+```bash
+pnpm chemd graph ./experiments/*.chemd --format json
+```
+
+## Knowledge Graph
+
+`training.knowledge_graph` 是单文档图谱。它包含：
+
+- document、molecule、material、reaction、result、analysis、sample、artifact、condition variation、condition attempt、narrative block、procedure、procedure step、observation、observation event、field value 和 normalized value 节点
+- 来自 semantic relations、procedure logic、observation logic、field evidence 和 normalization 的边
+- `field_evidence`
+- `missing_logic`
+
+示例：
+
+```json
+{
+  "nodes": [
+    { "node_id": "reaction::rxn-main", "node_type": "reaction", "original_id": "rxn-main" },
+    { "node_id": "result::res-main", "node_type": "result", "original_id": "res-main" },
+    { "node_id": "procedure-step::s-add", "node_type": "procedure_step", "label": "add" },
+    { "node_id": "observation-event::e-color", "node_type": "observation_event", "label": "color_change" }
+  ],
+  "edges": [
+    {
+      "edge_type": "result_describes_reaction",
+      "from_node_id": "result::res-main",
+      "to_node_id": "reaction::rxn-main",
+      "edge_source": "semantic_relation"
+    },
+    {
+      "edge_type": "event_observed_step",
+      "from_node_id": "observation-event::e-color",
+      "to_node_id": "procedure-step::s-add",
+      "edge_source": "observation_logic"
+    }
+  ],
+  "field_evidence": [
+    {
+      "subject_entity_id": "result::res-main",
+      "field": "yield_percent",
+      "value": 78,
+      "normalized": true,
+      "evidence_entity_ids": ["analysis::nmr-main"]
+    }
+  ],
+  "missing_logic": []
+}
+```
+
+Observation 不是只能作为块级图谱事实。`observation_to_events` 会降低作者写入的 event record，这些 event 节点可以连接 procedure step 或 evidence。Trace record 是 runtime log 与 audit context；它不是主要实验图谱事实。
+
+## Material Flow 与 Step Dependencies
+
+`experiment_logic.material_flow_graph` 包含物料流节点和边。节点覆盖 molecules、reactions、results、analyses、samples、artifacts 和 procedure steps。
+
+`experiment_logic.step_dependencies` 记录 ordered step edges、explicit dependencies、material-flow dependencies、produced artifacts 和 observation-event links。
+
+`experiment_logic.reaction_routes` 记录 route membership、previous reaction IDs、next reaction IDs，以及 reaction 是 root、intermediate、leaf 还是 isolated。
+
+示例：
+
+```json
+{
+  "material_flow_graph": {
+    "nodes": [
+      { "node_id": "molecule::mol-a", "node_type": "molecule", "entity_id": "molecule::mol-a" },
+      { "node_id": "reaction::rxn-main", "node_type": "reaction", "entity_id": "reaction::rxn-main" },
+      { "node_id": "procedure-step::s-add", "node_type": "procedure_step", "step_id": "s-add" }
+    ],
+    "edges": [
+      {
+        "edge_type": "material_input_to_reaction",
+        "from_node_id": "molecule::mol-a",
+        "to_node_id": "reaction::rxn-main",
+        "logic_source": "explicit",
+        "confidence": "high"
+      },
+      {
+        "edge_type": "step_consumes_material",
+        "from_node_id": "molecule::mol-a",
+        "to_node_id": "procedure-step::s-add",
+        "logic_source": "explicit",
+        "confidence": "high"
+      }
+    ]
+  },
+  "step_dependencies": [
+    {
+      "dependency_type": "step_observed_by_event",
+      "source_step_id": "s-add",
+      "target_event_id": "e-color",
+      "reason": "Observation event links to the step.",
+      "logic_source": "explicit",
+      "confidence": "high"
+    }
+  ]
+}
+```
+
+## Training Graph Index
+
+`chemd graph` 返回 `ChemdTrainingGraphIndexV1`，schema version 为 `chemd-training-graph-index/v0.1`。
+
+它包含：
+
+- `index_scope`
+- `nodes`
+- `edges`
+- `reaction_features`
+- `reaction_clusters`
+- `reaction_similarity_edges`
+- `warnings`
+
+示例：
+
+```json
+{
+  "schema_version": "chemd-training-graph-index/v0.1",
+  "index_scope": {
+    "document_ids": ["exp-export-example"],
+    "sources": [{ "document_id": "exp-export-example", "file_path": "exp.chemd" }]
+  },
+  "reaction_features": [
+    {
+      "reaction_entity_id": "reaction::rxn-main",
+      "document_id": "exp-export-example",
+      "reaction_signature": "mol-a>>mol-b",
+      "participant_signature": "mol-a|mol-b",
+      "fingerprint_status": "not_available",
+      "chemistry_feature_ref_ids": [],
+      "cluster_keys": [
+        { "basis": "reaction_signature", "key": "mol-a>>mol-b" }
+      ],
+      "changed_variable_fields": ["temperature"],
+      "controlled_variable_fields": ["solvent"],
+      "route_id": "route-a"
+    }
+  ],
+  "reaction_clusters": [
+    {
+      "cluster_id": "reaction-cluster::reaction_signature::mol-a--mol-b",
+      "basis": "reaction_signature",
+      "key": "mol-a>>mol-b",
+      "member_reaction_entity_ids": ["reaction::rxn-main"],
+      "document_ids": ["exp-export-example"],
+      "confidence": "high",
+      "shared_features": ["reaction_signature"],
+      "warnings": []
+    }
+  ],
+  "reaction_similarity_edges": [],
+  "warnings": ["computed_reaction_fingerprints_not_available"]
+}
+```
+
+## Reaction Map
+
+`@chemd/reaction-map` 会把 graph index 转为用于可视化的 `chemd-reaction-cluster-layout/v0.1`。
+
+```ts
+import { buildReactionMapFromGraphIndex } from "@chemd/reaction-map";
+
+const layout = buildReactionMapFromGraphIndex(graphIndex);
+```
+
+示例：
+
+```json
+{
+  "schema_version": "chemd-reaction-cluster-layout/v0.1",
+  "layout_engine": "deterministic_fallback",
+  "nodes": [
+    {
+      "reaction_entity_id": "reaction::rxn-main",
+      "cluster_id": "reaction-cluster::reaction_signature::mol-a--mol-b",
+      "x": 0,
+      "y": 0,
+      "quality_tier": "semantic"
+    }
+  ],
+  "edges": [],
+  "clusters": [
+    {
+      "cluster_id": "reaction-cluster::reaction_signature::mol-a--mol-b",
+      "label": "mol-a>>mol-b",
+      "basis": "reaction_signature",
+      "member_count": 1
+    }
+  ],
+  "input_summary": {
+    "reaction_count": 1,
+    "edge_count": 0,
+    "cluster_count": 1,
+    "singleton_count": 1
+  }
+}
+```
+
+## Reaction Intelligence
+
+Reaction intelligence 会用计算特征和 similarity edges 增强 graph-index reactions。
+
+输出包括：
+
+- `ReactionIntelligenceJob`
+- `ReactionIntelligenceArtifact`
+- `ChemdReactionIntelligenceGraphIndex`
+
+Provider 可以包括 semantic similarity、DRFP、RDKit fingerprints、RXNMapper、RXNFP、reaction center detection 和 TMAP layout。
+
+示例：
+
+```json
+{
+  "schema_version": "chemd-reaction-intelligence-artifact/v0.1",
+  "artifact_id": "artifact::reaction-intelligence::exp-export-example",
+  "job_id": "job::reaction-intelligence::exp-export-example",
+  "provider_statuses": [
+    {
+      "provider": "rdkit_fingerprint",
+      "status": "SKIP",
+      "reason_code": "provider_unavailable",
+      "warnings": ["rdkit_not_installed"]
+    }
+  ],
+  "computed_features": [],
+  "computed_similarity_edges": [],
+  "warnings": ["computed_features_unavailable"]
+}
+```

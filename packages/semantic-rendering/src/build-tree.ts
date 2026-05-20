@@ -42,13 +42,18 @@ const typeToRenderableNodeType = (type: unknown): ChemdRenderableNodeTypeV1 => {
     case "batch": return "ChemdBatchNode";
     case "reaction": return "ChemdReactionNode";
     case "condition_varies": return "ChemdConditionNode";
+    case "condition_variation_attempt": return "ChemdConditionAttemptNode";
     case "procedure": return "ChemdProcedureNode";
     case "step": return "ChemdProcedureStepNode";
+    case "control": return "ChemdProcedureControlNode";
     case "result": return "ChemdResultNode";
     case "analysis": return "ChemdAnalysisNode";
     case "sample": return "ChemdSampleNode";
     case "artifact": return "ChemdArtifactNode";
     case "observation": return "ChemdEvidenceNode";
+    case "event": return "ChemdObservationEventNode";
+    case "trace": return "ChemdTraceNode";
+    case "trace_event": return "ChemdTraceEventNode";
     case "template": return "ChemdTemplateNode";
     case "col": return "ChemdColumnNode";
     default: return "ChemdUnknownNode";
@@ -65,6 +70,10 @@ const directiveForType = (nodeType: ChemdRenderableNodeTypeV1): ChemdRenderDirec
       return { mode: "block", component: "ReactionBlock", hydrate: "visible", priority: "normal" };
     case "ChemdEvidenceNode":
       return { mode: "panel", component: "EvidencePanel", hydrate: "manual", priority: "deferred" };
+    case "ChemdTraceNode":
+      return { mode: "panel", component: "TraceLogPanel", hydrate: "never", priority: "deferred" };
+    case "ChemdTraceEventNode":
+      return { mode: "panel", component: "TraceEventPanel", hydrate: "never", priority: "deferred" };
     case "ChemdUnknownNode":
       return { mode: "block", component: "UnknownChemdNode", hydrate: "never", priority: "normal", fallback: "Unsupported Chemd node" };
     default:
@@ -104,7 +113,7 @@ const getSemanticId = (record: PlainRecord, nodeType: ChemdRenderableNodeTypeV1)
   if (nodeType === "ChemdDocumentNode" && isRecord(record.meta)) {
     return getStringField(record.meta, ["id"]);
   }
-  return getStringField(record, ["id", "stepId", "eventId", "name", "template"]);
+  return getStringField(record, ["id", "stepId", "controlId", "eventId", "name", "template"]);
 };
 
 const buildNodeId = (
@@ -143,9 +152,24 @@ const buildAttrs = (record: PlainRecord, nodeType: ChemdRenderableNodeTypeV1): R
   return attrs;
 };
 
+const arrayField = (value: unknown): unknown[] =>
+  Array.isArray(value) ? value : [];
+
 const collectChildInputs = (record: PlainRecord): unknown[] => {
   if (Array.isArray(record.children)) {
     return record.children;
+  }
+  if (record.type === "condition_varies" && Array.isArray(record.attempts)) {
+    return record.attempts.map((attempt, index) => buildConditionAttemptInput(record, attempt, index));
+  }
+  if (record.type === "procedure") {
+    return [...arrayField(record.steps), ...arrayField(record.controls)];
+  }
+  if (record.type === "observation") {
+    return arrayField(record.events);
+  }
+  if (record.type === "trace") {
+    return arrayField(record.events);
   }
   if (Array.isArray(record.body)) {
     return record.body;
@@ -154,6 +178,24 @@ const collectChildInputs = (record: PlainRecord): unknown[] => {
     return record.steps;
   }
   return [];
+};
+
+const buildConditionAttemptInput = (
+  parent: PlainRecord,
+  attempt: unknown,
+  index: number
+): unknown => {
+  if (!isRecord(attempt)) {
+    return attempt;
+  }
+  const parentId = getStringField(parent, ["id"]) ?? "condition";
+  const attemptId = getStringField(attempt, ["id"]) ?? `attempt-${index + 1}`;
+  return {
+    ...attempt,
+    type: "condition_variation_attempt",
+    attempt_id: attemptId,
+    id: `${parentId}.${attemptId}`
+  };
 };
 
 const mapDiagnostic = (diagnostic: Diagnostic): ChemdNodeDiagnosticV1 => ({

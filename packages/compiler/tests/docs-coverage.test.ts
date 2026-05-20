@@ -143,6 +143,109 @@ describe("docs coverage", () => {
     }
   });
 
+  it("keeps the syntax-block index field reference aligned with parser fields", () => {
+    const coverage = parserFieldCoverage();
+
+    for (const lang of ["en", "zh"] as const) {
+      const content = readDocsFile(lang, "syntax-blocks", "index.mdx");
+      const requiredLabel = lang === "en" ? "required" : "必填";
+      const defaultLabel = lang === "en" ? "defaults" : "默认值";
+
+      expect(content, `${lang}/syntax-blocks/index.mdx should explain required fields`).toContain(requiredLabel);
+      expect(content, `${lang}/syntax-blocks/index.mdx should explain defaults`).toContain(defaultLabel);
+
+      for (const [page, fields] of Object.entries(coverage)) {
+        expect(content, `${lang}/syntax-blocks/index.mdx should mention :::${page}`).toContain(`:::${page}`);
+
+        for (const field of uniqueSorted(fields)) {
+          expect(content, `${lang}/syntax-blocks/index.mdx should mention ${page}.${field}`).toContain(field);
+        }
+      }
+    }
+  });
+
+  it("documents TLC spot marker shape, size, and intensity syntax", () => {
+    for (const lang of ["en", "zh"] as const) {
+      const content = readDocsFile(lang, "syntax-blocks", "analysis.mdx");
+
+      for (const token of ["^3(4)", "size_rank", "intensity_rank", "circle", "up", "down"]) {
+        expect(content, `${lang}/syntax-blocks/analysis.mdx should document TLC marker ${token}`).toContain(token);
+      }
+    }
+  });
+
+  it("documents exporter and graph output contracts", () => {
+    const requiredTerms = [
+      "compileChemd(source).html",
+      "pnpm chemd export file.chemd --format json",
+      "compileChemd(source).docxBridge",
+      "chemd-lnf/v0.5",
+      "ChemdTrainingExportV2",
+      "chemd-training-export/v0.2",
+      "source_layer",
+      "semantic_layer",
+      "learning_layer",
+      "quality_layer",
+      "molecules",
+      "materials",
+      "batches",
+      "reactions",
+      "results",
+      "analyses",
+      "samples",
+      "artifacts",
+      "condition_variations",
+      "condition_variation_attempts",
+      "markdown_blocks",
+      "links",
+      "lnf",
+      "normalized_analysis",
+      "normalized_tlc",
+      "retrieval_chunks",
+      "prediction_instances",
+      "procedure_to_steps",
+      "observation_to_events",
+      "ChemdTrainingUnderstandingV1",
+      "chemd-training-understanding/v0.1",
+      "ChemdRagExportV1",
+      "chemd-rag-export/v0.1",
+      "ChemdTrainingTaskDatasetV1",
+      "ChemdTrainingCampaignV1",
+      "ChemdTrainingCampaignTaskDatasetV1",
+      "ChemdTrainingAnnotationPatchV1",
+      "knowledge_graph",
+      "material_flow_graph",
+      "step_dependencies",
+      "reaction_routes",
+      "ChemdTrainingGraphIndexV1",
+      "chemd-training-graph-index/v0.1",
+      "reaction_features",
+      "reaction_clusters",
+      "reaction_similarity_edges",
+      "chemd-reaction-cluster-layout/v0.1",
+      "ReactionIntelligenceJob",
+      "ReactionIntelligenceArtifact",
+      "ChemdReactionIntelligenceGraphIndex"
+    ];
+
+    for (const lang of ["en", "zh"] as const) {
+      const rootMeta = JSON.parse(readDocsFile(lang, "meta.json")) as { pages: string[] };
+      const exportsMeta = JSON.parse(readDocsFile(lang, "exports", "meta.json")) as { pages: string[] };
+      const content = ["index", ...exportsMeta.pages]
+        .map((page) => readDocsFile(lang, "exports", `${page}.mdx`))
+        .join("\n");
+
+      expect(rootMeta.pages, `${lang}/meta.json should include exports`).toContain("exports");
+      for (const page of ["html", "json-semantic", "docx", "lnf", "training-rag", "graph-reaction-map"]) {
+        expect(exportsMeta.pages, `${lang}/exports/meta.json should include ${page}`).toContain(page);
+      }
+
+      for (const term of requiredTerms) {
+        expect(content, `${lang}/exports should mention ${term}`).toContain(term);
+      }
+    }
+  });
+
   it("documents source diagnostic codes in both diagnostic-code appendices", () => {
     const diagnosticCodes = extractDiagnosticCodesFromSource();
 

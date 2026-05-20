@@ -1,0 +1,238 @@
+---
+title: Graph and Reaction Map Exports
+description: Knowledge graph, material flow, graph index, reaction map, and reaction intelligence outputs.
+---
+
+Graph outputs are built from training understandings. They describe relationships inside one document and across multiple documents.
+
+```bash
+pnpm chemd graph ./experiments/*.chemd --format json
+```
+
+## Knowledge Graph
+
+`training.knowledge_graph` is per document. It contains:
+
+- nodes for document, molecule, material, reaction, result, analysis, sample, artifact, condition variation, condition attempt, narrative block, procedure, procedure step, observation, observation event, field value, and normalized value
+- edges from semantic relations, procedure logic, observation logic, field evidence, and normalization
+- `field_evidence`
+- `missing_logic`
+
+Example:
+
+```json
+{
+  "nodes": [
+    { "node_id": "reaction::rxn-main", "node_type": "reaction", "original_id": "rxn-main" },
+    { "node_id": "result::res-main", "node_type": "result", "original_id": "res-main" },
+    { "node_id": "procedure-step::s-add", "node_type": "procedure_step", "label": "add" },
+    { "node_id": "observation-event::e-color", "node_type": "observation_event", "label": "color_change" }
+  ],
+  "edges": [
+    {
+      "edge_type": "result_describes_reaction",
+      "from_node_id": "result::res-main",
+      "to_node_id": "reaction::rxn-main",
+      "edge_source": "semantic_relation"
+    },
+    {
+      "edge_type": "event_observed_step",
+      "from_node_id": "observation-event::e-color",
+      "to_node_id": "procedure-step::s-add",
+      "edge_source": "observation_logic"
+    }
+  ],
+  "field_evidence": [
+    {
+      "subject_entity_id": "result::res-main",
+      "field": "yield_percent",
+      "value": 78,
+      "normalized": true,
+      "evidence_entity_ids": ["analysis::nmr-main"]
+    }
+  ],
+  "missing_logic": []
+}
+```
+
+Observation is not only a block-level graph fact. `observation_to_events` lowers authored event records, and those event nodes can link to procedure steps or evidence. Trace records are runtime logs and audit context; they are not primary experiment graph facts.
+
+## Material Flow and Step Dependencies
+
+`experiment_logic.material_flow_graph` contains material-flow nodes and edges. Nodes cover molecules, reactions, results, analyses, samples, artifacts, and procedure steps.
+
+`experiment_logic.step_dependencies` records ordered step edges, explicit dependencies, material-flow dependencies, produced artifacts, and observation-event links.
+
+`experiment_logic.reaction_routes` records route membership, previous reaction IDs, next reaction IDs, and whether a reaction is root, intermediate, leaf, or isolated.
+
+Example:
+
+```json
+{
+  "material_flow_graph": {
+    "nodes": [
+      { "node_id": "molecule::mol-a", "node_type": "molecule", "entity_id": "molecule::mol-a" },
+      { "node_id": "reaction::rxn-main", "node_type": "reaction", "entity_id": "reaction::rxn-main" },
+      { "node_id": "procedure-step::s-add", "node_type": "procedure_step", "step_id": "s-add" }
+    ],
+    "edges": [
+      {
+        "edge_type": "material_input_to_reaction",
+        "from_node_id": "molecule::mol-a",
+        "to_node_id": "reaction::rxn-main",
+        "logic_source": "explicit",
+        "confidence": "high"
+      },
+      {
+        "edge_type": "step_consumes_material",
+        "from_node_id": "molecule::mol-a",
+        "to_node_id": "procedure-step::s-add",
+        "logic_source": "explicit",
+        "confidence": "high"
+      }
+    ]
+  },
+  "step_dependencies": [
+    {
+      "dependency_type": "step_observed_by_event",
+      "source_step_id": "s-add",
+      "target_event_id": "e-color",
+      "reason": "Observation event links to the step.",
+      "logic_source": "explicit",
+      "confidence": "high"
+    }
+  ]
+}
+```
+
+## Training Graph Index
+
+`chemd graph` returns `ChemdTrainingGraphIndexV1` with schema version `chemd-training-graph-index/v0.1`.
+
+It contains:
+
+- `index_scope`
+- `nodes`
+- `edges`
+- `reaction_features`
+- `reaction_clusters`
+- `reaction_similarity_edges`
+- `warnings`
+
+Example:
+
+```json
+{
+  "schema_version": "chemd-training-graph-index/v0.1",
+  "index_scope": {
+    "document_ids": ["exp-export-example"],
+    "sources": [{ "document_id": "exp-export-example", "file_path": "exp.chemd" }]
+  },
+  "reaction_features": [
+    {
+      "reaction_entity_id": "reaction::rxn-main",
+      "document_id": "exp-export-example",
+      "reaction_signature": "mol-a>>mol-b",
+      "participant_signature": "mol-a|mol-b",
+      "fingerprint_status": "not_available",
+      "chemistry_feature_ref_ids": [],
+      "cluster_keys": [
+        { "basis": "reaction_signature", "key": "mol-a>>mol-b" }
+      ],
+      "changed_variable_fields": ["temperature"],
+      "controlled_variable_fields": ["solvent"],
+      "route_id": "route-a"
+    }
+  ],
+  "reaction_clusters": [
+    {
+      "cluster_id": "reaction-cluster::reaction_signature::mol-a--mol-b",
+      "basis": "reaction_signature",
+      "key": "mol-a>>mol-b",
+      "member_reaction_entity_ids": ["reaction::rxn-main"],
+      "document_ids": ["exp-export-example"],
+      "confidence": "high",
+      "shared_features": ["reaction_signature"],
+      "warnings": []
+    }
+  ],
+  "reaction_similarity_edges": [],
+  "warnings": ["computed_reaction_fingerprints_not_available"]
+}
+```
+
+## Reaction Map
+
+`@chemd/reaction-map` turns the graph index into `chemd-reaction-cluster-layout/v0.1` for visualization.
+
+```ts
+import { buildReactionMapFromGraphIndex } from "@chemd/reaction-map";
+
+const layout = buildReactionMapFromGraphIndex(graphIndex);
+```
+
+Example:
+
+```json
+{
+  "schema_version": "chemd-reaction-cluster-layout/v0.1",
+  "layout_engine": "deterministic_fallback",
+  "nodes": [
+    {
+      "reaction_entity_id": "reaction::rxn-main",
+      "cluster_id": "reaction-cluster::reaction_signature::mol-a--mol-b",
+      "x": 0,
+      "y": 0,
+      "quality_tier": "semantic"
+    }
+  ],
+  "edges": [],
+  "clusters": [
+    {
+      "cluster_id": "reaction-cluster::reaction_signature::mol-a--mol-b",
+      "label": "mol-a>>mol-b",
+      "basis": "reaction_signature",
+      "member_count": 1
+    }
+  ],
+  "input_summary": {
+    "reaction_count": 1,
+    "edge_count": 0,
+    "cluster_count": 1,
+    "singleton_count": 1
+  }
+}
+```
+
+## Reaction Intelligence
+
+Reaction intelligence enriches graph-index reactions with computed features and similarity edges.
+
+Outputs include:
+
+- `ReactionIntelligenceJob`
+- `ReactionIntelligenceArtifact`
+- `ChemdReactionIntelligenceGraphIndex`
+
+Providers can include semantic similarity, DRFP, RDKit fingerprints, RXNMapper, RXNFP, reaction center detection, and TMAP layout.
+
+Example:
+
+```json
+{
+  "schema_version": "chemd-reaction-intelligence-artifact/v0.1",
+  "artifact_id": "artifact::reaction-intelligence::exp-export-example",
+  "job_id": "job::reaction-intelligence::exp-export-example",
+  "provider_statuses": [
+    {
+      "provider": "rdkit_fingerprint",
+      "status": "SKIP",
+      "reason_code": "provider_unavailable",
+      "warnings": ["rdkit_not_installed"]
+    }
+  ],
+  "computed_features": [],
+  "computed_similarity_edges": [],
+  "warnings": ["computed_features_unavailable"]
+}
+```

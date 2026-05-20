@@ -17,9 +17,11 @@ The mixture turned deep red after n-BuLi addition.
 
 ## 字段
 
-| 字段 | 必填 | 说明 |
-| --- | --- | --- |
-| `ref` | 否 | 观察目标引用 |
+| 字段 | 必填 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `ref` | 否 | 无 | 观察目标引用 |
+| `event:` 子行 | 否 | 无 | 在当前 observation 内创建结构化 event |
+| 嵌套 `:::event` | 否 | 无 | 在当前 observation 内创建结构化 event 块 |
 
 `observation` 没有 resolver 必填字段。若未写显式 event，typechecker 会把正文交给 step ontology lowering 生成观察事件。
 
@@ -46,6 +48,27 @@ A white solid appeared after water addition.
 ```
 
 嵌套 event header 也接受裸 ID，例如 `:::event e-color`。如果 header 与字段都没有提供 ID，parser 会生成 `<observation-id>:eN`。
+
+### Event 字段
+
+| 字段 | 必填 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `id` | 否 | 省略时为 `<observation-id>:eN` | event ID；别名：`event_id` |
+| `type` | 是 | 无 | event 类型；别名：`eventType`、`event_type` |
+| `stage` | 否 | 无 | 实验阶段 |
+| `timepoint` | 否 | 无 | 时间点或相对步骤位置 |
+| `severity` | 否 | 无 | 定性严重程度 |
+| `linked_step` | 否 | 无 | 关联 step ID；别名：`linkedStep` |
+| `evidence` | 否 | 无 | 逗号分隔的 evidence ID |
+| `confidence` | 否 | 无 | 数值置信度 |
+| 其他字段 | 否 | 无 | 存入 event `params`；`value`、`color` 或 `state` 可成为归一化值候选 |
+
+行内 event 默认把第一个片段作为类型；也可以显式写成 `type=...`：
+
+```md
+event: color_change | id=e-color | color=orange | linkedStep=s-add
+event: type=phase_change | id=e-phase | value=clear upper layer
+```
 
 ## 诊断
 

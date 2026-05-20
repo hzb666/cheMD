@@ -64,6 +64,56 @@ describe("semantic render tree", () => {
     ]);
   });
 
+  it("renders condition attempts, observation events, controls, and trace logs as first-class nodes", () => {
+    const tree = buildSemanticRenderTree(createDocument([
+      {
+        type: "condition_varies",
+        id: "screen-1",
+        attempts: [{
+          id: "a1",
+          raw: "temp=80 C",
+          result: "res-1",
+          changes: [],
+          condition: []
+        }]
+      },
+      {
+        type: "procedure",
+        id: "proc-1",
+        steps: [{ type: "step", stepId: "s1", family: "add" }],
+        controls: [{ type: "control", controlId: "repeat-1", kind: "repeat", children: [] }]
+      },
+      {
+        type: "observation",
+        id: "obs-1",
+        events: [{ type: "event", eventId: "evt-1", eventType: "color", linkedStepId: "s1" }]
+      },
+      {
+        type: "trace",
+        id: "trace-1",
+        events: [{ type: "trace_event", eventId: "log-1", eventType: "started", stepId: "s1" }]
+      }
+    ]));
+
+    expect(tree.nodes.map((node) => node.node_type)).toEqual(expect.arrayContaining([
+      "ChemdConditionNode",
+      "ChemdConditionAttemptNode",
+      "ChemdProcedureControlNode",
+      "ChemdObservationEventNode",
+      "ChemdTraceNode",
+      "ChemdTraceEventNode"
+    ]));
+    expect(tree.nodes.find((node) => node.node_type === "ChemdConditionAttemptNode")).toMatchObject({
+      node_id: "condition-attempt::screen-1.a1",
+      semantic_id: "screen-1.a1",
+      attrs: {
+        attempt_id: "a1",
+        result: "res-1"
+      }
+    });
+    expect(tree.nodes.filter((node) => node.node_type === "ChemdUnknownNode")).toEqual([]);
+  });
+
   it("preserves source ranges and compiler diagnostics", () => {
     const document = createDocument([
       {

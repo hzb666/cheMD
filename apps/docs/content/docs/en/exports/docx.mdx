@@ -1,0 +1,63 @@
+---
+title: DOCX Bridge Export
+description: Markdown-to-DOCX bridge payloads and Node DOCX export behavior.
+---
+
+DOCX export has two layers:
+
+- `compileChemd(source).docxBridge`: JSON bridge payload for app integrations
+- `compileChemdToDocx` from `@chemd/compiler/node`: Node-only path that writes a `.docx` through Pandoc
+
+The bridge is produced by `@chemd/renderer-docx`.
+
+## Bridge Payload
+
+The bridge payload contains:
+
+- `document`: document ID, title, date, and rendered Markdown
+- `render`: render profile and adapter payload data
+- `semantic.typedGraph`: present when typed graph is supplied
+- `exportHints`: `format: "docx-bridge"` and `pipeline: "html-or-markdown-to-docx"`
+
+Example:
+
+```json
+{
+  "document": {
+    "id": "exp-export-example",
+    "title": "Export example",
+    "date": "2026-05-21",
+    "markdown": "# Export example\n\n## Reaction rxn-main\n\n- Reactants: @mol-a..."
+  },
+  "semantic": {
+    "typedGraph": {
+      "documentId": "exp-export-example"
+    }
+  },
+  "exportHints": {
+    "format": "docx-bridge",
+    "pipeline": "html-or-markdown-to-docx"
+  }
+}
+```
+
+## Node DOCX Export
+
+Node export renders DOCX Markdown, writes a temporary Markdown file, and invokes Pandoc:
+
+```ts
+import { compileChemdToDocx } from "@chemd/compiler/node";
+
+await compileChemdToDocx(source, {
+  outputPath: "report.docx",
+  referenceDocPath: "reference.docx"
+});
+```
+
+`outputPath` must end with `.docx`. Optional `referenceDocPath` and `extraArgs` are passed to Pandoc.
+
+## Notes
+
+- DOCX bridge is a transport contract, not the final binary file.
+- The Node DOCX path requires a working Pandoc environment.
+- Use HTML when the target is browser preview. Use DOCX when the target is a word-processing document.

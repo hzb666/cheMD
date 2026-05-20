@@ -1,0 +1,94 @@
+---
+title: 导出输出
+description: Chemd 的导出菜单、输出格式，以及每种投影的使用场景。
+---
+
+Chemd 导出是对一个已编译文档或一组已编译文档的投影。它们都来自同一条 parser、resolver、typechecker、step graph、runtime plan 和 render profile 管线，但每种格式保留的结构不同。
+
+## 格式总览
+
+| 输出 | 主要命令或字段 | 适用场景 |
+| --- | --- | --- |
+| HTML | `compileChemd(source).html` | 浏览器预览、网页发布、人工审阅 |
+| JSON + semantic graph | `pnpm chemd export file.chemd --format json` | 类 AST 结构输出和 typed semantic graph |
+| DOCX bridge | `compileChemd(source).docxBridge` | 通过 Node bridge 进行 Markdown-to-DOCX 转换 |
+| LNF | `pnpm chemd export file.chemd --format lnf` | canonical lab/runtime facts、step graph、controls 和 preflight summaries |
+| Training full | `pnpm chemd export file.chemd --format training-full` | 可审计 source、semantic、learning 和 quality layers |
+| Training understanding | `pnpm chemd export file.chemd --format training` | sanitized training 与 reasoning projection |
+| RAG | `pnpm chemd export file.chemd --format rag` | retrieval chunks 和搜索 metadata |
+| Graph index | `pnpm chemd graph *.chemd --format json` | 跨文档 graph、reaction clusters 和 reaction map 输入 |
+
+## 共享编译输出
+
+`compileChemd` 返回这些导出相关字段：
+
+```ts
+const result = compileChemd(source);
+
+result.html;
+result.json;
+result.docxBridge;
+result.lnf;
+result.ragExport;
+result.trainingUnderstanding;
+result.trainingExport;
+result.typedSemanticGraph;
+result.stepGraph;
+```
+
+CLI `export` 命令暴露 `json`、`lnf`、`rag`、`training` 和 `training-full`。HTML 与 DOCX 是 compile/app 输出，不是当前 CLI `export --format` 值。`graph` 命令会编译多个文件，并从它们的 training understanding 构建 graph index。
+
+## 最小源文件示例
+
+本节示例使用下面的紧凑记录：
+
+```md
+---
+id: exp-export-example
+title: Export example
+date: 2026-05-21
+primary_reaction: rxn-main
+primary_result: res-main
+---
+
+:::chemd #mol-a
+name: substrate A
+smiles: CCO
+:::
+
+:::chemd #mol-b
+name: product B
+smiles: CC=O
+:::
+
+:::chemd #rxn-main
+reactant: @mol-a | 1.0 mmol | 1.0 eq | limiting=true
+product: @mol-b
+solvent: MeCN
+temperature: 60 C
+:::
+
+:::result #res-main
+reaction: @rxn-main
+status: success
+yield: 78 %
+:::
+
+:::analysis #nmr-main
+type: nmr
+ref: @res-main
+artifact: @raw-nmr-main
+:::
+
+:::procedure #proc-main
+reaction: @rxn-main
+step: add | id=s-add | inputs=@mol-a | outputs=mixture-main
+:::
+
+:::observation #obs-main
+ref: @rxn-main
+event: color_change | id=e-color | linkedStep=s-add | evidence=@nmr-main | color=yellow
+:::
+```
+
+后续页面分别说明每种导出结构和示例。

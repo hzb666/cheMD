@@ -14,6 +14,8 @@ vi.mock("monaco-editor/esm/vs/editor/editor.worker?worker", () => ({
 }));
 
 import {
+  createChemdLanguageConfiguration,
+  createChemdMonarchTokensProvider,
   isSameChemdDocumentPath,
   resolveMonacoSourceJumpSelection,
   toChemdMonacoThemeId
@@ -90,5 +92,33 @@ describe("MonacoChemdEditor theme helpers", () => {
   it("maps resolved app themes to dedicated Monaco themes", () => {
     expect(toChemdMonacoThemeId("light")).toBe("chemd-desktop-light");
     expect(toChemdMonacoThemeId("dark")).toBe("chemd-desktop-dark");
+  });
+});
+
+describe("MonacoChemdEditor language helpers", () => {
+  it("keeps Chemd editor behavior in language configuration", () => {
+    const config = createChemdLanguageConfiguration();
+
+    expect(config.brackets).toContainEqual(["{", "}"]);
+    expect(config.brackets).toContainEqual(["[", "]"]);
+    expect(config.brackets).toContainEqual(["(", ")"]);
+    expect(config.autoClosingPairs).toContainEqual({ open: "{", close: "}" });
+    expect(config.surroundingPairs).toContainEqual({ open: "\"", close: "\"" });
+    expect(config.folding?.markers?.start.test(":::procedure #proc-main")).toBe(true);
+    expect(config.folding?.markers?.end.test(":::")).toBe(true);
+  });
+
+  it("recognizes Chemd-specific lexical classes before semantic analysis runs", () => {
+    const rootRules = createChemdMonarchTokensProvider().tokenizer.root;
+    const tokenNames = rootRules
+      .filter((rule): rule is [RegExp, string] => Array.isArray(rule) && typeof rule[1] === "string")
+      .map((rule) => rule[1]);
+
+    expect(tokenNames).toContain("keyword.block");
+    expect(tokenNames).toContain("delimiter.block");
+    expect(tokenNames).toContain("identifier.reference");
+    expect(tokenNames).toContain("identifier.declaration");
+    expect(tokenNames).toContain("string.chem");
+    expect(tokenNames).toContain("number.quantity");
   });
 });

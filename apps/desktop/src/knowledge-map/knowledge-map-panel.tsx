@@ -541,6 +541,7 @@ const semanticEdgeColor = (kind: SemanticFlowEdge["kind"]): string => {
     case "product": return "oklch(56% 0.13 255 / 0.76)";
     case "contains": return "oklch(64% 0.04 250 / 0.42)";
     case "evidence": return "oklch(60% 0.12 55 / 0.72)";
+    case "semantic_relation": return "oklch(48% 0.09 205 / 0.68)";
     case "document_order": return "oklch(55% 0.05 250 / 0.54)";
   }
 };

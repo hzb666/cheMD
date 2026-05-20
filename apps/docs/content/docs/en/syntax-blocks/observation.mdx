@@ -17,9 +17,11 @@ The mixture turned deep red after n-BuLi addition.
 
 ## Fields
 
-| field | required | notes |
-| --- | --- | --- |
-| `ref` | no | observation target reference |
+| field | required | default | notes |
+| --- | --- | --- | --- |
+| `ref` | no | none | observation target reference |
+| `event:` child line | no | none | creates a structured event inside this observation |
+| nested `:::event` | no | none | creates a structured event block inside this observation |
 
 `observation` has no resolver-required fields. When explicit events are absent, the typechecker passes the prose body to step ontology lowering.
 
@@ -46,6 +48,27 @@ A white solid appeared after water addition.
 ```
 
 The nested event header also accepts a bare ID, such as `:::event e-color`. If the header and fields do not provide an ID, the parser assigns `<observation-id>:eN`.
+
+### Event Fields
+
+| field | required | default | notes |
+| --- | --- | --- | --- |
+| `id` | no | `<observation-id>:eN` when omitted | event ID; alias: `event_id` |
+| `type` | yes | none | event type; aliases: `eventType`, `event_type` |
+| `stage` | no | none | experiment stage |
+| `timepoint` | no | none | time or relative point in the procedure |
+| `severity` | no | none | qualitative severity |
+| `linked_step` | no | none | step ID link; alias: `linkedStep` |
+| `evidence` | no | none | comma-separated evidence IDs |
+| `confidence` | no | none | numeric confidence |
+| other fields | no | none | stored as event `params`; `value`, `color`, or `state` can become normalized value candidates |
+
+Inline events use the first segment as the type unless it is written as `type=...`:
+
+```md
+event: color_change | id=e-color | color=orange | linkedStep=s-add
+event: type=phase_change | id=e-phase | value=clear upper layer
+```
 
 ## Diagnostics
 

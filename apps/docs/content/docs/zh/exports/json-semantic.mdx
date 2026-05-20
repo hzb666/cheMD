@@ -1,0 +1,91 @@
+---
+title: JSON 与语义导出
+description: JSON 文档输出、typed semantic graph，以及它和 training semantic_layer 的区别。
+---
+
+JSON 导出是 CLI 暴露的结构化文档导出：
+
+```bash
+pnpm chemd export ./examples/example.chemd --format json
+```
+
+它由 `@chemd/renderer-json` 根据 resolved document 和 typed graph 生成。
+
+## 输出形状
+
+JSON payload 包含：
+
+- `document.meta`：frontmatter metadata
+- `document.layout`：存在 `col` 节点被 flatten 时出现
+- `document.body`：序列化后的 Markdown 与结构化块
+- `semantic.typedGraph`：typechecker 生成的 typed semantic graph
+- `diagnostics`：附在文档上的 compiler diagnostics
+
+数组会被转为带稳定编号的对象键，例如 `01_reaction`、`02_result` 和 `01_reactant`。这样导出的 JSON 更适合 diff，也避免匿名数组项歧义。
+
+## 示例
+
+```json
+{
+  "document": {
+    "meta": {
+      "id": "exp-export-example",
+      "title": "Export example",
+      "date": "2026-05-21",
+      "primary_reaction": "rxn-main",
+      "primary_result": "res-main"
+    },
+    "body": {
+      "01_molecule": {
+        "id": "mol-a",
+        "name": "substrate A",
+        "smiles": "CCO",
+        "source_block_type": "chemd",
+        "syntax_origin": "chemd",
+        "declared_kind": "mol"
+      },
+      "02_molecule": {
+        "id": "mol-b",
+        "name": "product B",
+        "smiles": "CC=O",
+        "source_block_type": "chemd"
+      },
+      "03_reaction": {
+        "id": "rxn-main",
+        "reactants": {
+          "01_reactant": "@mol-a | 1.0 mmol | 1.0 eq | limiting=true"
+        },
+        "products": {
+          "01_product": "@mol-b"
+        },
+        "solvent": "MeCN",
+        "temperature": "60 C",
+        "source_block_type": "chemd"
+      }
+    }
+  },
+  "semantic": {
+    "typedGraph": {
+      "documentId": "exp-export-example",
+      "nodes": {
+        "rxn-main": {
+          "kind": "reaction",
+          "normalizedConditions": {
+            "solvent": { "raw": "MeCN", "normalized": "MeCN" },
+            "temperature": { "raw": "60 C", "value": 60, "unit": "C" }
+          }
+        }
+      }
+    }
+  },
+  "diagnostics": {}
+}
+```
+
+## Semantic Graph 与 Training Semantic Layer 的区别
+
+`semantic.typedGraph` 是 compiler/typechecker 图，用于校验、规范化 quantity、reference checks、reaction participants、route checks 和 step checks。
+
+`training-full.semantic_layer` 是另一层导出，用于下游 training 和 graph projections。它把选定事实复制并增强为稳定实体，例如 `reactions`、`results`、`analyses`、`condition_variation_attempts` 和 `links`。
+
+需要忠实文档结构和 compiler typed semantics 时使用 JSON 导出。需要 learning、RAG 或 graph-ready projection 时使用 training 导出。

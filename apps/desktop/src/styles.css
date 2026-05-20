@@ -259,6 +259,20 @@
   line-height: 1;
 }
 
+.monaco-shell .monaco-editor .chemd-fence-pair-line {
+  background-color: color-mix(in oklch, var(--primary) 10%, transparent);
+}
+
+.monaco-shell .monaco-editor .chemd-fence-pair-glyph {
+  border-left: 2px solid var(--primary);
+  margin-left: 3px;
+}
+
+.monaco-shell .monaco-editor .chemd-block-scope-glyph {
+  border-left: 1px solid color-mix(in oklch, var(--primary) 28%, transparent);
+  margin-left: 5px;
+}
+
 .monaco-shell .monaco-editor {
   --vscode-editorStickyScroll-background: var(--editor-workspace-surface);
   --vscode-editorStickyScrollGutter-background: var(--editor-workspace-surface);

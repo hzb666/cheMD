@@ -1,0 +1,224 @@
+---
+title: Training and RAG Exports
+description: Full training, sanitized training understanding, RAG chunks, task datasets, and annotation patches.
+---
+
+Training and RAG exports come from `@chemd/exporter-training`.
+
+```bash
+pnpm chemd export ./examples/example.chemd --format training-full
+pnpm chemd export ./examples/example.chemd --format training
+pnpm chemd export ./examples/example.chemd --format rag
+```
+
+## `training-full`
+
+`training-full` returns `ChemdTrainingExportV2` with schema version `chemd-training-export/v0.2`. It is the audit-capable export and keeps source context.
+
+Top-level fields:
+
+- `schema_version`, `export_id`, `exported_at`
+- `generator`
+- `document`
+- `governance`
+- `source_layer`
+- `semantic_layer`
+- `learning_layer`
+- `quality_layer`
+
+`semantic_layer` contains `molecules`, `materials`, `batches`, `reactions`, `results`, `analyses`, `samples`, `artifacts`, `condition_variations`, `condition_variation_attempts`, `markdown_blocks`, `links`, and optional `lnf`.
+
+`learning_layer` contains `retrieval_chunks`, `prediction_instances`, `chemistry_feature_refs`, `procedure_to_steps`, and `observation_to_events`.
+
+Example:
+
+```json
+{
+  "schema_version": "chemd-training-export/v0.2",
+  "document": {
+    "document_id": "exp-export-example",
+    "title": "Export example",
+    "date": "2026-05-21",
+    "primary_reaction_id": "rxn-main"
+  },
+  "governance": {
+    "confidentiality": "internal",
+    "allowed_uses": ["rag", "sft", "eval", "audit"],
+    "sanitization_policy": "default"
+  },
+  "semantic_layer": {
+    "reactions": [
+      {
+        "entity_id": "reaction::rxn-main",
+        "original_id": "rxn-main",
+        "reactants": [
+          {
+            "raw": "@mol-a | 1.0 mmol | 1.0 eq",
+            "reference_status": "resolved",
+            "target_entity_id": "molecule::mol-a"
+          }
+        ],
+        "normalized_conditions": {
+          "solvent": { "raw": "MeCN", "normalized": "MeCN" }
+        }
+      }
+    ],
+    "results": [
+      {
+        "entity_id": "result::res-main",
+        "reaction_ref_raw": "@rxn-main",
+        "status_label": "success",
+        "yield_percent": 78
+      }
+    ],
+    "analyses": [
+      {
+        "entity_id": "analysis::nmr-main",
+        "analysis_type": "nmr",
+        "ref_raw": "@res-main",
+        "normalized_analysis": { "analysis_type": "nmr" },
+        "normalized_tlc": null
+      }
+    ],
+    "condition_variation_attempts": [
+      {
+        "entity_id": "condition-variation-attempt::screen-a.a1",
+        "parent_condition_variation_id": "condition-variation::screen-a",
+        "attempt_id": "a1",
+        "reaction_ref_raw": "@rxn-main",
+        "result_ref_raw": "@res-main"
+      }
+    ],
+    "links": [
+      {
+        "relation_type": "result_describes_reaction",
+        "from_entity_id": "result::res-main",
+        "to_entity_id": "reaction::rxn-main"
+      }
+    ]
+  },
+  "learning_layer": {
+    "retrieval_chunks": [
+      {
+        "chunk_type": "document_summary",
+        "source_entity_ids": ["reaction::rxn-main", "result::res-main"],
+        "text": "Reaction rxn-main gave 78% yield."
+      }
+    ],
+    "procedure_to_steps": [
+      {
+        "procedure_id": "proc-main",
+        "source_type": "explicit_steps",
+        "steps": [{ "step_id": "s-add", "family": "add" }]
+      }
+    ],
+    "observation_to_events": [
+      {
+        "observation_id": "obs-main",
+        "events": [{ "event_id": "e-color", "event_type": "color_change" }]
+      }
+    ]
+  }
+}
+```
+
+## `training`
+
+`training` returns `ChemdTrainingUnderstandingV1` with schema version `chemd-training-understanding/v0.1`. It is the sanitized training projection. Governance can block it; blocked output keeps quality metadata but omits training entities and graph content.
+
+It contains:
+
+- `entities`: sanitized molecules, materials, reactions, results, analyses, samples, artifacts, condition variations, condition attempts, and narrative blocks
+- `relations`
+- `resolved_references`
+- `procedure_logic`
+- `experiment_logic`: outcomes, design contexts, outcome quality, taxonomy, expert routing, intent hypotheses, variable logic, causal links, material flow graph, step dependencies, reaction routes, evidence links, sample profiles, and artifact profiles
+- `knowledge_graph`
+- `lora_generation_hints`
+- `quality`
+
+Example:
+
+```json
+{
+  "schema_version": "chemd-training-understanding/v0.1",
+  "entities": {
+    "reactions": [{ "entity_id": "reaction::rxn-main", "original_id": "rxn-main" }],
+    "results": [{ "entity_id": "result::res-main", "yield_percent": 78 }],
+    "analyses": [{ "entity_id": "analysis::nmr-main", "analysis_type": "nmr" }],
+    "condition_variation_attempts": [
+      { "entity_id": "condition-variation-attempt::screen-a.a1", "attempt_id": "a1" }
+    ],
+    "narrative_blocks": []
+  },
+  "procedure_logic": {
+    "procedure_to_steps": [
+      { "procedure_id": "proc-main", "steps": [{ "step_id": "s-add", "family": "add" }] }
+    ],
+    "observation_to_events": [
+      { "observation_id": "obs-main", "events": [{ "event_id": "e-color" }] }
+    ]
+  },
+  "experiment_logic": {
+    "outcomes": [
+      {
+        "result_entity_id": "result::res-main",
+        "reaction_entity_id": "reaction::rxn-main",
+        "yield_percent": 78
+      }
+    ],
+    "material_flow_graph": { "nodes": [], "edges": [] },
+    "step_dependencies": []
+  },
+  "quality": {
+    "usable_for_training": true,
+    "confidence_score": 0.9,
+    "warnings": []
+  }
+}
+```
+
+## `rag`
+
+`rag` returns `ChemdRagExportV1` with schema version `chemd-rag-export/v0.1`. It contains `document`, `governance`, `chunks`, and `quality`.
+
+RAG chunks are sanitized retrieval chunks. They keep chunk type, source entity IDs, text, and metadata, but omit audit-only raw text.
+
+Example:
+
+```json
+{
+  "schema_version": "chemd-rag-export/v0.1",
+  "chunks": [
+    {
+      "chunk_id": "chunk::exp-export-example::reaction-summary::rxn-main",
+      "chunk_type": "reaction_summary",
+      "source_entity_ids": ["reaction::rxn-main", "result::res-main"],
+      "text": "rxn-main used mol-a and gave res-main in 78% yield.",
+      "metadata": {
+        "date": "2026-05-21",
+        "reaction_ids": ["reaction::rxn-main"],
+        "result_ids": ["result::res-main"],
+        "analysis_ids": ["analysis::nmr-main"],
+        "yield_percent": 78,
+        "solvent": "MeCN"
+      }
+    }
+  ],
+  "quality": {
+    "rag_eligible": true,
+    "chunk_count": 1
+  }
+}
+```
+
+## Task Datasets and Annotation Patches
+
+The exporter can derive:
+
+- `ChemdTrainingTaskDatasetV1`
+- `ChemdTrainingCampaignV1`
+- `ChemdTrainingCampaignTaskDatasetV1`
+- `ChemdTrainingAnnotationPatchV1`
+
+These outputs support SFT/eval examples, cross-document strategy examples, and human corrections for reaction taxonomy, expert routing, optimization trajectories, failure signals, intent hypotheses, variable logic, causal links, material-flow edges, step dependencies, and task examples.

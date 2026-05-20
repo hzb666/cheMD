@@ -1,0 +1,68 @@
+---
+title: HTML 导出
+description: 从已编译 Chemd 文档生成浏览器可用 HTML。
+---
+
+HTML 导出是面向人的预览输出。它由 `@chemd/renderer-html` 生成，并通过 `compileChemd(source).html` 暴露。
+
+## 包含内容
+
+HTML renderer 消费 resolved document、render profile、render adapter payload 和 typed graph。它渲染：
+
+- 文档标题和 metadata
+- Markdown heading、list、task checkbox、blockquote、link、inline code 和 inline chemistry
+- molecule、material、batch、reaction、result、analysis、procedure、trace、observation、sample、artifact、condition-varies、template、use 和 col blocks
+- procedure steps 和部分 step parameters
+- typed graph normalization 可用时的 TLC plate visual
+- source-safe block IDs 和显示标签
+
+HTML 用于展示。下游系统需要稳定机器契约时，应使用 JSON、LNF、training 或 graph 导出。
+
+## 示例
+
+```ts
+import { compileChemd } from "@chemd/compiler";
+
+const result = compileChemd(source);
+const html = result.html;
+```
+
+代表性输出片段：
+
+```html
+<article class="chemd-document">
+  <header class="chemd-document-header">
+    <h1>Export example</h1>
+  </header>
+  <section class="chemd-block chemd-block--reaction">
+    <h2>Reaction <span class="chemd-block-id">rxn-main</span></h2>
+    <dl>
+      <dt>Reactants</dt><dd>@mol-a | 1.0 mmol | 1.0 eq | limiting=true</dd>
+      <dt>Products</dt><dd>@mol-b</dd>
+      <dt>Solvent</dt><dd>MeCN</dd>
+      <dt>Temperature</dt><dd>60 C</dd>
+    </dl>
+  </section>
+  <section class="chemd-block chemd-block--procedure">
+    <ol class="chemd-procedure-steps">
+      <li>Step 1: Add</li>
+    </ol>
+  </section>
+</article>
+```
+
+当 analysis 有 normalized TLC 数据时，HTML 可以包含 TLC plate：
+
+```html
+<div class="chemd-tlc-plate">
+  <div class="chemd-tlc-lane" data-lane-id="lane-a">
+    <span class="chemd-tlc-spot" data-shape="circle" data-size-rank="3"></span>
+  </div>
+</div>
+```
+
+## 注意
+
+- renderer 不会把 raw source origin 这类 parser-only 字段泄漏到普通展示 HTML。
+- `col` layout block 在 HTML 中渲染为布局容器，但在 JSON body 序列化中会被 flatten。
+- 显示选项应通过 render profile 控制，不应为了某个 visual target 改写源语法。

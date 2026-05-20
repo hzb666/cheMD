@@ -5,21 +5,33 @@ description: '`:::analysis` 用类型化字段记录 TLC、NMR、色谱和质谱
 
 `:::analysis` 记录分析证据。必填字段是 `type`；不同 `type` 决定允许的结构化字段和诊断边界。
 
-## 公共字段
+## 字段
 
-| 字段 | 说明 |
-| --- | --- |
-| `type` | `tlc`、`nmr`、`hplc`、`uplc`、`gc`、`lcms`、`gcms`、`ms`、`hrms`、`ir`、`uv` |
-| `ref` | 指向 sample、reaction、result、condition screen 或 attempt |
-| `time` | 采样或分析时间 |
-| `eluent` / `plate` / `visualization` | TLC 方法信息 |
-| `method` | method/profile 引用或方法名称 |
-| `instrument` | 仪器名称 |
-| `solvent` / `frequency` | 未写在 `spectrum` 中的 NMR 元数据 |
-| `result` | 关联 result id 或简短解释 |
-| `artifact` / `artifacts` | 原始数据 artifact 引用 |
-| `data` | 无类型化字段时的非结构化兜底 |
-| `notes` | 备注 |
+| 字段 | 必填 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `type` | 是 | 无 | `tlc`、`nmr`、`hplc`、`uplc`、`gc`、`lcms`、`gcms`、`ms`、`hrms`、`ir`、`uv`；别名：`analysis_type`、`analysisType` |
+| `ref` | 否 | 无 | 指向 sample、reaction、result、condition screen 或 attempt |
+| `time` | 否 | 无 | 采样或分析时间；TLC 归一化接受 `h`、`hr`、`hrs`、`min`、`mins` |
+| `eluent` | 否 | 无 | TLC 展开剂 |
+| `plate` | 否 | `type: tlc` 时为 `silica gel GF254` | TLC 板材 |
+| `visualization` | 否 | `type: tlc` 时为 `UV 254 nm` | TLC 显色/观察方式 |
+| `result` | 否 | 无 | 关联 result id 或简短解释 |
+| `instrument` | 否 | 无 | 仪器名称 |
+| `solvent` | 否 | 无 | NMR 溶剂或方法溶剂 |
+| `frequency` | 否 | 无 | 未写在 `spectrum` 中的 NMR 频率 |
+| `method` | 否 | 无 | method/profile 引用或方法名称 |
+| `artifact` | 否 | 无 | 可重复的原始数据 artifact 引用；别名 `artifacts` 接受 `|` 列表 |
+| `spectrum` | 否 | 无 | NMR 谱图级元数据 |
+| `lane` | 否 | 无 | TLC 结构化泳道；每条 lane 重复一次 |
+| `spot` | 否 | 无 | 当前 `lane` 下的 TLC 点 |
+| `mess` | 否 | 无 | 当前 `lane` 下的拖尾、糊斑或宽区域 |
+| `base` | 否 | 无 | 标记当前 TLC lane 的基线；也可带点位内容 |
+| `none` | 否 | 无 | 标记当前 TLC lane 为空 |
+| `peak` | 否 | 无 | 可重复的 NMR/色谱峰 |
+| `ion` | 否 | 无 | 可重复的 MS ion |
+| `data` | 否 | 无 | 无类型化字段时的非结构化兜底 |
+| `notes` | 否 | 无 | 备注 |
+| `p1`、`p2`、... | 否 | 无 | 旧式紧凑 TLC lane 字段 |
 
 ## TLC
 
@@ -45,6 +57,32 @@ spot: 0.30
 `lane:` 开启一条 lane。后续 `spot`、`mess`、`base`、`none` 都归属当前 lane，直到下一个 `lane:`。lane label 和 spot label 必须是内置 role 或对象引用。内置 role 包括 `sm`、`rxn`、`prod`、`int`、`blank`、`impurity`、`unknown` / `unk`。
 
 `spot: sm` 引用已知标准 spot，不是引用整条 lane。它只复用该 spot 的 Rf 和 marker 等点位事实，不继承 lane 参数。没有候选、候选不唯一或目标冲突都会报错。`unknown` 只能和 Rf 一起使用，例如 `spot: 0.42 unknown`。
+
+### TLC 点位 marker
+
+TLC 点位写作：
+
+```md
+spot: <rf> [marker] [label-or-reference]
+```
+
+`marker` 可省略。它同时表达形状、大小和深浅：
+
+| marker 部分 | 写法 | 归一化含义 |
+| --- | --- | --- |
+| 形状 | 省略、`^`、`v` | 省略为 `circle`；`^` 为 `up`；`v` 为 `down` |
+| 大小 | 形状后写 `1` 到 `5` | `size_rank`；超出范围会夹到 `1..5` |
+| 深浅 | 大小或形状后写 `(1)` 到 `(5)` | `intensity_rank`；超出范围会夹到 `1..5` |
+
+示例：
+
+```md
+spot: 0.31 ^3(4) product
+spot: 0.62 v2 @mol-starting-material
+mess: 0.55 3(2)
+```
+
+`^3(4)` 表示向上的点，大小 rank 为 `3`，深浅 rank 为 `4`。普通 `spot: 0.30` 是圆点，不带大小和深浅 rank。
 
 ## NMR
 

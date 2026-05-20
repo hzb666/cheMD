@@ -42,6 +42,7 @@ const outputWithReaction = (): ChemdLanguageCompileSuccess => ({
       range: { startLine: 12, startColumn: 1, endLine: 16, endColumn: 4 }
     }
   ],
+  semanticTokens: [],
   symbols: [
     {
       id: "mol-a",
@@ -86,6 +87,114 @@ const outputWithReaction = (): ChemdLanguageCompileSuccess => ({
           id: "obs-a",
           text: "Reaction evidence",
           sourceSpan: { start: 181, end: 220, startLine: 18, endLine: 19 }
+        }
+      ],
+      diagnostics: []
+    },
+    diagnostics: []
+  } as unknown) as ChemdLanguageCompileSuccess["result"]
+});
+
+const outputWithRecentLanguageFeatures = (): ChemdLanguageCompileSuccess => ({
+  ...outputWithReaction(),
+  result: ({
+    document: {
+      type: "document",
+      meta: {
+        id: "language-feature-map-doc",
+        title: "Language feature map",
+        date: "2026-05-21"
+      },
+      children: [
+        {
+          type: "molecule",
+          id: "mol-a",
+          name: "A",
+          smiles: "CCO",
+          sourceSpan: { start: 42, end: 80, startLine: 7, endLine: 10 }
+        },
+        {
+          type: "reaction",
+          id: "rxn-a",
+          reactants: ["@mol-a | 1 mmol"],
+          products: ["@mol-b"],
+          sourceSpan: { start: 100, end: 180, startLine: 12, endLine: 16 }
+        },
+        {
+          type: "procedure",
+          id: "proc-a",
+          reaction: "rxn-a",
+          steps: [{
+            type: "step",
+            stepId: "s1",
+            family: "add",
+            inputs: ["mol-a"],
+            outputs: ["mol-b"],
+            sourceSpan: { start: 181, end: 220, startLine: 18, endLine: 18 }
+          }],
+          controls: [{
+            type: "control",
+            controlId: "loop-1",
+            kind: "repeat",
+            children: [],
+            sourceSpan: { start: 221, end: 240, startLine: 19, endLine: 19 }
+          }],
+          sourceSpan: { start: 181, end: 260, startLine: 18, endLine: 20 }
+        },
+        {
+          type: "condition_varies",
+          id: "screen-a",
+          reaction: "rxn-a",
+          changes: [],
+          attempts: [{
+            id: "a1",
+            raw: "temp=80 C",
+            reaction: "rxn-a",
+            result: "res-a",
+            changes: [],
+            condition: []
+          }],
+          sourceSpan: { start: 261, end: 320, startLine: 22, endLine: 25 }
+        },
+        {
+          type: "result",
+          id: "res-a",
+          reaction: "rxn-a",
+          yield: "83%",
+          sourceSpan: { start: 321, end: 350, startLine: 27, endLine: 27 }
+        },
+        {
+          type: "analysis",
+          id: "ana-a",
+          type_name: "nmr",
+          ref: "res-a",
+          sourceSpan: { start: 351, end: 390, startLine: 29, endLine: 31 }
+        },
+        {
+          type: "observation",
+          id: "obs-a",
+          ref: "rxn-a",
+          events: [{
+            type: "event",
+            eventId: "evt-a",
+            eventType: "color",
+            linkedStepId: "s1",
+            evidence: ["ana-a"],
+            sourceSpan: { start: 391, end: 420, startLine: 33, endLine: 33 }
+          }],
+          sourceSpan: { start: 391, end: 450, startLine: 33, endLine: 35 }
+        },
+        {
+          type: "trace",
+          id: "trace-a",
+          events: [{
+            type: "trace_event",
+            eventId: "trace-evt-a",
+            eventType: "started",
+            stepId: "s1",
+            sourceSpan: { start: 451, end: 470, startLine: 37, endLine: 37 }
+          }],
+          sourceSpan: { start: 451, end: 500, startLine: 37, endLine: 39 }
         }
       ],
       diagnostics: []
@@ -266,6 +375,68 @@ describe("desktop knowledge map view model", () => {
         sourceId: "document::map-doc",
         targetId: "molecule::mol-a",
         kind: "contains"
+      })
+    ]));
+  });
+
+  it("maps recent language-layer nodes into the IDE graph without treating trace as graph facts", () => {
+    const viewModel = buildKnowledgeMapViewModel(outputWithRecentLanguageFeatures());
+    const nodeTypes = viewModel.semanticTree?.nodes.map((node) => node.node_type) ?? [];
+    const flowNodeTypes = viewModel.semanticFlow.nodes.map((node) => node.nodeType);
+
+    expect(nodeTypes).toEqual(expect.arrayContaining([
+      "ChemdConditionAttemptNode",
+      "ChemdObservationEventNode",
+      "ChemdProcedureControlNode",
+      "ChemdTraceNode",
+      "ChemdTraceEventNode"
+    ]));
+    expect(nodeTypes).not.toContain("ChemdUnknownNode");
+    expect(flowNodeTypes).toEqual(expect.arrayContaining([
+      "ChemdConditionAttemptNode",
+      "ChemdObservationEventNode",
+      "ChemdProcedureControlNode"
+    ]));
+    expect(flowNodeTypes).not.toContain("ChemdTraceNode");
+    expect(flowNodeTypes).not.toContain("ChemdTraceEventNode");
+    expect(viewModel.semanticFlow.nodes.find((node) => node.label === "evt-a")).toMatchObject({
+      laneId: "evidence",
+      component: "ObservationEventBlock"
+    });
+    expect(viewModel.semanticFlow.nodes.find((node) => node.label === "screen-a.a1")).toMatchObject({
+      laneId: "reaction",
+      component: "ConditionAttemptBlock"
+    });
+    expect(viewModel.semanticFlow.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        sourceId: "reaction::rxn-a",
+        targetId: "condition-attempt::screen-a.a1",
+        kind: "semantic_relation",
+        label: "attempt reaction"
+      }),
+      expect.objectContaining({
+        sourceId: "condition-attempt::screen-a.a1",
+        targetId: "result::res-a",
+        kind: "semantic_relation",
+        label: "attempt result"
+      }),
+      expect.objectContaining({
+        sourceId: "result::res-a",
+        targetId: "analysis::ana-a",
+        kind: "semantic_relation",
+        label: "analysis ref"
+      }),
+      expect.objectContaining({
+        sourceId: "procedure-step::s1",
+        targetId: "observation-event::evt-a",
+        kind: "evidence",
+        label: "event step"
+      }),
+      expect.objectContaining({
+        sourceId: "observation-event::evt-a",
+        targetId: "analysis::ana-a",
+        kind: "evidence",
+        label: "event evidence"
       })
     ]));
   });
@@ -524,6 +695,7 @@ describe("desktop knowledge map view model", () => {
       compiledAt: "2026-05-13T00:00:00.000Z",
       diagnostics: [],
       outline: [],
+      semanticTokens: [],
       symbols: [],
       error: {
         code: "LS_COMPILE_FAILED",
