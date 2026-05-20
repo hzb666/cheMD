@@ -1283,3 +1283,37 @@ Known blockers not introduced by this stage:
 ### Next Steps
 
 - None - task complete
+
+
+## Session 120: Experiment language contract implementation
+
+**Date**: 2026-05-20
+**Task**: Experiment language contract implementation
+**Package**: web
+**Branch**: `trellis/language-contract-p0`
+
+### Summary
+
+Implemented current experiment language contract, synchronized app/docs syntax examples and developer docs, removed old repair/legacy public surfaces, and verified typecheck/test.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `fb40588` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

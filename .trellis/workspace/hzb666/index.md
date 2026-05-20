@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-3.md`
-- **Total Sessions**: 119
+- **Total Sessions**: 120
 - **Last Active**: 2026-05-20
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-3.md` | ~1285 | Active |
+| `journal-3.md` | ~1319 | Active |
 | `journal-2.md` | ~1956 | Archived |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
@@ -31,6 +31,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 120 | 2026-05-20 | Experiment language contract implementation | `fb40588` | `trellis/language-contract-p0` |
 | 119 | 2026-05-20 | Experiment language interop governance closeout | `44df622` | `trellis/language-contract-p0` |
 | 118 | 2026-05-20 | Procedure runtime trace | `da831b1` | `trellis/language-contract-p0` |
 | 117 | 2026-05-20 | Condition outcome analysis schemas | `af27f77` | `trellis/language-contract-p0` |
