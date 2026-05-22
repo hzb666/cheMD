@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest";
 import { parseChemd } from "@chemd/parser";
 import { resolveChemd } from "@chemd/resolver";
 
+import {
+  getTypecheckerEnumFieldValues,
+  getTypecheckerQuantityFieldClass
+} from "../src/field-schema";
 import { typecheckDocument } from "../src/index";
 
 describe("typed semantic graph", () => {
@@ -98,6 +102,35 @@ This prose should stay narrative and not create additional lowered steps.
 });
 
 describe("typed semantic graph normalization", () => {
+  it("reads typechecker field classes from the shared field value schema", () => {
+    const expectedQuantityFields = [
+      ["chemd", "amount", "amount"],
+      ["chemd", "equivalents", "equivalent"],
+      ["chemd", "temperature", "temperature"],
+      ["chemd", "time", "time"],
+      ["chemd", "pressure", "pressure"],
+      ["material", "purity", "percent"],
+      ["batch", "mass", "mass"],
+      ["batch", "purity", "percent"],
+      ["result", "yield", "percent"],
+      ["result", "conversion", "percent"],
+      ["result", "selectivity", "percent"],
+      ["result", "purity", "percent"],
+      ["result", "isolated_mass", "mass"],
+      ["sample", "purity", "percent"]
+    ] as const;
+
+    for (const [blockType, fieldName, quantityClass] of expectedQuantityFields) {
+      expect(getTypecheckerQuantityFieldClass(blockType, fieldName, "ph")).toBe(quantityClass);
+    }
+    expect(getTypecheckerEnumFieldValues("result", "status")).toEqual([
+      "success",
+      "partial",
+      "failed",
+      "unknown"
+    ]);
+  });
+
   it("keeps the current field value normalization contract stable", () => {
     const document = resolveChemd(parseChemd(`---
 id: exp-value-contract

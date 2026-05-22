@@ -37,7 +37,7 @@
   "notes": "Trellis loop on develop. Phase 1 must be behavior-preserving metadata and drift tests only; parser AST, typechecker typed graph, diagnostics, exports, and docs examples must not drift.",
   "meta": {
     "workflow": "trellis-loop",
-    "phase": "phase-3-language-service-schema-values-complete",
+    "phase": "phase-4-typechecker-schema-adapter-complete",
     "business_drift_policy": "no existing compile/parser/typechecker/render/export behavior changes",
     "phase_0": {
       "status": "complete",
@@ -54,6 +54,10 @@
     "phase_3": {
       "status": "complete",
       "summary": "Replaced language-service value completion registry with schema-derived suggestions while preserving existing visible completions."
+    },
+    "phase_4": {
+      "status": "complete",
+      "summary": "Added typechecker schema adapter for existing quantity field classes and equivalence tests while keeping legacy fallbacks."
     }
   }
 }

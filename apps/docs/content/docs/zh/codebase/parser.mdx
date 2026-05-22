@@ -81,6 +81,8 @@ resolver、typechecker、step ontology 与 language-service 层完成。因此 t
 field value schema 工作必须保持 metadata 化和防漂移测试，再逐步替换 parser 或
 compiler 行为。language-service 可以把这层 metadata 用于 enum value completion
 这类不改变语义的编辑器辅助，但不能改变 parser AST 输出或 typechecker 诊断。
+typechecker 会通过 adapter 读取同一份 metadata 中的既有 quantity field class，
+并保留旧 fallback 以维持当前行为。
 
 ### 当前块语法要点
 

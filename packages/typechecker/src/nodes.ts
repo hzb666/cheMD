@@ -35,6 +35,7 @@ import {
   parseQuantity
 } from "./normalize";
 import { resolveDerivedField } from "./expressions";
+import { getTypecheckerQuantityFieldClass } from "./field-schema";
 import { resolveReactionPrevReferences } from "./reaction-routes";
 import { resolveOptionalReference, resolveReferenceList } from "./reference-rules";
 import { resolveResultRelationships, resolveSampleRelationships } from "./relationships";
@@ -145,6 +146,24 @@ const collectQuantity = (
 
   return parsed.quantity;
 };
+
+const collectSchemaQuantity = (
+  output: BuiltTypedNode,
+  blockType: string,
+  key: string,
+  fallbackQuantityClass: QuantityClass,
+  raw: string | undefined,
+  objectIndex: Map<string, ObjectNode>,
+  sourceSpan?: SourceSpan
+): QuantityType | undefined =>
+  collectQuantity(
+    output,
+    key,
+    getTypecheckerQuantityFieldClass(blockType, key, fallbackQuantityClass),
+    raw,
+    objectIndex,
+    sourceSpan
+  );
 
 const createBase = (kind: TypedSemanticNode["kind"], node: ObjectNode): BuiltTypedNode => ({
   node: {
@@ -619,9 +638,10 @@ export const buildMoleculeNode = (
   context: BuildNodeContext
 ): BuiltTypedNode => {
   const output = createBase("molecule", node);
-  const amount = collectQuantity(output, "amount", "amount", node.amount, context.objectIndex, node.fieldSpans?.amount);
-  const equivalents = collectQuantity(
+  const amount = collectSchemaQuantity(output, "chemd", "amount", "amount", node.amount, context.objectIndex, node.fieldSpans?.amount);
+  const equivalents = collectSchemaQuantity(
     output,
+    "chemd",
     "equivalents",
     "equivalent",
     node.equivalents,
@@ -683,7 +703,7 @@ export const buildMaterialNode = (
     field: "molecule",
     expectedTargetKind: "molecule"
   }, context.externalTargetIndex);
-  const purity = collectQuantity(output, "purity", "percent", node.purity, context.objectIndex, node.fieldSpans?.purity);
+  const purity = collectSchemaQuantity(output, "material", "purity", "percent", node.purity, context.objectIndex, node.fieldSpans?.purity);
 
   output.diagnostics.push(...molecule.diagnostics);
   output.node = {
@@ -722,8 +742,8 @@ export const buildBatchNode = (
     field: "artifacts",
     expectedTargetKind: "artifact"
   }, context.externalTargetIndex);
-  const mass = collectQuantity(output, "mass", "mass", node.mass, context.objectIndex, node.fieldSpans?.mass);
-  const purity = collectQuantity(output, "purity", "percent", node.purity, context.objectIndex, node.fieldSpans?.purity);
+  const mass = collectSchemaQuantity(output, "batch", "mass", "mass", node.mass, context.objectIndex, node.fieldSpans?.mass);
+  const purity = collectSchemaQuantity(output, "batch", "purity", "percent", node.purity, context.objectIndex, node.fieldSpans?.purity);
 
   output.diagnostics.push(...source.diagnostics, ...molecule.diagnostics, ...artifacts.diagnostics);
   if (!isAllowedBatchSource(source.value)) {
@@ -755,9 +775,9 @@ export const buildReactionNode = (
   context: BuildNodeContext
 ): BuiltTypedNode => {
   const output = createBase("reaction", node);
-  const temperature = collectQuantity(output, "temperature", "temperature", node.temperature, context.objectIndex, node.fieldSpans?.temperature);
-  const time = collectQuantity(output, "time", "time", node.time, context.objectIndex, node.fieldSpans?.time);
-  const pressure = collectQuantity(output, "pressure", "pressure", node.pressure, context.objectIndex, node.fieldSpans?.pressure);
+  const temperature = collectSchemaQuantity(output, "chemd", "temperature", "temperature", node.temperature, context.objectIndex, node.fieldSpans?.temperature);
+  const time = collectSchemaQuantity(output, "chemd", "time", "time", node.time, context.objectIndex, node.fieldSpans?.time);
+  const pressure = collectSchemaQuantity(output, "chemd", "pressure", "pressure", node.pressure, context.objectIndex, node.fieldSpans?.pressure);
   const atmosphere = normalizeAtmosphere(node.atmosphere);
   const reactants = buildReactionParticipants("reactant", node.reactants ?? [], node, context);
   const products = buildReactionParticipants("product", node.products ?? [], node, context);
@@ -828,13 +848,14 @@ export const buildResultNode = (
     sourceNodeType: "result",
     sourceNodeId: node.id
   });
-  const yieldPercent = collectQuantity(output, "yield", "percent", node.yield, context.objectIndex, node.fieldSpans?.yield);
-  const conversion = collectQuantity(output, "conversion", "percent", node.conversion, context.objectIndex, node.fieldSpans?.conversion);
-  const selectivity = collectQuantity(output, "selectivity", "percent", node.selectivity, context.objectIndex, node.fieldSpans?.selectivity);
-  const purity = collectQuantity(output, "purity", "percent", node.purity, context.objectIndex, node.fieldSpans?.purity);
+  const yieldPercent = collectSchemaQuantity(output, "result", "yield", "percent", node.yield, context.objectIndex, node.fieldSpans?.yield);
+  const conversion = collectSchemaQuantity(output, "result", "conversion", "percent", node.conversion, context.objectIndex, node.fieldSpans?.conversion);
+  const selectivity = collectSchemaQuantity(output, "result", "selectivity", "percent", node.selectivity, context.objectIndex, node.fieldSpans?.selectivity);
+  const purity = collectSchemaQuantity(output, "result", "purity", "percent", node.purity, context.objectIndex, node.fieldSpans?.purity);
   const relationships = resolveResultRelationships(node, context.objectIndex, context.externalTargetIndex);
-  const isolatedMass = collectQuantity(
+  const isolatedMass = collectSchemaQuantity(
     output,
+    "result",
     "isolated_mass",
     "mass",
     node.isolated_mass,
@@ -1091,7 +1112,7 @@ export const buildSampleNode = (
   context: BuildNodeContext
 ): BuiltTypedNode => {
   const output = createBase("sample", node);
-  const purity = collectQuantity(output, "purity", "percent", node.purity, context.objectIndex, node.fieldSpans?.purity);
+  const purity = collectSchemaQuantity(output, "sample", "purity", "percent", node.purity, context.objectIndex, node.fieldSpans?.purity);
   const relationships = resolveSampleRelationships(node, context.objectIndex, context.externalTargetIndex);
   const artifacts = resolveReferenceList(node.artifacts ?? [], context.objectIndex, {
     sourceNodeType: "sample",
