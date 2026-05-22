@@ -13,6 +13,7 @@ import type {
 } from "./types";
 import { scanProseQuantities } from "./quantity";
 import { extractProseFrames } from "./frames";
+import { buildReactionCandidates } from "./reaction-candidates";
 
 const createSpan = (sourceText: string, start: number, end: number): ProseSourceSpan => ({
   start,
@@ -64,6 +65,12 @@ export const importProse = async (
   const materials = mentions.map((mention, index) => mentionToMaterial(sourceText, mention, index));
   const quantityResult = scanProseQuantities(sourceText);
   const frameResult = extractProseFrames(sourceText);
+  const reactionCandidates = buildReactionCandidates({
+    sourceText,
+    materials,
+    quantities: quantityResult.quantities,
+    steps: frameResult.steps
+  });
 
   return {
     sourceText,
@@ -71,6 +78,7 @@ export const importProse = async (
     quantities: quantityResult.quantities,
     steps: frameResult.steps,
     observations: frameResult.observations,
+    reactionCandidates,
     unparsedSpans: frameResult.unparsedSpans,
     diagnostics: [
       ...createLowConfidenceFormulaDiagnostics(sourceText, materials),

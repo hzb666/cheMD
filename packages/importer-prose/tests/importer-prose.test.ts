@@ -186,7 +186,9 @@ describe("prose importer skeleton", () => {
       date: "2026-05-23"
     });
 
+    expect(candidate.reactionCandidates).toEqual([]);
     expect(chemd).toContain(":::procedure #import-procedure");
+    expect(chemd).not.toContain(":::chemd");
     expect(chemd).toContain("step: add | id=s1 | materials=n-BuLi");
     expect(chemd).toContain(":::observation #import-observation");
     expect(chemd).toContain("event: color_change | id=e1 | linkedStep=s1 | confidence=0.78");
@@ -218,6 +220,8 @@ describe("prose importer skeleton", () => {
     const addSteps = result.candidate.steps.filter((step) => step.family === "add");
 
     expect(result.valid).toBe(true);
+    expect(result.candidate.reactionCandidates).toEqual([]);
+    expect(result.chemd).not.toContain(":::chemd");
     expect(errorCodes).toEqual([]);
     expect(families).toEqual(expect.arrayContaining([
       "charge",

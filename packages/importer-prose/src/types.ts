@@ -64,6 +64,37 @@ export interface ObservationFrame {
   evidence: readonly string[];
 }
 
+export type ReactionFactRole =
+  | "reactant"
+  | "product"
+  | "reagent"
+  | "solvent"
+  | "temperature"
+  | "time"
+  | "pressure"
+  | "atmosphere"
+  | "yield";
+
+export interface ReactionFactCandidate {
+  id: string;
+  role: ReactionFactRole;
+  raw: string;
+  normalized?: string;
+  confidence: number;
+  sourceSpan: ProseSourceSpan;
+  evidence: readonly string[];
+  warnings: readonly string[];
+}
+
+export interface ReactionCandidate {
+  id: string;
+  source: "prose_import";
+  confidence: number;
+  facts: readonly ReactionFactCandidate[];
+  rejectedFacts: readonly ReactionFactCandidate[];
+  diagnostics: readonly ImportDiagnostic[];
+}
+
 export interface UnparsedProseSpan extends ProseSourceSpan {
   id: string;
   reason: "no_canonical_step";
@@ -76,6 +107,7 @@ export interface ProseImportCandidate {
   quantities: readonly QuantityMention[];
   steps: readonly StepFrame[];
   observations: readonly ObservationFrame[];
+  reactionCandidates: readonly ReactionCandidate[];
   unparsedSpans: readonly UnparsedProseSpan[];
   diagnostics: readonly ImportDiagnostic[];
 }
