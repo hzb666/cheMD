@@ -1652,3 +1652,37 @@ importer-prose 从 @chemd/core quantity schema 构建数量扫描；覆盖 compa
 ### Next Steps
 
 - None - task complete
+
+
+## Session 130: 导入层复用 step ontology 生成 frames
+
+**Date**: 2026-05-23
+**Task**: 导入层复用 step ontology 生成 frames
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+importer-prose 通过 step-ontology lowering 生成 step/observation frames，并用 step schema 做参数漂移 warning；验证 importer-prose test/typecheck 与 step-ontology test 通过。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5e9a3a2` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
