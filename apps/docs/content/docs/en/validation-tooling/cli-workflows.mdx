@@ -95,6 +95,16 @@ pnpm chemd new organic-synthesis/suzuki-screen --out exp.chemd
 pnpm chemd new analytical/hplc-purity --out hplc.chemd --dry-run
 ```
 
+## `pnpm chemd import prose`
+
+`import prose` imports local experiment prose into a `.chemd` draft. The importer identifies candidate materials, quantities, steps, and observations; the draft is still validated by the compiler. See [Natural Language Import](/en/docs/validation-tooling/natural-language-import) for the full rule sources and boundaries.
+
+```text
+pnpm chemd import prose procedure.txt
+pnpm chemd import prose procedure.txt --out draft.chemd
+pnpm chemd import prose procedure.txt --format json --dry-run
+```
+
 ## `pnpm chemd graph`
 
 `graph` accepts multiple files. The CLI compiles each file, extracts training understanding, then calls `buildTrainingGraphIndexFromUnderstandings`. At least one input file is required. Output supports `text` and `json`.

@@ -18,6 +18,10 @@ import {
   type DomainTemplate,
   type DomainTemplateSummary
 } from "@chemd/domain-templates";
+import type {
+  ImportDiagnostic,
+  ProseToChemdResult
+} from "@chemd/importer-prose";
 import {
   DEFAULT_RUNTIME_CAPABILITIES,
   preflightRun,
@@ -47,6 +51,7 @@ const CHECK_OPTIONS = new Set<CliOption>(["dry-run", "format", "target"]);
 const PREFLIGHT_OPTIONS = new Set<CliOption>(["context", "dry-run", "format", "mode"]);
 const TEMPLATES_OPTIONS = new Set<CliOption>(["json"]);
 const NEW_OPTIONS = new Set<CliOption>(["dry-run", "out"]);
+const IMPORT_OPTIONS = new Set<CliOption>(["dry-run", "format", "out"]);
 const CHANGED_OPTIONS = new Set<CliOption>(["base", "format"]);
 const FIX_OPTIONS = new Set<CliOption>(["format", "max-iterations", "write"]);
 const AGENT_LOOP_OPTIONS = new Set<CliOption>([
@@ -70,6 +75,7 @@ const usage = [
   "  chemd export <file> --format json|lnf|rag|training|training-full",
   "  chemd templates [template-id] [--json]",
   "  chemd new <template-id> --out <file> [--dry-run]",
+  "  chemd import prose <file> [--out <file>] [--format text|json] [--dry-run]",
   "  chemd graph <file...> [--format text|json]",
   "  chemd diff <old-file> <new-file> [--format text|json]",
   "  chemd changed [--base <ref>] [--format text|json]",
@@ -115,6 +121,7 @@ type RunChemdRepairLoop = (
     maxIterations?: number;
   }
 ) => ChemdRepairLoopResult;
+type ImportProseToChemd = typeof import("@chemd/importer-prose")["importProseToChemd"];
 
 interface CliWriter {
   write(chunk: string): unknown;
@@ -128,6 +135,7 @@ type CliCommand =
   | { type: "export"; filePath: string; format: ExportFormat }
   | { type: "templates"; json: boolean; templateId?: string }
   | { type: "new"; dryRun: boolean; outPath: string; templateId: string }
+  | { type: "import-prose"; dryRun: boolean; filePath: string; format: TextFormat; outPath?: string }
   | { type: "graph"; filePaths: string[]; format: TextFormat }
   | { type: "diff"; beforePath: string; afterPath: string; format: TextFormat }
   | { type: "changed"; base: string; format: TextFormat }
@@ -200,6 +208,24 @@ interface ChangedReport {
   schemaVersion: "chemd-changed/v0.1";
   base: string;
   files: ChangedFileReport[];
+}
+
+interface ProseImportCliReport {
+  schemaVersion: "chemd-import-prose/v0.1";
+  chemd: string;
+  compilerDiagnosticCounts: DiagnosticCounts;
+  compilerDiagnostics: Diagnostic[];
+  dryRun: boolean;
+  filePath: string;
+  importDiagnosticCounts: DiagnosticCounts;
+  importDiagnostics: readonly ImportDiagnostic[];
+  materialCount: number;
+  observationCount: number;
+  outPath?: string;
+  quantityCount: number;
+  stepCount: number;
+  valid: boolean;
+  wroteFile: boolean;
 }
 
 interface FixReportIteration {
@@ -607,6 +633,27 @@ const parseNewArgs = (args: string[]): CliCommand => {
   };
 };
 
+const parseImportArgs = (args: string[]): CliCommand => {
+  const {
+    dryRun,
+    format = "text",
+    out,
+    positional
+  } = parseCommandArgs(args, IMPORT_OPTIONS);
+
+  if (positional.length !== 2 || positional[0] !== "prose") {
+    throw new CliUsageError("Import requires: import prose <file>.");
+  }
+
+  return {
+    type: "import-prose",
+    dryRun,
+    filePath: positional[1],
+    format: asTextFormat(format, "Import"),
+    ...(out ? { outPath: out } : {})
+  };
+};
+
 const parseDiffArgs = (args: string[]): CliCommand => {
   const { format = "text", positional } = parseCommandArgs(args, FORMAT_OPTION);
 
@@ -737,6 +784,10 @@ export const parseChemdCliArgs = (argv: string[]): CliCommand => {
     return parseNewArgs(rest);
   }
 
+  if (command === "import") {
+    return parseImportArgs(rest);
+  }
+
   if (command === "graph") {
     return parseGraphArgs(rest);
   }
@@ -767,6 +818,10 @@ const loadCompiler = async (): Promise<{
   runChemdRepairLoop: RunChemdRepairLoop;
 }> => import("@chemd/compiler");
 
+const loadImporterProse = async (): Promise<{
+  importProseToChemd: ImportProseToChemd;
+}> => import("@chemd/importer-prose");
+
 const readSource = (filePath: string, cwd: string): string => {
   const resolvedPath = path.resolve(cwd, filePath);
 
@@ -790,6 +845,14 @@ const writeSource = (filePath: string, cwd: string, source: string): void => {
 };
 
 const countDiagnostics = (diagnostics: Diagnostic[]): DiagnosticCounts => ({
+  error: diagnostics.filter((diagnostic) => diagnostic.severity === "error").length,
+  warning: diagnostics.filter((diagnostic) => diagnostic.severity === "warning").length,
+  info: diagnostics.filter((diagnostic) => diagnostic.severity === "info").length
+});
+
+const countImportDiagnostics = (
+  diagnostics: readonly ImportDiagnostic[]
+): DiagnosticCounts => ({
   error: diagnostics.filter((diagnostic) => diagnostic.severity === "error").length,
   warning: diagnostics.filter((diagnostic) => diagnostic.severity === "warning").length,
   info: diagnostics.filter((diagnostic) => diagnostic.severity === "info").length
@@ -1213,6 +1276,112 @@ const newFromTemplate = (
   writeSource(command.outPath, options.cwd, source);
   options.stdout.write(`Created ${command.outPath} from ${command.templateId}\n`);
   return EXIT_OK;
+};
+
+const toImportDocumentId = (filePath: string): string => {
+  const baseName = path.parse(filePath).name.toLowerCase();
+  const slug = baseName
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
+
+  return `import-${slug || "prose"}`;
+};
+
+const toImportDocumentTitle = (filePath: string): string =>
+  `Imported ${path.parse(filePath).name || "prose"}`;
+
+const hasImportErrorDiagnostics = (
+  diagnostics: readonly ImportDiagnostic[]
+): boolean =>
+  countImportDiagnostics(diagnostics).error > 0;
+
+const toProseImportCliReport = (
+  command: Extract<CliCommand, { type: "import-prose" }>,
+  result: ProseToChemdResult,
+  wroteFile: boolean
+): ProseImportCliReport => ({
+  schemaVersion: "chemd-import-prose/v0.1",
+  chemd: result.chemd,
+  compilerDiagnosticCounts: countDiagnostics(result.compileResult.diagnostics ?? []),
+  compilerDiagnostics: result.compileResult.diagnostics ?? [],
+  dryRun: command.dryRun,
+  filePath: command.filePath,
+  importDiagnosticCounts: countImportDiagnostics(result.candidate.diagnostics),
+  importDiagnostics: result.candidate.diagnostics,
+  materialCount: result.candidate.materials.length,
+  observationCount: result.candidate.observations.length,
+  ...(command.outPath ? { outPath: command.outPath } : {}),
+  quantityCount: result.candidate.quantities.length,
+  stepCount: result.candidate.steps.length,
+  valid: result.valid && !hasImportErrorDiagnostics(result.candidate.diagnostics),
+  wroteFile
+});
+
+const formatImportDiagnostic = (diagnostic: ImportDiagnostic): string => {
+  const span = diagnostic.span ? `:${diagnostic.span.start}-${diagnostic.span.end}` : "";
+
+  return [
+    `prose${span}`,
+    diagnostic.severity,
+    diagnostic.code,
+    diagnostic.message
+  ].join(" ");
+};
+
+const formatProseImportText = (report: ProseImportCliReport): string => {
+  const lines = [
+    `Prose import ${report.filePath}`,
+    `  valid: ${report.valid ? "yes" : "no"}`,
+    `  wrote file: ${report.wroteFile ? "yes" : "no"}`,
+    `  materials: ${report.materialCount}`,
+    `  quantities: ${report.quantityCount}`,
+    `  steps: ${report.stepCount}`,
+    `  observations: ${report.observationCount}`,
+    `  import diagnostics: ${report.importDiagnosticCounts.error} error(s), ${report.importDiagnosticCounts.warning} warning(s), ${report.importDiagnosticCounts.info} info`,
+    `  compiler diagnostics: ${report.compilerDiagnosticCounts.error} error(s), ${report.compilerDiagnosticCounts.warning} warning(s), ${report.compilerDiagnosticCounts.info} info`
+  ];
+
+  for (const diagnostic of report.importDiagnostics) {
+    lines.push(formatImportDiagnostic(diagnostic));
+  }
+
+  for (const diagnostic of report.compilerDiagnostics) {
+    lines.push(formatDiagnostic(report.filePath, diagnostic));
+  }
+
+  if (!report.outPath || report.dryRun || !report.wroteFile) {
+    lines.push("  chemd draft:");
+    lines.push(report.chemd);
+  }
+
+  return lines.join("\n");
+};
+
+const importProseFile = async (
+  command: Extract<CliCommand, { type: "import-prose" }>,
+  importProseToChemd: ImportProseToChemd,
+  options: NormalizedRunOptions
+): Promise<number> => {
+  const source = readSource(command.filePath, options.cwd);
+  const result = await importProseToChemd(source, {
+    documentId: toImportDocumentId(command.filePath),
+    title: toImportDocumentTitle(command.filePath)
+  });
+  const canWrite = Boolean(command.outPath) && !command.dryRun && result.valid
+    && !hasImportErrorDiagnostics(result.candidate.diagnostics);
+
+  if (canWrite && command.outPath) {
+    writeSource(command.outPath, options.cwd, result.chemd);
+  }
+
+  const report = toProseImportCliReport(command, result, canWrite);
+  const output = command.format === "json"
+    ? JSON.stringify(report, null, 2)
+    : formatProseImportText(report);
+
+  options.stdout.write(`${output}\n`);
+  return report.valid ? EXIT_OK : EXIT_VALIDATION_FAILED;
 };
 
 const formatGraphIndexText = (index: ChemdTrainingGraphIndexV1): string => {
@@ -1705,6 +1874,12 @@ const executeCommand = (
 
   if (command.type === "new") {
     return Promise.resolve(newFromTemplate(command, options));
+  }
+
+  if (command.type === "import-prose") {
+    return loadImporterProse().then((importer) =>
+      importProseFile(command, importer.importProseToChemd, options)
+    );
   }
 
   if (command.type === "graph") {

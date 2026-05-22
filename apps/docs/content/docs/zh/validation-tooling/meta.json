@@ -2,6 +2,7 @@
   "title": "验证、诊断与工具链",
   "pages": [
     "cli-workflows",
+    "natural-language-import",
     "error-checking",
     "diagnostics-fix"
   ]

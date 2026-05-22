@@ -84,6 +84,8 @@ pnpm --filter @chemd/runtime-trace test
 | 包 | 职责 |
 | --- | --- |
 | `@chemd/cli` | validate、export、graph、diff、changed、fix、agent-loop |
+| `@chemd/chemical-lexicon` | 本地化学名称、alias、formula-like 和候选识别 |
+| `@chemd/importer-prose` | 本地实验文本到 Chemd 草稿的导入 pipeline |
 | `@chemd/language-service` | 编辑器语言服务 |
 | `@chemd/domain-templates` | 共享 `.chemd` 起始模板 catalog |
 | `@chemd/workspace-index` | workspace 文档索引能力 |
@@ -93,13 +95,15 @@ pnpm --filter @chemd/runtime-trace test
 | `@chemd/agent-tools` | agent 工具集成 |
 | `@chemd/diagnostics` | v0.3 diagnostics 构造与诊断数据模型 |
 
-这些包服务 CLI、web、desktop 和后端集成。`@chemd/diagnostics` 被 typechecker 使用，`@chemd/storage-postgres` 被 web routes 与 desktop Rust 后端相关路径使用，`@chemd/reaction-map` 与 reaction intelligence 数据面相连。
+这些包服务 CLI、web、desktop 和后端集成。`@chemd/importer-prose` 只生成可审阅草稿并交给 compiler 校验；它复用 `@chemd/chemical-lexicon`、`@chemd/core` 数量规则和 `@chemd/step-ontology` lowering，不拥有独立 Chemd 语言规则。`@chemd/diagnostics` 被 typechecker 使用，`@chemd/storage-postgres` 被 web routes 与 desktop Rust 后端相关路径使用，`@chemd/reaction-map` 与 reaction intelligence 数据面相连。
 
 ### 集成职责
 
 | 包 | 常见入口 | 验证重点 |
 | --- | --- | --- |
 | `@chemd/cli` | command modules 与 `packages/cli/bin/chemd.mjs` | command output、exit codes、fix/agent-loop workflows |
+| `@chemd/chemical-lexicon` | local provider 与 recognizer exports | alias 命中、formula-like warning、provider 边界 |
+| `@chemd/importer-prose` | import pipeline、render 和 compile helpers | Chemd 草稿可编译、数量和 step/observation 规则不漂移 |
 | `@chemd/language-service` | language service exports | schema-driven completion、editor diagnostics、incremental feedback |
 | `@chemd/domain-templates` | catalog exports | template ID、生成源码有效性、CLI `templates`/`new` 输出 |
 | `@chemd/workspace-index` | workspace indexing APIs | 多文件发现、graph input、changed-file behavior |

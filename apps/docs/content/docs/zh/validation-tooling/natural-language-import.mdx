@@ -1,0 +1,71 @@
+---
+title: 自然语言导入
+description: 将本地实验文本导入为 Chemd 草稿的 CLI、规则来源和校验边界。
+---
+
+自然语言导入用于把本地实验描述转换为可审阅的 `.chemd` 草稿。它不是新的 Chemd 语法，也不绕过编译器。导入层先从文本中抽取物质、数量、步骤和观察候选，再渲染为现有 Chemd 块语法，最后通过 `compileChemd` 校验。
+
+## CLI 用法
+
+```text
+pnpm chemd import prose procedure.txt
+pnpm chemd import prose procedure.txt --out draft.chemd
+pnpm chemd import prose procedure.txt --format json --dry-run
+```
+
+默认 text 输出会在没有 `--out` 时打印生成的 Chemd 草稿。传入 `--out` 时，只有生成草稿通过 compiler error 检查才会写入文件。`--dry-run` 永远不写文件。
+
+JSON 输出 schema 为 `chemd-import-prose/v0.1`，包含：
+
+- `materialCount`、`quantityCount`、`stepCount` 和 `observationCount`。
+- import diagnostics 与 compiler diagnostics 的 severity 汇总。
+- 生成的 `chemd` 草稿。
+- `valid`、`dryRun` 和 `wroteFile`。
+
+## 转换链路
+
+| 阶段 | 来源 | 说明 |
+| --- | --- | --- |
+| 物质识别 | `@chemd/chemical-lexicon` | 默认使用本地词库、alias、formula-like 识别和上下文置信度；不默认访问网络。 |
+| 数量识别 | `@chemd/core` | 使用 Chemd 数量 schema 和单位归一化；`78%` 是整体 percent literal，`78 %` 会产生 warning。 |
+| 步骤识别 | `@chemd/step-ontology` | 复用 procedure lowering 与 StepFamily 参数 schema。 |
+| 观察识别 | `@chemd/step-ontology` | 复用 observation lowering，保留事件类型、置信度和可关联步骤。 |
+| 草稿渲染 | `@chemd/importer-prose` | 只渲染现有 `:::procedure` 和 `:::observation` 语法。 |
+| 最终校验 | `@chemd/compiler` | 由 compiler 决定生成草稿是否满足当前 Chemd 语言契约。 |
+
+这样导入层不会维护一套独立语言规则。数量单位、step 参数和观察事件的判断都来自已有 Chemd 包；如果 Chemd 语言层更新，导入层通过这些公共 API 跟随更新。
+
+## 示例
+
+输入文本：
+
+```text
+加入 n-BuLi 后体系逐渐变深红色。
+```
+
+生成草稿：
+
+```md
+---
+id: import-procedure
+title: Imported procedure
+date: 2026-05-23
+---
+
+:::procedure #import-procedure
+step: add | id=s1 | materials=n-BuLi
+:::
+
+:::observation #import-observation
+event: color_change | id=e1 | linkedStep=s1 | confidence=0.78
+:::
+```
+
+该草稿仍然需要使用者审阅。导入层给出的 `confidence`、formula-like 物质、未知单位或参数 drift 都应视为需要确认的提示，不应直接当作已验证事实。
+
+## 边界
+
+- 当前默认离线运行，不默认调用 PubChem、ChemDataExtractor 或外部 API。
+- 物质识别先采用本地词库和规则；外部化学识别可通过 provider 接口接入，但结果仍必须进入同一 Chemd 编译校验链路。
+- 导入层不修改 Chemd 语言层，不新增 block grammar，不直接写 parser/resolver/typechecker schema。
+- 观察不是简单块级事实；事件、文字描述和步骤引用会保留为可审阅候选。

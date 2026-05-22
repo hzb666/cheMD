@@ -95,6 +95,16 @@ pnpm chemd new organic-synthesis/suzuki-screen --out exp.chemd
 pnpm chemd new analytical/hplc-purity --out hplc.chemd --dry-run
 ```
 
+## `pnpm chemd import prose`
+
+`import prose` 把本地实验文本导入为 `.chemd` 草稿。导入层负责识别候选物质、数量、步骤和观察；草稿仍由 compiler 校验。更完整的规则来源和边界见[自然语言导入](/zh/docs/validation-tooling/natural-language-import)。
+
+```text
+pnpm chemd import prose procedure.txt
+pnpm chemd import prose procedure.txt --out draft.chemd
+pnpm chemd import prose procedure.txt --format json --dry-run
+```
+
 ## `pnpm chemd graph`
 
 `graph` 接收多个文件。CLI 逐个编译文件，提取 training understanding，然后调用 `buildTrainingGraphIndexFromUnderstandings`。至少需要一个输入文件。输出格式支持 `text` 与 `json`。

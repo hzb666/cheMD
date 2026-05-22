@@ -223,6 +223,8 @@ step: heat | id=s-heat | temperature=80 C | duration=30 min
 :::
 `;
 
+const proseImportSource = "加入 n-BuLi 后体系逐渐变深红色。";
+
 const runInTempDir = async (
   argv: string[],
   files: Record<string, string>,
@@ -513,6 +515,59 @@ name: patient sample
       expect(readFileSync(path.join(dir, "exp.chemd"), "utf8")).toContain(":::condition-varies");
       expect(newStderr.value).toBe("");
     }));
+
+  it("imports prose to a Chemd draft in text mode", async () => {
+    const result = await runInTempDir(["import", "prose", "procedure.txt"], {
+      "procedure.txt": proseImportSource
+    });
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(result.stdout).toContain("Prose import procedure.txt");
+    expect(result.stdout).toContain(":::procedure #import-procedure");
+    expect(result.stdout).toContain("step: add");
+    expect(result.stdout).toContain(":::observation #import-observation");
+    expect(result.stdout).toContain("event: color_change");
+    expect(result.stderr).toBe("");
+  });
+
+  it("writes imported Chemd to --out and keeps stdout as a summary", async () =>
+    withTempDir(async (dir) => {
+      writeFileSync(path.join(dir, "procedure.txt"), proseImportSource);
+
+      const stdout = createWriter();
+      const stderr = createWriter();
+      const exitCode = await runChemdCli([
+        "import",
+        "prose",
+        "procedure.txt",
+        "--out",
+        "draft.chemd"
+      ], { cwd: dir, stderr, stdout });
+
+      expect(exitCode).toBe(EXIT_OK);
+      expect(stdout.value).toContain("wrote file: yes");
+      expect(stdout.value).not.toContain(":::procedure #import-procedure");
+      expect(readFileSync(path.join(dir, "draft.chemd"), "utf8")).toContain(
+        ":::procedure #import-procedure"
+      );
+      expect(stderr.value).toBe("");
+    }));
+
+  it("emits structured JSON for prose import", async () => {
+    const result = await runInTempDir(
+      ["import", "prose", "procedure.txt", "--format", "json"],
+      { "procedure.txt": proseImportSource }
+    );
+    const payload = JSON.parse(result.stdout);
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(payload.schemaVersion).toBe("chemd-import-prose/v0.1");
+    expect(payload.valid).toBe(true);
+    expect(payload.stepCount).toBeGreaterThan(0);
+    expect(payload.observationCount).toBeGreaterThan(0);
+    expect(payload.chemd).toContain("step: add");
+    expect(result.stderr).toBe("");
+  });
 
   it("rejects unsupported export formats", async () => {
     const result = await runInTempDir(["export", "valid.chemd", "--format", "xml"], {

@@ -1,0 +1,71 @@
+---
+title: Natural Language Import
+description: CLI, rule sources, and validation boundaries for importing local experiment prose into Chemd drafts.
+---
+
+Natural language import turns local experiment prose into a reviewable `.chemd` draft. It is not a new Chemd syntax and it does not bypass the compiler. The importer first extracts material, quantity, step, and observation candidates, renders existing Chemd block syntax, and then validates the draft through `compileChemd`.
+
+## CLI Usage
+
+```text
+pnpm chemd import prose procedure.txt
+pnpm chemd import prose procedure.txt --out draft.chemd
+pnpm chemd import prose procedure.txt --format json --dry-run
+```
+
+Text output prints the generated Chemd draft when `--out` is not provided. With `--out`, the CLI writes only when the generated draft has no compiler errors. `--dry-run` never writes files.
+
+The JSON schema is `chemd-import-prose/v0.1` and includes:
+
+- `materialCount`, `quantityCount`, `stepCount`, and `observationCount`.
+- Severity summaries for import diagnostics and compiler diagnostics.
+- The generated `chemd` draft.
+- `valid`, `dryRun`, and `wroteFile`.
+
+## Conversion Path
+
+| Stage | Source | Notes |
+| --- | --- | --- |
+| Material recognition | `@chemd/chemical-lexicon` | Uses the local lexicon, aliases, formula-like recognition, and context confidence by default; it does not call the network by default. |
+| Quantity recognition | `@chemd/core` | Uses the Chemd quantity schema and unit normalization; `78%` is a single percent literal, while `78 %` emits a warning. |
+| Step recognition | `@chemd/step-ontology` | Reuses procedure lowering and the StepFamily parameter schema. |
+| Observation recognition | `@chemd/step-ontology` | Reuses observation lowering while preserving event type, confidence, and optional linked step. |
+| Draft rendering | `@chemd/importer-prose` | Renders only existing `:::procedure` and `:::observation` syntax. |
+| Final validation | `@chemd/compiler` | The compiler decides whether the draft satisfies the current Chemd language contract. |
+
+This keeps the importer from owning a parallel language rule set. Quantity units, step parameters, and observation events come from existing Chemd packages; when the language layer changes, the importer follows those public APIs.
+
+## Example
+
+Input prose:
+
+```text
+加入 n-BuLi 后体系逐渐变深红色。
+```
+
+Generated draft:
+
+```md
+---
+id: import-procedure
+title: Imported procedure
+date: 2026-05-23
+---
+
+:::procedure #import-procedure
+step: add | id=s1 | materials=n-BuLi
+:::
+
+:::observation #import-observation
+event: color_change | id=e1 | linkedStep=s1 | confidence=0.78
+:::
+```
+
+The draft still needs user review. Import-layer `confidence`, formula-like materials, unknown units, and parameter drift warnings are review signals, not verified facts.
+
+## Boundaries
+
+- The default path is offline and does not call PubChem, ChemDataExtractor, or external APIs.
+- Material recognition starts with the local lexicon and rules; external chemical recognizers can be connected through provider interfaces, but their results must still pass through the same Chemd compiler validation path.
+- The importer does not modify the Chemd language layer, add block grammar, or write parser/resolver/typechecker schema.
+- Observations are not collapsed into a single block-level fact; events, prose, and step references remain reviewable candidates.

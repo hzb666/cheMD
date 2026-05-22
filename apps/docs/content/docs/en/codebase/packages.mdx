@@ -84,6 +84,8 @@ Rendering consumes the resolved document, render options, and typed graph. Expor
 | Package | Responsibility |
 | --- | --- |
 | `@chemd/cli` | validate, export, graph, diff, changed, fix, and agent-loop |
+| `@chemd/chemical-lexicon` | Local chemical names, aliases, formula-like mentions, and candidate recognition |
+| `@chemd/importer-prose` | Import pipeline from local experiment prose to Chemd drafts |
 | `@chemd/language-service` | Editor language service |
 | `@chemd/domain-templates` | Shared starter `.chemd` template catalog |
 | `@chemd/workspace-index` | Workspace document indexing |
@@ -93,13 +95,15 @@ Rendering consumes the resolved document, render options, and typed graph. Expor
 | `@chemd/agent-tools` | Agent tooling integration |
 | `@chemd/diagnostics` | v0.3 diagnostics construction and diagnostic data model |
 
-These packages serve CLI, web, desktop, and backend integration. `@chemd/diagnostics` is used by the typechecker, `@chemd/storage-postgres` serves web routes and desktop backend paths, and `@chemd/reaction-map` connects to reaction intelligence data surfaces.
+These packages serve CLI, web, desktop, and backend integration. `@chemd/importer-prose` only produces reviewable drafts and sends them through compiler validation; it reuses `@chemd/chemical-lexicon`, `@chemd/core` quantity rules, and `@chemd/step-ontology` lowering instead of owning a parallel Chemd language rule set. `@chemd/diagnostics` is used by the typechecker, `@chemd/storage-postgres` serves web routes and desktop backend paths, and `@chemd/reaction-map` connects to reaction intelligence data surfaces.
 
 ### Integration Responsibilities
 
 | Package | Common entrypoints | Verification focus |
 | --- | --- | --- |
 | `@chemd/cli` | command modules and `packages/cli/bin/chemd.mjs` | command output, exit codes, fix/agent-loop workflows |
+| `@chemd/chemical-lexicon` | local provider and recognizer exports | alias hits, formula-like warnings, provider boundaries |
+| `@chemd/importer-prose` | import pipeline, render, and compile helpers | compilable Chemd drafts, no drift from quantity and step/observation rules |
 | `@chemd/language-service` | language service exports | schema-driven completion, editor diagnostics, incremental feedback |
 | `@chemd/domain-templates` | catalog exports | template IDs, generated source validity, CLI `templates`/`new` output |
 | `@chemd/workspace-index` | workspace indexing APIs | multi-file discovery, graph input, changed-file behavior |

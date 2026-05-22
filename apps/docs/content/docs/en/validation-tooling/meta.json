@@ -2,6 +2,7 @@
   "title": "Validation, Diagnostics, and Tooling",
   "pages": [
     "cli-workflows",
+    "natural-language-import",
     "error-checking",
     "diagnostics-fix"
   ]

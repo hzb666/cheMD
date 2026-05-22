@@ -294,6 +294,9 @@ importers:
       '@chemd/domain-templates':
         specifier: workspace:*
         version: link:../domain-templates
+      '@chemd/importer-prose':
+        specifier: workspace:*
+        version: link:../importer-prose
       '@chemd/runtime-lab':
         specifier: workspace:*
         version: link:../runtime-lab
