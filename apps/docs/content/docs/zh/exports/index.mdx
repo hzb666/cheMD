@@ -38,6 +38,8 @@ result.stepGraph;
 
 CLI `export` 命令暴露 `json`、`lnf`、`rag`、`training` 和 `training-full`。HTML 与 DOCX 是 compile/app 输出，不是当前 CLI `export --format` 值。`graph` 命令会编译多个文件，并从它们的 training understanding 构建 graph index。
 
+Field value schema metadata 是 compiler/tooling contract，不是单独的导出格式。它用于对齐编辑器补全和 typed quantity 字段，同时保持现有 JSON、semantic graph、training、RAG、HTML、DOCX 和 LNF 输出形状不变。
+
 ## 最小源文件示例
 
 本节示例使用下面的紧凑记录：

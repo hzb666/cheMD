@@ -86,6 +86,11 @@ JSON payload 包含：
 
 `semantic.typedGraph` 是 compiler/typechecker 图，用于校验、规范化 quantity、reference checks、reaction participants、route checks 和 step checks。
 
+Field value schema metadata 不会在 JSON 中增加单独的导出对象。它的作用是让
+typechecker 与编辑器对既有字段类别保持一致。例如 `temperature`、`time`、
+`pressure`、result metrics、mass 字段和 purity 字段仍导出为相同的 `QuantityType`
+记录；这些 quantity class 会先通过共享 schema adapter 解析，再回退到旧常量。
+
 `training-full.semantic_layer` 是另一层导出，用于下游 training 和 graph projections。它把选定事实复制并增强为稳定实体，例如 `reactions`、`results`、`analyses`、`condition_variation_attempts` 和 `links`。
 
 需要忠实文档结构和 compiler typed semantics 时使用 JSON 导出。需要 learning、RAG 或 graph-ready projection 时使用 training 导出。
