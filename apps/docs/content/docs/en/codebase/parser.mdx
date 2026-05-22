@@ -73,12 +73,14 @@ product: @mol-c
 The parser splits `;;` into separate field segments and splits configured list fields such as `reactants` with `|`. Structured participant fields use single-field lines (`reactant`, `product`, `reac`, `prod`) so amount, equivalent, mass, volume, and `limiting=true` remain attached to the intended participant. Plural aliases (`reactants`, `products`) are simple list aliases only.
 
 At this layer, field values are still source-preserving strings or string
-arrays. Block schema currently defines field names, aliases, list modes, and a
-small set of enum-like completion values; quantity, reference, status, analysis
-type, atmosphere, and step parameter typing run later in the resolver,
+arrays. `@chemd/core` block schema defines field names, aliases, list modes,
+and additive `FieldValueSchema` metadata for value kinds such as enum, quantity,
+percent, reference, list, record, chemical, and domain values. Parser behavior
+does not consume this metadata yet. Quantity, reference, status, analysis type,
+atmosphere, and step parameter typing still run later in the resolver,
 typechecker, step ontology, and language-service layers. Typed field value
-schema work must therefore start as additive metadata and drift tests before it
-replaces any parser or compiler behavior.
+schema work therefore has to remain metadata-backed and drift-tested before it
+can replace existing parser or compiler behavior.
 
 ### Current Block Grammar Notes
 

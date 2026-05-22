@@ -37,11 +37,15 @@
   "notes": "Trellis loop on develop. Phase 1 must be behavior-preserving metadata and drift tests only; parser AST, typechecker typed graph, diagnostics, exports, and docs examples must not drift.",
   "meta": {
     "workflow": "trellis-loop",
-    "phase": "phase-0-baseline-complete",
+    "phase": "phase-1-core-schema-complete",
     "business_drift_policy": "no existing compile/parser/typechecker/render/export behavior changes",
     "phase_0": {
       "status": "complete",
       "summary": "Added current behavior baseline tests and parser docs describing raw field values before typed schema migration."
+    },
+    "phase_1": {
+      "status": "complete",
+      "summary": "Added additive core FieldValueSchema metadata, read-only schema helpers, tests, and codebase docs without changing consumers."
     }
   }
 }

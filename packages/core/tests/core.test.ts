@@ -6,10 +6,16 @@ import {
   CHEMD_KIND_VALUE_ALIASES,
   createDocument,
   createMarkdownNode,
+  getBlockFieldSchema,
   getBlockFieldListMode,
   getBlockListFieldSet,
   getCanonicalBlockFields,
   getCompletionBlockFieldSchemas,
+  getEnumFieldValues,
+  getFieldValueSchema,
+  getFieldValueSuggestions,
+  getQuantityFieldClass,
+  getReferenceTargetKinds,
   parseReferenceId
 } from "../src/index";
 
@@ -93,5 +99,38 @@ describe("block field schema baseline", () => {
     expect(getCompletionBlockFieldSchemas("chemd", "molecule").map((field) => field.name)).not.toContain(
       "temperature"
     );
+  });
+
+  it("describes field value kinds without changing field-name resolution", () => {
+    expect(getBlockFieldSchema("chemd", "reaction_smiles")?.name).toBe("rxn_smiles");
+    expect(getBlockFieldSchema("analysis", "analysisType")?.name).toBe("type");
+
+    expect(getFieldValueSchema("chemd", "temperature")).toMatchObject({
+      kind: "quantity",
+      quantityClass: "temperature"
+    });
+    expect(getQuantityFieldClass("result", "isolated_mass")).toBe("mass");
+    expect(getQuantityFieldClass("result", "yield")).toBe("percent");
+    expect(getReferenceTargetKinds("chemd", "reactant")).toEqual([
+      "molecule",
+      "material",
+      "batch"
+    ]);
+    expect(getReferenceTargetKinds("trace", "plan")).toEqual(["procedure"]);
+  });
+
+  it("keeps enum values, aliases, and suggestions explicit for later consumers", () => {
+    expect(getEnumFieldValues("chemd", "kind")).toEqual(["molecule", "reaction"]);
+    expect(getFieldValueSchema("chemd", "kind")).toMatchObject({
+      kind: "enum",
+      aliases: CHEMD_KIND_VALUE_ALIASES
+    });
+    expect(getEnumFieldValues("result", "status")).toEqual([
+      "success",
+      "partial",
+      "failed",
+      "unknown"
+    ]);
+    expect(getFieldValueSuggestions("result", "status")).toContain("pending");
   });
 });
