@@ -34,6 +34,10 @@ solvent: MeCN ;; temperature: 40 C ;; time: 2 h
 以及领域专用紧凑语法。TLC `spot`、analysis `peak`、MS `ion` 等领域字段仍保留
 作者写下的紧凑 record，后续由对应类型的 normalizer 解析。
 
+record 形字段保留自己的参数 schema。例如 reaction participant 有 head value，
+并包含 `amount`、`equiv`、`mass`、`volume` 和 `limiting` 参数；`condition-varies`
+声明暴露 `baseline` 和 quantity class 参数。
+
 ## 支持的块
 
 正文解析器当前支持以下结构化块形式。大多数条目来自 block parser registry；`:::template` 是 `parseChildren` 内部处理的特殊分支。

@@ -37,7 +37,7 @@
   "notes": "Trellis loop on develop. Phase 1 must be behavior-preserving metadata and drift tests only; parser AST, typechecker typed graph, diagnostics, exports, and docs examples must not drift.",
   "meta": {
     "workflow": "trellis-loop",
-    "phase": "phase-4-typechecker-schema-adapter-complete",
+    "phase": "phase-5-record-domain-helpers-complete",
     "business_drift_policy": "no existing compile/parser/typechecker/render/export behavior changes",
     "phase_0": {
       "status": "complete",
@@ -58,6 +58,10 @@
     "phase_4": {
       "status": "complete",
       "summary": "Added typechecker schema adapter for existing quantity field classes and equivalence tests while keeping legacy fallbacks."
+    },
+    "phase_5": {
+      "status": "complete",
+      "summary": "Added read-only record parameter and coarse domain query helpers, tests, and language fundamentals docs."
     }
   }
 }

@@ -14,10 +14,14 @@ import {
   getBlockListFieldSet,
   getCanonicalBlockFields,
   getCompletionBlockFieldSchemas,
+  getCoarseFieldValueSchema,
+  getDomainFieldKind,
   getEnumFieldValues,
   getFieldValueSchema,
   getFieldValueSuggestions,
   getQuantityFieldClass,
+  getRecordFieldHeadSchema,
+  getRecordFieldParamSchema,
   getReferenceTargetKinds,
   parseReferenceId
 } from "../src/index";
@@ -216,5 +220,32 @@ describe("block field schema baseline", () => {
     );
 
     expect(invalidAliases).toEqual([]);
+  });
+
+  it("exposes structured record field head and parameter schemas", () => {
+    expect(getRecordFieldHeadSchema("chemd", "reactant")).toMatchObject({
+      kind: "ref_or_literal",
+      targetKind: ["molecule", "material", "batch"]
+    });
+    expect(getRecordFieldParamSchema("chemd", "reactant", "amount")).toMatchObject({
+      kind: "quantity",
+      quantityClass: "amount"
+    });
+    expect(getRecordFieldParamSchema("chemd", "reactant", "limiting")).toMatchObject({
+      kind: "boolean"
+    });
+    expect(getRecordFieldParamSchema("condition-varies", "factor", "quantity")).toMatchObject({
+      kind: "enum",
+      values: expect.arrayContaining(["temperature", "time", "percent"])
+    });
+  });
+
+  it("exposes coarse domain field exceptions for later normalizers", () => {
+    expect(getDomainFieldKind("analysis", "spot")).toBe("tlc_spot");
+    expect(getCoarseFieldValueSchema("analysis", "spot")).toMatchObject({
+      domainKind: "tlc_spot",
+      reason: expect.stringContaining("shape")
+    });
+    expect(getCoarseFieldValueSchema("analysis", "type")).toBeUndefined();
   });
 });

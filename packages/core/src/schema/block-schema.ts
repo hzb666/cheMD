@@ -642,6 +642,23 @@ export const getListItemValueSchema = (
 ): FieldValueSchema | undefined =>
   value?.kind === "list" ? value.item : value;
 
+export const getRecordFieldHeadSchema = (
+  blockType: string,
+  fieldName: string
+): FieldValueSchema | undefined => {
+  const value = getListItemValueSchema(getFieldValueSchema(blockType, fieldName));
+  return value?.kind === "record" ? value.head : undefined;
+};
+
+export const getRecordFieldParamSchema = (
+  blockType: string,
+  fieldName: string,
+  paramName: string
+): FieldValueSchema | undefined => {
+  const value = getListItemValueSchema(getFieldValueSchema(blockType, fieldName));
+  return value?.kind === "record" ? value.params[paramName] : undefined;
+};
+
 export const getEnumFieldValues = (
   blockType: string,
   fieldName: string
@@ -677,6 +694,22 @@ export const getQuantityFieldClass = (
 
   return value?.kind === "percent" ? "percent" : undefined;
 };
+
+export const getDomainFieldKind = (
+  blockType: string,
+  fieldName: string
+): string | undefined => {
+  const value = getListItemValueSchema(getFieldValueSchema(blockType, fieldName));
+  return value?.kind === "domain" ? value.domainKind : undefined;
+};
+
+export const getCoarseFieldValueSchema = (
+  blockType: string,
+  fieldName: string
+): CoarseFieldValueSchema | undefined =>
+  FIELD_VALUE_SCHEMA_COARSE_FIELDS.find((item) =>
+    item.blockType === blockType && item.fieldName === fieldName
+  );
 
 const referenceTargetsToArray = (targetKind: FieldReferenceTargets): ReferenceTargetKind[] =>
   typeof targetKind === "string" ? [targetKind] : [...targetKind];

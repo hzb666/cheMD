@@ -36,6 +36,11 @@ compact syntax. Domain-specific fields such as TLC `spot`, analysis `peak`, and
 MS `ion` remain authored compact records until their type-specific normalizers
 run later in the pipeline.
 
+Record-shaped fields keep their own parameter schema. For example, reaction
+participants have a head value plus `amount`, `equiv`, `mass`, `volume`, and
+`limiting` parameters, while `condition-varies` declarations expose `baseline`
+and quantity-class parameters.
+
 ## Supported Blocks
 
 The body parser currently supports these structured block forms. Most entries are registered block parsers; `:::template` is a parser special-case handled by `parseChildren`.
