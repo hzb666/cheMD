@@ -29,6 +29,13 @@ List fields use `|` separators. Default list fields are `reactant`, `product`, `
 
 Each block parser declares an allowed field set. Unknown fields produce an error-level `W_UNKNOWN_FIELD` diagnostic and are omitted from the parsed node.
 
+Every canonical field also has a shared value category used by docs and
+tooling. Current categories include plain text, enum, quantity, percent,
+reference or literal, list, record, chemical identifier, and domain-specific
+compact syntax. Domain-specific fields such as TLC `spot`, analysis `peak`, and
+MS `ion` remain authored compact records until their type-specific normalizers
+run later in the pipeline.
+
 ## Supported Blocks
 
 The body parser currently supports these structured block forms. Most entries are registered block parsers; `:::template` is a parser special-case handled by `parseChildren`.

@@ -220,6 +220,88 @@ export const CHEMD_KIND_VALUE_ALIASES: Record<string, ChemdSemanticKind> = {
   reac: "reaction"
 };
 
+export interface CoarseFieldValueSchema {
+  blockType: string;
+  fieldName: string;
+  domainKind: string;
+  reason: string;
+}
+
+export const FIELD_VALUE_SCHEMA_COARSE_FIELDS: readonly CoarseFieldValueSchema[] = [
+  {
+    blockType: "chemd",
+    fieldName: "mw",
+    domainKind: "molecular_weight",
+    reason: "Molecular weight accepts authored text until formula/mass-unit normalization is centralized."
+  },
+  {
+    blockType: "material",
+    fieldName: "density",
+    domainKind: "density",
+    reason: "Density can be numeric, concentration-like, or supplier text in current documents."
+  },
+  {
+    blockType: "analysis",
+    fieldName: "frequency",
+    domainKind: "nmr_frequency",
+    reason: "NMR frequency is normalized by analysis-specific helpers, not the shared field schema."
+  },
+  {
+    blockType: "analysis",
+    fieldName: "spectrum",
+    domainKind: "analysis_spectrum",
+    reason: "Spectrum lines are analysis-type-specific compact records."
+  },
+  {
+    blockType: "analysis",
+    fieldName: "lane",
+    domainKind: "tlc_lane",
+    reason: "TLC lanes use stateful compact syntax parsed by TLC helpers."
+  },
+  {
+    blockType: "analysis",
+    fieldName: "spot",
+    domainKind: "tlc_spot",
+    reason: "TLC spots keep compact role, reference, shape, size, shade, and Rf syntax together."
+  },
+  {
+    blockType: "analysis",
+    fieldName: "mess",
+    domainKind: "tlc_mess",
+    reason: "TLC mess records are compact TLC lane entries."
+  },
+  {
+    blockType: "analysis",
+    fieldName: "base",
+    domainKind: "tlc_baseline",
+    reason: "TLC baseline records are compact TLC lane entries."
+  },
+  {
+    blockType: "analysis",
+    fieldName: "none",
+    domainKind: "tlc_none",
+    reason: "TLC none records are compact TLC lane entries."
+  },
+  {
+    blockType: "analysis",
+    fieldName: "peak",
+    domainKind: "analysis_peak",
+    reason: "Peak syntax differs across NMR, chromatography, and MS analysis types."
+  },
+  {
+    blockType: "analysis",
+    fieldName: "ion",
+    domainKind: "mass_spectrometry_ion",
+    reason: "Ion syntax is normalized by MS-specific analysis helpers."
+  },
+  {
+    blockType: "template",
+    fieldName: "bind",
+    domainKind: "template_bindings",
+    reason: "Template bindings are parsed by template expansion rather than shared block fields."
+  }
+];
+
 export const BLOCK_SCHEMAS: readonly BlockSchema[] = [
   {
     blockType: "chemd",

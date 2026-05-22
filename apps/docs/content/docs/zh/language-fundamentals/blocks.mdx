@@ -29,6 +29,11 @@ solvent: MeCN ;; temperature: 40 C ;; time: 2 h
 
 每个块解析器声明自己的允许字段集合。未知字段产生 error 级 `W_UNKNOWN_FIELD` 诊断，该字段不会写入解析节点。
 
+每个规范字段也有共享 value category，供文档和工具层使用。当前类别包括普通
+文本、enum、quantity、percent、reference 或 literal、list、record、化学标识符
+以及领域专用紧凑语法。TLC `spot`、analysis `peak`、MS `ion` 等领域字段仍保留
+作者写下的紧凑 record，后续由对应类型的 normalizer 解析。
+
 ## 支持的块
 
 正文解析器当前支持以下结构化块形式。大多数条目来自 block parser registry；`:::template` 是 `parseChildren` 内部处理的特殊分支。

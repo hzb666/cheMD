@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 
+import type { FieldValueSchema } from "../src/index";
 import {
+  BLOCK_SCHEMAS,
   buildReactionEntityIdFromReference,
   buildScopedReferenceId,
   CHEMD_KIND_VALUE_ALIASES,
   createDocument,
   createMarkdownNode,
+  FIELD_VALUE_SCHEMA_COARSE_FIELDS,
   getBlockFieldSchema,
   getBlockFieldListMode,
   getBlockListFieldSet,
@@ -18,6 +21,28 @@ import {
   getReferenceTargetKinds,
   parseReferenceId
 } from "../src/index";
+
+const collectEnumValueSchemas = (
+  value: FieldValueSchema | undefined
+): Array<Extract<FieldValueSchema, { kind: "enum" }>> => {
+  if (!value) {
+    return [];
+  }
+  if (value.kind === "enum") {
+    return [value];
+  }
+  if (value.kind === "list") {
+    return collectEnumValueSchemas(value.item);
+  }
+  if (value.kind === "record") {
+    return [
+      ...collectEnumValueSchemas(value.head),
+      ...Object.values(value.params).flatMap(collectEnumValueSchemas)
+    ];
+  }
+
+  return [];
+};
 
 describe("core AST helpers", () => {
   it("creates a document with stable metadata and children", () => {
@@ -132,5 +157,64 @@ describe("block field schema baseline", () => {
       "unknown"
     ]);
     expect(getFieldValueSuggestions("result", "status")).toContain("pending");
+  });
+
+  it("requires value metadata on every canonical block field", () => {
+    const missing = BLOCK_SCHEMAS.flatMap((schema) =>
+      schema.fields.flatMap((field) =>
+        field.value ? [] : [`${schema.blockType}.${field.name}`]
+      )
+    );
+
+    expect(missing).toEqual([]);
+  });
+
+  it("keeps coarse domain value metadata in an explicit exception list", () => {
+    const domainFields = BLOCK_SCHEMAS.flatMap((schema) =>
+      schema.fields.flatMap((field) =>
+        field.value?.kind === "domain"
+          ? [`${schema.blockType}.${field.name}:${field.value.domainKind}`]
+          : []
+      )
+    ).sort();
+    const exceptions = FIELD_VALUE_SCHEMA_COARSE_FIELDS.map((item) =>
+      `${item.blockType}.${item.fieldName}:${item.domainKind}`
+    ).sort();
+
+    expect(domainFields).toEqual(exceptions);
+  });
+
+  it("keeps legacy value maps aligned with enum value schemas", () => {
+    const mismatches = BLOCK_SCHEMAS.flatMap((schema) =>
+      schema.fields.flatMap((field) => {
+        if (!field.values) {
+          return [];
+        }
+
+        const uniqueLegacyValues = [...new Set(Object.values(field.values))].sort();
+        const enumValues = getEnumFieldValues(schema.blockType, field.name).sort();
+        return JSON.stringify(uniqueLegacyValues) === JSON.stringify(enumValues)
+          ? []
+          : [`${schema.blockType}.${field.name}`];
+      })
+    );
+
+    expect(mismatches).toEqual([]);
+  });
+
+  it("keeps enum aliases resolving to declared enum values", () => {
+    const invalidAliases = BLOCK_SCHEMAS.flatMap((schema) =>
+      schema.fields.flatMap((field) =>
+        collectEnumValueSchemas(field.value).flatMap((value) =>
+          Object.entries(value.aliases ?? {}).flatMap(([alias, canonical]) =>
+            value.values.includes(canonical)
+              ? []
+              : [`${schema.blockType}.${field.name}:${alias}->${canonical}`]
+          )
+        )
+      )
+    );
+
+    expect(invalidAliases).toEqual([]);
   });
 });
