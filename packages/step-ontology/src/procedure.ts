@@ -18,6 +18,31 @@ import {
   extractTemperature,
   splitProcedureSentences
 } from "./text";
+import {
+  ADD_MATERIAL_MARKERS,
+  ADD_STOP_MARKERS,
+  ADDITION_PATTERNS,
+  ANALYSIS_PATTERNS,
+  CHARGE_BEFORE_MARKERS,
+  CHARGE_MATERIAL_MARKERS,
+  CHARGE_STOP_MARKERS,
+  CONCENTRATE_PATTERNS,
+  COOL_PATTERNS,
+  DRY_PATTERNS,
+  EXTRACT_PATTERNS,
+  FILTER_PATTERNS,
+  HAZARDOUS_REAGENT_PATTERNS,
+  HEAT_PATTERNS,
+  HOLD_PATTERNS,
+  INITIAL_CHARGE_PATTERNS,
+  NITROGEN_CONTEXT_PATTERNS,
+  PURGE_PATTERNS,
+  QUENCH_PATTERNS,
+  SAMPLE_PATTERNS,
+  SEPARATE_LAYERS_PATTERNS,
+  SLOW_ADDITION_PATTERNS,
+  SOLVENT_MARKERS
+} from "./procedure-import-patterns";
 
 interface SentenceContext {
   procedureId?: string;
@@ -71,7 +96,7 @@ const createProcedureSource = (
   provenance
 });
 
-const hasAny = (text: string, patterns: RegExp[]): boolean =>
+const hasAny = (text: string, patterns: readonly RegExp[]): boolean =>
   patterns.some((pattern) => pattern.test(text));
 
 const textAfterAny = (sentence: string, markers: readonly string[]): string | undefined => {
@@ -124,17 +149,22 @@ const isInitialChineseChargeAddition = (sentence: string): boolean => {
 };
 
 const getAddMaterial = (sentence: string): string | undefined =>
-  cleanExtractedText(stopAtAny(textAfterAny(sentence, ["滴加", "加入", "added dropwise", "added", "add"]) ?? "", ["后", "到", "至"])) || undefined;
+  cleanExtractedText(stopAtAny(textAfterAny(sentence, ADD_MATERIAL_MARKERS) ?? "", ADD_STOP_MARKERS)) || undefined;
 
 const getChargeMaterial = (sentence: string): string | undefined =>
-  cleanExtractedText(stopAtAny(textAfterAny(sentence, ["将"]) ?? textBeforeAny(sentence, ["charged", "charge"]) ?? "", ["加入", "置于", "溶于", "charged", "charge"])) || undefined;
+  cleanExtractedText(
+    stopAtAny(
+      textAfterAny(sentence, CHARGE_MATERIAL_MARKERS) ?? textBeforeAny(sentence, CHARGE_BEFORE_MARKERS) ?? "",
+      CHARGE_STOP_MARKERS
+    )
+  ) || undefined;
 
 const getSolvent = (sentence: string): string | undefined =>
-  readTokenAfterAny(sentence, ["溶于", "into", "in"]);
+  readTokenAfterAny(sentence, SOLVENT_MARKERS);
 
 const lowerCharge = (context: SentenceContext): CanonicalStepNode[] => {
   const isInitialCharge = context.sentenceIndex === 0
-    && hasAny(context.sentence, [/将.+(?:加入|置于|溶于)/, /\bcharged\b/i]);
+    && hasAny(context.sentence, INITIAL_CHARGE_PATTERNS);
 
   if (!isInitialCharge) {
     return [];
@@ -147,7 +177,7 @@ const lowerCharge = (context: SentenceContext): CanonicalStepNode[] => {
 };
 
 const lowerEnvironment = (context: SentenceContext): CanonicalStepNode[] => {
-  if (hasAny(context.sentence, [/氮气置换/, /nitrogen\s+purge/i, /\bpurged\b/i])) {
+  if (hasAny(context.sentence, PURGE_PATTERNS)) {
     return [createStep(context, "purge", {
       atmosphere: "nitrogen",
       ...(extractDuration(context.sentence) ? { duration: extractDuration(context.sentence) } : {})
@@ -161,11 +191,11 @@ const lowerTemperature = (context: SentenceContext): CanonicalStepNode[] => {
   const temperature = extractTemperature(context.sentence);
   const steps: CanonicalStepNode[] = [];
 
-  if (hasAny(context.sentence, [/冷却|冰浴/, /\bcooled?\b/i, /\bcooling\b/i])) {
+  if (hasAny(context.sentence, COOL_PATTERNS)) {
     steps.push(createStep(context, "cool", { target_temperature: temperature }, 0.9, ["changes_temperature"]));
   }
 
-  if (hasAny(context.sentence, [/加热|升温/, /\bheated?\b/i, /\bwarmed?\b/i])) {
+  if (hasAny(context.sentence, HEAT_PATTERNS)) {
     steps.push(createStep(context, "heat", { target_temperature: temperature }, 0.88, ["changes_temperature"]));
   }
 
@@ -173,26 +203,26 @@ const lowerTemperature = (context: SentenceContext): CanonicalStepNode[] => {
 };
 
 const lowerAddition = (context: SentenceContext): CanonicalStepNode[] => {
-  if (hasAny(context.sentence, [/淬灭/, /\bquench(?:ed)?\b/i])) {
+  if (hasAny(context.sentence, QUENCH_PATTERNS)) {
     return [createStep(context, "quench", {
       ...(getAddMaterial(context.sentence) ? { agent: getAddMaterial(context.sentence) } : {})
     }, 0.86)];
   }
 
-  if (!hasAny(context.sentence, [/滴加|加入/, /\badd(?:ed)?\b/i])) {
+  if (!hasAny(context.sentence, ADDITION_PATTERNS)) {
     return [];
   }
 
   return [createStep(context, "add", {
     ...(getAddMaterial(context.sentence) ? { materials: getAddMaterial(context.sentence) } : {}),
-    ...(hasAny(context.sentence, [/滴加|缓慢/, /dropwise|slowly/i]) ? { mode: "dropwise" } : {}),
-    ...(hasAny(context.sentence, [/氮气下/, /under\s+nitrogen/i]) ? { atmosphere: "nitrogen" } : {})
-  }, 0.84, hasAny(context.sentence, [/n-?BuLi/i]) ? ["consumes_hazardous_reagent"] : [])];
+    ...(hasAny(context.sentence, SLOW_ADDITION_PATTERNS) ? { mode: "dropwise" } : {}),
+    ...(hasAny(context.sentence, NITROGEN_CONTEXT_PATTERNS) ? { atmosphere: "nitrogen" } : {})
+  }, 0.84, hasAny(context.sentence, HAZARDOUS_REAGENT_PATTERNS) ? ["consumes_hazardous_reagent"] : [])];
 };
 
 const lowerProcess = (context: SentenceContext): CanonicalStepNode[] => {
   const duration = extractDuration(context.sentence);
-  const isHold = hasAny(context.sentence, [/反应|保温|搅拌/, /\bstir(?:red)?\b/i, /\bhold\b/i]);
+  const isHold = hasAny(context.sentence, HOLD_PATTERNS);
 
   return isHold && duration
     ? [createStep(context, "hold", { duration }, 0.86)]
@@ -200,7 +230,7 @@ const lowerProcess = (context: SentenceContext): CanonicalStepNode[] => {
 };
 
 const lowerWorkup = (context: SentenceContext): CanonicalStepNode[] => {
-  if (hasAny(context.sentence, [/萃取/, /\bextract(?:ed)?\b/i])) {
+  if (hasAny(context.sentence, EXTRACT_PATTERNS)) {
     const extractionSolvent = textBeforeAny(context.sentence, ["萃取"]);
     return [createStep(context, "extract", {
       ...(extractionSolvent ? { solvent: cleanExtractedText(extractionSolvent) } : {}),
@@ -208,7 +238,7 @@ const lowerWorkup = (context: SentenceContext): CanonicalStepNode[] => {
     }, 0.84, ["creates_biphasic_system"])];
   }
 
-  if (hasAny(context.sentence, [/干燥/, /\bdried?\b/i])) {
+  if (hasAny(context.sentence, DRY_PATTERNS)) {
     return [createStep(context, "dry", { agent: cleanExtractedText(textBeforeAny(context.sentence, ["干燥"]) ?? "") || undefined }, 0.82)];
   }
 
@@ -216,15 +246,15 @@ const lowerWorkup = (context: SentenceContext): CanonicalStepNode[] => {
 };
 
 const lowerMechanicalWorkup = (context: SentenceContext): CanonicalStepNode[] => {
-  if (hasAny(context.sentence, [/旋干|浓缩/, /\bconcentrat(?:e|ed)\b/i])) {
+  if (hasAny(context.sentence, CONCENTRATE_PATTERNS)) {
     return [createStep(context, "concentrate", { method: "rotavap" }, 0.84)];
   }
 
-  if (hasAny(context.sentence, [/分液|取有机层/, /separat(?:e|ed)\s+layers/i])) {
+  if (hasAny(context.sentence, SEPARATE_LAYERS_PATTERNS)) {
     return [createStep(context, "separate_layers", {}, 0.82, ["creates_biphasic_system"])];
   }
 
-  if (hasAny(context.sentence, [/过滤/, /\bfilter(?:ed)?\b/i])) {
+  if (hasAny(context.sentence, FILTER_PATTERNS)) {
     return [createStep(context, "filter", {}, 0.82)];
   }
 
@@ -234,11 +264,11 @@ const lowerMechanicalWorkup = (context: SentenceContext): CanonicalStepNode[] =>
 const lowerAnalysis = (context: SentenceContext): CanonicalStepNode[] => {
   const steps: CanonicalStepNode[] = [];
 
-  if (hasAny(context.sentence, [/取样/, /\bsampl(?:e|ed|ing)\b/i])) {
+  if (hasAny(context.sentence, SAMPLE_PATTERNS)) {
     steps.push(createStep(context, "sample", {}, 0.88, ["requires_sampling"]));
   }
 
-  if (hasAny(context.sentence, [/TLC|HPLC|NMR|分析/i])) {
+  if (hasAny(context.sentence, ANALYSIS_PATTERNS)) {
     steps.push(createStep(context, "analyze", { type: extractAnalysisType(context.sentence) }, 0.88));
   }
 
