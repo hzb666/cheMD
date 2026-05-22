@@ -1686,3 +1686,37 @@ importer-prose 通过 step-ontology lowering 生成 step/observation frames，�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 131: 导入 IR 渲染 Chemd 草稿并编译校验
+
+**Date**: 2026-05-23
+**Task**: 导入 IR 渲染 Chemd 草稿并编译校验
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+importer-prose 新增 Chemd 草稿渲染与 compileChemd 校验入口；验证 importer-prose test/typecheck 与 compiler v03-language 测试通过。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `db82b09` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
