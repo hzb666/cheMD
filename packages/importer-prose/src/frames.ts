@@ -15,6 +15,7 @@ import type {
   StepFrame,
   UnparsedProseSpan
 } from "./types";
+import { createCoverageLedger } from "./coverage";
 
 interface FrameExtractionResult {
   steps: StepFrame[];
@@ -159,15 +160,20 @@ export const extractProseFrames = (sourceText: string): FrameExtractionResult =>
   const observations = observationEvents.map((event, index) =>
     observationToFrame(sourceText, event, index)
   );
+  const coverage = createCoverageLedger(sourceText, steps, observations, unparsedSpans);
 
   return {
     steps,
     observations,
-    unparsedSpans,
+    unparsedSpans: [
+      ...unparsedSpans,
+      ...coverage.unparsedSpans
+    ],
     diagnostics: [
       ...convertStepDiagnostics(procedure.diagnostics),
       ...(observations.length > 0 ? convertObservationDiagnostics(observation.diagnostics) : []),
-      ...createStepParamDiagnostics(sourceText, steps)
+      ...createStepParamDiagnostics(sourceText, steps),
+      ...coverage.diagnostics
     ]
   };
 };

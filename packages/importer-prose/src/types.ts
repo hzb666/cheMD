@@ -97,7 +97,7 @@ export interface ReactionCandidate {
 
 export interface UnparsedProseSpan extends ProseSourceSpan {
   id: string;
-  reason: "no_canonical_step";
+  reason: "no_canonical_step" | "uncovered_action_like";
   confidence: number;
 }
 

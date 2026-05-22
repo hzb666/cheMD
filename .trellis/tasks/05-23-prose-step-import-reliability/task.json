@@ -3,7 +3,7 @@
   "name": "prose-step-import-reliability",
   "title": "Prose step import reliability",
   "description": "Improve English SI procedure step import with clause coverage and conservative warnings while keeping Chemd schema as source of truth.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": "step-ontology",
