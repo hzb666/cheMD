@@ -1822,3 +1822,37 @@ Planned the three SI import/state-model tasks and added the initial reaction can
 ### Next Steps
 
 - None - task complete
+
+
+## Session 135: Prose reaction import phase 2
+
+**Date**: 2026-05-23
+**Task**: Prose reaction import phase 2
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+Added schema-driven reaction block rendering for reaction candidates, linked rendered reaction blocks to procedures, and kept low-confidence empty candidates out of generated Chemd.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `eaad1da` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
