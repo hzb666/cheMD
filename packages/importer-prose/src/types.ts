@@ -34,6 +34,9 @@ export interface MaterialMention {
 export interface QuantityMention {
   id: string;
   raw: string;
+  value: number;
+  unit: string;
+  canonicalUnit?: string;
   span: ProseSourceSpan;
   quantityClass?: string;
   confidence: number;

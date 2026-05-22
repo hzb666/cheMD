@@ -7,7 +7,8 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@chemd/chemical-lexicon": "workspace:*"
+    "@chemd/chemical-lexicon": "workspace:*",
+    "@chemd/core": "workspace:*"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json --noEmit",
