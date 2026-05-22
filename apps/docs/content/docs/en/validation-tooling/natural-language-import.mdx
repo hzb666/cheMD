@@ -3,7 +3,7 @@ title: Natural Language Import
 description: CLI, rule sources, and validation boundaries for importing local experiment prose into Chemd drafts.
 ---
 
-Natural language import turns local experiment prose into a reviewable `.chemd` draft. It is not a new Chemd syntax and it does not bypass the compiler. The importer first extracts material, quantity, step, and observation candidates, renders existing Chemd block syntax, and then validates the draft through `compileChemd`.
+Natural language import turns local experiment prose into a reviewable `.chemd` draft. It is not a new Chemd syntax and it does not bypass the compiler. The importer first extracts material, quantity, step, observation, and reaction candidates, renders existing Chemd block syntax, and then validates the draft through `compileChemd`.
 
 ## CLI Usage
 
@@ -30,19 +30,21 @@ The JSON schema is `chemd-import-prose/v0.1` and includes:
 | Quantity recognition | `@chemd/core` | Uses the Chemd quantity schema and unit normalization; `78%` is a single percent literal, while `78 %` emits a warning. |
 | Step recognition | `@chemd/step-ontology` | Reuses procedure lowering and the StepFamily parameter schema. |
 | Observation recognition | `@chemd/step-ontology` | Reuses observation lowering while preserving event type, confidence, and optional linked step. |
-| Draft rendering | `@chemd/importer-prose` | Renders only existing `:::procedure` and `:::observation` syntax. |
+| Reaction candidate recognition | material, quantity, and step evidence | Builds a reaction candidate only from high-confidence reaction-stage evidence; explicit product evidence is required before a reaction block is rendered. |
+| Reaction rendering | existing Chemd schema and compiler | Renders existing `:::chemd kind: reaction` fields through the current Chemd schema/compiler surface; the importer does not define a separate reaction language. |
+| Draft rendering | `@chemd/importer-prose` | Renders existing `:::chemd`, `:::procedure`, and `:::observation` syntax. |
 | Final validation | `@chemd/compiler` | The compiler decides whether the draft satisfies the current Chemd language contract. |
 
-This keeps the importer from owning a parallel language rule set. Quantity units, step parameters, and observation events come from existing Chemd packages; when the language layer changes, the importer follows those public APIs.
+This keeps the importer from owning a parallel language rule set. Quantity units, step parameters, reaction fields, and observation events come from existing Chemd packages; when the language layer changes, the importer follows those public APIs.
 
-Text that is not covered by a rule is not treated as a high-confidence structured fact. The importer keeps it in `unparsedSpans` and diagnostics; only content recognized as canonical steps is rendered into `:::procedure`.
+Text that is not covered by a rule is not treated as a high-confidence structured fact. The importer keeps it in `unparsedSpans` and diagnostics; only content recognized as canonical steps is rendered into `:::procedure`, and only high-confidence reaction-stage facts are rendered into `:::chemd kind: reaction`.
 
 ## Example
 
-Input prose:
+English SI input:
 
 ```text
-加入 n-BuLi 后体系逐渐变深红色。
+To a solution of substrate6 and acyl-silane7 in THF at -78 °C was added sBuLi dropwise. The reaction was stirred for 15 min and afforded azetidine5. H2O was then added to quench the reaction, and the mixture was extracted with EtOAc. The combined organic phases were dried (MgSO4), filtered, and concentrated under reduced pressure. The residue was purified by flash column chromatography on silica gel.
 ```
 
 Generated draft:
@@ -54,16 +56,35 @@ title: Imported procedure
 date: 2026-05-23
 ---
 
-:::procedure #import-procedure
-step: add | id=s1 | materials=n-BuLi
+:::chemd #import-reaction-1
+kind: reaction
+reactant: substrate6 and acyl-silane7
+product: azetidine5
+reagents: sBuLi
+solvent: THF
+temperature: -78 °C
+time: 15 min
 :::
 
-:::observation #import-observation
-event: color_change | id=e1 | linkedStep=s1 | confidence=0.78
+:::procedure #import-procedure
+reaction: @import-reaction-1
+step: charge | id=s1 | materials=substrate6 and acyl-silane7 | solvent=THF
+step: cool | id=s2 | target_temperature=-78 °C
+step: add | id=s3 | materials=sBuLi | mode=dropwise
+step: hold | id=s4 | duration=15 min
+step: quench | id=s5 | agent=H2O
+step: extract | id=s6 | solvent=EtOAc
+step: dry | id=s7 | agent=MgSO4
+step: concentrate | id=s8 | method=reduced_pressure
+step: purify | id=s9 | technique=flash column chromatography | medium=silica gel
 :::
 ```
 
-The draft still needs user review. Import-layer `confidence`, formula-like materials, unknown units, and parameter drift warnings are review signals, not verified facts.
+The reaction summary is intentionally narrower than the procedure. `H2O`, `EtOAc`, `MgSO4`, and flash chromatography stay in the procedure/workup trail and are not written into reaction `reagents` or `solvent`.
+
+The importer can still create observation-only drafts from prose such as `加入 n-BuLi 后体系逐渐变深红色。`; that path keeps the observation as a reviewable candidate when there is no reaction candidate.
+
+The draft still needs user review. Import-layer `confidence`, formula-like materials, unknown units, excluded workup materials, and parameter drift warnings are review signals, not verified facts.
 
 ## Boundaries
 
@@ -71,3 +92,5 @@ The draft still needs user review. Import-layer `confidence`, formula-like mater
 - Material recognition starts with the local lexicon and rules; external chemical recognizers can be connected through provider interfaces, but their results must still pass through the same Chemd compiler validation path.
 - The importer does not modify the Chemd language layer, add block grammar, or write parser/resolver/typechecker schema.
 - Observations are not collapsed into a single block-level fact; events, prose, and step references remain reviewable candidates.
+- A reaction block is rendered only when the importer sees an explicit product signal such as `afforded` or `yielded`, because current Chemd reaction drafts need a `product`. Without that signal, the importer emits a warning and still keeps the procedure draft.
+- Workup, quench, extraction, drying, and purification materials are excluded from reaction fields and produce warnings instead of being silently written into `reagents` or `solvent`.

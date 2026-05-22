@@ -60,6 +60,111 @@ solvent: THF
     });
   });
 
+  it("exports prose-import reaction and linked procedure shape through training layers", () => {
+    const document = resolveChemd(parseChemd(`---
+id: exp-prose-import-export
+title: Prose import export
+date: 2026-05-23
+---
+
+:::chemd #import-reaction-1
+kind: reaction
+reactant: substrate
+product: product 5
+reagents: sBuLi
+solvent: THF
+time: 15 min
+:::
+
+:::procedure #import-procedure
+reaction: @import-reaction-1
+step: charge | materials=substrate
+step: add | materials=sBuLi
+step: hold | duration=15 min
+step: purify | method=column chromatography
+:::
+`));
+    const checked = typecheckDocument(document);
+    const record = exportTrainingRecordFromDocument(document, {
+      stepGraph: checked.stepGraph,
+      typedGraph: checked.typedGraph,
+      exportedAt: "2026-05-23T00:00:00.000Z"
+    });
+    const understanding = buildTrainingUnderstandingFromRecord(record);
+    const reaction = record.semantic_layer.reactions.find((candidate) =>
+      candidate.original_id === "import-reaction-1"
+    );
+    const procedurePair = record.learning_layer.procedure_to_steps?.find((pair) =>
+      pair.procedure_id === "import-procedure"
+    );
+    const procedureSnapshot = record.source_layer.raw_children.find((node) =>
+      node.node_type === "procedure" && node.original_id === "import-procedure"
+    );
+
+    expect(checked.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
+    expect(reaction).toMatchObject({
+      original_id: "import-reaction-1",
+      reactants: [
+        expect.objectContaining({
+          raw: "substrate",
+          reference_status: "literal"
+        })
+      ],
+      products: [
+        expect.objectContaining({
+          raw: "product 5",
+          reference_status: "literal"
+        })
+      ],
+      reagents_raw: "sBuLi",
+      solvent_raw: "THF",
+      time_raw: "15 min",
+      normalized_conditions: {
+        solvent: {
+          raw: "THF",
+          normalized: "tetrahydrofuran"
+        },
+        reagents: expect.objectContaining({
+          raw: "sBuLi",
+          normalized: expect.arrayContaining(["sBuLi"])
+        }),
+        time: expect.objectContaining({
+          value: 15,
+          unit: "min"
+        })
+      }
+    });
+    expect(procedureSnapshot?.raw_payload).toMatchObject({
+      reaction: "@import-reaction-1"
+    });
+    expect(procedurePair).toMatchObject({
+      procedure_id: "import-procedure",
+      source_type: "explicit_steps",
+      steps: [
+        expect.objectContaining({ family: "charge" }),
+        expect.objectContaining({ family: "add" }),
+        expect.objectContaining({ family: "hold" }),
+        expect.objectContaining({ family: "purify" })
+      ]
+    });
+    expect(understanding.knowledge_graph.nodes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        node_id: "rxn::exp-prose-import-export::import-reaction-1",
+        node_type: "reaction"
+      }),
+      expect.objectContaining({
+        node_id: "proc::exp-prose-import-export::import-procedure",
+        node_type: "procedure"
+      })
+    ]));
+    expect(understanding.knowledge_graph.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        edge_type: "procedure_has_step",
+        from_node_id: "proc::exp-prose-import-export::import-procedure"
+      })
+    ]));
+  });
+
   it("exports CAS separately from SMILES for molecule semantics", () => {
     const document = resolveChemd(parseChemd(`---
 id: exp-export-cas
