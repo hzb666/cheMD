@@ -13,7 +13,7 @@ import type {
 } from "./types";
 import { scanProseQuantities } from "./quantity";
 import { extractProseFrames } from "./frames";
-import { buildReactionCandidates } from "./reaction-candidates";
+import { buildReactionCandidateResult } from "./reaction-candidates";
 
 const createSpan = (sourceText: string, start: number, end: number): ProseSourceSpan => ({
   start,
@@ -65,7 +65,7 @@ export const importProse = async (
   const materials = mentions.map((mention, index) => mentionToMaterial(sourceText, mention, index));
   const quantityResult = scanProseQuantities(sourceText);
   const frameResult = extractProseFrames(sourceText);
-  const reactionCandidates = buildReactionCandidates({
+  const reactionResult = buildReactionCandidateResult({
     sourceText,
     materials,
     quantities: quantityResult.quantities,
@@ -78,12 +78,13 @@ export const importProse = async (
     quantities: quantityResult.quantities,
     steps: frameResult.steps,
     observations: frameResult.observations,
-    reactionCandidates,
+    reactionCandidates: reactionResult.candidates,
     unparsedSpans: frameResult.unparsedSpans,
     diagnostics: [
       ...createLowConfidenceFormulaDiagnostics(sourceText, materials),
       ...quantityResult.diagnostics,
       ...frameResult.diagnostics,
+      ...reactionResult.diagnostics,
       {
         code: "I_IMPORT_CHEMICAL_PROVIDER",
         severity: "info",

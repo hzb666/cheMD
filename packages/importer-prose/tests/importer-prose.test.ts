@@ -206,6 +206,21 @@ describe("prose importer skeleton", () => {
     expect(result.compileResult.diagnostics.map((diagnostic) => diagnostic.severity)).not.toContain("error");
   });
 
+  it("warns instead of rendering a reaction block without an explicit product", async () => {
+    const result = await importProseToChemd(
+      "To a solution of substrate in THF was added sBuLi dropwise. The reaction was stirred for 15 min.",
+      { documentId: "exp-no-product", title: "No product", date: "2026-05-23" }
+    );
+
+    expect(result.valid).toBe(true);
+    expect(result.candidate.reactionCandidates).toEqual([]);
+    expect(result.chemd).not.toContain(":::chemd #import-reaction-1");
+    expect(result.candidate.diagnostics).toContainEqual(expect.objectContaining({
+      code: "W_IMPORT_REACTION_PRODUCT_REQUIRED",
+      severity: "warning"
+    }));
+  });
+
   it("imports a wrapped English SI procedure into a compiler-valid Chemd draft", async () => {
     const result = await importProseToChemd(siProcedureSource, {
       documentId: "exp-si-import",
@@ -218,10 +233,42 @@ describe("prose importer skeleton", () => {
       .map((diagnostic) => diagnostic.code);
     const extractSteps = result.candidate.steps.filter((step) => step.family === "extract");
     const addSteps = result.candidate.steps.filter((step) => step.family === "add");
+    const reactionCandidate = result.candidate.reactionCandidates[0];
+    const reactionBlock = result.chemd.slice(
+      result.chemd.indexOf(":::chemd #import-reaction-1"),
+      result.chemd.indexOf(":::", result.chemd.indexOf("kind: reaction"))
+    );
 
     expect(result.valid).toBe(true);
-    expect(result.candidate.reactionCandidates).toEqual([]);
-    expect(result.chemd).not.toContain(":::chemd");
+    expect(result.candidate.reactionCandidates).not.toEqual([]);
+    expect(result.chemd).toContain(":::chemd #import-reaction-1");
+    expect(result.chemd).toContain("kind: reaction");
+    expect(reactionBlock).toContain("reactant:");
+    expect(reactionBlock).toContain("reagents:");
+    expect(reactionBlock).toContain("solvent: THF");
+    expect(reactionBlock).toContain("temperature: -78 °C");
+    expect(reactionBlock).toContain("time: 15 min");
+    expect(reactionBlock).not.toContain("solvent: EtOAc");
+    expect(reactionBlock).not.toContain("reagents: EtOAc");
+    expect(reactionBlock).not.toContain("MgSO4");
+    expect(reactionBlock).not.toContain("H2O");
+    expect(reactionCandidate.rejectedFacts.map((fact) => fact.raw)).toEqual(expect.arrayContaining([
+      "H2O (10 mL)",
+      "EtOAc",
+      "MgSO4"
+    ]));
+    expect(reactionCandidate.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "W_IMPORT_REACTION_WORKUP_EXCLUDED",
+        severity: "warning"
+      })
+    );
+    expect(result.candidate.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "W_IMPORT_REACTION_WORKUP_EXCLUDED",
+        severity: "warning"
+      })
+    );
     expect(errorCodes).toEqual([]);
     expect(families).toEqual(expect.arrayContaining([
       "charge",
