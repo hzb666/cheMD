@@ -1584,3 +1584,37 @@ Changed compact ordinary unit spacing from an error to W_QUANTITY_UNIT_SPACING w
 ### Next Steps
 
 - None - task complete
+
+
+## Session 128: 建立 prose importer 包骨架
+
+**Date**: 2026-05-23
+**Task**: 建立 prose importer 包骨架
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+新增 @chemd/importer-prose IR、provider re-export 和离线材料识别 pipeline；验证 importer-prose test/typecheck 通过。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c02082c` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

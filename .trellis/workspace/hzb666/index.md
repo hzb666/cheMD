@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-3.md`
-- **Total Sessions**: 127
+- **Total Sessions**: 128
 - **Last Active**: 2026-05-23
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-3.md` | ~1586 | Active |
+| `journal-3.md` | ~1620 | Active |
 | `journal-2.md` | ~1956 | Archived |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
@@ -31,6 +31,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 128 | 2026-05-23 | 建立 prose importer 包骨架 | `c02082c` | `develop` |
 | 127 | 2026-05-23 | 建立本地 chemical lexicon | `84812c1` | `develop` |
 | 126 | 2026-05-23 | 补 procedure 导入规则漂移测试 | `1a4b463` | `develop` |
 | 125 | 2026-05-23 | 集中 procedure 导入规则 | `0dc42ec` | `develop` |
