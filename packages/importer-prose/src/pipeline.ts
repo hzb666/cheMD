@@ -12,6 +12,7 @@ import type {
   ProseSourceSpan
 } from "./types";
 import { scanProseQuantities } from "./quantity";
+import { extractProseFrames } from "./frames";
 
 const createSpan = (sourceText: string, start: number, end: number): ProseSourceSpan => ({
   start,
@@ -62,16 +63,18 @@ export const importProse = async (
   });
   const materials = mentions.map((mention, index) => mentionToMaterial(sourceText, mention, index));
   const quantityResult = scanProseQuantities(sourceText);
+  const frameResult = extractProseFrames(sourceText);
 
   return {
     sourceText,
     materials,
     quantities: quantityResult.quantities,
-    steps: [],
-    observations: [],
+    steps: frameResult.steps,
+    observations: frameResult.observations,
     diagnostics: [
       ...createLowConfidenceFormulaDiagnostics(sourceText, materials),
       ...quantityResult.diagnostics,
+      ...frameResult.diagnostics,
       {
         code: "I_IMPORT_CHEMICAL_PROVIDER",
         severity: "info",

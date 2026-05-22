@@ -10,8 +10,6 @@ describe("prose importer skeleton", () => {
       "dichloromethane",
       "brine"
     ]);
-    expect(result.steps).toEqual([]);
-    expect(result.observations).toEqual([]);
   });
 
   it("emits a confirmation diagnostic for unresolved formula-like mentions", async () => {
@@ -21,17 +19,19 @@ describe("prose importer skeleton", () => {
       normalizedName: "C6H6",
       source: "formula-like"
     });
-    expect(result.diagnostics).toEqual([
+    expect(result.diagnostics).toContainEqual(
       expect.objectContaining({
         code: "W_IMPORT_FORMULA_UNRESOLVED",
         severity: "warning"
-      }),
+      })
+    );
+    expect(result.diagnostics).toContainEqual(
       expect.objectContaining({
         code: "I_IMPORT_CHEMICAL_PROVIDER",
         severity: "info",
         facts: { provider: "local-lexicon" }
       })
-    ]);
+    );
   });
 
   it("allows formula-like detection to be disabled", async () => {
@@ -40,11 +40,11 @@ describe("prose importer skeleton", () => {
     });
 
     expect(result.materials).toEqual([]);
-    expect(result.diagnostics).toEqual([
+    expect(result.diagnostics).toContainEqual(
       expect.objectContaining({
         code: "I_IMPORT_CHEMICAL_PROVIDER"
       })
-    ]);
+    );
   });
 
   it("extracts quantities from the Chemd quantity schema", async () => {
@@ -109,5 +109,39 @@ describe("prose importer skeleton", () => {
         }
       })
     );
+  });
+
+  it("builds step frames through the Chemd step ontology lowerer", async () => {
+    const result = await importProse([
+      "1. 将底物溶于 THF，冷却至 -78 °C。",
+      "2. 在氮气下缓慢滴加 n-BuLi。"
+    ].join("\n"));
+
+    expect(result.steps.map((step) => step.family)).toEqual([
+      "charge",
+      "cool",
+      "add"
+    ]);
+    expect(result.steps[1].params).toMatchObject({
+      target_temperature: "-78 °C"
+    });
+    expect(result.steps[2].params).toMatchObject({
+      mode: "dropwise",
+      atmosphere: "nitrogen"
+    });
+  });
+
+  it("builds observation frames with linked step evidence", async () => {
+    const result = await importProse("加入 n-BuLi 后体系逐渐变深红色。");
+
+    expect(result.observations[0]).toMatchObject({
+      rawText: "加入 n-BuLi 后体系逐渐变深红色。",
+      confidence: 0.78
+    });
+    expect(result.observations[0].evidence).toEqual([
+      "step_ontology.observation.event",
+      "eventType:color_change",
+      "linkedStepFamily:add"
+    ]);
   });
 });

@@ -2,6 +2,7 @@ import type {
   ChemicalLookupProvider,
   ChemicalMention
 } from "@chemd/chemical-lexicon";
+import type { StepFamily } from "@chemd/step-ontology";
 
 export interface ProseSourceSpan {
   start: number;
@@ -44,7 +45,7 @@ export interface QuantityMention {
 
 export interface StepFrame {
   id: string;
-  family: string;
+  family: StepFamily;
   params: Record<string, unknown>;
   span: ProseSourceSpan;
   confidence: number;

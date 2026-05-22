@@ -386,6 +386,9 @@ importers:
       '@chemd/core':
         specifier: workspace:*
         version: link:../core
+      '@chemd/step-ontology':
+        specifier: workspace:*
+        version: link:../step-ontology
 
   packages/interoperability: {}
 
