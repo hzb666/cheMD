@@ -57,6 +57,32 @@ describe("procedure and observation lowering", () => {
     ]);
   });
 
+  it("keeps decimal quantities and wrapped SI prose together while lowering English steps", () => {
+    const result = lowerProcedureToSteps({
+      procedureId: "proc-si",
+      body: [
+        "To a solution of freshly made 6 (99.8 mg, 1.40 equiv) and TMEDA (0.221 mL, 4.50 equiv) in THF (2.3 mL) at",
+        "−78 °C was added sBuLi (1.30 M in cyclohexane/hexane, 1.13 mL, 4.50 equiv) dropwise and the",
+        "resulting solution was stirred for 15 min at −78 °C."
+      ].join("\n")
+    });
+
+    expect(result.steps.map((step) => step.family)).toEqual([
+      "charge",
+      "cool",
+      "add",
+      "hold"
+    ]);
+    expect(result.steps[0].params.materials).toContain("99.8 mg");
+    expect(result.steps[1].params.target_temperature).toBe("-78 °C");
+    expect(result.steps[2].params.materials).toContain("sBuLi");
+    expect(result.steps[2].params.mode).toBe("dropwise");
+    expect(result.steps[3].params.duration).toBe("15 min");
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+      "W_PROCEDURE_PROSE_LOWERED"
+    ]);
+  });
+
   it("lowers observations and analysis blocks without new surface syntax", () => {
     const observation = lowerObservationToEvents({
       observationId: "obs-1",

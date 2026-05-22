@@ -64,12 +64,19 @@ export interface ObservationFrame {
   evidence: readonly string[];
 }
 
+export interface UnparsedProseSpan extends ProseSourceSpan {
+  id: string;
+  reason: "no_canonical_step";
+  confidence: number;
+}
+
 export interface ProseImportCandidate {
   sourceText: string;
   materials: readonly MaterialMention[];
   quantities: readonly QuantityMention[];
   steps: readonly StepFrame[];
   observations: readonly ObservationFrame[];
+  unparsedSpans: readonly UnparsedProseSpan[];
   diagnostics: readonly ImportDiagnostic[];
 }
 

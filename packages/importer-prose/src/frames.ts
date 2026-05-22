@@ -12,12 +12,14 @@ import type {
   ImportDiagnostic,
   ObservationFrame,
   ProseSourceSpan,
-  StepFrame
+  StepFrame,
+  UnparsedProseSpan
 } from "./types";
 
 interface FrameExtractionResult {
   steps: StepFrame[];
   observations: ObservationFrame[];
+  unparsedSpans: UnparsedProseSpan[];
   diagnostics: ImportDiagnostic[];
 }
 
@@ -119,6 +121,20 @@ const convertObservationDiagnostics = (
     facts: diagnostic.facts
   }));
 
+const isUnparsedObserveStep = (step: StepFrame): boolean =>
+  step.family === "observe"
+  && typeof step.params.raw === "string"
+  && step.confidence <= 0.4;
+
+const toUnparsedSpan = (step: StepFrame, index: number): UnparsedProseSpan => ({
+  id: `unparsed:${index + 1}`,
+  start: step.span.start,
+  end: step.span.end,
+  text: step.span.text,
+  reason: "no_canonical_step",
+  confidence: step.confidence
+});
+
 export const extractProseFrames = (sourceText: string): FrameExtractionResult => {
   const procedure = lowerProcedureToSteps({
     procedureId: "import-prose",
@@ -130,21 +146,27 @@ export const extractProseFrames = (sourceText: string): FrameExtractionResult =>
   });
 
   let fromIndex = 0;
-  const steps = procedure.steps.map((step, index) => {
+  const stepFrames = procedure.steps.map((step, index) => {
     const frame = stepToFrame(sourceText, step, index, fromIndex);
     fromIndex = frame.span.end;
     return frame;
   });
-  const observations = observation.events.map((event, index) =>
+  const steps = stepFrames.filter((step) => !isUnparsedObserveStep(step));
+  const unparsedSpans = stepFrames
+    .filter(isUnparsedObserveStep)
+    .map(toUnparsedSpan);
+  const observationEvents = observation.events.filter((event) => event.eventType);
+  const observations = observationEvents.map((event, index) =>
     observationToFrame(sourceText, event, index)
   );
 
   return {
     steps,
     observations,
+    unparsedSpans,
     diagnostics: [
       ...convertStepDiagnostics(procedure.diagnostics),
-      ...convertObservationDiagnostics(observation.diagnostics),
+      ...(observations.length > 0 ? convertObservationDiagnostics(observation.diagnostics) : []),
       ...createStepParamDiagnostics(sourceText, steps)
     ]
   };

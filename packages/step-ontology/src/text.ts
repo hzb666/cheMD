@@ -6,6 +6,16 @@ const splitLines = (value: string): string[] =>
 
 const isDigit = (char: string): boolean => char >= "0" && char <= "9";
 
+const SENTENCE_ABBREVIATIONS = new Set([
+  "aq",
+  "sat",
+  "conc",
+  "ca",
+  "eq",
+  "equiv",
+  "vol"
+]);
+
 const readNumberStart = (text: string, index: number, allowNegative: boolean): number | undefined => {
   if (allowNegative && text[index] === "-" && isDigit(text[index + 1] ?? "")) {
     return index;
@@ -68,11 +78,37 @@ const stripListMarker = (line: string): string => {
   return line;
 };
 
+const readTokenBefore = (text: string, index: number): string => {
+  let cursor = index - 1;
+  while (cursor >= 0 && /[A-Za-z]/.test(text[cursor] ?? "")) cursor -= 1;
+  return text.slice(cursor + 1, index);
+};
+
+const readNextNonWhitespace = (text: string, index: number): string | undefined => {
+  let cursor = index + 1;
+  while (isWhitespace(text[cursor] ?? "")) cursor += 1;
+  return text[cursor];
+};
+
+const isDecimalPoint = (line: string, index: number): boolean =>
+  isDigit(line[index - 1] ?? "") && isDigit(line[index + 1] ?? "");
+
+const isAbbreviationPeriod = (line: string, index: number): boolean =>
+  SENTENCE_ABBREVIATIONS.has(readTokenBefore(line, index).toLowerCase());
+
+const isSentencePeriod = (line: string, index: number): boolean => {
+  if (line[index] !== ".") return false;
+  if (isDecimalPoint(line, index) || isAbbreviationPeriod(line, index)) return false;
+  const next = readNextNonWhitespace(line, index);
+  return next === undefined || /[A-Z0-9(]/.test(next);
+};
+
 const splitSentenceLine = (line: string): string[] => {
   const result: string[] = [];
   let start = 0;
   for (let index = 0; index < line.length; index += 1) {
-    if ("。.;；".includes(line[index])) {
+    const char = line[index];
+    if ("。;；".includes(char) || isSentencePeriod(line, index)) {
       result.push(line.slice(start, index + 1));
       start = index + 1;
       while (isWhitespace(line[start] ?? "")) start += 1;
@@ -98,6 +134,7 @@ export const normalizeText = (value: string): string => {
   let normalized = "";
   let pendingSpace = false;
   for (const char of value.trim()) {
+    const normalizedChar = char === "−" || char === "–" ? "-" : char;
     if (isWhitespace(char)) {
       pendingSpace = normalized.length > 0;
       continue;
@@ -106,7 +143,7 @@ export const normalizeText = (value: string): string => {
       normalized += " ";
       pendingSpace = false;
     }
-    normalized += char;
+    normalized += normalizedChar;
   }
   return normalized;
 };
@@ -138,6 +175,11 @@ export const extractDuration = (text: string): string | undefined =>
 
 export const extractRepeatCount = (text: string): number | undefined => {
   const lower = text.toLowerCase();
+  const symbolic = lower.match(/\b(\d+)\s*[×x]\s*\d+/u);
+  if (symbolic) {
+    return Number(symbolic[1]);
+  }
+
   for (let index = 0; index < lower.length; index += 1) {
     if (!isDigit(lower[index])) continue;
     let cursor = index;
@@ -169,9 +211,13 @@ export const splitProcedureSentences = (body: string | undefined): string[] => {
     return [];
   }
 
-  return body
-    .split("\n")
-    .map((line) => stripListMarker(line.endsWith("\r") ? line.slice(0, -1) : line))
+  const rawLines = splitLines(body).filter((line) => line.trim());
+  const hasOrderedLines = rawLines.some(isOrderedListLine);
+  const sentenceInputs = hasOrderedLines
+    ? rawLines.map(stripListMarker)
+    : [rawLines.map((line) => stripListMarker(line).trim()).join(" ")];
+
+  return sentenceInputs
     .flatMap(splitSentenceLine)
     .map(normalizeText)
     .filter(Boolean);

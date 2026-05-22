@@ -224,6 +224,7 @@ interface ProseImportCliReport {
   outPath?: string;
   quantityCount: number;
   stepCount: number;
+  unparsedSpanCount: number;
   valid: boolean;
   wroteFile: boolean;
 }
@@ -1314,6 +1315,7 @@ const toProseImportCliReport = (
   ...(command.outPath ? { outPath: command.outPath } : {}),
   quantityCount: result.candidate.quantities.length,
   stepCount: result.candidate.steps.length,
+  unparsedSpanCount: result.candidate.unparsedSpans.length,
   valid: result.valid && !hasImportErrorDiagnostics(result.candidate.diagnostics),
   wroteFile
 });
@@ -1338,6 +1340,7 @@ const formatProseImportText = (report: ProseImportCliReport): string => {
     `  quantities: ${report.quantityCount}`,
     `  steps: ${report.stepCount}`,
     `  observations: ${report.observationCount}`,
+    `  unparsed spans: ${report.unparsedSpanCount}`,
     `  import diagnostics: ${report.importDiagnosticCounts.error} error(s), ${report.importDiagnosticCounts.warning} warning(s), ${report.importDiagnosticCounts.info} info`,
     `  compiler diagnostics: ${report.compilerDiagnosticCounts.error} error(s), ${report.compilerDiagnosticCounts.warning} warning(s), ${report.compilerDiagnosticCounts.info} info`
   ];

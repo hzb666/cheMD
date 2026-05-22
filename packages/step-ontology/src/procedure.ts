@@ -37,6 +37,7 @@ import {
   INITIAL_CHARGE_PATTERNS,
   NITROGEN_CONTEXT_PATTERNS,
   PURGE_PATTERNS,
+  PURIFY_PATTERNS,
   QUENCH_PATTERNS,
   SAMPLE_PATTERNS,
   SEPARATE_LAYERS_PATTERNS,
@@ -126,6 +127,15 @@ const stopAtAny = (text: string, markers: readonly string[]): string => {
   return index === undefined ? text : text.slice(0, index);
 };
 
+const stopAtAnyPhrase = (text: string, markers: readonly string[]): string => {
+  const lower = text.toLowerCase();
+  const index = markers
+    .map((candidate) => lower.indexOf(candidate.toLowerCase()))
+    .filter((candidate) => candidate >= 0)
+    .sort((left, right) => left - right)[0];
+  return index === undefined ? text : text.slice(0, index);
+};
+
 const readTokenAfterAny = (sentence: string, markers: readonly string[]): string | undefined => {
   const after = textAfterAny(sentence, markers)?.trimStart();
   if (!after) return undefined;
@@ -151,16 +161,101 @@ const isInitialChineseChargeAddition = (sentence: string): boolean => {
 const getAddMaterial = (sentence: string): string | undefined =>
   cleanExtractedText(stopAtAny(textAfterAny(sentence, ADD_MATERIAL_MARKERS) ?? "", ADD_STOP_MARKERS)) || undefined;
 
-const getChargeMaterial = (sentence: string): string | undefined =>
-  cleanExtractedText(
+const cleanMaterialText = (value: string | undefined): string | undefined => {
+  const cleaned = cleanExtractedText(
+    stopAtAnyPhrase(value ?? "", [
+      " and the ",
+      " before ",
+      " to quench",
+      " then ",
+      " dropwise"
+    ])
+  );
+  if (/^(?:dropwise|slowly|to\s+quench|and\s+the|the\s+reaction|the\s+resulting)\b/i.test(cleaned)) {
+    return undefined;
+  }
+  return cleaned || undefined;
+};
+
+const getPassiveAddedAfterMaterial = (sentence: string): string | undefined => {
+  const match = sentence.match(/\bwas\s+(?:then\s+)?added\s+(.+?)(?:$|\s+dropwise\b|\s+and\b|\s+before\b|\s+to\b)/i);
+  return cleanMaterialText(match?.[1]);
+};
+
+const getPassiveAddedBeforeMaterial = (sentence: string): string | undefined => {
+  const match = sentence.match(/^(.+?)\s+was\s+(?:then\s+)?added\b/i);
+  const candidate = cleanMaterialText(match?.[1]);
+  if (!candidate) return undefined;
+  if (/^(to\s+(?:a\s+solution|this)|the\s+reaction|the\s+resulting\s+solution)\b/i.test(candidate)) {
+    return undefined;
+  }
+  return candidate;
+};
+
+const getAdditionOfMaterial = (sentence: string): string | undefined => {
+  const match = sentence.match(/\baddition\s+of\s+(.+?)(?:$|\s+in\b|\s+and\b|\s+before\b)/i);
+  return cleanMaterialText(match?.[1]);
+};
+
+const uniqueValues = (values: readonly (string | undefined)[]): string[] =>
+  [...new Set(values.filter((value): value is string => Boolean(value)))];
+
+const getAddMaterials = (sentence: string): string[] =>
+  getPassiveAddedAfterMaterial(sentence) && !getPassiveAddedBeforeMaterial(sentence)
+    ? uniqueValues([
+        getPassiveAddedAfterMaterial(sentence),
+        getAdditionOfMaterial(sentence)
+      ])
+    : uniqueValues([
+        getPassiveAddedBeforeMaterial(sentence),
+        getAdditionOfMaterial(sentence),
+        cleanMaterialText(getAddMaterial(sentence))
+      ]);
+
+const getChargeMaterial = (sentence: string): string | undefined => {
+  const solutionMatch = sentence.match(/\bto a solution of\s+(.+?)(?:\s+in\s+|\s+was\s+added\b)/i);
+  if (solutionMatch?.[1]) {
+    return cleanExtractedText(solutionMatch[1]) || undefined;
+  }
+
+  return cleanExtractedText(
     stopAtAny(
       textAfterAny(sentence, CHARGE_MATERIAL_MARKERS) ?? textBeforeAny(sentence, CHARGE_BEFORE_MARKERS) ?? "",
       CHARGE_STOP_MARKERS
     )
   ) || undefined;
+};
 
 const getSolvent = (sentence: string): string | undefined =>
   readTokenAfterAny(sentence, SOLVENT_MARKERS);
+
+const getExtractionSolvent = (sentence: string): string | undefined => {
+  const match = sentence.match(/\bextracted\s+with\s+([A-Za-z][A-Za-z0-9/-]*)/i);
+  return cleanExtractedText(match?.[1] ?? "") || undefined;
+};
+
+const getDryingAgent = (sentence: string): string | undefined => {
+  const match = sentence.match(/\bdried\s*\(([^)]+)\)/i);
+  return cleanExtractedText(match?.[1] ?? textBeforeAny(sentence, ["干燥"]) ?? "") || undefined;
+};
+
+const getFilterMedium = (sentence: string): string | undefined => {
+  const match = sentence.match(/\bfiltered\s+(?:through|over|via)\s+(.+?)(?:$|,|\band\b)/i);
+  return cleanExtractedText(match?.[1] ?? "") || undefined;
+};
+
+const getPurificationParams = (sentence: string): Record<string, unknown> => ({
+  technique: /flash\s+column\s+chromatography/i.test(sentence)
+    ? "flash column chromatography"
+    : "chromatography",
+  ...(sentence.match(/\bon\s+silica\s+gel\b/i) ? { medium: "silica gel" } : {})
+});
+
+const getTemperatureAfterAny = (sentence: string, markers: readonly string[]): string | undefined =>
+  extractTemperature(textAfterAny(sentence, markers) ?? "") ?? extractTemperature(sentence);
+
+const hasColdAtCondition = (sentence: string): boolean =>
+  /\bat\s+-\d+(?:\.\d+)?\s*°?\s*C\b/i.test(sentence);
 
 const lowerCharge = (context: SentenceContext): CanonicalStepNode[] => {
   const isInitialCharge = context.sentenceIndex === 0
@@ -188,14 +283,15 @@ const lowerEnvironment = (context: SentenceContext): CanonicalStepNode[] => {
 };
 
 const lowerTemperature = (context: SentenceContext): CanonicalStepNode[] => {
-  const temperature = extractTemperature(context.sentence);
   const steps: CanonicalStepNode[] = [];
 
-  if (hasAny(context.sentence, COOL_PATTERNS)) {
+  if (hasAny(context.sentence, COOL_PATTERNS) || hasColdAtCondition(context.sentence)) {
+    const temperature = getTemperatureAfterAny(context.sentence, ["cooled", "cooling", "冷却", "at"]);
     steps.push(createStep(context, "cool", { target_temperature: temperature }, 0.9, ["changes_temperature"]));
   }
 
   if (hasAny(context.sentence, HEAT_PATTERNS)) {
+    const temperature = getTemperatureAfterAny(context.sentence, ["warmed", "heated", "加热", "升温"]);
     steps.push(createStep(context, "heat", { target_temperature: temperature }, 0.88, ["changes_temperature"]));
   }
 
@@ -203,21 +299,23 @@ const lowerTemperature = (context: SentenceContext): CanonicalStepNode[] => {
 };
 
 const lowerAddition = (context: SentenceContext): CanonicalStepNode[] => {
+  const materials = getAddMaterials(context.sentence);
+
   if (hasAny(context.sentence, QUENCH_PATTERNS)) {
-    return [createStep(context, "quench", {
-      ...(getAddMaterial(context.sentence) ? { agent: getAddMaterial(context.sentence) } : {})
-    }, 0.86)];
+    return materials[0]
+      ? [createStep(context, "quench", { agent: materials[0] }, 0.86)]
+      : [];
   }
 
   if (!hasAny(context.sentence, ADDITION_PATTERNS)) {
     return [];
   }
 
-  return [createStep(context, "add", {
-    ...(getAddMaterial(context.sentence) ? { materials: getAddMaterial(context.sentence) } : {}),
+  return materials.map((material) => createStep(context, "add", {
+    materials: material,
     ...(hasAny(context.sentence, SLOW_ADDITION_PATTERNS) ? { mode: "dropwise" } : {}),
     ...(hasAny(context.sentence, NITROGEN_CONTEXT_PATTERNS) ? { atmosphere: "nitrogen" } : {})
-  }, 0.84, hasAny(context.sentence, HAZARDOUS_REAGENT_PATTERNS) ? ["consumes_hazardous_reagent"] : [])];
+  }, 0.84, hasAny(context.sentence, HAZARDOUS_REAGENT_PATTERNS) ? ["consumes_hazardous_reagent"] : []));
 };
 
 const lowerProcess = (context: SentenceContext): CanonicalStepNode[] => {
@@ -230,35 +328,49 @@ const lowerProcess = (context: SentenceContext): CanonicalStepNode[] => {
 };
 
 const lowerWorkup = (context: SentenceContext): CanonicalStepNode[] => {
+  const steps: CanonicalStepNode[] = [];
+
   if (hasAny(context.sentence, EXTRACT_PATTERNS)) {
-    const extractionSolvent = textBeforeAny(context.sentence, ["萃取"]);
-    return [createStep(context, "extract", {
+    const extractionSolvent = getExtractionSolvent(context.sentence)
+      ?? textBeforeAny(context.sentence, ["萃取"]);
+    steps.push(createStep(context, "extract", {
       ...(extractionSolvent ? { solvent: cleanExtractedText(extractionSolvent) } : {}),
       ...(extractRepeatCount(context.sentence) ? { repeats: extractRepeatCount(context.sentence) } : {})
-    }, 0.84, ["creates_biphasic_system"])];
+    }, 0.84, ["creates_biphasic_system"]));
   }
 
   if (hasAny(context.sentence, DRY_PATTERNS)) {
-    return [createStep(context, "dry", { agent: cleanExtractedText(textBeforeAny(context.sentence, ["干燥"]) ?? "") || undefined }, 0.82)];
+    steps.push(createStep(context, "dry", {
+      ...(getDryingAgent(context.sentence) ? { agent: getDryingAgent(context.sentence) } : {})
+    }, 0.82));
   }
 
-  return lowerMechanicalWorkup(context);
+  return [
+    ...steps,
+    ...lowerMechanicalWorkup(context)
+  ];
 };
 
 const lowerMechanicalWorkup = (context: SentenceContext): CanonicalStepNode[] => {
+  const steps: CanonicalStepNode[] = [];
+
   if (hasAny(context.sentence, CONCENTRATE_PATTERNS)) {
-    return [createStep(context, "concentrate", { method: "rotavap" }, 0.84)];
+    steps.push(createStep(context, "concentrate", { method: "reduced_pressure" }, 0.84));
   }
 
   if (hasAny(context.sentence, SEPARATE_LAYERS_PATTERNS)) {
-    return [createStep(context, "separate_layers", {}, 0.82, ["creates_biphasic_system"])];
+    steps.push(createStep(context, "separate_layers", {}, 0.82, ["creates_biphasic_system"]));
   }
 
-  if (hasAny(context.sentence, FILTER_PATTERNS)) {
-    return [createStep(context, "filter", {}, 0.82)];
+  if (hasAny(context.sentence, FILTER_PATTERNS) && getFilterMedium(context.sentence)) {
+    steps.push(createStep(context, "filter", { medium: getFilterMedium(context.sentence) }, 0.82));
   }
 
-  return [];
+  if (hasAny(context.sentence, PURIFY_PATTERNS)) {
+    steps.push(createStep(context, "purify", getPurificationParams(context.sentence), 0.84));
+  }
+
+  return steps;
 };
 
 const lowerAnalysis = (context: SentenceContext): CanonicalStepNode[] => {

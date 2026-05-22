@@ -21,7 +21,7 @@ interface QuantityScanResult {
   diagnostics: ImportDiagnostic[];
 }
 
-const NUMBER_PATTERN = "[+-]?\\d+(?:\\.\\d+)?";
+const NUMBER_PATTERN = "[+\\-−–]?\\d+(?:\\.\\d+)?";
 const UNKNOWN_UNIT_PATTERN = new RegExp(
   `(?<![A-Za-z0-9.])(${NUMBER_PATTERN})\\s+([A-Za-z°℃%][A-Za-z/%°℃-]*)`,
   "gu"
@@ -89,7 +89,7 @@ const createQuantity = (
   if (match.index === undefined) return undefined;
 
   const raw = match[0];
-  const value = Number(match[1]);
+  const value = Number(match[1].replace(/[−–]/g, "-"));
   if (!Number.isFinite(value)) return undefined;
 
   return {

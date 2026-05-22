@@ -20,7 +20,7 @@ JSON 输出 schema 为 `chemd-import-prose/v0.1`，包含：
 - `materialCount`、`quantityCount`、`stepCount` 和 `observationCount`。
 - import diagnostics 与 compiler diagnostics 的 severity 汇总。
 - 生成的 `chemd` 草稿。
-- `valid`、`dryRun` 和 `wroteFile`。
+- `valid`、`dryRun`、`wroteFile` 和 `unparsedSpanCount`。
 
 ## 转换链路
 
@@ -34,6 +34,8 @@ JSON 输出 schema 为 `chemd-import-prose/v0.1`，包含：
 | 最终校验 | `@chemd/compiler` | 由 compiler 决定生成草稿是否满足当前 Chemd 语言契约。 |
 
 这样导入层不会维护一套独立语言规则。数量单位、step 参数和观察事件的判断都来自已有 Chemd 包；如果 Chemd 语言层更新，导入层通过这些公共 API 跟随更新。
+
+不被规则覆盖的文本不会被当作高置信结构化事实。导入层会把它保留在 `unparsedSpans` 和 diagnostics 中；只有识别为 canonical step 的内容才渲染进 `:::procedure`。
 
 ## 示例
 

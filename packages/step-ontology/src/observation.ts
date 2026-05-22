@@ -13,13 +13,15 @@ import type {
 
 const detectEventType = (text: string): ObservationEventType | undefined => {
   const lower = text.toLowerCase();
+  const hasColorWord = /\b(?:deep\s+red|red|yellow)\b/.test(lower);
+  const hasColorChangeContext = /\b(?:turn(?:ed)?|became|becomes|changed?|colour|color)\b/.test(lower);
+
   if (
     text.includes("颜色")
     || (text.includes("变") && text.includes("色"))
     || lower.includes("color")
     || lower.includes("colour")
-    || lower.includes("red")
-    || lower.includes("yellow")
+    || (hasColorWord && hasColorChangeContext)
   ) {
     return "color_change";
   }

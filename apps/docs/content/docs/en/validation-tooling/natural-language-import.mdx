@@ -20,7 +20,7 @@ The JSON schema is `chemd-import-prose/v0.1` and includes:
 - `materialCount`, `quantityCount`, `stepCount`, and `observationCount`.
 - Severity summaries for import diagnostics and compiler diagnostics.
 - The generated `chemd` draft.
-- `valid`, `dryRun`, and `wroteFile`.
+- `valid`, `dryRun`, `wroteFile`, and `unparsedSpanCount`.
 
 ## Conversion Path
 
@@ -34,6 +34,8 @@ The JSON schema is `chemd-import-prose/v0.1` and includes:
 | Final validation | `@chemd/compiler` | The compiler decides whether the draft satisfies the current Chemd language contract. |
 
 This keeps the importer from owning a parallel language rule set. Quantity units, step parameters, and observation events come from existing Chemd packages; when the language layer changes, the importer follows those public APIs.
+
+Text that is not covered by a rule is not treated as a high-confidence structured fact. The importer keeps it in `unparsedSpans` and diagnostics; only content recognized as canonical steps is rendered into `:::procedure`.
 
 ## Example
 
