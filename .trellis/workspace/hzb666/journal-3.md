@@ -1958,3 +1958,37 @@ Archived the completed prose reaction block import Trellis task after all four i
 ### Next Steps
 
 - None - task complete
+
+
+## Session 139: Prose step import phase 1
+
+**Date**: 2026-05-23
+**Task**: Prose step import phase 1
+**Package**: step-ontology
+**Branch**: `develop`
+
+### Summary
+
+Added an importer-side coverage ledger that flags uncovered English action-like spans in partially parsed procedure text without changing step ontology lowering behavior.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8dcce88` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
