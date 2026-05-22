@@ -57,6 +57,9 @@ export interface ObservationFrame {
   rawText: string;
   span: ProseSourceSpan;
   linkedStepId?: string;
+  linkedStepFamily?: StepFamily;
+  eventType?: string;
+  normalizedValue?: unknown;
   confidence: number;
   evidence: readonly string[];
 }
@@ -73,4 +76,10 @@ export interface ProseImportCandidate {
 export interface ProseImportOptions {
   chemicalProvider?: ChemicalLookupProvider;
   includeFormulaLike?: boolean;
+}
+
+export interface RenderChemdDraftOptions {
+  documentId?: string;
+  title?: string;
+  date?: string;
 }

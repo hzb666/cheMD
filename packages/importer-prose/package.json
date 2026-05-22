@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@chemd/chemical-lexicon": "workspace:*",
+    "@chemd/compiler": "workspace:*",
     "@chemd/core": "workspace:*",
     "@chemd/step-ontology": "workspace:*"
   },

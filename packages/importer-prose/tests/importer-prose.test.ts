@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { importProse } from "../src/index";
+import {
+  importProse,
+  importProseToChemd,
+  renderChemdDraft
+} from "../src/index";
 
 describe("prose importer skeleton", () => {
   it("extracts local chemical mentions into material IR", async () => {
@@ -143,5 +147,31 @@ describe("prose importer skeleton", () => {
       "eventType:color_change",
       "linkedStepFamily:add"
     ]);
+  });
+
+  it("renders import IR to existing Chemd block syntax", async () => {
+    const candidate = await importProse("加入 n-BuLi 后体系逐渐变深红色。");
+    const chemd = renderChemdDraft(candidate, {
+      documentId: "exp-import-test",
+      title: "Import test",
+      date: "2026-05-23"
+    });
+
+    expect(chemd).toContain(":::procedure #import-procedure");
+    expect(chemd).toContain("step: add | id=s1 | materials=n-BuLi");
+    expect(chemd).toContain(":::observation #import-observation");
+    expect(chemd).toContain("event: color_change | id=e1 | linkedStep=s1 | confidence=0.78");
+  });
+
+  it("validates rendered Chemd through the compiler", async () => {
+    const result = await importProseToChemd("加入 n-BuLi 后体系逐渐变深红色。", {
+      documentId: "exp-import-compile",
+      title: "Import compile",
+      date: "2026-05-23"
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.compileResult.stepGraph.steps.map((step) => step.family)).toContain("add");
+    expect(result.compileResult.diagnostics.map((diagnostic) => diagnostic.severity)).not.toContain("error");
   });
 });

@@ -383,6 +383,9 @@ importers:
       '@chemd/chemical-lexicon':
         specifier: workspace:*
         version: link:../chemical-lexicon
+      '@chemd/compiler':
+        specifier: workspace:*
+        version: link:../compiler
       '@chemd/core':
         specifier: workspace:*
         version: link:../core

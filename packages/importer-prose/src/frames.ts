@@ -68,6 +68,9 @@ const observationToFrame = (
   rawText: event.rawText,
   span: createSpanFromRawText(sourceText, event.rawText, 0),
   linkedStepId: event.linkedStepId,
+  linkedStepFamily: event.linkedStepFamily,
+  eventType: event.eventType,
+  normalizedValue: event.normalizedValue,
   confidence: event.confidence,
   evidence: [
     event.provenance?.ruleId ?? "step_ontology.observation",
