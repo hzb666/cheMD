@@ -1720,3 +1720,37 @@ importer-prose 新增 Chemd 草稿渲染与 compileChemd 校验入口；验证 i
 ### Next Steps
 
 - None - task complete
+
+
+## Session 132: 阶段 8：接入 prose import CLI 与文档
+
+**Date**: 2026-05-23
+**Task**: 阶段 8：接入 prose import CLI 与文档
+**Package**: cli
+**Branch**: `develop`
+
+### Summary
+
+新增 chemd import prose CLI，补充自然语言导入文档，并完成 CLI/importer/docs 验证。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e491999` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

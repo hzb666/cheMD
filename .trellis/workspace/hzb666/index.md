@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-3.md`
-- **Total Sessions**: 131
+- **Total Sessions**: 132
 - **Last Active**: 2026-05-23
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-3.md` | ~1722 | Active |
+| `journal-3.md` | ~1756 | Active |
 | `journal-2.md` | ~1956 | Archived |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
@@ -31,6 +31,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 132 | 2026-05-23 | 阶段 8：接入 prose import CLI 与文档 | `e491999` | `develop` |
 | 131 | 2026-05-23 | 导入 IR 渲染 Chemd 草稿并编译校验 | `db82b09` | `develop` |
 | 130 | 2026-05-23 | 导入层复用 step ontology 生成 frames | `5e9a3a2` | `develop` |
 | 129 | 2026-05-23 | 导入层数量扫描接入 Chemd 规则 | `43e5f4d` | `develop` |
