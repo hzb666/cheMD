@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-3.md`
-- **Total Sessions**: 121
-- **Last Active**: 2026-05-21
+- **Total Sessions**: 122
+- **Last Active**: 2026-05-22
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-3.md` | ~1373 | Active |
+| `journal-3.md` | ~1414 | Active |
 | `journal-2.md` | ~1956 | Archived |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
@@ -31,6 +31,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 122 | 2026-05-22 | Typed field value schema unification | `38def79`, `82886d0`, `31245fa`, `73699f2`, `6ab7c13`, `f92e044`, `3b76436`, `6040abd` | `develop` |
 | 121 | 2026-05-21 | Chemd IDE language features and export docs | `99dfa39` | `develop` |
 | 120 | 2026-05-20 | Experiment language contract implementation | `fb40588` | `trellis/language-contract-p0` |
 | 119 | 2026-05-20 | Experiment language interop governance closeout | `44df622` | `trellis/language-contract-p0` |

@@ -1371,3 +1371,44 @@ Completed Chemd IDE language-service highlighting, block matching, graph/export 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 122: Typed field value schema unification
+
+**Date**: 2026-05-22
+**Task**: Typed field value schema unification
+**Package**: core
+**Branch**: `develop`
+
+### Summary
+
+Completed a Trellis phased implementation for Chemd typed field value schema metadata, drift tests, language-service schema completions, typechecker quantity adapter, record/domain helpers, export docs alignment, and final targeted regression.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `38def79` | (see git log) |
+| `82886d0` | (see git log) |
+| `31245fa` | (see git log) |
+| `73699f2` | (see git log) |
+| `6ab7c13` | (see git log) |
+| `f92e044` | (see git log) |
+| `3b76436` | (see git log) |
+| `6040abd` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
