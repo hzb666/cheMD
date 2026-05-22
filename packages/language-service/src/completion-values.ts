@@ -1,29 +1,32 @@
+import {
+  BLOCK_SCHEMAS,
+  getBlockFieldSchema,
+  getFieldValueSuggestions
+} from "@chemd/core";
+
 import type { ChemdCompletionContext, ChemdCompletionItem } from "./completion-types";
 
-const valueRegistry: Record<string, string[]> = {
-  kind: ["molecule", "reaction"],
-  status: ["success", "failed", "partial", "pending"],
-  stage: [
-    "reaction_setup",
-    "reaction",
-    "workup",
-    "purification",
-    "analysis"
-  ],
-  family: [
-    "charge",
-    "add",
-    "stir",
-    "heat",
-    "cool",
-    "quench",
-    "extract",
-    "wash",
-    "dry",
-    "concentrate",
-    "purify",
-    "analyze"
-  ]
+const toSchemaBlockType = (blockType: string | undefined): string | undefined =>
+  blockType === "condition_varies" ? "condition-varies" : blockType;
+
+const findSchemaSuggestions = (
+  blockType: string | undefined,
+  fieldKey: string
+): string[] => {
+  const scopedBlockType = toSchemaBlockType(blockType);
+  const scoped = scopedBlockType
+    ? getFieldValueSuggestions(scopedBlockType, fieldKey)
+    : [];
+  const scopedField = scopedBlockType
+    ? getBlockFieldSchema(scopedBlockType, fieldKey)
+    : undefined;
+  if (scoped.length > 0 || scopedField) {
+    return scoped;
+  }
+
+  return BLOCK_SCHEMAS.map((schema) =>
+    getFieldValueSuggestions(schema.blockType, fieldKey)
+  ).find((values) => values.length > 0) ?? [];
 };
 
 export const getChemdValueCompletions = (
@@ -35,7 +38,8 @@ export const getChemdValueCompletions = (
   }
 
   const prefix = context.tokenPrefix.toLowerCase();
-  const values = valueRegistry[fieldKey] ?? [];
+  const blockType = context.isStepFamilyPosition ? "step" : context.block?.type;
+  const values = findSchemaSuggestions(blockType, fieldKey);
   return values
     .filter((value) => value.toLowerCase().startsWith(prefix))
     .map((value, index) => ({

@@ -53,13 +53,25 @@ kind: |
 :::`)).toEqual(["molecule", "reaction"]);
   });
 
-  it("keeps current value completion registry behavior visible before schema migration", () => {
+  it("keeps schema-derived value completion behavior compatible with the old registry", () => {
     expect(labelsFor(`:::result #res-main
 status: p|
 :::`)).toEqual(["partial", "pending"]);
     expect(labelsFor(`:::procedure #proc-main
 step: |
 :::`)).toEqual(expect.arrayContaining(["add", "stir", "analyze"]));
+  });
+
+  it("suggests enum values from the shared field value schema", () => {
+    expect(labelsFor(`:::analysis #ana-main
+type: lc|
+:::`)).toEqual(["lcms"]);
+  });
+
+  it("does not apply global enum fallbacks to scoped non-enum fields", () => {
+    expect(labelsFor(`:::trace_event #evt-main
+type: lc|
+:::`)).toEqual([]);
   });
 
   it("suggests reaction stage values", () => {

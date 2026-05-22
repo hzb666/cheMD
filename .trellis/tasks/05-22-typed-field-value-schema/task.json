@@ -37,7 +37,7 @@
   "notes": "Trellis loop on develop. Phase 1 must be behavior-preserving metadata and drift tests only; parser AST, typechecker typed graph, diagnostics, exports, and docs examples must not drift.",
   "meta": {
     "workflow": "trellis-loop",
-    "phase": "phase-2-schema-drift-guards-complete",
+    "phase": "phase-3-language-service-schema-values-complete",
     "business_drift_policy": "no existing compile/parser/typechecker/render/export behavior changes",
     "phase_0": {
       "status": "complete",
@@ -50,6 +50,10 @@
     "phase_2": {
       "status": "complete",
       "summary": "Added schema coverage tests, enum drift guards, coarse domain field exceptions, and language fundamentals docs."
+    },
+    "phase_3": {
+      "status": "complete",
+      "summary": "Replaced language-service value completion registry with schema-derived suggestions while preserving existing visible completions."
     }
   }
 }
