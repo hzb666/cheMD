@@ -1890,3 +1890,37 @@ Added conservative reaction candidate aggregation from existing prose step frame
 ### Next Steps
 
 - None - task complete
+
+
+## Session 137: Prose reaction import phase 4
+
+**Date**: 2026-05-23
+**Task**: Prose reaction import phase 4
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+Verified importer-shaped reaction and linked procedure exports through semantic/training layers, then updated EN/ZH natural language import docs with reaction rendering, product requirements, and workup exclusion warnings.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ffa37b6` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
