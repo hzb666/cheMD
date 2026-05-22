@@ -1754,3 +1754,37 @@ importer-prose 新增 Chemd 草稿渲染与 compileChemd 校验入口；验证 i
 ### Next Steps
 
 - None - task complete
+
+
+## Session 133: 完善真实英文 SI procedure 导入
+
+**Date**: 2026-05-23
+**Task**: 完善真实英文 SI procedure 导入
+**Package**: step-ontology
+**Branch**: `develop`
+
+### Summary
+
+增强英文 SI 文本切分、加料/workup lowering 与未匹配文本保留策略，真实样例可生成 compiler-valid Chemd 草稿。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5a921c5` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
