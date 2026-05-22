@@ -32,7 +32,7 @@ atmosphere: nitrogen
 
 :::result #res-main
 status: partial
-yield: 23 %
+yield: 23%
 :::
 `));
 
@@ -160,7 +160,7 @@ time: 2 h
 status: complete
 reaction: rxn-main
 product: mol-b
-yield: 72 %
+yield: 72%
 isolated_mass: 15 mg
 :::
 `));
@@ -204,7 +204,7 @@ isolated_mass: 15 mg
       yield: expect.objectContaining({
         kind: "quantity",
         quantityClass: "percent",
-        raw: "72 %",
+        raw: "72%",
         canonicalValue: 72,
         canonicalUnit: "percent"
       }),
@@ -445,7 +445,7 @@ date: 2026-04-24
 :::result #res-main
 reaction: ext-doc#rxn-main
 product: ext-doc#mol-product
-yield: 72 %
+yield: 72%
 :::
 
 :::analysis #ana-main

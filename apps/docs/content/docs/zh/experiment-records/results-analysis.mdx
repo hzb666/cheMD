@@ -14,7 +14,7 @@ description: '`:::result`、`:::analysis`、TLC lane、通用分析和必填字�
 
 ## `yield`、`conversion`、`selectivity`、`purity`
 
-这些字段在 AST 中保留原文，随后由 typechecker 按 percent quantity 解析。百分数必须在数值和单位之间保留空格，例如 `82 %`；`82%` 这类紧凑写法是 error。
+这些字段在 AST 中保留原文，随后由 typechecker 按 percent quantity 解析。百分号值是紧凑 literal，例如 `82%`；`82 %` 这类带空格写法是 error。
 
 ## `:::analysis` 分析块
 
@@ -26,7 +26,7 @@ type: hplc
 ref: @res-main
 method: HPLC area normalization
 instrument: Agilent 1260
-peak: 6.4 min (97 %, product)
+peak: 6.4 min (97%, product)
 data: Main peak at 6.4 min with trace impurity.
 :::
 ```
@@ -64,9 +64,9 @@ result 应连接 reaction 和 product，analysis 应连接 result 或 sample。�
 reaction: @rxn-main
 product: @mol-product
 status: success
-yield: 82 %
+yield: 82%
 isolated_mass: 120 mg
-purity: 98 %
+purity: 98%
 notes: isolated after silica gel chromatography
 :::
 
@@ -101,14 +101,14 @@ type: hplc
 ref: @res-main
 instrument: Agilent 1260
 method: C18 gradient
-peak: 6.4 min (98 %, product)
+peak: 6.4 min (98%, product)
 :::
 
 :::analysis #ana-lcms-product
 type: lcms
 ref: @sample-product
 method: ESI positive
-peak: 6.4 min (98 %, product)
+peak: 6.4 min (98%, product)
 ion: m/z 321.1234 [M+H]+
 :::
 ```

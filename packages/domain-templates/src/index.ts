@@ -54,7 +54,7 @@ smiles: c1ccc(-c2ccccc2)cc1
 
 :::material #mat-aryl-bromide
 molecule: @mol-aryl-bromide
-purity: 98 %
+purity: 98%
 :::
 
 :::chemd #rxn-main
@@ -72,18 +72,18 @@ time: overnight
 reaction: @rxn-main
 product: @mol-product
 status: success
-yield: 72 %
-conversion: 90 %
+yield: 72%
+conversion: 90%
 :::
 
 :::condition-varies #cv-screen
 standard: @rxn-main
 factor: base | baseline=K2CO3
-outcome: yield | baseline=72 %
+outcome: yield | baseline=72%
 
 attempt: var1
 base: Cs2CO3
-yield: 72 %
+yield: 72%
 :::
 
 :::sample #sample-crude
@@ -170,7 +170,7 @@ ref: @rxn-main
 reaction: @rxn-main
 product: @amide
 status: success
-yield: 65 %
+yield: 65%
 :::
 `)
   },
@@ -261,7 +261,7 @@ source: @rxn-main
 molecule: @alcohol
 state: crude
 mass: 120 mg
-purity: 84 %
+purity: 84%
 :::
 
 :::sample #sample-nmr
@@ -312,7 +312,7 @@ event: phase_change | linkedStep=s-heat | severity=info
 :::result #res-main
 reaction: @rxn-main
 status: success
-conversion: 82 %
+conversion: 82%
 :::
 `)
   },
@@ -382,8 +382,8 @@ type: hplc
 ref: @sample-main
 method: @method-hplc-a
 artifact: @art-hplc
-peak: 6.4 min (97 %, product)
-result: purity 97 %
+peak: 6.4 min (97%, product)
+result: purity 97%
 :::
 `)
   },
@@ -471,7 +471,7 @@ step: mix | id=s-irradiate | duration=16 h | adapter=photoreactor | resource=blu
 reaction: @rxn-main
 product: @product
 status: success
-yield: 54 %
+yield: 54%
 :::
 `)
   }

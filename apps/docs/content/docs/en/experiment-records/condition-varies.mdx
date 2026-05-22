@@ -13,16 +13,16 @@ standard: @rxn-baseline
 
 factor: solvent | baseline=THF
 factor: temperature | baseline=25 C
-outcome: yield | baseline=68 %
-outcome: conversion | baseline=85 %
+outcome: yield | baseline=68%
+outcome: conversion | baseline=85%
 
 attempt: mecn-40
 reaction: @rxn-mecn-40
 result: @res-mecn-40
 solvent: MeCN
 temperature: 40 C
-yield: 72 %
-conversion: 90 %
+yield: 72%
+conversion: 90%
 note: clean conversion by TLC
 :::
 ```
@@ -36,8 +36,8 @@ note: clean conversion by TLC
 ```md
 factor: solvent | baseline=THF
 factor: catalyst | baseline=Pd(PPh3)4
-outcome: yield | baseline=68 %
-outcome: ee | baseline=92 %
+outcome: yield | baseline=68%
+outcome: ee | baseline=92%
 ```
 
 The baseline on an outcome describes the standard result. If Chemd can infer the standard result and the declared baseline conflicts with that result, validation reports an error rather than guessing.
@@ -52,8 +52,8 @@ reaction: @rxn-dmf-60
 result: @res-dmf-60
 solvent: DMF
 temperature: 60 C
-yield: 45 %
-conversion: 70 %
+yield: 45%
+conversion: 70%
 ```
 
 `result:` is optional, but when present it must reference a result block. Attempt outcome values must not conflict with the linked result fields.
@@ -67,20 +67,20 @@ Declare baseline and attempt reactions as normal `:::chemd` reaction objects. St
 reaction: @rxn-mecn-40
 product: @product
 status: success
-yield: 72 %
-conversion: 90 %
+yield: 72%
+conversion: 90%
 :::
 
 :::condition-varies #cv-oxidation
 standard: @rxn-baseline
 factor: solvent | baseline=THF
-outcome: yield | baseline=68 %
+outcome: yield | baseline=68%
 
 attempt: mecn-40
 reaction: @rxn-mecn-40
 result: @res-mecn-40
 solvent: MeCN
-yield: 72 %
+yield: 72%
 :::
 ```
 

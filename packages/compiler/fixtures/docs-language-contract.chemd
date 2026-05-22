@@ -35,7 +35,7 @@ solvent: MeOH
 temperature: 25 C
 time: 1 h
 atmosphere: nitrogen
-yield: 82 %
+yield: 82%
 :::
 
 :::chemd #rxn-var1
@@ -48,19 +48,19 @@ solvent: MeOH
 temperature: 0 C
 time: 2 h
 atmosphere: nitrogen
-yield: 64 %
+yield: 64%
 :::
 
 :::result #res-main
 reaction: rxn-main
 product: mol-product
 status: success
-yield: 82 %
-conversion: 94 %
-selectivity: 90 %
+yield: 82%
+conversion: 94%
+selectivity: 90%
 isolated_mass: 120 mg
 product_state: colorless oil
-purity: 98 %
+purity: 98%
 notes: product isolated after extraction
 :::
 
@@ -68,9 +68,9 @@ notes: product isolated after extraction
 reaction: rxn-var1
 product: mol-product
 status: partial
-yield: 64 %
-conversion: 75 %
-purity: 92 %
+yield: 64%
+conversion: 75%
+purity: 92%
 notes: lower temperature slowed conversion
 :::
 
@@ -108,7 +108,7 @@ artifacts: art-tlc
 name: purified product
 ref: res-main
 derived_from: sample-crude
-purity: 98 %
+purity: 98%
 artifacts: art-nmr | art-hplc
 :::
 
@@ -140,17 +140,17 @@ factor: solvent | baseline=MeOH
 factor: temperature | baseline=25 C
 factor: atmosphere | baseline=nitrogen
 factor: time | baseline=1 h
-outcome: yield | baseline=82 %
-outcome: conversion | baseline=94 %
-outcome: purity | baseline=98 %
+outcome: yield | baseline=82%
+outcome: conversion | baseline=94%
+outcome: purity | baseline=98%
 attempt: var1
 reaction: @rxn-var1
 result: @res-var1
 temperature: 0 C
 time: 2 h
-yield: 64 %
-conversion: 75 %
-purity: 92 %
+yield: 64%
+conversion: 75%
+purity: 92%
 note: lower temperature reduces conversion
 notes: one-variable temperature screen
 :::

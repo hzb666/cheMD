@@ -59,7 +59,7 @@ Chemd 接收 Markdown 正文、YAML frontmatter、`:::` 结构化块、模板块
 
 resolver 构建对象索引，检查重复 ID，解析行内引用，解析 primary alias，展开模板，校验必填字段。必填字段为 material `molecule`、batch `source`、analysis `type_name`、sample `name`、artifact `kind` 与 `path`。molecule identity 与 reaction participant 存在性由 typechecker 校验。
 
-typechecker 构建 typed semantic graph、step graph、数量单位归一化、引用类型检查、结果关系检查、样品关系检查、reaction route 检查、reaction participant 化学计量检查和 observation 事件链接检查。数量单位覆盖 amount、mass、volume、temperature、time、pressure、concentration、equivalent、percent、rate、rpm 和 pH。percent 超出 0 到 100 产生 `E402`，无法解析数量或紧凑数字-单位语法产生 `E403`，单位大小写不规范产生 `W_QUANTITY_UNIT_CASING`。
+typechecker 构建 typed semantic graph、step graph、数量单位归一化、引用类型检查、结果关系检查、样品关系检查、reaction route 检查、reaction participant 化学计量检查和 observation 事件链接检查。数量类别覆盖 amount、mass、volume、temperature、time、pressure、concentration、equivalent、percent、rate、rpm 和 pH。percent 超出 0 到 100 产生 `E402`，无法解析数量或带空格的百分号 literal 产生 `E403`，普通数字-单位紧凑语法产生 `W_QUANTITY_UNIT_SPACING`，单位大小写不规范产生 `W_QUANTITY_UNIT_CASING`。
 
 ## Procedure 与 Observation 特性
 

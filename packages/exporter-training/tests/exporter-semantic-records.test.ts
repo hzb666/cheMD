@@ -93,21 +93,21 @@ date: 2026-05-20
 ---
 
 :::result #res-var1
-yield: 72 %
+yield: 72%
 :::
 
 :::condition-varies #cv-screen
 factor: solvent | baseline=THF
-outcome: yield | baseline=68 %
+outcome: yield | baseline=68%
 attempt: var1
 result: @res-var1
 solvent: MeCN
-yield: 72 %
+yield: 72%
 :::
 
 :::analysis #ana-lcms
 type: lcms
-peak: 6.4 min (97 %, product)
+peak: 6.4 min (97%, product)
 ion: m/z 124.1 ([M+H]+, product)
 :::
 `));
@@ -120,11 +120,11 @@ ion: m/z 124.1 ([M+H]+, product)
 
     expect(record.semantic_layer.condition_variations[0]).toMatchObject({
       factors: [expect.objectContaining({ field: "solvent", baseline_raw: "THF" })],
-      outcomes: [expect.objectContaining({ field: "yield", baseline_raw: "68 %" })]
+      outcomes: [expect.objectContaining({ field: "yield", baseline_raw: "68%" })]
     });
     expect(record.semantic_layer.condition_variation_attempts[0]).toMatchObject({
       factors: { solvent: "MeCN" },
-      outcomes: { yield: "72 %" }
+      outcomes: { yield: "72%" }
     });
     expect(record.semantic_layer.analyses[0]).toMatchObject({
       normalized_analysis: expect.objectContaining({ kind: "lcms" }),
@@ -161,7 +161,7 @@ smiles: c1ccc(-c2ccccc2)cc1
 molecule: @mol-aryl
 supplier: Sigma
 lot: A123
-purity: 98 %
+purity: 98%
 :::
 
 :::chemd #rxn-main
@@ -176,7 +176,7 @@ source: @rxn-main
 molecule: @mol-product
 state: crude
 mass: 120 mg
-purity: 84 %
+purity: 84%
 :::
 `));
     const checked = typecheckDocument(document);
@@ -239,18 +239,18 @@ reactant: @mol-a | 1.2 mmol | 1.0 equiv | limiting=true
 product: product
 solvent: THF
 temperature: 25 C
-yield: 81 %
+yield: 81%
 :::
 
 :::result #res-main
 status: success
-yield: 80 %
-purity: 95 %
+yield: 80%
+purity: 95%
 :::
 
 :::sample #sample-main
 name: final product
-purity: 95 %
+purity: 95%
 :::
 `));
     const checked = typecheckDocument(document);
@@ -336,7 +336,7 @@ solvent: THF
 :::result #res-main
 ref: rxn-main
 status: success
-yield: 80 %
+yield: 80%
 notes: isolated product after workup
 :::
 
@@ -344,7 +344,7 @@ notes: isolated product after workup
 ref: mol-product
 name: final product
 batch: B-001
-purity: 95 %
+purity: 95%
 notes: stored under nitrogen
 :::
 
@@ -429,7 +429,7 @@ date: 2026-04-24
 :::result #res-local
 reaction: ext-doc#rxn-main
 status: success
-yield: 88 %
+yield: 88%
 :::
 
 :::sample #sample-local

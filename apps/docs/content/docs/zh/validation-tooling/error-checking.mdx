@@ -56,7 +56,7 @@ TLC analysis 由 `type: tlc` 识别，并在 parser 阶段补入 `plate: silica 
 
 typechecker 解析 reaction、result、sample、material、batch 和 step 中的数量字段。无法按字段类别解析时产生 `E403`。percent 字段超出 0 到 100 时产生 `E402`。
 
-带单位数量必须在数值和单位之间保留空格。`1.0 mmol`、`1.2 eq` 和 `78 %` 合法；`1.0mmol`、`1.2eq` 和 `78%` 是 error。`rt` 与 `r.t.` 表示室温。`r.t. -> 80 C over 30 min` 这类 temperature program 使用同一套 temperature parser。单位大小写不规范但可归一时会产生 warning。
+带单位数量应该在数值和单位之间保留空格。百分号值是紧凑 literal。`1.0 mmol`、`1.2 eq` 和 `78%` 合法；`78 %` 是 error，而 `1.0mmol` 和 `1.2eq` 会被接受并产生 `W_QUANTITY_UNIT_SPACING`。`rt` 与 `r.t.` 表示室温。`r.t. -> 80 C over 30 min` 这类 temperature program 使用同一套 temperature parser。单位大小写不规范但可归一时会产生 warning。
 
 reaction participant 的化学计量是语义检查。只要任一 reactant 写了 amount、equivalent、mass、volume 或 `limiting=true`，就必须且只能有一个 `limiting=true`。limiting reactant 必须同时具有 amount 与 equivalent。其他有化学计量语义的 reactant 至少需要 amount 或 equivalent。
 

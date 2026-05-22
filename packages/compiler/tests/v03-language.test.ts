@@ -41,8 +41,8 @@ data: TLC shows starting material remains
 
 :::result #res-main
 status: partial
-yield: 23 %
-purity: 91 %
+yield: 23%
+purity: 91%
 :::
 
 :::sample #sample-main

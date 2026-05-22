@@ -85,7 +85,7 @@ solvent: MeCN ;; temperature: 60 C
 reactant: @mol-a | amount=1.0 mmol | equiv=1.0 | limiting=true
 reac: @mol-b | 1.2 eq
 product: @mol-c
-yield: 72 %
+yield: 72%
 :::
 `);
 
@@ -99,7 +99,7 @@ yield: 72 %
         "@mol-b | 1.2 eq"
       ],
       products: ["@mol-c"],
-      yield: "72 %"
+      yield: "72%"
     });
     expect(document.diagnostics).toEqual([]);
   });
@@ -272,13 +272,13 @@ standard: rxn-standard
 factor: solvent | baseline=THF
 factor: temperature | baseline=25 C
 factor: catalyst | baseline=Pd
-outcome: yield | baseline=40 %
+outcome: yield | baseline=40%
 attempt: var1
 reaction: rxn-var1
 result: res-var1
 solvent: MeCN
 temperature: 40 C
-yield: 78 %
+yield: 78%
 note: Higher yield but more impurity.
 attempt: var2 | mode=override
 reaction: rxn-var2
@@ -286,7 +286,7 @@ result: res-var2
 solvent: DMSO
 temperature: 60 C
 catalyst: Ni
-yield: 12 %
+yield: 12%
 note: Trace product by TLC.
 :::
 `);
@@ -307,7 +307,7 @@ note: Trace product by TLC.
           reaction: "rxn-var1",
           result: "res-var1",
           note: "Higher yield but more impurity.",
-          outcomes: { yield: "78 %" },
+          outcomes: { yield: "78%" },
           condition: expect.arrayContaining([
             expect.objectContaining({ field: "catalyst", candidate: "Pd" }),
             expect.objectContaining({ field: "solvent", candidate: "MeCN" })
@@ -319,7 +319,7 @@ note: Trace product by TLC.
           reaction: "rxn-var2",
           result: "res-var2",
           note: "Trace product by TLC.",
-          outcomes: { yield: "12 %" },
+          outcomes: { yield: "12%" },
           condition: expect.arrayContaining([
             expect.objectContaining({ field: "solvent", candidate: "DMSO" })
           ])

@@ -59,7 +59,7 @@ Default list fields are `reactants`, `products`, `reactant`, `product`, `reac`, 
 
 The resolver builds an object index, checks duplicate IDs, resolves inline references, resolves primary aliases, expands templates, and validates required fields. Required fields are material `molecule`, batch `source`, analysis `type_name`, sample `name`, and artifact `kind` and `path`. Molecule identity and reaction participant presence are enforced by the typechecker.
 
-The typechecker builds the typed semantic graph, step graph, quantity normalization, typed reference checks, result relationship checks, sample relationship checks, reaction route checks, reaction participant stoichiometry checks, and observation event link checks. Quantity units cover amount, mass, volume, temperature, time, pressure, concentration, equivalent, percent, rate, rpm, and pH. Percent values outside 0 to 100 produce `E402`; unparseable quantities and compact number-unit syntax produce `E403`; non-canonical unit casing produces `W_QUANTITY_UNIT_CASING`.
+The typechecker builds the typed semantic graph, step graph, quantity normalization, typed reference checks, result relationship checks, sample relationship checks, reaction route checks, reaction participant stoichiometry checks, and observation event link checks. Quantity classes cover amount, mass, volume, temperature, time, pressure, concentration, equivalent, percent, rate, rpm, and pH. Percent values outside 0 to 100 produce `E402`; unparseable quantities and spaced percent-sign literals produce `E403`; compact ordinary number-unit syntax produces `W_QUANTITY_UNIT_SPACING`; non-canonical unit casing produces `W_QUANTITY_UNIT_CASING`.
 
 ## Procedure and Observation Features
 

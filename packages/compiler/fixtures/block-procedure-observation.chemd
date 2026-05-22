@@ -32,7 +32,7 @@ time: 1 h
 reaction: rxn-main
 product: mol-product
 status: success
-yield: 80 %
+yield: 80%
 :::
 
 :::procedure #proc-main

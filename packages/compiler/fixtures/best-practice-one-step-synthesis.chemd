@@ -42,8 +42,8 @@ time: 4 h
 ref: rxn-main
 product: @mol-product
 status: success
-yield: 76 %
-purity: 95 %
+yield: 76%
+purity: 95%
 :::
 
 :::procedure #proc-main

@@ -66,7 +66,7 @@ const createMetricConflictDiagnostic = (
   });
 
 const parsePercentMetric = (raw: string): number | undefined => {
-  const match = raw.trim().match(/^(-?\d+(?:\.\d+)?)\s*(%|percent)$/i);
+  const match = raw.trim().match(/^(-?\d+(?:\.\d+)?)(?:%|\s+percent)$/i);
   return match ? Number(match[1]) : undefined;
 };
 

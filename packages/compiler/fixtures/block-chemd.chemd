@@ -32,16 +32,16 @@ temperature: 80 C
 time: 4 h
 pressure: 1 atm
 atmosphere: nitrogen
-yield: 78 %
+yield: 78%
 :::
 
 :::result #res-main
 reaction: rxn-main
 product: mol-product
 status: success
-yield: 78 %
-conversion: 92 %
-purity: 96 %
+yield: 78%
+conversion: 92%
+purity: 96%
 :::
 
 :::analysis #ana-main

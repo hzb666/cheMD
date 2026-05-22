@@ -56,7 +56,7 @@ TLC analysis is identified by `type: tlc`. The parser adds `plate: silica gel GF
 
 The typechecker parses quantity fields on reactions, results, samples, materials, batches, and steps. Values that cannot be parsed for the target field class produce `E403`. Percent values outside 0 to 100 produce `E402`.
 
-Unit-bearing quantities require a space between value and unit. `1.0 mmol`, `1.2 eq`, and `78 %` are valid; `1.0mmol`, `1.2eq`, and `78%` are errors. `rt` and `r.t.` are room-temperature shorthand. Temperature programs such as `r.t. -> 80 C over 30 min` use the same temperature parser. Non-canonical unit casing produces a warning when it can be normalized.
+Unit-bearing quantities should use a space between value and unit. Percent-sign values are compact literals. `1.0 mmol`, `1.2 eq`, and `78%` are valid; `78 %` is an error, while `1.0mmol` and `1.2eq` are accepted with `W_QUANTITY_UNIT_SPACING`. `rt` and `r.t.` are room-temperature shorthand. Temperature programs such as `r.t. -> 80 C over 30 min` use the same temperature parser. Non-canonical unit casing produces a warning when it can be normalized.
 
 Reaction participant stoichiometry is semantic. If any reactant has amount, equivalent, mass, volume, or `limiting=true`, exactly one reactant must be `limiting=true`. The limiting reactant must have both amount and equivalent. Other stoichiometric reactants need at least amount or equivalent.
 

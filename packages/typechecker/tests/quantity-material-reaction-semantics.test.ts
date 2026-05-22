@@ -25,10 +25,10 @@ pressure: > 1 atm
 :::
 
 :::result #res-main
-yield: 78 %
-conversion: 96 ± 2 %
-purity: 91-95 %
-selectivity: < 5 %
+yield: 78%
+conversion: 96±2%
+purity: 91-95%
+selectivity: <5%
 :::
 `);
 
@@ -71,7 +71,7 @@ selectivity: < 5 %
     });
   });
 
-  it("diagnoses compact units and non-canonical unit casing", () => {
+  it("accepts compact percent literals while diagnosing ordinary compact units", () => {
     const result = check(`---
 id: exp-quantity-diagnostics
 title: Quantity diagnostics
@@ -80,26 +80,51 @@ date: 2026-05-20
 
 :::result #res-main
 yield: 80%
+conversion: 80 %
 :::
 
 :::procedure #proc-main
-step: add | id=s-add | volume=1 ml
+step: add | id=s-add | volume=1ml | mass=1 MG
 :::
 `);
 
     expect(result.diagnostics).toEqual(expect.arrayContaining([
       expect.objectContaining({
         code: "E403",
-        sourceField: "yield",
-        facts: expect.objectContaining({ raw_value: "80%" })
+        sourceField: "conversion",
+        facts: expect.objectContaining({ raw_value: "80 %" })
+      }),
+      expect.objectContaining({
+        code: "W_QUANTITY_UNIT_SPACING",
+        severity: "warning",
+        sourceNodeId: "s-add",
+        sourceField: "volume",
+        facts: expect.objectContaining({ raw_value: "1ml" })
       }),
       expect.objectContaining({
         code: "W_QUANTITY_UNIT_CASING",
         sourceNodeId: "s-add",
-        sourceField: "volume",
+        sourceField: "mass",
         facts: expect.objectContaining({
-          raw_unit: "ml",
-          canonical_unit: "mL"
+          raw_unit: "MG",
+          canonical_unit: "mg"
+        })
+      })
+    ]));
+    expect(result.diagnostics).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: "E403",
+        sourceField: "yield"
+      })
+    ]));
+    expect(result.typedGraph.nodes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: "result",
+        yield: expect.objectContaining({
+          quantityClass: "percent",
+          raw: "80%",
+          canonicalValue: 80,
+          canonicalUnit: "percent"
         })
       })
     ]));
@@ -280,7 +305,7 @@ smiles: c1ccc(-c2ccccc2)cc1
 molecule: @mol-aryl
 supplier: Sigma
 lot: A123
-purity: 98 %
+purity: 98%
 :::
 
 :::chemd #rxn-main
@@ -295,7 +320,7 @@ source: @rxn-main
 molecule: @mol-product
 state: crude
 mass: 120 mg
-purity: 84 %
+purity: 84%
 :::
 
 :::sample #sample-nmr

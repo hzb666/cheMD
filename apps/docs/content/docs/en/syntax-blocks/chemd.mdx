@@ -72,7 +72,7 @@ Use `:::material` for purchased or inventory material. Use `:::batch` for materi
 molecule: @mol-substrate
 supplier: Sigma
 lot: A123
-purity: 98 %
+purity: 98%
 storage: flammable cabinet
 :::
 
@@ -81,7 +81,7 @@ source: @rxn-main
 molecule: @mol-product
 state: crude
 mass: 120 mg
-purity: 84 %
+purity: 84%
 :::
 ```
 
@@ -118,7 +118,7 @@ The parser infers reaction from participant fields and reaction-only fields such
 
 ## Quantity Surface
 
-Unit-bearing quantities require a space between number and unit: `78 %`, `1.0 mmol`, `1.0 eq`, `30 min`. Compact forms such as `78%` are errors. Non-canonical unit casing such as `1 ml` is accepted with a warning and normalized to `1 mL`.
+Unit-bearing quantities should use a space between number and unit: `1.0 mmol`, `1.0 eq`, `30 min`. Percent-sign values are compact literals such as `78%`; spaced forms such as `78 %` are errors. Compact ordinary units such as `1ml` are accepted with a warning and normalized when the unit is recognized. Non-canonical unit casing such as `1 ml` is accepted with a warning and normalized to `1 mL`.
 
 ## Diagnostics
 

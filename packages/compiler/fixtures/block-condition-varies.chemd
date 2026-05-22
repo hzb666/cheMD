@@ -55,21 +55,21 @@ time: 2 h
 reaction: rxn-standard
 product: mol-product
 status: partial
-yield: 35 %
+yield: 35%
 :::
 
 :::result #res-var1
 reaction: rxn-var1
 product: mol-product
 status: success
-yield: 76 %
+yield: 76%
 :::
 
 :::result #res-var2
 reaction: rxn-var2
 product: mol-product
 status: failed
-yield: 12 %
+yield: 12%
 :::
 
 :::condition-varies #cv-screen
@@ -77,13 +77,13 @@ standard: @rxn-standard
 factor: solvent | baseline=THF
 factor: temperature | baseline=25 C
 factor: catalyst | baseline=Pd(PPh3)4
-outcome: yield | baseline=35 %
+outcome: yield | baseline=35%
 attempt: var1
 reaction: @rxn-var1
 result: @res-var1
 solvent: MeCN
 temperature: 40 C
-yield: 76 %
+yield: 76%
 note: best conversion in the screen
 attempt: var2
 reaction: @rxn-var2
@@ -91,7 +91,7 @@ result: @res-var2
 solvent: DMF
 temperature: 60 C
 catalyst: Pd(dppf)Cl2
-yield: 12 %
+yield: 12%
 note: override catalyst gave low conversion
 notes: screening record with one inherited and one override attempt
 :::

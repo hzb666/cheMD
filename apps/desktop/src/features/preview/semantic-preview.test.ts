@@ -21,7 +21,7 @@ smiles: CCO
 
 :::result #res-a
 status: success
-yield: 82 %
+yield: 82%
 :::
 `;
 

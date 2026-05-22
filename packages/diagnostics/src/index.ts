@@ -92,6 +92,7 @@ const DIAGNOSTIC_SPECS: DiagnosticSpec[] = [
   { code: "E401", band: "quantity", title: "Invalid unit", defaultSeverity: "error" },
   { code: "E402", band: "quantity", title: "Invalid percent value", defaultSeverity: "error" },
   { code: "E403", band: "quantity", title: "Quantity parse failed", defaultSeverity: "error" },
+  { code: "W_QUANTITY_UNIT_SPACING", band: "quantity", title: "Missing quantity unit spacing", defaultSeverity: "warning" },
   { code: "W_QUANTITY_UNIT_CASING", band: "quantity", title: "Non-canonical unit casing", defaultSeverity: "warning" },
   { code: "E_MOLECULE_IDENTITY_MISSING", band: "type", title: "Missing molecule identity", defaultSeverity: "error" },
   { code: "E_MOLECULE_REACTION_QUANTITY", band: "type", title: "Molecule reaction quantity", defaultSeverity: "error" },
@@ -151,13 +152,23 @@ const LEGACY_BANDS: Record<string, DiagnosticBand> = {
 const SPEC_BY_CODE = new Map(DIAGNOSTIC_SPECS.map((spec) => [spec.code, spec]));
 
 const isQuantityDiagnostic = (diagnostic: V03Diagnostic): boolean =>
-  ["E401", "E402", "E403", "W_QUANTITY_UNIT_CASING"].includes(diagnostic.code);
+  ["E401", "E402", "E403", "W_QUANTITY_UNIT_SPACING", "W_QUANTITY_UNIT_CASING"].includes(diagnostic.code);
+
+const isSpacedPercentLiteralDiagnostic = (diagnostic: V03Diagnostic): boolean =>
+  diagnostic.code === "E403"
+    && diagnostic.facts?.expected_quantity_class === "percent"
+    && typeof diagnostic.facts.raw_value === "string"
+    && /\d\s+%/.test(diagnostic.facts.raw_value);
 
 const createQuantityQuickFix = (diagnostic: V03Diagnostic): QuickFix => {
   const field = typeof diagnostic.facts?.field === "string" ? diagnostic.facts.field : "field";
 
   return {
-    title: `Clarify ${field} using a numeric value and unit in the current block syntax`,
+    title: diagnostic.code === "W_QUANTITY_UNIT_SPACING"
+      ? `Insert a space between value and unit in ${field}`
+      : isSpacedPercentLiteralDiagnostic(diagnostic)
+        ? `Remove the space before % in ${field}`
+        : `Clarify ${field} using a numeric value and unit in the current block syntax`,
     kind: "normalize_unit",
     patch: {
       field,

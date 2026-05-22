@@ -67,6 +67,9 @@ const COMPACT_UNIT_PATTERN = "(?:°\\s*C|℃|[a-zA-Z]+(?:[/][a-zA-Z%]+)?|%)";
 const SCALAR_PATTERN = new RegExp(`^(${NUMBER_PATTERN})\\s+(${UNIT_PATTERN})$`);
 const COMPACT_SCALAR_PATTERN = new RegExp(`^(${NUMBER_PATTERN})(${COMPACT_UNIT_PATTERN})$`);
 
+const isPercentSignLiteral = (quantityClass: QuantityClass, rawUnit: string): boolean =>
+  quantityClass === "percent" && rawUnit.trim() === "%";
+
 const normalizeTemperatureShorthand = (raw: string): "room_temperature" | undefined =>
   raw.trim().replace(/\s+/g, "").replace(/\./g, "").toLowerCase() === "rt"
     ? "room_temperature"
@@ -117,6 +120,37 @@ const createQuantityDiagnostic = (
     code: "E403",
     severity: "error",
     message,
+    sourceLayer: "typechecker",
+    sourceNodeType: context.sourceNodeType,
+    sourceNodeId: context.sourceNodeId,
+    sourceField: context.field,
+    facts: {
+      field: context.field,
+      raw_value: raw,
+      expected_quantity_class: quantityClass
+    }
+  });
+
+const createPercentSpacingDiagnostic = (
+  raw: string,
+  context: QuantityParseContext
+): V03Diagnostic =>
+  createQuantityDiagnostic(
+    raw,
+    "percent",
+    context,
+    `Percent literal must not contain a space before % in ${context.field}: ${raw}`
+  );
+
+const createUnitSpacingDiagnostic = (
+  raw: string,
+  quantityClass: QuantityClass,
+  context: QuantityParseContext
+): V03Diagnostic =>
+  createV03Diagnostic({
+    code: "W_QUANTITY_UNIT_SPACING",
+    severity: "warning",
+    message: `Insert a space between value and unit in ${context.field}: ${raw}`,
     sourceLayer: "typechecker",
     sourceNodeType: context.sourceNodeType,
     sourceNodeId: context.sourceNodeId,
@@ -218,22 +252,28 @@ export const parseQuantity = (
     };
   }
 
+  const rawUnit = (match ?? compactMatch)?.[2] ?? "";
   const parsed = parseMatchedQuantity(
     normalizedRaw,
     Number((match ?? compactMatch)?.[1]),
-    (match ?? compactMatch)?.[2] ?? "",
+    rawUnit,
     quantityClass,
     context,
     comparatorResult.comparator
   );
-  if (compactMatch) {
-    const missingSpace = createQuantityDiagnostic(
+  if (compactMatch && !isPercentSignLiteral(quantityClass, rawUnit)) {
+    const missingSpace = createUnitSpacingDiagnostic(
       normalizedRaw,
       quantityClass,
-      context,
-      `Missing space between value and unit in ${context.field}: ${normalizedRaw}`
+      context
     );
     return mergeQuantityDiagnostics(parsed.quantity, [missingSpace, ...readDiagnostics(parsed)]);
+  }
+  if (match && isPercentSignLiteral(quantityClass, rawUnit)) {
+    return mergeQuantityDiagnostics(
+      parsed.quantity,
+      [createPercentSpacingDiagnostic(normalizedRaw, context), ...readDiagnostics(parsed)]
+    );
   }
 
   return parsed;
@@ -337,14 +377,19 @@ const parseRangeQuantity = (
   context: QuantityParseContext,
   comparator?: QuantityComparator
 ): { quantity: QuantityType; diagnostic?: V03Diagnostic; diagnostics?: V03Diagnostic[] } | undefined => {
-  const match = raw.match(new RegExp(`^(${NUMBER_PATTERN})\\s*(?:-|–|to)\\s*(${NUMBER_PATTERN})\\s+(${UNIT_PATTERN})$`, "i"));
+  const spacedMatch = raw.match(new RegExp(`^(${NUMBER_PATTERN})\\s*(?:-|–|to)\\s*(${NUMBER_PATTERN})\\s+(${UNIT_PATTERN})$`, "i"));
+  const compactPercentMatch = quantityClass === "percent"
+    ? raw.match(new RegExp(`^(${NUMBER_PATTERN})\\s*(?:-|–|to)\\s*(${NUMBER_PATTERN})%$`, "i"))
+    : undefined;
+  const match = spacedMatch ?? compactPercentMatch;
   if (!match) {
     return undefined;
   }
 
   const min = Number(match[1]);
   const max = Number(match[2]);
-  const unit = getQuantityUnit(quantityClass, match[3]);
+  const rawUnit = compactPercentMatch && match === compactPercentMatch ? "%" : match[3];
+  const unit = getQuantityUnit(quantityClass, rawUnit);
   if (!unit) {
     return {
       quantity: createRawQuantity(raw, quantityClass, context),
@@ -359,7 +404,13 @@ const parseRangeQuantity = (
     maxValue: max,
     canonicalValue: undefined
   };
-  return mergeQuantityDiagnostics(quantity, createUnitDiagnostics(match[3], unit, context));
+  const diagnostics = [
+    ...(spacedMatch && isPercentSignLiteral(quantityClass, rawUnit)
+      ? [createPercentSpacingDiagnostic(raw, context)]
+      : []),
+    ...createUnitDiagnostics(rawUnit, unit, context)
+  ];
+  return mergeQuantityDiagnostics(quantity, diagnostics);
 };
 
 const parseUncertaintyQuantity = (
@@ -368,12 +419,17 @@ const parseUncertaintyQuantity = (
   context: QuantityParseContext,
   comparator?: QuantityComparator
 ): { quantity: QuantityType; diagnostic?: V03Diagnostic; diagnostics?: V03Diagnostic[] } | undefined => {
-  const match = raw.match(new RegExp(`^(${NUMBER_PATTERN})\\s*(?:±|\\+/-)\\s*(${NUMBER_PATTERN})\\s+(${UNIT_PATTERN})$`, "i"));
+  const spacedMatch = raw.match(new RegExp(`^(${NUMBER_PATTERN})\\s*(?:±|\\+/-)\\s*(${NUMBER_PATTERN})\\s+(${UNIT_PATTERN})$`, "i"));
+  const compactPercentMatch = quantityClass === "percent"
+    ? raw.match(new RegExp(`^(${NUMBER_PATTERN})\\s*(?:±|\\+/-)\\s*(${NUMBER_PATTERN})%$`, "i"))
+    : undefined;
+  const match = spacedMatch ?? compactPercentMatch;
   if (!match) {
     return undefined;
   }
 
-  const unit = getQuantityUnit(quantityClass, match[3]);
+  const rawUnit = compactPercentMatch && match === compactPercentMatch ? "%" : match[3];
+  const unit = getQuantityUnit(quantityClass, rawUnit);
   if (!unit) {
     return {
       quantity: createRawQuantity(raw, quantityClass, context),
@@ -386,7 +442,13 @@ const parseUncertaintyQuantity = (
     valueKind: "uncertainty",
     uncertainty: Number(match[2])
   };
-  return mergeQuantityDiagnostics(quantity, createUnitDiagnostics(match[3], unit, context));
+  const diagnostics = [
+    ...(spacedMatch && isPercentSignLiteral(quantityClass, rawUnit)
+      ? [createPercentSpacingDiagnostic(raw, context)]
+      : []),
+    ...createUnitDiagnostics(rawUnit, unit, context)
+  ];
+  return mergeQuantityDiagnostics(quantity, diagnostics);
 };
 
 const parseUnitlessEquivalentQuantity = (

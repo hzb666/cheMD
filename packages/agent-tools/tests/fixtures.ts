@@ -30,7 +30,7 @@ export const proposal: PatchProposal = {
         endLine: 5,
         endColumn: 10
       },
-      replacement: "yield: 80 %"
+      replacement: "yield: 80%"
     }
   ],
   evidence: [citedRagEvidence]

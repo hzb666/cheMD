@@ -120,7 +120,7 @@ p1: sm 0.60 ^5(4)
 }
 col: {
 :::result #res-main
-yield: 63 %
+yield: 63%
 :::
 }
 :::`
@@ -186,7 +186,7 @@ date: 2026-04-11
 ---
 
 :::result #res-main
-yield: 63 %
+yield: 63%
 :::
 
 :::analysis
@@ -246,7 +246,7 @@ Yield: @res-main.yield`
       field: "yield",
       resolution: {
         status: "resolved",
-        value: "63 %"
+        value: "63%"
       }
     });
     expect(payload.document.body["03_markdown"]?.references["01_reference"]).not.toHaveProperty("start");

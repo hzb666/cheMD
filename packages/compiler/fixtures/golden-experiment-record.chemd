@@ -70,9 +70,9 @@ atmosphere: nitrogen
 ref: rxn-standard
 product: @mol-product
 status: partial
-yield: 41 %
-conversion: 58 %
-purity: 84 %
+yield: 41%
+conversion: 58%
+purity: 84%
 notes: Baseline THF entry stops at partial conversion.
 :::
 
@@ -80,10 +80,10 @@ notes: Baseline THF entry stops at partial conversion.
 ref: rxn-var1
 product: @mol-product
 status: success
-yield: 78 %
-conversion: 96 %
-selectivity: 93 %
-purity: 97 %
+yield: 78%
+conversion: 96%
+selectivity: 93%
+purity: 97%
 notes: Best balance of conversion and purity in the solvent screen.
 :::
 
@@ -91,9 +91,9 @@ notes: Best balance of conversion and purity in the solvent screen.
 ref: rxn-var2
 product: @mol-product
 status: failed
-yield: 18 %
-conversion: 25 %
-purity: 61 %
+yield: 18%
+conversion: 25%
+purity: 61%
 notes: Override condition increases impurity and depresses yield.
 :::
 
@@ -103,17 +103,17 @@ factor: solvent | baseline=THF
 factor: temperature | baseline=25 C
 factor: catalyst | baseline=Pd(PPh3)4
 factor: atmosphere | baseline=nitrogen
-outcome: yield | baseline=41 %
-outcome: conversion | baseline=58 %
-outcome: purity | baseline=84 %
+outcome: yield | baseline=41%
+outcome: conversion | baseline=58%
+outcome: purity | baseline=84%
 attempt: var1
 reaction: @rxn-var1
 result: @res-var1
 solvent: MeCN
 temperature: 40 C
-yield: 78 %
-conversion: 96 %
-purity: 97 %
+yield: 78%
+conversion: 96%
+purity: 97%
 note: Higher conversion while keeping the same catalyst and atmosphere.
 attempt: var2
 reaction: @rxn-var2
@@ -122,9 +122,9 @@ solvent: DMF
 temperature: 60 C
 catalyst: Pd(dppf)Cl2
 atmosphere: nitrogen
-yield: 18 %
-conversion: 25 %
-purity: 61 %
+yield: 18%
+conversion: 25%
+purity: 61%
 note: Full override worsens impurity profile.
 notes: Compare solvent and temperature first; only the second attempt overrides catalyst.
 :::
@@ -212,7 +212,7 @@ artifacts: art-tlc-var1
 ref: res-var1
 name: purified product from var1
 derived_from: sample-batch-var1
-purity: 97 %
+purity: 97%
 artifacts: art-nmr-var1
 :::
 

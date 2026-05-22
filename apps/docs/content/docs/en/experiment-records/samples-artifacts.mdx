@@ -14,12 +14,12 @@ ref: @rxn-main
 name: Crude reaction mixture after aqueous workup
 sample_id: CR-2026-001
 batch: batch-main-001
-purity: 82 %
+purity: 82%
 notes: Brown oil before purification
 :::
 ```
 
-`ref` can point to a reaction, result, or other object ID. `sample_id` and `batch` are stored as strings. `purity` enters the typechecker quantity parser and supports percent units.
+`ref` can point to a reaction, result, or other object ID. `sample_id` and `batch` are stored as strings. `purity` enters the typechecker quantity parser as a percent value.
 
 ## `derived_from`, `aliquot_of`, and `batch_of`
 
@@ -104,8 +104,8 @@ Use `sample.ref` for reaction or result association, `sample.artifacts` for atta
 :::result #res-main
 ref: @rxn-main
 status: success
-yield: 68 %
-purity: 96 %
+yield: 68%
+purity: 96%
 :::
 
 :::sample #sample-main
@@ -120,7 +120,7 @@ type: hplc
 ref: @sample-main
 instrument: Agilent 1260 Infinity II
 method: C18 gradient 10-90% MeCN
-result: purity 96 %
+result: purity 96%
 data: reports/hplc/main-product.pdf
 :::
 

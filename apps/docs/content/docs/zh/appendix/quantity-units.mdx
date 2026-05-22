@@ -7,7 +7,7 @@ Chemd 会保留原始数量文本，并在校验时为支持的数量类别计�
 
 ## 数量类别
 
-| 类别 | 支持单位 | 规范单位 |
+| 类别 | 接受的单位/形式 | 规范单位 |
 | --- | --- | --- |
 | `amount` | `mmol`、`mol` | `mmol` |
 | `mass` | `mg`、`g`、`kg` | `mg` |
@@ -17,14 +17,14 @@ Chemd 会保留原始数量文本，并在校验时为支持的数量类别计�
 | `pressure` | `bar`、`atm`、`psi` | `bar` |
 | `concentration` | `M`、`mM` | `M` |
 | `equivalent` | `equiv`、`eq` | `equiv` |
-| `percent` | `%`、`percent` | `percent` |
+| `percent` | 紧凑 `%` 后缀、`percent` 单词 | `percent` |
 | `rate` | `mL/min`、`L/min` | `mL/min` |
 | `rpm` | `rpm` | `rpm` |
 | `ph` | `pH` | `pH` |
 
 `rt` 与 `r.t.` 是室温 shorthand。`overnight` 是时间 shorthand。temperature program 也使用同一套数量解析，例如 `r.t. -> 80 C over 30 min`。
 
-带单位数量必须在数值和单位之间保留空格。`78 %` 与 `1.0 mmol` 合法；`78%` 与 `1.0mmol` 是 error。reaction participant 的 equivalent 也接受不带单位的 `equiv=1.2`。单位大小写可归一时会产生 warning。
+带单位数量应该在数值和单位之间保留空格。百分号值是紧凑 literal，`78%` 与 `1.0 mmol` 合法；`78 %` 是 error，而 `1.0mmol` 这类普通单位紧凑写法会被接受并产生 `W_QUANTITY_UNIT_SPACING`。reaction participant 的 equivalent 也接受不带单位的 `equiv=1.2`。单位大小写可归一时会产生 warning。
 
 ## 字段映射
 
@@ -93,4 +93,4 @@ isolated_mass: = to_unit(0.126 g, mg)
 
 ## 诊断
 
-数量文本无法匹配目标类别时产生 `E403`。紧凑的数字-单位写法也产生 `E403`。percent 数量小于 0 或大于 100 时产生 `E402`。单位大小写不规范产生 `W_QUANTITY_UNIT_CASING`。表达式求值失败时产生 `E_DERIVED_EXPRESSION_INVALID`。
+数量文本无法匹配目标类别时产生 `E403`。带空格的百分号 literal 也产生 `E403`。普通数字-单位紧凑写法产生 `W_QUANTITY_UNIT_SPACING`。percent 数量小于 0 或大于 100 时产生 `E402`。单位大小写不规范产生 `W_QUANTITY_UNIT_CASING`。表达式求值失败时产生 `E_DERIVED_EXPRESSION_INVALID`。

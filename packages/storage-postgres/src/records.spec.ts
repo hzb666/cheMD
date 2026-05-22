@@ -33,13 +33,13 @@ reactant: @mol-a | 1 mmol | 1 eq | limiting=true
 product: @mol-product
 solvent: THF
 temperature: 25 C
-yield: 81 %
+yield: 81%
 :::
 
 :::result #res-main
 reaction: @rxn-main
 status: success
-yield: 81 %
+yield: 81%
 :::
 
 :::sample #sample-main

@@ -18,7 +18,7 @@ products: product
 
 :::result #res-main
 status: success
-yield: 72 %
+yield: 72%
 :::
 
 :::analysis #ana-main
@@ -85,7 +85,7 @@ products: product
 
 :::result #res-main
 status: success
-yield: 72 %
+yield: 72%
 :::
 
 :::analysis #ana-main
@@ -117,7 +117,7 @@ products: product
 
 :::result #res-main
 status: success
-yield: 72 %
+yield: 72%
 :::`;
     const result = runChemdRepairLoop(source);
 
@@ -170,7 +170,7 @@ catalyst: Pd
 :::result #res-var1
 ref: @rxn-var1
 status: success
-yield: 81 %
+yield: 81%
 :::
 
 :::condition-varies #cv-screen

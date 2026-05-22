@@ -46,6 +46,48 @@ describe("v0.3 diagnostics registry", () => {
     });
   });
 
+  it("describes spaced percent literal quick fixes without treating % as a unit", () => {
+    const diagnostic = createV03Diagnostic({
+      code: "E403",
+      severity: "error",
+      message: "Percent literal must not contain a space before %",
+      sourceLayer: "typechecker",
+      facts: {
+        field: "yield",
+        raw_value: "80 %",
+        expected_quantity_class: "percent"
+      }
+    });
+
+    expect(buildQuickFixes(diagnostic)[0]).toMatchObject({
+      kind: "normalize_unit",
+      title: "Remove the space before % in yield"
+    });
+  });
+
+  it("classifies compact ordinary unit spacing as a quantity warning", () => {
+    const diagnostic = createV03Diagnostic({
+      code: "W_QUANTITY_UNIT_SPACING",
+      severity: "warning",
+      message: "Insert a space between value and unit",
+      sourceLayer: "typechecker",
+      facts: {
+        field: "volume",
+        raw_value: "1ml",
+        expected_quantity_class: "volume"
+      }
+    });
+
+    expect(getDiagnosticSpec("W_QUANTITY_UNIT_SPACING")).toMatchObject({
+      band: "quantity",
+      defaultSeverity: "warning"
+    });
+    expect(buildQuickFixes(diagnostic)[0]).toMatchObject({
+      kind: "normalize_unit",
+      title: "Insert a space between value and unit in volume"
+    });
+  });
+
   it("classifies chemd surface policy diagnostics and quick fixes", () => {
     const missingKindDiagnostic = createV03Diagnostic({
       code: "W_CHEMD_KIND_AMBIGUOUS",

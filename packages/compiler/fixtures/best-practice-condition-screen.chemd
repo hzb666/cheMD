@@ -67,18 +67,18 @@ time: 2 h
 ref: rxn-var1
 product: @mol-product
 status: success
-yield: 78 %
-conversion: 96 %
-purity: 97 %
+yield: 78%
+conversion: 96%
+purity: 97%
 :::
 
 :::result #res-var2
 ref: rxn-var2
 product: @mol-product
 status: failed
-yield: 18 %
-conversion: 25 %
-purity: 61 %
+yield: 18%
+conversion: 25%
+purity: 61%
 :::
 
 :::condition-varies #cv-screen
@@ -86,17 +86,17 @@ standard: @rxn-standard
 factor: solvent | baseline=THF
 factor: temperature | baseline=25 C
 factor: catalyst | baseline=Pd(PPh3)4
-outcome: yield | baseline=70 %
-outcome: conversion | baseline=90 %
-outcome: purity | baseline=95 %
+outcome: yield | baseline=70%
+outcome: conversion | baseline=90%
+outcome: purity | baseline=95%
 attempt: var1
 reaction: @rxn-var1
 result: @res-var1
 solvent: MeCN
 temperature: 40 C
-yield: 78 %
-conversion: 96 %
-purity: 97 %
+yield: 78%
+conversion: 96%
+purity: 97%
 note: Higher conversion with the baseline catalyst.
 attempt: var2
 reaction: @rxn-var2
@@ -104,9 +104,9 @@ result: @res-var2
 solvent: DMF
 temperature: 60 C
 catalyst: Pd(dppf)Cl2
-yield: 18 %
-conversion: 25 %
-purity: 61 %
+yield: 18%
+conversion: 25%
+purity: 61%
 note: Full override lowers conversion and purity.
 :::
 

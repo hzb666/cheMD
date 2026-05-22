@@ -205,7 +205,7 @@ resolver 维护 template stack。若模板调用链重复进入同一模板，�
 
 `ref<kind>` 的 kind 集合为 molecule、reaction、result、analysis、procedure、observation、sample、artifact 和 condition_varies。参数值必须解析为对应目标类型的引用。
 
-`quantity<class>` 的 class 集合为 amount、mass、volume、temperature、time、pressure、concentration、equivalent 和 percent。单位支持与 typechecker 数量解析一致：amount 支持 `mmol`、`mol`；mass 支持 `mg`、`g`、`kg`；volume 支持 `mL`、`ml`、`L`、`l`；temperature 支持 `C`、`°C`、`℃`、`K`、`F`；time 支持 `h`、`hr`、`hrs`、`min`、`mins`、`分钟`、`小时`；pressure 支持 `bar`、`atm`、`psi`；concentration 支持 `M`、`mM`；equivalent 支持 `equiv`、`eq`；percent 支持 `%` 与 `percent`。
+`quantity<class>` 的 class 集合为 amount、mass、volume、temperature、time、pressure、concentration、equivalent 和 percent。单位支持与 typechecker 数量解析一致：amount 支持 `mmol`、`mol`；mass 支持 `mg`、`g`、`kg`；volume 支持 `mL`、`ml`、`L`、`l`；temperature 支持 `C`、`°C`、`℃`、`K`、`F`；time 支持 `h`、`hr`、`hrs`、`min`、`mins`、`分钟`、`小时`；pressure 支持 `bar`、`atm`、`psi`；concentration 支持 `M`、`mM`；equivalent 支持 `equiv`、`eq`；percent 支持紧凑 `%` 后缀与 `percent` 单词。
 
 模板 body 中可以包含普通 Markdown、结构化块和嵌套 `:::use`。展开后的节点继续进入 resolver 与 typechecker，因此模板内对象仍受 ID、引用和必填字段规则约束。
 
@@ -231,6 +231,6 @@ Result @param.result is supported by sample @param.sample using @param.method. P
 result: @res-main
 sample: sample-product
 method: HPLC
-purity: 98 %
+purity: 98%
 :::
 ```

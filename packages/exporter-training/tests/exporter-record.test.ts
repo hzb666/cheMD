@@ -31,14 +31,14 @@ kind: reaction
 reactants: substrate
 products: product
 solvent: THF
-yield: 74 %
+yield: 74%
 chemistry_features: rxn-fp
 :::
 
 :::result #res-main
 ref: rxn-main
 status: success
-yield: 72 %
+yield: 72%
 notes: isolated yield confirmed by NMR
 :::
 
@@ -51,7 +51,7 @@ derived_from: rxn-main
 aliquot_of: sample-parent
 batch_of: sample-parent
 artifacts: spec-main
-purity: 96 %
+purity: 96%
 chemistry_features: sample-desc
 :::
 
@@ -341,7 +341,7 @@ describe("training export artifacts and projections", () => {
       task: "normalization_explanation",
       subject_entity_id: "res::exp-export-artifacts::res-main",
       field: "yield_percent",
-      raw_value: "72 %"
+      raw_value: "72%"
     });
     expect(normalizationInput).not.toHaveProperty("field_evidence");
     expect(normalizationInput).not.toHaveProperty("subject");
@@ -443,13 +443,13 @@ kind: reaction
 reactants: substrate
 products: product
 solvent: THF
-yield: 40 %
+yield: 40%
 :::
 
 :::result #res-base
 ref: rxn-base
 status: partial
-yield: 40 %
+yield: 40%
 :::
 
 :::chemd #rxn-variant
@@ -457,13 +457,13 @@ kind: reaction
 reactants: substrate
 products: product
 solvent: MeCN
-yield: 75 %
+yield: 75%
 :::
 
 :::result #res-variant
 ref: rxn-variant
 status: success
-yield: 75 %
+yield: 75%
 :::
 `));
     const checked = typecheckDocument(document);
@@ -660,7 +660,7 @@ solvent: THF
 :::result #res-main
 ref: rxn-main
 status: success
-yield: 66 %
+yield: 66%
 :::
 
 :::analysis #ana-missing

@@ -42,7 +42,7 @@ const fieldPattern = /^(\s*)([A-Za-z_][\w-]*)(\s*:)/u;
 const explicitReferencePattern = /@[A-Za-z0-9_.#/-]+/gu;
 const inlineParameterPattern = /(?:^|\|\s*)([A-Za-z_][\w-]*)(?=\s*=)/gu;
 const inlineChemPattern = /:chem\[[^\]]*\]/gu;
-const quantityPattern = /\b\d+(?:\.\d+)?\s*(?:mg|g|kg|ug|µg|ml|mL|L|M|mM|mol|mmol|eq|%|degC|°C|K|h|min|s|rpm|bar|atm|psi|pH)(?=$|[^\w%°µ])/gu;
+const quantityPattern = /\b\d+(?:\.\d+)?(?:%|\s+(?:mg|g|kg|ug|µg|ml|mL|L|M|mM|mol|mol%|mmol|eq|percent|degC|°C|K|h|min|s|rpm|bar|atm|psi|pH))(?=$|[^\w%°µ])/gu;
 
 const semanticTokenModifierSet = new Set<string>(CHEMD_SEMANTIC_TOKEN_MODIFIERS);
 

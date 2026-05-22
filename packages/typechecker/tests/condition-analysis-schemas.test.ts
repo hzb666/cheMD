@@ -23,29 +23,29 @@ product: product
 
 :::result #res-standard
 reaction: @rxn-standard
-yield: 68 %
-conversion: 85 %
+yield: 68%
+conversion: 85%
 :::
 
 :::result #res-var1
 reaction: @rxn-standard
-yield: 72 %
-conversion: 90 %
+yield: 72%
+conversion: 90%
 :::
 
 :::condition-varies #cv-screen
 standard: @rxn-standard
 factor: solvent | baseline=THF
 factor: temperature | baseline=25 C
-outcome: yield | baseline=68 %
-outcome: conversion | baseline=85 %
+outcome: yield | baseline=68%
+outcome: conversion | baseline=85%
 
 attempt: var1
 result: @res-var1
 solvent: MeCN
 temperature: 40 C
-yield: 72 %
-conversion: 90 %
+yield: 72%
+conversion: 90%
 note: Higher conversion.
 :::
 `);
@@ -59,14 +59,14 @@ note: Higher conversion.
         expect.objectContaining({ field: "temperature", baseline: "25 C" })
       ]),
       outcomes: expect.arrayContaining([
-        expect.objectContaining({ field: "yield", baseline: "68 %" })
+        expect.objectContaining({ field: "yield", baseline: "68%" })
       ]),
       attempts: expect.arrayContaining([
         expect.objectContaining({
           id: "var1",
           result: "@res-var1",
           factors: expect.objectContaining({ solvent: "MeCN" }),
-          outcomes: expect.objectContaining({ yield: "72 %" })
+          outcomes: expect.objectContaining({ yield: "72%" })
         })
       ])
     }));
@@ -81,7 +81,7 @@ date: 2026-05-20
 
 :::condition-varies #cv-screen
 factor: solvent | baseline=THF
-outcome: yield | baseline=68 %
+outcome: yield | baseline=68%
 attempt: var1
 temperature: 40 C
 :::
@@ -176,7 +176,7 @@ date: 2026-05-20
 :::analysis #ana-lcms
 type: lcms
 method: @lcms-esi-pos
-peak: 6.4 min (97 %, product)
+peak: 6.4 min (97%, product)
 ion: m/z 124.1 ([M+H]+, product)
 :::
 `);
@@ -219,7 +219,7 @@ ion: m/z 123.4 ([M]+)
 
 :::analysis #ana-lcms
 type: lcms
-peak: 6.4 min (97 %, product)
+peak: 6.4 min (97%, product)
 :::
 `);
 

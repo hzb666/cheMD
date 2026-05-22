@@ -21,7 +21,7 @@ products: product
 
 :::result #res-main
 status: success
-yield: 72 %
+yield: 72%
 :::
 
 :::analysis #ana-main
@@ -138,7 +138,7 @@ products: product
 :::result #res-main
 ref: rxn-main
 status: success
-yield: 72 %
+yield: 72%
 :::`;
     const firstPass = compileChemd(source);
 

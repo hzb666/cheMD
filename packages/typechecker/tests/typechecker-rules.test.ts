@@ -175,13 +175,13 @@ smiles: CCO
 kind: reaction
 reactants: reagent
 products: @product-a
-yield: 50 %
+yield: 50%
 :::
 
 :::result #res-main
 reaction: @rxn-main
 product: @missing-product
-yield: 65 %
+yield: 65%
 :::
 
 :::sample #sample-main

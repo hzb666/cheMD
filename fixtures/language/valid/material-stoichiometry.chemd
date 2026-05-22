@@ -28,7 +28,7 @@ smiles: c1ccc(-c2ccccc2)cc1
 molecule: @mol-aryl-bromide
 supplier: Sigma
 lot: A123
-purity: 98 %
+purity: 98%
 :::
 
 :::chemd #rxn-main
@@ -46,14 +46,14 @@ source: @rxn-main
 molecule: @mol-biaryl-product
 state: crude
 mass: 120 mg
-purity: 84 %
+purity: 84%
 :::
 
 :::result #res-main
 reaction: @rxn-main
 product: @mol-biaryl-product
 status: success
-yield: 78 %
+yield: 78%
 :::
 
 :::sample #sample-nmr

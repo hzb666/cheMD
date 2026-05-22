@@ -72,7 +72,7 @@ temperature: r.t.
 molecule: @mol-substrate
 supplier: Sigma
 lot: A123
-purity: 98 %
+purity: 98%
 storage: flammable cabinet
 :::
 
@@ -81,7 +81,7 @@ source: @rxn-main
 molecule: @mol-product
 state: crude
 mass: 120 mg
-purity: 84 %
+purity: 84%
 :::
 ```
 
@@ -118,7 +118,7 @@ parser 通过 participant 字段和 reaction-only 字段推断 reaction，例如
 
 ## 数量表面语法
 
-带单位数量必须在数字和单位之间保留空格：`78 %`、`1.0 mmol`、`1.0 eq`、`30 min`。`78%` 这样的紧凑写法是 error。`1 ml` 这类大小写不规范会被接受并归一为 `1 mL`，同时产生 warning。
+带单位数量应该在数字和单位之间保留空格：`1.0 mmol`、`1.0 eq`、`30 min`。百分号值是 `78%` 这样的紧凑 literal；`78 %` 这类带空格写法是 error。`1ml` 这类普通单位紧凑写法会被接受并产生 warning，单位可识别时继续归一。`1 ml` 这类大小写不规范会被接受并归一为 `1 mL`，同时产生 warning。
 
 ## 诊断
 

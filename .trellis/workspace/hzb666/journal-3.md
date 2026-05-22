@@ -1412,3 +1412,73 @@ Completed a Trellis phased implementation for Chemd typed field value schema met
 ### Next Steps
 
 - None - task complete
+
+
+## Session 123: Percent literal compact syntax
+
+**Date**: 2026-05-22
+**Task**: Percent literal compact syntax
+**Package**: typechecker
+**Branch**: `develop`
+
+### Summary
+
+Treated percent-sign values as compact literals, diagnosed spaced percent forms, synchronized examples/templates/docs, and verified impacted parser/typechecker/language-service/compiler/exporter/CLI/web/desktop/storage packages.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `25d6e8f` | (see git log) |
+| `449d670` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 124: Ordinary unit spacing warning
+
+**Date**: 2026-05-22
+**Task**: Ordinary unit spacing warning
+**Package**: typechecker
+**Branch**: `develop`
+
+### Summary
+
+Changed compact ordinary unit spacing from an error to W_QUANTITY_UNIT_SPACING warning, kept spaced percent literals as E403, and updated diagnostics docs/tests.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `45a99e1` | (see git log) |
+| `81e36c3` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

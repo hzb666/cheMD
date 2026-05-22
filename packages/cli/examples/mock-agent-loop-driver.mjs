@@ -20,7 +20,7 @@ const nextSource = request.source.includes(":::result #res-main")
 :::result #res-main
 ref: rxn-main
 status: success
-yield: 72 %
+yield: 72%
 :::
 
 :::analysis #ana-main

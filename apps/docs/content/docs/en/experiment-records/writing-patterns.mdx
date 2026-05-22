@@ -38,7 +38,7 @@ time: 2 h
 :::result #res-main
 reaction: @rxn-main
 status: success
-yield: 62 %
+yield: 62%
 :::
 
 :::procedure #proc-main
@@ -72,7 +72,7 @@ prev: rxn-step-1
 :::result #res-step-2
 reaction: @rxn-step-2
 status: success
-yield: 48 %
+yield: 48%
 :::
 ```
 
@@ -87,14 +87,14 @@ A condition screen should contain a baseline reaction, attempt reactions, attemp
 standard: @rxn-baseline
 factor: solvent | baseline=THF
 factor: temperature | baseline=25 C
-outcome: conversion | baseline=85 %
+outcome: conversion | baseline=85%
 
 attempt: attempt-mecn-40
 reaction: @rxn-mecn-40
 result: @res-mecn-40
 solvent: MeCN
 temperature: 40 C
-conversion: 90 %
+conversion: 90%
 note: highest conversion in the first screen
 :::
 ```
@@ -122,8 +122,8 @@ type: hplc
 ref: @res-main
 instrument: Agilent 1260 Infinity II
 method: C18 gradient 10-90% MeCN
-peak: 6.4 min (96 %, product)
-result: purity 96 %
+peak: 6.4 min (96%, product)
+result: purity 96%
 :::
 ```
 
@@ -220,6 +220,6 @@ product: @mol-product
 reaction: @rxn-main
 product: @mol-product
 status: success
-yield: 70 %
+yield: 70%
 :::
 ```

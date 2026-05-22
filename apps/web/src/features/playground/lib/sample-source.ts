@@ -69,10 +69,10 @@ base: 0.50 product
 col: {
 :::result #res-main
 status: complete
-yield: 63 %
-conversion: 78 %
-selectivity: 91 %
-purity: 98 %
+yield: 63%
+conversion: 78%
+selectivity: 91%
+purity: 98%
 notes: TLC demo shows circle / up / down, mess, none, and base.
 :::
 }

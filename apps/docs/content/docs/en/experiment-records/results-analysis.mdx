@@ -14,7 +14,7 @@ description: '`:::result`, `:::analysis`, TLC lanes, generic analysis, and requi
 
 ## `yield`, `conversion`, `selectivity`, and `purity`
 
-These fields preserve the authored text in the AST, then the typechecker parses them as percent quantities. Percent values require a space before the unit, for example `82 %`. Compact forms such as `82%` are errors.
+These fields preserve the authored text in the AST, then the typechecker parses them as percent quantities. Percent-sign values are compact literals, for example `82%`; spaced forms such as `82 %` are errors.
 
 ## `:::analysis`
 
@@ -26,7 +26,7 @@ type: hplc
 ref: @res-main
 method: HPLC area normalization
 instrument: Agilent 1260
-peak: 6.4 min (97 %, product)
+peak: 6.4 min (97%, product)
 data: Main peak at 6.4 min with trace impurity.
 :::
 ```
@@ -64,9 +64,9 @@ Connect the result to the reaction and product, then connect analyses to the res
 reaction: @rxn-main
 product: @mol-product
 status: success
-yield: 82 %
+yield: 82%
 isolated_mass: 120 mg
-purity: 98 %
+purity: 98%
 notes: isolated after silica gel chromatography
 :::
 
@@ -101,14 +101,14 @@ type: hplc
 ref: @res-main
 instrument: Agilent 1260
 method: C18 gradient
-peak: 6.4 min (98 %, product)
+peak: 6.4 min (98%, product)
 :::
 
 :::analysis #ana-lcms-product
 type: lcms
 ref: @sample-product
 method: ESI positive
-peak: 6.4 min (98 %, product)
+peak: 6.4 min (98%, product)
 ion: m/z 321.1234 [M+H]+
 :::
 ```

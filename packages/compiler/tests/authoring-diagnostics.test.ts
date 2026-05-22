@@ -18,7 +18,7 @@ products: product
 
 :::result #res-main
 status: success
-yield: 72 %
+yield: 72%
 :::
 
 :::analysis #ana-main

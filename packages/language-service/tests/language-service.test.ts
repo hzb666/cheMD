@@ -28,7 +28,7 @@ products: product-main
 
 :::result #res-main
 status: success
-yield: 78 %
+yield: 78%
 :::
 
 :::template charge-line
@@ -106,7 +106,7 @@ describe("compileChemdForEditor", () => {
       }),
       expect.objectContaining({
         type: "number",
-        range: { startLine: 19, startColumn: 8, endLine: 19, endColumn: 12 },
+        range: { startLine: 19, startColumn: 8, endLine: 19, endColumn: 11 },
         modifiers: expect.arrayContaining(["quantity"])
       }),
       expect.objectContaining({
@@ -297,7 +297,7 @@ products: product-b
 :::result #res-step-02
 reaction: rxn-step-02
 status: success
-yield: 82 %
+yield: 82%
 :::
 `;
 

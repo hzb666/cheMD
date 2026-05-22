@@ -45,7 +45,7 @@ const buildResultBlockText = (resultId: string, reactionId: string): string =>
     `:::result #${resultId}`,
     `ref: ${reactionId}`,
     "status: success",
-    "yield: 0 %",
+    "yield: 0%",
     ":::"
   ].join("\n");
 
@@ -481,7 +481,7 @@ const buildReactionResultStarter = (usedIds: Set<string>): AuthoringTemplate => 
         `:::result #${resultId}`,
         `ref: ${reactionId}`,
         "status: success",
-        "yield: 0 %",
+        "yield: 0%",
         ":::"
       ].join("\n")
     }
@@ -508,13 +508,13 @@ const buildConditionScreenTemplate = (
         `standard: ${standardId}`,
         "factor: solvent | baseline=THF",
         "factor: temperature | baseline=25 C",
-        "outcome: conversion | baseline=85 %",
+        "outcome: conversion | baseline=85%",
         "attempt: var1",
         `reaction: ${fallbackCandidate}`,
         "result: @res-var1",
         "solvent: MeCN",
         "temperature: 40 C",
-        "conversion: 90 %",
+        "conversion: 90%",
         "note: conversion improved",
         ":::"
       ].join("\n")

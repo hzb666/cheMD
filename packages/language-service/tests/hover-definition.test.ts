@@ -39,7 +39,7 @@ products: product-main
 
 :::result #res-main
 status: success
-yield: 72 %
+yield: 72%
 :::
 `;
 
@@ -77,7 +77,7 @@ describe("getChemdHover", () => {
     expect(hover?.symbol?.canonicalQuantities).toEqual([
       expect.objectContaining({
         field: "yield",
-        raw: "72 %",
+        raw: "72%",
         canonicalValue: 72,
         canonicalUnit: "percent"
       })

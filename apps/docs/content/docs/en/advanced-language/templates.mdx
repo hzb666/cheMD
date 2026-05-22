@@ -205,7 +205,7 @@ This call chain forms `a -> b -> a`. The resolver stops cyclic expansion, emits 
 
 The `ref<kind>` kind set is molecule, reaction, result, analysis, procedure, observation, sample, artifact, and condition_varies. Parameter values must resolve to references with the expected target kind.
 
-The `quantity<class>` class set is amount, mass, volume, temperature, time, pressure, concentration, equivalent, and percent. Supported units align with the typechecker quantity parser: amount supports `mmol` and `mol`; mass supports `mg`, `g`, and `kg`; volume supports `mL`, `ml`, `L`, and `l`; temperature supports `C`, `°C`, `℃`, `K`, and `F`; time supports `h`, `hr`, `hrs`, `min`, `mins`, `分钟`, and `小时`; pressure supports `bar`, `atm`, and `psi`; concentration supports `M` and `mM`; equivalent supports `equiv` and `eq`; percent supports `%` and `percent`.
+The `quantity<class>` class set is amount, mass, volume, temperature, time, pressure, concentration, equivalent, and percent. Supported units align with the typechecker quantity parser: amount supports `mmol` and `mol`; mass supports `mg`, `g`, and `kg`; volume supports `mL`, `ml`, `L`, and `l`; temperature supports `C`, `°C`, `℃`, `K`, and `F`; time supports `h`, `hr`, `hrs`, `min`, `mins`, `分钟`, and `小时`; pressure supports `bar`, `atm`, and `psi`; concentration supports `M` and `mM`; equivalent supports `equiv` and `eq`; percent supports the compact `%` suffix and the `percent` word.
 
 Template body can contain Markdown, structured blocks, and nested `:::use` calls. Expanded nodes continue through resolver and typechecker, so objects inside templates still follow ID, reference, and required-field rules.
 
@@ -231,6 +231,6 @@ Result @param.result is supported by sample @param.sample using @param.method. P
 result: @res-main
 sample: sample-product
 method: HPLC
-purity: 98 %
+purity: 98%
 :::
 ```

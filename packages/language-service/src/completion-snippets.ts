@@ -79,10 +79,10 @@ const snippets: Array<Omit<ChemdCompletionItem, "range">> = [{
     ":::condition-varies #cv-${1:id}",
     "standard: ${2:@rxn-standard}",
     "factor: ${3:solvent} | baseline=${4:THF}",
-    "outcome: ${5:yield} | baseline=${6:68 %}",
+    "outcome: ${5:yield} | baseline=${6:68%}",
     "attempt: ${7:var1}",
     "${3:solvent}: ${8:MeCN}",
-    "${5:yield}: ${9:72 %}",
+    "${5:yield}: ${9:72%}",
     ":::"
   ].join("\n"),
   insertTextFormat: "snippet",

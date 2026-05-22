@@ -29,13 +29,13 @@ kind: reaction
 reactants: @mol-a
 products: product
 solvent: THF
-yield: 81 %
+yield: 81%
 :::
 
 :::result #res-main
 reaction: @rxn-main
 status: success
-yield: 80 %
+yield: 80%
 :::
 `;
 

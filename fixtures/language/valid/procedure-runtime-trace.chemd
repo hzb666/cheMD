@@ -30,7 +30,7 @@ temperature: 40 C
 reaction: @rxn-main
 product: traced product
 status: success
-yield: 70 %
+yield: 70%
 :::
 
 :::analysis #ana-tlc
