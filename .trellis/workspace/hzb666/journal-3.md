@@ -1618,3 +1618,37 @@ Changed compact ordinary unit spacing from an error to W_QUANTITY_UNIT_SPACING w
 ### Next Steps
 
 - None - task complete
+
+
+## Session 129: 导入层数量扫描接入 Chemd 规则
+
+**Date**: 2026-05-23
+**Task**: 导入层数量扫描接入 Chemd 规则
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+importer-prose 从 @chemd/core quantity schema 构建数量扫描；覆盖 compact percent、spaced percent warning 和 unknown unit warning。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `43e5f4d` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
