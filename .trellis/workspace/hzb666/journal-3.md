@@ -1856,3 +1856,37 @@ Added schema-driven reaction block rendering for reaction candidates, linked ren
 ### Next Steps
 
 - None - task complete
+
+
+## Session 136: Prose reaction import phase 3
+
+**Date**: 2026-05-23
+**Task**: Prose reaction import phase 3
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+Added conservative reaction candidate aggregation from existing prose step frames, surfaced reaction exclusion warnings at the import layer, and kept missing-product candidates from producing compiler-invalid reaction blocks.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `03edda9` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
