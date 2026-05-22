@@ -1516,3 +1516,37 @@ Changed compact ordinary unit spacing from an error to W_QUANTITY_UNIT_SPACING w
 ### Next Steps
 
 - None - task complete
+
+
+## Session 126: 补 procedure 导入规则漂移测试
+
+**Date**: 2026-05-23
+**Task**: 补 procedure 导入规则漂移测试
+**Package**: step-ontology
+**Branch**: `develop`
+
+### Summary
+
+为 procedure import patterns 增加 schema drift 测试；验证 @chemd/step-ontology test/typecheck 通过。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1a4b463` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

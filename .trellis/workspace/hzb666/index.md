@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-3.md`
-- **Total Sessions**: 125
+- **Total Sessions**: 126
 - **Last Active**: 2026-05-23
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-3.md` | ~1518 | Active |
+| `journal-3.md` | ~1552 | Active |
 | `journal-2.md` | ~1956 | Archived |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
@@ -31,6 +31,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 126 | 2026-05-23 | 补 procedure 导入规则漂移测试 | `1a4b463` | `develop` |
 | 125 | 2026-05-23 | 集中 procedure 导入规则 | `0dc42ec` | `develop` |
 | 124 | 2026-05-22 | Ordinary unit spacing warning | `45a99e1`, `81e36c3` | `develop` |
 | 123 | 2026-05-22 | Percent literal compact syntax | `25d6e8f`, `449d670` | `develop` |
