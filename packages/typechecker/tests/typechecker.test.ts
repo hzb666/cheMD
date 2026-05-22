@@ -98,6 +98,96 @@ This prose should stay narrative and not create additional lowered steps.
 });
 
 describe("typed semantic graph normalization", () => {
+  it("keeps the current field value normalization contract stable", () => {
+    const document = resolveChemd(parseChemd(`---
+id: exp-value-contract
+title: Field value contract
+date: 2026-05-22
+---
+
+:::chemd #mol-a
+kind: molecule
+smiles: CCO
+:::
+
+:::chemd #mol-b
+kind: molecule
+smiles: CC=O
+:::
+
+:::chemd #rxn-main
+kind: reaction
+reactant: @mol-a
+product: @mol-b
+temperature: 60 C
+time: 2 h
+:::
+
+:::result #res-main
+status: complete
+reaction: rxn-main
+product: mol-b
+yield: 72 %
+isolated_mass: 15 mg
+:::
+`));
+
+    const result = typecheckDocument(document);
+    const reaction = result.typedGraph.nodes.find((node) => node.kind === "reaction");
+    const resultNode = result.typedGraph.nodes.find((node) => node.kind === "result");
+
+    expect(reaction).toMatchObject({
+      kind: "reaction",
+      temperature: expect.objectContaining({
+        kind: "quantity",
+        quantityClass: "temperature",
+        raw: "60 C",
+        canonicalValue: 60,
+        canonicalUnit: "C"
+      }),
+      time: expect.objectContaining({
+        kind: "quantity",
+        quantityClass: "time",
+        raw: "2 h",
+        canonicalValue: 2,
+        canonicalUnit: "h"
+      })
+    });
+    expect(resultNode).toMatchObject({
+      kind: "result",
+      status: "success",
+      reaction: expect.objectContaining({
+        kind: "reference",
+        refId: "rxn-main",
+        targetKind: "reaction",
+        resolved: true
+      }),
+      product: expect.objectContaining({
+        kind: "reference",
+        refId: "mol-b",
+        targetKind: "molecule",
+        resolved: true
+      }),
+      yield: expect.objectContaining({
+        kind: "quantity",
+        quantityClass: "percent",
+        raw: "72 %",
+        canonicalValue: 72,
+        canonicalUnit: "percent"
+      }),
+      isolatedMass: expect.objectContaining({
+        kind: "quantity",
+        quantityClass: "mass",
+        raw: "15 mg",
+        canonicalValue: 15,
+        canonicalUnit: "mg"
+      })
+    });
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).not.toEqual(
+      expect.arrayContaining(["E306", "E403", "E_TYPED_REFERENCE_MISMATCH"])
+    );
+  });
+
   it("keeps molecule CAS separate from SMILES in typed graph", () => {
     const document = resolveChemd(parseChemd(`---
 id: exp-typed-cas

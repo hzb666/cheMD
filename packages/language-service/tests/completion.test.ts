@@ -53,6 +53,15 @@ kind: |
 :::`)).toEqual(["molecule", "reaction"]);
   });
 
+  it("keeps current value completion registry behavior visible before schema migration", () => {
+    expect(labelsFor(`:::result #res-main
+status: p|
+:::`)).toEqual(["partial", "pending"]);
+    expect(labelsFor(`:::procedure #proc-main
+step: |
+:::`)).toEqual(expect.arrayContaining(["add", "stir", "analyze"]));
+  });
+
   it("suggests reaction stage values", () => {
     expect(labelsFor(`:::chemd #rxn-main
 kind: reaction

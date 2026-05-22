@@ -3,8 +3,13 @@ import { describe, expect, it } from "vitest";
 import {
   buildReactionEntityIdFromReference,
   buildScopedReferenceId,
+  CHEMD_KIND_VALUE_ALIASES,
   createDocument,
   createMarkdownNode,
+  getBlockFieldListMode,
+  getBlockListFieldSet,
+  getCanonicalBlockFields,
+  getCompletionBlockFieldSchemas,
   parseReferenceId
 } from "../src/index";
 
@@ -38,5 +43,55 @@ describe("core AST helpers", () => {
     });
     expect(buildScopedReferenceId("route-doc", "rxn-step-07")).toBe("route-doc#rxn-step-07");
     expect(buildReactionEntityIdFromReference("route-doc#rxn-step-07")).toBe("rxn::route-doc::rxn-step-07");
+  });
+});
+
+describe("block field schema baseline", () => {
+  it("keeps canonical field lists and aliases as the field-name source of truth", () => {
+    expect(getCanonicalBlockFields("result")).toEqual([
+      "status",
+      "yield",
+      "conversion",
+      "selectivity",
+      "isolated_mass",
+      "product_state",
+      "purity",
+      "notes",
+      "ref",
+      "reaction",
+      "product"
+    ]);
+    expect(getCanonicalBlockFields("chemd")).toEqual(expect.arrayContaining([
+      "kind",
+      "smiles",
+      "reactant",
+      "product",
+      "temperature",
+      "yield"
+    ]));
+    expect(CHEMD_KIND_VALUE_ALIASES).toEqual({
+      molecule: "molecule",
+      mol: "molecule",
+      reaction: "reaction",
+      reac: "reaction"
+    });
+  });
+
+  it("keeps current list and completion behavior stable before value schema work", () => {
+    expect([...getBlockListFieldSet("chemd")].sort()).toEqual([
+      "chemistry_features",
+      "conditions",
+      "prev",
+      "product",
+      "reactant"
+    ]);
+    expect(getBlockFieldListMode("chemd", "reactant")).toBe("repeat");
+    expect(getBlockFieldListMode("chemd", "reactant", "reactants")).toBe("pipe");
+    expect(getCompletionBlockFieldSchemas("chemd", "molecule").map((field) => field.name)).toEqual(
+      expect.arrayContaining(["smiles", "cas", "mw"])
+    );
+    expect(getCompletionBlockFieldSchemas("chemd", "molecule").map((field) => field.name)).not.toContain(
+      "temperature"
+    );
   });
 });

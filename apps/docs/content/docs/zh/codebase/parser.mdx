@@ -72,6 +72,13 @@ product: @mol-c
 
 parser 会把 `;;` 拆成多个字段片段，并按块配置把 `reactants` 等列表字段用 `|` 拆分。结构化 participant 使用单字段行（`reactant`、`product`、`reac`、`prod`），这样 amount、equivalent、mass、volume 和 `limiting=true` 会挂在正确 participant 上。复数别名 `reactants`、`products` 只表示简单列表。
 
+在这一层，字段 value 仍保持为原始字符串或字符串数组。当前 block schema
+定义字段名、别名、列表模式和少量类似 enum 的补全值；quantity、reference、
+status、analysis type、atmosphere 和 step parameter 类型化都在后续 resolver、
+typechecker、step ontology 与 language-service 层完成。因此 typed field value
+schema 工作必须先作为增量 metadata 和防漂移测试接入，再逐步替换 parser 或
+compiler 行为。
+
 ### 当前块语法要点
 
 - `chemd` parser 通过显式 `kind`、`kind` 值别名（`mol`、`reac`）或稳定字段形状推断生成 molecule / reaction node。reaction participant 来自 canonical `reactant` / `product` 字段，以及紧凑别名 `reac` / `prod`。

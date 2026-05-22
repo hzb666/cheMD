@@ -1,0 +1,12 @@
+{"file": ".trellis/tasks/05-22-typed-field-value-schema/prd.md", "reason": "Task PRD, phase plan, no-drift policy, validation gates"}
+{"file": ".trellis/workflow.md", "reason": "Trellis task lifecycle and phase workflow"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Cross-layer schema, parser, typechecker, IDE, docs contract thinking"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Avoid duplicate field/value registries and schema drift"}
+{"file": ".trellis/spec/core/backend/index.md", "reason": "Core package ownership and pre-development checklist"}
+{"file": ".trellis/spec/core/backend/directory-structure.md", "reason": "Core public API and shared contract placement"}
+{"file": ".trellis/spec/core/backend/quality-guidelines.md", "reason": "Core strict TypeScript and test gates"}
+{"file": ".trellis/spec/parser/backend/index.md", "reason": "Parser package ownership and checklist"}
+{"file": ".trellis/spec/parser/backend/quality-guidelines.md", "reason": "Parser behavior and test gates"}
+{"file": ".trellis/spec/compiler/backend/index.md", "reason": "Compiler orchestration and checklist"}
+{"file": ".trellis/spec/compiler/backend/language-v03-contracts.md", "reason": "Typed graph, render/export, diagnostics contract"}
+{"file": ".trellis/spec/compiler/backend/quality-guidelines.md", "reason": "Compiler test gates"}

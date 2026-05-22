@@ -72,6 +72,38 @@ products: b
     });
   });
 
+  it("preserves block field values as raw strings before typechecking", () => {
+    const document = parseChemd(`---
+id: exp-field-values
+title: Field value baseline
+date: 2026-05-22
+---
+
+:::chemd #rxn-values
+kind: reaction
+solvent: MeCN ;; temperature: 60 C
+reactant: @mol-a | amount=1.0 mmol | equiv=1.0 | limiting=true
+reac: @mol-b | 1.2 eq
+product: @mol-c
+yield: 72 %
+:::
+`);
+
+    expect(document.children[0]).toMatchObject({
+      type: "reaction",
+      id: "rxn-values",
+      solvent: "MeCN",
+      temperature: "60 C",
+      reactants: [
+        "@mol-a | amount=1.0 mmol | equiv=1.0 | limiting=true",
+        "@mol-b | 1.2 eq"
+      ],
+      products: ["@mol-c"],
+      yield: "72 %"
+    });
+    expect(document.diagnostics).toEqual([]);
+  });
+
   it("does not report missing chemd kind when inference is stable", () => {
     const document = parseChemd(`---
 id: exp-strict-kind
