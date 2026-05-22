@@ -3,7 +3,7 @@
   "name": "typed-field-value-schema",
   "title": "Chemd typed field value schema unification",
   "description": "Unify Chemd block field value schema metadata across core, parser, typechecker, language-service, docs, and drift tests without changing existing compile behavior.",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": null,
   "scope": "packages/core schema, parser field parsing, typechecker normalization, language-service IDE metadata, apps/docs language docs, drift tests",
   "package": "core",
@@ -11,7 +11,7 @@
   "creator": "hzb666",
   "assignee": "hzb666",
   "createdAt": "2026-05-22",
-  "completedAt": null,
+  "completedAt": "2026-05-22",
   "branch": null,
   "base_branch": "develop",
   "worktree_path": null,
@@ -37,7 +37,7 @@
   "notes": "Trellis loop on develop. Phase 1 must be behavior-preserving metadata and drift tests only; parser AST, typechecker typed graph, diagnostics, exports, and docs examples must not drift.",
   "meta": {
     "workflow": "trellis-loop",
-    "phase": "phase-6-export-docs-aligned",
+    "phase": "phase-7-complete",
     "business_drift_policy": "no existing compile/parser/typechecker/render/export behavior changes",
     "phase_0": {
       "status": "complete",
@@ -66,6 +66,10 @@
     "phase_6": {
       "status": "complete",
       "summary": "Documented export-layer impact: schema metadata aligns tooling and typed quantities without changing export shapes."
+    },
+    "phase_7": {
+      "status": "complete",
+      "summary": "Ran full targeted regression across core, parser, typechecker, language-service, compiler docs tests, and docs typecheck."
     }
   }
 }
