@@ -281,6 +281,8 @@ importers:
 
   packages/agent-tools: {}
 
+  packages/chemical-lexicon: {}
+
   packages/cli:
     dependencies:
       '@chemd/compiler':
@@ -375,6 +377,12 @@ importers:
       '@chemd/typechecker':
         specifier: workspace:*
         version: link:../typechecker
+
+  packages/importer-prose:
+    dependencies:
+      '@chemd/chemical-lexicon':
+        specifier: workspace:*
+        version: link:../chemical-lexicon
 
   packages/interoperability: {}
 
