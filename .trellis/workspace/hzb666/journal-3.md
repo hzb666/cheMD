@@ -1550,3 +1550,37 @@ Changed compact ordinary unit spacing from an error to W_QUANTITY_UNIT_SPACING w
 ### Next Steps
 
 - None - task complete
+
+
+## Session 127: 建立本地 chemical lexicon
+
+**Date**: 2026-05-23
+**Task**: 建立本地 chemical lexicon
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+新增 @chemd/chemical-lexicon 离线名称识别、公式候选和本地 provider；验证新包 test/typecheck 通过。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `84812c1` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
