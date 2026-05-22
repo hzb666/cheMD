@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-3.md`
-- **Total Sessions**: 133
+- **Total Sessions**: 134
 - **Last Active**: 2026-05-23
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-3.md` | ~1790 | Active |
+| `journal-3.md` | ~1824 | Active |
 | `journal-2.md` | ~1956 | Archived |
 | `journal-1.md` | ~1998 | Archived |
 <!-- @@@/auto:active-documents -->
@@ -31,6 +31,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 134 | 2026-05-23 | Prose reaction import phase 1 | `ba2a6d4` | `develop` |
 | 133 | 2026-05-23 | 完善真实英文 SI procedure 导入 | `5a921c5` | `develop` |
 | 132 | 2026-05-23 | 阶段 8：接入 prose import CLI 与文档 | `e491999` | `develop` |
 | 131 | 2026-05-23 | 导入 IR 渲染 Chemd 草稿并编译校验 | `db82b09` | `develop` |

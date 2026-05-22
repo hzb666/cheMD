@@ -1788,3 +1788,37 @@ importer-prose 新增 Chemd 草稿渲染与 compileChemd 校验入口；验证 i
 ### Next Steps
 
 - None - task complete
+
+
+## Session 134: Prose reaction import phase 1
+
+**Date**: 2026-05-23
+**Task**: Prose reaction import phase 1
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+Planned the three SI import/state-model tasks and added the initial reaction candidate contract without changing rendered Chemd behavior.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ba2a6d4` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
