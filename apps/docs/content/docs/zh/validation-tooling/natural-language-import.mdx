@@ -86,6 +86,29 @@ step: purify | id=s11 | technique=flash column chromatography | medium=silica ge
 
 Reaction 摘要会比 procedure 更窄。`H2O`、`EtOAc`、brine、`MgSO4`、Celite 和 flash chromatography 会留在 procedure/workup 轨迹里，不会写入 reaction 的 `reagents` 或 `solvent`。
 
+## Procedure State 审阅模型
+
+导入器还会从 canonical steps 派生 procedure state 模型。它是审阅数据，不是 Chemd 语法，也不是运行时执行。该模型从空容器开始，在每个 step 后记录一个 snapshot：
+
+```text
+initial: contents=[]
+step s1 charge: contents=[substrate6 and acyl-silane7, THF]
+step s2 cool: temperature=-78 °C
+step s3 add: contents += sBuLi
+step s4 hold: duration=15 min
+step s5 quench: contents += H2O
+step s6 extract: phaseMarkers += extracted
+step s7 wash: contents += brine
+step s8 dry: contents += MgSO4
+step s9 filter: phaseMarkers += filtered
+step s10 concentrate: phaseMarkers += concentrated
+step s11 purify: phaseMarkers += purified
+```
+
+`step:` 行是作者写入或导入得到的操作。Procedure state 是覆盖这些 steps 的派生审阅模型。Runtime trace 又是另一层，用于真实或回放执行事件，例如 step start、completion、artifact 和 observation。
+
+如果某个 step family 不能表示为状态转移，导入器会发出 state warning，并继续保留原 step 或 unparsed span 供审阅。
+
 导入器仍可从 `加入 n-BuLi 后体系逐渐变深红色。` 这样的文本生成 observation-only 草稿；没有 reaction 候选时，观察会保留为可审阅候选。
 
 该草稿仍然需要使用者审阅。导入层给出的 `confidence`、formula-like 物质、未知单位、被排除的 workup 物质或参数 drift 都应视为需要确认的提示，不应直接当作已验证事实。

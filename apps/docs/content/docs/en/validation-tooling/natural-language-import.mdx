@@ -90,6 +90,35 @@ step: purify | id=s11 | technique=flash column chromatography | medium=silica ge
 
 The reaction summary is intentionally narrower than the procedure. `H2O`, `EtOAc`, brine, `MgSO4`, Celite, and flash chromatography stay in the procedure/workup trail and are not written into reaction `reagents` or `solvent`.
 
+## Procedure State Review
+
+The importer also builds a derived procedure state model from the canonical
+steps. It is review data, not Chemd syntax and not runtime execution. The model
+starts from an empty vessel and records snapshots after each step:
+
+```text
+initial: contents=[]
+step s1 charge: contents=[substrate6 and acyl-silane7, THF]
+step s2 cool: temperature=-78 °C
+step s3 add: contents += sBuLi
+step s4 hold: duration=15 min
+step s5 quench: contents += H2O
+step s6 extract: phaseMarkers += extracted
+step s7 wash: contents += brine
+step s8 dry: contents += MgSO4
+step s9 filter: phaseMarkers += filtered
+step s10 concentrate: phaseMarkers += concentrated
+step s11 purify: phaseMarkers += purified
+```
+
+`step:` lines are the authored or imported operations. Procedure state is a
+derived review model over those steps. Runtime trace is different again: it is
+for live or replayed execution events such as step start, completion, artifacts,
+and observations.
+
+If a step family cannot be represented as a state transition, the importer
+emits a state warning and keeps the source step or unparsed span visible.
+
 The importer can still create observation-only drafts from prose such as `加入 n-BuLi 后体系逐渐变深红色。`; that path keeps the observation as a reviewable candidate when there is no reaction candidate.
 
 The draft still needs user review. Import-layer `confidence`, formula-like materials, unknown units, excluded workup materials, and parameter drift warnings are review signals, not verified facts.

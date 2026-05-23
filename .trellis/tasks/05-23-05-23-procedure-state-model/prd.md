@@ -100,7 +100,7 @@ Status: implemented.
 
 ## Phase 3: Docs and Review Examples
 
-Status: planned.
+Status: implemented.
 
 ### Tasks
 
@@ -119,6 +119,13 @@ Status: planned.
 - `pnpm --filter @chemd/compiler test -- docs-coverage.test.ts docs-marked-examples.test.ts`
 - `pnpm --filter @chemd/docs typecheck`
 - `pnpm --filter @chemd/docs build`
+
+### Implementation Notes
+
+- EN/ZH import docs now distinguish operation steps, derived procedure state,
+  and runtime trace.
+- Examples show the empty-vessel state stack evolving across imported steps.
+- Warning policy states unsupported transitions remain visible for review.
 
 ## Review Requirements
 
