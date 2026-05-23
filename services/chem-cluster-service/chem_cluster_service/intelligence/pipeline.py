@@ -14,6 +14,7 @@ from chem_cluster_service.intelligence.contracts import (
     require_valid_job_input,
     validate_job_input,
 )
+from chem_cluster_service.intelligence.clustering import build_reaction_similarity_groups
 from chem_cluster_service.intelligence.io import ClassifiedEnvelope, validation_envelope
 from chem_cluster_service.intelligence.providers.rdkit_fingerprint import (
     run_rdkit_fingerprint_provider,
@@ -88,6 +89,13 @@ def run_reaction_intelligence_pipeline(
         provider_reports.append(output.provider)
 
     generated_at = _format_generated_at(clock)
+    similarity_edges = _collect_similarity_edges(provider_outputs)
+    reaction_ids = [
+        item["reaction_entity_id"]
+        for item in job["reactions"]
+        if isinstance(item.get("reaction_entity_id"), str)
+    ]
+    groups = build_reaction_similarity_groups(reaction_ids, similarity_edges)
     artifact: ReactionIntelligenceArtifact = {
         "schema_version": REACTION_INTELLIGENCE_ARTIFACT_SCHEMA_VERSION,
         "artifact_id": f"reaction-intelligence-artifact::{job['job_id']}",
@@ -96,7 +104,10 @@ def run_reaction_intelligence_pipeline(
         "generated_at": generated_at,
         "providers": provider_reports,
         "reaction_features": _merge_reaction_features(provider_outputs),
-        "similarity_edges": _collect_similarity_edges(provider_outputs),
+        "similarity_edges": similarity_edges,
+        "strict_reaction_clusters": groups["strict_reaction_clusters"],
+        "candidate_reaction_neighbors": groups["candidate_reaction_neighbors"],
+        "semantic_reaction_groups": groups["semantic_reaction_groups"],
         "warnings": _dedupe_strings(artifact_warnings),
     }
     layout = _first_layout(provider_outputs)

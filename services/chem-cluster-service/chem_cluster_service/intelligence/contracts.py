@@ -102,6 +102,9 @@ class ReactionIntelligenceArtifact(TypedDict, total=False):
     providers: list[ProviderReport]
     reaction_features: list[ComputedFeature]
     similarity_edges: list[ComputedSimilarityEdge]
+    strict_reaction_clusters: list[dict[str, Any]]
+    candidate_reaction_neighbors: list[dict[str, Any]]
+    semantic_reaction_groups: list[dict[str, Any]]
     layout: dict[str, Any]
     warnings: list[str]
 
@@ -264,6 +267,56 @@ def _validate_similarity_contribution(
         errors.append(f"{label}.basis must be strings")
 
 
+def _validate_basis_values(value: Any, label: str, errors: list[str]) -> None:
+    if _is_string_list(value) and any(item not in COMPUTED_SIMILARITY_BASIS for item in value):
+        errors.append(f"{label} contains invalid basis")
+
+
+def _validate_strict_cluster(value: Any, index: int, errors: list[str]) -> None:
+    label = f"strict_reaction_clusters[{index}]"
+    if not _is_object(value):
+        errors.append(f"{label} must be an object")
+        return
+    for field in ("cluster_id", "representative_reaction_entity_id"):
+        _require_string(errors, value, field, f"{label}.{field}")
+    for field in ("reaction_entity_ids", "basis_summary", "warnings"):
+        if not _is_string_list(value.get(field)):
+            errors.append(f"{label}.{field} must be strings")
+    for field in ("mean_score", "min_edge_score"):
+        if not isinstance(value.get(field), (int, float)):
+            errors.append(f"{label}.{field} must be a number")
+    _validate_basis_values(value.get("basis_summary"), f"{label}.basis_summary", errors)
+
+
+def _validate_candidate_neighbor(value: Any, index: int, errors: list[str]) -> None:
+    label = f"candidate_reaction_neighbors[{index}]"
+    if not _is_object(value):
+        errors.append(f"{label} must be an object")
+        return
+    for field in ("edge_id", "from_reaction_entity_id", "to_reaction_entity_id"):
+        _require_string(errors, value, field, f"{label}.{field}")
+    if not isinstance(value.get("score"), (int, float)):
+        errors.append(f"{label}.score must be a number")
+    for field in ("basis", "warnings"):
+        if not _is_string_list(value.get(field)):
+            errors.append(f"{label}.{field} must be strings")
+    _validate_basis_values(value.get("basis"), f"{label}.basis", errors)
+
+
+def _validate_semantic_group(value: Any, index: int, errors: list[str]) -> None:
+    label = f"semantic_reaction_groups[{index}]"
+    if not _is_object(value):
+        errors.append(f"{label} must be an object")
+        return
+    _require_string(errors, value, "group_id", f"{label}.group_id")
+    if not isinstance(value.get("mean_score"), (int, float)):
+        errors.append(f"{label}.mean_score must be a number")
+    for field in ("reaction_entity_ids", "basis_summary", "warnings"):
+        if not _is_string_list(value.get(field)):
+            errors.append(f"{label}.{field} must be strings")
+    _validate_basis_values(value.get("basis_summary"), f"{label}.basis_summary", errors)
+
+
 def validate_artifact(value: Any) -> list[str]:
     errors: list[str] = []
     if not _is_object(value):
@@ -276,6 +329,9 @@ def validate_artifact(value: Any) -> list[str]:
         ("providers", _validate_provider_report),
         ("reaction_features", _validate_computed_feature),
         ("similarity_edges", _validate_computed_edge),
+        ("strict_reaction_clusters", _validate_strict_cluster),
+        ("candidate_reaction_neighbors", _validate_candidate_neighbor),
+        ("semantic_reaction_groups", _validate_semantic_group),
     ):
         items = value.get(field)
         if not isinstance(items, list):

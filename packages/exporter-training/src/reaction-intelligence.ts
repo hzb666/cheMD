@@ -9,10 +9,13 @@ import type {
   ReactionIntelligenceServiceJobBuildResult,
   BuildReactionIntelligenceServiceJobOptions,
   ReactionIntelligenceArtifact,
+  ReactionIntelligenceCandidateReactionNeighbor,
   ReactionIntelligenceCluster,
   ReactionIntelligenceComputedFeature,
   ReactionIntelligenceComputedSimilarityEdge,
-  ReactionIntelligenceLayout
+  ReactionIntelligenceLayout,
+  ReactionIntelligenceSemanticReactionGroup,
+  ReactionIntelligenceStrictReactionCluster
 } from "./reaction-intelligence-types";
 import type { ChemdTrainingGraphIndexV1 } from "./graph-index-types";
 
@@ -291,6 +294,65 @@ const normalizeClusters = (
     }));
 };
 
+const normalizeStrictClusters = (
+  artifact: ReactionIntelligenceArtifact,
+  reactionIds: ReadonlySet<string>
+): ReactionIntelligenceStrictReactionCluster[] | undefined => {
+  if (!artifact.strict_reaction_clusters) return undefined;
+  return artifact.strict_reaction_clusters
+    .filter((cluster) =>
+      cluster.reaction_entity_ids.length > 0
+      && cluster.reaction_entity_ids.every((reactionId) => reactionIds.has(reactionId))
+      && reactionIds.has(cluster.representative_reaction_entity_id)
+      && Number.isFinite(cluster.mean_score)
+      && Number.isFinite(cluster.min_edge_score)
+    )
+    .map((cluster) => ({
+      ...cluster,
+      reaction_entity_ids: [...cluster.reaction_entity_ids],
+      basis_summary: [...cluster.basis_summary],
+      warnings: [...cluster.warnings]
+    }));
+};
+
+const normalizeCandidateNeighbors = (
+  artifact: ReactionIntelligenceArtifact,
+  reactionIds: ReadonlySet<string>
+): ReactionIntelligenceCandidateReactionNeighbor[] | undefined => {
+  if (!artifact.candidate_reaction_neighbors) return undefined;
+  return artifact.candidate_reaction_neighbors
+    .filter((neighbor) =>
+      reactionIds.has(neighbor.from_reaction_entity_id)
+      && reactionIds.has(neighbor.to_reaction_entity_id)
+      && neighbor.from_reaction_entity_id !== neighbor.to_reaction_entity_id
+      && Number.isFinite(neighbor.score)
+    )
+    .map((neighbor) => ({
+      ...neighbor,
+      basis: [...neighbor.basis],
+      warnings: [...neighbor.warnings]
+    }));
+};
+
+const normalizeSemanticGroups = (
+  artifact: ReactionIntelligenceArtifact,
+  reactionIds: ReadonlySet<string>
+): ReactionIntelligenceSemanticReactionGroup[] | undefined => {
+  if (!artifact.semantic_reaction_groups) return undefined;
+  return artifact.semantic_reaction_groups
+    .filter((group) =>
+      group.reaction_entity_ids.length > 0
+      && group.reaction_entity_ids.every((reactionId) => reactionIds.has(reactionId))
+      && Number.isFinite(group.mean_score)
+    )
+    .map((group) => ({
+      ...group,
+      reaction_entity_ids: [...group.reaction_entity_ids],
+      basis_summary: [...group.basis_summary],
+      warnings: [...group.warnings]
+    }));
+};
+
 const skippedProviderWarnings = (artifact: ReactionIntelligenceArtifact): string[] =>
   artifact.provider_statuses.flatMap((status) => [
     ...status.warnings,
@@ -301,17 +363,32 @@ const skippedProviderWarnings = (artifact: ReactionIntelligenceArtifact): string
 const droppedArtifactWarnings = (
   artifact: ReactionIntelligenceArtifact,
   features: ReactionIntelligenceComputedFeature[],
-  edges: ReactionIntelligenceComputedSimilarityEdge[]
+  edges: ReactionIntelligenceComputedSimilarityEdge[],
+  strictClusters: ReactionIntelligenceStrictReactionCluster[] | undefined,
+  candidateNeighbors: ReactionIntelligenceCandidateReactionNeighbor[] | undefined,
+  semanticGroups: ReactionIntelligenceSemanticReactionGroup[] | undefined
 ): string[] => {
   const featureIds = new Set(features.map((feature) => feature.feature_id));
   const edgeIds = new Set(edges.map((edge) => edge.edge_id));
+  const strictClusterIds = new Set((strictClusters ?? []).map((cluster) => cluster.cluster_id));
+  const candidateNeighborIds = new Set((candidateNeighbors ?? []).map((neighbor) => neighbor.edge_id));
+  const semanticGroupIds = new Set((semanticGroups ?? []).map((group) => group.group_id));
   return uniqueStrings([
     ...artifact.computed_features
       .filter((feature) => !featureIds.has(feature.feature_id))
       .map((feature) => `computed_feature_not_merged:${feature.feature_id}`),
     ...artifact.computed_similarity_edges
       .filter((edge) => !edgeIds.has(edge.edge_id))
-      .map((edge) => `computed_similarity_edge_not_merged:${edge.edge_id}`)
+      .map((edge) => `computed_similarity_edge_not_merged:${edge.edge_id}`),
+    ...(artifact.strict_reaction_clusters ?? [])
+      .filter((cluster) => !strictClusterIds.has(cluster.cluster_id))
+      .map((cluster) => `strict_reaction_cluster_not_merged:${cluster.cluster_id}`),
+    ...(artifact.candidate_reaction_neighbors ?? [])
+      .filter((neighbor) => !candidateNeighborIds.has(neighbor.edge_id))
+      .map((neighbor) => `candidate_reaction_neighbor_not_merged:${neighbor.edge_id}`),
+    ...(artifact.semantic_reaction_groups ?? [])
+      .filter((group) => !semanticGroupIds.has(group.group_id))
+      .map((group) => `semantic_reaction_group_not_merged:${group.group_id}`)
   ]);
 };
 
@@ -324,6 +401,9 @@ const buildLayer = (
   const computedEdges = normalizeEdges(artifact, reactionIds);
   const layout = normalizeLayout(artifact, reactionIds);
   const clusters = normalizeClusters(artifact, reactionIds);
+  const strictClusters = normalizeStrictClusters(artifact, reactionIds);
+  const candidateNeighbors = normalizeCandidateNeighbors(artifact, reactionIds);
+  const semanticGroups = normalizeSemanticGroups(artifact, reactionIds);
   return {
     schema_version: "chemd-reaction-intelligence-graph-layer/v0.1",
     source_artifact_id: artifact.artifact_id,
@@ -335,11 +415,21 @@ const buildLayer = (
     computed_features: computedFeatures,
     computed_similarity_edges: computedEdges,
     ...(clusters ? { clusters } : {}),
+    ...(strictClusters ? { strict_reaction_clusters: strictClusters } : {}),
+    ...(candidateNeighbors ? { candidate_reaction_neighbors: candidateNeighbors } : {}),
+    ...(semanticGroups ? { semantic_reaction_groups: semanticGroups } : {}),
     ...(layout ? { layout } : {}),
     warnings: uniqueStrings([
       ...artifact.warnings,
       ...skippedProviderWarnings(artifact),
-      ...droppedArtifactWarnings(artifact, computedFeatures, computedEdges)
+      ...droppedArtifactWarnings(
+        artifact,
+        computedFeatures,
+        computedEdges,
+        strictClusters,
+        candidateNeighbors,
+        semanticGroups
+      )
     ])
   };
 };

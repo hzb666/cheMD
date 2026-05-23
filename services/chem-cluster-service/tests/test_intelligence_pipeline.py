@@ -91,6 +91,23 @@ class ReactionIntelligencePipelineTests(unittest.TestCase):
                 "hybrid_consensus",
             ],
         )
+        self.assertEqual(result.payload["strict_reaction_clusters"], [
+            {
+                "cluster_id": "strict-reaction-cluster::rxn-a::rxn-b",
+                "reaction_entity_ids": ["rxn-a", "rxn-b"],
+                "representative_reaction_entity_id": "rxn-a",
+                "mean_score": 0.84,
+                "min_edge_score": 0.84,
+                "basis_summary": [
+                    "hybrid_consensus",
+                    "rdkit_fingerprint_tanimoto",
+                    "semantic_family_support",
+                ],
+                "warnings": [],
+            }
+        ])
+        self.assertEqual(result.payload["candidate_reaction_neighbors"], [])
+        self.assertEqual(result.payload["semantic_reaction_groups"], [])
         self.assertEqual(validate_artifact(result.payload), [])
 
     def test_tmap_layout_is_classified_without_dependency(self):

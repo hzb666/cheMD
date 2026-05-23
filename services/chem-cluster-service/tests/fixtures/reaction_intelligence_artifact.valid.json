@@ -72,5 +72,8 @@
       "warnings": []
     }
   ],
+  "strict_reaction_clusters": [],
+  "candidate_reaction_neighbors": [],
+  "semantic_reaction_groups": [],
   "warnings": []
 }

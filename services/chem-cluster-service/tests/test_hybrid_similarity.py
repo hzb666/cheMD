@@ -270,6 +270,9 @@ def artifact(edges):
         ],
         "reaction_features": [],
         "similarity_edges": edges,
+        "strict_reaction_clusters": [],
+        "candidate_reaction_neighbors": [],
+        "semantic_reaction_groups": [],
         "warnings": [],
     }
 

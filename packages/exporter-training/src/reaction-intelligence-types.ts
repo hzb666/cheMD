@@ -74,13 +74,20 @@ export interface ReactionIntelligenceComputedFeature {
 
 export type ReactionIntelligenceComputedSimilarityBasis =
   | "semantic_similarity"
+  | "semantic_family_support"
+  | "semantic_procedure_support"
   | "drfp_tanimoto"
   | "rdkit_tanimoto"
+  | "rdkit_fingerprint_tanimoto"
   | "rxnfp_cosine"
   | "atom_mapping_reaction_center"
   | "reaction_center_overlap"
+  | "same_reaction_center"
+  | "compatible_reaction_center"
+  | "conflicting_reaction_center"
   | "fingerprint_tanimoto"
-  | "hybrid_computed";
+  | "hybrid_computed"
+  | "hybrid_consensus";
 
 export interface ReactionIntelligenceSimilarityContribution {
   basis: ReactionIntelligenceComputedSimilarityBasis;
@@ -129,6 +136,36 @@ export interface ReactionIntelligenceCluster {
   metadata?: ReactionIntelligenceJsonObject;
 }
 
+export interface ReactionIntelligenceStrictReactionCluster {
+  cluster_id: string;
+  reaction_entity_ids: string[];
+  representative_reaction_entity_id: string;
+  mean_score: number;
+  min_edge_score: number;
+  basis_summary: ReactionIntelligenceComputedSimilarityBasis[];
+  warnings: string[];
+  metadata?: ReactionIntelligenceJsonObject;
+}
+
+export interface ReactionIntelligenceCandidateReactionNeighbor {
+  edge_id: string;
+  from_reaction_entity_id: string;
+  to_reaction_entity_id: string;
+  score: number;
+  basis: ReactionIntelligenceComputedSimilarityBasis[];
+  warnings: string[];
+  metadata?: ReactionIntelligenceJsonObject;
+}
+
+export interface ReactionIntelligenceSemanticReactionGroup {
+  group_id: string;
+  reaction_entity_ids: string[];
+  mean_score: number;
+  basis_summary: ReactionIntelligenceComputedSimilarityBasis[];
+  warnings: string[];
+  metadata?: ReactionIntelligenceJsonObject;
+}
+
 export interface ReactionIntelligenceArtifact {
   schema_version: "chemd-reaction-intelligence-artifact/v0.1";
   artifact_id: string;
@@ -139,6 +176,9 @@ export interface ReactionIntelligenceArtifact {
   computed_features: ReactionIntelligenceComputedFeature[];
   computed_similarity_edges: ReactionIntelligenceComputedSimilarityEdge[];
   clusters?: ReactionIntelligenceCluster[];
+  strict_reaction_clusters?: ReactionIntelligenceStrictReactionCluster[];
+  candidate_reaction_neighbors?: ReactionIntelligenceCandidateReactionNeighbor[];
+  semantic_reaction_groups?: ReactionIntelligenceSemanticReactionGroup[];
   layout?: ReactionIntelligenceLayout;
   warnings: string[];
 }
@@ -151,6 +191,9 @@ export interface MergedReactionIntelligenceLayer {
   computed_features: ReactionIntelligenceComputedFeature[];
   computed_similarity_edges: ReactionIntelligenceComputedSimilarityEdge[];
   clusters?: ReactionIntelligenceCluster[];
+  strict_reaction_clusters?: ReactionIntelligenceStrictReactionCluster[];
+  candidate_reaction_neighbors?: ReactionIntelligenceCandidateReactionNeighbor[];
+  semantic_reaction_groups?: ReactionIntelligenceSemanticReactionGroup[];
   layout?: ReactionIntelligenceLayout;
   warnings: string[];
 }

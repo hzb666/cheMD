@@ -289,6 +289,113 @@ describe("reaction intelligence graph index merge", () => {
     });
   });
 
+  it("merges strict clusters, candidate neighbors, and semantic groups explicitly", () => {
+    const index = buildIndex();
+    const artifact: ReactionIntelligenceArtifact = {
+      ...computedArtifact(),
+      strict_reaction_clusters: [
+        {
+          cluster_id: "strict-reaction-cluster::a::b",
+          reaction_entity_ids: [rxnA, rxnB],
+          representative_reaction_entity_id: rxnA,
+          mean_score: 0.84,
+          min_edge_score: 0.82,
+          basis_summary: ["hybrid_consensus", "rdkit_fingerprint_tanimoto"],
+          warnings: []
+        }
+      ],
+      candidate_reaction_neighbors: [
+        {
+          edge_id: "candidate-edge::a::b",
+          from_reaction_entity_id: rxnA,
+          to_reaction_entity_id: rxnB,
+          score: 0.62,
+          basis: ["rdkit_fingerprint_tanimoto"],
+          warnings: []
+        }
+      ],
+      semantic_reaction_groups: [
+        {
+          group_id: "semantic-reaction-group::a::b",
+          reaction_entity_ids: [rxnA, rxnB],
+          mean_score: 0.9,
+          basis_summary: ["semantic_family_support", "semantic_procedure_support"],
+          warnings: ["semantic_similarity_without_computed_fingerprint"]
+        }
+      ]
+    };
+
+    const enriched = mergeReactionIntelligenceArtifactIntoGraphIndex(index, artifact);
+
+    expect(enriched.reaction_intelligence.strict_reaction_clusters).toEqual([
+      expect.objectContaining({
+        cluster_id: "strict-reaction-cluster::a::b",
+        reaction_entity_ids: [rxnA, rxnB],
+        min_edge_score: 0.82
+      })
+    ]);
+    expect(enriched.reaction_intelligence.candidate_reaction_neighbors).toEqual([
+      expect.objectContaining({
+        edge_id: "candidate-edge::a::b",
+        basis: ["rdkit_fingerprint_tanimoto"]
+      })
+    ]);
+    expect(enriched.reaction_intelligence.semantic_reaction_groups).toEqual([
+      expect.objectContaining({
+        group_id: "semantic-reaction-group::a::b",
+        basis_summary: ["semantic_family_support", "semantic_procedure_support"]
+      })
+    ]);
+  });
+
+  it("warns instead of silently dropping invalid reaction intelligence groups", () => {
+    const index = buildIndex();
+    const artifact: ReactionIntelligenceArtifact = {
+      ...computedArtifact(),
+      strict_reaction_clusters: [
+        {
+          cluster_id: "strict-reaction-cluster::unknown",
+          reaction_entity_ids: [rxnA, "rxn::missing"],
+          representative_reaction_entity_id: rxnA,
+          mean_score: 0.84,
+          min_edge_score: 0.82,
+          basis_summary: ["hybrid_consensus"],
+          warnings: []
+        }
+      ],
+      candidate_reaction_neighbors: [
+        {
+          edge_id: "candidate-edge::unknown",
+          from_reaction_entity_id: rxnA,
+          to_reaction_entity_id: "rxn::missing",
+          score: 0.62,
+          basis: ["rdkit_fingerprint_tanimoto"],
+          warnings: []
+        }
+      ],
+      semantic_reaction_groups: [
+        {
+          group_id: "semantic-reaction-group::unknown",
+          reaction_entity_ids: ["rxn::missing"],
+          mean_score: 0.9,
+          basis_summary: ["semantic_family_support"],
+          warnings: []
+        }
+      ]
+    };
+
+    const enriched = mergeReactionIntelligenceArtifactIntoGraphIndex(index, artifact);
+
+    expect(enriched.reaction_intelligence.strict_reaction_clusters).toEqual([]);
+    expect(enriched.reaction_intelligence.candidate_reaction_neighbors).toEqual([]);
+    expect(enriched.reaction_intelligence.semantic_reaction_groups).toEqual([]);
+    expect(enriched.reaction_intelligence.warnings).toEqual(expect.arrayContaining([
+      "strict_reaction_cluster_not_merged:strict-reaction-cluster::unknown",
+      "candidate_reaction_neighbor_not_merged:candidate-edge::unknown",
+      "semantic_reaction_group_not_merged:semantic-reaction-group::unknown"
+    ]));
+  });
+
   it("keeps semantic-only warnings when no artifact is available", () => {
     const index = buildIndex();
     const enriched = mergeReactionIntelligenceArtifactIntoGraphIndex(index);
