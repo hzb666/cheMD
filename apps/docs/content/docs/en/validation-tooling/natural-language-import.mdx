@@ -15,6 +15,13 @@ pnpm chemd import prose procedure.txt --format json --dry-run
 
 Text output prints the generated Chemd draft when `--out` is not provided. With `--out`, the CLI writes only when the generated draft has no compiler errors. `--dry-run` never writes files.
 
+When `RXN_API_KEY` is available in the environment or in a local ignored `.env`
+file, the CLI first asks RXN for Chemistry for a paragraph action sequence. If
+the request fails or the key is missing, the importer falls back to the local
+Chemd procedure lowerer. RXN actions are treated as candidates only: material
+names are re-aligned to the original prose, quantities remain subject to Chemd
+quantity parsing, and the rendered draft still goes through `compileChemd`.
+
 The JSON schema is `chemd-import-prose/v0.1` and includes:
 
 - `materialCount`, `quantityCount`, `stepCount`, and `observationCount`.
@@ -28,7 +35,7 @@ The JSON schema is `chemd-import-prose/v0.1` and includes:
 | --- | --- | --- |
 | Material recognition | `@chemd/chemical-lexicon` | Uses the local lexicon, aliases, formula-like recognition, and context confidence by default; it does not call the network by default. |
 | Quantity recognition | `@chemd/core` | Uses the Chemd quantity schema and unit normalization; `78%` is a single percent literal, while `78 %` emits a warning. |
-| Step recognition | `@chemd/step-ontology` | Reuses procedure lowering and the StepFamily parameter schema. |
+| Step recognition | RXN action provider, then `@chemd/step-ontology` fallback | RXN can provide `MAKESOLUTION`, `ADD`, `STIR`, `EXTRACT`, `WASH`, `DRYSOLUTION`, and `PURIFY` action candidates. If unavailable, the local procedure lowerer reuses the StepFamily parameter schema. |
 | Observation recognition | `@chemd/step-ontology` | Reuses observation lowering while preserving event type, confidence, and optional linked step. |
 | Reaction candidate recognition | material, quantity, and step evidence | Builds a reaction candidate only from high-confidence reaction-stage evidence; explicit product evidence is required before a reaction block is rendered. |
 | Reaction rendering | existing Chemd schema and compiler | Renders existing `:::chemd kind: reaction` fields through the current Chemd schema/compiler surface; the importer does not define a separate reaction language. |
@@ -36,6 +43,12 @@ The JSON schema is `chemd-import-prose/v0.1` and includes:
 | Final validation | `@chemd/compiler` | The compiler decides whether the draft satisfies the current Chemd language contract. |
 
 This keeps the importer from owning a parallel language rule set. Quantity units, step parameters, reaction fields, and observation events come from existing Chemd packages; when the language layer changes, the importer follows those public APIs.
+
+The RXN layer is deliberately not a trusted fact source. For example, if an RXN
+action changes `EtOAc (50 mL x 3)` into `EtOAc (50 mL) 3 x`, Chemd keeps the
+original prose as the quantity source and lets the compiler decide whether the
+rendered field is valid. `ADD SLN` is treated as a reference to a preceding
+`MAKESOLUTION` action instead of a material named `SLN`.
 
 Text that is not covered by a rule is not treated as a high-confidence structured fact. The importer keeps it in `unparsedSpans` and diagnostics; only content recognized as canonical steps is rendered into `:::procedure`, and only high-confidence reaction-stage facts are rendered into `:::chemd kind: reaction`.
 

@@ -122,6 +122,8 @@ type RunChemdRepairLoop = (
   }
 ) => ChemdRepairLoopResult;
 type ImportProseToChemd = typeof import("@chemd/importer-prose")["importProseToChemd"];
+type CreateNodeRxnProcedureActionProvider =
+  typeof import("@chemd/importer-prose")["createNodeRxnProcedureActionProvider"];
 
 interface CliWriter {
   write(chunk: string): unknown;
@@ -822,6 +824,7 @@ const loadCompiler = async (): Promise<{
 }> => import("@chemd/compiler");
 
 const loadImporterProse = async (): Promise<{
+  createNodeRxnProcedureActionProvider: CreateNodeRxnProcedureActionProvider;
   importProseToChemd: ImportProseToChemd;
 }> => import("@chemd/importer-prose");
 
@@ -1371,13 +1374,17 @@ const formatProseImportText = (report: ProseImportCliReport): string => {
 
 const importProseFile = async (
   command: Extract<CliCommand, { type: "import-prose" }>,
-  importProseToChemd: ImportProseToChemd,
+  importer: {
+    createNodeRxnProcedureActionProvider: CreateNodeRxnProcedureActionProvider;
+    importProseToChemd: ImportProseToChemd;
+  },
   options: NormalizedRunOptions
 ): Promise<number> => {
   const source = readSource(command.filePath, options.cwd);
-  const result = await importProseToChemd(source, {
+  const result = await importer.importProseToChemd(source, {
     documentId: toImportDocumentId(command.filePath),
-    title: toImportDocumentTitle(command.filePath)
+    title: toImportDocumentTitle(command.filePath),
+    procedureActionProvider: importer.createNodeRxnProcedureActionProvider({ cwd: options.cwd })
   });
   const canWrite = Boolean(command.outPath) && !command.dryRun && result.valid
     && !hasImportErrorDiagnostics(result.candidate.diagnostics);
@@ -1889,7 +1896,7 @@ const executeCommand = (
 
   if (command.type === "import-prose") {
     return loadImporterProse().then((importer) =>
-      importProseFile(command, importer.importProseToChemd, options)
+      importProseFile(command, importer, options)
     );
   }
 

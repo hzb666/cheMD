@@ -211,6 +211,90 @@ describe("prose importer skeleton", () => {
     expect(result.compileResult.diagnostics.map((diagnostic) => diagnostic.severity)).not.toContain("error");
   });
 
+  it("uses RXN-style action providers before local procedure lowering", async () => {
+    const provider = {
+      name: "mock-rxn",
+      async extractActions() {
+        return {
+          provider: "mock-rxn",
+          actions: [
+            "MAKESOLUTION with 7-(difluoromethylsulfonyl)-4-fluoro-indan-1-one (110 mg, 0.42 mmol) and methanol (4 mL)",
+            "ADD SLN",
+            "ADD sodium borohydride (24 mg, 0.62 mmol)",
+            "STIR for 1 hour at ambient temperature"
+          ]
+        };
+      }
+    };
+    const source = "To a stirred solution of 7-(difluoromethylsulfonyl)-4-fluoro-indan-1-one (110 mg, 0.42 mmol) in methanol (4 mL) was added sodium borohydride (24 mg, 0.62 mmol). The reaction mixture was stirred at ambient temperature for 1 hour.";
+    const result = await importProseToChemd(source, {
+      documentId: "exp-rxn-actions",
+      title: "RXN actions",
+      date: "2026-05-23",
+      procedureActionProvider: provider
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.candidate.steps.map((step) => step.family)).toEqual([
+      "charge",
+      "add",
+      "hold"
+    ]);
+    expect(result.chemd).toContain("7-(difluoromethylsulfonyl)-4-fluoro-indan-1-one");
+    expect(result.chemd).toContain("step: hold | id=s3 | duration=1 h | condition=room temperature");
+    expect(result.candidate.materials).toContainEqual(expect.objectContaining({
+      normalizedName: "sodium borohydride",
+      source: "rxn-action"
+    }));
+    expect(result.candidate.diagnostics).toContainEqual(expect.objectContaining({
+      code: "I_IMPORT_PROCEDURE_ACTION_PROVIDER",
+      facts: expect.objectContaining({ provider: "mock-rxn" })
+    }));
+  });
+
+  it("falls back to local procedure lowering when the action provider fails", async () => {
+    const provider = {
+      name: "broken-rxn",
+      async extractActions(): Promise<never> {
+        throw new Error("network unavailable");
+      }
+    };
+    const result = await importProse("The reaction was stirred for 15 min.", {
+      procedureActionProvider: provider
+    });
+
+    expect(result.steps.map((step) => step.family)).toEqual(["hold"]);
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({
+      code: "W_IMPORT_PROCEDURE_ACTION_PROVIDER_FALLBACK",
+      facts: expect.objectContaining({ provider: "broken-rxn" })
+    }));
+  });
+
+  it("marks RXN material candidates when action parameters drift from original prose", async () => {
+    const provider = {
+      name: "mock-rxn",
+      async extractActions() {
+        return {
+          provider: "mock-rxn",
+          actions: [
+            "ADD HBr (35% aq) (0.172 drops)"
+          ]
+        };
+      }
+    };
+    const result = await importProse("HBr (48% aq., several drops) was added.", {
+      procedureActionProvider: provider
+    });
+
+    expect(result.materials).toContainEqual(expect.objectContaining({
+      name: "HBr",
+      normalizedName: "hydrobromic acid",
+      source: "rxn-action",
+      span: expect.objectContaining({ text: "HBr" }),
+      evidence: expect.arrayContaining(["rxn_original_parameter_drift"])
+    }));
+  });
+
   it("warns instead of rendering a reaction block without an explicit product", async () => {
     const result = await importProseToChemd(
       "To a solution of substrate in THF was added sBuLi dropwise. The reaction was stirred for 15 min.",

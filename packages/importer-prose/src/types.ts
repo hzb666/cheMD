@@ -1,4 +1,5 @@
 import type {
+  ChemicalCategory,
   ChemicalLookupProvider,
   ChemicalMention
 } from "@chemd/chemical-lexicon";
@@ -28,8 +29,8 @@ export interface MaterialMention {
   name: string;
   normalizedName: string;
   confidence: number;
-  category: string;
-  source: ChemicalMention["source"];
+  category: ChemicalCategory | "solution" | "generic_material";
+  source: ChemicalMention["source"] | "rxn-action";
   span: ProseSourceSpan;
   evidence: readonly string[];
   formula?: string;
@@ -104,6 +105,17 @@ export interface UnparsedProseSpan extends ProseSourceSpan {
   confidence: number;
 }
 
+export interface ProcedureActionProviderResult {
+  provider: string;
+  actions: readonly string[];
+  diagnostics?: readonly ImportDiagnostic[];
+}
+
+export interface ProcedureActionProvider {
+  name: string;
+  extractActions(sourceText: string): Promise<ProcedureActionProviderResult>;
+}
+
 export interface ProseImportCandidate {
   sourceText: string;
   materials: readonly MaterialMention[];
@@ -118,6 +130,7 @@ export interface ProseImportCandidate {
 
 export interface ProseImportOptions {
   chemicalProvider?: ChemicalLookupProvider;
+  procedureActionProvider?: ProcedureActionProvider;
   includeFormulaLike?: boolean;
 }
 

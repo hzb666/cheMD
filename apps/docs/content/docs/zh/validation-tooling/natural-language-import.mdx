@@ -15,6 +15,8 @@ pnpm chemd import prose procedure.txt --format json --dry-run
 
 默认 text 输出会在没有 `--out` 时打印生成的 Chemd 草稿。传入 `--out` 时，只有生成草稿通过 compiler error 检查才会写入文件。`--dry-run` 永远不写文件。
 
+当环境变量或本地忽略的 `.env` 中存在 `RXN_API_KEY` 时，CLI 会先调用 RXN for Chemistry 获取 paragraph action sequence。请求失败或未配置 key 时，导入器会自动回退到 Chemd 本地 procedure lowering。RXN action 只作为候选：材料名称会重新对齐原文，数量仍由 Chemd quantity schema 解析，最终草稿仍必须通过 `compileChemd`。
+
 JSON 输出 schema 为 `chemd-import-prose/v0.1`，包含：
 
 - `materialCount`、`quantityCount`、`stepCount` 和 `observationCount`。
@@ -28,7 +30,7 @@ JSON 输出 schema 为 `chemd-import-prose/v0.1`，包含：
 | --- | --- | --- |
 | 物质识别 | `@chemd/chemical-lexicon` | 默认使用本地词库、alias、formula-like 识别和上下文置信度；不默认访问网络。 |
 | 数量识别 | `@chemd/core` | 使用 Chemd 数量 schema 和单位归一化；`78%` 是整体 percent literal，`78 %` 会产生 warning。 |
-| 步骤识别 | `@chemd/step-ontology` | 复用 procedure lowering 与 StepFamily 参数 schema。 |
+| 步骤识别 | RXN action provider，然后回退到 `@chemd/step-ontology` | RXN 可提供 `MAKESOLUTION`、`ADD`、`STIR`、`EXTRACT`、`WASH`、`DRYSOLUTION`、`PURIFY` 等动作候选；不可用时使用本地 procedure lowerer 与 StepFamily 参数 schema。 |
 | 观察识别 | `@chemd/step-ontology` | 复用 observation lowering，保留事件类型、置信度和可关联步骤。 |
 | Reaction 候选识别 | 物质、数量和 step evidence | 只从高置信 reaction 阶段证据生成候选；必须有显式 product 证据才会渲染 reaction block。 |
 | Reaction 渲染 | 现有 Chemd schema 与 compiler | 通过当前 Chemd schema/compiler 表面渲染现有 `:::chemd kind: reaction` 字段；导入层不定义另一套 reaction 语言。 |
@@ -36,6 +38,8 @@ JSON 输出 schema 为 `chemd-import-prose/v0.1`，包含：
 | 最终校验 | `@chemd/compiler` | 由 compiler 决定生成草稿是否满足当前 Chemd 语言契约。 |
 
 这样导入层不会维护一套独立语言规则。数量单位、step 参数、reaction 字段和观察事件的判断都来自已有 Chemd 包；如果 Chemd 语言层更新，导入层通过这些公共 API 跟随更新。
+
+RXN 层不是可信事实源。比如 RXN 把 `EtOAc (50 mL x 3)` 改写成 `EtOAc (50 mL) 3 x` 时，Chemd 仍以原文作为数量来源，并由 compiler 判断渲染字段是否有效。`ADD SLN` 会被视为对前一个 `MAKESOLUTION` action 的引用，而不是名为 `SLN` 的材料。
 
 不被规则覆盖的文本不会被当作高置信结构化事实。导入层会把它保留在 `unparsedSpans` 和 diagnostics 中；只有识别为 canonical step 的内容才渲染进 `:::procedure`，只有高置信 reaction 阶段事实才渲染进 `:::chemd kind: reaction`。
 
