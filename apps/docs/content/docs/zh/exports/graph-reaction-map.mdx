@@ -222,6 +222,14 @@ computed chemistry。
 `service_job_reaction_skipped_missing_canonical_rxn_smiles:*`。默认 provider
 policy 会禁用网络访问，并把缺失的本地依赖视为 skipped providers。
 
+Hybrid similarity edges 会暴露 contribution-level evidence。Computed chemistry
+signals 是主权重：RDKit / reaction fingerprint Tanimoto 权重为 `0.30`，RXNFP
+cosine 为 `0.25`，reaction center support 为 `0.25`，Chemd semantic context
+为 `0.20`。缺失的 provider component 不会按 0 分处理，而是只对可用权重重新归一化。
+reaction center 冲突且 RDKit support 低时会报告
+`strict_cluster_hard_reject:reaction_center_conflict_low_rdkit`；后续 cluster builder
+不能把这类 edge 提升为 strict reaction cluster。
+
 输出包括：
 
 - `ReactionIntelligenceJob`

@@ -224,6 +224,15 @@ reaction SMILES are skipped from the provider job and reported with
 provider policy keeps network access disabled and treats missing local
 dependencies as skipped providers.
 
+Hybrid similarity edges expose contribution-level evidence. Computed chemistry
+signals carry the main weight: RDKit/reaction fingerprint Tanimoto uses weight
+`0.30`, RXNFP cosine uses `0.25`, reaction center support uses `0.25`, and
+Chemd semantic context uses `0.20`. Missing provider components are ignored and
+the available weights are renormalized. A reaction center conflict with low
+RDKit support is reported as
+`strict_cluster_hard_reject:reaction_center_conflict_low_rdkit`; later cluster
+builders must not promote that edge into a strict reaction cluster.
+
 Outputs include:
 
 - `ReactionIntelligenceJob`

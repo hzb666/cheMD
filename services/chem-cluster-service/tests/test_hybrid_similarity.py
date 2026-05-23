@@ -64,6 +64,32 @@ class HybridSimilarityTests(unittest.TestCase):
                     "provider::rxnmapper",
                 ],
                 "source_hashes": ["sha256:a", "sha256:b"],
+                "contributions": [
+                    {
+                        "component": "semantic",
+                        "score": 0.9,
+                        "weight": 0.2,
+                        "basis": ["semantic_family_support", "semantic_procedure_support"],
+                    },
+                    {
+                        "component": "rdkit",
+                        "score": 0.8,
+                        "weight": 0.3,
+                        "basis": ["rdkit_fingerprint_tanimoto"],
+                    },
+                    {
+                        "component": "rxnfp",
+                        "score": 0.95,
+                        "weight": 0.25,
+                        "basis": ["rxnfp_cosine"],
+                    },
+                    {
+                        "component": "reaction_center",
+                        "score": 1.0,
+                        "weight": 0.25,
+                        "basis": ["same_reaction_center"],
+                    },
+                ],
                 "warnings": [],
             },
         )
@@ -75,8 +101,25 @@ class HybridSimilarityTests(unittest.TestCase):
             [computed_edge("rxn-a", "rxn-b", 0.6, "rdkit_fingerprint_tanimoto")],
         )
 
-        self.assertEqual(edges[0]["score"], 0.763636)
+        self.assertEqual(edges[0]["score"], 0.72)
         self.assertEqual(edges[0]["confidence"], "medium")
+        self.assertEqual(
+            edges[0]["contributions"],
+            [
+                {
+                    "component": "semantic",
+                    "score": 0.9,
+                    "weight": 0.2,
+                    "basis": ["semantic_family_support"],
+                },
+                {
+                    "component": "rdkit",
+                    "score": 0.6,
+                    "weight": 0.3,
+                    "basis": ["rdkit_fingerprint_tanimoto"],
+                },
+            ],
+        )
         self.assertEqual(
             edges[0]["basis"],
             ["semantic_family_support", "rdkit_fingerprint_tanimoto", "hybrid_consensus"],
@@ -91,6 +134,7 @@ class HybridSimilarityTests(unittest.TestCase):
         self.assertEqual(edges[0]["score"], 0.85)
         self.assertEqual(edges[0]["confidence"], "low")
         self.assertEqual(edges[0]["provider_ids"], [])
+        self.assertEqual(edges[0]["contributions"][0]["component"], "semantic")
         self.assertEqual(edges[0]["warnings"], ["semantic_similarity_without_computed_fingerprint"])
 
     def test_source_warnings_prevent_high_confidence(self):
@@ -133,7 +177,7 @@ class HybridSimilarityTests(unittest.TestCase):
                 "computed-edge::rxn-a::rxn-c::hybrid-similarity",
             ],
         )
-        self.assertEqual(edges[1]["score"], 0.81)
+        self.assertEqual(edges[1]["score"], 0.833333)
         self.assertEqual(edges[1]["from_reaction_entity_id"], "rxn-a")
         self.assertEqual(edges[1]["to_reaction_entity_id"], "rxn-c")
 
@@ -159,6 +203,23 @@ class HybridSimilarityTests(unittest.TestCase):
         self.assertEqual(edges[0]["score"], 1.0)
         self.assertEqual(edges[0]["basis"], ["rxnfp_cosine"])
 
+    def test_marks_hard_reject_when_center_conflicts_with_low_rdkit_support(self):
+        edges = build_hybrid_similarity_edges(
+            [],
+            [
+                computed_edge("rxn-a", "rxn-b", 0.4, "rdkit_fingerprint_tanimoto"),
+                computed_edge("rxn-a", "rxn-b", 0.0, "conflicting_reaction_center"),
+            ],
+        )
+
+        self.assertEqual(edges[0]["score"], 0.218182)
+        self.assertEqual(
+            edges[0]["basis"],
+            ["rdkit_fingerprint_tanimoto", "conflicting_reaction_center", "hybrid_consensus"],
+        )
+        self.assertIn("strict_cluster_hard_reject:reaction_center_conflict_low_rdkit", edges[0]["warnings"])
+        self.assertEqual(edges[0]["confidence"], "low")
+
 
 def semantic_edge(left, right, score, basis):
     return {
@@ -177,6 +238,7 @@ def computed_edge(left, right, score, basis, warnings=None):
         "rxnfp_cosine": ["provider::rxnfp"],
         "same_reaction_center": ["provider::rxnmapper"],
         "compatible_reaction_center": ["provider::rxnmapper"],
+        "conflicting_reaction_center": ["provider::rxnmapper"],
     }[basis]
     return {
         "edge_id": f"computed-edge::{left}::{right}::{basis}",

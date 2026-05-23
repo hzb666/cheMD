@@ -10,10 +10,10 @@ SEMANTIC_ONLY_WARNING = "semantic_similarity_without_computed_fingerprint"
 HYBRID_PROVIDER_ID = "provider::hybrid-graph"
 
 COMPONENT_WEIGHTS = {
-    "semantic": 0.30,
-    "rdkit": 0.25,
+    "semantic": 0.20,
+    "rdkit": 0.30,
     "rxnfp": 0.25,
-    "reaction_center": 0.20,
+    "reaction_center": 0.25,
 }
 
 COMPUTED_BASIS_ORDER = [
@@ -23,6 +23,7 @@ COMPUTED_BASIS_ORDER = [
     "rxnfp_cosine",
     "same_reaction_center",
     "compatible_reaction_center",
+    "conflicting_reaction_center",
     "hybrid_consensus",
 ]
 
@@ -42,6 +43,7 @@ COMPUTED_BASIS_COMPONENTS = {
     "rxnfp_cosine": "rxnfp",
     "same_reaction_center": "reaction_center",
     "compatible_reaction_center": "reaction_center",
+    "conflicting_reaction_center": "reaction_center",
 }
 
 
@@ -129,6 +131,8 @@ def _to_edge(aggregate: _PairAggregate, provider_id: str) -> ComputedSimilarityE
         warnings.discard(SEMANTIC_ONLY_WARNING)
     elif "semantic" in aggregate.scores:
         warnings.add(SEMANTIC_ONLY_WARNING)
+    if _is_hard_reject(aggregate):
+        warnings.add("strict_cluster_hard_reject:reaction_center_conflict_low_rdkit")
 
     basis = set(aggregate.basis)
     if len(aggregate.scores) > 1:
@@ -148,6 +152,7 @@ def _to_edge(aggregate: _PairAggregate, provider_id: str) -> ComputedSimilarityE
         "basis": _ordered_basis(basis),
         "provider_ids": sorted(provider_ids),
         "source_hashes": sorted(aggregate.source_hashes),
+        "contributions": _contributions(aggregate),
         "warnings": sorted_warnings,
     }
 
@@ -160,6 +165,33 @@ def _weighted_score(scores: Mapping[str, float]) -> float:
         scores[item] * COMPONENT_WEIGHTS[item] for item in scores if item in COMPONENT_WEIGHTS
     )
     return round(weighted / weight_total, 6)
+
+
+def _is_hard_reject(aggregate: _PairAggregate) -> bool:
+    return (
+        "conflicting_reaction_center" in aggregate.basis
+        and "rdkit" in aggregate.scores
+        and aggregate.scores["rdkit"] < 0.45
+    )
+
+
+def _contributions(aggregate: _PairAggregate) -> list[dict[str, object]]:
+    return [
+        {
+            "component": component,
+            "score": round(aggregate.scores[component], 6),
+            "weight": COMPONENT_WEIGHTS[component],
+            "basis": _ordered_basis(
+                {
+                    basis
+                    for basis in aggregate.basis
+                    if COMPUTED_BASIS_COMPONENTS.get(basis) == component
+                }
+            ),
+        }
+        for component in ("semantic", "rdkit", "rxnfp", "reaction_center")
+        if component in aggregate.scores and component in COMPONENT_WEIGHTS
+    ]
 
 
 def _confidence(score: float, has_computed_support: bool, warnings: list[str]) -> str:

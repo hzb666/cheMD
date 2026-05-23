@@ -21,6 +21,7 @@ ComputedSimilarityBasis = Literal[
     "rxnfp_cosine",
     "same_reaction_center",
     "compatible_reaction_center",
+    "conflicting_reaction_center",
     "semantic_family_support",
     "semantic_procedure_support",
     "hybrid_consensus",
@@ -115,6 +116,7 @@ COMPUTED_SIMILARITY_BASIS = {
     "rxnfp_cosine",
     "same_reaction_center",
     "compatible_reaction_center",
+    "conflicting_reaction_center",
     "semantic_family_support",
     "semantic_procedure_support",
     "hybrid_consensus",
@@ -235,6 +237,31 @@ def _validate_computed_edge(value: Any, index: int, errors: list[str]) -> None:
         item not in COMPUTED_SIMILARITY_BASIS for item in value["basis"]
     ):
         errors.append(f"similarity_edges[{index}].basis contains invalid basis")
+    contributions = value.get("contributions")
+    if contributions is not None:
+        if not isinstance(contributions, list):
+            errors.append(f"similarity_edges[{index}].contributions must be a list")
+        else:
+            for contribution_index, contribution in enumerate(contributions):
+                _validate_similarity_contribution(
+                    contribution, index, contribution_index, errors
+                )
+
+
+def _validate_similarity_contribution(
+    value: Any, edge_index: int, contribution_index: int, errors: list[str]
+) -> None:
+    label = f"similarity_edges[{edge_index}].contributions[{contribution_index}]"
+    if not _is_object(value):
+        errors.append(f"{label} must be an object")
+        return
+    _require_string(errors, value, "component", f"{label}.component")
+    if not isinstance(value.get("score"), (int, float)):
+        errors.append(f"{label}.score must be a number")
+    if not isinstance(value.get("weight"), (int, float)):
+        errors.append(f"{label}.weight must be a number")
+    if not _is_string_list(value.get("basis")):
+        errors.append(f"{label}.basis must be strings")
 
 
 def validate_artifact(value: Any) -> list[str]:
