@@ -588,3 +588,72 @@ Marked the phase one Trellis task completed and linked it to the implementation 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 153: Hybrid reaction evidence contract
+
+**Date**: 2026-05-24
+**Task**: Hybrid reaction evidence contract
+**Package**: exporter-training
+**Branch**: `develop`
+
+### Summary
+
+Added service job conversion from canonical reaction input, skipped-reaction warnings, provider policy defaults, tests, docs, and completed the phase two Trellis task. Verified exporter-training tests/typecheck, docs typecheck, docs marked examples/coverage, and chem-cluster-service tests.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `bc2d880` | (see git log) |
+| `e7ed988` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 154: Hybrid clustering Trellis plan document
+
+**Date**: 2026-05-24
+**Task**: Hybrid clustering Trellis plan document
+**Package**: desktop
+**Branch**: `develop`
+
+### Summary
+
+Recorded the remaining hybrid reaction clustering Trellis plan in docs/chemd-hybrid-reaction-clustering-trellis-plan.zh-CN.md so future sessions can resume after context compression.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9fdd651` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
