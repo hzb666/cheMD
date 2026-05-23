@@ -1,0 +1,76 @@
+{
+  "cases": [
+    {
+      "id": "strict-computed-cluster",
+      "requested_providers": ["rdkit_fingerprint", "rxnfp", "hybrid_graph"],
+      "semantic_edges": [
+        { "left": "rxn-a", "right": "rxn-b", "score": 0.9, "basis": ["same_family_procedure"] }
+      ],
+      "provider_edges": {
+        "rdkit_fingerprint": [
+          { "left": "rxn-a", "right": "rxn-b", "score": 0.82, "basis": "rdkit_fingerprint_tanimoto" }
+        ],
+        "rxnfp": [
+          { "left": "rxn-a", "right": "rxn-b", "score": 0.88, "basis": "rxnfp_cosine" }
+        ]
+      },
+      "expected": {
+        "strict_cluster_count": 1,
+        "candidate_neighbor_count": 0,
+        "semantic_group_count": 0,
+        "required_warnings": []
+      }
+    },
+    {
+      "id": "semantic-only-group",
+      "requested_providers": ["hybrid_graph"],
+      "semantic_edges": [
+        { "left": "rxn-a", "right": "rxn-b", "score": 0.88, "basis": ["same_reaction_family"] }
+      ],
+      "provider_edges": {},
+      "expected": {
+        "strict_cluster_count": 0,
+        "candidate_neighbor_count": 0,
+        "semantic_group_count": 1,
+        "required_warnings": ["semantic_similarity_without_computed_fingerprint"]
+      }
+    },
+    {
+      "id": "reaction-center-hard-reject",
+      "requested_providers": ["rdkit_fingerprint", "rxnmapper", "hybrid_graph"],
+      "semantic_edges": [],
+      "provider_edges": {
+        "rdkit_fingerprint": [
+          { "left": "rxn-a", "right": "rxn-b", "score": 0.4, "basis": "rdkit_fingerprint_tanimoto" }
+        ],
+        "rxnmapper": [
+          { "left": "rxn-a", "right": "rxn-b", "score": 0.0, "basis": "conflicting_reaction_center" }
+        ]
+      },
+      "expected": {
+        "strict_cluster_count": 0,
+        "candidate_neighbor_count": 0,
+        "semantic_group_count": 0,
+        "required_warnings": ["strict_cluster_hard_reject:reaction_center_conflict_low_rdkit"]
+      }
+    },
+    {
+      "id": "provider-skip-warning",
+      "requested_providers": ["rdkit_fingerprint", "hybrid_graph"],
+      "semantic_edges": [
+        { "left": "rxn-a", "right": "rxn-b", "score": 0.75, "basis": ["same_reaction_family"] }
+      ],
+      "provider_edges": {},
+      "skipped_providers": ["rdkit_fingerprint"],
+      "expected": {
+        "strict_cluster_count": 0,
+        "candidate_neighbor_count": 0,
+        "semantic_group_count": 1,
+        "required_warnings": [
+          "dependency_not_installed",
+          "semantic_similarity_without_computed_fingerprint"
+        ]
+      }
+    }
+  ]
+}

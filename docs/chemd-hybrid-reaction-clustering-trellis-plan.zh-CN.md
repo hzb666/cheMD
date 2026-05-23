@@ -510,7 +510,7 @@ chore(trellis)：complete <phase> task
 后续从 Phase 3 继续，不要重做 Phase 1 / Phase 2：
 
 ```text
-Phase 3 completed -> Phase 4 completed -> Phase 5 completed -> Phase 6 in closeout -> Phase 7 -> Phase 8
+Phase 3 completed -> Phase 4 completed -> Phase 5 completed -> Phase 6 completed -> Phase 7 in closeout -> Phase 8
 ```
 
 ## 进度记录
@@ -518,4 +518,5 @@ Phase 3 completed -> Phase 4 completed -> Phase 5 completed -> Phase 6 in closeo
 - 2026-05-24: Phase 1/2/3 已完成并 record。
 - 2026-05-24: Phase 4 已完成并 record。
 - 2026-05-24: Phase 5 已完成并 record。
-- 2026-05-24: Phase 6 已实现 CLI text contract 和 EN/ZH docs 示例；等待 commit/record 后进入 Phase 7。
+- 2026-05-24: Phase 6 已完成并 record。
+- 2026-05-24: Phase 7 已加入 hybrid clustering gold corpus，覆盖 strict computed、semantic-only、hard reject、provider skip；等待 commit/record 后进入 Phase 8。
