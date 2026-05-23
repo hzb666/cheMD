@@ -78,6 +78,7 @@ export const importProse = async (
     quantities: quantityResult.quantities,
     steps: frameResult.steps,
     observations: frameResult.observations,
+    procedureState: frameResult.procedureState,
     reactionCandidates: reactionResult.candidates,
     unparsedSpans: frameResult.unparsedSpans,
     diagnostics: [

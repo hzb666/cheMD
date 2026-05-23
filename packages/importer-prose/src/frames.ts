@@ -1,11 +1,14 @@
 import {
   getStepParamSchema,
+  buildProcedureState,
   lowerObservationToEvents,
   lowerProcedureToSteps
 } from "@chemd/step-ontology";
 import type {
   CanonicalStepNode,
-  ObservationEventNode
+  ObservationEventNode,
+  ProcedureStateResult,
+  ProcedureStateWarning
 } from "@chemd/step-ontology";
 
 import type {
@@ -20,6 +23,7 @@ import { createCoverageLedger } from "./coverage";
 interface FrameExtractionResult {
   steps: StepFrame[];
   observations: ObservationFrame[];
+  procedureState: ProcedureStateResult;
   unparsedSpans: UnparsedProseSpan[];
   diagnostics: ImportDiagnostic[];
 }
@@ -122,6 +126,19 @@ const convertObservationDiagnostics = (
     facts: diagnostic.facts
   }));
 
+const convertStateWarningDiagnostics = (
+  warnings: readonly ProcedureStateWarning[]
+): ImportDiagnostic[] =>
+  warnings.map((warning) => ({
+    code: warning.code,
+    severity: "warning" as const,
+    message: warning.message,
+    facts: {
+      step_family: warning.stepFamily,
+      step_id: warning.stepId
+    }
+  }));
+
 const isUnparsedObserveStep = (step: StepFrame): boolean =>
   step.family === "observe"
   && typeof step.params.raw === "string"
@@ -145,6 +162,7 @@ export const extractProseFrames = (sourceText: string): FrameExtractionResult =>
     observationId: "import-prose",
     body: sourceText
   });
+  const procedureState = buildProcedureState(procedure.steps);
 
   let fromIndex = 0;
   const stepFrames = procedure.steps.map((step, index) => {
@@ -165,6 +183,7 @@ export const extractProseFrames = (sourceText: string): FrameExtractionResult =>
   return {
     steps,
     observations,
+    procedureState,
     unparsedSpans: [
       ...unparsedSpans,
       ...coverage.unparsedSpans
@@ -172,6 +191,7 @@ export const extractProseFrames = (sourceText: string): FrameExtractionResult =>
     diagnostics: [
       ...convertStepDiagnostics(procedure.diagnostics),
       ...(observations.length > 0 ? convertObservationDiagnostics(observation.diagnostics) : []),
+      ...convertStateWarningDiagnostics(procedureState.warnings),
       ...createStepParamDiagnostics(sourceText, steps),
       ...coverage.diagnostics
     ]

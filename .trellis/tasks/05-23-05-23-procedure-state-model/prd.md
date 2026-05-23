@@ -70,7 +70,7 @@ Status: implemented.
 
 ## Phase 2: Importer Integration
 
-Status: planned.
+Status: implemented.
 
 ### Tasks
 
@@ -90,6 +90,13 @@ Status: planned.
 - `pnpm --filter @chemd/importer-prose test`
 - `pnpm --filter @chemd/importer-prose typecheck`
 - `pnpm --filter @chemd/cli test`
+
+### Implementation Notes
+
+- Prose import candidates now include `procedureState`.
+- CLI JSON/text exposes `stateSnapshotCount` and `stateWarningCount`.
+- State warnings are converted into import diagnostics while rendered Chemd
+  remains normal `:::procedure` syntax.
 
 ## Phase 3: Docs and Review Examples
 

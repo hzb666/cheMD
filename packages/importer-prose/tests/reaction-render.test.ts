@@ -51,6 +51,19 @@ const makeImportCandidate = (
     }
   ],
   observations: [],
+  procedureState: {
+    finalState: {
+      conditions: {},
+      contents: [],
+      index: 0,
+      phaseMarkers: [],
+      sourceStepFamily: "observe",
+      sourceStepId: "initial",
+      warnings: []
+    },
+    snapshots: [],
+    warnings: []
+  },
   reactionCandidates: [reactionCandidate],
   unparsedSpans: [],
   diagnostics: []

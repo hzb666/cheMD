@@ -162,6 +162,11 @@ describe("prose importer skeleton", () => {
       mode: "dropwise",
       atmosphere: "nitrogen"
     });
+    expect(result.procedureState.snapshots).toHaveLength(result.steps.length);
+    expect(result.procedureState.finalState.contents).toEqual(expect.arrayContaining([
+      expect.objectContaining({ role: "material" }),
+      expect.objectContaining({ name: "THF", role: "solvent" })
+    ]));
   });
 
   it("builds observation frames with linked step evidence", async () => {

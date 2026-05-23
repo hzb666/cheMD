@@ -222,6 +222,8 @@ interface ProseImportCliReport {
   materialCount: number;
   observationCount: number;
   outPath?: string;
+  stateSnapshotCount: number;
+  stateWarningCount: number;
   quantityCount: number;
   stepCount: number;
   unparsedSpanCount: number;
@@ -1314,6 +1316,8 @@ const toProseImportCliReport = (
   observationCount: result.candidate.observations.length,
   ...(command.outPath ? { outPath: command.outPath } : {}),
   quantityCount: result.candidate.quantities.length,
+  stateSnapshotCount: result.candidate.procedureState.snapshots.length,
+  stateWarningCount: result.candidate.procedureState.warnings.length,
   stepCount: result.candidate.steps.length,
   unparsedSpanCount: result.candidate.unparsedSpans.length,
   valid: result.valid && !hasImportErrorDiagnostics(result.candidate.diagnostics),
@@ -1342,6 +1346,8 @@ const formatProseImportText = (report: ProseImportCliReport): string => {
     `  quantities: ${report.quantityCount}`,
     `  steps: ${report.stepCount}`,
     `  observations: ${report.observationCount}`,
+    `  state snapshots: ${report.stateSnapshotCount}`,
+    `  state warnings: ${report.stateWarningCount}`,
     `  unparsed spans: ${report.unparsedSpanCount}`,
     `  import diagnostics: ${report.importDiagnosticCounts.error} error(s), ${report.importDiagnosticCounts.warning} warning(s), ${report.importDiagnosticCounts.info} info`,
     `  compiler diagnostics: ${report.compilerDiagnosticCounts.error} error(s), ${report.compilerDiagnosticCounts.warning} warning(s), ${report.compilerDiagnosticCounts.info} info`

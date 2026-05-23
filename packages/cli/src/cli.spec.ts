@@ -544,6 +544,7 @@ name: patient sample
     expect(result.stdout).toContain("step: wash");
     expect(result.stdout).toContain("step: dry");
     expect(result.stdout).toContain("step: concentrate");
+    expect(result.stdout).toContain("state snapshots:");
     expect(result.stderr).toBe("");
   });
 
@@ -581,6 +582,8 @@ name: patient sample
     expect(payload.schemaVersion).toBe("chemd-import-prose/v0.1");
     expect(payload.valid).toBe(true);
     expect(payload.stepCount).toBeGreaterThan(0);
+    expect(payload.stateSnapshotCount).toBeGreaterThan(0);
+    expect(payload.stateWarningCount).toBeGreaterThanOrEqual(0);
     expect(payload.observationCount).toBeGreaterThan(0);
     expect(payload.chemd).toContain("step: add");
     expect(result.stderr).toBe("");

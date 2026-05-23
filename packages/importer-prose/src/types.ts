@@ -2,7 +2,10 @@ import type {
   ChemicalLookupProvider,
   ChemicalMention
 } from "@chemd/chemical-lexicon";
-import type { StepFamily } from "@chemd/step-ontology";
+import type {
+  ProcedureStateResult,
+  StepFamily
+} from "@chemd/step-ontology";
 
 export interface ProseSourceSpan {
   start: number;
@@ -107,6 +110,7 @@ export interface ProseImportCandidate {
   quantities: readonly QuantityMention[];
   steps: readonly StepFrame[];
   observations: readonly ObservationFrame[];
+  procedureState: ProcedureStateResult;
   reactionCandidates: readonly ReactionCandidate[];
   unparsedSpans: readonly UnparsedProseSpan[];
   diagnostics: readonly ImportDiagnostic[];
