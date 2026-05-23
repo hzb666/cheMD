@@ -381,3 +381,53 @@ Verification:
 ### Next Steps
 
 - None - task complete
+
+
+## Session 148: Phase 2 procedure state import integration
+
+**Date**: 2026-05-23
+**Task**: Phase 2 procedure state import integration
+**Package**: cli
+**Branch**: `develop`
+
+### Summary
+
+Expose derived procedure state through importer and CLI reports.
+
+### Main Changes
+
+Phase 2 completed for procedure-state-model.
+
+Changes:
+- Added `procedureState` to prose import candidates.
+- Converted state model warnings into import diagnostics.
+- Added `stateSnapshotCount` and `stateWarningCount` to CLI JSON/text reports.
+- Kept rendered `.chemd` draft syntax unchanged.
+
+Verification:
+- pnpm --filter @chemd/step-ontology test
+- pnpm --filter @chemd/step-ontology typecheck
+- pnpm --filter @chemd/importer-prose test
+- pnpm --filter @chemd/importer-prose typecheck
+- pnpm --filter @chemd/cli test
+- pnpm --filter @chemd/cli typecheck
+- pnpm chemd import prose <temp-file> --format json --dry-run
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f8a09e8` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
