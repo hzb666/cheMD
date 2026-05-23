@@ -831,3 +831,38 @@ Phase 7 added deterministic gold corpus cases for strict computed clusters, sema
 ### Next Steps
 
 - None - task complete
+
+
+## Session 160: Hybrid reaction clustering final review
+
+**Date**: 2026-05-24
+**Task**: Hybrid reaction clustering final review
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+Phase 8 completed final drift audit, documented naming consistency, and tracked the hybrid clustering math TeX appendix. Verified python -m unittest discover services/chem-cluster-service/tests; pnpm --filter @chemd/exporter-training test; pnpm --filter @chemd/exporter-training typecheck; pnpm --filter @chemd/cli test; pnpm --filter @chemd/cli typecheck; pnpm --filter @chemd/docs typecheck; pnpm --filter @chemd/compiler test -- docs-coverage.test.ts docs-marked-examples.test.ts; git diff --check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a01537a` | (see git log) |
+| `a827460` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
