@@ -431,3 +431,50 @@ Verification:
 ### Next Steps
 
 - None - task complete
+
+
+## Session 149: Phase 3 procedure state docs
+
+**Date**: 2026-05-23
+**Task**: Phase 3 procedure state docs
+**Package**: step-ontology
+**Branch**: `develop`
+
+### Summary
+
+Document derived procedure state review data and examples.
+
+### Main Changes
+
+Phase 3 completed for procedure-state-model.
+
+Changes:
+- Documented operation steps versus derived procedure state versus runtime trace.
+- Added EN/ZH examples showing the empty-vessel state stack evolving after imported steps.
+- Documented warning policy for unsupported state transitions.
+
+Verification:
+- pnpm --filter @chemd/compiler test -- docs-coverage.test.ts docs-marked-examples.test.ts
+- pnpm --filter @chemd/docs typecheck
+- pnpm --filter @chemd/docs build
+
+Docs build exited 0. It still printed existing metadataBase warnings and transient fonts.gstatic.com ECONNRESET messages.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `72c0f78` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
