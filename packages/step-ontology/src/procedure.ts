@@ -160,7 +160,14 @@ const isInitialChineseChargeAddition = (sentence: string): boolean => {
 };
 
 const getAddMaterial = (sentence: string): string | undefined =>
-  cleanExtractedText(stopAtAny(textAfterAny(sentence, ADD_MATERIAL_MARKERS) ?? "", ADD_STOP_MARKERS)) || undefined;
+  cleanMaterialText(stopAtAny(textAfterAddMarker(sentence) ?? "", ADD_STOP_MARKERS));
+
+const textAfterAddMarker = (sentence: string): string | undefined => {
+  if (/\baddition\s+of\b/i.test(sentence)) {
+    return undefined;
+  }
+  return textAfterAny(sentence, ADD_MATERIAL_MARKERS);
+};
 
 const cleanMaterialText = (value: string | undefined): string | undefined => {
   const cleaned = cleanExtractedText(
@@ -173,6 +180,9 @@ const cleanMaterialText = (value: string | undefined): string | undefined => {
     ])
   );
   if (/^(?:dropwise|slowly|to\s+quench|and\s+the|the\s+reaction|the\s+resulting)\b/i.test(cleaned)) {
+    return undefined;
+  }
+  if (/^(?:at\s+-?\d+(?:\.\d+)?|under\s+|in\s+a\s+sealed)\b/i.test(cleaned)) {
     return undefined;
   }
   return cleaned || undefined;
@@ -361,6 +371,7 @@ const lowerAddition = (context: SentenceContext): CanonicalStepNode[] => {
 
   return materials.map((material) => createStep(context, "add", {
     materials: material,
+    ...(extractTemperature(context.sentence) ? { temperature: extractTemperature(context.sentence) } : {}),
     ...(hasAny(context.sentence, SLOW_ADDITION_PATTERNS) ? { mode: "dropwise" } : {}),
     ...(hasAny(context.sentence, NITROGEN_CONTEXT_PATTERNS) ? { atmosphere: "nitrogen" } : {})
   }, 0.84, hasAny(context.sentence, HAZARDOUS_REAGENT_PATTERNS) ? ["consumes_hazardous_reagent"] : []));

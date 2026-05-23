@@ -146,6 +146,8 @@ Add or improve lowering for existing step families:
 
 ## Phase 4: Addition versus Quench Attribution
 
+Status: implemented.
+
 ### Tasks
 
 - Ensure same-sentence add/quench cases become distinct steps.
@@ -166,6 +168,15 @@ Add or improve lowering for existing step families:
 
 - `pnpm --filter @chemd/step-ontology test`
 - `pnpm --filter @chemd/importer-prose test`
+
+### Implementation Notes
+
+- `before the addition of ...` is split into its own addition clause so source
+  order stays visible.
+- Addition temperature and `dropwise` modifiers are attached to the add step
+  using existing schema-backed params.
+- Condition-looking fragments such as `at -78 °C` are no longer accepted as
+  material mentions.
 
 ## Phase 5: Purification Detail Preservation
 

@@ -110,6 +110,27 @@ describe("procedure and observation lowering", () => {
     ]);
   });
 
+  it("keeps addition modifiers near the correct action clause", () => {
+    const result = lowerProcedureToSteps({
+      procedureId: "proc-attribution",
+      body: "Acyl silane 7 was added dropwise at -78 °C, the reaction was stirred for 10 min before the addition of tBuOH."
+    });
+
+    expect(result.steps.map((step) => step.family)).toEqual([
+      "cool",
+      "add",
+      "hold",
+      "add"
+    ]);
+    expect(result.steps[1].params).toMatchObject({
+      materials: "Acyl silane 7",
+      mode: "dropwise",
+      temperature: "-78 °C"
+    });
+    expect(result.steps[2].params.duration).toBe("10 min");
+    expect(result.steps[3].params.materials).toBe("tBuOH");
+  });
+
   it("keeps unrecognized action clauses as low-confidence prose", () => {
     const result = lowerProcedureToSteps({
       procedureId: "proc-unmatched-clause",
