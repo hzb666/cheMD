@@ -796,3 +796,38 @@ Phase 6 made CLI text and docs distinguish semantic graph-index clusters from st
 ### Next Steps
 
 - None - task complete
+
+
+## Session 159: Hybrid reaction clustering gold corpus
+
+**Date**: 2026-05-24
+**Task**: Hybrid reaction clustering gold corpus
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+Phase 7 added deterministic gold corpus cases for strict computed clusters, semantic-only groups, hard rejects, and skipped provider warnings. Verified python -m unittest discover services/chem-cluster-service/tests; pnpm --filter @chemd/exporter-training test; pnpm --filter @chemd/exporter-training typecheck; pnpm --filter @chemd/docs typecheck; pnpm --filter @chemd/compiler test -- docs-coverage.test.ts docs-marked-examples.test.ts; git diff --check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `515a0ce` | (see git log) |
+| `0e9ceda` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
