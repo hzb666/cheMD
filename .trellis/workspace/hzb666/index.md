@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-4.md`
-- **Total Sessions**: 150
-- **Last Active**: 2026-05-23
+- **Total Sessions**: 152
+- **Last Active**: 2026-05-24
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-4.md` | ~522 | Active |
+| `journal-4.md` | ~590 | Active |
 | `journal-3.md` | ~1994 | Archived |
 | `journal-2.md` | ~1956 | Archived |
 | `journal-1.md` | ~1998 | Archived |
@@ -32,6 +32,8 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 152 | 2026-05-24 | Hybrid reaction canonical input task closeout | `c04dd39` | `develop` |
+| 151 | 2026-05-24 | Hybrid reaction canonical input | `d3315ee` | `develop` |
 | 150 | 2026-05-23 | Archive procedure state model | `5bd46eb` | `develop` |
 | 149 | 2026-05-23 | Phase 3 procedure state docs | `72c0f78` | `develop` |
 | 148 | 2026-05-23 | Phase 2 procedure state import integration | `f8a09e8` | `develop` |

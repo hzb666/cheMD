@@ -520,3 +520,71 @@ Archive commit recorded separately from implementation phase commits.
 ### Next Steps
 
 - None - task complete
+
+
+## Session 151: Hybrid reaction canonical input
+
+**Date**: 2026-05-24
+**Task**: Hybrid reaction canonical input
+**Package**: desktop
+**Branch**: `develop`
+
+### Summary
+
+Added graph-derived canonical reaction intelligence input, explicit missing canonical SMILES warnings, tests, and EN/ZH docs. Verified exporter-training tests/typecheck, docs typecheck, docs coverage examples, and git diff check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d3315ee` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 152: Hybrid reaction canonical input task closeout
+
+**Date**: 2026-05-24
+**Task**: Hybrid reaction canonical input task closeout
+**Package**: desktop
+**Branch**: `develop`
+
+### Summary
+
+Marked the phase one Trellis task completed and linked it to the implementation commit after verifying task.py finish only cleared current task state.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c04dd39` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
