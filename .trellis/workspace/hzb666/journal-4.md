@@ -149,3 +149,52 @@ Verification:
 ### Next Steps
 
 - None - task complete
+
+
+## Session 143: Phase 5 purification details
+
+**Date**: 2026-05-23
+**Task**: Phase 5 purification details
+**Package**: step-ontology
+**Branch**: `develop`
+
+### Summary
+
+Preserve purification technique, medium, eluent, and column details.
+
+### Main Changes
+
+Phase 5 completed for prose-step-import-reliability.
+
+Changes:
+- Preserved purification details for flash column, prep TLC, silica plug, trituration, and recrystallization.
+- Stored eluent ratios and gradient text in the existing `eluent` param instead of adding non-schema fields.
+- Avoided treating prep TLC as analytical TLC.
+
+Verification:
+- pnpm --filter @chemd/step-ontology test
+- pnpm --filter @chemd/step-ontology typecheck
+- pnpm --filter @chemd/importer-prose test
+- pnpm --filter @chemd/importer-prose typecheck
+- pnpm --filter @chemd/typechecker test
+- pnpm --filter @chemd/typechecker typecheck
+- pnpm chemd import prose <temp-file> --format json --dry-run
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e895c62` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
