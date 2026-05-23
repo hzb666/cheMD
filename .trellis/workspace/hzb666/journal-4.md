@@ -726,3 +726,38 @@ Phase 4 added strict reaction clusters, candidate neighbors, semantic groups, ex
 ### Next Steps
 
 - None - task complete
+
+
+## Session 157: Hybrid reaction cluster profiles
+
+**Date**: 2026-05-24
+**Task**: Hybrid reaction cluster profiles
+**Package**: exporter-training
+**Branch**: `develop`
+
+### Summary
+
+Phase 5 added strict reaction cluster profiles for LLM and training use without changing cluster decisions. Verified pnpm --filter @chemd/exporter-training test; pnpm --filter @chemd/exporter-training typecheck; pnpm --filter @chemd/docs typecheck; python -m unittest discover services/chem-cluster-service/tests; pnpm --filter @chemd/compiler test -- docs-coverage.test.ts docs-marked-examples.test.ts; git diff --check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `43433d2` | (see git log) |
+| `59c88ac` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
