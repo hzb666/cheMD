@@ -247,3 +247,48 @@ Docs build passed with existing metadataBase warnings from Next.js.
 ### Next Steps
 
 - None - task complete
+
+
+## Session 145: Archive prose step import reliability
+
+**Date**: 2026-05-23
+**Task**: Archive prose step import reliability
+**Package**: step-ontology
+**Branch**: `develop`
+
+### Summary
+
+Archived the completed prose-step-import-reliability task.
+
+### Main Changes
+
+Completed and archived prose-step-import-reliability.
+
+Scope completed:
+- Phase 1 coverage ledger.
+- Phase 2 clause/action segmentation.
+- Phase 3 high-frequency SI operation gaps.
+- Phase 4 addition attribution and modifier binding.
+- Phase 5 purification detail preservation.
+- Phase 6 CLI diagnostics and docs.
+
+Archive commit recorded separately from implementation phase commits.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6aeb0f8` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
