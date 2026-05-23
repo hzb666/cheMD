@@ -761,3 +761,38 @@ Phase 5 added strict reaction cluster profiles for LLM and training use without 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 158: Hybrid reaction clustering user contract
+
+**Date**: 2026-05-24
+**Task**: Hybrid reaction clustering user contract
+**Package**: cli
+**Branch**: `develop`
+
+### Summary
+
+Phase 6 made CLI text and docs distinguish semantic graph-index clusters from strict computed reaction-intelligence outputs. Verified pnpm --filter @chemd/cli test; pnpm --filter @chemd/cli typecheck; pnpm --filter @chemd/docs typecheck; pnpm --filter @chemd/compiler test -- docs-coverage.test.ts docs-marked-examples.test.ts; git diff --check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b357782` | (see git log) |
+| `a78a7b3` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
