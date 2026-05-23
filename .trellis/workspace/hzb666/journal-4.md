@@ -478,3 +478,45 @@ Docs build exited 0. It still printed existing metadataBase warnings and transie
 ### Next Steps
 
 - None - task complete
+
+
+## Session 150: Archive procedure state model
+
+**Date**: 2026-05-23
+**Task**: Archive procedure state model
+**Package**: step-ontology
+**Branch**: `develop`
+
+### Summary
+
+Archived the completed procedure-state-model task.
+
+### Main Changes
+
+Completed and archived procedure-state-model.
+
+Scope completed:
+- Phase 1 state model core over canonical procedure steps.
+- Phase 2 importer and CLI integration.
+- Phase 3 EN/ZH docs and review examples.
+
+Archive commit recorded separately from implementation phase commits.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5bd46eb` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
