@@ -292,3 +292,47 @@ Archive commit recorded separately from implementation phase commits.
 ### Next Steps
 
 - None - task complete
+
+
+## Session 146: Plan procedure state model
+
+**Date**: 2026-05-23
+**Task**: Plan procedure state model
+**Package**: step-ontology
+**Branch**: `develop`
+
+### Summary
+
+Created the Procedure State Model PRD and phased plan.
+
+### Main Changes
+
+Created the procedure-state-model Trellis task and PRD.
+
+Plan:
+- Phase 1: state model core over canonical steps.
+- Phase 2: importer and CLI integration without changing rendered Chemd syntax.
+- Phase 3: docs and examples explaining derived review state versus runtime trace.
+
+Boundary:
+- No Chemd language-layer syntax changes.
+- State derives from canonical steps and schema-backed params.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2236e1d` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
