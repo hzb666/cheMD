@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-4.md`
-- **Total Sessions**: 146
+- **Total Sessions**: 147
 - **Last Active**: 2026-05-23
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-4.md` | ~338 | Active |
+| `journal-4.md` | ~383 | Active |
 | `journal-3.md` | ~1994 | Archived |
 | `journal-2.md` | ~1956 | Archived |
 | `journal-1.md` | ~1998 | Archived |
@@ -32,6 +32,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 147 | 2026-05-23 | Phase 1 procedure state core | `7aa5a00` | `develop` |
 | 146 | 2026-05-23 | Plan procedure state model | `2236e1d` | `develop` |
 | 145 | 2026-05-23 | Archive prose step import reliability | `6aeb0f8` | `develop` |
 | 144 | 2026-05-23 | Phase 6 import diagnostics docs | `2710919` | `develop` |

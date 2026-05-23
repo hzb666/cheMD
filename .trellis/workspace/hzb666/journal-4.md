@@ -336,3 +336,48 @@ Boundary:
 ### Next Steps
 
 - None - task complete
+
+
+## Session 147: Phase 1 procedure state core
+
+**Date**: 2026-05-23
+**Task**: Phase 1 procedure state core
+**Package**: step-ontology
+**Branch**: `develop`
+
+### Summary
+
+Build procedure state snapshots from canonical steps.
+
+### Main Changes
+
+Phase 1 completed for procedure-state-model.
+
+Changes:
+- Added `buildProcedureState()` in step-ontology.
+- Produced ordered snapshots from canonical steps.
+- Tracked vessel contents, active conditions, phase markers, and state warnings.
+- Exported the model from the package entrypoint.
+
+Verification:
+- pnpm --filter @chemd/step-ontology test
+- pnpm --filter @chemd/step-ontology typecheck
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7aa5a00` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
