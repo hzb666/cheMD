@@ -198,3 +198,52 @@ Verification:
 ### Next Steps
 
 - None - task complete
+
+
+## Session 144: Phase 6 import diagnostics docs
+
+**Date**: 2026-05-23
+**Task**: Phase 6 import diagnostics docs
+**Package**: cli
+**Branch**: `develop`
+
+### Summary
+
+Expose prose import warning spans and document review policy.
+
+### Main Changes
+
+Phase 6 completed for prose-step-import-reliability.
+
+Changes:
+- CLI text diagnostics now include original prose span text for visible review.
+- Added CLI regression for uncovered action warnings and unparsed span counts.
+- Updated EN/ZH natural-language-import docs with clause coverage, warning policy, workup, and purification examples.
+
+Verification:
+- pnpm --filter @chemd/cli test
+- pnpm --filter @chemd/cli typecheck
+- pnpm --filter @chemd/compiler test -- docs-coverage.test.ts docs-marked-examples.test.ts
+- pnpm --filter @chemd/docs typecheck
+- pnpm --filter @chemd/docs build
+
+Docs build passed with existing metadataBase warnings from Next.js.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2710919` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

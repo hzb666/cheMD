@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-4.md`
-- **Total Sessions**: 143
+- **Total Sessions**: 144
 - **Last Active**: 2026-05-23
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-4.md` | ~200 | Active |
+| `journal-4.md` | ~249 | Active |
 | `journal-3.md` | ~1994 | Archived |
 | `journal-2.md` | ~1956 | Archived |
 | `journal-1.md` | ~1998 | Archived |
@@ -32,6 +32,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 144 | 2026-05-23 | Phase 6 import diagnostics docs | `2710919` | `develop` |
 | 143 | 2026-05-23 | Phase 5 purification details | `e895c62` | `develop` |
 | 142 | 2026-05-23 | Phase 4 addition attribution | `d938244` | `develop` |
 | 141 | 2026-05-23 | Phase 3 prose operation gaps | `63de0ff` | `develop` |
