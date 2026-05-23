@@ -1,0 +1,442 @@
+% !TeX program = xelatex
+% !TeX encoding = UTF-8
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{fontspec}
+\usepackage{xeCJK}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+
+\IfFontExistsTF{Source Han Serif SC}{
+  \setCJKmainfont{Source Han Serif SC}
+}{
+  \setCJKmainfont{Noto Serif CJK SC}
+}
+\IfFontExistsTF{Source Han Sans SC}{
+  \setCJKsansfont{Source Han Sans SC}
+}{
+  \setCJKsansfont{Noto Sans CJK SC}
+}
+\setmainfont{TeX Gyre Termes}
+\setsansfont{TeX Gyre Heros}
+\xeCJKsetup{
+  CJKspace=false,
+  CJKecglue={},
+  PunctStyle=kaiming
+}
+
+\linespread{1.18}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.35em}
+\setlength{\abovedisplayskip}{0.9em}
+\setlength{\belowdisplayskip}{0.9em}
+\setlength{\abovedisplayshortskip}{0.65em}
+\setlength{\belowdisplayshortskip}{0.65em}
+\setlength{\jot}{0.65em}
+\renewcommand{\arraystretch}{1.18}
+\allowdisplaybreaks
+\numberwithin{equation}{section}
+
+\DeclareMathOperator{\ConnectedComponents}{ConnectedComponents}
+
+\title{Chemd 混合反应聚类数学设计}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{设计目标}
+
+本文描述 Chemd 反应聚类的数学设计。该设计的核心目标不是用单一文本相似度把反应粗略分组，而是先用化学证据约束可合并边界，再用 Chemd 文档图谱中的语义上下文补充排序、解释和候选关系。
+
+设计上，任意两条反应 \(r_i\) 与 \(r_j\) 的关系由四类证据共同刻画：
+
+\begin{enumerate}[label=\arabic*.]
+  \item 反应指纹相似度 \(R_{ij}\)：描述反应整体结构变化是否相近。
+  \item 反应向量相似度 \(X_{ij}\)：描述模型嵌入空间中的反应相似性。
+  \item 反应中心相似度 \(C_{ij}\)：描述关键成键、断键或反应位点是否一致。
+  \item 语义上下文相似度 \(S_{ij}\)：描述 Chemd 文档中的家族、步骤、条件、物料、路线、结果和观察是否相近。
+\end{enumerate}
+
+其中，\(R_{ij}\)、\(X_{ij}\) 与 \(C_{ij}\) 属于计算化学证据；\(S_{ij}\) 属于文档语义证据。严格反应簇必须由计算化学证据主导，语义上下文只用于增强排序和解释，不能单独覆盖冲突的化学证据。
+
+\section{反应对相似度}
+
+对任意两条反应 \(r_i\) 和 \(r_j\)，定义四个基础相似度分量：
+
+\begin{equation}
+\begin{aligned}
+R_{ij} & = \text{反应指纹相似度}, \\
+X_{ij} & = \text{反应向量相似度}, \\
+C_{ij} & = \text{反应中心相似度}, \\
+S_{ij} & = \text{语义上下文相似度}.
+\end{aligned}
+\end{equation}
+
+\subsection{反应指纹相似度}
+
+设 \(F_i\) 和 \(F_j\) 分别是两条反应的位向量指纹。反应指纹相似度使用 Tanimoto 系数：
+
+\begin{equation}
+R_{ij}
+=
+\frac{|F_i \cap F_j|}{|F_i \cup F_j|}.
+\end{equation}
+
+该值越接近 \(1\)，表示两条反应在结构变化模式上越接近；越接近 \(0\)，表示共享的指纹特征越少。该信号适合发现反应结构变化模式相近的样本，但在指纹过稀疏、反应映射不完整或底物表示不规范时，可能无法完整表达反应中心的一致性。
+
+\subsection{反应向量相似度}
+
+设 \(\mathbf e_i,\mathbf e_j \in \mathbb R^d\) 是两条反应的稠密向量表示。反应向量相似度使用截断后的余弦相似度：
+
+\begin{equation}
+X_{ij}
+=
+\max\left(
+0,\,
+\frac{\mathbf e_i \cdot \mathbf e_j}
+{\|\mathbf e_i\|_2 \|\mathbf e_j\|_2}
+\right).
+\end{equation}
+
+截断操作将负余弦值归零，避免把方向相反的向量解释为负证据。设计上，\(X_{ij}\) 适合作为结构指纹之外的补充信号，尤其用于捕获反应表示中的连续变化和模型学习到的潜在相似性。但它仍然不应单独决定严格聚类，因为向量相近可能来自上下文、底物类别或训练分布，而不一定代表反应中心一致。
+
+\subsection{反应中心相似度}
+
+反应中心相似度是离散化的化学判断信号：
+
+\begin{equation}
+C_{ij}
+=
+\begin{cases}
+1.00, & \text{反应中心相同}, \\
+0.72, & \text{反应中心兼容}, \\
+0.00, & \text{反应中心冲突}, \\
+\varnothing, & \text{反应中心不可用}.
+\end{cases}
+\end{equation}
+
+这里的 \(1.00\) 表示关键成键、断键或反应位点在设计上可视为一致；\(0.72\) 表示两个反应中心并不完全相同，但仍可被视为同一类化学变化的兼容证据；\(0.00\) 表示存在明确冲突，后续硬门禁会优先处理这一情况；\(\varnothing\) 表示反应中心尚不可判定，不能被误当作低相似度。
+
+\subsection{语义上下文相似度}
+
+Chemd 文档图谱中的语义字段通常是集合型特征。对任意集合 \(A\) 和 \(B\)，使用 Jaccard 相似度：
+
+\begin{equation}
+J(A,B)
+=
+\frac{|A \cap B|}{|A \cup B|}.
+\end{equation}
+
+语义上下文由多个 Chemd 图谱特征加权混合得到：
+
+\begin{equation}
+\begin{aligned}
+S_{ij}
+=
+& 0.25\,S^{\mathrm{family}}_{ij}
++ 0.20\,S^{\mathrm{procedure}}_{ij} \\
+&+ 0.20\,S^{\mathrm{condition}}_{ij}
++ 0.15\,S^{\mathrm{material}}_{ij} \\
+&+ 0.10\,S^{\mathrm{route}}_{ij}
++ 0.05\,S^{\mathrm{result}}_{ij} \\
+&+ 0.05\,S^{\mathrm{observation}}_{ij}.
+\end{aligned}
+\end{equation}
+
+各分量含义如下：
+
+\begin{center}
+\begin{tabularx}{\textwidth}{@{}llX@{}}
+\toprule
+分量 & 权重 & 设计含义 \\
+\midrule
+\(S^{\mathrm{family}}_{ij}\) & \(0.25\) & 反应家族或反应类型是否相近。 \\
+\(S^{\mathrm{procedure}}_{ij}\) & \(0.20\) & 实验步骤、操作顺序或制备模式是否相近。 \\
+\(S^{\mathrm{condition}}_{ij}\) & \(0.20\) & 温度、时间、气氛、溶剂、压力等条件是否相近。 \\
+\(S^{\mathrm{material}}_{ij}\) & \(0.15\) & 底物、试剂、催化剂、添加剂等物料是否相近。 \\
+\(S^{\mathrm{route}}_{ij}\) & \(0.10\) & 合成路线位置、上游来源或下游用途是否相近。 \\
+\(S^{\mathrm{result}}_{ij}\) & \(0.05\) & 产率、选择性、转化率等结果描述是否相近。 \\
+\(S^{\mathrm{observation}}_{ij}\) & \(0.05\) & 颜色、沉淀、放热、气体产生等观察记录是否相近。 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+语义上下文的权重设计保持较低，是为了防止相同实验写法、相似路线描述或相同物料标签把化学上不相似的反应错误合并。它更适合回答“为什么这两条反应值得放在一起看”，而不是回答“这两条反应是否属于同一个严格化学簇”。
+
+\section{混合相似度}
+
+混合相似度 \(H_{ij}\) 是可用证据的归一化加权平均。不可用值 \(\varnothing\) 不按 \(0\) 处理，而是从分子和分母中同时移除。这样可以避免因为某个证据源暂时缺失而系统性压低反应对的相似度。
+
+定义可用性指示函数：
+
+\begin{equation}
+\delta_Q(i,j)
+=
+\begin{cases}
+1, & Q_{ij}\neq\varnothing, \\
+0, & Q_{ij}=\varnothing.
+\end{cases}
+\end{equation}
+
+定义四类证据的设计权重：
+
+\begin{equation}
+\begin{aligned}
+w_R &= 0.30, &
+w_X &= 0.25, &
+w_C &= 0.25, &
+w_S &= 0.20.
+\end{aligned}
+\end{equation}
+
+混合相似度写为：
+
+\begin{equation}
+\begin{aligned}
+H_{ij}
+&=
+\frac{N_{ij}}{D_{ij}}, \\
+N_{ij}
+&=
+w_R R_{ij}\delta_R(i,j)
++ w_X X_{ij}\delta_X(i,j) \\
+&\quad
++ w_C C_{ij}\delta_C(i,j)
++ w_S S_{ij}\delta_S(i,j), \\
+D_{ij}
+&=
+w_R \delta_R(i,j)
++ w_X \delta_X(i,j)
++ w_C \delta_C(i,j)
++ w_S \delta_S(i,j).
+\end{aligned}
+\end{equation}
+
+当 \(D_{ij}=0\) 时，表示该反应对没有任何可用证据。设计上令 \(H_{ij}=\varnothing\)，并且不生成相似边。该处理比默认给出 \(0\) 更保守，因为“没有证据”与“证据显示不相似”在聚类语义上并不相同。
+
+计算化学证据是否存在定义为：
+
+\begin{equation}
+\begin{aligned}
+\mathrm{Computed}_{ij}
+&=
+\mathbb 1[R_{ij}\neq\varnothing]
+\lor
+\mathbb 1[X_{ij}\neq\varnothing]
+\lor
+\mathbb 1[C_{ij}\neq\varnothing].
+\end{aligned}
+\end{equation}
+
+\section{硬门禁}
+
+严格聚类必须先通过硬门禁。硬门禁的作用是把“可解释的相似”分成两层：第一层判断化学上是否允许合并，第二层才使用混合分数判断是否足够接近。
+
+反应中心冲突定义为：
+
+\begin{equation}
+\mathrm{CenterConflict}_{ij}
+=
+\mathbb 1[C_{ij}=0].
+\end{equation}
+
+当反应中心冲突且反应指纹也不足以支持相似时，直接拒绝：
+
+\begin{equation}
+\mathrm{HardReject}_{ij}
+=
+(C_{ij}=0)
+\land
+(R_{ij}<0.45).
+\end{equation}
+
+严格聚类允许条件定义为：
+
+\begin{equation}
+\begin{aligned}
+\mathrm{StrictAllowed}_{ij}
+=
+&\ \mathrm{Computed}_{ij} \\
+&\land \neg\mathrm{CenterConflict}_{ij} \\
+&\land
+\left(
+R_{ij}\ge 0.70
+\lor
+X_{ij}\ge 0.85
+\lor
+C_{ij}=1.00
+\right) \\
+&\land H_{ij}\ge 0.75.
+\end{aligned}
+\end{equation}
+
+该条件表达了三层设计意图：首先，严格簇必须有至少一种计算化学证据；其次，明确的反应中心冲突不能被语义相似度覆盖；最后，至少有一个强化学信号达到阈值，并且整体混合相似度足够高。换言之，语义上下文可以提高一个边的解释质量，但不能把化学证据不足的关系提升为严格聚类关系。
+
+\section{边类型分类}
+
+每个反应对最多生成一种边类型：
+
+\begin{equation}
+\begin{aligned}
+E_{ij}
+=
+\begin{cases}
+\mathrm{strict\_computed\_similarity},
+& \begin{aligned}[t]
+  &\mathrm{StrictAllowed}_{ij} \\
+  &\land \neg\mathrm{HardReject}_{ij},
+  \end{aligned} \\
+
+\mathrm{candidate\_neighbor},
+& \begin{aligned}[t]
+  &\mathrm{Computed}_{ij} \\
+  &\land H_{ij}\ge 0.55 \\
+  &\land \neg\mathrm{StrictAllowed}_{ij},
+  \end{aligned} \\
+
+\mathrm{semantic\_group\_similarity},
+& \begin{aligned}[t]
+  &\neg\mathrm{Computed}_{ij} \\
+  &\land S_{ij}\ge 0.65,
+  \end{aligned} \\
+
+\varnothing,
+& \text{其他情况}.
+\end{cases}
+\end{aligned}
+\end{equation}
+
+三类边的设计语义如下：
+
+\begin{enumerate}[label=\arabic*.]
+  \item \(\mathrm{strict\_computed\_similarity}\)：进入严格反应簇的边，代表化学证据和混合分数同时满足合并条件。
+  \item \(\mathrm{candidate\_neighbor}\)：有一定化学证据，但不足以直接合并的候选近邻，适合用于人工复核、推荐、局部扩展或后续更昂贵的相似度计算。
+  \item \(\mathrm{semantic\_group\_similarity}\)：缺少计算化学证据时，仅由语义上下文形成的语义分组边，适合用于文档导航和主题组织，不应默认进入严格化学簇。
+\end{enumerate}
+
+\section{严格反应簇构造}
+
+设 \(V\) 是所有反应节点集合。严格边集合定义为：
+
+\begin{equation}
+E_{\mathrm{strict}}
+=
+\{(i,j)\mid E_{ij}=\mathrm{strict\_computed\_similarity}\}.
+\end{equation}
+
+严格相似图为：
+
+\begin{equation}
+G_{\mathrm{strict}}
+=
+(V,E_{\mathrm{strict}}).
+\end{equation}
+
+严格反应簇定义为严格相似图的连通分量：
+
+\begin{equation}
+\mathcal C_{\mathrm{strict}}
+=
+\ConnectedComponents(G_{\mathrm{strict}}).
+\end{equation}
+
+候选近邻边和语义分组边保留为辅助结构，不参与严格反应簇的连通分量计算：
+
+\begin{equation}
+E_{\mathrm{candidate}}
+=
+\{(i,j)\mid E_{ij}=\mathrm{candidate\_neighbor}\},
+\end{equation}
+
+\begin{equation}
+E_{\mathrm{semantic}}
+=
+\{(i,j)\mid E_{ij}=\mathrm{semantic\_group\_similarity}\}.
+\end{equation}
+
+这种分层构造可以避免“语义上相近但化学上不确定”的反应通过图连通性被间接并入严格簇。严格簇用于化学相似关系，候选近邻用于待确认关系，语义分组用于文档组织关系。
+
+\section{簇置信度}
+
+对任意严格反应簇 \(C\)，设 \(E_C\) 为簇内严格边集合。簇的平均相似度为：
+
+\begin{equation}
+\mathrm{cluster\_score}(C)
+=
+\frac{1}{|E_C|}
+\sum_{(i,j)\in E_C} H_{ij}.
+\end{equation}
+
+簇内最弱边为：
+
+\begin{equation}
+\mathrm{min\_edge\_score}(C)
+=
+\min_{(i,j)\in E_C} H_{ij}.
+\end{equation}
+
+反应中心一致性为：
+
+\begin{equation}
+\begin{aligned}
+\mathrm{center\_consistency}(C)
+=
+\frac{
+|\{(i,j)\in E_C \mid C_{ij}\in\{1.00,0.72\}\}|
+}{
+|E_C|
+}.
+\end{aligned}
+\end{equation}
+
+簇置信度定义为：
+
+\begin{equation}
+\begin{aligned}
+\mathrm{confidence}(C)
+=
+\begin{cases}
+\mathrm{high},
+& \begin{aligned}[t]
+  &\mathrm{cluster\_score}(C)\ge 0.85 \\
+  &\land\ \mathrm{min\_edge\_score}(C)\ge 0.75 \\
+  &\land\ \mathrm{center\_consistency}(C)\ge 0.80,
+  \end{aligned} \\
+
+\mathrm{medium},
+& \mathrm{cluster\_score}(C)\ge 0.70, \\
+
+\mathrm{low},
+& \text{其他情况}.
+\end{cases}
+\end{aligned}
+\end{equation}
+
+该置信度不是新的聚类条件，而是对已有严格簇质量的解释层。高置信度簇要求平均分、最弱边和反应中心一致性同时足够强；中置信度簇表示整体相似度可接受但仍可能存在弱边；低置信度簇需要在界面或后续分析中谨慎展示。
+
+\section{设计解释}
+
+该混合聚类设计可以概括为三条原则。
+
+\begin{enumerate}[label=\arabic*.]
+  \item \textbf{化学证据决定严格合并。}只有存在计算化学证据，并且没有明确反应中心冲突时，反应对才可能进入严格反应簇。
+  \item \textbf{语义证据用于补充，而不是覆盖。}语义上下文可以提升排序质量、补充候选关系、解释簇画像，但不能单独把缺少化学支持的反应放入严格簇。
+  \item \textbf{候选关系和语义分组必须与严格簇分离。}候选近邻适合用于人工复核、推荐和后续计算；语义分组适合用于文档导航和主题组织。二者都不应默认等价于严格化学聚类。
+\end{enumerate}
+
+因此，最终输出应至少区分三类结果：严格反应簇、候选近邻关系和语义分组。这种分层可以在保持化学可靠性的同时，利用 Chemd 文档结构提供更完整的解释和探索能力。
+
+\section{建议编译方式}
+
+本文档面向 Overleaf 的 XeLaTeX 编译链。请在 Overleaf 菜单中将编译器设置为 XeLaTeX。若项目字体列表中没有 \texttt{Source Han Serif SC}，本文档会退回到 \texttt{Noto Serif CJK SC}；该字体与思源宋体同源，适合作为 Overleaf 环境中的兼容替代。
+
+\end{document}

@@ -510,7 +510,7 @@ chore(trellis)：complete <phase> task
 后续从 Phase 3 继续，不要重做 Phase 1 / Phase 2：
 
 ```text
-Phase 3 completed -> Phase 4 completed -> Phase 5 completed -> Phase 6 completed -> Phase 7 in closeout -> Phase 8
+Phase 3 completed -> Phase 4 completed -> Phase 5 completed -> Phase 6 completed -> Phase 7 completed -> Phase 8 in closeout
 ```
 
 ## 进度记录
@@ -519,4 +519,16 @@ Phase 3 completed -> Phase 4 completed -> Phase 5 completed -> Phase 6 completed
 - 2026-05-24: Phase 4 已完成并 record。
 - 2026-05-24: Phase 5 已完成并 record。
 - 2026-05-24: Phase 6 已完成并 record。
-- 2026-05-24: Phase 7 已加入 hybrid clustering gold corpus，覆盖 strict computed、semantic-only、hard reject、provider skip；等待 commit/record 后进入 Phase 8。
+- 2026-05-24: Phase 7 已完成并 record。
+- 2026-05-24: Phase 8 审查确认 Python artifact、TS merge、CLI text、EN/ZH docs 的 strict/candidate/semantic/profile 命名一致；`reaction_clusters` 仍是 graph-index semantic clusters；`docs/hybrid-reaction-clustering-math.tex` 需要显式纳入提交。
+
+## Phase 8 审查结果
+
+- `reaction_clusters` 仍由 `packages/exporter-training/src/graph-index.ts` 生成，语义是 graph-index semantic source truth。
+- strict computed 聚类只通过 `strict_reaction_clusters` 输出。
+- 弱 computed 邻居只通过 `candidate_reaction_neighbors` 输出。
+- semantic-only 相似性只通过 `semantic_reaction_groups` 输出。
+- LLM/训练解释层只通过 `strict_reaction_cluster_profiles` 输出，不改变聚类成员。
+- provider skip、semantic-only、hard reject、dropped merge group 都有 warning 路径。
+- CLI text 已显式区分 semantic graph-index clusters 和 reaction-intelligence strict clusters。
+- EN/ZH docs 已同步字段、示例与 gold case 说明。
