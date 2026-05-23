@@ -6,6 +6,7 @@ import { typecheckDocument } from "@chemd/typechecker";
 
 import {
   buildReactionIntelligenceCanonicalInput,
+  buildReactionIntelligenceServiceJob,
   buildTrainingGraphIndexFromUnderstandings,
   buildTrainingUnderstandingFromRecord,
   exportTrainingRecordFromDocument,
@@ -203,6 +204,57 @@ describe("reaction intelligence canonical input", () => {
       })
     ]));
     expect(input.reactions[0]).not.toHaveProperty("canonical_rxn_smiles");
+  });
+});
+
+describe("reaction intelligence service job", () => {
+  it("converts only compute-ready canonical inputs into provider jobs", () => {
+    const index = buildIndex();
+    const featureRefId = "feature-ref::rxn-a::canonical-smiles";
+    index.reaction_features[0] = {
+      ...index.reaction_features[0],
+      fingerprint_status: "external_ref_available",
+      chemistry_feature_ref_ids: [featureRefId]
+    };
+    const canonicalInput = buildReactionIntelligenceCanonicalInput(index, {
+      graph_index_id: "graph-index::service-job",
+      source_compile_run_ids: ["compile-run::service-job"],
+      canonical_rxn_smiles_by_feature_ref: {
+        [featureRefId]: "CC(=O)O.CCO>>CC(=O)OCC"
+      }
+    });
+
+    const result = buildReactionIntelligenceServiceJob(canonicalInput, {
+      job_id: "job::service-job",
+      requested_providers: ["rdkit_fingerprint", "hybrid_graph"]
+    });
+
+    expect(result.job).toMatchObject({
+      schema_version: "chemd-reaction-intelligence-job/v0.1",
+      job_id: "job::service-job",
+      graph_index_id: "graph-index::service-job",
+      source_compile_run_ids: ["compile-run::service-job"],
+      requested_providers: ["rdkit_fingerprint", "hybrid_graph"],
+      provider_policy: {
+        missing_dependency: "skip",
+        per_reaction_failure: "warn",
+        allow_network: false
+      }
+    });
+    expect(result.job.reactions).toEqual([
+      expect.objectContaining({
+        reaction_entity_id: rxnA,
+        document_id: "exp-ri-a",
+        canonical_rxn_smiles: "CC(=O)O.CCO>>CC(=O)OCC",
+        participant_signature: "acid-a+alcohol=>ester-a",
+        reaction_family: "esterification",
+        procedure_signature: "add>add>hold>concentrate"
+      })
+    ]);
+    expect(result.skipped_reaction_entity_ids).toEqual([rxnB]);
+    expect(result.warnings).toEqual([
+      "service_job_reaction_skipped_missing_canonical_rxn_smiles:rxn::exp-ri-b::rxn-b"
+    ]);
   });
 });
 

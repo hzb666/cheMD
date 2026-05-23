@@ -216,6 +216,12 @@ feature ref 提供的值。没有 canonical reaction SMILES 时，reaction 仍�
 并带 `canonical_rxn_smiles_not_available`；Chemd 不会从 prose 或语义分组推断
 computed chemistry。
 
+当 canonical input 转成 `chem-cluster-service` job 时，只有 compute-ready reactions
+会发送给 providers。缺少 canonical reaction SMILES 的 reactions 会从 provider job
+中跳过，并报告
+`service_job_reaction_skipped_missing_canonical_rxn_smiles:*`。默认 provider
+policy 会禁用网络访问，并把缺失的本地依赖视为 skipped providers。
+
 输出包括：
 
 - `ReactionIntelligenceJob`

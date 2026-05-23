@@ -5,6 +5,9 @@ import type {
   MergedReactionIntelligenceLayer,
   ReactionIntelligenceCanonicalInput,
   ReactionIntelligenceCanonicalReactionInput,
+  ReactionIntelligenceServiceJob,
+  ReactionIntelligenceServiceJobBuildResult,
+  BuildReactionIntelligenceServiceJobOptions,
   ReactionIntelligenceArtifact,
   ReactionIntelligenceCluster,
   ReactionIntelligenceComputedFeature,
@@ -98,6 +101,64 @@ export const buildReactionIntelligenceCanonicalInput = (
     reactions,
     compute_ready_reaction_count: reactions.length - missingCount,
     warnings: missingCount > 0 ? [`canonical_rxn_smiles_missing_for_reactions:${missingCount}`] : []
+  };
+};
+
+const defaultProviderPolicy = (
+  policy: BuildReactionIntelligenceServiceJobOptions["provider_policy"] = {}
+): ReactionIntelligenceServiceJob["provider_policy"] => ({
+  missing_dependency: policy.missing_dependency ?? "skip",
+  per_reaction_failure: policy.per_reaction_failure ?? "warn",
+  allow_network: false
+});
+
+const serviceJobReaction = (
+  reaction: ReactionIntelligenceCanonicalReactionInput
+): ReactionIntelligenceServiceJob["reactions"][number] | undefined => {
+  if (!reaction.canonical_rxn_smiles) return undefined;
+  return {
+    reaction_entity_id: reaction.reaction_entity_id,
+    document_id: reaction.document_id,
+    canonical_rxn_smiles: reaction.canonical_rxn_smiles,
+    participant_signature: reaction.participant_signature,
+    source_hash: reaction.source_hash,
+    ...(reaction.semantic_context.reaction_family
+      ? { reaction_family: reaction.semantic_context.reaction_family }
+      : {}),
+    ...(reaction.semantic_context.procedure_signature
+      ? { procedure_signature: reaction.semantic_context.procedure_signature }
+      : {}),
+    ...(reaction.semantic_context.condition_signature
+      ? { condition_signature: reaction.semantic_context.condition_signature }
+      : {})
+  };
+};
+
+export const buildReactionIntelligenceServiceJob = (
+  input: ReactionIntelligenceCanonicalInput,
+  options: BuildReactionIntelligenceServiceJobOptions = {}
+): ReactionIntelligenceServiceJobBuildResult => {
+  const reactions = input.reactions.flatMap((reaction) => {
+    const serviceReaction = serviceJobReaction(reaction);
+    return serviceReaction ? [serviceReaction] : [];
+  });
+  const skippedReactionEntityIds = input.reactions
+    .filter((reaction) => !reaction.canonical_rxn_smiles)
+    .map((reaction) => reaction.reaction_entity_id);
+  return {
+    job: {
+      schema_version: "chemd-reaction-intelligence-job/v0.1",
+      job_id: options.job_id ?? `reaction-intelligence-job::${createStableHash(input.graph_index_id)}`,
+      graph_index_id: input.graph_index_id,
+      source_compile_run_ids: [...input.source_compile_run_ids],
+      reactions,
+      requested_providers: [...(options.requested_providers ?? ["rdkit_fingerprint", "hybrid_graph"])],
+      provider_policy: defaultProviderPolicy(options.provider_policy)
+    },
+    skipped_reaction_entity_ids: skippedReactionEntityIds,
+    warnings: skippedReactionEntityIds.map((reactionId) =>
+      `service_job_reaction_skipped_missing_canonical_rxn_smiles:${reactionId}`
+    )
   };
 };
 

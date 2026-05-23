@@ -202,3 +202,49 @@ export interface BuildReactionIntelligenceCanonicalInputOptions {
   source_compile_run_ids?: string[];
   canonical_rxn_smiles_by_feature_ref?: Record<string, string>;
 }
+
+export type ReactionIntelligenceServiceProvider =
+  | "rdkit_fingerprint"
+  | "rxnmapper"
+  | "rxnfp"
+  | "hybrid_graph"
+  | "tmap_layout";
+
+export interface ReactionIntelligenceServiceProviderPolicy {
+  missing_dependency: "skip" | "error" | "fallback";
+  per_reaction_failure: "warn" | "error";
+  allow_network: false;
+}
+
+export interface ReactionIntelligenceServiceJobReaction {
+  reaction_entity_id: string;
+  document_id: string;
+  canonical_rxn_smiles: string;
+  participant_signature: string;
+  source_hash: string;
+  reaction_family?: string;
+  procedure_signature?: string;
+  condition_signature?: string;
+}
+
+export interface ReactionIntelligenceServiceJob {
+  schema_version: "chemd-reaction-intelligence-job/v0.1";
+  job_id: string;
+  graph_index_id: string;
+  source_compile_run_ids: string[];
+  reactions: ReactionIntelligenceServiceJobReaction[];
+  requested_providers: ReactionIntelligenceServiceProvider[];
+  provider_policy: ReactionIntelligenceServiceProviderPolicy;
+}
+
+export interface BuildReactionIntelligenceServiceJobOptions {
+  job_id?: string;
+  requested_providers?: ReactionIntelligenceServiceProvider[];
+  provider_policy?: Partial<ReactionIntelligenceServiceProviderPolicy>;
+}
+
+export interface ReactionIntelligenceServiceJobBuildResult {
+  job: ReactionIntelligenceServiceJob;
+  skipped_reaction_entity_ids: string[];
+  warnings: string[];
+}

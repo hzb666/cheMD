@@ -217,6 +217,13 @@ the caller. If no canonical reaction SMILES are available, the reaction remains
 in the input with `canonical_rxn_smiles_not_available`; Chemd does not infer
 computed chemistry from prose or semantic grouping.
 
+When this canonical input is converted into a `chem-cluster-service` job, only
+compute-ready reactions are sent to providers. Reactions missing canonical
+reaction SMILES are skipped from the provider job and reported with
+`service_job_reaction_skipped_missing_canonical_rxn_smiles:*`. The default
+provider policy keeps network access disabled and treats missing local
+dependencies as skipped providers.
+
 Outputs include:
 
 - `ReactionIntelligenceJob`
