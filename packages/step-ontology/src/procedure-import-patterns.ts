@@ -17,9 +17,9 @@ export const CHARGE_STOP_MARKERS = ["加入", "置于", "溶于", "charged", "ch
 export const SOLVENT_MARKERS = ["溶于", "into", "in"] as const;
 
 export const INITIAL_CHARGE_PATTERNS = [/将.+(?:加入|置于|溶于)/, /\bcharged\b/i, /\bto a solution of\b/i] as const;
-export const PURGE_PATTERNS = [/氮气置换/, /nitrogen\s+purge/i, /\bpurged\b/i] as const;
+export const PURGE_PATTERNS = [/氮气置换/, /nitrogen\s+purge/i, /\bpurged\b/i, /\bdegassed\s+with\b/i] as const;
 export const COOL_PATTERNS = [/冷却|冰浴/, /\bcooled?\b/i, /\bcooling\b/i] as const;
-export const HEAT_PATTERNS = [/加热|升温/, /\bheated?\b/i, /\bwarmed?\b/i] as const;
+export const HEAT_PATTERNS = [/加热|升温/, /\bheated?\b/i, /\bwarmed?\b/i, /\breflux(?:ed)?\b/i] as const;
 export const QUENCH_PATTERNS = [/淬灭/, /\bquench(?:ed)?\b/i] as const;
 export const ADDITION_PATTERNS = [/滴加|加入/, /\badd(?:ed)?\b/i, /\baddition\s+of\b/i] as const;
 export const SLOW_ADDITION_PATTERNS = [/滴加|缓慢/, /dropwise|slowly/i] as const;
@@ -29,9 +29,14 @@ export const HOLD_PATTERNS = [/反应|保温|搅拌/, /\bstir(?:red)?\b/i, /\bho
 export const SAMPLE_PATTERNS = [/取样/, /\bsampl(?:e|ed|ing)\b/i] as const;
 export const ANALYSIS_PATTERNS = [/TLC|HPLC|NMR|分析/i] as const;
 export const EXTRACT_PATTERNS = [/萃取/, /\bextract(?:ed)?\b/i] as const;
+export const WASH_PATTERNS = [/洗涤/, /\bwash(?:ed)?\b/i] as const;
 export const DRY_PATTERNS = [/干燥/, /\bdried?\b/i] as const;
-export const CONCENTRATE_PATTERNS = [/旋干|浓缩/, /\bconcentrat(?:e|ed)\b/i] as const;
-export const SEPARATE_LAYERS_PATTERNS = [/分液|取有机层/, /separat(?:e|ed)\s+layers/i] as const;
+export const CONCENTRATE_PATTERNS = [/旋干|浓缩/, /\bconcentrat(?:e|ed)\b/i, /\bin\s+vacuo\b/i] as const;
+export const SEPARATE_LAYERS_PATTERNS = [
+  /分液|取有机层/,
+  /separat(?:e|ed)\s+layers/i,
+  /layers?\s+were\s+separat(?:ed|e)/i
+] as const;
 export const FILTER_PATTERNS = [/过滤/, /\bfilter(?:ed)?\b/i] as const;
 export const PURIFY_PATTERNS = [/纯化|柱层析/, /\bpurified?\b/i, /\bchromatograph(?:y|ed)\b/i] as const;
 
@@ -111,6 +116,13 @@ export const PROCEDURE_IMPORT_RULES = [
     producedParams: ["solvent", "repeats"],
     confidence: 0.84,
     effects: ["creates_biphasic_system"]
+  },
+  {
+    id: "wash.solvent",
+    family: "wash",
+    triggerPatterns: WASH_PATTERNS,
+    producedParams: ["solvent", "repeats"],
+    confidence: 0.82
   },
   {
     id: "dry.agent",

@@ -15,17 +15,8 @@ describe("prose import coverage ledger", () => {
       span.reason === "uncovered_action_like"
     );
 
-    expect(families).toEqual(expect.arrayContaining(["dry", "concentrate"]));
+    expect(families).toEqual(expect.arrayContaining(["wash", "dry", "concentrate"]));
     expect(uncoveredWarnings).toEqual([
-      expect.objectContaining({
-        severity: "warning",
-        span: expect.objectContaining({ text: "washed" }),
-        facts: expect.objectContaining({
-          action: "washed",
-          family: "wash",
-          source: "english_action_keyword"
-        })
-      }),
       expect.objectContaining({
         severity: "warning",
         span: expect.objectContaining({ text: "filtered" }),
@@ -37,7 +28,6 @@ describe("prose import coverage ledger", () => {
       })
     ]);
     expect(uncoveredSpans).toEqual([
-      expect.objectContaining({ text: "washed" }),
       expect.objectContaining({ text: "filtered" })
     ]);
   });

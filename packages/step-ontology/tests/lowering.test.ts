@@ -131,6 +131,36 @@ describe("procedure and observation lowering", () => {
     ]);
   });
 
+  it("lowers frequent SI workup and condition phrases without new families", () => {
+    const result = lowerProcedureToSteps({
+      procedureId: "proc-workup-conditions",
+      body: [
+        "The organic layer was washed with brine, dried over Na2SO4, filtered through Celite, and concentrated in vacuo.",
+        "The mixture was refluxed overnight under argon in a sealed tube.",
+        "The layers were separated."
+      ].join(" ")
+    });
+
+    expect(result.steps.map((step) => step.family)).toEqual([
+      "wash",
+      "dry",
+      "filter",
+      "concentrate",
+      "heat",
+      "separate_layers"
+    ]);
+    expect(result.steps[0].params.solvent).toBe("brine");
+    expect(result.steps[1].params.agent).toBe("Na2SO4");
+    expect(result.steps[2].params.medium).toBe("Celite");
+    expect(result.steps[3].params.method).toBe("reduced_pressure");
+    expect(result.steps[4].params).toMatchObject({
+      atmosphere: "argon",
+      duration: "overnight",
+      method: "reflux",
+      vessel: "sealed"
+    });
+  });
+
   it("lowers observations and analysis blocks without new surface syntax", () => {
     const observation = lowerObservationToEvents({
       observationId: "obs-1",

@@ -42,7 +42,8 @@ import {
   SAMPLE_PATTERNS,
   SEPARATE_LAYERS_PATTERNS,
   SLOW_ADDITION_PATTERNS,
-  SOLVENT_MARKERS
+  SOLVENT_MARKERS,
+  WASH_PATTERNS
 } from "./procedure-import-patterns";
 
 interface SentenceContext {
@@ -239,9 +240,14 @@ const getExtractionSolvent = (sentence: string): string | undefined => {
   return cleanExtractedText(match?.[1] ?? "") || undefined;
 };
 
+const getWashSolvent = (sentence: string): string | undefined => {
+  const match = sentence.match(/\bwashed\s+with\s+(.+?)(?:$|,|\band\b|\bthen\b)/i);
+  return cleanMaterialText(match?.[1]);
+};
+
 const getDryingAgent = (sentence: string): string | undefined => {
-  const match = sentence.match(/\bdried\s*\(([^)]+)\)/i);
-  return cleanExtractedText(match?.[1] ?? textBeforeAny(sentence, ["干燥"]) ?? "") || undefined;
+  const match = sentence.match(/\bdried\s*(?:\(([^)]+)\)|(?:over|with)\s+(.+?)(?:$|,|\band\b|\bthen\b))/i);
+  return cleanMaterialText(match?.[1] ?? match?.[2] ?? textBeforeAny(sentence, ["干燥"])) || undefined;
 };
 
 const getFilterMedium = (sentence: string): string | undefined => {
@@ -255,6 +261,32 @@ const getPurificationParams = (sentence: string): Record<string, unknown> => ({
     : "chromatography",
   ...(sentence.match(/\bon\s+silica\s+gel\b/i) ? { medium: "silica gel" } : {})
 });
+
+const normalizeAtmosphere = (value: string | undefined): string | undefined => {
+  const lower = value?.toLowerCase().replace(/\s+/g, "");
+  if (!lower) return undefined;
+  if (lower === "n2" || lower === "nitrogen") return "nitrogen";
+  if (lower === "ar" || lower === "argon") return "argon";
+  if (lower === "o2" || lower === "oxygen") return "oxygen";
+  if (lower === "air") return "air";
+  return undefined;
+};
+
+const getAtmosphere = (sentence: string): string | undefined => {
+  const match = sentence.match(/\b(?:under|with)\s+(nitrogen|argon|oxygen|air|n2|ar|o2)\b/i)
+    ?? sentence.match(/\b(nitrogen|argon|oxygen|air|n2|ar|o2)\s+(?:atmosphere|balloon)\b/i);
+  return normalizeAtmosphere(match?.[1]);
+};
+
+const getVesselCondition = (sentence: string): string | undefined =>
+  /\bsealed\s+(?:tube|flask|vessel)\b/i.test(sentence) ? "sealed" : undefined;
+
+const isReflux = (sentence: string): boolean => /\breflux(?:ed)?\b/i.test(sentence);
+
+const getConcentrateMethod = (sentence: string): string =>
+  /\b(?:under\s+reduced\s+pressure|reduced\s+pressure|in\s+vacuo)\b/i.test(sentence)
+    ? "reduced_pressure"
+    : "concentrate";
 
 const getTemperatureAfterAny = (sentence: string, markers: readonly string[]): string | undefined =>
   extractTemperature(textAfterAny(sentence, markers) ?? "") ?? extractTemperature(sentence);
@@ -278,8 +310,10 @@ const lowerCharge = (context: SentenceContext): CanonicalStepNode[] => {
 
 const lowerEnvironment = (context: SentenceContext): CanonicalStepNode[] => {
   if (hasAny(context.sentence, PURGE_PATTERNS)) {
+    const atmosphere = getAtmosphere(context.sentence) ?? "nitrogen";
     return [createStep(context, "purge", {
-      atmosphere: "nitrogen",
+      atmosphere,
+      ...(/\bdegassed\b/i.test(context.sentence) ? { method: "degassed" } : {}),
       ...(extractDuration(context.sentence) ? { duration: extractDuration(context.sentence) } : {})
     }, 0.9, ["uses_inert_atmosphere"])];
   }
@@ -299,7 +333,13 @@ const lowerTemperature = (context: SentenceContext): CanonicalStepNode[] => {
 
   if (hasAny(context.sentence, HEAT_PATTERNS)) {
     const temperature = getTemperatureAfterAny(context.sentence, ["warmed", "heated", "加热", "升温"]);
-    steps.push(createStep(context, "heat", { target_temperature: temperature }, 0.88, ["changes_temperature"]));
+    steps.push(createStep(context, "heat", {
+      ...(temperature ? { target_temperature: temperature } : {}),
+      ...(extractDuration(context.sentence) ? { duration: extractDuration(context.sentence) } : {}),
+      ...(isReflux(context.sentence) ? { method: "reflux" } : {}),
+      ...(getAtmosphere(context.sentence) ? { atmosphere: getAtmosphere(context.sentence) } : {}),
+      ...(getVesselCondition(context.sentence) ? { vessel: getVesselCondition(context.sentence) } : {})
+    }, 0.88, ["changes_temperature"]));
   }
 
   return steps;
@@ -331,7 +371,12 @@ const lowerProcess = (context: SentenceContext): CanonicalStepNode[] => {
   const isHold = hasAny(context.sentence, HOLD_PATTERNS);
 
   return isHold && duration
-    ? [createStep(context, "hold", { duration }, 0.86)]
+    ? [createStep(context, "hold", {
+        duration,
+        ...(extractTemperature(context.sentence) ? { temperature: extractTemperature(context.sentence) } : {}),
+        ...(getAtmosphere(context.sentence) ? { atmosphere: getAtmosphere(context.sentence) } : {}),
+        ...(getVesselCondition(context.sentence) ? { vessel: getVesselCondition(context.sentence) } : {})
+      }, 0.86)]
     : [];
 };
 
@@ -353,6 +398,13 @@ const lowerWorkup = (context: SentenceContext): CanonicalStepNode[] => {
     }, 0.82));
   }
 
+  if (hasAny(context.sentence, WASH_PATTERNS) && getWashSolvent(context.sentence)) {
+    steps.push(createStep(context, "wash", {
+      solvent: getWashSolvent(context.sentence),
+      ...(extractRepeatCount(context.sentence) ? { repeats: extractRepeatCount(context.sentence) } : {})
+    }, 0.82));
+  }
+
   return [
     ...steps,
     ...lowerMechanicalWorkup(context)
@@ -363,7 +415,7 @@ const lowerMechanicalWorkup = (context: SentenceContext): CanonicalStepNode[] =>
   const steps: CanonicalStepNode[] = [];
 
   if (hasAny(context.sentence, CONCENTRATE_PATTERNS)) {
-    steps.push(createStep(context, "concentrate", { method: "reduced_pressure" }, 0.84));
+    steps.push(createStep(context, "concentrate", { method: getConcentrateMethod(context.sentence) }, 0.84));
   }
 
   if (hasAny(context.sentence, SEPARATE_LAYERS_PATTERNS)) {

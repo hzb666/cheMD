@@ -106,6 +106,8 @@ Status: implemented.
 
 ## Phase 3: High-Frequency Operation Gaps
 
+Status: implemented.
+
 ### Tasks
 
 Add or improve lowering for existing step families:
@@ -131,6 +133,16 @@ Add or improve lowering for existing step families:
 
 - `pnpm --filter @chemd/step-ontology test`
 - `pnpm --filter @chemd/typechecker test`
+
+### Implementation Notes
+
+- `wash`, `dry`, `filter through`, and `concentrate in vacuo` now lower to
+  existing step families and schema-backed params.
+- `refluxed overnight under argon in a sealed tube` lowers to `heat` with
+  `method`, `duration`, `atmosphere`, and `vessel`.
+- Bare `filtered` without a known medium is intentionally not filled with a
+  fake medium; it remains visible through warnings from the import coverage
+  layer.
 
 ## Phase 4: Addition versus Quench Attribution
 

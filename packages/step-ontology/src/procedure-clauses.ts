@@ -1,5 +1,5 @@
 const CLAUSE_ACTION_PATTERN =
-  /^(?:(?:the|a)\s+)?(?:(?:resulting\s+)?(?:reaction|mixture|solution|suspension)|combined\s+organic\s+phases?|organic\s+phases?|aqueous\s+phases?|layers?|residue|crude|this)?\s*(?:was|were|is|are)?\s*(?:then\s+)?(?:added|add|stirred|stir|warmed|warm|heated|heat|cooled|cool|quenched|quench|extracted|extract|washed|wash|dried|dry|filtered|filter|concentrated|concentrate|purified|purify|separated|separate|diluted|dilute|handled)\b/i;
+  /^(?:(?:the|a)\s+)?(?:(?:resulting\s+)?(?:reaction|mixture|solution|suspension)|combined\s+organic\s+phases?|organic\s+phases?|aqueous\s+phases?|layers?|residue|crude|this)?\s*(?:was|were|is|are)?\s*(?:then\s+)?(?:added|add|stirred|stir|warmed|warm|heated|heat|refluxed|reflux|cooled|cool|quenched|quench|extracted|extract|washed|wash|dried|dry|filtered|filter|concentrated|concentrate|purified|purify|separated|separate|diluted|dilute|handled)\b/i;
 
 const BOUNDARY_WORD_PATTERN = /\b(?:and|then|before|after|followed\s+by)\b/gi;
 

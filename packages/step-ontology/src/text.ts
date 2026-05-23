@@ -170,10 +170,14 @@ const stripTrailingCleanPunctuation = (value: string): string => {
 };
 
 export const extractTemperature = (text: string): string | undefined =>
-  readNumberWithUnit(text, ["℃", "C", "K", "F"], true);
+  /\b(?:room\s+temperature|ambient\s+temperature|r\.?\s*t\.?)\b/i.test(text)
+    ? "room temperature"
+    : readNumberWithUnit(text, ["℃", "C", "K", "F"], true);
 
 export const extractDuration = (text: string): string | undefined =>
-  readNumberWithUnit(text, ["hrs", "hr", "h", "mins", "min", "小时", "分钟"], false);
+  /\bovernight\b/i.test(text)
+    ? "overnight"
+    : readNumberWithUnit(text, ["hrs", "hr", "h", "mins", "min", "小时", "分钟"], false);
 
 export const extractRepeatCount = (text: string): number | undefined => {
   const lower = text.toLowerCase();
