@@ -36,8 +36,8 @@
           "feature_ref_id": "feature-ref::ester-1::rdkit",
           "provider": "rdkit",
           "kind": "bit_vector",
-          "algorithm": "rdkit_reaction_composite_6144_v2",
-          "dimension": 6144,
+          "algorithm": "rdkit_reaction_directional_8192_v3",
+          "dimension": 8192,
           "storage": "sidecar_file",
           "hash": "sha256:fp-ester-1",
           "block_dimensions": {
@@ -46,12 +46,14 @@
             "side": 2048,
             "reactant": 2048,
             "product": 2048,
-            "change": 2048
+            "gained": 2048,
+            "lost": 2048
           },
           "block_offsets": {
             "reactant": 0,
             "product": 2048,
-            "change": 4096
+            "gained": 4096,
+            "lost": 6144
           }
         }
       ],
@@ -84,16 +86,18 @@
       "provider_ids": ["provider::rdkit-fingerprint", "provider::hybrid-graph"],
       "source_hashes": ["sha256:ester-1", "sha256:ester-2"],
       "metadata": {
-        "algorithm": "rdkit_reaction_composite_6144_v2",
+        "algorithm": "rdkit_reaction_directional_8192_v3",
         "block_similarity": {
           "reactant": 0.84,
           "product": 0.81,
-          "change": 0.82
+          "gained": 0.83,
+          "lost": 0.81
         },
         "block_weights": {
-          "reactant": 0.25,
-          "product": 0.25,
-          "change": 0.5
+          "reactant": 0.2,
+          "product": 0.2,
+          "gained": 0.3,
+          "lost": 0.3
         }
       },
       "warnings": []

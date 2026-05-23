@@ -17,14 +17,15 @@ from chem_cluster_service.intelligence.contracts import (
 PROVIDER_ID = "provider::rdkit-fingerprint"
 PROVIDER_KIND = "rdkit_fingerprint"
 EDGE_BASIS = "rdkit_fingerprint_tanimoto"
-FINGERPRINT_ALGORITHM = "rdkit_reaction_composite_6144_v2"
+FINGERPRINT_ALGORITHM = "rdkit_reaction_directional_8192_v3"
 DEFAULT_COMPONENT_DIMENSION = 1024
 DEFAULT_SIDE_DIMENSION = DEFAULT_COMPONENT_DIMENSION * 2
-DEFAULT_DIMENSION = DEFAULT_SIDE_DIMENSION * 3
+DEFAULT_DIMENSION = DEFAULT_SIDE_DIMENSION * 4
 BLOCK_WEIGHTS = {
-    "reactant": 0.25,
-    "product": 0.25,
-    "change": 0.50,
+    "reactant": 0.20,
+    "product": 0.20,
+    "gained": 0.30,
+    "lost": 0.30,
 }
 
 
@@ -153,7 +154,7 @@ class RdkitFingerprintProvider:
         self.path_dimension = path_dimension
         self.morgan_dimension = morgan_dimension
         self.side_dimension = path_dimension + morgan_dimension
-        self.dimension = self.side_dimension * 3
+        self.dimension = self.side_dimension * 4
         self.similarity_threshold = similarity_threshold
 
     def inspect(self) -> ProviderReport:
@@ -257,17 +258,20 @@ class RdkitFingerprintProvider:
                 "side": self.side_dimension,
                 "reactant": self.side_dimension,
                 "product": self.side_dimension,
-                "change": self.side_dimension,
+                "gained": self.side_dimension,
+                "lost": self.side_dimension,
             },
             "block_offsets": {
                 "reactant": 0,
                 "product": self.side_dimension,
-                "change": self.side_dimension * 2,
+                "gained": self.side_dimension * 2,
+                "lost": self.side_dimension * 3,
             },
             "block_bit_indices": {
                 "reactant": sorted(fingerprint.reactant_bits),
                 "product": sorted(fingerprint.product_bits),
-                "change": sorted(fingerprint.change_bits),
+                "gained": sorted(fingerprint.gained_bits),
+                "lost": sorted(fingerprint.lost_bits),
             },
             "block_weights": BLOCK_WEIGHTS,
         }
@@ -313,7 +317,8 @@ class RdkitFingerprintProvider:
 class ReactionFingerprint:
     reactant_bits: set[int]
     product_bits: set[int]
-    change_bits: set[int]
+    gained_bits: set[int]
+    lost_bits: set[int]
     bits: set[int]
 
     @staticmethod
@@ -323,15 +328,18 @@ class ReactionFingerprint:
         *,
         side_dimension: int,
     ) -> "ReactionFingerprint":
-        change_bits = reactant_bits.symmetric_difference(product_bits)
+        gained_bits = product_bits - reactant_bits
+        lost_bits = reactant_bits - product_bits
         return ReactionFingerprint(
             reactant_bits=set(reactant_bits),
             product_bits=set(product_bits),
-            change_bits=change_bits,
+            gained_bits=gained_bits,
+            lost_bits=lost_bits,
             bits={
                 *reactant_bits,
                 *(side_dimension + bit for bit in product_bits),
-                *(side_dimension * 2 + bit for bit in change_bits),
+                *(side_dimension * 2 + bit for bit in gained_bits),
+                *(side_dimension * 3 + bit for bit in lost_bits),
             },
         )
 
@@ -382,7 +390,8 @@ def _reaction_fingerprint_similarity(
     contributions = {
         "reactant": _tanimoto(left.reactant_bits, right.reactant_bits),
         "product": _tanimoto(left.product_bits, right.product_bits),
-        "change": _tanimoto(left.change_bits, right.change_bits),
+        "gained": _tanimoto(left.gained_bits, right.gained_bits),
+        "lost": _tanimoto(left.lost_bits, right.lost_bits),
     }
     score = sum(contributions[block] * BLOCK_WEIGHTS[block] for block in BLOCK_WEIGHTS)
     return round(score, 6), {block: round(value, 6) for block, value in contributions.items()}

@@ -135,13 +135,13 @@ class RdkitFingerprintProviderTests(unittest.TestCase):
         self.assertTrue(fingerprint_ref["feature_ref_id"].startswith("feature-ref::rxn-a::rdkit::"))
         self.assertEqual(fingerprint_ref["provider"], "rdkit")
         self.assertEqual(fingerprint_ref["kind"], "bit_vector")
-        self.assertEqual(fingerprint_ref["algorithm"], "rdkit_reaction_composite_6144_v2")
-        self.assertEqual(fingerprint_ref["dimension"], 6144)
+        self.assertEqual(fingerprint_ref["algorithm"], "rdkit_reaction_directional_8192_v3")
+        self.assertEqual(fingerprint_ref["dimension"], 8192)
         self.assertEqual(fingerprint_ref["storage"], "inline")
         self.assertTrue(fingerprint_ref["hash"].startswith("sha256:"))
         self.assertEqual(
             fingerprint_ref["bit_indices"],
-            [1, 2, 2053, 2054, 4097, 4098, 4101, 4102],
+            [1, 2, 2053, 2054, 4101, 4102, 6145, 6146],
         )
         self.assertEqual(
             fingerprint_ref["block_dimensions"],
@@ -151,7 +151,8 @@ class RdkitFingerprintProviderTests(unittest.TestCase):
                 "side": 2048,
                 "reactant": 2048,
                 "product": 2048,
-                "change": 2048,
+                "gained": 2048,
+                "lost": 2048,
             },
         )
         self.assertEqual(
@@ -159,12 +160,13 @@ class RdkitFingerprintProviderTests(unittest.TestCase):
             {
                 "reactant": [1, 2],
                 "product": [5, 6],
-                "change": [1, 2, 5, 6],
+                "gained": [5, 6],
+                "lost": [1, 2],
             },
         )
         self.assertEqual(
             fingerprint_ref["block_weights"],
-            {"reactant": 0.25, "product": 0.25, "change": 0.5},
+            {"reactant": 0.2, "product": 0.2, "gained": 0.3, "lost": 0.3},
         )
 
     def test_tanimoto_edges_are_computed_for_valid_reactions(self):
@@ -182,19 +184,25 @@ class RdkitFingerprintProviderTests(unittest.TestCase):
                 "edge_id": "computed-edge::rxn-a::rxn-b::rdkit-fingerprint-tanimoto",
                 "from_reaction_entity_id": "rxn-a",
                 "to_reaction_entity_id": "rxn-b",
-                "score": 0.633333,
-                "confidence": "low",
+                "score": 0.666667,
+                "confidence": "medium",
                 "basis": ["rdkit_fingerprint_tanimoto"],
                 "provider_ids": ["provider::rdkit-fingerprint"],
                 "source_hashes": ["sha256:a", "sha256:b"],
                 "metadata": {
-                    "algorithm": "rdkit_reaction_composite_6144_v2",
+                    "algorithm": "rdkit_reaction_directional_8192_v3",
                     "block_similarity": {
                         "reactant": 1.0,
                         "product": 0.333333,
-                        "change": 0.6,
+                        "gained": 0.333333,
+                        "lost": 1.0,
                     },
-                    "block_weights": {"reactant": 0.25, "product": 0.25, "change": 0.5},
+                    "block_weights": {
+                        "reactant": 0.2,
+                        "product": 0.2,
+                        "gained": 0.3,
+                        "lost": 0.3,
+                    },
                 },
                 "warnings": [],
             },

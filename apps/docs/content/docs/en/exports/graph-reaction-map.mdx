@@ -247,16 +247,16 @@ dependencies as skipped providers.
 
 Hybrid similarity edges expose contribution-level evidence. Computed chemistry
 signals carry the main weight: RDKit reaction fingerprints use
-`rdkit_reaction_composite_6144_v2`, a sparse composite vector built from
-reactant-side, product-side, and product-minus-reactant change blocks. Each side
+`rdkit_reaction_directional_8192_v3`, a sparse directional vector built from
+reactant-side, product-side, product-gained, and reactant-lost blocks. Each side
 contains RDKit path fingerprint `1024` bits plus Morgan radius-2 fingerprint
-`1024` bits; the final vector has `6144` dimensions. RDKit pair similarity is a
-weighted block score: `0.25` reactant Tanimoto, `0.25` product Tanimoto, and
-`0.50` change Tanimoto. The RDKit contribution uses hybrid weight `0.30`, RXNFP
-cosine uses `0.25`, reaction center support uses `0.25`, and Chemd semantic
-context uses `0.20`. Missing provider components are ignored and the available
-weights are renormalized. A reaction center conflict with low RDKit support is
-reported as
+`1024` bits; the final vector has `8192` dimensions. RDKit pair similarity still
+uses Tanimoto inside each block, then combines the blocks as `0.20` reactant,
+`0.20` product, `0.30` gained, and `0.30` lost. The RDKit contribution uses
+hybrid weight `0.30`, RXNFP cosine uses `0.25`, reaction center support uses
+`0.25`, and Chemd semantic context uses `0.20`. Missing provider components are
+ignored and the available weights are renormalized. A reaction center conflict
+with low RDKit support is reported as
 `strict_cluster_hard_reject:reaction_center_conflict_low_rdkit`; later cluster
 builders must not promote that edge into a strict reaction cluster.
 

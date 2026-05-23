@@ -89,12 +89,13 @@ RDKit 反应指纹使用复合稀疏位向量。每一侧先拼接 path fingerpr
 \begin{aligned}
 A_i &= [A_i^{\mathrm{path}}, A_i^{\mathrm{morgan}}] \in \{0,1\}^{2048},\\
 P_i &= [P_i^{\mathrm{path}}, P_i^{\mathrm{morgan}}] \in \{0,1\}^{2048},\\
-\Delta_i &= A_i \triangle P_i \in \{0,1\}^{2048},\\
-F_i &= [A_i, P_i, \Delta_i] \in \{0,1\}^{6144}.
+G_i &= P_i \setminus A_i \in \{0,1\}^{2048},\\
+L_i &= A_i \setminus P_i \in \{0,1\}^{2048},\\
+F_i &= [A_i, P_i, G_i, L_i] \in \{0,1\}^{8192}.
 \end{aligned}
 \end{equation}
 
-其中 \(A_i\) 是 reactant-side 指纹，\(P_i\) 是 product-side 指纹，\(\Delta_i\) 是产物侧与反应物侧的对称差分变化块。任意两个位集合 \(U,V\) 的 Tanimoto 系数定义为：
+其中 \(A_i\) 是 reactant-side 指纹，\(P_i\) 是 product-side 指纹，\(G_i\) 是 product-gained 方向块，\(L_i\) 是 reactant-lost 方向块。任意两个位集合 \(U,V\) 的 Tanimoto 系数定义为：
 
 \begin{equation}
 T(U,V)
@@ -107,12 +108,13 @@ T(U,V)
 \begin{equation}
 R_{ij}
 =
-0.25\,T(A_i,A_j)
-+0.25\,T(P_i,P_j)
-+0.50\,T(\Delta_i,\Delta_j).
+0.20\,T(A_i,A_j)
++0.20\,T(P_i,P_j)
++0.30\,T(G_i,G_j)
++0.30\,T(L_i,L_j).
 \end{equation}
 
-该定义保留 reactant side、product side 和 transformation/change 三类信息。变化块权重最高，因此更适合严格反应聚类；reactant/product 相似度提供背景支持，但不能单独覆盖反应中心冲突。
+该定义保留 reactant side、product side、product-gained 和 reactant-lost 四类信息。新增与消失方向块权重更高，因此能区分氧化/还原这类正反方向相似但语义相反的反应；reactant/product 相似度提供背景支持，但不能单独覆盖反应中心冲突。
 
 \subsection{反应向量相似度}
 
