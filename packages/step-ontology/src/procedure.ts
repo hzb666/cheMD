@@ -265,11 +265,40 @@ const getFilterMedium = (sentence: string): string | undefined => {
   return cleanExtractedText(match?.[1] ?? "") || undefined;
 };
 
+const getPurificationTechnique = (sentence: string): string => {
+  if (/\bprep(?:arative)?\s+TLC\b/i.test(sentence)) return "prep TLC";
+  if (/\bsilica\s+plug\b/i.test(sentence)) return "silica plug";
+  if (/\btriturat(?:ed|ion)\b/i.test(sentence)) return "trituration";
+  if (/\brecrystalliz(?:ed|ation)\b/i.test(sentence)) return "recrystallization";
+  if (/flash\s+column\s+chromatography/i.test(sentence)) return "flash column chromatography";
+  return "chromatography";
+};
+
+const getPurificationMedium = (sentence: string): string | undefined => {
+  if (/\bon\s+silica\s+gel\b/i.test(sentence) || /\bsilica\s+plug\b/i.test(sentence)) {
+    return "silica gel";
+  }
+  return undefined;
+};
+
+const getPurificationEluent = (sentence: string): string | undefined => {
+  const match = sentence.match(/\beluent[:\s]+(.+?)(?:\.?$|,|\band\b)/i)
+    ?? sentence.match(/\b(?:using|with)\s+(.+?\d+\s*:\s*\d+)(?:\.?$|,|\band\b)/i)
+    ?? sentence.match(/\bgradient\s+(.+?)(?:\.?$|,|\band\b)/i);
+  return cleanExtractedText(match?.[1] ?? "") || undefined;
+};
+
+const getPurificationColumn = (sentence: string): string | undefined => {
+  if (/\bflash\s+column\b/i.test(sentence)) return "flash";
+  if (/\bcolumn\s+chromatography\b/i.test(sentence)) return "column";
+  return undefined;
+};
+
 const getPurificationParams = (sentence: string): Record<string, unknown> => ({
-  technique: /flash\s+column\s+chromatography/i.test(sentence)
-    ? "flash column chromatography"
-    : "chromatography",
-  ...(sentence.match(/\bon\s+silica\s+gel\b/i) ? { medium: "silica gel" } : {})
+  technique: getPurificationTechnique(sentence),
+  ...(getPurificationMedium(sentence) ? { medium: getPurificationMedium(sentence) } : {}),
+  ...(getPurificationEluent(sentence) ? { eluent: getPurificationEluent(sentence) } : {}),
+  ...(getPurificationColumn(sentence) ? { column: getPurificationColumn(sentence) } : {})
 });
 
 const normalizeAtmosphere = (value: string | undefined): string | undefined => {
@@ -451,7 +480,7 @@ const lowerAnalysis = (context: SentenceContext): CanonicalStepNode[] => {
     steps.push(createStep(context, "sample", {}, 0.88, ["requires_sampling"]));
   }
 
-  if (hasAny(context.sentence, ANALYSIS_PATTERNS)) {
+  if (hasAny(context.sentence, ANALYSIS_PATTERNS) && !isPreparativeTlc(context.sentence)) {
     steps.push(createStep(context, "analyze", { type: extractAnalysisType(context.sentence) }, 0.88));
   }
 
@@ -462,6 +491,9 @@ const extractAnalysisType = (sentence: string): string => {
   const match = sentence.match(/\b(TLC|HPLC|NMR)\b/i);
   return match?.[1]?.toLowerCase() ?? "unknown";
 };
+
+const isPreparativeTlc = (sentence: string): boolean =>
+  /\bprep(?:arative)?\s+TLC\b/i.test(sentence);
 
 const lowerSentence = (context: SentenceContext): CanonicalStepNode[] => [
   ...lowerCharge(context),

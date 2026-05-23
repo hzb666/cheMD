@@ -38,7 +38,15 @@ export const SEPARATE_LAYERS_PATTERNS = [
   /layers?\s+were\s+separat(?:ed|e)/i
 ] as const;
 export const FILTER_PATTERNS = [/过滤/, /\bfilter(?:ed)?\b/i] as const;
-export const PURIFY_PATTERNS = [/纯化|柱层析/, /\bpurified?\b/i, /\bchromatograph(?:y|ed)\b/i] as const;
+export const PURIFY_PATTERNS = [
+  /纯化|柱层析/,
+  /\bpurified?\b/i,
+  /\bchromatograph(?:y|ed)\b/i,
+  /\bprep(?:arative)?\s+TLC\b/i,
+  /\bsilica\s+plug\b/i,
+  /\btriturat(?:ed|ion)\b/i,
+  /\brecrystalliz(?:ed|ation)\b/i
+] as const;
 
 export const PROCEDURE_IMPORT_RULES = [
   {

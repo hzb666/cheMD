@@ -180,6 +180,8 @@ Status: implemented.
 
 ## Phase 5: Purification Detail Preservation
 
+Status: implemented.
+
 ### Tasks
 
 - Preserve chromatography parameters:
@@ -204,6 +206,15 @@ Status: implemented.
 
 - `pnpm --filter @chemd/step-ontology test`
 - `pnpm --filter @chemd/importer-prose test`
+
+### Implementation Notes
+
+- Flash column, prep TLC, silica plug, trituration, and recrystallization map to
+  `purify.technique`.
+- Silica and eluent details are preserved through existing `medium`, `eluent`,
+  and `column` params.
+- Ratio and gradient text remains inside `eluent` instead of introducing a new
+  non-schema `ratio` param.
 
 ## Phase 6: Documentation and Import CLI Diagnostics
 

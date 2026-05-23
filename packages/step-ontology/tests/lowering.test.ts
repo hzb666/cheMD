@@ -182,6 +182,34 @@ describe("procedure and observation lowering", () => {
     });
   });
 
+  it("preserves purification details in existing purify params", () => {
+    const result = lowerProcedureToSteps({
+      procedureId: "proc-purify",
+      body: [
+        "The residue was purified by flash column chromatography on silica gel using hexanes/EtOAc 4:1.",
+        "The crude material was purified by prep TLC with petroleum ether/ethyl acetate 9:1.",
+        "The product was recrystallized from ethanol."
+      ].join(" ")
+    });
+
+    expect(result.steps.map((step) => step.family)).toEqual([
+      "purify",
+      "purify",
+      "purify"
+    ]);
+    expect(result.steps[0].params).toMatchObject({
+      column: "flash",
+      eluent: "hexanes/EtOAc 4:1",
+      medium: "silica gel",
+      technique: "flash column chromatography"
+    });
+    expect(result.steps[1].params).toMatchObject({
+      eluent: "petroleum ether/ethyl acetate 9:1",
+      technique: "prep TLC"
+    });
+    expect(result.steps[2].params.technique).toBe("recrystallization");
+  });
+
   it("lowers observations and analysis blocks without new surface syntax", () => {
     const observation = lowerObservationToEvents({
       observationId: "obs-1",
