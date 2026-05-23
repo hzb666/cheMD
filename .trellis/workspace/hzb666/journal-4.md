@@ -691,3 +691,38 @@ Added weighted hybrid similarity contributions, updated chemistry-first weights,
 ### Next Steps
 
 - None - task complete
+
+
+## Session 156: Hybrid reaction strict clusters
+
+**Date**: 2026-05-24
+**Task**: Hybrid reaction strict clusters
+**Package**: exporter-training
+**Branch**: `develop`
+
+### Summary
+
+Phase 4 added strict reaction clusters, candidate neighbors, semantic groups, exporter-training merge support, docs, and validation. Verified python unittest discover services/chem-cluster-service/tests; pnpm --filter @chemd/exporter-training test; pnpm --filter @chemd/exporter-training typecheck; pnpm --filter @chemd/docs typecheck; pnpm --filter @chemd/compiler test -- docs-coverage.test.ts docs-marked-examples.test.ts; git diff --check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `77ab2e5` | (see git log) |
+| `d710fa4` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
