@@ -9,6 +9,27 @@ Graph outputs are built from training understandings. They describe relationship
 pnpm chemd graph ./experiments/*.chemd --format json
 ```
 
+Text output labels graph-index clusters as semantic source truth. Computed
+reaction-intelligence summaries appear only when a merged
+`reaction_intelligence` layer is present.
+
+```text
+Chemd graph index
+  documents: 2
+  nodes: 24
+  edges: 31
+  reactions: 2
+  semantic reaction clusters: 1
+  semantic reaction similarity edges: 1
+  reaction intelligence:
+    providers: 3
+    strict reaction clusters: 1
+    candidate reaction neighbors: 0
+    semantic reaction groups: 0
+    strict cluster profiles: 1
+    warnings: provider_skipped:rxnfp
+```
+
 ## Knowledge Graph
 
 `training.knowledge_graph` is per document. It contains:

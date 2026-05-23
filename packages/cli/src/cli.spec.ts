@@ -10,6 +10,7 @@ import {
   EXIT_OK,
   EXIT_USAGE,
   EXIT_VALIDATION_FAILED,
+  formatGraphIndexText,
   runChemdCli
 } from "./cli";
 import type { GitRunner } from "./git-changed";
@@ -635,6 +636,39 @@ name: patient sample
       warnings: ["semantic_similarity_without_computed_fingerprint"]
     });
     expect(result.stderr).toBe("");
+  });
+
+  it("formats reaction intelligence counts separately from semantic graph clusters", () => {
+    const text = formatGraphIndexText({
+      schema_version: "chemd-training-graph-index/v0.1",
+      index_scope: {
+        document_ids: ["exp-cli-graph-a"],
+        sources: []
+      },
+      nodes: [],
+      edges: [],
+      reaction_features: [],
+      reaction_clusters: [],
+      reaction_similarity_edges: [],
+      warnings: [],
+      reaction_intelligence: {
+        provider_statuses: [{ provider: "rdkit_fingerprint", status: "OK", warnings: [] }],
+        strict_reaction_clusters: [{ cluster_id: "strict-a" }],
+        candidate_reaction_neighbors: [{ edge_id: "candidate-a" }],
+        semantic_reaction_groups: [{ group_id: "semantic-a" }],
+        strict_reaction_cluster_profiles: [{ profile_id: "profile-a" }],
+        warnings: ["provider_skipped:rxnfp"]
+      }
+    });
+
+    expect(text).toContain("semantic reaction clusters: 0");
+    expect(text).toContain("semantic reaction similarity edges: 0");
+    expect(text).toContain("reaction intelligence:");
+    expect(text).toContain("strict reaction clusters: 1");
+    expect(text).toContain("candidate reaction neighbors: 1");
+    expect(text).toContain("semantic reaction groups: 1");
+    expect(text).toContain("strict cluster profiles: 1");
+    expect(text).toContain("warnings: provider_skipped:rxnfp");
   });
 
   it("rejects graph without input files", async () => {

@@ -292,6 +292,19 @@ interface AgentLoopReport {
   wroteFile: boolean;
 }
 
+interface GraphIndexReactionIntelligenceSummary {
+  candidate_reaction_neighbors?: unknown[];
+  provider_statuses?: unknown[];
+  semantic_reaction_groups?: unknown[];
+  strict_reaction_cluster_profiles?: unknown[];
+  strict_reaction_clusters?: unknown[];
+  warnings?: string[];
+}
+
+type GraphIndexWithOptionalReactionIntelligence = ChemdTrainingGraphIndexV1 & {
+  reaction_intelligence?: GraphIndexReactionIntelligenceSummary;
+};
+
 interface CliCompilerServices {
   buildTrainingGraphIndex: BuildTrainingGraphIndex;
   compileChemd: CompileChemd;
@@ -1402,16 +1415,39 @@ const importProseFile = async (
   return report.valid ? EXIT_OK : EXIT_VALIDATION_FAILED;
 };
 
-const formatGraphIndexText = (index: ChemdTrainingGraphIndexV1): string => {
+const collectionSize = (value: unknown[] | undefined): number =>
+  Array.isArray(value) ? value.length : 0;
+
+const appendReactionIntelligenceSummary = (
+  lines: string[],
+  summary: GraphIndexReactionIntelligenceSummary | undefined
+) => {
+  if (!summary) return;
+  lines.push(
+    "  reaction intelligence:",
+    `    providers: ${collectionSize(summary.provider_statuses)}`,
+    `    strict reaction clusters: ${collectionSize(summary.strict_reaction_clusters)}`,
+    `    candidate reaction neighbors: ${collectionSize(summary.candidate_reaction_neighbors)}`,
+    `    semantic reaction groups: ${collectionSize(summary.semantic_reaction_groups)}`,
+    `    strict cluster profiles: ${collectionSize(summary.strict_reaction_cluster_profiles)}`
+  );
+  if (summary.warnings && summary.warnings.length > 0) {
+    lines.push(`    warnings: ${summary.warnings.join(", ")}`);
+  }
+};
+
+export const formatGraphIndexText = (index: GraphIndexWithOptionalReactionIntelligence): string => {
   const lines = [
     "Chemd graph index",
     `  documents: ${index.index_scope.document_ids.length}`,
     `  nodes: ${index.nodes.length}`,
     `  edges: ${index.edges.length}`,
     `  reactions: ${index.reaction_features.length}`,
-    `  reaction clusters: ${index.reaction_clusters.length}`,
-    `  reaction similarity edges: ${index.reaction_similarity_edges.length}`
+    `  semantic reaction clusters: ${index.reaction_clusters.length}`,
+    `  semantic reaction similarity edges: ${index.reaction_similarity_edges.length}`
   ];
+
+  appendReactionIntelligenceSummary(lines, index.reaction_intelligence);
 
   for (const cluster of index.reaction_clusters.slice(0, 20)) {
     lines.push(
