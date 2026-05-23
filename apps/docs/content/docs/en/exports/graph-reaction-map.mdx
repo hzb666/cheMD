@@ -208,6 +208,15 @@ Example:
 
 Reaction intelligence enriches graph-index reactions with computed features and similarity edges.
 
+Before providers run, `@chemd/exporter-training` can derive a canonical reaction
+intelligence input from the graph index. This input preserves Chemd semantic
+context such as reaction family, procedure signature, condition signature,
+route id, changed variables, and controlled variables. Canonical reaction
+SMILES are accepted only from explicit chemistry feature references supplied by
+the caller. If no canonical reaction SMILES are available, the reaction remains
+in the input with `canonical_rxn_smiles_not_available`; Chemd does not infer
+computed chemistry from prose or semantic grouping.
+
 Outputs include:
 
 - `ReactionIntelligenceJob`

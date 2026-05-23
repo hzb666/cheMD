@@ -5,6 +5,7 @@ import { resolveChemd } from "@chemd/resolver";
 import { typecheckDocument } from "@chemd/typechecker";
 
 import {
+  buildReactionIntelligenceCanonicalInput,
   buildTrainingGraphIndexFromUnderstandings,
   buildTrainingUnderstandingFromRecord,
   exportTrainingRecordFromDocument,
@@ -147,6 +148,62 @@ const computedArtifact = (): ReactionIntelligenceArtifact => ({
     }
   ],
   warnings: []
+});
+
+describe("reaction intelligence canonical input", () => {
+  it("builds compute-ready reaction inputs from explicit chemistry feature refs", () => {
+    const index = buildIndex();
+    const featureRefId = "feature-ref::rxn-a::canonical-smiles";
+    index.reaction_features[0] = {
+      ...index.reaction_features[0],
+      fingerprint_status: "external_ref_available",
+      chemistry_feature_ref_ids: [featureRefId]
+    };
+
+    const input = buildReactionIntelligenceCanonicalInput(index, {
+      graph_index_id: "graph-index::test",
+      source_compile_run_ids: ["compile-run::test"],
+      canonical_rxn_smiles_by_feature_ref: {
+        [featureRefId]: "CC(=O)O.CCO>>CC(=O)OCC"
+      }
+    });
+
+    expect(input).toMatchObject({
+      schema_version: "chemd-reaction-intelligence-canonical-input/v0.1",
+      graph_index_id: "graph-index::test",
+      source_compile_run_ids: ["compile-run::test"],
+      compute_ready_reaction_count: 1
+    });
+    expect(input.reactions[0]).toMatchObject({
+      reaction_entity_id: rxnA,
+      document_id: "exp-ri-a",
+      canonical_rxn_smiles: "CC(=O)O.CCO>>CC(=O)OCC",
+      chemistry_feature_ref_ids: [featureRefId],
+      semantic_context: expect.objectContaining({
+        reaction_family: "esterification",
+        procedure_signature: "add>add>hold>concentrate"
+      }),
+      warnings: []
+    });
+  });
+
+  it("keeps reactions without canonical chemistry as warned non-computed inputs", () => {
+    const input = buildReactionIntelligenceCanonicalInput(buildIndex(), {
+      graph_index_id: "graph-index::missing-smiles"
+    });
+
+    expect(input.compute_ready_reaction_count).toBe(0);
+    expect(input.warnings).toEqual([
+      "canonical_rxn_smiles_missing_for_reactions:2"
+    ]);
+    expect(input.reactions).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        reaction_entity_id: rxnA,
+        warnings: ["canonical_rxn_smiles_not_available"]
+      })
+    ]));
+    expect(input.reactions[0]).not.toHaveProperty("canonical_rxn_smiles");
+  });
 });
 
 describe("reaction intelligence graph index merge", () => {

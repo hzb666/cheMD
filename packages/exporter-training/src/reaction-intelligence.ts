@@ -1,7 +1,10 @@
 import type {
+  BuildReactionIntelligenceCanonicalInputOptions,
   ChemdReactionIntelligenceGraphIndex,
   MergeReactionIntelligenceOptions,
   MergedReactionIntelligenceLayer,
+  ReactionIntelligenceCanonicalInput,
+  ReactionIntelligenceCanonicalReactionInput,
   ReactionIntelligenceArtifact,
   ReactionIntelligenceCluster,
   ReactionIntelligenceComputedFeature,
@@ -11,6 +14,92 @@ import type {
 import type { ChemdTrainingGraphIndexV1 } from "./graph-index-types";
 
 const uniqueStrings = (values: string[]): string[] => Array.from(new Set(values.filter(Boolean))).sort();
+
+const createStableHash = (value: string): string => {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+};
+
+const sourceHashForReaction = (
+  index: ChemdTrainingGraphIndexV1,
+  reaction: ChemdTrainingGraphIndexV1["reaction_features"][number]
+): string => {
+  const sourceHash = index.index_scope.sources.find((source) =>
+    source.document_id === reaction.document_id
+  )?.content_hash;
+  if (sourceHash) return sourceHash;
+  return `sha256:graph-feature:${createStableHash([
+    reaction.reaction_entity_id,
+    reaction.reaction_signature,
+    reaction.participant_signature,
+    reaction.procedure_signature ?? "",
+    reaction.condition_signature ?? ""
+  ].join("|"))}`;
+};
+
+const canonicalSmilesForFeatureRefs = (
+  featureRefs: string[],
+  values: Record<string, string>
+): string | undefined =>
+  featureRefs.map((ref) => values[ref]?.trim()).find((value): value is string =>
+    typeof value === "string" && value.length > 0
+  );
+
+const buildCanonicalReactionInput = (
+  index: ChemdTrainingGraphIndexV1,
+  reaction: ChemdTrainingGraphIndexV1["reaction_features"][number],
+  options: BuildReactionIntelligenceCanonicalInputOptions
+): ReactionIntelligenceCanonicalReactionInput => {
+  const canonicalRxnSmiles = canonicalSmilesForFeatureRefs(
+    reaction.chemistry_feature_ref_ids,
+    options.canonical_rxn_smiles_by_feature_ref ?? {}
+  );
+  const warnings = canonicalRxnSmiles ? [] : ["canonical_rxn_smiles_not_available"];
+  return {
+    reaction_entity_id: reaction.reaction_entity_id,
+    document_id: reaction.document_id,
+    source_hash: sourceHashForReaction(index, reaction),
+    participant_signature: reaction.participant_signature,
+    reaction_signature: reaction.reaction_signature,
+    ...(canonicalRxnSmiles ? { canonical_rxn_smiles: canonicalRxnSmiles } : {}),
+    chemistry_feature_ref_ids: [...reaction.chemistry_feature_ref_ids],
+    semantic_context: {
+      ...(reaction.reaction_family ? { reaction_family: reaction.reaction_family } : {}),
+      ...(reaction.procedure_signature ? { procedure_signature: reaction.procedure_signature } : {}),
+      ...(reaction.condition_signature ? { condition_signature: reaction.condition_signature } : {}),
+      ...(reaction.route_id ? { route_id: reaction.route_id } : {}),
+      changed_variable_fields: [...reaction.changed_variable_fields],
+      controlled_variable_fields: [...reaction.controlled_variable_fields]
+    },
+    warnings
+  };
+};
+
+export const buildReactionIntelligenceCanonicalInput = (
+  index: ChemdTrainingGraphIndexV1,
+  options: BuildReactionIntelligenceCanonicalInputOptions = {}
+): ReactionIntelligenceCanonicalInput => {
+  const reactions = index.reaction_features.map((reaction) =>
+    buildCanonicalReactionInput(index, reaction, options)
+  );
+  const missingCount = reactions.filter((reaction) =>
+    reaction.canonical_rxn_smiles === undefined
+  ).length;
+  return {
+    schema_version: "chemd-reaction-intelligence-canonical-input/v0.1",
+    graph_index_id: options.graph_index_id ?? `graph-index::${createStableHash(index.index_scope.document_ids.join("|"))}`,
+    graph_index_schema_version: index.schema_version,
+    document_ids: [...index.index_scope.document_ids],
+    source_compile_run_ids: [...(options.source_compile_run_ids ?? [])],
+    reactions,
+    compute_ready_reaction_count: reactions.length - missingCount,
+    warnings: missingCount > 0 ? [`canonical_rxn_smiles_missing_for_reactions:${missingCount}`] : []
+  };
+};
 
 const cloneGraphIndex = (index: ChemdTrainingGraphIndexV1): ChemdTrainingGraphIndexV1 => ({
   ...index,

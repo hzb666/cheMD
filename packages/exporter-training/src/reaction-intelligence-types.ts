@@ -164,3 +164,41 @@ export interface MergeReactionIntelligenceOptions {
 }
 
 export type ReactionIntelligenceSemanticSimilarityEdge = TrainingReactionSimilarityEdgeV1;
+
+export interface ReactionIntelligenceCanonicalSemanticContext {
+  reaction_family?: string;
+  procedure_signature?: string;
+  condition_signature?: string;
+  route_id?: string;
+  changed_variable_fields: string[];
+  controlled_variable_fields: string[];
+}
+
+export interface ReactionIntelligenceCanonicalReactionInput {
+  reaction_entity_id: string;
+  document_id: string;
+  source_hash: string;
+  participant_signature: string;
+  reaction_signature: string;
+  canonical_rxn_smiles?: string;
+  chemistry_feature_ref_ids: string[];
+  semantic_context: ReactionIntelligenceCanonicalSemanticContext;
+  warnings: string[];
+}
+
+export interface ReactionIntelligenceCanonicalInput {
+  schema_version: "chemd-reaction-intelligence-canonical-input/v0.1";
+  graph_index_id: string;
+  graph_index_schema_version: ChemdTrainingGraphIndexV1["schema_version"];
+  document_ids: string[];
+  source_compile_run_ids: string[];
+  reactions: ReactionIntelligenceCanonicalReactionInput[];
+  compute_ready_reaction_count: number;
+  warnings: string[];
+}
+
+export interface BuildReactionIntelligenceCanonicalInputOptions {
+  graph_index_id?: string;
+  source_compile_run_ids?: string[];
+  canonical_rxn_smiles_by_feature_ref?: Record<string, string>;
+}

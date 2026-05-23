@@ -208,6 +208,14 @@ const layout = buildReactionMapFromGraphIndex(graphIndex);
 
 Reaction intelligence 会用计算特征和 similarity edges 增强 graph-index reactions。
 
+provider 运行前，`@chemd/exporter-training` 可以从 graph index 生成 canonical
+reaction intelligence input。该输入保留 Chemd 语义上下文，例如 reaction family、
+procedure signature、condition signature、route id、changed variables 和
+controlled variables。Canonical reaction SMILES 只接受调用方通过显式 chemistry
+feature ref 提供的值。没有 canonical reaction SMILES 时，reaction 仍保留在输入里，
+并带 `canonical_rxn_smiles_not_available`；Chemd 不会从 prose 或语义分组推断
+computed chemistry。
+
 输出包括：
 
 - `ReactionIntelligenceJob`
