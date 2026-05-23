@@ -36,9 +36,23 @@
           "feature_ref_id": "feature-ref::ester-1::rdkit",
           "provider": "rdkit",
           "kind": "bit_vector",
-          "dimension": 2048,
+          "algorithm": "rdkit_reaction_composite_6144_v2",
+          "dimension": 6144,
           "storage": "sidecar_file",
-          "hash": "sha256:fp-ester-1"
+          "hash": "sha256:fp-ester-1",
+          "block_dimensions": {
+            "path": 1024,
+            "morgan": 1024,
+            "side": 2048,
+            "reactant": 2048,
+            "product": 2048,
+            "change": 2048
+          },
+          "block_offsets": {
+            "reactant": 0,
+            "product": 2048,
+            "change": 4096
+          }
         }
       ],
       "atom_mapping": {
@@ -69,6 +83,19 @@
       "basis": ["rdkit_fingerprint_tanimoto", "hybrid_consensus"],
       "provider_ids": ["provider::rdkit-fingerprint", "provider::hybrid-graph"],
       "source_hashes": ["sha256:ester-1", "sha256:ester-2"],
+      "metadata": {
+        "algorithm": "rdkit_reaction_composite_6144_v2",
+        "block_similarity": {
+          "reactant": 0.84,
+          "product": 0.81,
+          "change": 0.82
+        },
+        "block_weights": {
+          "reactant": 0.25,
+          "product": 0.25,
+          "change": 0.5
+        }
+      },
       "warnings": []
     }
   ],

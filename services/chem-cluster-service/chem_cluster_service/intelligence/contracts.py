@@ -81,7 +81,7 @@ class ComputedFeature(TypedDict, total=False):
     warnings: list[str]
 
 
-class ComputedSimilarityEdge(TypedDict):
+class RequiredComputedSimilarityEdge(TypedDict):
     edge_id: str
     from_reaction_entity_id: str
     to_reaction_entity_id: str
@@ -91,6 +91,10 @@ class ComputedSimilarityEdge(TypedDict):
     provider_ids: list[str]
     source_hashes: list[str]
     warnings: list[str]
+
+
+class ComputedSimilarityEdge(RequiredComputedSimilarityEdge, total=False):
+    metadata: dict[str, Any]
 
 
 class ReactionIntelligenceArtifact(TypedDict, total=False):
@@ -240,6 +244,8 @@ def _validate_computed_edge(value: Any, index: int, errors: list[str]) -> None:
         item not in COMPUTED_SIMILARITY_BASIS for item in value["basis"]
     ):
         errors.append(f"similarity_edges[{index}].basis contains invalid basis")
+    if value.get("metadata") is not None and not _is_object(value.get("metadata")):
+        errors.append(f"similarity_edges[{index}].metadata must be an object")
     contributions = value.get("contributions")
     if contributions is not None:
         if not isinstance(contributions, list):

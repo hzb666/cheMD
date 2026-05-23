@@ -12,6 +12,7 @@ from chem_cluster_service.intelligence.providers.rdkit_fingerprint import (
     RdkitAdapterInspection,
     RdkitFingerprintProvider,
     ReactionFingerprintError,
+    ReactionFingerprint,
     run_rdkit_fingerprint_provider,
 )
 
@@ -24,7 +25,7 @@ class MissingRdkitAdapter:
             warning="dependency_not_installed",
         )
 
-    def fingerprint_reaction(self, canonical_rxn_smiles, dimension):
+    def fingerprint_reaction(self, canonical_rxn_smiles, path_dimension, morgan_dimension):
         raise AssertionError("SKIP path must not fingerprint reactions")
 
 
@@ -38,16 +39,21 @@ class FakeRdkitAdapter:
             package_version="fake-rdkit-1.0",
         )
 
-    def fingerprint_reaction(self, canonical_rxn_smiles, dimension):
-        self.calls.append((canonical_rxn_smiles, dimension))
+    def fingerprint_reaction(self, canonical_rxn_smiles, path_dimension, morgan_dimension):
+        self.calls.append((canonical_rxn_smiles, path_dimension, morgan_dimension))
         if canonical_rxn_smiles == "invalid>>":
             raise ReactionFingerprintError("reaction_smiles_contains_invalid_molecule")
         fingerprints = {
-            "A>>B": {1, 2, 3, 4},
-            "A>>C": {1, 2, 3, 5},
-            "D>>E": {20, 21, 22},
+            "A>>B": ({1, 2}, {5, 6}),
+            "A>>C": ({1, 2}, {5, 7}),
+            "D>>E": ({10, 11}, {12, 13}),
         }
-        return set(fingerprints[canonical_rxn_smiles])
+        reactant_bits, product_bits = fingerprints[canonical_rxn_smiles]
+        return ReactionFingerprint.from_side_bits(
+            set(reactant_bits),
+            set(product_bits),
+            side_dimension=path_dimension + morgan_dimension,
+        )
 
 
 def reactions():
@@ -114,10 +120,9 @@ class RdkitFingerprintProviderTests(unittest.TestCase):
         result = run_rdkit_fingerprint_provider(
             [reactions()[0]],
             adapter=adapter,
-            dimension=64,
         )
 
-        self.assertEqual(adapter.calls, [("A>>B", 64)])
+        self.assertEqual(adapter.calls, [("A>>B", 1024, 1024)])
         self.assertEqual(result["provider"]["status"], "PASS")
         self.assertEqual(result["provider"]["package_version"], "fake-rdkit-1.0")
         feature = result["reaction_features"][0]
@@ -130,16 +135,42 @@ class RdkitFingerprintProviderTests(unittest.TestCase):
         self.assertTrue(fingerprint_ref["feature_ref_id"].startswith("feature-ref::rxn-a::rdkit::"))
         self.assertEqual(fingerprint_ref["provider"], "rdkit")
         self.assertEqual(fingerprint_ref["kind"], "bit_vector")
-        self.assertEqual(fingerprint_ref["dimension"], 64)
+        self.assertEqual(fingerprint_ref["algorithm"], "rdkit_reaction_composite_6144_v2")
+        self.assertEqual(fingerprint_ref["dimension"], 6144)
         self.assertEqual(fingerprint_ref["storage"], "inline")
         self.assertTrue(fingerprint_ref["hash"].startswith("sha256:"))
-        self.assertEqual(fingerprint_ref["bit_indices"], [1, 2, 3, 4])
+        self.assertEqual(
+            fingerprint_ref["bit_indices"],
+            [1, 2, 2053, 2054, 4097, 4098, 4101, 4102],
+        )
+        self.assertEqual(
+            fingerprint_ref["block_dimensions"],
+            {
+                "path": 1024,
+                "morgan": 1024,
+                "side": 2048,
+                "reactant": 2048,
+                "product": 2048,
+                "change": 2048,
+            },
+        )
+        self.assertEqual(
+            fingerprint_ref["block_bit_indices"],
+            {
+                "reactant": [1, 2],
+                "product": [5, 6],
+                "change": [1, 2, 5, 6],
+            },
+        )
+        self.assertEqual(
+            fingerprint_ref["block_weights"],
+            {"reactant": 0.25, "product": 0.25, "change": 0.5},
+        )
 
     def test_tanimoto_edges_are_computed_for_valid_reactions(self):
         result = run_rdkit_fingerprint_provider(
             reactions(),
             adapter=FakeRdkitAdapter(),
-            dimension=64,
         )
 
         self.assertEqual(len(result["reaction_features"]), 3)
@@ -151,11 +182,20 @@ class RdkitFingerprintProviderTests(unittest.TestCase):
                 "edge_id": "computed-edge::rxn-a::rxn-b::rdkit-fingerprint-tanimoto",
                 "from_reaction_entity_id": "rxn-a",
                 "to_reaction_entity_id": "rxn-b",
-                "score": 0.6,
+                "score": 0.633333,
                 "confidence": "low",
                 "basis": ["rdkit_fingerprint_tanimoto"],
                 "provider_ids": ["provider::rdkit-fingerprint"],
                 "source_hashes": ["sha256:a", "sha256:b"],
+                "metadata": {
+                    "algorithm": "rdkit_reaction_composite_6144_v2",
+                    "block_similarity": {
+                        "reactant": 1.0,
+                        "product": 0.333333,
+                        "change": 0.6,
+                    },
+                    "block_weights": {"reactant": 0.25, "product": 0.25, "change": 0.5},
+                },
                 "warnings": [],
             },
         )
@@ -174,7 +214,6 @@ class RdkitFingerprintProviderTests(unittest.TestCase):
         result = run_rdkit_fingerprint_provider(
             items,
             adapter=FakeRdkitAdapter(),
-            dimension=64,
         )
 
         self.assertEqual(result["provider"]["status"], "PASS")

@@ -244,10 +244,16 @@ computed chemistry。
 policy 会禁用网络访问，并把缺失的本地依赖视为 skipped providers。
 
 Hybrid similarity edges 会暴露 contribution-level evidence。Computed chemistry
-signals 是主权重：RDKit / reaction fingerprint Tanimoto 权重为 `0.30`，RXNFP
-cosine 为 `0.25`，reaction center support 为 `0.25`，Chemd semantic context
-为 `0.20`。缺失的 provider component 不会按 0 分处理，而是只对可用权重重新归一化。
-reaction center 冲突且 RDKit support 低时会报告
+signals 是主权重：RDKit reaction fingerprint 使用
+`rdkit_reaction_composite_6144_v2`，它是由 reactant-side、product-side 和
+product-minus-reactant change blocks 构成的 sparse composite vector。每个 side
+包含 RDKit path fingerprint `1024` bits 与 Morgan radius-2 fingerprint `1024`
+bits；最终 vector 是 `6144` 维。RDKit pair similarity 是分块加权分数：`0.25`
+reactant Tanimoto、`0.25` product Tanimoto、`0.50` change Tanimoto。RDKit
+contribution 在 hybrid 中权重为 `0.30`，RXNFP cosine 为 `0.25`，reaction
+center support 为 `0.25`，Chemd semantic context 为 `0.20`。缺失的 provider
+component 不会按 0 分处理，而是只对可用权重重新归一化。reaction center 冲突且
+RDKit support 低时会报告
 `strict_cluster_hard_reject:reaction_center_conflict_low_rdkit`；后续 cluster builder
 不能把这类 edge 提升为 strict reaction cluster。
 

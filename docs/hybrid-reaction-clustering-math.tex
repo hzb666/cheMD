@@ -83,15 +83,36 @@ S_{ij} & = \text{语义上下文相似度}.
 
 \subsection{反应指纹相似度}
 
-设 \(F_i\) 和 \(F_j\) 分别是两条反应的位向量指纹。反应指纹相似度使用 Tanimoto 系数：
+RDKit 反应指纹使用复合稀疏位向量。每一侧先拼接 path fingerprint 与 Morgan radius-2 fingerprint：
+
+\begin{equation}
+\begin{aligned}
+A_i &= [A_i^{\mathrm{path}}, A_i^{\mathrm{morgan}}] \in \{0,1\}^{2048},\\
+P_i &= [P_i^{\mathrm{path}}, P_i^{\mathrm{morgan}}] \in \{0,1\}^{2048},\\
+\Delta_i &= A_i \triangle P_i \in \{0,1\}^{2048},\\
+F_i &= [A_i, P_i, \Delta_i] \in \{0,1\}^{6144}.
+\end{aligned}
+\end{equation}
+
+其中 \(A_i\) 是 reactant-side 指纹，\(P_i\) 是 product-side 指纹，\(\Delta_i\) 是产物侧与反应物侧的对称差分变化块。任意两个位集合 \(U,V\) 的 Tanimoto 系数定义为：
+
+\begin{equation}
+T(U,V)
+=
+\frac{|U \cap V|}{|U \cup V|}.
+\end{equation}
+
+反应指纹相似度不是对 \(F_i\) 与 \(F_j\) 直接做一次整体 Tanimoto，而是按块加权：
 
 \begin{equation}
 R_{ij}
 =
-\frac{|F_i \cap F_j|}{|F_i \cup F_j|}.
+0.25\,T(A_i,A_j)
++0.25\,T(P_i,P_j)
++0.50\,T(\Delta_i,\Delta_j).
 \end{equation}
 
-该值越接近 \(1\)，表示两条反应在结构变化模式上越接近；越接近 \(0\)，表示共享的指纹特征越少。该信号适合发现反应结构变化模式相近的样本，但在指纹过稀疏、反应映射不完整或底物表示不规范时，可能无法完整表达反应中心的一致性。
+该定义保留 reactant side、product side 和 transformation/change 三类信息。变化块权重最高，因此更适合严格反应聚类；reactant/product 相似度提供背景支持，但不能单独覆盖反应中心冲突。
 
 \subsection{反应向量相似度}
 
