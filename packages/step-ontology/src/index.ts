@@ -3,5 +3,6 @@ export * from "./procedure";
 export * from "./procedure-import-patterns";
 export * from "./observation";
 export * from "./analysis";
+export * from "./procedure-state";
 export * from "./step-schema-types";
 export * from "./step-schemas";

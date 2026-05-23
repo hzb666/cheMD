@@ -35,7 +35,7 @@ Importers and docs should call this model instead of duplicating step semantics.
 
 ## Phase 1: State Model Core
 
-Status: planned.
+Status: implemented.
 
 ### Tasks
 
@@ -59,6 +59,14 @@ Status: planned.
 
 - `pnpm --filter @chemd/step-ontology test`
 - `pnpm --filter @chemd/step-ontology typecheck`
+
+### Implementation Notes
+
+- Added a pure `buildProcedureState()` helper over canonical steps.
+- State snapshots track contents, active conditions, phase markers, source
+  step ids, and state-model warnings.
+- Unsupported families are represented as warnings instead of being silently
+  dropped.
 
 ## Phase 2: Importer Integration
 
