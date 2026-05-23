@@ -657,3 +657,37 @@ Recorded the remaining hybrid reaction clustering Trellis plan in docs/chemd-hyb
 ### Next Steps
 
 - None - task complete
+
+
+## Session 155: Hybrid reaction similarity scoring
+
+**Date**: 2026-05-24
+**Task**: Hybrid reaction similarity scoring
+**Package**: exporter-training
+**Branch**: `develop`
+
+### Summary
+
+Added weighted hybrid similarity contributions, updated chemistry-first weights, added reaction-center hard-reject warning, updated contract validation and docs. Verified chem-cluster-service tests, exporter-training tests/typecheck, docs typecheck, docs coverage examples, and diff check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e21aca7` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
