@@ -97,14 +97,6 @@ const collectActionEntries = (sourceText: string): CoverageLedgerEntry[] =>
     )
   ).sort((left, right) => left.span.start - right.span.start);
 
-const isNoCanonicalSpan = (
-  entry: CoverageLedgerEntry,
-  unparsedSpans: readonly UnparsedProseSpan[]
-): boolean =>
-  unparsedSpans.some((span) =>
-    span.reason === "no_canonical_step" && spansOverlap(entry.span, span)
-  );
-
 const isCoveredByStep = (
   entry: CoverageLedgerEntry,
   steps: readonly StepFrame[]
@@ -122,8 +114,7 @@ const isCoveredByObservation = (
 const classifyActionEntry = (
   entry: CoverageLedgerEntry,
   steps: readonly StepFrame[],
-  observations: readonly ObservationFrame[],
-  unparsedSpans: readonly UnparsedProseSpan[]
+  observations: readonly ObservationFrame[]
 ): CoverageLedgerEntry => {
   if (isCoveredByStep(entry, steps)) {
     return { ...entry, status: "covered_by_step" };
@@ -131,10 +122,6 @@ const classifyActionEntry = (
 
   if (isCoveredByObservation(entry, observations)) {
     return { ...entry, status: "covered_by_observation" };
-  }
-
-  if (isNoCanonicalSpan(entry, unparsedSpans)) {
-    return { ...entry, status: "ignored_narrative" };
   }
 
   return { ...entry, status: "uncovered_action_like" };
@@ -179,7 +166,7 @@ export const createCoverageLedger = (
   existingUnparsedSpans: readonly UnparsedProseSpan[]
 ): CoverageResult => {
   const actionEntries = collectActionEntries(sourceText).map((entry) =>
-    classifyActionEntry(entry, steps, observations, existingUnparsedSpans)
+    classifyActionEntry(entry, steps, observations)
   );
   const uncoveredActionEntries = actionEntries.filter((entry) =>
     entry.status === "uncovered_action_like"

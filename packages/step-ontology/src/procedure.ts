@@ -197,6 +197,11 @@ const getAdditionOfMaterial = (sentence: string): string | undefined => {
   return cleanMaterialText(match?.[1]);
 };
 
+const getQuenchAgent = (sentence: string): string | undefined => {
+  const match = sentence.match(/\bquench(?:ed)?\s+with\s+(.+?)(?:$|,|\band\b|\bthen\b)/i);
+  return cleanMaterialText(match?.[1]);
+};
+
 const uniqueValues = (values: readonly (string | undefined)[]): string[] =>
   [...new Set(values.filter((value): value is string => Boolean(value)))];
 
@@ -284,8 +289,10 @@ const lowerEnvironment = (context: SentenceContext): CanonicalStepNode[] => {
 
 const lowerTemperature = (context: SentenceContext): CanonicalStepNode[] => {
   const steps: CanonicalStepNode[] = [];
+  const coldAtConditionIsAction = hasColdAtCondition(context.sentence)
+    && !hasAny(context.sentence, HOLD_PATTERNS);
 
-  if (hasAny(context.sentence, COOL_PATTERNS) || hasColdAtCondition(context.sentence)) {
+  if (hasAny(context.sentence, COOL_PATTERNS) || coldAtConditionIsAction) {
     const temperature = getTemperatureAfterAny(context.sentence, ["cooled", "cooling", "冷却", "at"]);
     steps.push(createStep(context, "cool", { target_temperature: temperature }, 0.9, ["changes_temperature"]));
   }
@@ -302,8 +309,9 @@ const lowerAddition = (context: SentenceContext): CanonicalStepNode[] => {
   const materials = getAddMaterials(context.sentence);
 
   if (hasAny(context.sentence, QUENCH_PATTERNS)) {
-    return materials[0]
-      ? [createStep(context, "quench", { agent: materials[0] }, 0.86)]
+    const agent = getQuenchAgent(context.sentence) ?? materials[0];
+    return agent
+      ? [createStep(context, "quench", { agent }, 0.86)]
       : [];
   }
 

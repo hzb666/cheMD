@@ -70,6 +70,8 @@ source text
 
 ## Phase 2: Clause and Action Segmentation
 
+Status: implemented.
+
 ### Tasks
 
 - Split SI sentences on action-list boundaries:
@@ -91,6 +93,16 @@ source text
 
 - `pnpm --filter @chemd/step-ontology test -- lowering.test.ts`
 - `pnpm --filter @chemd/importer-prose test`
+
+### Implementation Notes
+
+- Added parser-side clause segmentation after sentence splitting and before
+  procedure lowering.
+- Split points only apply outside balanced parentheses so concentration,
+  solvent-ratio, and quantity commas remain attached to their material mention.
+- Unsupported action-like clauses still become low-confidence prose with `W805`.
+- Import coverage still emits `W_IMPORT_PROSE_UNCOVERED_ACTION` for action
+  keywords that do not become canonical steps.
 
 ## Phase 3: High-Frequency Operation Gaps
 

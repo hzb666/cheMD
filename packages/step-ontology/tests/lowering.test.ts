@@ -62,7 +62,7 @@ describe("procedure and observation lowering", () => {
       procedureId: "proc-si",
       body: [
         "To a solution of freshly made 6 (99.8 mg, 1.40 equiv) and TMEDA (0.221 mL, 4.50 equiv) in THF (2.3 mL) at",
-        "−78 °C was added sBuLi (1.30 M in cyclohexane/hexane, 1.13 mL, 4.50 equiv) dropwise and the",
+        "−78 °C was added sBuLi (1.30 M in cyclohexane/hexane (92/8), 1.13 mL, 4.50 equiv) dropwise and the",
         "resulting solution was stirred for 15 min at −78 °C."
       ].join("\n")
     });
@@ -76,10 +76,58 @@ describe("procedure and observation lowering", () => {
     expect(result.steps[0].params.materials).toContain("99.8 mg");
     expect(result.steps[1].params.target_temperature).toBe("-78 °C");
     expect(result.steps[2].params.materials).toContain("sBuLi");
+    expect(result.steps[2].params.materials).toContain("1.13 mL");
     expect(result.steps[2].params.mode).toBe("dropwise");
     expect(result.steps[3].params.duration).toBe("15 min");
     expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
       "W_PROCEDURE_PROSE_LOWERED"
+    ]);
+  });
+
+  it("splits English action clauses outside parentheses and preserves action order", () => {
+    const result = lowerProcedureToSteps({
+      procedureId: "proc-clauses",
+      body: "BBr3 was added dropwise, the reaction was stirred for 10 min, then quenched with H2O and extracted with EtOAc."
+    });
+
+    expect(result.steps.map((step) => step.family)).toEqual([
+      "add",
+      "hold",
+      "quench",
+      "extract"
+    ]);
+    expect(result.steps[0].params).toMatchObject({
+      materials: "BBr3",
+      mode: "dropwise"
+    });
+    expect(result.steps[2].params.agent).toBe("H2O");
+    expect(result.steps[3].params.solvent).toBe("EtOAc");
+    expect(result.steps.map((step) => step.source.rawText)).toEqual([
+      "BBr3 was added dropwise",
+      "the reaction was stirred for 10 min",
+      "quenched with H2O",
+      "extracted with EtOAc."
+    ]);
+  });
+
+  it("keeps unrecognized action clauses as low-confidence prose", () => {
+    const result = lowerProcedureToSteps({
+      procedureId: "proc-unmatched-clause",
+      body: "BBr3 was added dropwise, then handled as usual, and extracted with EtOAc."
+    });
+
+    expect(result.steps.map((step) => step.family)).toEqual([
+      "add",
+      "observe",
+      "extract"
+    ]);
+    expect(result.steps[1]).toMatchObject({
+      params: { raw: "handled as usual" },
+      loweringConfidence: 0.35
+    });
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+      "W_PROCEDURE_PROSE_LOWERED",
+      "W805"
     ]);
   });
 

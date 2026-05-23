@@ -1,3 +1,5 @@
+import { splitProcedureActionClauses } from "./procedure-clauses";
+
 const isWhitespace = (char: string): boolean =>
   char === " " || char === "\t" || char === "\n" || char === "\r" || char === "\f";
 
@@ -219,6 +221,7 @@ export const splitProcedureSentences = (body: string | undefined): string[] => {
 
   return sentenceInputs
     .flatMap(splitSentenceLine)
+    .flatMap(splitProcedureActionClauses)
     .map(normalizeText)
     .filter(Boolean);
 };
