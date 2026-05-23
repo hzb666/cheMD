@@ -901,3 +901,38 @@ Replaced RDKit Morgan side-XOR fingerprint with rdkit_reaction_composite_6144_v2
 ### Next Steps
 
 - None - task complete
+
+
+## Session 162: RDKit directional reaction fingerprint
+
+**Date**: 2026-05-24
+**Task**: RDKit directional reaction fingerprint
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+Changed RDKit reaction fingerprints from XOR change blocks to directional gained/lost blocks. The provider now emits rdkit_reaction_directional_8192_v3 with reactant, product, gained, and lost blocks, and computes weighted per-block Tanimoto. Verified python -m unittest discover services/chem-cluster-service/tests; pnpm --filter @chemd/docs typecheck; pnpm --filter @chemd/compiler test -- docs-coverage.test.ts docs-marked-examples.test.ts; git diff --check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f142333` | (see git log) |
+| `912be1d` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

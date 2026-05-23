@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-4.md`
-- **Total Sessions**: 161
+- **Total Sessions**: 162
 - **Last Active**: 2026-05-24
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-4.md` | ~903 | Active |
+| `journal-4.md` | ~938 | Active |
 | `journal-3.md` | ~1994 | Archived |
 | `journal-2.md` | ~1956 | Archived |
 | `journal-1.md` | ~1998 | Archived |
@@ -32,6 +32,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 162 | 2026-05-24 | RDKit directional reaction fingerprint | `f142333`, `912be1d` | `develop` |
 | 161 | 2026-05-24 | RDKit composite reaction fingerprint | `8a760e4`, `999de47` | `develop` |
 | 160 | 2026-05-24 | Hybrid reaction clustering final review | `a01537a`, `a827460` | `develop` |
 | 159 | 2026-05-24 | Hybrid reaction clustering gold corpus | `515a0ce`, `0e9ceda` | `develop` |
