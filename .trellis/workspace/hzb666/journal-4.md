@@ -102,3 +102,50 @@ Verification:
 ### Next Steps
 
 - None - task complete
+
+
+## Session 142: Phase 4 addition attribution
+
+**Date**: 2026-05-23
+**Task**: Phase 4 addition attribution
+**Package**: step-ontology
+**Branch**: `develop`
+
+### Summary
+
+Preserve addition ordering and bind modifiers to add steps.
+
+### Main Changes
+
+Phase 4 completed for prose-step-import-reliability.
+
+Changes:
+- Split `before the addition of ...` into its own action clause to preserve source order.
+- Attached addition temperature and dropwise modifiers to the add step through existing params.
+- Prevented condition fragments such as `at -78 °C` from becoming material mentions.
+
+Verification:
+- pnpm --filter @chemd/step-ontology test
+- pnpm --filter @chemd/step-ontology typecheck
+- pnpm --filter @chemd/importer-prose test
+- pnpm --filter @chemd/importer-prose typecheck
+- pnpm chemd import prose <temp-file> --format json --dry-run
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d938244` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
