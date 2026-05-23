@@ -224,6 +224,8 @@ step: heat | id=s-heat | temperature=80 C | duration=30 min
 `;
 
 const proseImportSource = "加入 n-BuLi 后体系逐渐变深红色。";
+const proseImportPartialCoverageSource =
+  "The organic phases were washed with brine, dried over Na2SO4, filtered, and concentrated under reduced pressure.";
 
 const runInTempDir = async (
   argv: string[],
@@ -527,6 +529,21 @@ name: patient sample
     expect(result.stdout).toContain("step: add");
     expect(result.stdout).toContain(":::observation #import-observation");
     expect(result.stdout).toContain("event: color_change");
+    expect(result.stderr).toBe("");
+  });
+
+  it("prints prose import coverage warnings and unparsed span counts", async () => {
+    const result = await runInTempDir(["import", "prose", "procedure.txt"], {
+      "procedure.txt": proseImportPartialCoverageSource
+    });
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(result.stdout).toMatch(/unparsed spans: [1-9]/);
+    expect(result.stdout).toContain("W_IMPORT_PROSE_UNCOVERED_ACTION");
+    expect(result.stdout).toContain("filtered");
+    expect(result.stdout).toContain("step: wash");
+    expect(result.stdout).toContain("step: dry");
+    expect(result.stdout).toContain("step: concentrate");
     expect(result.stderr).toBe("");
   });
 

@@ -218,6 +218,8 @@ Status: implemented.
 
 ## Phase 6: Documentation and Import CLI Diagnostics
 
+Status: implemented.
+
 ### Tasks
 
 - Update CLI JSON/text summary counts:
@@ -238,6 +240,13 @@ Status: implemented.
 - `pnpm --filter @chemd/compiler test -- docs-coverage.test.ts docs-marked-examples.test.ts`
 - `pnpm --filter @chemd/docs build`
 - `pnpm --filter @chemd/docs typecheck`
+
+### Implementation Notes
+
+- CLI regression coverage now asserts visible unparsed counts and uncovered
+  action warnings in text output.
+- EN/ZH docs show clause coverage, conservative warning policy, workup steps,
+  and purification eluent preservation.
 
 ## Review Requirements
 

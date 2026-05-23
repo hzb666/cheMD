@@ -1322,13 +1322,15 @@ const toProseImportCliReport = (
 
 const formatImportDiagnostic = (diagnostic: ImportDiagnostic): string => {
   const span = diagnostic.span ? `:${diagnostic.span.start}-${diagnostic.span.end}` : "";
+  const spanText = diagnostic.span?.text ? ` "${diagnostic.span.text}"` : "";
 
   return [
     `prose${span}`,
     diagnostic.severity,
     diagnostic.code,
-    diagnostic.message
-  ].join(" ");
+    diagnostic.message,
+    spanText
+  ].filter(Boolean).join(" ");
 };
 
 const formatProseImportText = (report: ProseImportCliReport): string => {
