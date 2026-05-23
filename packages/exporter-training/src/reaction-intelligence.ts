@@ -18,6 +18,7 @@ import type {
   ReactionIntelligenceStrictReactionCluster
 } from "./reaction-intelligence-types";
 import type { ChemdTrainingGraphIndexV1 } from "./graph-index-types";
+import { buildStrictReactionClusterProfiles } from "./reaction-cluster-profile";
 
 const uniqueStrings = (values: string[]): string[] => Array.from(new Set(values.filter(Boolean))).sort();
 
@@ -448,8 +449,12 @@ export const mergeReactionIntelligenceArtifactIntoGraphIndex = (
   }
 
   const reactionIds = new Set(clonedIndex.reaction_features.map((feature) => feature.reaction_entity_id));
+  const layer = buildLayer(artifact, reactionIds, options);
   return {
     ...clonedIndex,
-    reaction_intelligence: buildLayer(artifact, reactionIds, options)
+    reaction_intelligence: {
+      ...layer,
+      strict_reaction_cluster_profiles: buildStrictReactionClusterProfiles(clonedIndex, layer)
+    }
   };
 };

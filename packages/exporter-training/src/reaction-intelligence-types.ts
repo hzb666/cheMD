@@ -166,6 +166,34 @@ export interface ReactionIntelligenceSemanticReactionGroup {
   metadata?: ReactionIntelligenceJsonObject;
 }
 
+export interface ReactionIntelligenceStrictReactionClusterProfile {
+  profile_id: string;
+  cluster_id: string;
+  reaction_entity_ids: string[];
+  representative_reaction_entity_id: string;
+  label: string;
+  member_count: number;
+  document_ids: string[];
+  score_summary: {
+    mean_score: number;
+    min_edge_score: number;
+  };
+  evidence_basis: ReactionIntelligenceComputedSimilarityBasis[];
+  common_fields: {
+    reaction_signature?: string;
+    participant_signature?: string;
+    reaction_family?: string;
+    procedure_signature?: string;
+    condition_signature?: string;
+    route_id?: string;
+    changed_variable_fields: string[];
+    controlled_variable_fields: string[];
+    chemistry_feature_ref_ids: string[];
+  };
+  warnings: string[];
+  source: "strict_reaction_cluster_profile";
+}
+
 export interface ReactionIntelligenceArtifact {
   schema_version: "chemd-reaction-intelligence-artifact/v0.1";
   artifact_id: string;
@@ -179,6 +207,7 @@ export interface ReactionIntelligenceArtifact {
   strict_reaction_clusters?: ReactionIntelligenceStrictReactionCluster[];
   candidate_reaction_neighbors?: ReactionIntelligenceCandidateReactionNeighbor[];
   semantic_reaction_groups?: ReactionIntelligenceSemanticReactionGroup[];
+  strict_reaction_cluster_profiles?: ReactionIntelligenceStrictReactionClusterProfile[];
   layout?: ReactionIntelligenceLayout;
   warnings: string[];
 }
@@ -194,6 +223,7 @@ export interface MergedReactionIntelligenceLayer {
   strict_reaction_clusters?: ReactionIntelligenceStrictReactionCluster[];
   candidate_reaction_neighbors?: ReactionIntelligenceCandidateReactionNeighbor[];
   semantic_reaction_groups?: ReactionIntelligenceSemanticReactionGroup[];
+  strict_reaction_cluster_profiles?: ReactionIntelligenceStrictReactionClusterProfile[];
   layout?: ReactionIntelligenceLayout;
   warnings: string[];
 }

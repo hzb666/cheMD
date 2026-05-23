@@ -7,6 +7,7 @@ import { typecheckDocument } from "@chemd/typechecker";
 import {
   buildReactionIntelligenceCanonicalInput,
   buildReactionIntelligenceServiceJob,
+  buildStrictReactionClusterProfiles,
   buildTrainingGraphIndexFromUnderstandings,
   buildTrainingUnderstandingFromRecord,
   exportTrainingRecordFromDocument,
@@ -346,6 +347,31 @@ describe("reaction intelligence graph index merge", () => {
         basis_summary: ["semantic_family_support", "semantic_procedure_support"]
       })
     ]);
+    expect(enriched.reaction_intelligence.strict_reaction_cluster_profiles).toEqual([
+      expect.objectContaining({
+        profile_id: "strict-reaction-cluster-profile::strict-reaction-cluster::a::b",
+        cluster_id: "strict-reaction-cluster::a::b",
+        reaction_entity_ids: [rxnA, rxnB],
+        representative_reaction_entity_id: rxnA,
+        label: "esterification / add>add>hold>concentrate",
+        member_count: 2,
+        document_ids: ["exp-ri-a", "exp-ri-b"],
+        score_summary: {
+          mean_score: 0.84,
+          min_edge_score: 0.82
+        },
+        evidence_basis: ["hybrid_consensus", "rdkit_fingerprint_tanimoto"],
+        common_fields: expect.objectContaining({
+          reaction_family: "esterification",
+          procedure_signature: "add>add>hold>concentrate",
+          condition_signature: "reagents=catalytic H2SO4",
+          controlled_variable_fields: ["products", "reactants", "reaction_name", "reagents"],
+          changed_variable_fields: [],
+          chemistry_feature_ref_ids: []
+        }),
+        warnings: []
+      })
+    ]);
   });
 
   it("warns instead of silently dropping invalid reaction intelligence groups", () => {
@@ -389,6 +415,7 @@ describe("reaction intelligence graph index merge", () => {
     expect(enriched.reaction_intelligence.strict_reaction_clusters).toEqual([]);
     expect(enriched.reaction_intelligence.candidate_reaction_neighbors).toEqual([]);
     expect(enriched.reaction_intelligence.semantic_reaction_groups).toEqual([]);
+    expect(enriched.reaction_intelligence.strict_reaction_cluster_profiles).toEqual([]);
     expect(enriched.reaction_intelligence.warnings).toEqual(expect.arrayContaining([
       "strict_reaction_cluster_not_merged:strict-reaction-cluster::unknown",
       "candidate_reaction_neighbor_not_merged:candidate-edge::unknown",
@@ -518,5 +545,32 @@ describe("reaction intelligence graph index merge", () => {
       reaction_entity_ids: [rxnA, rxnB],
       representative_reaction_entity_id: rxnA
     });
+  });
+});
+
+describe("strict reaction cluster profiles", () => {
+  it("reports missing reaction feature evidence without changing the cluster", () => {
+    const profiles = buildStrictReactionClusterProfiles(buildIndex(), {
+      strict_reaction_clusters: [
+        {
+          cluster_id: "strict-reaction-cluster::missing",
+          reaction_entity_ids: [rxnA, "rxn::missing"],
+          representative_reaction_entity_id: "rxn::missing",
+          mean_score: 0.79,
+          min_edge_score: 0.76,
+          basis_summary: ["hybrid_consensus", "rxnfp_cosine"],
+          warnings: []
+        }
+      ]
+    });
+
+    expect(profiles).toEqual([
+      expect.objectContaining({
+        cluster_id: "strict-reaction-cluster::missing",
+        reaction_entity_ids: [rxnA, "rxn::missing"],
+        representative_reaction_entity_id: rxnA,
+        warnings: ["strict_cluster_profile_missing_reaction_feature:rxn::missing"]
+      })
+    ]);
   });
 });

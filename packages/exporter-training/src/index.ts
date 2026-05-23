@@ -9,4 +9,5 @@ export * from "./graph-index";
 export * from "./graph-index-types";
 export * from "./reaction-intelligence";
 export * from "./reaction-intelligence-types";
+export * from "./reaction-cluster-profile";
 export * from "./reaction-cluster-adapter";
