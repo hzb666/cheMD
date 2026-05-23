@@ -53,3 +53,52 @@ Verification:
 ### Next Steps
 
 - None - task complete
+
+
+## Session 141: Phase 3 prose operation gaps
+
+**Date**: 2026-05-23
+**Task**: Phase 3 prose operation gaps
+**Package**: step-ontology
+**Branch**: `develop`
+
+### Summary
+
+Lower frequent SI workup and condition phrases through existing step schema.
+
+### Main Changes
+
+Phase 3 completed for prose-step-import-reliability.
+
+Changes:
+- Added existing-family lowering for wash, dry-over, filter-through, concentrate-in-vacuo, reflux, overnight, atmosphere, sealed vessel, and separated layers.
+- Kept bare `filtered` conservative: no fake medium is generated, so coverage warnings remain visible.
+- Updated coverage-ledger tests to reflect wash now being covered while unsupported filter remains uncovered.
+
+Verification:
+- pnpm --filter @chemd/step-ontology test
+- pnpm --filter @chemd/step-ontology typecheck
+- pnpm --filter @chemd/importer-prose test
+- pnpm --filter @chemd/importer-prose typecheck
+- pnpm --filter @chemd/typechecker test
+- pnpm --filter @chemd/typechecker typecheck
+- pnpm chemd import prose <temp-file> --format json --dry-run
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `63de0ff` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
