@@ -866,3 +866,38 @@ Phase 8 completed final drift audit, documented naming consistency, and tracked 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 161: RDKit composite reaction fingerprint
+
+**Date**: 2026-05-24
+**Task**: RDKit composite reaction fingerprint
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+Replaced RDKit Morgan side-XOR fingerprint with rdkit_reaction_composite_6144_v2: path1024+Morgan1024 reactant/product/change blocks and weighted block Tanimoto. Updated artifact fixture, service contract metadata, docs, and math appendix. Verified python -m unittest discover services/chem-cluster-service/tests; pnpm --filter @chemd/docs typecheck; pnpm --filter @chemd/compiler test -- docs-coverage.test.ts docs-marked-examples.test.ts; git diff --check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8a760e4` | (see git log) |
+| `999de47` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
