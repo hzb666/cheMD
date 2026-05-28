@@ -7,7 +7,7 @@ import { buildAuthoringAssistance } from "../src/authoring-assistance";
 
 const semanticLayer = (input: Record<string, unknown>): ChemdTrainingExportV2 =>
   ({
-    source_layer: { raw_children: [] },
+    source_layer: { declarations: [] },
     semantic_layer: {
       molecules: [],
       materials: [],
@@ -19,7 +19,8 @@ const semanticLayer = (input: Record<string, unknown>): ChemdTrainingExportV2 =>
       artifacts: [],
       condition_variations: [],
       condition_variation_attempts: [],
-      markdown_blocks: [],
+      documentation_blocks: [],
+      procedures: [],
       links: [],
       ...input
     }

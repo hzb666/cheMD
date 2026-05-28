@@ -1,23 +1,23 @@
 import { describe, expect, it } from "vitest";
 
 import { buildCanonicalLnf } from "../src/index";
+import { createProgram, declaration, refValue } from "./fixtures";
 
 describe("canonical LNF builder", () => {
-  it("builds compact entities and workflow steps without inventing author syntax", () => {
+  it("builds program-native v1 source, entities, semantic links, workflow, and agent audit", () => {
     const lnf = buildCanonicalLnf({
-      document: {
-        id: "exp-lnf",
-        title: "LNF test",
-        date: "2026-04-17"
-      },
+      document: createProgram(),
       typedGraph: {
         documentId: "exp-lnf",
         nodes: [{
           kind: "reaction",
           nodeId: "rxn-main",
           sourceNodeType: "reaction",
-          syntaxOrigin: "chemd",
-          declaredKind: "reaction",
+          sourceMetadata: {
+            sourceKind: "declaration",
+            declarationKind: "reaction",
+            declarationId: "rxn-main"
+          },
           prev: [],
           next: [],
           reactants: [],
@@ -34,49 +34,102 @@ describe("canonical LNF builder", () => {
         diagnostics: []
       },
       stepGraph: {
-        procedures: [],
+        procedures: [{
+          procedureId: "proc-main",
+          structureHint: "explicit_steps",
+          sourceType: "explicit_steps",
+          steps: [],
+          diagnostics: [],
+          loweringConfidence: 1
+        }],
         observations: [],
         diagnostics: [],
         steps: [{
           stepId: "s1",
           family: "cool",
-          params: { target_temperature: "0 °C" },
+          params: { target_temperature: "0 degC" },
           source: {
             sourceNodeType: "procedure",
-            sourceNodeId: "proc-1",
-            rawText: "冷却至 0 °C。"
+            sourceNodeId: "proc-main",
+            sourceType: "explicit_step",
+            rawText: "step cool"
           },
-          loweringConfidence: 0.95
+          loweringConfidence: 1
         }]
       },
       diagnostics: []
     });
 
-    expect(lnf.schemaVersion).toBe("chemd-lnf/v0.5");
-    expect(lnf.experiment.workflow.steps[0]).toMatchObject({
-      family: "cool",
-      params: { target_temperature: "0 °C" }
+    expect(lnf.schemaVersion).toBe("chemd-lnf/v1.0");
+    expect(lnf.experiment.document).toMatchObject({
+      id: "exp-lnf",
+      moduleName: "lnf",
+      sourceLanguage: "chemd/program-v1"
     });
+    expect(lnf.experiment.source.declarationIndex).toContainEqual(expect.objectContaining({
+      declarationId: "rxn-main",
+      declarationKind: "reaction",
+      docIds: ["doc-rxn-main"]
+    }));
     expect(lnf.experiment.entities.reactions[0]).toMatchObject({
-      syntaxOrigin: "chemd",
-      declaredKind: "reaction",
-      normalizedConditions: {
-        solvent: {
-          normalized: "tetrahydrofuran"
+      declarationId: "rxn-main",
+      fields: { solvent: { value: "THF" } },
+      typedNode: {
+        kind: "reaction",
+        normalizedConditions: {
+          solvent: {
+            normalized: "tetrahydrofuran"
+          }
         }
       }
     });
+    expect(lnf.experiment.entities).toMatchObject({
+      molecules: [{ declarationId: "mol-a" }],
+      materials: [{ declarationId: "mat-a" }],
+      batches: [{ declarationId: "batch-a" }],
+      results: [{ declarationId: "result-main" }],
+      analyses: [{ declarationId: "analysis-main" }],
+      samples: [{ declarationId: "sample-main" }],
+      artifacts: [{ declarationId: "artifact-main" }],
+      conditionScreens: [{ declarationId: "screen-main" }]
+    });
+    expect(lnf.experiment.semantic.documentationLinks[0]).toMatchObject({
+      docId: "doc-rxn-main",
+      attachment: { kind: "declaration", declarationId: "rxn-main" }
+    });
+    expect(lnf.experiment.workflow).toMatchObject({
+      procedures: [{ procedureId: "proc-main" }],
+      traces: [{ declarationId: "trace-main" }],
+      stepSources: {
+        explicitStepIds: ["s1"],
+        loweredStepIds: [],
+        observationEvents: []
+      }
+    });
+    expect(lnf.experiment.agent).toMatchObject({
+      runs: [{ id: "agent-review", goal: "Review synthesis source." }],
+      patches: [{ runId: "agent-review", patch: { id: "patch-1" } }],
+      decisions: [{ runId: "agent-review", decision: { id: "decision-1" } }]
+    });
+    expect(lnf.experiment.quality.sourceCompleteness).toMatchObject({
+      declarationCount: 11,
+      documentationCount: 1,
+      unresolvedReferenceCount: 0,
+      incompleteDeclarationCount: 0,
+      agentAuditRunCount: 1
+    });
+    expect("migration" in lnf.experiment.quality).toBe(false);
   });
 
-  it("indexes explicit/lowered source ids and reports syntax summary counts", () => {
+  it("reports source completeness from unresolved references and declaration diagnostics", () => {
     const lnf = buildCanonicalLnf({
-      document: {
-        id: "exp-lnf-source",
-        title: "Canonical LNF source test",
-        date: "2026-04-17"
-      },
+      document: createProgram([
+        declaration("result", "result-missing", {
+          reaction: refValue("@missing-rxn", "missing-rxn", "unresolved")
+        })
+      ]),
       typedGraph: {
-        documentId: "exp-lnf-source",
+        documentId: "exp-lnf",
         nodes: [],
         quantities: [],
         diagnostics: []
@@ -101,85 +154,48 @@ describe("canonical LNF builder", () => {
           diagnostics: []
         }],
         diagnostics: [],
-        steps: [
-          {
-            stepId: "s1",
-            family: "add",
-            params: {},
-            source: {
-              sourceNodeType: "procedure",
-              sourceNodeId: "proc-1",
-              sourceType: "explicit_step",
-              rawText: "step: add"
-            },
-            loweringConfidence: 1
+        steps: [{
+          stepId: "s2",
+          family: "observe",
+          params: {},
+          source: {
+            sourceNodeType: "procedure",
+            sourceNodeId: "proc-main",
+            sourceType: "lowered_step",
+            rawText: "observe"
           },
-          {
-            stepId: "s2",
-            family: "observe",
-            params: {},
-            source: {
-              sourceNodeType: "procedure",
-              sourceNodeId: "proc-1",
-              sourceType: "lowered_step",
-              rawText: "turned yellow"
-            },
-            loweringConfidence: 0.7
-          }
-        ]
+          loweringConfidence: 0.7
+        }]
       },
       diagnostics: [{
-        code: "W_CHEMD_KIND_AMBIGUOUS",
+        code: "E_RESULT_REACTION_CONFLICT",
         severity: "error",
-        message: "chemd kind cannot be inferred",
-        sourceNodeType: "chemd"
+        message: "Result reaction is invalid.",
+        sourceLayer: "typechecker",
+        sourceNodeType: "result",
+        sourceNodeId: "result-missing"
       }]
     });
 
     expect(lnf.experiment.workflow.stepSources).toEqual({
-      explicitStepIds: ["s1"],
+      explicitStepIds: [],
       loweredStepIds: ["s2"],
       observationEvents: [{ observationId: "obs-main", eventId: "obs-main::event-1" }]
     });
-    expect(lnf.experiment.quality.migration.legacyBlockCount).toBe(0);
-    expect(lnf.experiment.quality.migration.missingKindCount).toBe(1);
+    expect(lnf.experiment.quality.sourceCompleteness).toMatchObject({
+      declarationCount: 12,
+      documentationCount: 1,
+      unresolvedReferenceCount: 1,
+      incompleteDeclarationCount: 1
+    });
   });
 
-  it("preserves semantic graph, step provenance, and runtime summaries", () => {
+  it("preserves runtime summaries without legacy migration fields", () => {
     const lnf = buildCanonicalLnf({
-      document: {
-        id: "exp-lnf-runtime",
-        title: "Canonical LNF runtime test",
-        date: "2026-04-18"
-      },
+      document: createProgram(),
       typedGraph: {
-        documentId: "exp-lnf-runtime",
-        nodes: [{
-          kind: "reaction",
-          nodeId: "rxn-main",
-          sourceNodeType: "reaction",
-          prev: [],
-          next: [],
-          reactants: [{
-            kind: "reference",
-            targetKind: "molecule",
-            refId: "mol-a",
-            resolved: true
-          }],
-          products: [],
-          participants: [{
-            id: "rxn-main.reactant.1",
-            role: "reactant",
-            raw: "@mol-a",
-            reference: {
-              kind: "reference",
-              targetKind: "molecule",
-              refId: "mol-a",
-              resolved: true
-            }
-          }],
-          normalizedConditions: {}
-        }],
+        documentId: "exp-lnf",
+        nodes: [],
         quantities: [],
         diagnostics: []
       },
@@ -191,42 +207,19 @@ describe("canonical LNF builder", () => {
           stepId: "s1",
           family: "add",
           params: {},
-          inputs: [{
-            raw: "@mol-a",
-            reference: {
-              kind: "reference",
-              targetKind: "molecule",
-              refId: "mol-a",
-              resolved: true
-            }
-          }],
           source: {
             sourceNodeType: "procedure",
-            sourceNodeId: "proc-1",
+            sourceNodeId: "proc-main",
             sourceType: "explicit_step",
-            rawText: "step: add",
-            provenance: {
-              origin: "author",
-              sourceNodeType: "step",
-              sourceNodeId: "s1",
-              ruleId: "parser.author.step",
-              confidence: 1
-            }
-          },
-          provenance: {
-            origin: "author",
-            sourceNodeType: "step",
-            sourceNodeId: "s1",
-            ruleId: "parser.author.step",
-            confidence: 1
+            rawText: "step add"
           },
           loweringConfidence: 1
         }]
       },
       diagnostics: [],
       runPlan: {
-        planId: "runplan::exp-lnf-runtime",
-        documentId: "exp-lnf-runtime",
+        planId: "runplan::exp-lnf",
+        documentId: "exp-lnf",
         status: "planned",
         diagnostics: [],
         controls: [],
@@ -244,9 +237,9 @@ describe("canonical LNF builder", () => {
           sourceType: "explicit_step",
           source: {
             sourceNodeType: "procedure",
-            sourceNodeId: "proc-1",
+            sourceNodeId: "proc-main",
             sourceType: "explicit_step",
-            rawText: "step: add"
+            rawText: "step add"
           }
         }]
       },
@@ -257,7 +250,7 @@ describe("canonical LNF builder", () => {
       },
       runtimeState: {
         runId: "run-1",
-        planId: "runplan::exp-lnf-runtime",
+        planId: "runplan::exp-lnf",
         mode: "dry-run",
         status: "running",
         currentStepId: "s1",
@@ -270,25 +263,12 @@ describe("canonical LNF builder", () => {
         trace: [{
           traceId: "trace-1",
           type: "step_started",
-          timestamp: "2026-04-18T00:00:00.000Z",
+          timestamp: "2026-05-29T00:00:00.000Z",
           stepId: "s1"
         }]
       }
     });
 
-    expect(lnf.experiment.semantic.typedGraph.nodes[0]).toMatchObject({
-      kind: "reaction",
-      reactants: [{ kind: "reference", targetKind: "molecule", refId: "mol-a" }]
-    });
-    expect(lnf.experiment.workflow.steps[0]).toMatchObject({
-      stepId: "s1",
-      source: {
-        provenance: {
-          ruleId: "parser.author.step"
-        }
-      },
-      inputs: [{ raw: "@mol-a", reference: { targetKind: "molecule" } }]
-    });
     expect(lnf.experiment.runtime?.planSummary?.steps[0]).toMatchObject({
       stepId: "s1",
       confirmationStrategy: "manual_required"

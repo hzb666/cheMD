@@ -8,51 +8,48 @@ import {
   storagePostgresMigrations
 } from ".";
 
-const source = `---
-id: exp-storage
-title: Storage mapping
-date: 2026-04-22
-primary_result: res-main
----
+const source = `module exp_storage
 
-:::chemd #mol-a
-kind: molecule
-name: ethanol
-smiles: CCO
-:::
+meta {
+  id: "exp-storage"
+  title: "Storage mapping"
+  date: "2026-04-22"
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
 
-:::chemd #mol-product
-kind: molecule
-name: product
-smiles: CCO
-:::
+molecule mol_a {
+  name: "ethanol"
+  smiles: "CCO"
+}
 
-:::chemd #rxn-main
-kind: reaction
-reactant: @mol-a | 1 mmol | 1 eq | limiting=true
-product: @mol-product
-solvent: THF
-temperature: 25 C
-yield: 81%
-:::
+molecule mol_product {
+  name: "product"
+  smiles: "CCO"
+}
 
-:::result #res-main
-reaction: @rxn-main
-status: success
-yield: 81%
-:::
+reaction rxn_main {
+  reactants: [@mol_a]
+  products: [@mol_product]
+  solvent: "THF"
+  temperature: 25 C
+}
 
-:::sample #sample-main
-ref: res-main
-name: final product
-artifacts: spec-main
-:::
+result res_main for @rxn_main {
+  product: @mol_product
+  status: success
+  yield: 81%
+}
 
-:::artifact #spec-main
-kind: nmr_spectrum
-ref: res-main
-path: data/spec-main.pdf
-:::
+sample sample_main {
+  name: "final product"
+}
+
+artifact spec_main {
+  kind: nmr_spectrum
+  ref: @res_main
+  path: "data/spec-main.pdf"
+}
 `;
 
 describe("PostgreSQL storage records", () => {
@@ -72,7 +69,7 @@ describe("PostgreSQL storage records", () => {
     expect(records.experiment).toMatchObject({
       experimentId: "exp-storage",
       title: "Storage mapping",
-      primaryResultId: "res-main"
+      primaryResultId: "res_main"
     });
     expect(records.revision).toMatchObject({
       revisionId: "rev-1",
@@ -82,7 +79,7 @@ describe("PostgreSQL storage records", () => {
     });
     expect(records.compileRun.status).toBe("success");
     expect(records.compileRun.diagnosticCounts.error).toBe(0);
-    expect(records.compileArtifact.trainingExport.schema_version).toBe("chemd-training-export/v0.2");
+    expect(records.compileArtifact.trainingExport.schema_version).toBe("chemd-training-export/v0.3");
     expect(records.compileArtifact.trainingUnderstanding.schema_version).toBe(
       "chemd-training-understanding/v0.1"
     );

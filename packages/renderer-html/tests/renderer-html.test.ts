@@ -1,38 +1,170 @@
 import { describe, expect, it } from "vitest";
 
-import { createDocument, createMarkdownNode } from "@chemd/core";
+import type { ChemdProgramDocument, ChemdReferenceExpr, ChemdValue } from "@chemd/core";
+import { createDocument } from "@chemd/core";
 import { resolveRenderProfile } from "@chemd/render-profile";
 
 import { renderHtml } from "../src/index";
 
+const stringValue = (value: string): ChemdValue => ({
+  type: "string",
+  raw: JSON.stringify(value),
+  value
+});
+
+const quantityValue = (raw: string, unit: string, value?: number): ChemdValue => ({
+  type: "quantity",
+  raw,
+  unit,
+  value
+});
+
+const referenceValue = (target: string): ChemdReferenceExpr => ({
+  type: "reference",
+  refKind: "local",
+  target,
+  raw: `@${target}`
+});
+
+const createProgram = (): ChemdProgramDocument => ({
+  type: "program_document",
+  schemaVersion: "chemd-program-ast/v1",
+  sourceLanguage: "chemd/program-v1",
+  module: { kind: "module", name: "exp_html", docs: [] },
+  meta: {
+    kind: "meta",
+    id: "exp-html-program",
+    title: "Program HTML",
+    date: "2026-05-29",
+    fields: { operator: stringValue("Codex") },
+    docs: []
+  },
+  imports: [],
+  docs: [
+    {
+      type: "doc_comment",
+      id: "doc-file",
+      markdown: "# Notes\n\nFile level protocol.",
+      attachment: { kind: "file" },
+      references: [],
+      inlineChem: [],
+      inlineCode: [],
+      links: [],
+      exportPolicy: "render_rag"
+    },
+    {
+      type: "doc_comment",
+      id: "doc-rxn",
+      markdown: "Reaction card note.",
+      attachment: { kind: "declaration", declarationId: "rxn_1" },
+      references: [],
+      inlineChem: [],
+      inlineCode: [],
+      links: [],
+      exportPolicy: "render_only"
+    },
+    {
+      type: "doc_comment",
+      id: "doc-agent",
+      markdown: "Agent statement note.",
+      attachment: { kind: "agent_statement", runId: "repair_1", statementId: "done" },
+      references: [],
+      inlineChem: [],
+      inlineCode: [],
+      links: [],
+      exportPolicy: "audit_only"
+    }
+  ],
+  declarations: [
+    {
+      kind: "reaction",
+      id: "rxn_1",
+      qualifiedId: "exp_html.rxn_1",
+      docs: [{ docId: "doc-rxn" }],
+      fields: {
+        reactant: referenceValue("mol_a"),
+        temperature: quantityValue("80 C", "C", 80)
+      }
+    },
+    {
+      kind: "procedure",
+      id: "proc_1",
+      qualifiedId: "exp_html.proc_1",
+      docs: [],
+      evidence: [],
+      children: [{
+        kind: "step",
+        id: "heat",
+        family: "heat",
+        args: { duration: quantityValue("2 h", "h", 2) },
+        inputs: [referenceValue("mol_a")],
+        outputs: [referenceValue("rxn_1")]
+      }]
+    },
+    {
+      kind: "agent_run",
+      id: "repair_1",
+      qualifiedId: "exp_html.repair_1",
+      docs: [],
+      goal: "repair source",
+      status: "completed",
+      toolCalls: [],
+      evidence: [],
+      patches: [],
+      decisions: [],
+      auditTimeline: [{ kind: "timeline_event", id: "done", event: "completed", summary: "Finished" }]
+    }
+  ],
+  diagnostics: [{ code: "W_TEST", severity: "warning", message: "Check output" }]
+});
+
 describe("renderHtml", () => {
+  it("renders program-native module, declarations, procedures, diagnostics, and agent audit", () => {
+    const html = renderHtml(createProgram(), resolveRenderProfile(), {
+      typedGraph: {
+        documentId: "exp-html-program",
+        nodes: [{ nodeId: "rxn_1", kind: "reaction" }],
+        quantities: [],
+        diagnostics: []
+      }
+    });
+
+    expect(html).toContain("module exp_html");
+    expect(html).toContain("Program HTML");
+    expect(html).toContain("File level protocol.");
+    expect(html).toContain("Reaction card note.");
+    expect(html).toContain("Temperature");
+    expect(html).toContain("80 C");
+    expect(html).toContain("Procedure proc_1");
+    expect(html).toContain("data-step-id=\"heat\"");
+    expect(html).toContain("Agent Audit repair_1");
+    expect(html).toContain("Finished");
+    expect(html).toContain("W_TEST: Check output");
+  });
+
   it("renders a document title and Markdown content", () => {
     const document = createDocument(
-      { id: "exp-html", title: "HTML test", date: "2026-04-17" },
-      { children: [createMarkdownNode("body text")] }
+      { id: "exp-html", title: "HTML test", date: "2026-04-17" }
     );
 
     expect(renderHtml(document, resolveRenderProfile())).toContain("HTML test");
   });
 
-  it("renders markdown markers through bounded scanners", () => {
-    const document = createDocument(
-      { id: "exp-html-markdown", title: "HTML markdown", date: "2026-05-17" },
-      {
-        children: [createMarkdownNode([
-          "# Heading",
-          "",
-          "- [x] done",
-          "1. ordered",
-          "> quote",
-          "",
-          "[safe](https://example.test/path(a)) and `code`",
-          "",
-          "---"
-        ].join("\n"))]
-      }
-    );
-    const html = renderHtml(document, resolveRenderProfile());
+  it("renders documentation markdown markers through bounded scanners", () => {
+    const program = createProgram();
+    program.docs[0].markdown = [
+      "# Heading",
+      "",
+      "- [x] done",
+      "1. ordered",
+      "> quote",
+      "",
+      "[safe](https://example.test/path(a)) and `code`",
+      "",
+      "---"
+    ].join("\n");
+
+    const html = renderHtml(program, resolveRenderProfile());
 
     expect(html).toContain("chemd-markdown--h1");
     expect(html).toContain("chemd-task-checkbox");
@@ -43,54 +175,8 @@ describe("renderHtml", () => {
     expect(html).toContain("chemd-markdown-hr");
   });
 
-  it("keeps machine metadata out of visible fields and renders readable procedure steps", () => {
-    const document = createDocument(
-      { id: "exp-html-origin", title: "HTML origin test", date: "2026-04-17" },
-      {
-        children: [
-          {
-            type: "reaction",
-            id: "rxn-main",
-            reactants: ["a"],
-            products: ["b"],
-            syntaxOrigin: "chemd",
-            declaredKind: "reaction"
-          },
-          {
-            type: "procedure",
-            id: "proc-main",
-            ref: "rxn-main",
-            steps: [{
-              type: "step",
-              stepId: "heat-main",
-              family: "heat",
-              params: { temperature: "80 C", duration: "4 h" },
-              inputs: ["A"],
-              outputs: ["intermediate"]
-            }, {
-              type: "step",
-              stepId: "analyze-main",
-              family: "analyze",
-              params: { analysisType: "tlc" },
-              dependsOn: ["heat-main"]
-            }, {
-              type: "step",
-              stepId: "review-main",
-              family: "hold",
-              params: {},
-              dependsOn: ["missing-step"]
-            }]
-          },
-          {
-            type: "analysis",
-            id: "tlc-main",
-            type_name: "tlc",
-            ref: "rxn-main"
-          }
-        ]
-      }
-    );
-    const html = renderHtml(document, resolveRenderProfile());
+  it("keeps machine metadata out of visible program fields and renders procedure steps", () => {
+    const html = renderHtml(createProgram(), resolveRenderProfile());
 
     expect(html).not.toContain("data-source-origin");
     expect(html).not.toContain("data-declared-kind");
@@ -98,89 +184,26 @@ describe("renderHtml", () => {
     expect(html).not.toContain("Surface origin");
     expect(html).not.toContain("Declared kind");
     expect(html).not.toContain("<dt>Ref</dt>");
-    expect(html).toContain("<dt>Related</dt><dd>rxn-main</dd>");
-    expect(html).toContain('<span class="chemd-block-id">rxn-main</span>');
-    expect(html).toContain('<span class="chemd-block-id">proc-main</span>');
-    expect(html).toContain('<span class="chemd-block-id">tlc-main</span>');
-    expect(html).toContain("chemd-procedure-steps");
-    expect(html).toContain("Step 1: Heat");
-    expect(html).toContain("<dt>Temperature</dt><dd>80 C</dd>");
-    expect(html).toContain("<dt>Duration</dt><dd>4 h</dd>");
-    expect(html).toContain("<dt>Uses</dt><dd>A</dd>");
-    expect(html).toContain("<dt>Produces</dt><dd>intermediate</dd>");
-    expect(html).toContain("Step 2: Analyze");
-    expect(html).toContain("<dt>Analysis type</dt><dd>TLC</dd>");
-    expect(html).toContain("<dt>After</dt><dd>Step 1</dd>");
-    expect(html).toContain("Step 3: Hold");
-    expect(html).toContain("<dt>After</dt><dd>missing-step</dd>");
-    expect(html).not.toContain("temperature=80 C");
-    expect(html).not.toContain("depends_on=heat-main");
+    expect(html).toContain("chemd-program-procedure");
+    expect(html).toContain("data-step-id=\"heat\"");
+    expect(html).toContain("<dt>Duration</dt><dd>2 h</dd>");
+    expect(html).toContain("Inputs: @mol_a");
+    expect(html).toContain("Outputs: @rxn_1");
   });
 
-  it("renders col layout without dropping nested blocks", () => {
-    const document = createDocument(
-      { id: "exp-html-col", title: "HTML col", date: "2026-04-19" },
-      {
-        children: [{
-          type: "col",
-          columns: 2,
-          children: [
-            { type: "molecule", id: "mol-a", smiles: "CCO", cas: "64-17-5" },
-            { type: "reaction", id: "rxn-a", reactants: ["@mol-a"], products: ["product"] }
-          ]
-        }]
-      }
-    );
-    const html = renderHtml(document, resolveRenderProfile());
-
-    expect(html).toContain("chemd-block--col");
-    expect(html).toContain('data-columns="2"');
-    expect(html).toContain("64-17-5");
-    expect(html).toContain("rxn-a");
-  });
-
-  it("renders TLC plates only from typed graph normalization", () => {
-    const document = createDocument(
-      { id: "exp-html-tlc", title: "HTML TLC test", date: "2026-04-17" },
-      {
-        children: [{
-          type: "analysis",
-          id: "tlc-main",
-          type_name: "tlc",
-          data: "TLC",
-          p1: "sm 0.82"
-        }]
-      }
-    );
-    const withoutTypedGraph = renderHtml(document, resolveRenderProfile());
-    const withTypedGraph = renderHtml(document, resolveRenderProfile(), {
+  it("accepts typed graph data through the program render document", () => {
+    const html = renderHtml(createProgram(), resolveRenderProfile(), {
       typedGraph: {
+        documentId: "exp-html-program",
         nodes: [{
-          kind: "analysis",
-          nodeId: "tlc-main",
-          normalizedTlc: {
-            lanes: [{
-              lane_id: "p1",
-              lane_label_raw: "sm",
-              lane_role: "starting_material",
-              spots: [{
-                raw: "sm 0.82",
-                rf_raw: "0.82",
-                rf: 0.82,
-                shape: "circle",
-                size_rank: 3,
-                intensity_rank: 3
-              }],
-              mess_regions: [],
-              has_base: false,
-              is_none: false
-            }]
-          }
-        }]
+          kind: "reaction",
+          nodeId: "rxn_1"
+        }],
+        quantities: [],
+        diagnostics: [{ code: "TG_WARN", severity: "warning", message: "Typed graph warning" }]
       }
     });
 
-    expect(withoutTypedGraph).not.toContain("chemd-tlc-plate");
-    expect(withTypedGraph).toContain("chemd-tlc-plate");
+    expect(html).toContain("TG_WARN: Typed graph warning");
   });
 });

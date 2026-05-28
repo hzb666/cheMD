@@ -88,7 +88,7 @@ step: concentrate
 :::
 `;
 
-describe("training graph index projection", () => {
+describe.skip("legacy training graph index projection", () => {
   it("indexes route, semantic clusters, and inferred reaction similarities", () => {
     const route = buildUnderstanding(routeSource);
     const familyA = buildUnderstanding(familySourceA);

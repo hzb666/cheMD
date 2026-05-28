@@ -374,8 +374,36 @@ const createProgramCompileResult = (source: string) => {
     docs,
     document: program,
     html: "",
-    json: JSON.stringify(program),
-    lnf: { schemaVersion: "chemd-lnf/v0.5" },
+    json: JSON.stringify({
+      program: {
+        schema_version: "chemd-program-json/v1",
+        module: { name: moduleName },
+        meta: {
+          id,
+          title: "CLI Program",
+          date: "2026-04-19",
+          fields: {},
+          docs: []
+        },
+        imports: [],
+        declarations: Object.fromEntries(
+          declarations.map((declaration) => [declaration.id, {
+            id: declaration.id,
+            kind: declaration.kind
+          }])
+        ),
+        documentation: Object.fromEntries(
+          docs.map((doc) => [doc.id, {
+            id: doc.id,
+            markdown: doc.markdown
+          }])
+        ),
+        agent_runs: {}
+      },
+      semantic: { typedGraph: {} },
+      diagnostics
+    }),
+    lnf: { schemaVersion: "chemd-lnf/v1.0" },
     program,
     ragExport: {
       chunks: [{ id: `${id}:summary`, text: "program summary" }],
@@ -393,7 +421,7 @@ const createProgramCompileResult = (source: string) => {
         governance_quality: { diagnostics: governanceDiagnostics },
         training_quality: { review_required: source.includes("PII_PROGRAM"), review_reasons: [] }
       },
-      schema_version: "chemd-training-export/v0.2",
+      schema_version: "chemd-training-export/v0.3",
       source_layer: { audit_only_fields: ["source_layer.raw_source"] }
     },
     trainingUnderstanding: {
@@ -645,9 +673,10 @@ result res_main for @rxn_main {
     const payload = JSON.parse(result.stdout);
 
     expect(result.exitCode).toBe(EXIT_OK);
-    expect(payload.meta.id).toBe("exp-cli-valid");
-    expect(payload.declarations[0]).toMatchObject({ id: "mol_main", kind: "molecule" });
-    expect(payload.docs.length).toBe(1);
+    expect(payload.program.schema_version).toBe("chemd-program-json/v1");
+    expect(payload.program.meta.id).toBe("exp-cli-valid");
+    expect(payload.program.declarations.mol_main).toMatchObject({ id: "mol_main" });
+    expect(Object.keys(payload.program.documentation)).toHaveLength(1);
     expect(result.stderr).toBe("");
   });
 
@@ -668,7 +697,7 @@ result res_main for @rxn_main {
     const payload = JSON.parse(result.stdout);
 
     expect(result.exitCode).toBe(EXIT_OK);
-    expect(payload.schemaVersion).toBe("chemd-lnf/v0.5");
+    expect(payload.schemaVersion).toBe("chemd-lnf/v1.0");
   });
 
   it("exports training output", async () => {
@@ -703,7 +732,7 @@ result res_main for @rxn_main {
     const payload = JSON.parse(result.stdout);
 
     expect(result.exitCode).toBe(EXIT_OK);
-    expect(payload.schema_version).toBe("chemd-training-export/v0.2");
+    expect(payload.schema_version).toBe("chemd-training-export/v0.3");
     expect(payload.governance.source).toBe("workspace_policy");
     expect(payload.source_layer.audit_only_fields).toContain("source_layer.raw_source");
     expect(payload.source_layer).toBeDefined();

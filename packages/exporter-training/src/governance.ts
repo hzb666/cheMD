@@ -15,8 +15,8 @@ const DEFAULT_ALLOWED_USES: NonNullable<DataGovernanceInfo["allowed_uses"]> = [
 export const TRAINING_AUDIT_ONLY_FIELDS = [
   "source_layer.raw_source",
   "source_layer.resolved_source",
-  "source_layer.raw_meta",
-  "source_layer.raw_children.raw_payload",
+  "source_layer.meta",
+  "source_layer.declarations.raw_payload",
   "semantic_layer.materials.supplier",
   "semantic_layer.materials.lot",
   "semantic_layer.samples.supplier",

@@ -43,7 +43,6 @@ import {
 } from "./diagnosis";
 import { buildAuthoringAssistance } from "./authoring-assistance";
 import { buildAuthoringDiagnostics } from "./authoring-diagnostics";
-import { applyProgramSemanticLayer } from "./program-training-export";
 import type { AuthoringAssistance } from "./authoring-types";
 export {
   applyDiagnosticQuickFix,
@@ -147,7 +146,7 @@ const mergeRenderSelection = (
 };
 
 export const renderCompiledJson = (
-  document: ChemdDocument,
+  document: ChemdProgramDocument,
   typedGraph: TypedSemanticGraph
 ): string => renderJson(document, { typedGraph });
 
@@ -233,7 +232,6 @@ export const compileChemd = (source: string, options: CompileOptions = {}): Comp
         diagnostics: [...semanticProgram.diagnostics, ...renderProfileResolution.diagnostics]
       }
     : semanticProgram;
-  const legacyDocument = createLegacyDocumentBridge(renderProgram);
   const runPlan = buildRunPlan({
     documentId: renderProgram.meta.id,
     typedGraph: typecheckResult.typedGraph,
@@ -243,18 +241,18 @@ export const compileChemd = (source: string, options: CompileOptions = {}): Comp
     capabilities: DEFAULT_RUNTIME_CAPABILITIES
   });
   const lnf = buildCanonicalLnf({
-    document: legacyDocument,
+    document: renderProgram,
     typedGraph: typecheckResult.typedGraph,
     stepGraph: typecheckResult.stepGraph,
-    diagnostics: legacyDocument.diagnostics,
+    diagnostics: renderProgram.diagnostics,
     runPlan,
     runtimePreflight
   });
-  const trainingExport = applyProgramSemanticLayer(exportTrainingRecordFromDocument(legacyDocument, {
+  const trainingExport = exportTrainingRecordFromDocument(renderProgram, {
     stepGraph: typecheckResult.stepGraph,
     typedGraph: typecheckResult.typedGraph,
     lnf
-  }), renderProgram);
+  });
   const ragExport = buildRagExportFromTrainingRecord(trainingExport);
   const trainingUnderstanding = buildTrainingUnderstandingFromRecord(trainingExport);
   const authoringAssistance = buildAuthoringAssistance(renderProgram, trainingExport);
@@ -269,9 +267,9 @@ export const compileChemd = (source: string, options: CompileOptions = {}): Comp
   const diagnosis = buildCompilerDiagnosis(compileProgram.diagnostics);
   const renderOptions = renderProfileResolution.options;
   const renderAdapterPayload = mapRenderOptionsToAdapterPayload(renderOptions);
-  const html = renderHtml(compileDocument, renderOptions, { typedGraph: typecheckResult.typedGraph });
-  const json = renderCompiledJson(compileDocument, typecheckResult.typedGraph);
-  const docxBridge = renderDocxBridge(compileDocument, renderOptions, renderAdapterPayload, {
+  const html = renderHtml(compileProgram, renderOptions, { typedGraph: typecheckResult.typedGraph });
+  const json = renderCompiledJson(compileProgram, typecheckResult.typedGraph);
+  const docxBridge = renderDocxBridge(compileProgram, renderOptions, renderAdapterPayload, {
     typedGraph: typecheckResult.typedGraph
   });
 

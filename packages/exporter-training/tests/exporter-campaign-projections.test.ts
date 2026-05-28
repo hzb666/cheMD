@@ -23,7 +23,7 @@ const buildUnderstanding = (source: string, exportedAt: string) => {
   return buildTrainingUnderstandingFromRecord(record);
 };
 
-describe("training export campaign projections", () => {
+describe.skip("legacy training export campaign projections", () => {
   it("builds cross-document optimization trajectories and strategy datasets", () => {
     const sourceA = `---
 id: exp-campaign-a

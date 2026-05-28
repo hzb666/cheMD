@@ -94,6 +94,11 @@ const readNormalizedValue = (
   value: { normalized?: string } | null | undefined
 ): string | null => value?.normalized ?? null;
 
+const readConditionValue = (
+  value: { normalized?: string } | null | undefined,
+  raw: string | undefined
+): string | null => readNormalizedValue(value) ?? raw ?? null;
+
 const readNormalizedList = (
   value: { normalized?: string[] } | null | undefined
 ): string | null => value?.normalized ? value.normalized.join(", ") : null;
@@ -120,8 +125,8 @@ const buildVariableMap = (
   return {
     reactants: participantList(reaction.reactants),
     products: participantList(reaction.products),
-    solvent: readNormalizedValue(reaction.normalized_conditions.solvent),
-    catalyst: readNormalizedValue(reaction.normalized_conditions.catalyst),
+    solvent: readConditionValue(reaction.normalized_conditions.solvent, reaction.solvent_raw),
+    catalyst: readConditionValue(reaction.normalized_conditions.catalyst, reaction.catalyst_raw),
     reagents: readNormalizedList(reaction.normalized_conditions.reagents),
     atmosphere: readNormalizedValue(reaction.normalized_conditions.atmosphere),
     temperature: formatNumeric(reaction.normalized_conditions.temperature),

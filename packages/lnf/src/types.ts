@@ -1,14 +1,40 @@
-import type { ChemdDocument, Diagnostic, NormalizedReactionConditions } from "@chemd/core";
+import type {
+  AgentPatchDecisionDeclaration,
+  AgentPatchProposalDeclaration,
+  AgentRunDeclaration,
+  ArtifactDeclaration,
+  BatchDeclaration,
+  ChemdDeclaration,
+  ChemdDocComment,
+  ChemdDocCommentAttachment,
+  ChemdMetaDeclaration,
+  ChemdModuleDeclaration,
+  ChemdProgramDeclarationKind,
+  ChemdProgramDocument,
+  ChemdValue,
+  ConditionScreenDeclaration,
+  Diagnostic,
+  MaterialDeclaration,
+  MoleculeDeclaration,
+  ReactionDeclaration,
+  ResultDeclaration,
+  AnalysisDeclaration,
+  SampleDeclaration,
+  SourceSpan,
+  TraceDeclaration
+} from "@chemd/core";
 import type { V03Diagnostic } from "@chemd/diagnostics";
 import type {
   CanonicalStepNode,
   ObservationEventNode,
   CanonicalProcedureControlNode,
+  ProcedureLoweringResult,
   StepGraph
 } from "@chemd/step-ontology";
 import type {
   QuantityType,
-  TypedSemanticGraph
+  TypedSemanticGraph,
+  TypedSemanticNode
 } from "@chemd/typechecker";
 import type {
   LabState,
@@ -21,7 +47,53 @@ export interface LnfDocumentInfo {
   id: string;
   title: string;
   date: string;
+  moduleName: string;
+  sourceLanguage: ChemdProgramDocument["sourceLanguage"];
 }
+
+export interface LnfDeclarationIndexEntry {
+  declarationId: string;
+  qualifiedId: string;
+  declarationKind: ChemdProgramDeclarationKind;
+  sourceSpan?: SourceSpan;
+  docIds: string[];
+}
+
+export interface LnfProgramSource {
+  module: ChemdModuleDeclaration;
+  meta: ChemdMetaDeclaration;
+  declarationIndex: LnfDeclarationIndexEntry[];
+  documentation: ChemdDocComment[];
+}
+
+export interface LnfEntityBase<
+  Declaration extends ChemdDeclaration,
+  TypedNode extends TypedSemanticNode | undefined = undefined
+> {
+  declarationId: string;
+  qualifiedId: string;
+  declarationKind: Declaration["kind"];
+  fields: Record<string, ChemdValue>;
+  annotations?: Declaration["annotations"];
+  sourceSpan?: SourceSpan;
+  docIds: string[];
+  declaration: Declaration;
+  typedNode?: TypedNode;
+}
+
+export type LnfMolecule = LnfEntityBase<MoleculeDeclaration, Extract<TypedSemanticNode, { kind: "molecule" }>>;
+export type LnfMaterial = LnfEntityBase<MaterialDeclaration, Extract<TypedSemanticNode, { kind: "material" }>>;
+export type LnfBatch = LnfEntityBase<BatchDeclaration, Extract<TypedSemanticNode, { kind: "batch" }>>;
+export type LnfReaction = LnfEntityBase<ReactionDeclaration, Extract<TypedSemanticNode, { kind: "reaction" }>>;
+export type LnfResult = LnfEntityBase<ResultDeclaration, Extract<TypedSemanticNode, { kind: "result" }>>;
+export type LnfAnalysis = LnfEntityBase<AnalysisDeclaration, Extract<TypedSemanticNode, { kind: "analysis" }>>;
+export type LnfSample = LnfEntityBase<SampleDeclaration, Extract<TypedSemanticNode, { kind: "sample" }>>;
+export type LnfArtifact = LnfEntityBase<ArtifactDeclaration, Extract<TypedSemanticNode, { kind: "artifact" }>>;
+export type LnfConditionScreen = LnfEntityBase<
+  ConditionScreenDeclaration,
+  Extract<TypedSemanticNode, { kind: "condition_screen" }>
+>;
+export type LnfTrace = LnfEntityBase<TraceDeclaration, Extract<TypedSemanticNode, { kind: "trace" }>>;
 
 export interface LnfStep {
   stepId: string;
@@ -44,27 +116,16 @@ export interface LnfStep {
   loweringConfidence: number;
 }
 
-export interface LnfReaction {
-  nodeId: string;
-  syntaxOrigin?: string;
-  declaredKind?: string;
-  reactants: unknown[];
-  products: unknown[];
-  conditions: Record<string, unknown>;
-  normalizedConditions?: NormalizedReactionConditions;
+export interface LnfProcedure {
+  procedureId?: string;
+  lowering: ProcedureLoweringResult;
 }
 
-export interface LnfResult {
-  nodeId: string;
-  status?: string;
-  outcome: Record<string, QuantityType | undefined>;
-  notes?: string;
-}
-
-export interface LnfMigrationSummary {
-  legacyBlockCount: number;
-  missingKindCount: number;
-  conflictCount: number;
+export interface LnfDocumentationLink {
+  docId: string;
+  attachment: ChemdDocCommentAttachment;
+  references: ChemdDocComment["references"];
+  links: ChemdDocComment["links"];
 }
 
 export interface LnfRuntimeSummary {
@@ -120,25 +181,61 @@ export interface LnfRuntimePlanSummary {
   steps: LnfRuntimeStepSummary[];
 }
 
-export interface ChemdLnfCanonical {
-  schemaVersion: "chemd-lnf/v0.5";
+export interface LnfAgentPatchProposal {
+  runId: string;
+  patch: AgentPatchProposalDeclaration;
+}
+
+export interface LnfAgentPatchDecision {
+  runId: string;
+  decision: AgentPatchDecisionDeclaration;
+}
+
+export interface LnfAgentSection {
+  runs: AgentRunDeclaration[];
+  patches: LnfAgentPatchProposal[];
+  decisions: LnfAgentPatchDecision[];
+}
+
+export interface LnfSourceCompletenessSummary {
+  declarationCount: number;
+  documentationCount: number;
+  unresolvedReferenceCount: number;
+  incompleteDeclarationCount: number;
+  agentAuditRunCount: number;
+}
+
+export interface ChemdLnfCanonicalV1 {
+  schemaVersion: "chemd-lnf/v1.0";
   experiment: {
     document: LnfDocumentInfo;
+    source: LnfProgramSource;
     entities: {
+      molecules: LnfMolecule[];
+      materials: LnfMaterial[];
+      batches: LnfBatch[];
       reactions: LnfReaction[];
       results: LnfResult[];
+      analyses: LnfAnalysis[];
+      samples: LnfSample[];
+      artifacts: LnfArtifact[];
+      conditionScreens: LnfConditionScreen[];
     };
     semantic: {
       typedGraph: TypedSemanticGraph;
       quantities: QuantityType[];
+      documentationLinks: LnfDocumentationLink[];
     };
     workflow: {
+      procedures: LnfProcedure[];
       steps: LnfStep[];
       controls?: CanonicalProcedureControlNode[];
       observations: ObservationEventNode[];
+      traces: LnfTrace[];
       diagnostics: V03Diagnostic[];
       stepSources: LnfStepSourceIndex;
     };
+    agent?: LnfAgentSection;
     runtime?: {
       planSummary?: LnfRuntimePlanSummary;
       stateSummary?: LnfRuntimeSummary;
@@ -146,15 +243,15 @@ export interface ChemdLnfCanonical {
     };
     quality: {
       diagnostics: Array<Diagnostic | V03Diagnostic>;
-      migration: LnfMigrationSummary;
+      sourceCompleteness: LnfSourceCompletenessSummary;
     };
   };
 }
 
-export type ChemdLnf = ChemdLnfCanonical;
+export type ChemdLnf = ChemdLnfCanonicalV1;
 
 export interface BuildLnfInput {
-  document: ChemdDocument | LnfDocumentInfo;
+  document: ChemdProgramDocument;
   typedGraph: TypedSemanticGraph;
   stepGraph: StepGraph;
   diagnostics: Array<Diagnostic | V03Diagnostic>;

@@ -9,76 +9,87 @@ LNF 是 canonical lab-normal form。它通过 CLI export 暴露：
 pnpm chemd export ./examples/example.chemd --format lnf
 ```
 
-schema version 为 `chemd-lnf/v0.5`。
+schema version 为 `chemd-lnf/v1.0`。
 
 ## 输出形状
 
 `ChemdLnf` 包含：
 
-- `experiment.document`：ID、title 和 date
-- `experiment.entities.reactions`：reaction node IDs、participants、raw conditions 和 normalized conditions
-- `experiment.entities.results`：result node IDs、status、outcome quantities 和 notes
+- `experiment.document`：ID、title、date、module name 和 source language
+- `experiment.source`：module、meta、declaration index 和 documentation comments
+- `experiment.entities`：来自 program declarations 的 molecules、materials、batches、reactions、results、analyses、samples、artifacts 和 condition screens
 - `experiment.semantic.typedGraph`：typed semantic graph
 - `experiment.semantic.quantities`：normalized quantity records
+- `experiment.semantic.documentationLinks`：doc comment references 和 attachments
+- `experiment.workflow.procedures`：procedure lowering summaries
 - `experiment.workflow.steps`：canonical step nodes，包含 params、inputs、outputs、dependencies、evidence、artifacts、effects、control path、source、provenance、raw text 和 lowering confidence
 - `experiment.workflow.controls`：canonical procedure control nodes
 - `experiment.workflow.observations`：observation event nodes
+- `experiment.workflow.traces`：trace declarations
 - `experiment.workflow.diagnostics`
 - `experiment.workflow.stepSources`：explicit step IDs、lowered step IDs 和 observation-event source index
+- `experiment.agent`：agent runs、patch proposals 和 decisions
 - `experiment.runtime`：可用时的 run plan summary、state summary 和 preflight
-- `experiment.quality`：diagnostics 和 migration summary
+- `experiment.quality`：diagnostics 和 source completeness
 
 ## 示例
 
 ```json
 {
-  "schemaVersion": "chemd-lnf/v0.5",
+  "schemaVersion": "chemd-lnf/v1.0",
   "experiment": {
     "document": {
       "id": "exp-export-example",
       "title": "Export example",
-      "date": "2026-05-21"
+      "date": "2026-05-21",
+      "moduleName": "exp_export_example",
+      "sourceLanguage": "chemd/program-v1"
+    },
+    "source": {
+      "module": { "name": "exp_export_example" },
+      "declarationIndex": [
+        {
+          "declarationId": "rxn_main",
+          "declarationKind": "reaction",
+          "docIds": []
+        }
+      ],
+      "documentation": []
     },
     "entities": {
       "reactions": [
         {
-          "nodeId": "rxn-main",
-          "reactants": ["@mol-a | 1.0 mmol | 1.0 eq | limiting=true"],
-          "products": ["@mol-b"],
-          "conditions": { "solvent": "MeCN", "temperature": "60 C" },
-          "normalizedConditions": {
-            "solvent": { "raw": "MeCN", "normalized": "MeCN" },
-            "temperature": { "raw": "60 C", "value": 60, "unit": "C" }
+          "declarationId": "rxn_main",
+          "declarationKind": "reaction",
+          "fields": {
+            "solvent": { "type": "string", "value": "MeCN" }
           }
-        }
-      ],
-      "results": [
-        {
-          "nodeId": "res-main",
-          "status": "success",
-          "outcome": { "yield": { "raw": "78%", "value": 78, "unit": "%" } }
         }
       ]
     },
     "workflow": {
       "steps": [
         {
-          "stepId": "s-add",
+          "stepId": "s_add",
           "family": "add",
           "params": {},
-          "inputs": ["@mol-a"],
-          "outputs": ["mixture-main"],
-          "rawText": "add | id=s-add | inputs=@mol-a | outputs=mixture-main",
+          "rawText": "step s_add = add(inputs: [@mol_a])",
           "loweringConfidence": 1
         }
       ],
-      "observations": [
-        { "eventId": "e-color", "eventType": "color_change", "linkedStepId": "s-add" }
-      ],
       "stepSources": {
-        "explicitStepIds": ["s-add"],
+        "explicitStepIds": ["s_add"],
         "loweredStepIds": [],
-        "observationEvents": [{ "observationId": "obs-main", "eventId": "e-color" }]
+        "observationEvents": []
+      }
+    },
+    "quality": {
+      "sourceCompleteness": {
+        "declarationCount": 4,
+        "documentationCount": 0,
+        "unresolvedReferenceCount": 0,
+        "incompleteDeclarationCount": 0,
+        "agentAuditRunCount": 0
       }
     }
   }

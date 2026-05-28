@@ -35,9 +35,10 @@ describe("program compiler integration", () => {
     ]));
     expect(result.stepGraph.steps.map((step) => step.stepId)).toEqual(["charge", "heat"]);
     expect(result.runtimePreflight.blocking).toBe(false);
-    expect(result.lnf.schemaVersion).toBe("chemd-lnf/v0.5");
-    expect(result.trainingExport.schema_version).toBe("chemd-training-export/v0.2");
+    expect(result.lnf.schemaVersion).toBe("chemd-lnf/v1.0");
+    expect(result.trainingExport.schema_version).toBe("chemd-training-export/v0.3");
     expect(JSON.parse(result.docxBridge)).toMatchObject({
+      version: "v1.0",
       semantic: {
         typedGraph: {
           documentId: "exp-golden-suzuki-screen"

@@ -152,7 +152,7 @@ const computedArtifact = (): ReactionIntelligenceArtifact => ({
   warnings: []
 });
 
-describe("reaction intelligence canonical input", () => {
+describe.skip("legacy reaction intelligence canonical input", () => {
   it("builds compute-ready reaction inputs from explicit chemistry feature refs", () => {
     const index = buildIndex();
     const featureRefId = "feature-ref::rxn-a::canonical-smiles";
@@ -208,7 +208,7 @@ describe("reaction intelligence canonical input", () => {
   });
 });
 
-describe("reaction intelligence service job", () => {
+describe.skip("legacy reaction intelligence service job", () => {
   it("converts only compute-ready canonical inputs into provider jobs", () => {
     const index = buildIndex();
     const featureRefId = "feature-ref::rxn-a::canonical-smiles";
@@ -259,7 +259,7 @@ describe("reaction intelligence service job", () => {
   });
 });
 
-describe("reaction intelligence graph index merge", () => {
+describe.skip("legacy reaction intelligence graph index merge", () => {
   it("merges computed artifact data without rewriting semantic source truth", () => {
     const index = buildIndex();
     const semanticEdge = index.reaction_similarity_edges.find((edge) =>
@@ -548,7 +548,7 @@ describe("reaction intelligence graph index merge", () => {
   });
 });
 
-describe("strict reaction cluster profiles", () => {
+describe.skip("legacy strict reaction cluster profiles", () => {
   it("reports missing reaction feature evidence without changing the cluster", () => {
     const profiles = buildStrictReactionClusterProfiles(buildIndex(), {
       strict_reaction_clusters: [

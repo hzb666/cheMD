@@ -1,44 +1,25 @@
-import type { Diagnostic } from "@chemd/core";
-import type { V03Diagnostic } from "@chemd/diagnostics";
-import type { CanonicalStepNode, ObservationEventNode, StepGraph } from "@chemd/step-ontology";
-import type {
-  TypedReactionNode,
-  TypedResultNode,
-  TypedSemanticNode
-} from "@chemd/typechecker";
+import type { ObservationEventNode, CanonicalStepNode, StepGraph } from "@chemd/step-ontology";
 import type { PreflightResult, RunPlan, RuntimeStep } from "@chemd/runtime-lab";
 
+import {
+  buildSourceCompleteness,
+  declarationsOfKind,
+  toAgentSection,
+  toDeclarationIndexEntry,
+  toDocumentInfo,
+  toDocumentationLink,
+  toLnfEntity,
+  toProcedures
+} from "./program-source";
 import type {
   BuildLnfInput,
   ChemdLnf,
-  LnfDocumentInfo,
-  LnfMigrationSummary,
-  LnfReaction,
-  LnfResult,
   LnfRuntimePlanSummary,
   LnfRuntimeStepSummary,
   LnfRuntimeSummary,
   LnfStep,
   LnfStepSourceIndex
 } from "./types";
-
-const toDocumentInfo = (document: BuildLnfInput["document"]): LnfDocumentInfo => {
-  if ("meta" in document) {
-    return {
-      id: document.meta.id,
-      title: document.meta.title,
-      date: document.meta.date
-    };
-  }
-
-  return document;
-};
-
-const isReactionNode = (node: TypedSemanticNode): node is TypedReactionNode =>
-  node.kind === "reaction";
-
-const isResultNode = (node: TypedSemanticNode): node is TypedResultNode =>
-  node.kind === "result";
 
 const toLnfStep = (step: CanonicalStepNode): LnfStep => ({
   stepId: step.stepId,
@@ -61,51 +42,23 @@ const toLnfStep = (step: CanonicalStepNode): LnfStep => ({
   loweringConfidence: step.loweringConfidence
 });
 
-const toLnfReaction = (node: TypedReactionNode): LnfReaction => ({
-  nodeId: node.nodeId,
-  syntaxOrigin: node.syntaxOrigin,
-  declaredKind: node.declaredKind,
-  reactants: node.reactants,
-  products: node.products,
-  conditions: {
-    solvent: node.solvent,
-    catalyst: node.catalyst,
-    reagents: node.reagents,
-    atmosphere: node.atmosphere,
-    temperature: node.temperature,
-    time: node.time,
-    pressure: node.pressure
-  },
-  normalizedConditions: node.normalizedConditions
-});
-
-const toLnfResult = (node: TypedResultNode): LnfResult => ({
-  nodeId: node.nodeId,
-  status: node.status,
-  outcome: {
-    yield: node.yield,
-    conversion: node.conversion,
-    selectivity: node.selectivity,
-    purity: node.purity,
-    isolatedMass: node.isolatedMass
-  },
-  notes: node.notes
-});
-
 const toObservationEvents = (stepGraph: StepGraph): ObservationEventNode[] =>
   stepGraph.observations.flatMap((observation) => observation.events);
 
-const countDiagnostics = (
-  diagnostics: Array<Diagnostic | V03Diagnostic>,
-  code: string
-): number => diagnostics.filter((diagnostic) => diagnostic.code === code).length;
-
-const buildMigrationSummary = (
-  diagnostics: Array<Diagnostic | V03Diagnostic>
-): LnfMigrationSummary => ({
-  legacyBlockCount: 0,
-  missingKindCount: countDiagnostics(diagnostics, "W_CHEMD_KIND_AMBIGUOUS"),
-  conflictCount: countDiagnostics(diagnostics, "E_CHEMD_KIND_CONFLICT")
+const toStepSourceIndex = (
+  steps: LnfStep[],
+  observations: ObservationEventNode[]
+): LnfStepSourceIndex => ({
+  explicitStepIds: steps
+    .filter((step) => step.sourceType === "explicit_step")
+    .map((step) => step.stepId),
+  loweredStepIds: steps
+    .filter((step) => step.sourceType === "lowered_step")
+    .map((step) => step.stepId),
+  observationEvents: observations.map((observation) => ({
+    observationId: observation.observationId,
+    eventId: observation.eventId
+  }))
 });
 
 const toRuntimeStepStates = (
@@ -128,13 +81,13 @@ const toRuntimeSummary = (input: BuildLnfInput): LnfRuntimeSummary | undefined =
 
   const runtimeState = input.runtimeState;
   return {
-    planId: runtimeState?.planId ?? input.runPlan?.planId,
-    runId: runtimeState?.runId,
-    mode: runtimeState?.mode,
-    status: runtimeState?.status ?? input.runPlan?.status,
-    currentStepId: runtimeState?.currentStepId,
+    planId: runtimeState.planId ?? input.runPlan?.planId,
+    runId: runtimeState.runId,
+    mode: runtimeState.mode,
+    status: runtimeState.status ?? input.runPlan?.status,
+    currentStepId: runtimeState.currentStepId,
     stepCount: countRuntimeSteps(input),
-    traceCount: runtimeState?.trace.length ?? 0,
+    traceCount: runtimeState.trace.length,
     stepStates: toRuntimeStepStates(runtimeState),
     controlStates: runtimeState.controlStates.map((control) => ({
       controlId: control.controlId,
@@ -144,22 +97,6 @@ const toRuntimeSummary = (input: BuildLnfInput): LnfRuntimeSummary | undefined =
     }))
   };
 };
-
-const toStepSourceIndex = (
-  steps: LnfStep[],
-  observations: ObservationEventNode[]
-): LnfStepSourceIndex => ({
-  explicitStepIds: steps
-    .filter((step) => step.sourceType === "explicit_step")
-    .map((step) => step.stepId),
-  loweredStepIds: steps
-    .filter((step) => step.sourceType === "lowered_step")
-    .map((step) => step.stepId),
-  observationEvents: observations.map((observation) => ({
-    observationId: observation.observationId,
-    eventId: observation.eventId
-  }))
-});
 
 const toRuntimeStepSummary = (step: RuntimeStep): LnfRuntimeStepSummary => ({
   stepId: step.stepId,
@@ -210,30 +147,58 @@ export const buildCanonicalLnf = (input: BuildLnfInput): ChemdLnf => {
         ...(input.runtimePreflight ? { preflight: input.runtimePreflight } : {})
       }
     : undefined;
+  const agent = toAgentSection(input.document);
 
   return {
-    schemaVersion: "chemd-lnf/v0.5",
+    schemaVersion: "chemd-lnf/v1.0",
     experiment: {
-      document: toDocumentInfo(input.document),
+      document: toDocumentInfo(input),
+      source: {
+        module: input.document.module,
+        meta: input.document.meta,
+        declarationIndex: input.document.declarations.map(toDeclarationIndexEntry),
+        documentation: input.document.docs
+      },
       entities: {
-        reactions: input.typedGraph.nodes.filter(isReactionNode).map(toLnfReaction),
-        results: input.typedGraph.nodes.filter(isResultNode).map(toLnfResult)
+        molecules: declarationsOfKind(input, "molecule")
+          .map((declaration) => toLnfEntity(declaration, input.typedGraph.nodes, "molecule")),
+        materials: declarationsOfKind(input, "material")
+          .map((declaration) => toLnfEntity(declaration, input.typedGraph.nodes, "material")),
+        batches: declarationsOfKind(input, "batch")
+          .map((declaration) => toLnfEntity(declaration, input.typedGraph.nodes, "batch")),
+        reactions: declarationsOfKind(input, "reaction")
+          .map((declaration) => toLnfEntity(declaration, input.typedGraph.nodes, "reaction")),
+        results: declarationsOfKind(input, "result")
+          .map((declaration) => toLnfEntity(declaration, input.typedGraph.nodes, "result")),
+        analyses: declarationsOfKind(input, "analysis")
+          .map((declaration) => toLnfEntity(declaration, input.typedGraph.nodes, "analysis")),
+        samples: declarationsOfKind(input, "sample")
+          .map((declaration) => toLnfEntity(declaration, input.typedGraph.nodes, "sample")),
+        artifacts: declarationsOfKind(input, "artifact")
+          .map((declaration) => toLnfEntity(declaration, input.typedGraph.nodes, "artifact")),
+        conditionScreens: declarationsOfKind(input, "condition_screen")
+          .map((declaration) => toLnfEntity(declaration, input.typedGraph.nodes, "condition_screen"))
       },
       semantic: {
         typedGraph: input.typedGraph,
-        quantities: input.typedGraph.quantities
+        quantities: input.typedGraph.quantities,
+        documentationLinks: input.document.docs.map(toDocumentationLink)
       },
       workflow: {
+        procedures: toProcedures(input.stepGraph),
         steps,
         controls: input.stepGraph.controls,
         observations,
+        traces: declarationsOfKind(input, "trace")
+          .map((declaration) => toLnfEntity(declaration, input.typedGraph.nodes, "trace")),
         diagnostics: input.stepGraph.diagnostics,
         stepSources: toStepSourceIndex(steps, observations)
       },
+      ...(agent ? { agent } : {}),
       ...(runtime ? { runtime } : {}),
       quality: {
         diagnostics: input.diagnostics,
-        migration: buildMigrationSummary(input.diagnostics)
+        sourceCompleteness: buildSourceCompleteness(input)
       }
     }
   };

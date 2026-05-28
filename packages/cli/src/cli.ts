@@ -1290,7 +1290,7 @@ const preflightFile = (
 
 const selectExportPayload = (result: CompileResult, format: ExportFormat): unknown => {
   if (format === "json") {
-    return getCompileProgram(result);
+    return JSON.parse(result.json);
   }
 
   if (format === "lnf") {

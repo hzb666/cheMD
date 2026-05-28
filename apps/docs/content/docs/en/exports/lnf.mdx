@@ -9,76 +9,87 @@ LNF is the canonical lab-normal form. It is exposed through CLI export:
 pnpm chemd export ./examples/example.chemd --format lnf
 ```
 
-The schema version is `chemd-lnf/v0.5`.
+The schema version is `chemd-lnf/v1.0`.
 
 ## Output Shape
 
 `ChemdLnf` contains:
 
-- `experiment.document`: ID, title, and date
-- `experiment.entities.reactions`: reaction node IDs, participants, raw conditions, and normalized conditions
-- `experiment.entities.results`: result node IDs, status, outcome quantities, and notes
+- `experiment.document`: ID, title, date, module name, and source language
+- `experiment.source`: module, meta, declaration index, and documentation comments
+- `experiment.entities`: program declaration entities for molecules, materials, batches, reactions, results, analyses, samples, artifacts, and condition screens
 - `experiment.semantic.typedGraph`: typed semantic graph
 - `experiment.semantic.quantities`: normalized quantity records
+- `experiment.semantic.documentationLinks`: doc comment references and attachments
+- `experiment.workflow.procedures`: procedure lowering summaries
 - `experiment.workflow.steps`: canonical step nodes with params, inputs, outputs, dependencies, evidence, artifacts, effects, control path, source, provenance, raw text, and lowering confidence
 - `experiment.workflow.controls`: canonical procedure control nodes
 - `experiment.workflow.observations`: observation event nodes
+- `experiment.workflow.traces`: trace declarations
 - `experiment.workflow.diagnostics`
 - `experiment.workflow.stepSources`: explicit step IDs, lowered step IDs, and observation-event source index
+- `experiment.agent`: agent runs, patch proposals, and decisions
 - `experiment.runtime`: run plan summary, state summary, and preflight when available
-- `experiment.quality`: diagnostics and migration summary
+- `experiment.quality`: diagnostics and source completeness
 
 ## Example
 
 ```json
 {
-  "schemaVersion": "chemd-lnf/v0.5",
+  "schemaVersion": "chemd-lnf/v1.0",
   "experiment": {
     "document": {
       "id": "exp-export-example",
       "title": "Export example",
-      "date": "2026-05-21"
+      "date": "2026-05-21",
+      "moduleName": "exp_export_example",
+      "sourceLanguage": "chemd/program-v1"
+    },
+    "source": {
+      "module": { "name": "exp_export_example" },
+      "declarationIndex": [
+        {
+          "declarationId": "rxn_main",
+          "declarationKind": "reaction",
+          "docIds": []
+        }
+      ],
+      "documentation": []
     },
     "entities": {
       "reactions": [
         {
-          "nodeId": "rxn-main",
-          "reactants": ["@mol-a | 1.0 mmol | 1.0 eq | limiting=true"],
-          "products": ["@mol-b"],
-          "conditions": { "solvent": "MeCN", "temperature": "60 C" },
-          "normalizedConditions": {
-            "solvent": { "raw": "MeCN", "normalized": "MeCN" },
-            "temperature": { "raw": "60 C", "value": 60, "unit": "C" }
+          "declarationId": "rxn_main",
+          "declarationKind": "reaction",
+          "fields": {
+            "solvent": { "type": "string", "value": "MeCN" }
           }
-        }
-      ],
-      "results": [
-        {
-          "nodeId": "res-main",
-          "status": "success",
-          "outcome": { "yield": { "raw": "78%", "value": 78, "unit": "%" } }
         }
       ]
     },
     "workflow": {
       "steps": [
         {
-          "stepId": "s-add",
+          "stepId": "s_add",
           "family": "add",
           "params": {},
-          "inputs": ["@mol-a"],
-          "outputs": ["mixture-main"],
-          "rawText": "add | id=s-add | inputs=@mol-a | outputs=mixture-main",
+          "rawText": "step s_add = add(inputs: [@mol_a])",
           "loweringConfidence": 1
         }
       ],
-      "observations": [
-        { "eventId": "e-color", "eventType": "color_change", "linkedStepId": "s-add" }
-      ],
       "stepSources": {
-        "explicitStepIds": ["s-add"],
+        "explicitStepIds": ["s_add"],
         "loweredStepIds": [],
-        "observationEvents": [{ "observationId": "obs-main", "eventId": "e-color" }]
+        "observationEvents": []
+      }
+    },
+    "quality": {
+      "sourceCompleteness": {
+        "declarationCount": 4,
+        "documentationCount": 0,
+        "unresolvedReferenceCount": 0,
+        "incompleteDeclarationCount": 0,
+        "agentAuditRunCount": 0
       }
     }
   }

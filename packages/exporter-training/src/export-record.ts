@@ -5,10 +5,11 @@ import type { TypedSemanticGraph } from "@chemd/typechecker";
 
 import { buildLearningLayer } from "./learning-layer";
 import { buildDataGovernanceInfo } from "./governance";
+import { buildProgramSemanticLayer } from "./program-semantic-layer";
 import { buildQualityLayer } from "./quality-layer";
 import { buildSemanticLayer } from "./semantic-layer";
-import { buildSourceLayer } from "./source-layer";
-import type { ChemdTrainingExportV2, ExportedDocumentInfo } from "./types";
+import { buildProgramSourceLayer, buildSourceLayer } from "./source-layer";
+import type { ChemdTrainingExportV3, ExportedDocumentInfo } from "./types";
 
 const DEFAULT_EXPORTER_MODULE = "@chemd/exporter-training";
 const DEFAULT_EXPORTER_VERSION = "0.0.0";
@@ -23,27 +24,50 @@ export interface ExportTrainingRecordOptions {
   lnf?: ChemdLnf;
 }
 
-const toDocumentInfo = (document: ChemdDocument): ExportedDocumentInfo => {
-  const tags = Array.isArray(document.meta.tags)
-    ? document.meta.tags.filter((value): value is string => typeof value === "string")
-    : undefined;
+const valueText = (value: unknown): string | undefined => {
+  if (!value || typeof value !== "object") return typeof value === "string" ? value : undefined;
+  const record = value as { type?: string; value?: unknown; name?: unknown; raw?: unknown; target?: unknown };
+  if (record.type === "string" && typeof record.value === "string") return record.value;
+  if (record.type === "identifier" && typeof record.name === "string") return record.name;
+  if (record.type === "reference" && typeof record.target === "string") return record.target;
+  return typeof record.raw === "string" ? record.raw : undefined;
+};
+
+const valueList = (value: unknown): string[] | undefined => {
+  if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string");
+  if (value && typeof value === "object" && (value as { type?: string }).type === "list") {
+    const items = (value as { items?: unknown[] }).items ?? [];
+    return items.map(valueText).filter((item): item is string => Boolean(item));
+  }
+  return undefined;
+};
+
+const toDocumentInfo = (document: ChemdDocument | ChemdProgramDocument): ExportedDocumentInfo => {
+  const metaFields = isChemdDocument(document) ? document.meta : document.meta.fields;
+  const tags = valueList(metaFields.tags);
+  const primary = isChemdDocument(document) ? undefined : document.meta.primary;
 
   return {
     document_id: document.meta.id,
     title: document.meta.title,
     date: document.meta.date,
     ...(tags && tags.length > 0 ? { tags } : {}),
-    ...(typeof document.meta.primary_molecule === "string"
+    ...(isChemdDocument(document) && typeof document.meta.primary_molecule === "string"
       ? { primary_molecule_id: document.meta.primary_molecule }
-      : {}),
-    ...(typeof document.meta.primary_reaction === "string"
+      : primary?.molecule ? { primary_molecule_id: primary.molecule.target } : {}),
+    ...(isChemdDocument(document) && typeof document.meta.primary_reaction === "string"
       ? { primary_reaction_id: document.meta.primary_reaction }
-      : {}),
-    ...(typeof document.meta.primary_result === "string" ? { primary_result_id: document.meta.primary_result } : {}),
-    ...(typeof document.meta.primary_analysis === "string"
+      : primary?.reaction ? { primary_reaction_id: primary.reaction.target } : {}),
+    ...(isChemdDocument(document) && typeof document.meta.primary_result === "string"
+      ? { primary_result_id: document.meta.primary_result }
+      : primary?.result ? { primary_result_id: primary.result.target } : {}),
+    ...(isChemdDocument(document) && typeof document.meta.primary_analysis === "string"
       ? { primary_analysis_id: document.meta.primary_analysis }
-      : {}),
-    ...(typeof document.meta.primary_sample === "string" ? { primary_sample_id: document.meta.primary_sample } : {})
+      : primary?.analysis ? { primary_analysis_id: primary.analysis.target } : {}),
+    ...(isChemdDocument(document) && typeof document.meta.primary_sample === "string"
+      ? { primary_sample_id: document.meta.primary_sample }
+      : primary?.sample ? { primary_sample_id: primary.sample.target } : {}),
+    language: isChemdDocument(document) ? undefined : document.sourceLanguage
   };
 };
 
@@ -68,54 +92,40 @@ const createEmptyTypedGraph = (documentId: string): TypedSemanticGraph => ({
 const isChemdDocument = (document: ChemdDocument | ChemdProgramDocument): document is ChemdDocument =>
   document.type === "document";
 
-const createProgramLegacyBridge = (program: ChemdProgramDocument): ChemdDocument => ({
-  type: "document",
-  meta: {
-    id: program.meta.id,
-    title: program.meta.title,
-    date: program.meta.date
-  },
-  children: [],
-  diagnostics: program.diagnostics,
-  ...(program.source ? { source: program.source } : {}),
-  ...(program.renderSelection ? { renderSelection: program.renderSelection } : {})
-});
-
 export const exportTrainingRecordFromDocument = (
   document: ChemdDocument | ChemdProgramDocument,
   options: ExportTrainingRecordOptions = {}
-): ChemdTrainingExportV2 => {
-  const sourceDocument = isChemdDocument(document)
-    ? document
-    : createProgramLegacyBridge(document);
+): ChemdTrainingExportV3 => {
   const exportedAt = options.exportedAt ?? new Date().toISOString();
   const fingerprint = createStableHash(
-    typeof sourceDocument.source === "string"
-      ? sourceDocument.source
-      : JSON.stringify({ meta: sourceDocument.meta, children: sourceDocument.children })
+    typeof document.source === "string"
+      ? document.source
+      : JSON.stringify(isChemdDocument(document)
+        ? { meta: document.meta, children: document.children }
+        : { meta: document.meta, declarations: document.declarations })
   );
-  const exportId = options.exportId ?? `export::${sourceDocument.meta.id}::${fingerprint}`;
-  const documentInfo = toDocumentInfo(sourceDocument);
-  const sourceLayer = buildSourceLayer(sourceDocument);
-  const governance = buildDataGovernanceInfo(sourceDocument.meta);
-  const typedGraph = options.typedGraph ?? createEmptyTypedGraph(sourceDocument.meta.id);
-  const baseSemanticLayer = buildSemanticLayer(sourceDocument, {
-    typedGraph
-  });
+  const exportId = options.exportId ?? `export::${document.meta.id}::${fingerprint}`;
+  const documentInfo = toDocumentInfo(document);
+  const sourceLayer = isChemdDocument(document) ? buildSourceLayer(document) : buildProgramSourceLayer(document);
+  const governance = buildDataGovernanceInfo(isChemdDocument(document) ? document.meta : document.meta.fields);
+  const typedGraph = options.typedGraph ?? createEmptyTypedGraph(document.meta.id);
+  const baseSemanticLayer = isChemdDocument(document)
+    ? buildSemanticLayer(document, { typedGraph })
+    : buildProgramSemanticLayer(document, typedGraph);
   const semanticLayer = {
     ...baseSemanticLayer,
     ...(options.lnf ? { lnf: options.lnf } : {})
   };
   const learningLayer = buildLearningLayer({
     document: documentInfo,
-    sourceDocument,
+    sourceDocument: isChemdDocument(document) ? document : undefined,
     semanticLayer,
     stepGraph: options.stepGraph
   });
-  const qualityLayer = buildQualityLayer(sourceDocument.diagnostics, learningLayer, governance);
+  const qualityLayer = buildQualityLayer(document.diagnostics, learningLayer, governance);
 
   return {
-    schema_version: "chemd-training-export/v0.2",
+    schema_version: "chemd-training-export/v0.3",
     export_id: exportId,
     exported_at: exportedAt,
     generator: {
@@ -123,10 +133,9 @@ export const exportTrainingRecordFromDocument = (
       exporter_module: options.exporterModule ?? DEFAULT_EXPORTER_MODULE,
       exporter_version: options.exporterVersion ?? DEFAULT_EXPORTER_VERSION,
       pipeline: [
-        "parseChemd",
-        "resolveChemd",
-        "typecheckDocument",
-        "buildCanonicalLnf",
+        isChemdDocument(document) ? "parseChemd" : "parseChemdProgram",
+        isChemdDocument(document) ? "resolveChemd" : "programAst",
+        "typecheckProgram",
         "exportTrainingRecordFromDocument"
       ]
     },

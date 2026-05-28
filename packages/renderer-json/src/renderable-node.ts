@@ -1,13 +1,36 @@
-import type { ChemdDocument, ChemdNode, FieldSourceSpans, SourceSpan } from "@chemd/core";
+import type { ChemdDocument, SourceSpan } from "@chemd/core";
+import {
+  buildProgramRenderDocument,
+  isChemdProgramDocument,
+  type ProgramRenderDocument,
+  type ProgramRenderProcedureStatement,
+  type ProgramRenderSection
+} from "@chemd/semantic-rendering";
 
 export const CHEMD_RENDERABLE_NODE_SCHEMA_VERSION = "chemd.renderable-node.v1";
 
-export type ChemdRenderableNodeKindV1 = ChemdNode["type"] | "document";
+export type ChemdRenderableNodeKindV1 =
+  | "document"
+  | "markdown"
+  | "col"
+  | "template"
+  | "molecule"
+  | "reaction"
+  | "analysis"
+  | "documentation"
+  | "declaration"
+  | "procedure"
+  | "procedure_step"
+  | "procedure_control"
+  | "procedure_doc"
+  | "agent_run"
+  | "trace";
 export type ChemdHydrationTargetV1 = "molecule" | "reaction" | "analysis";
 
 export interface BuildRenderableNodeTreeOptions {
   includeSourceRefs?: boolean;
   sourceId?: string;
+  typedGraph?: unknown;
 }
 
 export interface ChemdSourceRefV1 {
@@ -57,31 +80,21 @@ interface BuildContext {
   sourceId?: string;
 }
 
-const HEAVY_NODE_TYPES = new Set<ChemdHydrationTargetV1>(["molecule", "reaction", "analysis"]);
+type RenderableInput =
+  | ChemdDocument
+  | ProgramRenderDocument
+  | Parameters<typeof buildProgramRenderDocument>[0];
 
-const FIELD_KEYS_BY_TYPE: Record<string, string[]> = {
-  molecule: ["id", "name", "smiles", "cas", "inchi", "inchikey", "canonical_smiles", "formula", "mw", "role", "caption", "chemistryFeatureRefs"],
-  material: ["id", "molecule", "supplier", "lot", "purity", "density", "storage", "notes", "chemistryFeatureRefs"],
-  batch: ["id", "source", "molecule", "state", "mass", "purity", "artifacts", "notes", "chemistryFeatureRefs"],
-  reaction: ["id", "name", "route", "reactants", "products", "conditions", "caption", "chemistryFeatureRefs"],
-  analysis: ["id", "type_name", "ref", "method", "data", "result", "instrument", "notes"],
-  result: ["id", "status", "yield", "conversion", "selectivity", "purity", "notes"],
-  procedure: ["id", "ref", "reaction", "body", "evidence", "steps"],
-  trace: ["id", "plan", "mode", "events"],
-  observation: ["id", "ref", "body", "events"],
-  sample: ["id", "name", "sample_id", "batch", "purity", "notes"],
-  artifact: ["id", "kind", "path", "checksum", "instrument", "notes"],
-  condition_varies: ["id", "reaction", "standard", "factors", "outcomes", "condition", "changes", "attempts", "notes"],
-  use: ["template", "values"]
-};
+const HEAVY_SECTION_KINDS = new Set<ChemdHydrationTargetV1>(["molecule", "reaction", "analysis"]);
 
 export const buildRenderableNodeTree = (
-  document: ChemdDocument,
+  document: RenderableInput,
   options: BuildRenderableNodeTreeOptions = {}
 ): ChemdRenderableNodeTreeV1 => {
+  const renderDocument = toProgramRenderDocument(document, options);
   const context: BuildContext = {
     includeSourceRefs: options.includeSourceRefs ?? true,
-    sourceId: options.sourceId ?? document.meta.id
+    sourceId: options.sourceId ?? renderDocument.meta.id
   };
 
   return {
@@ -89,169 +102,274 @@ export const buildRenderableNodeTree = (
     root: {
       nodeId: "document",
       kind: "document",
-      label: document.meta.title || document.meta.id || "Chemd document",
+      label: renderDocument.meta.title || renderDocument.meta.id || "Chemd document",
       directive: { kind: "document", display: "flow" },
-      children: document.children.map((node, index) => buildNode(node, [pathSegment(index, node.type)], context))
+      children: renderDocument.sections.map((section, index) =>
+        buildSectionNode(section, [pathSegment(index, section.kind, section.id)], context)
+      )
     }
   };
 };
 
-const buildNode = (node: ChemdNode, path: string[], context: BuildContext): ChemdRenderableNodeV1 => {
-  const sourceRefs = buildSourceRefs(node, context);
-  const range = sourceRefs?.[0]?.range;
+const toProgramRenderDocument = (
+  document: RenderableInput,
+  options: BuildRenderableNodeTreeOptions
+): ProgramRenderDocument => {
+  if (isProgramRenderDocument(document)) return document;
+  if (isChemdProgramDocument(document)) {
+    return buildProgramRenderDocument(document, { typedGraph: options.typedGraph });
+  }
+  return buildLegacyRenderDocument(document);
+};
 
+const isProgramRenderDocument = (value: unknown): value is ProgramRenderDocument =>
+  typeof value === "object"
+  && value !== null
+  && (value as { schema_version?: unknown }).schema_version === "chemd-program-render/v1";
+
+const buildLegacyRenderDocument = (document: ChemdDocument): ProgramRenderDocument => ({
+  schema_version: "chemd-program-render/v1",
+  sourceLanguage: "chemd/program-v1",
+  moduleName: String(document.meta.id || "legacy_document"),
+  meta: {
+    id: String(document.meta.id || "legacy-document"),
+    title: String(document.meta.title || document.meta.id || "Untitled experiment"),
+    date: String(document.meta.date || ""),
+    fields: {},
+    docs: []
+  },
+  imports: [],
+  sections: [],
+  diagnostics: document.diagnostics,
+  semantic: {
+    typedGraph: {
+      documentId: document.meta.id,
+      nodes: [],
+      quantities: [],
+      diagnostics: []
+    }
+  }
+});
+
+const buildSectionNode = (
+  section: ProgramRenderSection,
+  path: string[],
+  context: BuildContext
+): ChemdRenderableNodeV1 => {
+  if (section.kind === "documentation") {
+    return buildSemanticNode({
+      kind: "documentation",
+      id: section.id,
+      label: section.title,
+      payload: { docs: section.docs.map((doc) => doc.id) },
+      children: section.docs.map((doc, index) =>
+        buildTextNode(
+          `doc:${doc.id}`,
+          firstTextLine(doc.markdown) ?? doc.id,
+          doc.markdown,
+          [...path, pathSegment(index, "documentation", doc.id)],
+          context,
+          doc.sourceSpan
+        )
+      )
+    }, path, context);
+  }
+
+  if (section.kind === "procedure") {
+    return buildSemanticNode({
+      kind: "procedure",
+      id: section.id,
+      label: section.id,
+      payload: {
+        qualified_id: section.qualifiedId,
+        target: section.target,
+        evidence: section.evidence,
+        docs: section.docs.map((doc) => doc.id)
+      },
+      children: section.statements.map((statement, index) =>
+        buildProcedureStatementNode(statement, [...path, pathSegment(index, statement.kind)], context)
+      )
+    }, path, context);
+  }
+
+  if (section.kind === "agent_run") {
+    return buildSemanticNode({
+      kind: "agent_run",
+      id: section.id,
+      label: section.id,
+      payload: {
+        qualified_id: section.qualifiedId,
+        goal: section.goal,
+        status: section.status,
+        target_files: section.targetFiles,
+        docs: section.docs.map((doc) => doc.id),
+        tool_calls: section.toolCalls,
+        evidence: section.evidence,
+        patches: section.patches,
+        decisions: section.decisions,
+        audit_timeline: section.auditTimeline
+      },
+      children: []
+    }, path, context);
+  }
+
+  if (section.kind === "trace") {
+    return buildSemanticNode({
+      kind: "trace",
+      id: section.id,
+      label: section.id,
+      payload: {
+        qualified_id: section.qualifiedId,
+        docs: section.docs.map((doc) => doc.id),
+        fields: section.fields
+      },
+      children: []
+    }, path, context);
+  }
+
+  const payload = {
+    qualified_id: section.qualifiedId,
+    kind: section.declarationKind,
+    docs: section.docs.map((doc) => doc.id),
+    fields: section.fields
+  };
+
+  return HEAVY_SECTION_KINDS.has(section.declarationKind as ChemdHydrationTargetV1)
+    ? buildHydrationNode(section.id, section.declarationKind as ChemdHydrationTargetV1, payload, path, context)
+    : buildSemanticNode({
+        kind: "declaration",
+        id: section.id,
+        label: section.id,
+        payload,
+        children: []
+      }, path, context);
+};
+
+const buildProcedureStatementNode = (
+  statement: ProgramRenderProcedureStatement,
+  path: string[],
+  context: BuildContext
+): ChemdRenderableNodeV1 => {
+  if (statement.kind === "doc") {
+    return buildTextNode(
+      `doc:${statement.doc.id}`,
+      firstTextLine(statement.doc.markdown) ?? statement.doc.id,
+      statement.doc.markdown,
+      path,
+      context,
+      statement.doc.sourceSpan
+    );
+  }
+
+  if (statement.kind === "control") {
+    return buildSemanticNode({
+      kind: "procedure_control",
+      id: statement.id ?? path.at(-1) ?? "control",
+      label: statement.controlKind,
+      payload: { control_kind: statement.controlKind, args: statement.args },
+      children: statement.children.map((child, index) =>
+        buildProcedureStatementNode(child, [...path, pathSegment(index, child.kind)], context)
+      )
+    }, path, context);
+  }
+
+  return buildSemanticNode({
+    kind: "procedure_step",
+    id: statement.id,
+    label: `${statement.family} ${statement.id}`,
+    payload: {
+      family: statement.family,
+      args: statement.args,
+      inputs: statement.inputs,
+      outputs: statement.outputs,
+      depends_on: statement.dependsOn,
+      evidence: statement.evidence,
+      docs: statement.docs.map((doc) => doc.id)
+    },
+    children: []
+  }, path, context);
+};
+
+const buildHydrationNode = (
+  id: string,
+  target: ChemdHydrationTargetV1,
+  payload: Record<string, unknown>,
+  path: string[],
+  context: BuildContext
+): ChemdRenderableNodeV1 => {
+  const nodeId = buildNodeId(path, id);
   return {
-    nodeId: buildNodeId(path, node),
-    kind: node.type,
-    label: buildLabel(node),
-    ...(range ? { range } : {}),
-    ...(sourceRefs ? { sourceRefs } : {}),
-    directive: buildDirective(node, path),
-    children: buildChildren(node, path, context)
+    nodeId,
+    kind: "declaration",
+    label: id,
+    ...sourceRefs(undefined, context),
+    directive: {
+      kind: "hydrate",
+      target,
+      hydration: { mode: "lazy", key: nodeId, status: "ready" },
+      payload,
+      fallback: "placeholder"
+    },
+    children: []
   };
 };
 
-const buildChildren = (node: ChemdNode, path: string[], context: BuildContext): ChemdRenderableNodeV1[] => {
-  if (node.type === "col") {
-    return node.children.map((child, index) => buildNode(child, [...path, pathSegment(index, child.type)], context));
+const buildSemanticNode = (
+  input: {
+    kind: ChemdRenderableNodeKindV1;
+    id: string;
+    label: string;
+    payload: Record<string, unknown>;
+    children: ChemdRenderableNodeV1[];
+  },
+  path: string[],
+  context: BuildContext
+): ChemdRenderableNodeV1 => ({
+  nodeId: buildNodeId(path, input.id),
+  kind: input.kind,
+  label: input.label,
+  ...sourceRefs(undefined, context),
+  directive: { kind: "semantic", target: input.kind, payload: input.payload },
+  children: input.children
+});
+
+const buildTextNode = (
+  id: string,
+  label: string,
+  text: string,
+  path: string[],
+  context: BuildContext,
+  range?: SourceSpan
+): ChemdRenderableNodeV1 => ({
+  nodeId: buildNodeId(path, id),
+  kind: "documentation",
+  label,
+  ...sourceRefs(range, context),
+  directive: { kind: "text", text },
+  children: []
+});
+
+const sourceRefs = (
+  range: SourceSpan | undefined,
+  context: BuildContext
+): { range?: SourceSpan; sourceRefs?: ChemdSourceRefV1[] } => {
+  if (!context.includeSourceRefs || !range) {
+    return {};
   }
-
-  if (node.type === "template") {
-    const templatePath = [...path, normalizeIdPart(node.name)];
-
-    return node.body.map((child, index) => buildNode(child, [...templatePath, pathSegment(index, child.type)], context));
-  }
-
-  return [];
-};
-
-const buildDirective = (node: ChemdNode, path: string[]): ChemdRenderDirectiveV1 => {
-  if (node.type === "markdown") {
-    return { kind: "text", text: node.value };
-  }
-
-  if (node.type === "col") {
-    return { kind: "layout", display: "columns", columns: node.columns };
-  }
-
-  if (node.type === "template") {
-    return { kind: "template", template: node.name, expansion: "nested-body", params: [...node.params] };
-  }
-
-  if (HEAVY_NODE_TYPES.has(node.type as ChemdHydrationTargetV1)) {
-    return buildHeavyDirective(node, buildNodeId(path, node));
-  }
-
-  return { kind: "semantic", target: node.type, payload: pickPayload(node) };
-};
-
-const buildHeavyDirective = (node: ChemdNode, nodeId: string): ChemdRenderDirectiveV1 => {
-  const target = node.type as ChemdHydrationTargetV1;
-  const payload = pickPayload(node);
-  const hydration = { mode: "lazy" as const, key: nodeId, status: "ready" as const };
-
-  if (hasRenderableHeavyPayload(target, payload)) {
-    return { kind: "hydrate", target, hydration, payload, fallback: "placeholder" };
-  }
-
   return {
-    kind: "placeholder",
-    target,
-    hydration: { ...hydration, status: "placeholder" },
-    reason: "missing_render_payload",
-    text: `${target} content is not available`
+    range,
+    sourceRefs: [{ ...(context.sourceId ? { sourceId: context.sourceId } : {}), range }]
   };
-};
-
-const hasRenderableHeavyPayload = (target: ChemdHydrationTargetV1, payload: Record<string, unknown>): boolean => {
-  const requiredKeys: Record<ChemdHydrationTargetV1, string[]> = {
-    molecule: ["name", "smiles", "cas", "formula", "chemistryFeatureRefs"],
-    reaction: ["name", "route", "reactants", "products", "conditions", "chemistryFeatureRefs"],
-    analysis: ["type_name", "method", "data", "result", "instrument"]
-  };
-
-  return requiredKeys[target].some((key) => payload[key] !== undefined);
-};
-
-const buildLabel = (node: ChemdNode): string => {
-  if (node.type === "markdown") {
-    return firstTextLine(node.value) ?? "Markdown";
-  }
-
-  if (node.type === "col") {
-    return `${node.columns} columns`;
-  }
-
-  if (node.type === "template") {
-    return node.name;
-  }
-
-  return readString(node, ["name", "id", "route", "ref", "status", "type_name", "template"]) ?? node.type;
-};
-
-const buildSourceRefs = (node: ChemdNode, context: BuildContext): ChemdSourceRefV1[] | undefined => {
-  if (
-    !context.includeSourceRefs ||
-    node.type === "markdown" ||
-    node.type === "col" ||
-    node.type === "template" ||
-    node.type === "use"
-  ) {
-    return undefined;
-  }
-
-  const refs = [
-    ...spanRef(undefined, node.sourceSpan, context.sourceId),
-    ...fieldSpanRefs(node.fieldSpans, context.sourceId)
-  ];
-
-  return refs.length > 0 ? refs : undefined;
-};
-
-const fieldSpanRefs = (fieldSpans: FieldSourceSpans | undefined, sourceId?: string): ChemdSourceRefV1[] => {
-  if (!fieldSpans) {
-    return [];
-  }
-
-  return Object.entries(fieldSpans)
-    .sort(([left], [right]) => left.localeCompare(right))
-    .flatMap(([field, range]) => spanRef(field, range, sourceId));
-};
-
-const spanRef = (field: string | undefined, range: SourceSpan | undefined, sourceId?: string): ChemdSourceRefV1[] =>
-  range && hasSpanValue(range)
-    ? [{ ...(sourceId ? { sourceId } : {}), ...(field ? { field } : {}), range }]
-    : [];
-
-const hasSpanValue = (range: SourceSpan): boolean =>
-  Object.values(range).some((value) => typeof value === "number");
-
-const pickPayload = (node: ChemdNode): Record<string, unknown> => {
-  const record = node as unknown as Record<string, unknown>;
-  const keys = FIELD_KEYS_BY_TYPE[node.type] ?? [];
-
-  return Object.fromEntries(keys.filter((key) => record[key] !== undefined).map((key) => [key, record[key]]));
-};
-
-const readString = (node: ChemdNode, keys: string[]): string | undefined => {
-  const record = node as unknown as Record<string, unknown>;
-  const value = keys.map((key) => record[key]).find((item) => typeof item === "string" && item.length > 0);
-
-  return typeof value === "string" ? value : undefined;
 };
 
 const firstTextLine = (value: string): string | undefined =>
   value.split(/\r?\n/).map((line) => line.trim()).find((line) => line.length > 0);
 
-const buildNodeId = (path: string[], node: ChemdNode): string => {
-  const explicitId = readString(node, ["id", "name", "template", "ref"]);
-  const suffix = explicitId ? `.${normalizeIdPart(explicitId)}` : "";
+const buildNodeId = (path: string[], id: string): string =>
+  `document.${path.join(".")}${id ? `.${normalizeIdPart(id)}` : ""}`;
 
-  return `document.${path.join(".")}${suffix}`;
-};
-
-const pathSegment = (index: number, kind: string): string =>
-  `${String(index + 1).padStart(2, "0")}_${normalizeIdPart(kind)}`;
+const pathSegment = (index: number, kind: string, id?: string): string =>
+  `${String(index + 1).padStart(2, "0")}_${normalizeIdPart(id ?? kind)}`;
 
 const normalizeIdPart = (value: string): string =>
   value.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-|-$/g, "") || "node";

@@ -460,13 +460,13 @@ const buildEntityIdIndex = (record: ChemdTrainingExportV2): Map<string, ObjectEn
 };
 
 const buildNarrativeBlocks = (record: ChemdTrainingExportV2): TrainingNarrativeBlockV1[] =>
-  record.semantic_layer.markdown_blocks.map((block) => ({
-    entity_id: block.entity_id,
-    cleaned_text: block.cleaned_text,
+  record.semantic_layer.documentation_blocks.map((block) => ({
+    entity_id: block.doc_id,
+    cleaned_text: block.text_for_embedding ?? block.raw_markdown,
     references: block.references,
-    inline_chem: block.inline_chem,
-    inline_code: block.inline_code,
-    links: block.links
+    inline_chem: [],
+    inline_code: [],
+    links: []
   }));
 
 const normalizeReferenceId = (value: string): string =>
@@ -569,15 +569,15 @@ const buildMarkdownReferences = (
   record: ChemdTrainingExportV2,
   entityByOriginalId: Map<string, ObjectEntity>
 ): TrainingResolvedReferenceV1[] =>
-  record.semantic_layer.markdown_blocks.flatMap((block) =>
+  record.semantic_layer.documentation_blocks.flatMap((block) =>
     block.references.map((reference) => {
       const target = entityByOriginalId.get(reference.source);
 
       return {
         raw: reference.raw,
-        source_entity_id: block.entity_id,
+        source_entity_id: block.doc_id,
         source_entity_type: "markdown",
-        ...(reference.field ? { source_field: "markdown_reference", target_field: reference.field } : {}),
+        ...(reference.field ? { source_field: "doc_comment_reference", target_field: reference.field } : {}),
         ...(target ? { target_entity_id: target.entity_id, target_original_id: target.original_id } : {}),
         ...(reference.resolution_status ? { resolution_status: reference.resolution_status } : {}),
         ...(reference.resolution_value !== undefined ? { resolution_value: reference.resolution_value } : {})
@@ -2471,10 +2471,10 @@ const buildKnowledgeNodes = (
   ...semanticNodesForEntity("artifact", record.semantic_layer.artifacts),
   ...semanticNodesForEntity("condition_variation", record.semantic_layer.condition_variations),
   ...semanticNodesForEntity("condition_variation_attempt", record.semantic_layer.condition_variation_attempts),
-  ...record.semantic_layer.markdown_blocks.map((block) => ({
-    node_id: block.entity_id,
+  ...record.semantic_layer.documentation_blocks.map((block) => ({
+    node_id: block.doc_id,
     node_type: "narrative" as const,
-    label: block.cleaned_text.slice(0, 80)
+    label: (block.text_for_embedding ?? block.raw_markdown).slice(0, 80)
   })),
   ...buildProcedureNodes(record),
   ...buildObservationNodes(record),
@@ -3869,7 +3869,7 @@ const buildRecommendedLoraTasks = (
   const qualityIssueCount = missingLogic.length + (record.quality_layer.training_quality.exclusion_reasons?.length ?? 0);
 
   return [
-    ...includeTask(record.source_layer.raw_children.length > 0, createTaskHint("record_to_chemd", "Source snapshots can be reconstructed as Chemd blocks.")),
+    ...includeTask(record.source_layer.declarations.length > 0, createTaskHint("record_to_chemd", "Program declarations can be reconstructed as Chemd records.")),
     ...includeTask(qualityIssueCount > 0, createTaskHint("chemd_repair", "Quality warnings or missing logic can be turned into repair examples.")),
     ...includeTask(hasNormalizationEvidence, createTaskHint("normalization_explanation", "Normalized field evidence is available.")),
     ...(entityIds.length > 0 ? [createTaskHint("entity_extraction", "Experiment entities are available.", entityIds)] : []),
@@ -3920,7 +3920,7 @@ const buildBlockedLoraTasks = (context: LoraHintContext): LoraTaskHintV1[] => {
   const hasEvidenceInterpretation = hasEvidenceLinks;
 
   return [
-    ...includeTask(record.source_layer.raw_children.length === 0, createTaskHint("record_to_chemd", "No source snapshots are available.")),
+    ...includeTask(record.source_layer.declarations.length === 0, createTaskHint("record_to_chemd", "No source declarations are available.")),
     ...includeTask(!hasNormalizationEvidence, createTaskHint("normalization_explanation", "No normalized field evidence is available.")),
     ...includeTask(!hasReactions, createTaskHint("reaction_classification", "No reaction entities are available.")),
     ...includeTask(!hasReactions, createTaskHint("expert_routing", "No reaction entities are available.")),

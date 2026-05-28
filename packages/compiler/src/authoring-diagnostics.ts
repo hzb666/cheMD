@@ -100,22 +100,27 @@ const buildChecklistDiagnostic = (input: {
     }
   });
 
+const hasProgramSemanticContent = (trainingExport: ChemdTrainingExportV2): boolean =>
+  trainingExport.semantic_layer.reactions.length > 0
+  || trainingExport.semantic_layer.results.length > 0
+  || trainingExport.semantic_layer.analyses.length > 0
+  || trainingExport.semantic_layer.condition_variations.length > 0
+  || trainingExport.semantic_layer.condition_variation_attempts.length > 0
+  || trainingExport.semantic_layer.procedures.length > 0
+  || trainingExport.semantic_layer.documentation_blocks.length > 0
+  || trainingExport.source_layer.declarations.some((declaration) =>
+    ["procedure", "observation", "result", "analysis", "reaction", "condition_screen"].includes(
+      declaration.declaration_kind
+    )
+  );
+
 export const buildAuthoringDiagnostics = (
   assistance: AuthoringAssistance,
   trainingExport: ChemdTrainingExportV2
 ): Diagnostic[] => [
   ...assistance.suggestions.map(buildSuggestionDiagnostic),
   ...(
-    trainingExport.semantic_layer.reactions.length > 0
-    || trainingExport.semantic_layer.results.length > 0
-    || trainingExport.semantic_layer.analyses.length > 0
-    || trainingExport.semantic_layer.condition_variations.length > 0
-    || trainingExport.semantic_layer.condition_variation_attempts.length > 0
-    || trainingExport.source_layer.raw_children.some((node) =>
-      ["procedure", "observation", "result", "analysis", "reaction", "condition_screen"].includes(node.node_type)
-    )
-      ? assistance.minimal_sets
-      : []
+    hasProgramSemanticContent(trainingExport) ? assistance.minimal_sets : []
   )
     .filter((item) => item.status === "needs_author_input" && item.missing_items.length > 0)
     .map((item) => buildChecklistDiagnostic({

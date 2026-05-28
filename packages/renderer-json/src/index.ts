@@ -1,220 +1,183 @@
+import type { ChemdDocument } from "@chemd/core";
 import {
-  type ChemdDocument,
-  type ChemdNode,
-  type InlineChemToken,
-  type InlineCodeToken,
-  type MarkdownLinkToken,
-  type MarkdownNode,
-  type ReferenceToken,
-  type StructuredNode
-} from "@chemd/core";
+  buildProgramRenderDocument,
+  formatProgramRenderValue,
+  isChemdProgramDocument,
+  type ProgramRenderDocument,
+  type ProgramRenderSection
+} from "@chemd/semantic-rendering";
 
 export * from "./renderable-node";
 
-interface SerializedNodeEntry {
-  type: string;
-  value: unknown;
-}
+export const CHEMD_PROGRAM_JSON_SCHEMA_VERSION = "chemd-program-json/v1";
 
 export interface RenderJsonOptions {
   typedGraph?: unknown;
 }
 
-const ARRAY_ITEM_NAME_BY_KEY: Record<string, string> = {
-  diagnostics: "diagnostic",
-  tags: "tag",
-  references: "reference",
-  inlineChem: "inlineChem",
-  inlineCode: "inlineCode",
-  links: "link",
-  nodes: "node",
-  steps: "step",
-  events: "event",
-  inputs: "input",
-  outputs: "output",
-  artifacts: "artifact",
-  effects: "effect",
-  reactants: "reactant",
-  products: "product",
-  conditions: "condition",
-  params: "param",
-  lanes: "lane",
-  spots: "spot",
-  mess_regions: "mess_region",
-  normalized: "item"
+type RenderJsonInput = ChemdDocument | ProgramRenderDocument | Parameters<typeof buildProgramRenderDocument>[0];
+
+export const renderJson = (
+  document: RenderJsonInput,
+  options: RenderJsonOptions = {}
+): string => {
+  const renderDocument = toProgramRenderDocument(document, options);
+  return JSON.stringify(toProgramJsonPayload(renderDocument), null, 2);
 };
 
-const ARRAY_ITEM_NAME_BY_PATH: Record<string, string> = {
-  "document.body.*.normalized_conditions.reagents.normalized": "reagent"
-};
-
-const isPlainObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
-const normalizePathSegment = (segment: string): string =>
-  /^\d{2}_/.test(segment) ? "*" : segment;
-
-const resolveArrayItemName = (path: string[]): string => {
-  const normalizedPath = path.map((segment) => normalizePathSegment(segment)).join(".");
-  const exactMatch = ARRAY_ITEM_NAME_BY_PATH[normalizedPath];
-  if (exactMatch) {
-    return exactMatch;
+const toProgramRenderDocument = (
+  document: RenderJsonInput,
+  options: RenderJsonOptions
+): ProgramRenderDocument => {
+  if (isProgramRenderDocument(document)) return document;
+  if (isChemdProgramDocument(document)) {
+    return buildProgramRenderDocument(document, { typedGraph: options.typedGraph });
   }
-
-  const key = path[path.length - 1];
-  return ARRAY_ITEM_NAME_BY_KEY[key] ?? "item";
+  return buildLegacyRenderDocument(document, options);
 };
 
-const objectifyArrays = (value: unknown, path: string[] = []): unknown => {
-  if (Array.isArray(value)) {
-    const itemName = resolveArrayItemName(path);
-    const keyWidth = Math.max(2, String(value.length).length);
+const isProgramRenderDocument = (value: unknown): value is ProgramRenderDocument =>
+  typeof value === "object"
+  && value !== null
+  && (value as { schema_version?: unknown }).schema_version === "chemd-program-render/v1";
 
-    return Object.fromEntries(
-      value.map((item, index) => [
-        `${String(index + 1).padStart(keyWidth, "0")}_${itemName}`,
-        objectifyArrays(item, path)
-      ])
-    );
+const buildLegacyRenderDocument = (
+  document: ChemdDocument,
+  options: RenderJsonOptions
+): ProgramRenderDocument => ({
+  schema_version: "chemd-program-render/v1",
+  sourceLanguage: "chemd/program-v1",
+  moduleName: String(document.meta.id || "legacy_document"),
+  meta: {
+    id: String(document.meta.id || "legacy-document"),
+    title: String(document.meta.title || document.meta.id || "Untitled experiment"),
+    date: String(document.meta.date || ""),
+    fields: {},
+    docs: []
+  },
+  imports: [],
+  sections: [],
+  diagnostics: document.diagnostics,
+  semantic: {
+    typedGraph: normalizeTypedGraph(document.meta.id, options.typedGraph)
   }
+});
 
-  if (isPlainObject(value)) {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, nestedValue]) => [
-        key,
-        objectifyArrays(nestedValue, [...path, key])
-      ])
-    );
+const normalizeTypedGraph = (
+  documentId: unknown,
+  typedGraph: unknown
+): ProgramRenderDocument["semantic"]["typedGraph"] => {
+  if (typeof typedGraph === "object" && typedGraph !== null) {
+    return typedGraph as ProgramRenderDocument["semantic"]["typedGraph"];
   }
-
-  return value;
-};
-
-const stripTokenLocation = <
-  T extends ReferenceToken | InlineChemToken | InlineCodeToken | MarkdownLinkToken
->(
-  token: T
-): Omit<T, "start" | "end" | "startLine" | "startColumn" | "endLine" | "endColumn"> => {
-  const {
-    start: _start,
-    end: _end,
-    startLine: _startLine,
-    startColumn: _startColumn,
-    endLine: _endLine,
-    endColumn: _endColumn,
-    ...rest
-  } = token;
-
-  return rest;
-};
-
-const serializeMarkdownNode = (node: MarkdownNode): SerializedNodeEntry => {
-  const { type: _type, ...rest } = node;
-
   return {
-    type: "markdown",
-    value: {
-      ...rest,
-      references: node.references.map((token) => stripTokenLocation(token)),
-      inlineChem: node.inlineChem.map((token) => stripTokenLocation(token)),
-      inlineCode: node.inlineCode.map((token) => stripTokenLocation(token)),
-      links: node.links.map((token) => stripTokenLocation(token))
+    documentId: typeof documentId === "string" ? documentId : undefined,
+    nodes: [],
+    quantities: [],
+    diagnostics: []
+  };
+};
+
+const toProgramJsonPayload = (document: ProgramRenderDocument): Record<string, unknown> => ({
+  program: {
+    schema_version: CHEMD_PROGRAM_JSON_SCHEMA_VERSION,
+    module: {
+      name: document.moduleName
+    },
+    meta: {
+      id: document.meta.id,
+      title: document.meta.title,
+      date: document.meta.date,
+      fields: renderValues(document.meta.fields),
+      docs: document.meta.docs.map((doc) => doc.id)
+    },
+    imports: document.imports,
+    declarations: declarationsFromSections(document.sections),
+    documentation: documentationFromSections(document.sections),
+    agent_runs: agentRunsFromSections(document.sections)
+  },
+  semantic: {
+    typedGraph: document.semantic.typedGraph
+  },
+  diagnostics: document.diagnostics
+});
+
+const declarationsFromSections = (
+  sections: ProgramRenderSection[]
+): Record<string, unknown> =>
+  Object.fromEntries(sections.flatMap((section): Array<[string, unknown]> => {
+    if (section.kind === "declaration") {
+      return [[section.id, {
+        kind: section.declarationKind,
+        qualified_id: section.qualifiedId,
+        docs: section.docs.map((doc) => doc.id),
+        fields: renderValues(section.fields)
+      }]];
     }
-  };
-};
+    if (section.kind === "procedure") {
+      return [[section.id, {
+        kind: "procedure",
+        qualified_id: section.qualifiedId,
+        target: section.target,
+        docs: section.docs.map((doc) => doc.id),
+        statements: section.statements
+      }]];
+    }
+    if (section.kind === "trace") {
+      return [[section.id, {
+        kind: "trace",
+        qualified_id: section.qualifiedId,
+        docs: section.docs.map((doc) => doc.id),
+        fields: renderValues(section.fields)
+      }]];
+    }
+    return [];
+  }));
 
-const serializeSourceMetadata = (node: Exclude<StructuredNode, { type: "col" }>): Record<string, unknown> => {
-  const payload = node as unknown as Record<string, unknown>;
-  const syntaxOrigin = typeof payload.syntaxOrigin === "string" ? payload.syntaxOrigin : undefined;
-  const declaredKind = typeof payload.declaredKind === "string" ? payload.declaredKind : undefined;
-
-  return {
-    source_block_type: syntaxOrigin ?? node.type,
-    ...(syntaxOrigin ? { syntax_origin: syntaxOrigin } : {}),
-    ...(declaredKind ? { declared_kind: declaredKind } : {})
-  };
-};
-
-const serializeStructuredPayload = (
-  node: Exclude<StructuredNode, { type: "col" }>
+const documentationFromSections = (
+  sections: ProgramRenderSection[]
 ): Record<string, unknown> => {
-  const { type: _type, syntaxOrigin: _syntaxOrigin, declaredKind: _declaredKind, ...rest } = (
-    node as unknown as Record<string, unknown>
-  );
-
-  return {
-    ...rest,
-    ...serializeSourceMetadata(node)
-  };
+  const docs = sections.flatMap((section) => {
+    if (section.kind === "documentation") return section.docs;
+    if ("docs" in section) return section.docs;
+    return [];
+  });
+  return Object.fromEntries(docs.map((doc) => [doc.id, {
+    attachment: doc.attachment,
+    markdown: doc.markdown,
+    references: doc.references,
+    export_policy: doc.exportPolicy
+  }]));
 };
 
-const serializeStructuredNode = (
-  node: Exclude<StructuredNode, { type: "col" }>
-): SerializedNodeEntry => {
-  const { type } = node;
-  const rest = serializeStructuredPayload(node);
+const agentRunsFromSections = (
+  sections: ProgramRenderSection[]
+): Record<string, unknown> =>
+  Object.fromEntries(sections.flatMap((section): Array<[string, unknown]> =>
+    section.kind === "agent_run"
+      ? [[section.id, {
+          qualified_id: section.qualifiedId,
+          goal: section.goal,
+          status: section.status,
+          target_files: section.targetFiles,
+          docs: section.docs.map((doc) => doc.id),
+          tool_calls: section.toolCalls,
+          evidence: section.evidence,
+          patches: section.patches,
+          decisions: section.decisions,
+          audit_timeline: section.auditTimeline,
+          statement_docs: section.statementDocs.map((doc) => doc.id)
+        }]]
+      : []
+  ));
 
-  if (node.type === "template") {
-    return {
-      type,
-      value: {
-        ...rest,
-        body: serializeBody(node.body)
-      }
-    };
-  }
-
-  return {
-    type,
-    value: rest
-  };
-};
-
-const serializeNode = (
-  node: ChemdNode
-): SerializedNodeEntry[] => {
-  if (node.type === "markdown") {
-    return [serializeMarkdownNode(node)];
-  }
-
-  if (node.type === "col") {
-    return node.children.flatMap((child) => serializeNode(child));
-  }
-
-  return [serializeStructuredNode(node)];
-};
-
-const hasColNode = (nodes: ChemdNode[]): boolean =>
-  nodes.some((node) =>
-    node.type === "col"
-      ? true
-      : node.type === "template" && hasColNode(node.body)
-  );
-
-const serializeBody = (nodes: ChemdNode[]): Record<string, unknown> => {
-  const entries = nodes.flatMap((node) => serializeNode(node));
-  const keyWidth = Math.max(2, String(entries.length).length);
-
-  return Object.fromEntries(
-    entries.map((entry, index) => [
-      `${String(index + 1).padStart(keyWidth, "0")}_${entry.type}`,
-      entry.value
-    ])
-  );
-};
-
-export const renderJson = (document: ChemdDocument, options: RenderJsonOptions = {}): string => {
-  return JSON.stringify(
-    objectifyArrays({
-      document: {
-        meta: document.meta,
-        ...(hasColNode(document.children) ? { layout: { col_strategy: "flatten_children" } } : {}),
-        body: serializeBody(document.children)
-      },
-      ...(options.typedGraph ? { semantic: { typedGraph: options.typedGraph } } : {}),
-      diagnostics: document.diagnostics
-    }),
-    null,
-    2
-  );
-};
+const renderValues = (
+  fields: Record<string, Parameters<typeof formatProgramRenderValue>[0]>
+): Record<string, unknown> =>
+  Object.fromEntries(Object.entries(fields).map(([key, value]) => [
+    key,
+    {
+      ...value,
+      text: formatProgramRenderValue(value)
+    }
+  ]));

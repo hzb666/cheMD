@@ -58,12 +58,12 @@ const collectEntityCandidates = (
     ["artifact", semantic.artifacts],
     ["condition_variation", semantic.condition_variations],
     ["condition_variation_attempt", semantic.condition_variation_attempts],
-    ["markdown", semantic.markdown_blocks]
+    ["documentation", semantic.documentation_blocks]
   ] as const;
 
   return groups.flatMap(([kind, entities]) => entities.flatMap((entity) => {
     const payload = asRecord(entity);
-    const entityId = readString(payload, "entity_id");
+    const entityId = readString(payload, "entity_id") ?? readString(payload, "doc_id");
     if (!entityId) {
       return [];
     }
@@ -72,7 +72,7 @@ const collectEntityCandidates = (
       kind,
       sourceRange: readEntityRange(payload, blockRanges, fallback),
       payload,
-      originalId: readString(payload, "original_id")
+      originalId: readString(payload, "original_id") ?? readString(payload, "doc_id")
     }];
   }));
 };

@@ -50,7 +50,7 @@ const findCompiledEntitySourceRange = (
     semanticLayer.artifacts,
     semanticLayer.condition_variations,
     semanticLayer.condition_variation_attempts,
-    semanticLayer.markdown_blocks
+    semanticLayer.documentation_blocks
   ] as readonly unknown[][];
   const entity = groups.flat().find((item) =>
     toJsonRecord(item).entity_id === entityId

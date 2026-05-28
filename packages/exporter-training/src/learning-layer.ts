@@ -140,8 +140,10 @@ const createRetrievalMetadata = (
   analysis_ids: semanticLayer.analyses.map((analysis) => analysis.entity_id),
   sample_ids: semanticLayer.samples.map((sample) => sample.entity_id),
   artifact_ids: semanticLayer.artifacts.map((artifact) => artifact.entity_id),
-  condition_variation_ids: semanticLayer.condition_variations.map((variation) => variation.entity_id),
-  condition_variation_attempt_ids: semanticLayer.condition_variation_attempts.map((attempt) => attempt.entity_id),
+  condition_screen_ids: semanticLayer.condition_screens.map((screen) => screen.entity_id),
+  procedure_ids: semanticLayer.procedures.map((procedure) => procedure.entity_id),
+  trace_ids: semanticLayer.traces.map((trace) => trace.entity_id),
+  agent_run_ids: semanticLayer.agent_runs.map((agentRun) => agentRun.entity_id),
   analysis_types: uniqueStrings(semanticLayer.analyses.map((analysis) => analysis.analysis_type))
 });
 
@@ -158,12 +160,11 @@ const buildDocumentSummaryText = (
   semanticLayer.analyses.length ? `${semanticLayer.analyses.length} analyses` : undefined,
   semanticLayer.samples.length ? `${semanticLayer.samples.length} samples` : undefined,
   semanticLayer.artifacts.length ? `${semanticLayer.artifacts.length} artifacts` : undefined,
-  semanticLayer.condition_variations.length
-    ? `${semanticLayer.condition_variations.length} condition variations`
+  semanticLayer.condition_screens.length
+    ? `${semanticLayer.condition_screens.length} condition screens`
     : undefined,
-  semanticLayer.condition_variation_attempts.length
-    ? `${semanticLayer.condition_variation_attempts.length} condition variation attempts`
-    : undefined
+  semanticLayer.procedures.length ? `${semanticLayer.procedures.length} procedures` : undefined,
+  semanticLayer.agent_runs.length ? `${semanticLayer.agent_runs.length} agent audit runs` : undefined
 );
 
 const getDocumentSummaryEntityIds = (semanticLayer: SemanticLayerV1): string[] => [
@@ -173,41 +174,35 @@ const getDocumentSummaryEntityIds = (semanticLayer: SemanticLayerV1): string[] =
   ...semanticLayer.analyses.map((analysis) => analysis.entity_id),
   ...semanticLayer.samples.map((sample) => sample.entity_id),
   ...semanticLayer.artifacts.map((artifact) => artifact.entity_id),
-  ...semanticLayer.condition_variations.map((variation) => variation.entity_id),
-  ...semanticLayer.condition_variation_attempts.map((attempt) => attempt.entity_id)
+  ...semanticLayer.condition_screens.map((screen) => screen.entity_id),
+  ...semanticLayer.procedures.map((procedure) => procedure.entity_id),
+  ...semanticLayer.traces.map((trace) => trace.entity_id),
+  ...semanticLayer.agent_runs.map((agentRun) => agentRun.entity_id)
 ];
 
-const buildConditionVariationChunks = (
+const semanticFactTags = {
+  chunk_kind: "semantic_fact" as const,
+  truth_source: "declaration" as const
+};
+
+const buildConditionScreenChunks = (
   document: ExportedDocumentInfo,
   semanticLayer: SemanticLayerV1,
   metadata: RetrievalMetadataV1
 ): RetrievalChunkV1[] => {
-  const variationChunks: RetrievalChunkV1[] = semanticLayer.condition_variations.flatMap((variation) =>
-    variation.text_for_embedding
+  return semanticLayer.condition_screens.flatMap((screen) =>
+    screen.text_for_embedding
       ? [{
-          chunk_id: `retrieval::${document.document_id}::${variation.entity_id}`,
+          chunk_id: `retrieval::${document.document_id}::${screen.entity_id}`,
           experiment_id: document.document_id,
-          chunk_type: "condition_variation" as const,
-          source_entity_ids: [variation.entity_id],
-          text: variation.text_for_embedding,
+          chunk_type: "condition_screen" as const,
+          ...semanticFactTags,
+          source_entity_ids: [screen.entity_id],
+          text: screen.text_for_embedding,
           metadata
         }]
       : []
   );
-  const attemptChunks: RetrievalChunkV1[] = semanticLayer.condition_variation_attempts.flatMap((attempt) =>
-    attempt.text_for_embedding
-      ? [{
-          chunk_id: `retrieval::${document.document_id}::${attempt.entity_id}`,
-          experiment_id: document.document_id,
-          chunk_type: "condition_variation_attempt" as const,
-          source_entity_ids: [attempt.parent_condition_variation_id, attempt.entity_id],
-          text: attempt.text_for_embedding,
-          metadata
-        }]
-      : []
-  );
-
-  return [...variationChunks, ...attemptChunks];
 };
 
 const buildRetrievalChunks = (
@@ -223,24 +218,27 @@ const buildRetrievalChunks = (
       chunk_id: `retrieval::${document.document_id}::document-summary`,
       experiment_id: document.document_id,
       chunk_type: "document_summary",
+      ...semanticFactTags,
       source_entity_ids: getDocumentSummaryEntityIds(semanticLayer),
       text: documentSummary,
       metadata
     });
   }
 
-  semanticLayer.markdown_blocks.forEach((block) => {
+  semanticLayer.documentation_blocks.forEach((block) => {
     if (!block.text_for_embedding) {
       return;
     }
 
     chunks.push({
-      chunk_id: `retrieval::${document.document_id}::${block.entity_id}`,
+      chunk_id: `retrieval::${document.document_id}::${block.doc_id}`,
       experiment_id: document.document_id,
-      chunk_type: "markdown",
-      source_entity_ids: [block.entity_id],
+      chunk_type: "documentation",
+      chunk_kind: "narrative_doc",
+      truth_source: "doc_comment",
+      source_entity_ids: [block.attached_to ?? block.doc_id],
       text: block.text_for_embedding,
-      raw_text: block.raw_text,
+      raw_text: block.raw_markdown,
       metadata
     });
   });
@@ -255,6 +253,7 @@ const buildRetrievalChunks = (
       chunk_id: `retrieval::${document.document_id}::${reaction.entity_id}`,
       experiment_id: document.document_id,
       chunk_type: "reaction_summary",
+      ...semanticFactTags,
       source_entity_ids: [reaction.entity_id],
       text,
       metadata
@@ -271,6 +270,7 @@ const buildRetrievalChunks = (
       chunk_id: `retrieval::${document.document_id}::${result.entity_id}`,
       experiment_id: document.document_id,
       chunk_type: "result_notes",
+      ...semanticFactTags,
       source_entity_ids: [result.entity_id],
       text,
       metadata: {
@@ -302,6 +302,7 @@ const buildRetrievalChunks = (
       chunk_id: `retrieval::${document.document_id}::${analysis.entity_id}`,
       experiment_id: document.document_id,
       chunk_type: "analysis_notes",
+      ...semanticFactTags,
       source_entity_ids: [analysis.entity_id],
       text,
       metadata: {
@@ -328,6 +329,7 @@ const buildRetrievalChunks = (
       chunk_id: `retrieval::${document.document_id}::${sample.entity_id}`,
       experiment_id: document.document_id,
       chunk_type: "sample_notes",
+      ...semanticFactTags,
       source_entity_ids: [sample.entity_id],
       text,
       metadata: {
@@ -352,13 +354,55 @@ const buildRetrievalChunks = (
       chunk_id: `retrieval::${document.document_id}::${artifact.entity_id}`,
       experiment_id: document.document_id,
       chunk_type: "artifact_notes",
+      ...semanticFactTags,
       source_entity_ids: [artifact.entity_id],
       text,
       metadata
     });
   });
 
-  chunks.push(...buildConditionVariationChunks(document, semanticLayer, metadata));
+  chunks.push(...buildConditionScreenChunks(document, semanticLayer, metadata));
+
+  semanticLayer.procedures.forEach((procedure) => {
+    if (!procedure.text_for_embedding) return;
+    chunks.push({
+      chunk_id: `retrieval::${document.document_id}::${procedure.entity_id}`,
+      experiment_id: document.document_id,
+      chunk_type: "procedure",
+      ...semanticFactTags,
+      source_entity_ids: [procedure.entity_id],
+      text: procedure.text_for_embedding,
+      metadata
+    });
+  });
+
+  semanticLayer.agent_runs.forEach((agentRun) => {
+    if (!agentRun.text_for_embedding) return;
+    chunks.push({
+      chunk_id: `retrieval::${document.document_id}::${agentRun.entity_id}`,
+      experiment_id: document.document_id,
+      chunk_type: "agent_audit",
+      chunk_kind: "agent_audit",
+      truth_source: "agent_run",
+      source_entity_ids: [agentRun.entity_id],
+      text: agentRun.text_for_embedding,
+      metadata
+    });
+  });
+
+  semanticLayer.traces.forEach((trace) => {
+    if (!trace.text_for_embedding) return;
+    chunks.push({
+      chunk_id: `retrieval::${document.document_id}::${trace.entity_id}`,
+      experiment_id: document.document_id,
+      chunk_type: "runtime_trace",
+      chunk_kind: "runtime_trace",
+      truth_source: "trace",
+      source_entity_ids: [trace.entity_id],
+      text: trace.text_for_embedding,
+      metadata
+    });
+  });
 
   return chunks;
 };

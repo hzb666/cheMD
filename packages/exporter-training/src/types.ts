@@ -2,18 +2,20 @@ import type { NormalizedAnalysis, NormalizedTlcAnalysis, SourceSpan } from "@che
 import type { ChemdLnf } from "@chemd/lnf";
 import type { CanonicalStepNode, ObservationEventNode } from "@chemd/step-ontology";
 
-export interface ChemdTrainingExportV2 {
-  schema_version: "chemd-training-export/v0.2";
+export interface ChemdTrainingExportV3 {
+  schema_version: "chemd-training-export/v0.3";
   export_id: string;
   exported_at: string;
   generator: ExportGeneratorInfo;
   document: ExportedDocumentInfo;
   governance: DataGovernanceInfo;
-  source_layer: SourceLayerV1;
-  semantic_layer: SemanticLayerV1;
-  learning_layer: LearningLayerV1;
-  quality_layer: QualityLayerV1;
+  source_layer: ProgramSourceLayerV1;
+  semantic_layer: ProgramSemanticLayerV1;
+  learning_layer: ProgramLearningLayerV1;
+  quality_layer: ProgramQualityLayerV1;
 }
+
+export type ChemdTrainingExportV2 = ChemdTrainingExportV3;
 
 export interface DataGovernanceInfo {
   confidentiality?: "public" | "internal" | "restricted";
@@ -47,13 +49,65 @@ export interface ExportedDocumentInfo {
   language?: string;
 }
 
-export interface SourceLayerV1 {
+export interface ProgramSourceLayerV1 {
   raw_source?: string;
   resolved_source?: string;
-  raw_meta: Record<string, unknown>;
-  raw_children: SourceNodeSnapshot[];
+  program: SourceProgramSnapshot;
+  module: SourceModuleSnapshot;
+  meta: SourceMetaSnapshot;
+  declarations: SourceDeclarationSnapshot[];
+  doc_comments: SourceDocCommentSnapshot[];
   diagnostics: ExportedDiagnostic[];
   audit_only_fields?: string[];
+}
+
+export type SourceLayerV1 = ProgramSourceLayerV1;
+
+export interface SourceProgramSnapshot {
+  schema_version: string;
+  source_language: string;
+  imports: Array<{
+    module_name: string;
+    from: string;
+    alias?: string;
+    docs: string[];
+  }>;
+  source_span?: SourceSpan;
+}
+
+export interface SourceModuleSnapshot {
+  name: string;
+  docs: string[];
+  source_span?: SourceSpan;
+}
+
+export interface SourceMetaSnapshot {
+  id: string;
+  title: string;
+  date: string;
+  fields: Record<string, unknown>;
+  primary?: Record<string, unknown>;
+  docs: string[];
+  source_span?: SourceSpan;
+}
+
+export interface SourceDeclarationSnapshot {
+  declaration_index: number;
+  declaration_kind: string;
+  declaration_id: string;
+  qualified_id?: string;
+  docs: string[];
+  raw_payload: Record<string, unknown>;
+  source_span?: SourceSpan;
+}
+
+export interface SourceDocCommentSnapshot {
+  doc_id: string;
+  attachment_kind: "file" | "module" | "declaration" | "field" | "procedure_step" | "agent_statement";
+  attached_to?: string;
+  raw_markdown: string;
+  export_policy: "render_rag" | "render_only" | "audit_only";
+  source_span?: SourceSpan;
 }
 
 export interface SourceNodeSnapshot {
@@ -94,7 +148,7 @@ export interface ExportedDiagnostic {
   };
 }
 
-export interface SemanticLayerV1 {
+export interface ProgramSemanticLayerV1 {
   molecules: ExportedMoleculeV1[];
   materials: ExportedMaterialV1[];
   batches: ExportedBatchV1[];
@@ -103,12 +157,18 @@ export interface SemanticLayerV1 {
   analyses: ExportedAnalysisV1[];
   samples: ExportedSampleV1[];
   artifacts: ExportedArtifactV1[];
+  condition_screens: ExportedConditionScreenV1[];
   condition_variations: ExportedConditionVaryV1[];
   condition_variation_attempts: ExportedConditionVariationAttemptV1[];
-  markdown_blocks: ExportedMarkdownBlockV1[];
+  procedures: ExportedProcedureV1[];
+  traces: ExportedTraceV1[];
+  agent_runs: ExportedAgentRunV1[];
+  documentation_blocks: ExportedDocumentationBlockV1[];
   links: ExportedRelationV1[];
   lnf?: ChemdLnf;
 }
+
+export type SemanticLayerV1 = ProgramSemanticLayerV1;
 
 export interface ExportedEntityBase {
   entity_id: string;
@@ -424,6 +484,75 @@ export interface ExportedMarkdownBlockV1 extends ExportedEntityBase {
   text_for_embedding?: string;
 }
 
+export interface ExportedDocumentationBlockV1 {
+  doc_id: string;
+  attachment_kind: "file" | "module" | "declaration" | "field" | "procedure_step" | "agent_statement";
+  attached_to?: string;
+  raw_markdown: string;
+  references: ExportedReferenceTokenV1[];
+  text_for_embedding?: string;
+  fact_status: "narrative_only";
+}
+
+export interface ExportedConditionScreenV1 extends ExportedEntityBase {
+  source_node_type: "condition_screen";
+  reaction_ref_raw?: string;
+  standard_ref_raw?: string;
+  factors?: string[];
+  outcomes?: string[];
+  notes?: string;
+  text_for_embedding?: string;
+}
+
+export interface ExportedProcedureStepV1 {
+  step_id: string;
+  family: string;
+  args: Record<string, unknown>;
+  input_refs_raw?: string[];
+  output_refs_raw?: string[];
+  depends_on?: string[];
+  evidence_refs_raw?: string[];
+  confidence?: number;
+}
+
+export interface ExportedProcedureV1 extends ExportedEntityBase {
+  source_node_type: "procedure";
+  target_ref_raw?: string;
+  evidence_refs_raw?: string[];
+  steps: ExportedProcedureStepV1[];
+  text_for_embedding?: string;
+}
+
+export interface ExportedTraceV1 extends ExportedEntityBase {
+  source_node_type: "trace";
+  target_ref_raw?: string;
+  mode?: string;
+  event_count?: number;
+  text_for_embedding?: string;
+}
+
+export interface ExportedAgentRunV1 extends ExportedEntityBase {
+  source_node_type: "agent_run";
+  goal: string;
+  status: string;
+  target_files?: string[];
+  evidence_refs_raw?: string[];
+  tool_calls: Array<{ tool_call_id: string; name: string; status: string }>;
+  patches: Array<{ patch_id: string; status: string; title?: string; edit_count: number }>;
+  decisions: Array<{ decision_id: string; decision: string; patch_id?: string; rationale?: string }>;
+  audit_timeline: Array<{
+    event_id: string;
+    event: string;
+    at?: string;
+    actor?: string;
+    summary?: string;
+    related_tool_call_id?: string;
+    related_patch_id?: string;
+    evidence_refs_raw?: string[];
+  }>;
+  text_for_embedding?: string;
+}
+
 export interface ExportedRelationV1 {
   relation_id: string;
   relation_type:
@@ -465,6 +594,12 @@ export interface ExportedRelationV1 {
     | "condition_variation_attempt_targets_reaction"
     | "condition_variation_attempt_compares_standard"
     | "condition_variation_attempt_has_result"
+    | "condition_screen_targets_reaction"
+    | "condition_screen_compares_standard"
+    | "analysis_targets_condition_screen"
+    | "procedure_targets_reaction"
+    | "trace_targets_declaration"
+    | "agent_run_references_declaration"
     | "analysis_targets_condition_variation"
     | "analysis_targets_condition_variation_attempt"
     | "markdown_mentions_entity";
@@ -485,8 +620,10 @@ export interface RetrievalMetadataV1 {
   analysis_ids?: string[];
   sample_ids?: string[];
   artifact_ids?: string[];
-  condition_variation_ids?: string[];
-  condition_variation_attempt_ids?: string[];
+  condition_screen_ids?: string[];
+  procedure_ids?: string[];
+  trace_ids?: string[];
+  agent_run_ids?: string[];
   analysis_types?: string[];
   status_label?: "success" | "partial" | "failed" | "unknown";
   yield_percent?: number | null;
@@ -502,15 +639,19 @@ export interface RetrievalChunkV1 {
   chunk_id: string;
   experiment_id: string;
   chunk_type:
-    | "markdown"
+    | "documentation"
     | "reaction_summary"
     | "result_notes"
     | "analysis_notes"
     | "sample_notes"
     | "artifact_notes"
-    | "condition_variation"
-    | "condition_variation_attempt"
+    | "condition_screen"
+    | "procedure"
+    | "agent_audit"
+    | "runtime_trace"
     | "document_summary";
+  chunk_kind: "semantic_fact" | "narrative_doc" | "agent_audit" | "runtime_trace";
+  truth_source: "declaration" | "doc_comment" | "agent_run" | "trace";
   source_entity_ids: string[];
   text: string;
   raw_text?: string;
@@ -610,13 +751,15 @@ export interface ObservationToEventsPairV03 {
   diagnostics: ExportedDiagnostic[];
 }
 
-export interface LearningLayerV1 {
+export interface ProgramLearningLayerV1 {
   retrieval_chunks: RetrievalChunkV1[];
   prediction_instances: PredictionInstanceV1[];
   chemistry_feature_refs?: ChemistryFeatureRefV1[];
   procedure_to_steps?: ProcedureToStepsPairV03[];
   observation_to_events?: ObservationToEventsPairV03[];
 }
+
+export type LearningLayerV1 = ProgramLearningLayerV1;
 
 export interface ParseQualityV1 {
   diagnostic_counts: {
@@ -655,9 +798,11 @@ export interface GovernanceQualityV1 {
   sanitized_projection: boolean;
 }
 
-export interface QualityLayerV1 {
+export interface ProgramQualityLayerV1 {
   governance_quality: GovernanceQualityV1;
   parse_quality: ParseQualityV1;
   normalization_quality: NormalizationQualityV1;
   training_quality: TrainingQualityV1;
 }
+
+export type QualityLayerV1 = ProgramQualityLayerV1;

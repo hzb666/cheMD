@@ -9,50 +9,46 @@ import {
 const createSource = (input: {
   catalyst: string;
   yieldPercent: string;
-}): string => `---
-id: exp-memory-loop
-title: Suzuki optimization
-date: 2026-04-22
-primary_reaction: rxn-main
-primary_result: res-main
-tags:
-  - suzuki
----
+}): string => `module exp_memory_loop
 
-:::chemd #aryl
-kind: molecule
-name: aryl bromide
-smiles: Brc1ccccc1
-:::
+meta {
+  id: "exp-memory-loop"
+  title: "Suzuki optimization"
+  date: "2026-04-22"
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+  tags: ["suzuki"]
+}
 
-:::chemd #boron
-kind: molecule
-name: phenylboronic acid
-smiles: OB(O)c1ccccc1
-:::
+molecule aryl {
+  name: "aryl bromide"
+  smiles: "Brc1ccccc1"
+}
 
-:::chemd #product
-kind: molecule
-name: biphenyl
-smiles: c1ccc(-c2ccccc2)cc1
-:::
+molecule boron {
+  name: "phenylboronic acid"
+  smiles: "OB(O)c1ccccc1"
+}
 
-:::chemd #rxn-main
-kind: reaction
-name: Suzuki coupling
-reactants: @aryl | @boron
-products: @product
-solvent: dioxane
-catalyst: ${input.catalyst}
-temperature: 80 C
-yield: ${input.yieldPercent}
-:::
+molecule product {
+  name: "biphenyl"
+  smiles: "c1ccc(-c2ccccc2)cc1"
+}
 
-:::result #res-main
-reaction: @rxn-main
-status: success
-yield: ${input.yieldPercent}
-:::
+reaction rxn_main {
+  name: "Suzuki coupling"
+  reactants: [@aryl, @boron]
+  products: [@product]
+  solvent: "dioxane"
+  catalyst: "${input.catalyst}"
+  temperature: 80 C
+}
+
+result res_main for @rxn_main {
+  product: @product
+  status: success
+  yield: ${input.yieldPercent}
+}
 `;
 
 const compileUnderstanding = (source: string) =>

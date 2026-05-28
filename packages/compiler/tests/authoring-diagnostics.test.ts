@@ -5,13 +5,15 @@ import { buildAuthoringDiagnostics } from "../src/authoring-diagnostics";
 import type { AuthoringAssistance } from "../src/index";
 
 const trainingExport = {
-  source_layer: { raw_children: [{ node_type: "reaction" }] },
+  source_layer: { declarations: [{ declaration_kind: "reaction" }] },
   semantic_layer: {
     reactions: [{ original_id: "rxn_main" }],
     results: [],
     analyses: [],
     condition_variations: [],
-    condition_variation_attempts: []
+    condition_variation_attempts: [],
+    procedures: [],
+    documentation_blocks: []
   }
 } as unknown as ChemdTrainingExportV2;
 

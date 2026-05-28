@@ -1611,9 +1611,29 @@ export const buildSemanticLayer = (
     analyses,
     samples,
     artifacts,
+    condition_screens: conditionVariations.map((variation) => ({
+      ...variation,
+      source_node_type: "condition_screen" as const,
+      reaction_ref_raw: variation.reaction_ref_raw,
+      standard_ref_raw: variation.standard_ref_raw,
+      factors: variation.factors?.map((factor) => factor.raw),
+      outcomes: variation.outcomes?.map((outcome) => outcome.raw),
+      notes: variation.notes,
+      text_for_embedding: variation.text_for_embedding
+    })),
     condition_variations: conditionVariations,
     condition_variation_attempts: conditionVariationAttempts,
-    markdown_blocks: markdownBlocks,
+    procedures: [],
+    traces: [],
+    agent_runs: [],
+    documentation_blocks: markdownBlocks.map((block) => ({
+      doc_id: block.entity_id,
+      attachment_kind: "file" as const,
+      raw_markdown: block.raw_text,
+      references: block.references,
+      text_for_embedding: block.text_for_embedding,
+      fact_status: "narrative_only" as const
+    })),
     links
   };
 };

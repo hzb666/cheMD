@@ -13,7 +13,7 @@ pnpm chemd export ./examples/example.chemd --format rag
 
 ## `training-full`
 
-`training-full` returns `ChemdTrainingExportV2` with schema version `chemd-training-export/v0.2`. It is the audit-capable export and keeps source context.
+`training-full` returns `ChemdTrainingExportV3` with schema version `chemd-training-export/v0.3`. It is the audit-capable export and keeps program source context.
 
 Top-level fields:
 
@@ -26,7 +26,9 @@ Top-level fields:
 - `learning_layer`
 - `quality_layer`
 
-`semantic_layer` contains `molecules`, `materials`, `batches`, `reactions`, `results`, `analyses`, `samples`, `artifacts`, `condition_variations`, `condition_variation_attempts`, `markdown_blocks`, `links`, and optional `lnf`.
+`source_layer` contains program, module, meta, declaration, and doc-comment snapshots.
+
+`semantic_layer` contains `molecules`, `materials`, `batches`, `reactions`, `results`, `analyses`, `samples`, `artifacts`, `condition_variations`, `condition_variation_attempts`, `procedures`, `traces`, `agent_runs`, `documentation_blocks`, `links`, and optional `lnf`.
 
 `learning_layer` contains `retrieval_chunks`, `prediction_instances`, `chemistry_feature_refs`, `procedure_to_steps`, and `observation_to_events`.
 
@@ -34,7 +36,7 @@ Example:
 
 ```json
 {
-  "schema_version": "chemd-training-export/v0.2",
+  "schema_version": "chemd-training-export/v0.3",
   "document": {
     "document_id": "exp-export-example",
     "title": "Export example",
@@ -49,13 +51,13 @@ Example:
   "semantic_layer": {
     "reactions": [
       {
-        "entity_id": "reaction::rxn-main",
-        "original_id": "rxn-main",
+        "entity_id": "rxn::exp-export-example::rxn_main",
+        "original_id": "rxn_main",
         "reactants": [
           {
-            "raw": "@mol-a | 1.0 mmol | 1.0 eq",
+            "raw": "@mol_a",
             "reference_status": "resolved",
-            "target_entity_id": "molecule::mol-a"
+            "target_entity_id": "mol::exp-export-example::mol_a"
           }
         ],
         "normalized_conditions": {
@@ -65,17 +67,17 @@ Example:
     ],
     "results": [
       {
-        "entity_id": "result::res-main",
-        "reaction_ref_raw": "@rxn-main",
+        "entity_id": "res::exp-export-example::res_main",
+        "reaction_ref_raw": "@rxn_main",
         "status_label": "success",
         "yield_percent": 78
       }
     ],
     "analyses": [
       {
-        "entity_id": "analysis::nmr-main",
+        "entity_id": "ana::exp-export-example::nmr_main",
         "analysis_type": "nmr",
-        "ref_raw": "@res-main",
+        "ref_raw": "@res_main",
         "normalized_analysis": { "analysis_type": "nmr" },
         "normalized_tlc": null
       }
@@ -92,8 +94,8 @@ Example:
     "links": [
       {
         "relation_type": "result_describes_reaction",
-        "from_entity_id": "result::res-main",
-        "to_entity_id": "reaction::rxn-main"
+        "from_entity_id": "res::exp-export-example::res_main",
+        "to_entity_id": "rxn::exp-export-example::rxn_main"
       }
     ]
   },
@@ -101,8 +103,10 @@ Example:
     "retrieval_chunks": [
       {
         "chunk_type": "document_summary",
-        "source_entity_ids": ["reaction::rxn-main", "result::res-main"],
-        "text": "Reaction rxn-main gave 78% yield."
+        "chunk_kind": "semantic_fact",
+        "truth_source": "declaration",
+        "source_entity_ids": ["rxn::exp-export-example::rxn_main", "res::exp-export-example::res_main"],
+        "text": "Reaction rxn_main gave 78% yield."
       }
     ],
     "procedure_to_steps": [
@@ -182,7 +186,7 @@ Example:
 
 `rag` returns `ChemdRagExportV1` with schema version `chemd-rag-export/v0.1`. It contains `document`, `governance`, `chunks`, and `quality`.
 
-RAG chunks are sanitized retrieval chunks. They keep chunk type, source entity IDs, text, and metadata, but omit audit-only raw text.
+RAG chunks are sanitized retrieval chunks. They keep chunk type, chunk kind, truth source, source entity IDs, text, and metadata, but omit audit-only raw text.
 
 Example:
 
@@ -193,8 +197,10 @@ Example:
     {
       "chunk_id": "chunk::exp-export-example::reaction-summary::rxn-main",
       "chunk_type": "reaction_summary",
-      "source_entity_ids": ["reaction::rxn-main", "result::res-main"],
-      "text": "rxn-main used mol-a and gave res-main in 78% yield.",
+      "chunk_kind": "semantic_fact",
+      "truth_source": "declaration",
+      "source_entity_ids": ["rxn::exp-export-example::rxn_main", "res::exp-export-example::res_main"],
+      "text": "rxn_main used mol_a and gave res_main in 78% yield.",
       "metadata": {
         "date": "2026-05-21",
         "reaction_ids": ["reaction::rxn-main"],

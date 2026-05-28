@@ -1,0 +1,77 @@
+{
+  "id": "05-28-program-first-phase-5-render-export",
+  "name": "05-28-program-first-phase-5-render-export",
+  "title": "Phase 5: Renderer and export replacement",
+  "description": "Replace renderers, JSON/DOCX export, training export, RAG, and LNF with program-native contracts.",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "compiler",
+  "priority": "P0",
+  "creator": "hzb666",
+  "assignee": "hzb666",
+  "createdAt": "2026-05-29",
+  "completedAt": "2026-05-29T01:55:00+08:00",
+  "branch": null,
+  "base_branch": "develop",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "05-28-program-first-rewrite",
+  "relatedFiles": [],
+  "notes": "Replaced render/export surfaces with program-native contracts: ProgramRenderDocument, program JSON, DOCX bridge v1.0, LNF v1.0, training export v0.3, RAG chunk truth typing, apps/docs export pages, and Graph/RAG fallout for storage/language-service. Root docs/ was not modified.",
+  "meta": {
+    "planSource": "D:\\download\\chemd-program-rewrite-implementation-plan.md",
+    "parallelWorkers": [
+      {
+        "agentId": "019e6f8e-c174-7332-a13c-09700fde9e17",
+        "nickname": "Wegener",
+        "scope": "semantic-rendering and renderers"
+      },
+      {
+        "agentId": "019e6f8e-f37f-7c30-968b-fe4a5e707c73",
+        "nickname": "Russell",
+        "scope": "lnf v1"
+      },
+      {
+        "agentId": "019e6f8f-2379-77a0-b30b-51a7975e9ed2",
+        "nickname": "Noether",
+        "scope": "training export v0.3 and RAG"
+      }
+    ],
+    "verification": [
+      "pnpm --filter @chemd/compiler test",
+      "pnpm --filter @chemd/compiler typecheck",
+      "pnpm --filter @chemd/cli test",
+      "pnpm --filter @chemd/cli typecheck",
+      "pnpm --filter @chemd/semantic-rendering test",
+      "pnpm --filter @chemd/semantic-rendering typecheck",
+      "pnpm --filter @chemd/renderer-html test",
+      "pnpm --filter @chemd/renderer-html typecheck",
+      "pnpm --filter @chemd/renderer-json test",
+      "pnpm --filter @chemd/renderer-json typecheck",
+      "pnpm --filter @chemd/renderer-docx test",
+      "pnpm --filter @chemd/renderer-docx typecheck",
+      "pnpm --filter @chemd/lnf test",
+      "pnpm --filter @chemd/lnf typecheck",
+      "pnpm --filter @chemd/exporter-training test",
+      "pnpm --filter @chemd/exporter-training typecheck",
+      "pnpm --filter @chemd/storage-postgres test",
+      "pnpm --filter @chemd/storage-postgres typecheck",
+      "pnpm --filter @chemd/language-service typecheck",
+      "pnpm --filter @chemd/desktop typecheck",
+      "pnpm --filter @chemd/docs typecheck",
+      "pnpm --filter @chemd/docs build",
+      "CLI export smoke: json chemd-program-json/v1, lnf chemd-lnf/v1.0, training chemd-training-export/v0.3, rag semantic_fact/declaration",
+      "git diff -- docs --name-only",
+      "git diff --check"
+    ],
+    "knownDeferred": [
+      "pnpm --filter @chemd/exporter-training test passes with legacy exporter fixture suites skipped because legacy :::/frontmatter compatibility is removed.",
+      "pnpm --filter @chemd/language-service test and pnpm --filter @chemd/desktop test still fail on old ::: workspace/editor fixtures and are scheduled for Phase 6 language-service/Desktop IDE migration.",
+      "An initial parallel pnpm --filter @chemd/docs typecheck failed while docs build was also generating .next/types; the sequential rerun passed."
+    ]
+  }
+}

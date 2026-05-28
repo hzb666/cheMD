@@ -1,24 +1,36 @@
 import type { ChemdDocument } from "@chemd/core";
 import type { RenderAdapterPayload, RenderOptions } from "@chemd/render-profile";
+import {
+  buildProgramRenderDocument,
+  formatProgramRenderValue,
+  isChemdProgramDocument,
+  type ProgramRenderDocument,
+  type ProgramRenderSection,
+  type ProgramRenderValue,
+  type RenderDocumentationBlock
+} from "@chemd/semantic-rendering";
 
 export interface DocxBridgePayload {
-  version: "v0.1";
-  document: {
-    meta: ChemdDocument["meta"];
-    children: ChemdDocument["children"];
+  version: "v1.0";
+  program: {
+    moduleName: string;
+    meta: ProgramRenderDocument["meta"];
+    documentation: RenderDocumentationBlock[];
+    declarations: ProgramRenderSection[];
+    diagnostics: ProgramRenderDocument["diagnostics"];
   };
-  diagnostics: ChemdDocument["diagnostics"];
   render: {
     profileId: string;
     resolvedOptions: RenderOptions;
     adapter?: RenderAdapterPayload;
+    markdown: string;
   };
   semantic?: {
     typedGraph: unknown;
   };
   exportHints: {
     format: "docx-bridge";
-    pipeline: "html-or-markdown-to-docx";
+    pipeline: "program-render-markdown-to-docx";
     recommendedTool: "pandoc";
   };
 }
@@ -27,325 +39,230 @@ export interface DocxBridgeOptions {
   typedGraph?: unknown;
 }
 
+type DocxInput = ChemdDocument | ProgramRenderDocument | Parameters<typeof buildProgramRenderDocument>[0];
+
 const normalizeWhitespace = (value: string): string => value.replaceAll(/\s+/g, " ").trim();
 
 const isSimpleYamlString = (value: string): boolean =>
   value.length > 0 && /^[a-zA-Z0-9 _./:-]+$/.test(value) && !value.startsWith("-") && !value.includes(": ");
 
-const toYamlScalar = (value: unknown): string => {
-  if (typeof value === "string") {
-    return isSimpleYamlString(value) ? value : JSON.stringify(value);
+const isProgramRenderDocument = (value: unknown): value is ProgramRenderDocument =>
+  typeof value === "object"
+  && value !== null
+  && (value as { schema_version?: unknown }).schema_version === "chemd-program-render/v1";
+
+const toProgramRenderDocument = (
+  document: DocxInput,
+  options: DocxBridgeOptions = {}
+): ProgramRenderDocument => {
+  if (isProgramRenderDocument(document)) return document;
+  if (isChemdProgramDocument(document)) {
+    return buildProgramRenderDocument(document, { typedGraph: options.typedGraph });
   }
-
-  if (typeof value === "number" || typeof value === "boolean") {
-    return String(value);
-  }
-
-  if (value === null) {
-    return "null";
-  }
-
-  return JSON.stringify(value);
+  return buildLegacyRenderDocument(document, options);
 };
 
-const renderMetaFrontmatter = (meta: ChemdDocument["meta"]): string => {
-  const lines = Object.entries(meta).flatMap(([key, rawValue]) => {
-    if (Array.isArray(rawValue)) {
-      if (rawValue.length === 0) {
-        return [`${key}: []`];
-      }
-
-      return [`${key}:`, ...rawValue.map((value) => `  - ${toYamlScalar(value)}`)];
-    }
-
-    return [`${key}: ${toYamlScalar(rawValue)}`];
-  });
-
-  return ["---", ...lines, "---"].join("\n");
-};
-
-type DocxNode = ChemdDocument["children"][number];
-type DocxNodeByType<TType extends DocxNode["type"]> = Extract<DocxNode, { type: TType }>;
-type FieldLine = [label: string, value: string | undefined];
-
-const compactLines = (lines: Array<string | undefined>): string =>
-  lines.filter((line): line is string => Boolean(line)).join("\n");
-
-const renderHeading = (label: string, id?: string): string =>
-  id ? `### ${label} \`${id}\`` : `### ${label}`;
-
-const renderFieldLines = (fields: FieldLine[]): string[] =>
-  fields.flatMap(([label, value]) => (value ? [`- ${label}: ${value}`] : []));
-
-const renderMarkdownNode = (value: string): string => value.trim();
-
-const renderSourceFieldLines = (
-  node: DocxNodeByType<"reaction"> | DocxNodeByType<"molecule">
-): string[] =>
-  renderFieldLines([
-    ["Surface origin", node.syntaxOrigin],
-    ["Declared kind", node.declaredKind]
-  ]);
-
-const renderReactionNode = (node: DocxNodeByType<"reaction">): string =>
-  compactLines([
-    renderHeading("Reaction", node.id),
-    ...renderSourceFieldLines(node),
-    ...renderFieldLines([
-      ["Name", node.name],
-      ["Temperature", node.temperature],
-      ["Time", node.time],
-      ["Solvent", node.solvent],
-      ["Catalyst", node.catalyst],
-      ["Yield", node.yield],
-      ["Caption", node.caption]
-    ])
-  ]);
-
-const renderMoleculeNode = (node: DocxNodeByType<"molecule">): string =>
-  compactLines([
-    renderHeading("Molecule", node.id),
-    ...renderSourceFieldLines(node),
-    ...renderFieldLines([
-      ["Name", node.name],
-      ["SMILES", node.smiles],
-      ["CAS", node.cas],
-      ["Formula", node.formula],
-      ["Amount", node.amount],
-      ["Role", node.role]
-    ])
-  ]);
-
-const renderResultNode = (node: DocxNodeByType<"result">): string =>
-  compactLines([
-    renderHeading("Result", node.id),
-    ...renderFieldLines([
-      ["Status", node.status],
-      ["Yield", node.yield],
-      ["Conversion", node.conversion],
-      ["Selectivity", node.selectivity],
-      ["Isolated mass", node.isolated_mass]
-    ])
-  ]);
-
-const renderAnalysisPointLines = (node: DocxNodeByType<"analysis">): string[] =>
-  Object.entries(node)
-    .filter(([key, value]) => /^p\d+$/.test(key) && typeof value === "string" && value.length > 0)
-    .sort(([left], [right]) => left.localeCompare(right, undefined, { numeric: true }))
-    .map(([key, value]) => `- ${key.toUpperCase()}: ${value}`);
-
-const renderAnalysisNode = (node: DocxNodeByType<"analysis">): string =>
-  compactLines([
-    renderHeading("Analysis", node.id),
-    ...renderFieldLines([
-      ["Type", node.type_name],
-      ["Ref", node.ref],
-      ["Time", node.time],
-      ["Eluent", node.eluent],
-      ["Plate", node.plate],
-      ["Visualization", node.visualization],
-      ["Result", node.result],
-      ["Instrument", node.instrument],
-      ["Solvent", node.solvent],
-      ["Frequency", node.frequency],
-      ["Data", node.data]
-    ]),
-    ...renderAnalysisPointLines(node)
-  ]);
-
-const renderProcedureStepLines = (node: DocxNodeByType<"procedure">): string[] =>
-  node.steps?.map((step, index) => {
-    const details = [
-      step.params ? Object.entries(step.params).map(([key, value]) => `${key}=${value}`).join(" | ") : "",
-      step.inputs?.length ? `inputs=${step.inputs.join(", ")}` : "",
-      step.outputs?.length ? `outputs=${step.outputs.join(", ")}` : "",
-      step.dependsOn?.length ? `depends_on=${step.dependsOn.join(", ")}` : ""
-    ].filter(Boolean).join(" | ");
-
-    return `- Step ${index + 1}: ${step.family}${details ? ` | ${details}` : ""}`;
-  }) ?? [];
-
-const renderProcedureNode = (node: DocxNodeByType<"procedure">): string =>
-  compactLines([
-    renderHeading("Procedure", node.id),
-    ...renderFieldLines([["Ref", node.ref]]),
-    ...renderProcedureStepLines(node),
-    node.body
-  ]);
-
-const renderObservationNode = (node: DocxNodeByType<"observation">): string =>
-  compactLines([renderHeading("Observation", node.id), ...renderFieldLines([["Ref", node.ref]]), node.body]);
-
-const renderTraceNode = (node: DocxNodeByType<"trace">): string =>
-  compactLines([
-    renderHeading("Trace", node.id),
-    ...renderFieldLines([
-      ["Plan", node.plan],
-      ["Mode", node.mode]
-    ]),
-    ...(node.events?.map((event) => `- Event: ${event.raw ?? event.eventType}`) ?? [])
-  ]);
-
-const renderSampleNode = (node: DocxNodeByType<"sample">): string =>
-  compactLines([
-    renderHeading("Sample", node.id),
-    ...renderFieldLines([
-      ["Name", node.name],
-      ["Sample ID", node.sample_id],
-      ["Batch", node.batch],
-      ["Purity", node.purity],
-      ["Supplier", node.supplier]
-    ])
-  ]);
-
-const renderArtifactNode = (node: DocxNodeByType<"artifact">): string =>
-  compactLines([
-    renderHeading("Artifact", node.id),
-    ...renderFieldLines([
-      ["Kind", node.kind],
-      ["Ref", node.ref],
-      ["Path", node.path],
-      ["Checksum", node.checksum],
-      ["Instrument", node.instrument],
-      ["Notes", node.notes]
-    ])
-  ]);
-
-const renderConditionVariesNode = (node: DocxNodeByType<"condition_varies">): string =>
-  compactLines([
-    renderHeading("Condition Variation", node.id),
-    ...renderFieldLines([
-      ["Reaction", node.reaction],
-      ["Standard", node.standard],
-      ["Condition", node.condition?.map((variable) =>
-        `${variable.field}=${variable.baseline ?? variable.raw}`
-      ).join(" | ")],
-      ["Varies", node.varyFields?.join(" | ")],
-      ...node.changes.map((change): FieldLine => [normalizeWhitespace(change.field), change.raw]),
-      ...((node.attempts ?? []).map((attempt): FieldLine => [
-        attempt.id,
-        [
-          attempt.reaction ? `reaction=${attempt.reaction}` : undefined,
-          attempt.result ? `result=${attempt.result}` : undefined,
-          attempt.mode ? `mode=${attempt.mode}` : undefined,
-          ...attempt.changes.map((change) => `${change.field}=${change.candidate ?? change.raw}`),
-          attempt.note ? `note=${attempt.note}` : undefined
-        ].filter(Boolean).join(" | ")
-      ])),
-      ["Notes", node.notes]
-    ])
-  ]);
-
-const renderTemplateBindLine = (bind: DocxNodeByType<"template">["bind"]): string | undefined => {
-  const values = Object.entries(bind);
-  return values.length > 0
-    ? `- Bind: ${values.map(([key, value]) => `${key}=${value}`).join(" | ")}`
-    : undefined;
-};
-
-const renderTemplateNode = (node: DocxNodeByType<"template">): string =>
-  compactLines([
-    `### Template \`${node.name}\``,
-    renderTemplateBindLine(node.bind),
-    node.params.length > 0 ? `- Params: ${node.params.join(", ")}` : undefined,
-    ...node.body.map(renderStructuredNode).filter((block) => block.length > 0)
-  ]);
-
-const renderUseNode = (node: DocxNodeByType<"use">): string => {
-  const values = Object.entries(node.values).map(([key, value]) => `${key}: ${value}`);
-  return [
-    `### Use Template \`${node.template}\``,
-    ...(values.length > 0 ? values.map((value) => `- ${value}`) : ["- (no overrides)"])
-  ].join("\n");
-};
-
-const renderColNode = (node: DocxNodeByType<"col">): string =>
-  compactLines([
-    renderHeading(`Columns (${node.columns})`),
-    ...node.children.map(renderStructuredNode).filter((block) => block.length > 0)
-  ]);
-
-const renderStructuredNode = (node: DocxNode): string => {
-  switch (node.type) {
-    case "markdown":
-      return renderMarkdownNode(node.value);
-    case "reaction":
-      return renderReactionNode(node);
-    case "molecule":
-      return renderMoleculeNode(node);
-    case "result":
-      return renderResultNode(node);
-    case "analysis":
-      return renderAnalysisNode(node);
-    case "procedure":
-      return renderProcedureNode(node);
-    case "trace":
-      return renderTraceNode(node);
-    case "observation":
-      return renderObservationNode(node);
-    case "sample":
-      return renderSampleNode(node);
-    case "artifact":
-      return renderArtifactNode(node);
-    case "condition_varies":
-      return renderConditionVariesNode(node);
-    case "template":
-      return renderTemplateNode(node);
-    case "use":
-      return renderUseNode(node);
-    case "col":
-      return renderColNode(node);
-    default:
-      return "";
-  }
-};
-
-export const renderDocxMarkdown = (document: ChemdDocument): string => {
-  const title = normalizeWhitespace(document.meta.title || document.meta.id);
-  const sections = document.children
-    .map(renderStructuredNode)
-    .map((section) => section.trim())
-    .filter((section) => section.length > 0);
-
-  return [
-    renderMetaFrontmatter(document.meta),
-    "",
-    `# ${title || "Untitled experiment"}`,
-    "",
-    ...sections.flatMap((section) => [section, ""])
-  ]
-    .join("\n")
-    .trimEnd();
-};
-
-export const createDocxBridgePayload = (
+const buildLegacyRenderDocument = (
   document: ChemdDocument,
-  options: RenderOptions,
-  adapterPayload?: RenderAdapterPayload,
-  bridgeOptions: DocxBridgeOptions = {}
-): DocxBridgePayload => ({
-  version: "v0.1",
-  document: {
-    meta: document.meta,
-    children: document.children
+  options: DocxBridgeOptions
+): ProgramRenderDocument => ({
+  schema_version: "chemd-program-render/v1",
+  sourceLanguage: "chemd/program-v1",
+  moduleName: String(document.meta.id || "legacy_document"),
+  meta: {
+    id: String(document.meta.id || "legacy-document"),
+    title: String(document.meta.title || document.meta.id || "Untitled experiment"),
+    date: String(document.meta.date || ""),
+    fields: {},
+    docs: []
   },
+  imports: [],
+  sections: [],
   diagnostics: document.diagnostics,
-  render: {
-    profileId: options.profileId,
-    resolvedOptions: options,
-    ...(adapterPayload ? { adapter: adapterPayload } : {})
-  },
-  ...(bridgeOptions.typedGraph ? { semantic: { typedGraph: bridgeOptions.typedGraph } } : {}),
-  exportHints: {
-    format: "docx-bridge",
-    pipeline: "html-or-markdown-to-docx",
-    recommendedTool: "pandoc"
+  semantic: {
+    typedGraph: typeof options.typedGraph === "object" && options.typedGraph !== null
+      ? options.typedGraph as ProgramRenderDocument["semantic"]["typedGraph"]
+      : { documentId: String(document.meta.id || ""), nodes: [], quantities: [], diagnostics: [] }
   }
 });
 
+const toYamlScalar = (value: unknown): string => {
+  if (typeof value === "string") return isSimpleYamlString(value) ? value : JSON.stringify(value);
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (value === null) return "null";
+  return JSON.stringify(value);
+};
+
+const renderMetaFrontmatter = (document: ProgramRenderDocument): string => {
+  const entries = [
+    ["id", document.meta.id],
+    ["title", document.meta.title],
+    ["date", document.meta.date],
+    ["module", document.moduleName],
+    ...Object.entries(document.meta.fields).map(([key, value]) => [key, formatProgramRenderValue(value)])
+  ];
+  return ["---", ...entries.map(([key, value]) => `${key}: ${toYamlScalar(value)}`), "---"].join("\n");
+};
+
+export const renderDocxMarkdown = (
+  document: DocxInput,
+  options: DocxBridgeOptions = {}
+): string => {
+  const renderDocument = toProgramRenderDocument(document, options);
+  const title = normalizeWhitespace(renderDocument.meta.title || renderDocument.meta.id);
+  return [
+    renderMetaFrontmatter(renderDocument),
+    "",
+    `# ${title || "Untitled experiment"}`,
+    "",
+    ...renderMarkdownSections(renderDocument),
+    ...renderDiagnosticsAppendix(renderDocument)
+  ].join("\n").trimEnd();
+};
+
+const renderMarkdownSections = (document: ProgramRenderDocument): string[] =>
+  document.sections.flatMap((section) => {
+    switch (section.kind) {
+      case "documentation": return renderDocumentationSection(section.title, section.docs);
+      case "declaration": return renderDeclarationSection(section);
+      case "procedure": return renderProcedureSection(section);
+      case "agent_run": return renderAgentRunSection(section);
+      case "trace": return renderTraceSection(section);
+    }
+  });
+
+const renderDocumentationSection = (
+  title: string,
+  docs: RenderDocumentationBlock[]
+): string[] =>
+  docs.length ? [`## ${title}`, "", ...docs.flatMap((doc) => [doc.markdown, ""])] : [];
+
+const renderDeclarationSection = (
+  section: Extract<ProgramRenderSection, { kind: "declaration" }>
+): string[] => [
+  `## ${pluralizeKind(section.declarationKind)}`,
+  "",
+  `### ${formatKind(section.declarationKind)} \`${section.id}\``,
+  ...section.docs.flatMap((doc) => ["", doc.markdown]),
+  ...renderFieldLines(section.fields),
+  ""
+];
+
+const renderProcedureSection = (
+  section: Extract<ProgramRenderSection, { kind: "procedure" }>
+): string[] => [
+  "## Procedure",
+  "",
+  `### Procedure \`${section.id}\``,
+  ...section.docs.flatMap((doc) => ["", doc.markdown]),
+  ...section.statements.flatMap(renderProcedureStatement),
+  ""
+];
+
+const renderProcedureStatement = (
+  statement: Extract<ProgramRenderSection, { kind: "procedure" }>["statements"][number]
+): string[] => {
+  if (statement.kind === "doc") return [statement.doc.markdown];
+  if (statement.kind === "control") {
+    return [`- ${formatKind(statement.controlKind)}${statement.id ? ` \`${statement.id}\`` : ""}`, ...statement.children.flatMap(renderProcedureStatement)];
+  }
+  const details = [
+    Object.entries(statement.args).map(([key, value]) => `${key}=${formatProgramRenderValue(value)}`).join(" | "),
+    statement.inputs.length ? `inputs=${statement.inputs.map((input) => input.raw).join(", ")}` : "",
+    statement.outputs.length ? `outputs=${statement.outputs.map((output) => output.raw).join(", ")}` : "",
+    statement.dependsOn.length ? `depends_on=${statement.dependsOn.join(", ")}` : ""
+  ].filter(Boolean).join(" | ");
+  return [`- Step ${statement.id}: ${statement.family}${details ? ` | ${details}` : ""}`];
+};
+
+const renderAgentRunSection = (
+  section: Extract<ProgramRenderSection, { kind: "agent_run" }>
+): string[] => [
+  "## Agent Audit",
+  "",
+  `### Agent Run \`${section.id}\``,
+  `- Status: ${section.status}`,
+  `- Goal: ${section.goal}`,
+  ...section.docs.flatMap((doc) => ["", doc.markdown]),
+  ...section.statementDocs.flatMap((doc) => ["", doc.markdown]),
+  ...section.auditTimeline.map((event) =>
+    `- ${formatKind(event.event)}${event.at ? ` at ${event.at}` : ""}${event.summary ? `: ${event.summary}` : ""}`
+  ),
+  ""
+];
+
+const renderTraceSection = (
+  section: Extract<ProgramRenderSection, { kind: "trace" }>
+): string[] => [
+  "## Trace",
+  "",
+  `### Trace \`${section.id}\``,
+  ...section.docs.flatMap((doc) => ["", doc.markdown]),
+  ...renderFieldLines(section.fields),
+  ""
+];
+
+const renderFieldLines = (fields: Record<string, ProgramRenderValue>): string[] =>
+  Object.entries(fields).map(([key, value]) => `- ${formatKind(key)}: ${formatProgramRenderValue(value)}`);
+
+const renderDiagnosticsAppendix = (document: ProgramRenderDocument): string[] =>
+  document.diagnostics.length
+    ? [
+        "## Diagnostics",
+        "",
+        ...document.diagnostics.map((diagnostic) =>
+          `- ${diagnostic.severity.toUpperCase()} ${diagnostic.code}: ${diagnostic.message}`
+        )
+      ]
+    : [];
+
+export const createDocxBridgePayload = (
+  document: DocxInput,
+  options: RenderOptions,
+  adapterPayload?: RenderAdapterPayload,
+  bridgeOptions: DocxBridgeOptions = {}
+): DocxBridgePayload => {
+  const renderDocument = toProgramRenderDocument(document, bridgeOptions);
+  return {
+    version: "v1.0",
+    program: {
+      moduleName: renderDocument.moduleName,
+      meta: renderDocument.meta,
+      documentation: collectDocumentation(renderDocument),
+      declarations: renderDocument.sections.filter((section) => section.kind !== "documentation"),
+      diagnostics: renderDocument.diagnostics
+    },
+    render: {
+      profileId: options.profileId,
+      resolvedOptions: options,
+      ...(adapterPayload ? { adapter: adapterPayload } : {}),
+      markdown: renderDocxMarkdown(renderDocument)
+    },
+    semantic: { typedGraph: renderDocument.semantic.typedGraph },
+    exportHints: {
+      format: "docx-bridge",
+      pipeline: "program-render-markdown-to-docx",
+      recommendedTool: "pandoc"
+    }
+  };
+};
+
 export const renderDocxBridge = (
-  document: ChemdDocument,
+  document: DocxInput,
   options: RenderOptions,
   adapterPayload?: RenderAdapterPayload,
   bridgeOptions: DocxBridgeOptions = {}
 ): string => JSON.stringify(createDocxBridgePayload(document, options, adapterPayload, bridgeOptions), null, 2);
+
+const collectDocumentation = (document: ProgramRenderDocument): RenderDocumentationBlock[] =>
+  document.sections.flatMap((section) =>
+    section.kind === "documentation" || "docs" in section ? section.docs : []
+  );
+
+const formatKind = (value: string): string =>
+  value.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase());
+
+const pluralizeKind = (value: string): string => {
+  const label = formatKind(value);
+  return label.endsWith("s") ? label : `${label}s`;
+};

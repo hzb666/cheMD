@@ -13,7 +13,7 @@ pnpm chemd export ./examples/example.chemd --format rag
 
 ## `training-full`
 
-`training-full` 返回 `ChemdTrainingExportV2`，schema version 为 `chemd-training-export/v0.2`。它是可审计导出，会保留 source context。
+`training-full` 返回 `ChemdTrainingExportV3`，schema version 为 `chemd-training-export/v0.3`。它是可审计导出，会保留 program source context。
 
 顶层字段：
 
@@ -26,7 +26,9 @@ pnpm chemd export ./examples/example.chemd --format rag
 - `learning_layer`
 - `quality_layer`
 
-`semantic_layer` 包含 `molecules`、`materials`、`batches`、`reactions`、`results`、`analyses`、`samples`、`artifacts`、`condition_variations`、`condition_variation_attempts`、`markdown_blocks`、`links` 和可选 `lnf`。
+`source_layer` 包含 program、module、meta、declaration 和 doc-comment snapshots。
+
+`semantic_layer` 包含 `molecules`、`materials`、`batches`、`reactions`、`results`、`analyses`、`samples`、`artifacts`、`condition_variations`、`condition_variation_attempts`、`procedures`、`traces`、`agent_runs`、`documentation_blocks`、`links` 和可选 `lnf`。
 
 `learning_layer` 包含 `retrieval_chunks`、`prediction_instances`、`chemistry_feature_refs`、`procedure_to_steps` 和 `observation_to_events`。
 
@@ -34,7 +36,7 @@ pnpm chemd export ./examples/example.chemd --format rag
 
 ```json
 {
-  "schema_version": "chemd-training-export/v0.2",
+  "schema_version": "chemd-training-export/v0.3",
   "document": {
     "document_id": "exp-export-example",
     "title": "Export example",
@@ -49,13 +51,13 @@ pnpm chemd export ./examples/example.chemd --format rag
   "semantic_layer": {
     "reactions": [
       {
-        "entity_id": "reaction::rxn-main",
-        "original_id": "rxn-main",
+        "entity_id": "rxn::exp-export-example::rxn_main",
+        "original_id": "rxn_main",
         "reactants": [
           {
-            "raw": "@mol-a | 1.0 mmol | 1.0 eq",
+            "raw": "@mol_a",
             "reference_status": "resolved",
-            "target_entity_id": "molecule::mol-a"
+            "target_entity_id": "mol::exp-export-example::mol_a"
           }
         ],
         "normalized_conditions": {
@@ -65,17 +67,17 @@ pnpm chemd export ./examples/example.chemd --format rag
     ],
     "results": [
       {
-        "entity_id": "result::res-main",
-        "reaction_ref_raw": "@rxn-main",
+        "entity_id": "res::exp-export-example::res_main",
+        "reaction_ref_raw": "@rxn_main",
         "status_label": "success",
         "yield_percent": 78
       }
     ],
     "analyses": [
       {
-        "entity_id": "analysis::nmr-main",
+        "entity_id": "ana::exp-export-example::nmr_main",
         "analysis_type": "nmr",
-        "ref_raw": "@res-main",
+        "ref_raw": "@res_main",
         "normalized_analysis": { "analysis_type": "nmr" },
         "normalized_tlc": null
       }
@@ -92,8 +94,8 @@ pnpm chemd export ./examples/example.chemd --format rag
     "links": [
       {
         "relation_type": "result_describes_reaction",
-        "from_entity_id": "result::res-main",
-        "to_entity_id": "reaction::rxn-main"
+        "from_entity_id": "res::exp-export-example::res_main",
+        "to_entity_id": "rxn::exp-export-example::rxn_main"
       }
     ]
   },
@@ -101,8 +103,10 @@ pnpm chemd export ./examples/example.chemd --format rag
     "retrieval_chunks": [
       {
         "chunk_type": "document_summary",
-        "source_entity_ids": ["reaction::rxn-main", "result::res-main"],
-        "text": "Reaction rxn-main gave 78% yield."
+        "chunk_kind": "semantic_fact",
+        "truth_source": "declaration",
+        "source_entity_ids": ["rxn::exp-export-example::rxn_main", "res::exp-export-example::res_main"],
+        "text": "Reaction rxn_main gave 78% yield."
       }
     ],
     "procedure_to_steps": [
@@ -182,7 +186,7 @@ pnpm chemd export ./examples/example.chemd --format rag
 
 `rag` 返回 `ChemdRagExportV1`，schema version 为 `chemd-rag-export/v0.1`。它包含 `document`、`governance`、`chunks` 和 `quality`。
 
-RAG chunk 是 sanitized retrieval chunk。它保留 chunk type、source entity IDs、text 和 metadata，但省略 audit-only raw text。
+RAG chunk 是 sanitized retrieval chunk。它保留 chunk type、chunk kind、truth source、source entity IDs、text 和 metadata，但省略 audit-only raw text。
 
 示例：
 
@@ -193,8 +197,10 @@ RAG chunk 是 sanitized retrieval chunk。它保留 chunk type、source entity I
     {
       "chunk_id": "chunk::exp-export-example::reaction-summary::rxn-main",
       "chunk_type": "reaction_summary",
-      "source_entity_ids": ["reaction::rxn-main", "result::res-main"],
-      "text": "rxn-main used mol-a and gave res-main in 78% yield.",
+      "chunk_kind": "semantic_fact",
+      "truth_source": "declaration",
+      "source_entity_ids": ["rxn::exp-export-example::rxn_main", "res::exp-export-example::res_main"],
+      "text": "rxn_main used mol_a and gave res_main in 78% yield.",
       "metadata": {
         "date": "2026-05-21",
         "reaction_ids": ["reaction::rxn-main"],
