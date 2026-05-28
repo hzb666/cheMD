@@ -1015,3 +1015,50 @@ Verification:
 ### Next Steps
 
 - None - task complete
+
+
+## Session 165: Phase 2 parser replacement
+
+**Date**: 2026-05-28
+**Task**: Phase 2 parser replacement
+**Package**: parser
+**Branch**: `develop`
+
+### Summary
+
+Switched @chemd/parser to the program-first parse path with lexer, value/doc/declaration/procedure/agent parsing and program tests.
+
+### Main Changes
+
+- Replaced @chemd/parser public parseChemd entrypoint with parseChemdProgram.
+- Added program lexer, token model, value parser, doc comment parser, and legacy syntax fatal diagnostics.
+- Added program parser support for module/import/meta declarations, field declarations, procedure steps, and agent run entries.
+- Removed legacy parser tests that asserted frontmatter, ::: blocks, template/use, nested legacy blocks, and document.children behavior.
+- Added program parser tests for values, docs, imports/module refs, malformed blocks, procedure, and agent runs.
+- Addressed review findings: import alias reference context, import doc comments, grouped line docs, missing closing brace diagnostics, and decision block spans.
+
+Verification:
+- pnpm --filter @chemd/parser test: passed, 4 files / 12 tests.
+- pnpm --filter @chemd/parser typecheck: passed.
+- pnpm --filter @chemd/core typecheck: passed.
+- python .trellis\scripts\task.py validate .trellis\tasks\05-28-program-first-phase-2-parser: passed.
+- git diff --check: passed with CRLF warnings only.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a865a6c` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
