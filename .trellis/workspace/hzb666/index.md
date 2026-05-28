@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-4.md`
-- **Total Sessions**: 169
+- **Total Sessions**: 170
 - **Last Active**: 2026-05-29
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-4.md` | ~1291 | Active |
+| `journal-4.md` | ~1365 | Active |
 | `journal-3.md` | ~1994 | Archived |
 | `journal-2.md` | ~1956 | Archived |
 | `journal-1.md` | ~1998 | Archived |
@@ -32,6 +32,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 170 | 2026-05-29 | Phase 7 full program-first cleanup | `1b5ba6b` | `develop` |
 | 169 | 2026-05-29 | Phase 6 IDE storage language-service migration | `8a5637a` | `develop` |
 | 168 | 2026-05-29 | Phase 5 renderer and export replacement | `b165692` | `develop` |
 | 167 | 2026-05-29 | Phase 4 compiler pipeline replacement | `331adbe` | `develop` |

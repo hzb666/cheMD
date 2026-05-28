@@ -1329,3 +1329,37 @@ Migrated language-service, Desktop IDE, storage, and web/playground surfaces to 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 170: Phase 7 full program-first cleanup
+
+**Date**: 2026-05-29
+**Task**: Phase 7 full program-first cleanup
+**Package**: compiler
+**Branch**: `develop`
+
+### Summary
+
+Completed the final program-first cleanup: removed legacy fenced-block parser and fixtures, tightened program-native compiler/render/export/IDE/docs contracts, closed Phase 7 and parent Trellis task, and verified typecheck/test/build with documented lint/Rust blockers.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1b5ba6b` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
