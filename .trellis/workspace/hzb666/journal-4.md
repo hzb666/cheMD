@@ -535,7 +535,15 @@ Added graph-derived canonical reaction intelligence input, explicit missing cano
 
 ### Main Changes
 
-(Add details)
+- Replaced compiler entrypoint with program-first
+  parse/resolve/typecheck pipeline.
+- Added temporary program semantic layer for training export
+  while renderer/LNF/export packages wait for Phase 5.
+- Updated CLI validate/check/export/diff/changed/graph paths
+  to report program declarations and ignore `.chemd.md`.
+- Reworked authoring, repair, quick-fix, compiler tests,
+  fixtures, importer output, and apps/docs examples for
+  program syntax.
 
 ### Git Commits
 
@@ -545,7 +553,24 @@ Added graph-derived canonical reaction intelligence input, explicit missing cano
 
 ### Testing
 
-- [OK] (Add test results)
+- [OK] `pnpm --filter @chemd/compiler test`
+- [OK] `pnpm --filter @chemd/compiler typecheck`
+- [OK] `pnpm --filter @chemd/cli test`
+- [OK] `pnpm --filter @chemd/cli typecheck`
+- [OK] `pnpm --filter @chemd/parser test`
+- [OK] `pnpm --filter @chemd/resolver test`
+- [OK] `pnpm --filter @chemd/typechecker test`
+- [OK] `pnpm --filter @chemd/importer-prose test`
+- [OK] `pnpm --filter @chemd/importer-prose typecheck`
+- [OK] `pnpm --filter @chemd/exporter-training typecheck`
+- [OK] `pnpm --filter @chemd/docs typecheck`
+- [OK] `pnpm --filter @chemd/docs build`
+- [OK] `pnpm chemd validate packages/compiler/fixtures/program-golden-suzuki-screen.chemd`
+- [OK] `git diff -- docs --name-only`
+- [OK] `git diff --check`
+- Deferred: `pnpm --filter @chemd/exporter-training test`
+  still targets legacy frontmatter and `:::` fixtures; this is
+  Phase 5 scope.
 
 ### Status
 
@@ -553,7 +578,7 @@ Added graph-derived canonical reaction intelligence input, explicit missing cano
 
 ### Next Steps
 
-- None - task complete
+- Start Phase 5 renderer/export/LNF migration.
 
 
 ## Session 152: Hybrid reaction canonical input task closeout
@@ -1114,6 +1139,40 @@ Verification:
 | Hash | Message |
 |------|---------|
 | `ea02a77` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 167: Phase 4 compiler pipeline replacement
+
+**Date**: 2026-05-29
+**Task**: Phase 4 compiler pipeline replacement
+**Package**: compiler
+**Branch**: `develop`
+
+### Summary
+
+Replaced compiler and CLI integration with program-first parse/resolve/typecheck contracts; updated authoring, tests, apps/docs, and Trellis Phase 4 state.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `331adbe` | (see git log) |
 
 ### Testing
 
