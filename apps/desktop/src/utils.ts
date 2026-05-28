@@ -43,8 +43,62 @@ export const DEFAULT_SAMPLE_SOURCE_NAME = "ethanol-oxidation.chemd";
 
 export const sampleSources: Record<string, string> = {
   [DEFAULT_SAMPLE_SOURCE_NAME]: playgroundSampleSource,
-  "suzuki-screen.chemd": "---\nid: exp-desktop-suzuki\ntitle: Suzuki coupling condition screen\ndate: 2026-05-12\n---\n\n:::chemd #mol-aryl-bromide\nsmiles: Cc1ccc(Br)cc1\n:::\n\n:::chemd #mol-boronic-acid\nsmiles: OB(O)c1ccccc1\n:::\n\n:::chemd #mol-biaryl-product\nsmiles: Cc1ccc(-c2ccccc2)cc1\n:::\n\n:::chemd #rxn-screen\nkind: reaction\nreactants: @mol-aryl-bromide | @mol-boronic-acid\nproducts: @mol-biaryl-product\nconditions:\n  catalyst: Pd(PPh3)4\n  base: K2CO3\n  solvent: dioxane/water\n:::\n\n:::result #screen-result\nstatus: pending\nyield: 78%\n:::\n",
-  "calibration.chemd": "---\nid: exp-desktop-calibration\ntitle: HPLC calibration record\ndate: 2026-05-12\n---\n\n:::sample #std-a\nname: caffeine standard\namount: 2.0 mg\n:::\n\n:::analysis #calibration\nmethod: HPLC-UV\ntarget: caffeine\nresult: linear fit accepted\n:::\n"
+  "suzuki-screen.chemd": `module exp_desktop_suzuki
+
+meta {
+  id: "exp-desktop-suzuki"
+  title: "Suzuki coupling condition screen"
+  date: "2026-05-12"
+  primary_reaction: @rxn_screen
+  primary_result: @screen_result
+}
+
+molecule mol_aryl_bromide {
+  smiles: "Cc1ccc(Br)cc1"
+}
+
+molecule mol_boronic_acid {
+  smiles: "OB(O)c1ccccc1"
+}
+
+molecule mol_biaryl_product {
+  smiles: "Cc1ccc(-c2ccccc2)cc1"
+}
+
+reaction rxn_screen {
+  reactants: [@mol_aryl_bromide, @mol_boronic_acid]
+  products: [@mol_biaryl_product]
+  catalyst: "Pd(PPh3)4"
+  base: "K2CO3"
+  solvent: "dioxane/water"
+}
+
+result screen_result for @rxn_screen {
+  status: pending
+  yield: 78%
+}
+`,
+  "calibration.chemd": `module exp_desktop_calibration
+
+meta {
+  id: "exp-desktop-calibration"
+  title: "HPLC calibration record"
+  date: "2026-05-12"
+  primary_sample: @std_a
+  primary_analysis: @calibration
+}
+
+sample std_a {
+  name: "caffeine standard"
+  amount: 2.0 mg
+}
+
+analysis calibration for @std_a {
+  method: "HPLC-UV"
+  target: "caffeine"
+  result: "linear fit accepted"
+}
+`
 };
 
 // ---------------------------------------------------------------------------

@@ -24,7 +24,8 @@
     "05-28-program-first-phase-2-parser",
     "05-28-program-first-phase-3-resolver-typechecker",
     "05-29-05-28-program-first-phase-4-compiler-pipeline",
-    "05-29-05-28-program-first-phase-5-render-export"
+    "05-29-05-28-program-first-phase-5-render-export",
+    "05-29-05-28-program-first-phase-6-ide-storage"
   ],
   "parent": null,
   "relatedFiles": [],

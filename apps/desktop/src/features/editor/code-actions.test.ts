@@ -13,15 +13,18 @@ import {
   updateChemdCodeActionOutput
 } from "./code-actions";
 
-const source = `---
-id: exp-monaco-code-actions
-title: Monaco code actions
-date: 2026-05-13
----
+const source = `module exp_monaco_code_actions
 
-:::chemd #mol-main
-name: draft
-:::
+meta {
+  id: "exp-monaco-code-actions"
+  title: "Monaco code actions"
+  date: "2026-05-13"
+}
+
+reaction rxn_main {
+  reactants: [@missing_molecule]
+  products: [product]
+}
 `;
 
 const createModel = (
@@ -102,10 +105,10 @@ describe("chemd Monaco code action provider", () => {
       documentUri
     });
     const diagnostic = compileOutput.diagnostics.find((item) =>
-      item.code === "W_CHEMD_KIND_AMBIGUOUS"
+      item.severity === "error"
     );
     if (!diagnostic) {
-      throw new Error("Expected W_CHEMD_KIND_AMBIGUOUS diagnostic");
+      throw new Error("Expected unresolved program reference diagnostic");
     }
     const diagnosticWithQuickFixes: ChemdEditorDiagnostic = {
       ...diagnostic,
@@ -119,7 +122,7 @@ describe("chemd Monaco code action provider", () => {
             beforeHash: "before-molecule",
             edits: [{
               range: diagnostic.range,
-              replacement: `${source}\nkind: molecule\n`
+              replacement: `molecule missing_molecule {\n  smiles: "CCO"\n}\n\n${source}`
             }]
           }
         },
@@ -132,7 +135,7 @@ describe("chemd Monaco code action provider", () => {
             beforeHash: "before-reaction",
             edits: [{
               range: diagnostic.range,
-              replacement: `${source}\nkind: reaction\n`
+              replacement: source.replace("@missing_molecule", "product")
             }]
           }
         }
@@ -183,7 +186,7 @@ describe("chemd Monaco code action provider", () => {
       resource: model.uri,
       versionId: 7,
       textEdit: {
-        text: expect.stringContaining("kind: molecule")
+        text: expect.stringContaining("molecule missing_molecule")
       },
       metadata: {
         needsConfirmation: false,

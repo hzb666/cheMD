@@ -314,7 +314,7 @@ const Page = () => {
   });
   const logoSrc = typeof logoMark === "string" ? logoMark : logoMark.src;
   const diagnosticCount = result.diagnostics.length;
-  const documentSubtitle = [result.document.meta.date, result.document.meta.id].filter(Boolean).join(" · ");
+  const documentSubtitle = [result.program.meta.date, result.program.meta.id].filter(Boolean).join(" · ");
   const {
     handleApplyQuickFix,
     handleApplyAuthoringSuggestion,
@@ -361,7 +361,7 @@ const Page = () => {
       <div className="flex min-h-0 flex-col xl:h-full w-full max-w-[2000px] mx-auto">
         <PlaygroundHeader
           logoSrc={logoSrc}
-          title={result.document.meta.title || "Untitled Document"}
+          title={result.program.meta.title || "Untitled Document"}
           subtitle={documentSubtitle}
           profileId={result.renderOptions.profileId}
           labStorageStatus={labStorageStatus}

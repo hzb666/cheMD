@@ -1,4 +1,4 @@
-import type { ChemdTrainingExportV2 } from "@chemd/exporter-training";
+import type { ChemdTrainingExportV3 } from "@chemd/exporter-training";
 import type { JsonRecord } from "@chemd/storage-postgres";
 
 import type { CreatePostgresRuntimeClientOptions } from "./postgres-client";
@@ -43,7 +43,7 @@ export interface PostgresTrainingRevisionExport {
   createdAt: string;
   compileRunId: string;
   compileCreatedAt: string;
-  trainingExport: ChemdTrainingExportV2;
+  trainingExport: ChemdTrainingExportV3;
 }
 
 export interface PostgresCorrectionPatternExport {

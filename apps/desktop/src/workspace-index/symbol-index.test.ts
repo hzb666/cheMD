@@ -26,22 +26,24 @@ const fileEntry = (
   ...overrides
 });
 
-const createSource = (reactionId: string): string => `---
-id: ${reactionId}
-title: ${reactionId}
-date: 2026-05-13
----
+const createSource = (reactionId: string): string => `module exp_${reactionId.replace(/-/g, "_")}
 
-:::chemd #mol-main
-kind: molecule
-smiles: CCO
-:::
+meta {
+  id: "${reactionId}"
+  title: "${reactionId}"
+  date: "2026-05-13"
+}
 
-:::chemd #${reactionId}
-kind: reaction
-reactants: mol-main
-products: product-main
-:::
+/// Indexed molecule declaration.
+molecule mol-main {
+  name: "main"
+  smiles: "CCO"
+}
+
+reaction ${reactionId} {
+  reactants: [@mol-main]
+  products: [product-main]
+}
 `;
 
 describe("buildWorkspaceSymbolIndex", () => {
@@ -203,7 +205,7 @@ describe("buildWorkspaceSymbolIndex", () => {
       expect.objectContaining({
         documentUri: "workspace://workspace-alpha/experiments/pass.chemd",
         status: "ok",
-        symbolCount: 2
+        symbolCount: 4
       })
     ]));
     expect(result.index.symbolIdsByName["rxn-ok"]).toHaveLength(1);

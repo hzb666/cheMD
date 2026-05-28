@@ -41,28 +41,31 @@ const compile: WorkspaceIndexCompileFn = (input): ChemdLanguageCompileSuccess =>
     : [{ id: "rxn-a", label: "rxn-a", kind: "reaction", range: range(6) }]
 });
 
-const citationSource = `---
-id: exp-rag-gate
-title: RAG gate
-date: 2026-05-13
----
+const citationSource = `module exp_rag_gate
 
-:::chemd #mol-a
-kind: molecule
-smiles: CCO
-:::
+meta {
+  id: "exp-rag-gate"
+  title: "RAG gate"
+  date: "2026-05-13"
+  primary_reaction: @rxn-a
+  primary_result: @res-a
+}
 
-:::chemd #rxn-a
-kind: reaction
-reactants: mol-a
-products: product-a
-:::
+/// RAG gate fixture keeps declaration source ranges.
+molecule mol-a {
+  name: "Ethanol"
+  smiles: "CCO"
+}
 
-:::result #res-a
-reaction: rxn-a
-status: success
-yield: 72%
-:::
+reaction rxn-a {
+  reactants: [@mol-a]
+  products: [product-a]
+}
+
+result res-a for @rxn-a {
+  status: success
+  yield: 72%
+}
 `;
 
 const citationCandidate = (

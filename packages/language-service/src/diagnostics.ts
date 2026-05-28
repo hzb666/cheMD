@@ -1,6 +1,6 @@
 import type { Diagnostic, SourceRange } from "@chemd/core";
 import { buildQuickFixProposals } from "./quick-fix";
-import { createStartRange } from "./ranges";
+import { createStartRange, sourceSpanToRange } from "./ranges";
 import type {
   ChemdEditorDiagnostic,
   ChemdSourceRange
@@ -20,7 +20,9 @@ export const mapCompilerDiagnostic = (
   source: string,
   diagnostic: Diagnostic
 ): ChemdEditorDiagnostic => {
-  const range = mapSourceRange(diagnostic.position);
+  const range = diagnostic.position
+    ? mapSourceRange(diagnostic.position)
+    : sourceSpanToRange(diagnostic.sourceSpan, createStartRange());
 
   return {
     code: diagnostic.code,

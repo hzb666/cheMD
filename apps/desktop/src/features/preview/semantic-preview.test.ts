@@ -7,22 +7,37 @@ import {
 
 import { buildSemanticPreview } from "./semantic-preview";
 
-const source = `---
-id: exp-semantic-preview
-title: Semantic Preview
-date: 2026-05-13
----
+const source = `module exp_semantic_preview
 
-:::chemd #mol-a
-kind: molecule
-name: Ethanol
-smiles: CCO
-:::
+/*md
+# Semantic Preview
+*/
+meta {
+  id: "exp-semantic-preview"
+  title: "Semantic Preview"
+  date: "2026-05-13"
+}
 
-:::result #res-a
-status: success
-yield: 82%
-:::
+/// Molecule declaration rendered from doc comments.
+molecule mol_a {
+  name: "Ethanol"
+  smiles: "CCO"
+}
+
+molecule mol_b {
+  name: "Acetaldehyde"
+  smiles: "CC=O"
+}
+
+reaction rxn_a {
+  reactants: [@mol_a]
+  products: [@mol_b]
+}
+
+result res_a for @rxn_a {
+  status: success
+  yield: 82%
+}
 `;
 
 const compileOk = (): ChemdLanguageCompileOutput =>
@@ -40,7 +55,8 @@ describe("buildSemanticPreview", () => {
     expect(preview.tree?.schemaVersion).toBe("chemd.renderable-node.v1");
     expect(preview.tree?.root.label).toBe("Semantic Preview");
     expect(preview.html).toContain("chemd-renderable-tree");
-    expect(preview.html).toContain('data-chemd-node-kind="molecule"');
+    expect(preview.html).toContain('data-chemd-hydration-target="molecule"');
+    expect(preview.html).toContain("# Semantic Preview");
     expect(preview.html).toContain('data-chemd-render-state="ready"');
   });
 
@@ -66,24 +82,25 @@ describe("buildSemanticPreview", () => {
     expect(preview.diagnostics[0]?.message).toContain("compiler exploded");
   });
 
-  it("returns fallback preview when compile success has no document", () => {
+  it("returns fallback preview when compile success has no semantic input", () => {
     const output = compileOk();
     expect(output.status).toBe("ok");
-    const missingDocumentOutput = {
+    const missingSemanticInputOutput = {
       ...output,
       result: {
         ...(output.status === "ok" ? output.result : {}),
-        document: undefined
+        document: undefined,
+        program: undefined
       }
     } as unknown as ChemdLanguageCompileOutput;
 
-    const preview = buildSemanticPreview(missingDocumentOutput);
+    const preview = buildSemanticPreview(missingSemanticInputOutput);
 
     expect(preview.state).toBe("fallback");
-    expect(preview.reason).toBe("missing_document");
+    expect(preview.reason).toBe("missing_semantic_input");
     expect(preview.html).toBe("");
     expect(preview.tree).toBeNull();
-    expect(preview.message).toContain("document");
+    expect(preview.message).toContain("semantic input");
     expect(preview.diagnostics).toEqual(output.diagnostics);
   });
 

@@ -21,7 +21,6 @@ import type {
   GraphBuildContext
 } from "./graph-rag-types";
 import {
-  buildBlockRangeMap,
   createDocumentRange,
   createSourceHash
 } from "./ranges";
@@ -289,7 +288,7 @@ export const buildEditorGraphRagRecords = (
 ): EditorGraphRagRecords => {
   const compileOutput = buildCompileOutput(input);
   const documentRange = createDocumentRange(input.source);
-  const blockRanges = buildBlockRangeMap(input.source);
+  const blockRanges = new Map(compileOutput.symbols.map((symbol) => [symbol.id, symbol.range]));
   const entities = compileOutput.status === "ok"
     ? collectEntityCandidates(compileOutput, blockRanges, documentRange)
     : [];

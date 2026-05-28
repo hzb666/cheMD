@@ -3,6 +3,7 @@ import type {
   ChemdCompletionItem,
   ChemdCompletionRequest
 } from "./completion-types";
+import { isReferenceableSymbolKind } from "./program-model";
 import type { ChemdSourceRange, ChemdSymbol } from "./types";
 
 const referenceFields = new Set(["reactant", "product", "reac", "prod", "reactants", "products", "prev", "molecule", "source", "ref"]);
@@ -32,6 +33,7 @@ export const getChemdReferenceCompletions = (
 
   const prefix = token.symbolPrefix.toLowerCase();
   return filterPreferredSymbols(getCurrentDocumentSymbols(symbols, context.block?.id), context)
+    .filter((symbol) => isReferenceableSymbolKind(symbol.kind))
     .filter((symbol) => symbol.id.toLowerCase().startsWith(prefix))
     .map((symbol, index) => createReferenceItem(symbol, token.range, index));
 };

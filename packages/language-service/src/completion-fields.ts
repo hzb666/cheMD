@@ -1,7 +1,7 @@
 import {
   getBlockChildLineFields,
   getCompletionBlockFieldSchemas,
-  type BlockFieldSchema
+  getDeclarationSchema
 } from "@chemd/core";
 import {
   STEP_FAMILIES,
@@ -20,7 +20,6 @@ const commonFields = ["kind", "name", "caption"];
 interface FieldCompletionEntry {
   aliasOf?: string;
   name: string;
-  schema?: BlockFieldSchema;
 }
 
 interface StepParamCompletionEntry {
@@ -71,6 +70,16 @@ const getFieldsForKind = (
 ): FieldCompletionEntry[] => {
   if (kind === "unknown") {
     return commonFields.map((name) => ({ name }));
+  }
+  const declarationSchema = getDeclarationSchema(kind);
+  if (declarationSchema) {
+    const canonicalEntries = declarationSchema.fields.map((schema) => ({ name: schema.name }));
+    const aliasEntries = prefix.length === 0
+      ? []
+      : declarationSchema.fields.flatMap((schema) =>
+          schema.aliases?.map((alias) => ({ name: alias, aliasOf: schema.name })) ?? []
+        );
+    return [...canonicalEntries, ...aliasEntries];
   }
 
   const { blockType, semanticKind } = getSchemaContext(kind);

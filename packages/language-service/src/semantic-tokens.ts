@@ -38,6 +38,11 @@ export interface ChemdSemanticToken {
 }
 
 const blockHeaderPattern = /^(\s*:::)(\s*)([A-Za-z][\w-]*)(?:\s+(#[A-Za-z0-9_-]+))?/u;
+const programDeclarationPattern = /^(\s*)(molecule|material|batch|reaction|result|analysis|sample|artifact|condition_screen|procedure|observation|trace)\s+([A-Za-z_][\w-]*)(?:\s+for\s+@[A-Za-z0-9_.#/-]+)?\s*\{/u;
+const programModulePattern = /^(\s*)(module)\s+([A-Za-z_][\w-]*)/u;
+const programMetaPattern = /^(\s*)(meta)\s*\{/u;
+const programAgentPattern = /^(\s*)(agent)(\s+)(run)\s+([A-Za-z_][\w-]*)\s*\{/u;
+const programStepPattern = /^(\s*)(step)\s+([A-Za-z_][\w-]*)\s*=/u;
 const fieldPattern = /^(\s*)([A-Za-z_][\w-]*)(\s*:)/u;
 const explicitReferencePattern = /@[A-Za-z0-9_.#/-]+/gu;
 const inlineParameterPattern = /(?:^|\|\s*)([A-Za-z_][\w-]*)(?=\s*=)/gu;
@@ -117,6 +122,100 @@ export const buildChemdSemanticTokens = (
 
   lines.forEach((line, index) => {
     const lineNumber = index + 1;
+    const programDeclaration = line.match(programDeclarationPattern);
+    if (programDeclaration) {
+      const blockType = programDeclaration[2] ?? "";
+      const blockTypeStart = (programDeclaration[1]?.length ?? 0);
+      pushToken(tokens, {
+        range: toRange(lineNumber, blockTypeStart, blockTypeStart + blockType.length),
+        type: "keyword",
+        modifiers: ["block"]
+      });
+
+      const declaration = programDeclaration[3] ?? "";
+      const declarationStart = line.indexOf(declaration, blockTypeStart + blockType.length);
+      const symbol = symbolById.get(declaration);
+      const kindModifier = symbolKindModifier(symbol);
+      pushToken(tokens, {
+        range: toRange(lineNumber, declarationStart, declarationStart + declaration.length),
+        type: "variable",
+        modifiers: [
+          "declaration",
+          ...(kindModifier ? [kindModifier] : [])
+        ]
+      });
+    }
+
+    const moduleMatch = line.match(programModulePattern);
+    if (moduleMatch) {
+      const keyword = moduleMatch[2] ?? "";
+      const keywordStart = moduleMatch[1]?.length ?? 0;
+      pushToken(tokens, {
+        range: toRange(lineNumber, keywordStart, keywordStart + keyword.length),
+        type: "keyword",
+        modifiers: ["block"]
+      });
+      const declaration = moduleMatch[3] ?? "";
+      const declarationStart = line.indexOf(declaration, keywordStart + keyword.length);
+      pushToken(tokens, {
+        range: toRange(lineNumber, declarationStart, declarationStart + declaration.length),
+        type: "variable",
+        modifiers: ["declaration"]
+      });
+    }
+
+    const metaMatch = line.match(programMetaPattern);
+    if (metaMatch) {
+      const keyword = metaMatch[2] ?? "";
+      const keywordStart = metaMatch[1]?.length ?? 0;
+      pushToken(tokens, {
+        range: toRange(lineNumber, keywordStart, keywordStart + keyword.length),
+        type: "keyword",
+        modifiers: ["block", "metadata"]
+      });
+    }
+
+    const agentMatch = line.match(programAgentPattern);
+    if (agentMatch) {
+      const agentStart = agentMatch[1]?.length ?? 0;
+      const runStart = agentStart + (agentMatch[2]?.length ?? 0) + (agentMatch[3]?.length ?? 0);
+      const declaration = agentMatch[5] ?? "";
+      const declarationStart = line.indexOf(declaration, runStart + (agentMatch[4]?.length ?? 0));
+      pushToken(tokens, {
+        range: toRange(lineNumber, agentStart, agentStart + (agentMatch[2]?.length ?? 0)),
+        type: "keyword",
+        modifiers: ["block"]
+      });
+      pushToken(tokens, {
+        range: toRange(lineNumber, runStart, runStart + (agentMatch[4]?.length ?? 0)),
+        type: "keyword",
+        modifiers: ["block"]
+      });
+      pushToken(tokens, {
+        range: toRange(lineNumber, declarationStart, declarationStart + declaration.length),
+        type: "variable",
+        modifiers: ["declaration"]
+      });
+    }
+
+    const stepMatch = line.match(programStepPattern);
+    if (stepMatch) {
+      const keyword = stepMatch[2] ?? "";
+      const keywordStart = stepMatch[1]?.length ?? 0;
+      const declaration = stepMatch[3] ?? "";
+      const declarationStart = line.indexOf(declaration, keywordStart + keyword.length);
+      pushToken(tokens, {
+        range: toRange(lineNumber, keywordStart, keywordStart + keyword.length),
+        type: "keyword",
+        modifiers: ["block", "procedure"]
+      });
+      pushToken(tokens, {
+        range: toRange(lineNumber, declarationStart, declarationStart + declaration.length),
+        type: "variable",
+        modifiers: ["declaration"]
+      });
+    }
+
     const headerMatch = line.match(blockHeaderPattern);
     if (headerMatch) {
       const blockType = headerMatch[3] ?? "";

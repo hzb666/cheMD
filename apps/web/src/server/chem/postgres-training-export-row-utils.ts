@@ -1,4 +1,4 @@
-import type { ChemdTrainingExportV2 } from "@chemd/exporter-training";
+import type { ChemdTrainingExportV3 } from "@chemd/exporter-training";
 import type { JsonRecord } from "@chemd/storage-postgres";
 
 import {
@@ -89,15 +89,15 @@ export const readJsonRecordArray = (
   return parsed as JsonRecord[];
 };
 
-const isTrainingExport = (value: unknown): value is ChemdTrainingExportV2 =>
+const isTrainingExport = (value: unknown): value is ChemdTrainingExportV3 =>
   typeof value === "object" &&
   value !== null &&
-  (value as { schema_version?: unknown }).schema_version === "chemd-training-export/v0.2";
+  (value as { schema_version?: unknown }).schema_version === "chemd-training-export/v0.3";
 
 export const requireTrainingExport = (
   revisionId: string,
   value: unknown
-): ChemdTrainingExportV2 => {
+): ChemdTrainingExportV3 => {
   const parsed = parseJsonValue(value);
   if (!isTrainingExport(parsed)) {
     throw new PostgresTrainingExportArtifactError(revisionId);

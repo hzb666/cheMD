@@ -8,22 +8,23 @@ import {
   findChemdWorkspaceSymbolsByName
 } from "../src/index";
 
-const createSource = (id: string, reactionId: string): string => `---
-id: ${id}
-title: ${id}
-date: 2026-05-13
----
+const createSource = (id: string, reactionId: string): string => `module ${id.replaceAll("-", "_")}
 
-:::chemd #mol-main
-kind: molecule
-smiles: CCO
-:::
+meta {
+  id: "${id}"
+  title: "${id}"
+  date: "2026-05-13"
+}
 
-:::chemd #${reactionId}
-kind: reaction
-reactants: mol-main
-products: product-main
-:::
+molecule mol-main {
+  name: "main"
+  smiles: "CCO"
+}
+
+reaction ${reactionId} {
+  reactants: [@mol-main]
+  products: ["product-main"]
+}
 `;
 
 describe("buildChemdWorkspaceSymbolIndex", () => {

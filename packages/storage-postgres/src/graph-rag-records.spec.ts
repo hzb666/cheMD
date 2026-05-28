@@ -9,26 +9,40 @@ import {
   getPostgresGraphRagExtensionSchemaSql
 } from ".";
 
-const source = `---
-id: exp-desktop
-title: Graph RAG Contract
-date: 2026-05-12
----
+const source = `module exp_desktop
 
-:::chemd #rxn-main
-kind: reaction
-reactants: aldehyde
-products: alcohol
-solvent: THF
-yield: 72%
-route: route-a
-:::
+/*md
+Graph RAG Contract documents a program-native export.
+*/
+meta {
+  id: "exp-desktop"
+  title: "Graph RAG Contract"
+  date: "2026-05-12"
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
 
-:::result #res-main
-reaction: @rxn-main
-status: success
-yield: 72%
-:::
+molecule mol_aldehyde {
+  name: "aldehyde"
+}
+
+molecule mol_alcohol {
+  name: "alcohol"
+}
+
+/// The main reaction is documented for RAG.
+reaction rxn_main {
+  reactants: [@mol_aldehyde]
+  products: [@mol_alcohol]
+  solvent: "THF"
+  yield: 72%
+  route: "route-a"
+}
+
+result res_main for @rxn_main {
+  status: success
+  yield: 72%
+}
 `;
 
 const sourceRange = {
@@ -60,16 +74,16 @@ const buildRecords = () => {
         {
           edge_id: "edge-evidence-1",
           edge_type: "evidence_link",
-          from_node_id: "rxn::exp-desktop::rxn-main",
-          to_node_id: "res::exp-desktop::res-main",
+          from_node_id: "rxn::exp-desktop::rxn_main",
+          to_node_id: "res::exp-desktop::res_main",
           document_id: "exp-desktop",
           confidence: 0.7,
-          properties: { evidence_entity_ids: ["res::exp-desktop::res-main"] }
+          properties: { evidence_entity_ids: ["res::exp-desktop::res_main"] }
         }
       ],
       reaction_features: [
         {
-          reaction_entity_id: "rxn::exp-desktop::rxn-main",
+          reaction_entity_id: "rxn::exp-desktop::rxn_main",
           document_id: "exp-desktop",
           reaction_signature: "aldehyde->alcohol",
           participant_signature: "aldehyde|alcohol",
@@ -86,8 +100,8 @@ const buildRecords = () => {
       reaction_similarity_edges: [
         {
           edge_id: "sim-1",
-          from_reaction_entity_id: "rxn::exp-desktop::rxn-main",
-          to_reaction_entity_id: "rxn::exp-desktop::rxn-main",
+          from_reaction_entity_id: "rxn::exp-desktop::rxn_main",
+          to_reaction_entity_id: "rxn::exp-desktop::rxn_main",
           basis: ["same_route"],
           score: 0.92,
           warnings: []
@@ -96,8 +110,8 @@ const buildRecords = () => {
       warnings: []
     },
     sourceRangesByEntityId: {
-      "rxn::exp-desktop::rxn-main": sourceRange,
-      "res::exp-desktop::res-main": sourceRange
+      "rxn::exp-desktop::rxn_main": sourceRange,
+      "res::exp-desktop::res_main": sourceRange
     },
     sourceRangesByChunkId: Object.fromEntries(
       compiled.ragExport.chunks.map((chunk) => [chunk.chunk_id, sourceRange])
@@ -106,7 +120,7 @@ const buildRecords = () => {
       "edge-evidence-1": {
         experiment_id: "exp-desktop",
         revision_id: "rev-graph-rag-1",
-        evidence_entity_ids: ["res::exp-desktop::res-main"],
+        evidence_entity_ids: ["res::exp-desktop::res_main"],
         source_range: sourceRange
       }
     },
@@ -167,7 +181,7 @@ describe("PostgreSQL Graph/RAG extension records", () => {
     expect(records.reactionGraphNodes[0]).toMatchObject({
       experimentId: "exp-desktop",
       revisionId: "rev-graph-rag-1",
-      entityId: "rxn::exp-desktop::rxn-main",
+      entityId: "rxn::exp-desktop::rxn_main",
       sourceRange,
       routeId: "route-a"
     });
@@ -176,7 +190,7 @@ describe("PostgreSQL Graph/RAG extension records", () => {
         edgeId: "edge-evidence-1",
         experimentId: "exp-desktop",
         evidence: expect.objectContaining({
-          evidence_entity_ids: ["res::exp-desktop::res-main"],
+          evidence_entity_ids: ["res::exp-desktop::res_main"],
           source_range: sourceRange
         })
       })

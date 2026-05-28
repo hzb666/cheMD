@@ -11,28 +11,31 @@ import {
 } from "./persistence";
 
 const createdAt = "2026-05-12T02:30:00.000Z";
-const source = `---
-id: exp-desktop-persist
-title: Desktop persistence
-date: 2026-05-12
----
+const source = `module exp_desktop_persist
 
-:::chemd #mol-a
-kind: molecule
-smiles: CCO
-:::
+meta {
+  id: "exp-desktop-persist"
+  title: "Desktop persistence"
+  date: "2026-05-12"
+  primary_reaction: @rxn-a
+  primary_result: @res-a
+}
 
-:::chemd #rxn-a
-kind: reaction
-reactants: mol-a
-products: product-a
-:::
+/// Runtime persistence should retain doc comments for RAG.
+molecule mol-a {
+  name: "Ethanol"
+  smiles: "CCO"
+}
 
-:::result #res-a
-reaction: rxn-a
-status: success
-yield: 82%
-:::
+reaction rxn-a {
+  reactants: [@mol-a]
+  products: [product-a]
+}
+
+result res-a for @rxn-a {
+  status: success
+  yield: 82%
+}
 `;
 
 const workspace = {

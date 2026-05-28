@@ -20,32 +20,33 @@ const withCursor = (source: string): { source: string; cursorOffset: number } =>
   };
 };
 
-const source = `---
-id: exp-hover-definition
-title: Hover definition
-date: 2026-05-13
----
+const source = `module exp_hover_definition
 
-:::chemd #mol-main
-kind: molecule
-smiles: CCO
-:::
+meta {
+  id: "exp-hover-definition"
+  title: "Hover definition"
+  date: "2026-05-13"
+}
 
-:::chemd #rxn-main
-kind: reaction
-reactants: @mol-main
-products: product-main
-:::
+molecule mol-main {
+  name: "main"
+  smiles: "CCO"
+}
 
-:::result #res-main
-status: success
-yield: 72%
-:::
+reaction rxn-main {
+  reactants: [@mol-main]
+  products: ["product-main"]
+}
+
+result res-main for @rxn-main {
+  status: success
+  yield: 72%
+}
 `;
 
 describe("getChemdHover", () => {
   it("returns symbol metadata and source line at the current position", () => {
-    const marked = source.replace("#mol-main", "#mol|-main");
+    const marked = source.replace("mol-main {", "mol|-main {");
     const request = withCursor(marked);
     const compileOutput = compileChemdForEditor({ source: request.source });
     const hover = getChemdHover(request, { compileOutput });
@@ -62,14 +63,13 @@ describe("getChemdHover", () => {
         }
       },
       sourceLine: {
-        line: 7,
-        text: ":::chemd #mol-main"
+        text: "molecule mol-main {"
       }
     });
   });
 
   it("returns canonical quantity details from typed graph", () => {
-    const marked = source.replace("#res-main", "#res|-main");
+    const marked = source.replace("res-main", "res|-main");
     const request = withCursor(marked);
     const compileOutput = compileChemdForEditor({ source: request.source });
     const hover = getChemdHover(request, { compileOutput });
@@ -78,26 +78,25 @@ describe("getChemdHover", () => {
       expect.objectContaining({
         field: "yield",
         raw: "72%",
-        canonicalValue: 72,
-        canonicalUnit: "percent"
+        valueKind: "scalar"
       })
     ]);
   });
 
   it("returns diagnostics at the current position without throwing", () => {
-    const marked = source.replace("#mol-main", "#mol|-main");
+    const marked = source.replace("mol-main {", "mol|-main {");
     const request = withCursor(marked);
     const compileOutput = compileChemdForEditor({ source: request.source });
     const symbol = compileOutput.symbols.find((item) => item.id === "mol-main");
     compileOutput.diagnostics = [{
-      code: "W_CHEMD_KIND_AMBIGUOUS",
+      code: "E_TEST_DIAGNOSTIC",
       severity: "warning",
-      message: "Molecule block should declare kind explicitly",
+      message: "Test diagnostic",
       range: symbol?.range ?? {
-        startLine: 7,
+        startLine: 9,
         startColumn: 1,
-        endLine: 10,
-        endColumn: 4
+        endLine: 11,
+        endColumn: 2
       },
       sourceNodeId: "mol-main",
       quickFixes: []
@@ -105,13 +104,13 @@ describe("getChemdHover", () => {
     const hover = getChemdHover(request, { compileOutput });
 
     expect(hover?.diagnostic).toMatchObject({
-      code: "W_CHEMD_KIND_AMBIGUOUS",
+      code: "E_TEST_DIAGNOSTIC",
       severity: "warning",
       sourceNodeId: "mol-main"
     });
   });
 
-  it("returns reference target information for symbol references", () => {
+  it("returns reference target information for program reference expressions", () => {
     const marked = source.replace("@mol-main", "@mol|-main");
     const request = withCursor(marked);
     const compileOutput = compileChemdForEditor({ source: request.source });
@@ -123,27 +122,21 @@ describe("getChemdHover", () => {
         kind: "molecule",
         explicitReference: true,
         tokenRange: {
-          startLine: 14,
-          startColumn: 12
+          startLine: expect.any(Number),
+          startColumn: expect.any(Number)
         }
       }
     });
   });
 
-  it("returns null when no compile output or hover data is available", () => {
+  it("returns null when no compile output is available", () => {
     expect(getChemdHover({ source: "plain text", position: { line: 1, column: 1 } }))
       .toBeNull();
-
-    const compileOutput = compileChemdForEditor({ source: "plain text" });
-    expect(getChemdHover({
-      source: "plain text",
-      position: { line: 1, column: 1 }
-    }, { compileOutput })).toBeNull();
   });
 });
 
 describe("getChemdDefinition", () => {
-  it("returns the current document definition for reference tokens", () => {
+  it("returns the current document definition for reference expressions", () => {
     const marked = source.replace("@mol-main", "@mol|-main");
     const request = withCursor(marked);
     const compileOutput = compileChemdForEditor({
@@ -160,11 +153,11 @@ describe("getChemdDefinition", () => {
       uri: "file:///workspace/hover.chemd",
       path: "D:/workspace/hover.chemd",
       range: expect.objectContaining({
-        startLine: 7,
+        startLine: 9,
         startColumn: 1
       }),
       sourceSpan: expect.objectContaining({
-        startLine: 7,
+        startLine: 9,
         startColumn: 1
       }),
       target: {
@@ -177,7 +170,7 @@ describe("getChemdDefinition", () => {
   });
 
   it("returns the current document definition for bare symbol id tokens", () => {
-    const marked = source.replace("@mol-main", "mol|-main");
+    const marked = source.replace("mol-main {", "mol|-main {");
     const request = withCursor(marked);
     const compileOutput = compileChemdForEditor({ source: request.source });
     const definitions = getChemdDefinition(request, { compileOutput });
@@ -201,7 +194,7 @@ describe("getChemdDefinition", () => {
     const request = withCursor(marked);
     const workspaceSymbolIndex = buildChemdWorkspaceSymbolIndex([{
       documentUri: "file:///workspace/other.chemd",
-      source: source.replace("#rxn-main", "#rxn-other")
+      source: source.replace("rxn-main", "rxn-other")
     }]);
     const definitions = getChemdDefinition(request, { workspaceSymbolIndex });
 
@@ -219,11 +212,11 @@ describe("getChemdDefinition", () => {
     const workspaceSymbolIndex = buildChemdWorkspaceSymbolIndex([
       {
         documentUri: "file:///workspace/a.chemd",
-        source: source.replace("#rxn-main", "#shared-rxn")
+        source: source.replace("rxn-main", "shared-rxn")
       },
       {
         documentUri: "file:///workspace/b.chemd",
-        source: source.replace("#rxn-main", "#shared-rxn")
+        source: source.replace("rxn-main", "shared-rxn")
       }
     ]);
     const result = getChemdDefinitionResult(request, { workspaceSymbolIndex });

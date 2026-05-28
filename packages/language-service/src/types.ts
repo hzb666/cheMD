@@ -36,6 +36,7 @@ export interface ChemdEditorDiagnostic {
 }
 
 export type ChemdOutlineKind =
+  | "module"
   | "metadata"
   | "molecule"
   | "material"
@@ -44,8 +45,20 @@ export type ChemdOutlineKind =
   | "result"
   | "analysis"
   | "sample"
+  | "artifact"
+  | "condition_screen"
   | "procedure"
+  | "step"
+  | "control"
   | "observation"
+  | "trace"
+  | "agent_run"
+  | "agent_tool"
+  | "agent_evidence"
+  | "agent_patch"
+  | "agent_decision"
+  | "agent_timeline"
+  | "documentation"
   | "template";
 
 export interface ChemdOutlineItem {

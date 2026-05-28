@@ -1,4 +1,5 @@
 import { getChemdCompletionContext } from "./completion-context";
+import { isReferenceableSymbolKind } from "./program-model";
 import type {
   ChemdCompletionContext,
   ChemdCompletionRequest
@@ -71,6 +72,7 @@ export const getChemdWorkspaceReferenceCompletions = (
   }
 
   const symbols = index.symbols
+    .filter((symbol) => isReferenceableSymbolKind(symbol.kind))
     .filter((symbol) => isCompletionMatch(symbol, token.symbolPrefix))
     .filter((symbol) => !isCurrentSymbol(symbol, request, context))
     .sort((left, right) => compareWorkspaceSymbols(left, right, request, context));

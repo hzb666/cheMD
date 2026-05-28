@@ -47,7 +47,7 @@ const createResult = (): ExportPostgresTrainingResult => ({
     compileRunId: "run-1",
     compileCreatedAt: "2026-04-22T00:01:00.000Z",
     trainingExport: {
-      schema_version: "chemd-training-export/v0.2"
+      schema_version: "chemd-training-export/v0.3"
     } as ExportPostgresTrainingResult["revisions"][number]["trainingExport"]
   }],
   correctionPatterns: [{

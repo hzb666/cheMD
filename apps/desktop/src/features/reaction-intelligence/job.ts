@@ -35,11 +35,82 @@ const sourceHashForReaction = (source: string, reactionId: string): string => {
   return `fnv1a:${createSourceHash(reactionSource)}`;
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+const readString = (value: unknown): string | undefined =>
+  typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+
+const readProgramStringValue = (value: unknown): string | undefined => {
+  if (!isRecord(value)) {
+    return readString(value);
+  }
+  return readString(value.value)
+    ?? readString(value.raw)
+    ?? readString(value.name);
+};
+
+const normalizeReferenceId = (value: string | undefined): string | undefined => {
+  const token = value?.split("|")[0]?.trim().split(/[,\s]+/u)[0]?.trim();
+  if (!token) {
+    return undefined;
+  }
+  return token.replace(/^[@#]/u, "").split("#").at(-1);
+};
+
+const addStructure = (
+  structures: Map<string, string>,
+  id: string | undefined,
+  smiles: string | undefined
+): void => {
+  const normalizedId = normalizeReferenceId(id);
+  if (normalizedId && smiles) {
+    structures.set(normalizedId, smiles);
+  }
+};
+
+const buildStructureById = (
+  compileOutput: Extract<ChemdLanguageCompileOutput, { status: "ok" }>
+): Map<string, string> => {
+  const structures = new Map<string, string>();
+  for (const molecule of compileOutput.result.trainingExport.semantic_layer.molecules) {
+    const record = molecule as unknown as Record<string, unknown>;
+    const smiles = readString(record.canonical_smiles) ?? readString(record.smiles);
+    addStructure(structures, readString(record.original_id), smiles);
+    addStructure(structures, readString(record.entity_id), smiles);
+  }
+  for (const declaration of compileOutput.result.program?.declarations ?? []) {
+    if (
+      declaration.kind !== "molecule"
+      && declaration.kind !== "material"
+      && declaration.kind !== "batch"
+    ) {
+      continue;
+    }
+    addStructure(
+      structures,
+      declaration.id,
+      readProgramStringValue(declaration.fields.smiles)
+    );
+  }
+  return structures;
+};
+
 const participantSmiles = (
-  participants: readonly { canonical_smiles?: string; smiles?: string }[]
+  participants: readonly {
+    canonical_smiles?: string;
+    smiles?: string;
+    target_original_id?: string;
+    raw: string;
+  }[],
+  structures: ReadonlyMap<string, string>
 ): string[] | null => {
   const values = participants.map((participant) =>
-    participant.canonical_smiles?.trim() || participant.smiles?.trim() || ""
+    participant.canonical_smiles?.trim()
+    || participant.smiles?.trim()
+    || structures.get(normalizeReferenceId(participant.target_original_id) ?? "")
+    || structures.get(normalizeReferenceId(participant.raw) ?? "")
+    || ""
   );
   return values.length > 0 && values.every((value) => value.length > 0)
     ? values
@@ -71,11 +142,12 @@ export const buildReactionIntelligenceJob = ({
 
   const documentId = normalizeDocumentUri(compileOutput.result.trainingExport.document.document_id || documentUri);
   const sourceHash = createSourceHash(source);
+  const structures = buildStructureById(compileOutput);
   const skippedReactionIds: string[] = [];
   const reactions = compileOutput.result.trainingExport.semantic_layer.reactions.flatMap((reaction) => {
     const reactionId = reaction.original_id ?? reaction.entity_id;
-    const reactants = participantSmiles(reaction.reactants);
-    const products = participantSmiles(reaction.products);
+    const reactants = participantSmiles(reaction.reactants, structures);
+    const products = participantSmiles(reaction.products, structures);
     if (!reactants || !products) {
       skippedReactionIds.push(reactionId);
       return [];

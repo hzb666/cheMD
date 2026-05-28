@@ -213,6 +213,23 @@ export interface BuildKnowledgeMapViewModelOptions {
   reactionIntelligenceArtifact?: ChemdReactionIntelligenceArtifactV1 | null;
 }
 
+type SuccessfulCompileOutput = Extract<ChemdLanguageCompileOutput, { status: "ok" }>;
+type ProgramDocument = SuccessfulCompileOutput["result"]["program"];
+type ProgramDeclaration = ProgramDocument["declarations"][number];
+type ProgramReference = { raw?: string; target?: string };
+type ProgramProcedure = Extract<ProgramDeclaration, { kind: "procedure" }>;
+type ProgramProcedureStatement = ProgramProcedure["children"][number];
+type ProgramProcedureStep = Extract<ProgramProcedureStatement, { kind: "step" }>;
+type ProgramProcedureControl = Extract<ProgramProcedureStatement, { kind: "control" }>;
+type ProgramSourceSpan = NonNullable<ProgramDeclaration["sourceSpan"]>;
+
+type SyntheticSemanticNode = Record<string, unknown> & {
+  type: string;
+  id?: string;
+  sourceSpan?: ProgramSourceSpan;
+  fieldSpans?: Record<string, ProgramSourceSpan>;
+};
+
 const emptyReactionMap = (documentUri = "current"): ReactionMapLayout =>
   buildReactionMapFromGraphIndex({
     graph_index_id: `desktop-knowledge-map::${documentUri}`,
@@ -230,9 +247,12 @@ const buildState = (
   if (output.status === "failed") {
     return "failed";
   }
+  const semanticSymbolCount = output.symbols.filter((symbol) =>
+    symbol.kind !== "module" && symbol.kind !== "meta"
+  ).length;
   if (
     reactionMap.nodes.length === 0
-    && output.outline.every((item) => item.kind === "metadata")
+    && semanticSymbolCount === 0
   ) {
     return "empty";
   }
@@ -318,6 +338,214 @@ const buildReactionInput = (
       ? ["deterministic_fallback_layout_used", "reaction_intelligence_edges_applied"]
       : ["deterministic_fallback_layout_used"]
   };
+};
+
+const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+const referenceText = (reference: unknown): string | undefined => {
+  if (!isPlainRecord(reference)) {
+    return undefined;
+  }
+  const programReference = reference as ProgramReference;
+  return programReference.raw || (programReference.target ? `@${programReference.target}` : undefined);
+};
+
+const programValueToAttr = (value: unknown): unknown => {
+  if (!isPlainRecord(value)) {
+    return value;
+  }
+  switch (value.type) {
+    case "string": return value.value;
+    case "identifier": return value.name;
+    case "boolean": return value.value;
+    case "number": return value.value ?? value.raw;
+    case "quantity": return value.raw;
+    case "percent": return value.raw;
+    case "reference": return referenceText(value as ProgramReference);
+    case "list": return Array.isArray(value.items)
+      ? value.items.map(programValueToAttr)
+      : [];
+    case "record": return isPlainRecord(value.fields)
+      ? Object.fromEntries(Object.entries(value.fields).map(([key, item]) => [
+        key,
+        programValueToAttr(item)
+      ]))
+      : {};
+    case "call": return value.raw ?? value.callee;
+    case "patch": return value.raw;
+    default: return value.raw ?? value.value ?? value;
+  }
+};
+
+const programFieldsToAttrs = (
+  fields: Record<string, unknown> | undefined
+): Record<string, unknown> =>
+  Object.fromEntries(Object.entries(fields ?? {}).map(([key, value]) => [
+    key,
+    programValueToAttr(value)
+  ]));
+
+const programReferencesToAttrs = (
+  references: readonly unknown[] | undefined
+): string[] => (references ?? []).flatMap((reference) => {
+  const value = referenceText(reference);
+  return value ? [value] : [];
+});
+
+const declarationType = (kind: ProgramDeclaration["kind"]): string => {
+  if (kind === "condition_screen") return "condition_varies";
+  if (kind === "agent_run") return "trace";
+  return kind;
+};
+
+const targetFieldForDeclaration = (
+  kind: ProgramDeclaration["kind"]
+): string | null => {
+  switch (kind) {
+    case "result":
+    case "condition_screen":
+      return "reaction";
+    case "analysis":
+    case "observation":
+    case "trace":
+      return "ref";
+    default:
+      return null;
+  }
+};
+
+const procedureStepToNode = (
+  step: ProgramProcedureStep
+): SyntheticSemanticNode => ({
+  type: "step",
+  id: step.id,
+  stepId: step.id,
+  family: step.family,
+  ...programFieldsToAttrs(step.args),
+  inputs: programReferencesToAttrs(step.inputs),
+  outputs: programReferencesToAttrs(step.outputs),
+  dependsOn: [...(step.dependsOn ?? [])],
+  evidence: programReferencesToAttrs(step.evidence),
+  sourceSpan: step.sourceSpan
+});
+
+const procedureControlToNode = (
+  control: ProgramProcedureControl
+): SyntheticSemanticNode => ({
+  type: "control",
+  id: control.id,
+  controlId: control.id,
+  kind: control.controlKind,
+  ...programFieldsToAttrs(control.args),
+  children: control.children.flatMap(programProcedureStatementToNode),
+  sourceSpan: control.sourceSpan
+});
+
+const programProcedureStatementToNode = (
+  statement: ProgramProcedureStatement
+): SyntheticSemanticNode[] => {
+  if (statement.kind === "step") {
+    return [procedureStepToNode(statement)];
+  }
+  if (statement.kind === "control") {
+    return [procedureControlToNode(statement)];
+  }
+  return [];
+};
+
+const procedureDeclarationToNode = (
+  declaration: ProgramProcedure
+): SyntheticSemanticNode => ({
+  type: "procedure",
+  id: declaration.id,
+  reaction: referenceText(declaration.target),
+  evidence: programReferencesToAttrs(declaration.evidence),
+  steps: declaration.children.filter((item): item is ProgramProcedureStep =>
+    item.kind === "step"
+  ).map(procedureStepToNode),
+  controls: declaration.children.filter((item): item is ProgramProcedureControl =>
+    item.kind === "control"
+  ).map(procedureControlToNode),
+  sourceSpan: declaration.sourceSpan,
+  fieldSpans: declaration.fieldSpans
+});
+
+const agentRunDeclarationToNode = (
+  declaration: Extract<ProgramDeclaration, { kind: "agent_run" }>
+): SyntheticSemanticNode => ({
+  type: "trace",
+  id: declaration.id,
+  agent_run: true,
+  goal: declaration.goal,
+  status: declaration.status,
+  targetFiles: [...(declaration.targetFiles ?? [])],
+  events: declaration.auditTimeline.map((event) => ({
+    type: "trace_event",
+    eventId: event.id,
+    eventType: event.event,
+    summary: event.summary,
+    sourceSpan: event.sourceSpan
+  })),
+  sourceSpan: declaration.sourceSpan
+});
+
+const declarationToSemanticNode = (
+  declaration: ProgramDeclaration
+): SyntheticSemanticNode => {
+  if (declaration.kind === "procedure") {
+    return procedureDeclarationToNode(declaration);
+  }
+  if (declaration.kind === "agent_run") {
+    return agentRunDeclarationToNode(declaration);
+  }
+
+  const attrs = "fields" in declaration
+    ? programFieldsToAttrs(declaration.fields)
+    : {};
+  const targetField = targetFieldForDeclaration(declaration.kind);
+  const target = "target" in declaration ? referenceText(declaration.target) : undefined;
+  return {
+    type: declarationType(declaration.kind),
+    id: declaration.id,
+    ...attrs,
+    ...(targetField && target ? { [targetField]: target } : {}),
+    sourceSpan: declaration.sourceSpan,
+    fieldSpans: declaration.fieldSpans
+  };
+};
+
+const buildProgramSemanticDocument = (
+  program: ProgramDocument
+) => ({
+  type: "document" as const,
+  meta: {
+    id: program.meta.id,
+    title: program.meta.title,
+    date: program.meta.date
+  },
+  children: [
+    ...program.docs.map((doc) => ({
+      type: "markdown",
+      value: doc.markdown,
+      sourceSpan: doc.sourceSpan
+    })),
+    ...program.declarations.map(declarationToSemanticNode)
+  ],
+  diagnostics: program.diagnostics
+});
+
+const buildSemanticTreeForOutput = (
+  output: SuccessfulCompileOutput
+): ChemdSemanticRenderTreeV1 => {
+  const renderInput = {
+    document: output.result.program
+      ? buildProgramSemanticDocument(output.result.program)
+      : output.result.document,
+    diagnostics: output.result.diagnostics,
+    sourceUri: output.documentUri
+  };
+  return buildSemanticRenderTree(renderInput as Parameters<typeof buildSemanticRenderTree>[0]);
 };
 
 const summarizeSemanticTree = (
@@ -709,6 +937,15 @@ const referenceCandidates = (value: unknown): string[] => {
   if (Array.isArray(value)) {
     return uniqueStrings(value.flatMap(referenceCandidates));
   }
+  if (isPlainRecord(value)) {
+    if (value.type === "reference") {
+      return typeof value.target === "string" ? [value.target] : referenceCandidates(value.raw);
+    }
+    if (value.type === "list") {
+      return referenceCandidates(value.items);
+    }
+    return uniqueStrings(Object.values(value).flatMap(referenceCandidates));
+  }
   return [];
 };
 
@@ -1042,11 +1279,7 @@ export const buildKnowledgeMapViewModel = (
     ? artifact.layout
     : null;
   const semanticTree = output.status === "ok"
-    ? buildSemanticRenderTree({
-      document: output.result.document,
-      diagnostics: output.result.diagnostics,
-      sourceUri: output.documentUri
-    })
+    ? buildSemanticTreeForOutput(output)
     : null;
   const reactionMap = reactionMapFromArtifact ?? (output.status === "failed"
     ? emptyReactionMap(output.documentUri)

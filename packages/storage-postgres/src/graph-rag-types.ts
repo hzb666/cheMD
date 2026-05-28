@@ -1,6 +1,6 @@
 import type {
   ChemdRagExportV1,
-  ChemdTrainingExportV2,
+  ChemdTrainingExportV3,
   ChemdTrainingGraphIndexV1
 } from "@chemd/exporter-training";
 
@@ -119,7 +119,7 @@ export interface BuildPostgresGraphRagStorageInput {
   experimentId: string;
   revisionId: string;
   createdAt?: string;
-  trainingExport: ChemdTrainingExportV2;
+  trainingExport: ChemdTrainingExportV3;
   ragExport: ChemdRagExportV1;
   graphIndex?: ChemdTrainingGraphIndexV1;
   graphSnapshotId?: string;

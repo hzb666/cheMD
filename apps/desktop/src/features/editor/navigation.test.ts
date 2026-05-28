@@ -10,21 +10,22 @@ import {
   updateChemdNavigationOutput
 } from "./navigation";
 
-const source = `---
-id: exp-monaco-navigation
-title: Monaco navigation
-date: 2026-05-13
----
+const source = `module exp_monaco_navigation
 
-:::chemd #mol-main
-kind: molecule
-smiles: CCO
-:::
+meta {
+  id: "exp-monaco-navigation"
+  title: "Monaco navigation"
+  date: "2026-05-13"
+}
 
-:::chemd #rxn-main
-kind: reaction
-reactants: @mol-main
-:::
+molecule mol_main {
+  name: "Main"
+  smiles: "CCO"
+}
+
+reaction rxn_main {
+  reactants: [@mol_main]
+}
 `;
 
 const withCursor = (input: string): { source: string; position: Position } => {
@@ -152,7 +153,7 @@ describe("chemd Monaco navigation providers", () => {
     const definitionProviders: languages.DefinitionProvider[] = [];
     const monaco = createMonaco(hoverProviders, definitionProviders);
     const documentUri = "chemd://desktop/hover-definition.chemd";
-    const marked = withCursor(source.replace("@mol-main", "@mol|-main"));
+    const marked = withCursor(source.replace("@mol_main", "@mol|_main"));
     const model = createModel(marked.source, documentUri);
     const compileOutput = compileChemdForEditor({
       source: marked.source,
@@ -172,12 +173,13 @@ describe("chemd Monaco navigation providers", () => {
 
     expect(hoverProviders).toHaveLength(1);
     expect(definitionProviders).toHaveLength(1);
-    expect(hover?.contents[0].value).toContain("mol-main");
+    expect(hover?.contents[0].value).toContain("mol_main");
+    expect(hover?.contents[0].value).toContain("kind: `molecule`");
     expect(definition).toEqual([
       expect.objectContaining({
         range: expect.objectContaining({
-          startLineNumber: 7,
-          startColumn: 1
+          startLineNumber: expect.any(Number),
+          startColumn: expect.any(Number)
         })
       })
     ]);

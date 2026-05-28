@@ -13,7 +13,7 @@ export type SemanticPreviewState = "ready" | "fallback";
 
 export type SemanticPreviewFallbackReason =
   | "compile_failed"
-  | "missing_document";
+  | "missing_semantic_input";
 
 export interface SemanticPreview {
   state: SemanticPreviewState;
@@ -27,7 +27,7 @@ export interface SemanticPreview {
 }
 
 const readyMessage = "Semantic preview is ready.";
-const missingDocumentMessage = "Semantic preview is unavailable because the compile output has no document.";
+const missingSemanticInputMessage = "Semantic preview is unavailable because the compile output has no semantic input.";
 
 const copyDiagnostics = (
   diagnostics: readonly ChemdEditorDiagnostic[]
@@ -64,12 +64,14 @@ export const buildSemanticPreview = (
     return buildFallbackPreview(input, "compile_failed", `Compile failed: ${input.error.message}`);
   }
 
-  if (!input.result.document) {
-    return buildFallbackPreview(input, "missing_document", missingDocumentMessage);
+  const renderInput = input.result.program ?? input.result.document;
+  if (!renderInput) {
+    return buildFallbackPreview(input, "missing_semantic_input", missingSemanticInputMessage);
   }
 
-  const tree = buildRenderableNodeTree(input.result.document, {
-    sourceId: input.documentUri ?? input.result.document.meta.id
+  const tree = buildRenderableNodeTree(renderInput, {
+    sourceId: input.documentUri ?? input.result.document.meta.id,
+    typedGraph: input.result.typedSemanticGraph
   });
 
   return {

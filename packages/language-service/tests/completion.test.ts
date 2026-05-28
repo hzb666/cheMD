@@ -30,73 +30,48 @@ describe("getChemdCompletions", () => {
         label: "chemd reaction",
         kind: "snippet",
         insertTextFormat: "snippet",
-        insertText: expect.stringContaining("reactant: ${2:@mol-a}")
+        insertText: expect.stringContaining("reaction rxn_${1:id}")
       }),
       expect.objectContaining({
         id: "snippet.chemd.molecule",
         label: "chemd molecule",
         kind: "snippet",
-        insertText: expect.stringContaining("smiles: ${3:SMILES}")
+        insertText: expect.stringContaining("smiles: ${3:\"SMILES\"}")
       })
     ]));
-    const reactionSnippet = items.find((item) => item.id === "snippet.chemd.reaction");
-    const moleculeSnippet = items.find((item) => item.id === "snippet.chemd.molecule");
-    expect(reactionSnippet?.insertText).not.toContain("kind:");
-    expect(reactionSnippet?.insertText).not.toContain("reactants:");
-    expect(reactionSnippet?.insertText).not.toContain("products:");
-    expect(moleculeSnippet?.insertText).not.toContain("kind:");
-  });
-
-  it("suggests kind values inside chemd blocks", () => {
-    expect(labelsFor(`:::chemd #draft
-kind: |
-:::`)).toEqual(["molecule", "reaction"]);
   });
 
   it("keeps schema-derived value completion behavior compatible with the old registry", () => {
-    expect(labelsFor(`:::result #res-main
-status: p|
-:::`)).toEqual(["partial", "pending"]);
-    expect(labelsFor(`:::procedure #proc-main
-step: |
-:::`)).toEqual(expect.arrayContaining(["add", "stir", "analyze"]));
+    expect(labelsFor(`result res-main {
+  status: p|
+}`)).toEqual(["partial", "pending"]);
+    expect(labelsFor(`procedure proc-main {
+  step next = |
+}`)).toEqual(expect.arrayContaining(["add", "stir", "analyze"]));
   });
 
   it("suggests enum values from the shared field value schema", () => {
-    expect(labelsFor(`:::analysis #ana-main
-type: lc|
-:::`)).toEqual(["lcms"]);
+    expect(labelsFor(`analysis ana-main {
+  type: lc|
+}`)).toEqual(["lcms"]);
   });
 
   it("does not apply global enum fallbacks to scoped non-enum fields", () => {
-    expect(labelsFor(`:::trace_event #evt-main
-type: lc|
-:::`)).toEqual([]);
-  });
-
-  it("suggests reaction stage values", () => {
-    expect(labelsFor(`:::chemd #rxn-main
-kind: reaction
-stage: |
-:::`)).toEqual([
-      "reaction_setup",
-      "reaction",
-      "workup",
-      "purification",
-      "analysis"
-    ]);
+    expect(labelsFor(`trace trace-main {
+  type: lc|
+}`)).toEqual([]);
   });
 
   it("suggests procedure step family values", () => {
-    expect(labelsFor(`:::procedure #proc-main
-step: hea|
-:::`)).toEqual(["heat"]);
+    expect(labelsFor(`procedure proc-main {
+  step next = hea|
+}`)).toEqual(["heat"]);
   });
 
   it("suggests step parameters from the StepFamily schema", () => {
-    const source = `:::procedure #proc-main
-step: heat | temp
-:::`;
+    const source = `procedure proc-main {
+  step heat = heat(temp
+}`;
 
     expect(getChemdCompletions({
       source,
@@ -106,29 +81,29 @@ step: heat | temp
 
   it("filters current-document references by field context", () => {
     const compileOutput = compileChemdForEditor({
-      source: `---
-id: exp-completion
-title: Completion
-date: 2026-05-13
----
+      source: `module exp_completion
 
-:::chemd #mol-a
-kind: molecule
-smiles: CCO
-:::
+meta {
+  id: "exp-completion"
+  title: "Completion"
+  date: "2026-05-13"
+}
 
-:::chemd #rxn-a
-kind: reaction
-reactants: @mol-a
-products: product-a
-:::
+molecule mol-a {
+  name: "mol a"
+  smiles: "CCO"
+}
+
+reaction rxn-a {
+  reactants: [@mol-a]
+  products: ["product-a"]
+}
 `
     });
     const items = getChemdCompletions({
-      ...withCursor(`:::chemd #rxn-edit
-kind: reaction
-reactants: @|
-:::`),
+      ...withCursor(`reaction rxn-edit {
+  reactants: @|
+}`),
       documentUri: "file:///current.chemd",
       compileOutput,
       triggerKind: "trigger-character",
@@ -141,36 +116,32 @@ reactants: @|
       kind: "reference",
       insertText: "@mol-a",
       range: {
-        startLine: 3,
-        startColumn: 12,
-        endLine: 3,
-        endColumn: 13
+        startLine: 2,
+        startColumn: 14,
+        endLine: 2,
+        endColumn: 15
       }
     });
   });
 
-  it("suggests reaction block fields and omits existing fields", () => {
-    const labels = labelsFor(`:::chemd #rxn-main
-kind: reaction
-|
-:::`);
+  it("suggests reaction declaration fields and omits existing fields", () => {
+    const labels = labelsFor(`reaction rxn-main {
+  |
+}`);
 
     expect(labels).toEqual(expect.arrayContaining([
-      "reactant:",
-      "product:",
+      "reactants:",
+      "products:",
       "rxn_smiles:",
       "route:"
     ]));
-    expect(labels).not.toContain("reactants:");
-    expect(labels).not.toContain("products:");
     expect(labels).not.toContain("kind:");
   });
 
   it("offers field aliases only when the alias prefix is typed", () => {
-    const items = getChemdCompletions(withCursor(`:::chemd #rxn-main
-kind: reaction
-reaction_|
-:::`)).items;
+    const items = getChemdCompletions(withCursor(`reaction rxn-main {
+  reaction_|
+}`)).items;
 
     expect(items).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -185,25 +156,24 @@ reaction_|
     ]));
   });
 
-  it("suggests molecule block fields", () => {
-    expect(labelsFor(`:::chemd #mol-main
-kind: molecule
-|
-:::`)).toEqual(expect.arrayContaining([
+  it("suggests molecule declaration fields", () => {
+    expect(labelsFor(`molecule mol-main {
+  |
+}`)).toEqual(expect.arrayContaining([
+      "name:",
       "smiles:",
+      "role:",
+      "formula:",
       "cas:",
       "inchi:",
-      "inchikey:",
-      "canonical_smiles:",
-      "mw:"
+      "inchikey:"
     ]));
-    expect(labelsFor(`:::chemd #mol-main
-kind: molecule
-|
-:::`)).not.toContain("amount:");
+    expect(labelsFor(`molecule mol-main {
+  |
+}`)).not.toContain("amount:");
   });
 
-  it("does not offer completions inside frontmatter", () => {
+  it("does not offer completions inside legacy frontmatter", () => {
     expect(labelsFor(`---
 title: |
 ---
@@ -218,21 +188,22 @@ title: |
   });
 
   it("suggests current document symbol references from compile output", () => {
-    const source = `---
-id: exp-completion
-title: Completion
----
+    const source = `module exp_completion
 
-:::chemd #mol-main
-kind: molecule
-smiles: CCO
-:::
+meta {
+  id: "exp-completion"
+  title: "Completion"
+}
 
-:::chemd #rxn-main
-kind: reaction
-reactants: @mol-main
-products: @mol-main
-:::
+molecule mol-main {
+  name: "main"
+  smiles: "CCO"
+}
+
+reaction rxn-main {
+  reactants: [@mol-main]
+  products: [@mol-main]
+}
 
 Related: @|
 `;
@@ -255,9 +226,7 @@ Related: @|
           symbolId: "mol-main",
           symbolKind: "molecule"
         }
-      })
-    ]));
-    expect(items).toEqual(expect.arrayContaining([
+      }),
       expect.objectContaining({
         id: "reference.chemd.rxn-main",
         label: "rxn-main",
@@ -268,15 +237,21 @@ Related: @|
   });
 
   it("suggests references in reference value positions without an at token", () => {
-    const source = `:::chemd #mol-main
-kind: molecule
-smiles: CCO
-:::
+    const source = `module exp_completion
 
-:::chemd #rxn-main
-kind: reaction
-reactants: |
-:::
+meta {
+  id: "exp-completion"
+  title: "Completion"
+}
+
+molecule mol-main {
+  name: "main"
+  smiles: "CCO"
+}
+
+reaction rxn-main {
+  reactants: |
+}
 `;
     const { source: cleanSource, cursorOffset } = withCursor(source);
     const compileOutput = compileChemdForEditor({ source: cleanSource });
@@ -297,10 +272,17 @@ reactants: |
   });
 
   it("does not flood ordinary prose with reference suggestions", () => {
-    const source = `:::chemd #mol-main
-kind: molecule
-smiles: CCO
-:::
+    const source = `module exp_completion
+
+meta {
+  id: "exp-completion"
+  title: "Completion"
+}
+
+molecule mol-main {
+  name: "main"
+  smiles: "CCO"
+}
 
 This is prose|
 `;
@@ -316,10 +298,9 @@ This is prose|
   });
 
   it("does not throw or suggest references without compile output", () => {
-    const items = getChemdCompletions(withCursor(`:::chemd #rxn-main
-kind: reaction
-reactants: @|
-:::`)).items;
+    const items = getChemdCompletions(withCursor(`reaction rxn-main {
+  reactants: @|
+}`)).items;
 
     expect(items.some((item) => item.kind === "reference")).toBe(false);
   });

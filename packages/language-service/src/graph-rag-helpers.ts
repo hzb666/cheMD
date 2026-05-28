@@ -122,7 +122,7 @@ export const indexGraphNodes = (
   nodes: readonly EditorGraphRagNode[]
 ): void => {
   for (const node of nodes) {
-    if (node.blockId) {
+    if (node.blockId && !context.nodeByBlockId.has(node.blockId)) {
       context.nodeByBlockId.set(node.blockId, node);
     }
     context.nodeByEntityId.set(node.entityId, node);

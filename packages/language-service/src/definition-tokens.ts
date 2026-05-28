@@ -113,7 +113,7 @@ const scanTokenEnd = (lineText: string, seedIndex: number): number => {
 };
 
 const isTokenChar = (value: string | undefined): boolean =>
-  Boolean(value && /[A-Za-z0-9_@#-]/.test(value));
+  Boolean(value && /[A-Za-z0-9_@#./-]/.test(value));
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(Math.max(value, min), max);

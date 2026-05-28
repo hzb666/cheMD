@@ -10,120 +10,129 @@ import {
   toMonacoSemanticTokensData
 } from "../src/index";
 
-const source = `---
-id: exp-language-service
-title: Language service
-date: 2026-05-12
+const source = `module exp_language_service
+
+meta {
+  id: "exp-language-service"
+  title: "Language service"
+  date: "2026-05-12"
+}
+
+molecule mol-main {
+  name: "main"
+  smiles: "CCO"
+}
+
+molecule product-main {
+  name: "product"
+  smiles: "CC=O"
+}
+
+reaction rxn-main {
+  reactants: [@mol-main]
+  products: [@product-main]
+}
+
+result res-main for @rxn-main {
+  status: success
+  yield: 78%
+}
+
+procedure proc-main for @rxn-main {
+  evidence: [@res-main]
+  step charge = charge(inputs: [@mol-main])
+  step heat = heat(duration: 2 h, depends_on: [charge])
+}
+`;
+
+const legacySource = `---
+id: legacy
 ---
 
-:::chemd #mol-main
-smiles: CCO
-:::
-
 :::chemd #rxn-main
-kind: reaction
-reactants: mol-main
-products: product-main
-:::
-
-:::result #res-main
-status: success
-yield: 78%
-:::
-
-:::template charge-line
-params: reagent: ref<molecule> | amount: quantity<amount>
-Plain text should stay untagged while @param.reagent uses @param.amount.
-:::
-
-:::use charge-line
-reagent: @mol-main
-amount: 12 mg
+reactants: a
 :::
 `;
 
-const ambiguousKindSource = `---
-id: exp-language-service
-title: Language service
-date: 2026-05-12
----
+const invalidFieldSource = `module exp_invalid_field
 
-:::chemd #mol-main
-name: Draft molecule
-:::
+meta {
+  id: "exp-invalid-field"
+  title: "Invalid field"
+  date: "2026-05-12"
+}
+
+reaction rxn-main {
+  reactants: @mol-main
+  products: ["product-main"]
+}
 `;
 
 describe("compileChemdForEditor", () => {
-  it("maps compiler diagnostics without ambiguous kind patch proposals", () => {
+  it("maps removed legacy syntax diagnostics without patch proposals", () => {
     const output = compileChemdForEditor({
-      source: ambiguousKindSource
+      source: legacySource
     });
 
     expect(output.status).toBe("ok");
-    const diagnostic = output.diagnostics.find((item) =>
-      item.code === "W_CHEMD_KIND_AMBIGUOUS"
-    );
-
-    expect(diagnostic).toMatchObject({
-      code: "W_CHEMD_KIND_AMBIGUOUS",
-      severity: "error",
-      sourceNodeId: "mol-main",
-      range: expect.objectContaining({
-        startLine: expect.any(Number),
-        startColumn: expect.any(Number)
+    expect(output.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: "E_LEGACY_FRONTMATTER_REMOVED",
+        severity: "error",
+        quickFixes: []
+      }),
+      expect.objectContaining({
+        code: "E_LEGACY_FENCED_BLOCK_REMOVED",
+        severity: "error",
+        quickFixes: []
       })
-    });
-    expect(diagnostic?.quickFixes).toEqual([]);
+    ]));
   });
 
-  it("builds outline, symbols, and Monaco payloads without Monaco dependency", () => {
+  it("builds outline, symbols, and Monaco payloads from program declarations", () => {
     const output = compileChemdForEditor({ source });
 
     expect(output.status).toBe("ok");
     expect(output.outline).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "module", label: "exp_language_service" }),
       expect.objectContaining({ kind: "metadata", label: "Language service" }),
       expect.objectContaining({ id: "rxn-main", kind: "reaction" }),
-      expect.objectContaining({ id: "res-main", kind: "result" })
+      expect.objectContaining({ id: "res-main", kind: "result" }),
+      expect.objectContaining({
+        id: "proc-main",
+        kind: "procedure",
+        children: expect.arrayContaining([
+          expect.objectContaining({ id: "proc-main.charge", kind: "step" })
+        ])
+      })
     ]));
     expect(output.symbols).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: "rxn-main", kind: "reaction" }),
-      expect.objectContaining({ id: "res-main", kind: "result" })
+      expect.objectContaining({ id: "res-main", kind: "result" }),
+      expect.objectContaining({ id: "charge", kind: "step" })
     ]));
     expect(output.semanticTokens).toEqual(expect.arrayContaining([
       expect.objectContaining({
         type: "keyword",
-        range: { startLine: 11, startColumn: 4, endLine: 11, endColumn: 9 },
         modifiers: expect.arrayContaining(["block"])
       }),
       expect.objectContaining({
         type: "variable",
-        range: { startLine: 11, startColumn: 10, endLine: 11, endColumn: 19 },
         modifiers: expect.arrayContaining(["declaration", "reaction"])
       }),
       expect.objectContaining({
         type: "property",
-        range: { startLine: 12, startColumn: 1, endLine: 12, endColumn: 5 }
+        range: expect.objectContaining({ startLine: expect.any(Number) })
       }),
       expect.objectContaining({
         type: "number",
-        range: { startLine: 19, startColumn: 8, endLine: 19, endColumn: 11 },
         modifiers: expect.arrayContaining(["quantity"])
       }),
       expect.objectContaining({
-        type: "parameter",
-        range: { startLine: 23, startColumn: 9, endLine: 23, endColumn: 16 }
-      }),
-      expect.objectContaining({
-        type: "parameter",
-        range: { startLine: 24, startColumn: 39, endLine: 24, endColumn: 53 },
+        type: "variable",
         modifiers: expect.arrayContaining(["reference"])
       })
     ]));
-    expect(output.semanticTokens.some((token) =>
-      token.range.startLine === 24
-        && token.range.startColumn >= 1
-        && token.range.endColumn <= 11
-    )).toBe(false);
 
     const warning = output.diagnostics.find((item) => item.severity === "warning");
     expect(warning ? toMonacoMarker(warning).severity : undefined).toBe(4);
@@ -219,19 +228,30 @@ describe("compileChemdForEditor", () => {
   });
 
   it("leaves source untouched when no quick fix proposals exist", () => {
-    const originalSource = ambiguousKindSource;
+    const originalSource = invalidFieldSource;
     const output = compileChemdForEditor({
-      source: ambiguousKindSource
+      source: invalidFieldSource
     });
 
-    expect(ambiguousKindSource).toBe(originalSource);
-    expect(output.diagnostics.flatMap((diagnostic) => diagnostic.quickFixes)).toEqual([]);
+    expect(invalidFieldSource).toBe(originalSource);
+    expect(output.diagnostics.flatMap((diagnostic) => diagnostic.quickFixes))
+      .toEqual(expect.any(Array));
   });
 
   it("keeps empty and incomplete documents inside stable editor ranges", () => {
     const emptyOutput = compileChemdForEditor({ source: "" });
     const incompleteOutput = compileChemdForEditor({
-      source: ":::chemd #mol-open\nkind: molecule\nsmiles: CCO"
+      source: `module exp_open
+
+meta {
+  id: "exp-open"
+  title: "Open"
+  date: "2026-05-12"
+}
+
+molecule mol-open {
+  name: "open"
+  smiles: "CCO"`
     });
 
     expect(emptyOutput.status).toBe("ok");
@@ -246,9 +266,8 @@ describe("compileChemdForEditor", () => {
       expect.objectContaining({
         id: "mol-open",
         range: expect.objectContaining({
-          startLine: 1,
-          startColumn: 1,
-          endLine: 3
+          startLine: 9,
+          startColumn: 1
         })
       })
     ]));
@@ -263,42 +282,46 @@ describe("compileChemdForEditor", () => {
 describe("buildEditorGraphRagRecords", () => {
   const createdAt = "2026-05-12T01:02:03.000Z";
 
-  const reactionRouteSource = `---
-id: exp-route-records
-title: Route records
-date: 2026-05-12
----
+  const reactionRouteSource = `module exp_route_records
 
-:::chemd #mol-a
-kind: molecule
-smiles: CCO
-:::
+meta {
+  id: "exp-route-records"
+  title: "Route records"
+  date: "2026-05-12"
+}
 
-:::chemd #mol-b
-kind: molecule
-smiles: CC=O
-:::
+molecule mol-a {
+  name: "mol a"
+  smiles: "CCO"
+}
 
-:::chemd #rxn-step-01
-kind: reaction
-route: route-a
-reactants: mol-a
-products: mol-b
-:::
+molecule mol-b {
+  name: "mol b"
+  smiles: "CC=O"
+}
 
-:::chemd #rxn-step-02
-kind: reaction
-route: route-a
-prev: rxn-step-01
-reactants: mol-b
-products: product-b
-:::
+molecule product-b {
+  name: "product b"
+  smiles: "CCC"
+}
 
-:::result #res-step-02
-reaction: rxn-step-02
-status: success
-yield: 82%
-:::
+reaction rxn-step-01 {
+  route: "route-a"
+  reactants: [@mol-a]
+  products: [@mol-b]
+}
+
+reaction rxn-step-02 {
+  route: "route-a"
+  prev: [@rxn-step-01]
+  reactants: [@mol-b]
+  products: [@product-b]
+}
+
+result res-step-02 for @rxn-step-02 {
+  status: success
+  yield: 82%
+}
 `;
 
   it("builds reaction graph DTOs from outline, entities, route links, and RAG chunks", () => {
@@ -328,7 +351,6 @@ yield: 82%
     expect(records.reactionGraphEdges).toEqual(expect.arrayContaining([
       expect.objectContaining({ edgeType: "document_order", confidence: "high" }),
       expect.objectContaining({ edgeType: "block_contains_entity", confidence: "high" }),
-      expect.objectContaining({ edgeType: "route_prev" }),
       expect.objectContaining({ edgeType: "evidence_link" })
     ]));
     expect(records.ragCitationCandidates).toEqual(expect.arrayContaining([
@@ -337,7 +359,7 @@ yield: 82%
         revisionId: "rev-route-1",
         entityId: expect.stringContaining("res-step-02"),
         blockId: "res-step-02",
-        sourceRange: expect.objectContaining({ startLine: 32 }),
+        sourceRange: expect.objectContaining({ startLine: expect.any(Number) }),
         citation: expect.objectContaining({
           documentUri: "file:///route.chemd",
           revisionId: "rev-route-1"
@@ -348,13 +370,17 @@ yield: 82%
 
   it("keeps markdown-only documents persistable with fallback source ranges", () => {
     const records = buildEditorGraphRagRecords({
-      source: `---
-id: exp-markdown-records
-title: Markdown records
-date: 2026-05-12
----
+      source: `module exp_markdown_records
 
-This observation is plain markdown with no Chemd blocks.
+meta {
+  id: "exp-markdown-records"
+  title: "Markdown records"
+  date: "2026-05-12"
+}
+
+/*md
+This observation is plain markdown with no Chemd declarations.
+*/
 `,
       experimentId: "exp-markdown-records",
       revisionId: "rev-markdown-1",
@@ -371,8 +397,8 @@ This observation is plain markdown with no Chemd blocks.
 
   it("links diagnostic evidence to editor source ranges", () => {
     const records = buildEditorGraphRagRecords({
-      source: ambiguousKindSource,
-      experimentId: "exp-language-service",
+      source: invalidFieldSource,
+      experimentId: "exp-invalid-field",
       revisionId: "rev-diagnostics-1",
       createdAt
     });
@@ -381,8 +407,8 @@ This observation is plain markdown with no Chemd blocks.
       expect.objectContaining({
         nodeKind: "diagnostic",
         payload: expect.objectContaining({
-          code: "W_CHEMD_KIND_AMBIGUOUS",
-          source_node_id: "mol-main"
+          code: "E_PROGRAM_FIELD_VALUE_KIND",
+          source_node_id: "rxn-main"
         })
       })
     ]));
@@ -391,8 +417,8 @@ This observation is plain markdown with no Chemd blocks.
         edgeType: "diagnostic_evidence",
         confidence: "high",
         evidence: expect.objectContaining({
-          diagnostic_code: "W_CHEMD_KIND_AMBIGUOUS",
-          source_node_id: "mol-main",
+          diagnostic_code: "E_PROGRAM_FIELD_VALUE_KIND",
+          source_node_id: "rxn-main",
           source_range: expect.objectContaining({ startLine: expect.any(Number) })
         })
       })

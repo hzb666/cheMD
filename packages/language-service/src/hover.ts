@@ -5,6 +5,7 @@ import {
   readSourceLine,
   resolveEditorPosition
 } from "./definition-tokens";
+import { findProgramReferenceAtPosition } from "./program-model";
 import type {
   ChemdEditorDiagnostic,
   ChemdLanguageCompileOutput,
@@ -118,6 +119,21 @@ const findReferenceTarget = (
   compileOutput: ChemdLanguageCompileOutput,
   position: ChemdEditorPosition
 ): ChemdHoverReferenceTarget | undefined => {
+  const programReference = compileOutput.status === "ok"
+    ? findProgramReferenceAtPosition(compileOutput.result, request.source, position)
+    : undefined;
+  if (programReference) {
+    const symbol = compileOutput.symbols.find((item) =>
+      item.id === programReference.symbolId ||
+      item.id === programReference.symbolId.split("#").at(-1)
+    );
+    return symbol ? {
+      ...toHoverSymbol(symbol, compileOutput),
+      tokenRange: programReference.range,
+      explicitReference: true
+    } : undefined;
+  }
+
   const token = findTokenAtPosition(request.source, position);
   const symbol = token
     ? compileOutput.symbols.find((item) => item.id === token.symbolId)

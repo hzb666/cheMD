@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { ChemdTrainingExportV2 } from "@chemd/exporter-training";
+import type { ChemdTrainingExportV3 } from "@chemd/exporter-training";
 
 import type { PostgresQueryClient } from "./postgres-storage";
 import {
@@ -14,13 +14,13 @@ interface QueryCall {
 }
 
 const trainingExport = {
-  schema_version: "chemd-training-export/v0.2",
+  schema_version: "chemd-training-export/v0.3",
   document: {
     document_id: "exp-export",
     title: "Export",
     date: "2026-04-22"
   }
-} as ChemdTrainingExportV2;
+} as ChemdTrainingExportV3;
 
 const createClient = (): PostgresQueryClient & { calls: QueryCall[] } => {
   const calls: QueryCall[] = [];

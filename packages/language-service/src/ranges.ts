@@ -1,3 +1,4 @@
+import type { SourceSpan } from "@chemd/core";
 import type { ChemdSourceRange } from "./types";
 
 const splitSourceLines = (source: string): string[] =>
@@ -22,6 +23,27 @@ export const createStartRange = (): ChemdSourceRange => ({
   endLine: 1,
   endColumn: 1
 });
+
+export const sourceSpanToRange = (
+  sourceSpan: SourceSpan | undefined,
+  fallback: ChemdSourceRange
+): ChemdSourceRange => {
+  if (
+    typeof sourceSpan?.startLine !== "number" ||
+    typeof sourceSpan.startColumn !== "number" ||
+    typeof sourceSpan.endLine !== "number" ||
+    typeof sourceSpan.endColumn !== "number"
+  ) {
+    return fallback;
+  }
+
+  return {
+    startLine: Math.max(1, sourceSpan.startLine),
+    startColumn: Math.max(1, sourceSpan.startColumn),
+    endLine: Math.max(sourceSpan.startLine, sourceSpan.endLine),
+    endColumn: Math.max(1, sourceSpan.endColumn)
+  };
+};
 
 const readHeaderId = (headerArg: string | undefined): string | undefined => {
   const trimmed = headerArg?.trim() ?? "";

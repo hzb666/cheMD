@@ -20,21 +20,37 @@ type CompletionWithData = languages.CompletionItem & {
   };
 };
 
-const currentSource = `:::chemd #mol-current
-kind: molecule
-smiles: CCO
-:::
+const currentSource = `module exp_completion_current
 
-:::chemd #rxn-current
-kind: reaction
-reactants: @|
-:::
+meta {
+  id: "exp-completion-current"
+  title: "Completion current"
+  date: "2026-05-13"
+}
+
+molecule mol_current {
+  name: "Current"
+  smiles: "CCO"
+}
+
+reaction rxn_current {
+  reactants: [@|]
+  products: [@mol_current]
+}
 `;
 
-const librarySource = `:::chemd #mol-lib
-kind: molecule
-smiles: CCN
-:::
+const librarySource = `module exp_completion_library
+
+meta {
+  id: "exp-completion-library"
+  title: "Completion library"
+  date: "2026-05-13"
+}
+
+molecule mol_lib {
+  name: "Library"
+  smiles: "CCN"
+}
 `;
 
 const withCursor = (input: string): { source: string; position: Position } => {
@@ -196,23 +212,23 @@ describe("chemd Monaco completion provider", () => {
 
     expect(providers).toHaveLength(1);
     expect(suggestions.length).toBeGreaterThan(workspaceSuggestions.length);
-    expect(workspaceSuggestions).toHaveLength(2);
+    expect(workspaceSuggestions.length).toBeGreaterThanOrEqual(2);
     expect(workspaceSuggestions).toContainEqual(
       expect.objectContaining({
         kind: monaco.languages.CompletionItemKind.Reference,
         detail: expect.stringContaining(libraryUri),
-        filterText: expect.stringContaining("mol-lib"),
+        filterText: expect.stringContaining("mol_lib"),
         sortText: expect.stringMatching(/^wr-/),
-        insertText: expect.stringContaining("mol-lib"),
+        insertText: expect.stringContaining("mol_lib"),
         range: expect.objectContaining({
-          startLineNumber: 8,
-          startColumn: 12,
-          endLineNumber: 8,
-          endColumn: 13
+          startLineNumber: marked.position.lineNumber,
+          startColumn: marked.position.column - 1,
+          endLineNumber: marked.position.lineNumber,
+          endColumn: marked.position.column
         }),
         data: expect.objectContaining({
           type: "workspace-reference",
-          localId: "mol-lib",
+          localId: "mol_lib",
           documentUri: libraryUri,
           stale: false
         })

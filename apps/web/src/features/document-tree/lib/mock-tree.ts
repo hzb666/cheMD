@@ -1,82 +1,62 @@
 import { compileChemd } from "@chemd/compiler";
-import type { ChemdNode } from "@chemd/core";
+import type { ChemdProgramDeclarationKind } from "@chemd/core";
 
 export interface TreeNode {
   id: string;
   kind:
     | "document"
+    | "material"
     | "molecule"
+    | "batch"
     | "reaction"
     | "result"
     | "analysis"
+    | "condition_screen"
     | "procedure"
     | "observation"
     | "sample"
-    | "condition_varies";
+    | "artifact"
+    | "trace"
+    | "agent_run";
 }
 
-const isTreeObjectNode = (
-  node: ChemdNode
-): node is Extract<
-  ChemdNode,
-  {
-    type:
-      | "molecule"
-      | "reaction"
-      | "result"
-      | "analysis"
-      | "procedure"
-      | "observation"
-      | "sample"
-      | "condition_varies";
-  }
-> =>
-  [
-    "molecule",
-    "reaction",
-    "result",
-    "analysis",
-    "procedure",
-    "observation",
-    "sample",
-    "condition_varies"
-  ].includes(node.type);
+const TREE_DECLARATION_KINDS = new Set<TreeNode["kind"]>([
+  "material",
+  "molecule",
+  "batch",
+  "reaction",
+  "result",
+  "analysis",
+  "condition_screen",
+  "procedure",
+  "observation",
+  "sample",
+  "artifact",
+  "trace",
+  "agent_run"
+]);
 
-const collectTreeNodes = (children: ChemdNode[]): Array<TreeNode> => {
-  const nodes: Array<TreeNode> = [];
-
-  for (const child of children) {
-    if (child.type === "col") {
-      nodes.push(...collectTreeNodes(child.children));
-      continue;
-    }
-
-    if (child.type === "template") {
-      nodes.push(...collectTreeNodes(child.body));
-      continue;
-    }
-
-    if (!isTreeObjectNode(child) || !child.id) {
-      continue;
-    }
-
-    nodes.push({
-      id: child.id,
-      kind: child.type
-    });
-  }
-
-  return nodes;
-};
+const isTreeDeclarationKind = (
+  kind: ChemdProgramDeclarationKind
+): kind is Exclude<TreeNode["kind"], "document"> =>
+  TREE_DECLARATION_KINDS.has(kind as TreeNode["kind"]);
 
 export const buildMockTreeFromSource = (source: string): TreeNode[] => {
-  const document = compileChemd(source).document;
+  const program = compileChemd(source).program;
   const nodes: TreeNode[] = [
     {
-      id: document.meta.id,
+      id: program.meta.id,
       kind: "document"
     }
   ];
 
-  return [...nodes, ...collectTreeNodes(document.children)];
+  return [
+    ...nodes,
+    ...program.declarations
+      .filter((declaration) => isTreeDeclarationKind(declaration.kind))
+      .map((declaration) => ({
+        id: declaration.id,
+        kind: declaration.kind
+      }))
+  ];
 };

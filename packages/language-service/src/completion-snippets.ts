@@ -5,41 +5,39 @@ const snippets: Array<Omit<ChemdCompletionItem, "range">> = [{
   label: "chemd reaction",
   kind: "snippet",
   insertText: [
-    ":::chemd #rxn-${1:id}",
-    "reactant: ${2:@mol-a} | ${3:1.0 mmol} | ${4:1.0 eq} | limiting=true",
-    "reactant: ${5:@mol-b} | ${6:1.2 eq}",
-    "product: ${7:@mol-c}",
-    "solvent: ${8:MeCN}",
-    "temperature: ${9:r.t.}",
-    "time: ${10:2 h}",
-    ":::"
+    "reaction rxn_${1:id} {",
+    "  reactants: [${2:@mol_a}]",
+    "  products: [${3:@mol_product}]",
+    "  solvent: ${4:\"MeCN\"}",
+    "  temperature: ${5:25 C}",
+    "  time: ${6:2 h}",
+    "}"
   ].join("\n"),
   insertTextFormat: "snippet",
-  detail: "Chemd reaction block",
+  detail: "Chemd reaction declaration",
   sortText: "a-reaction"
 }, {
   id: "snippet.chemd.molecule",
   label: "chemd molecule",
   kind: "snippet",
   insertText: [
-    ":::chemd #mol-${1:id}",
-    "name: ${2:name}",
-    "smiles: ${3:SMILES}",
-    ":::"
+    "molecule mol_${1:id} {",
+    "  name: ${2:\"name\"}",
+    "  smiles: ${3:\"SMILES\"}",
+    "}"
   ].join("\n"),
   insertTextFormat: "snippet",
-  detail: "Chemd molecule block",
+  detail: "Chemd molecule declaration",
   sortText: "a-molecule"
 }, {
   id: "snippet.result",
   label: "result block",
   kind: "snippet",
   insertText: [
-    ":::result #res-${1:id}",
-    "reaction: ${2:@rxn-main}",
-    "status: ${3:pending}",
-    "notes: ${4:notes}",
-    ":::"
+    "result res_${1:id} for ${2:@rxn_main} {",
+    "  status: ${3:pending}",
+    "  notes: ${4:\"notes\"}",
+    "}"
   ].join("\n"),
   insertTextFormat: "snippet",
   detail: "Result evidence block",
@@ -49,10 +47,9 @@ const snippets: Array<Omit<ChemdCompletionItem, "range">> = [{
   label: "procedure block",
   kind: "snippet",
   insertText: [
-    ":::procedure #proc-${1:id}",
-    "reaction: ${2:@rxn-main}",
-    "step: ${3:charge} | inputs=${4:@mol-a} | outputs=${5:@mol-b}",
-    ":::"
+    "procedure proc_${1:id} for ${2:@rxn_main} {",
+    "  step ${3:charge} = ${4:charge}(inputs: [${5:@mol_a}])",
+    "}"
   ].join("\n"),
   insertTextFormat: "snippet",
   detail: "Procedure block",
@@ -61,13 +58,7 @@ const snippets: Array<Omit<ChemdCompletionItem, "range">> = [{
   id: "snippet.template",
   label: "template block",
   kind: "snippet",
-  insertText: [
-    ":::template ${1:name}",
-    "params: ${2:param:string}",
-    "description: ${3:description}",
-    "${4:body}",
-    ":::"
-  ].join("\n"),
+  insertText: "/*md\n${1:documentation}\n*/",
   insertTextFormat: "snippet",
   detail: "Template block",
   sortText: "a-template"
@@ -76,14 +67,11 @@ const snippets: Array<Omit<ChemdCompletionItem, "range">> = [{
   label: "condition-varies block",
   kind: "snippet",
   insertText: [
-    ":::condition-varies #cv-${1:id}",
-    "standard: ${2:@rxn-standard}",
-    "factor: ${3:solvent} | baseline=${4:THF}",
-    "outcome: ${5:yield} | baseline=${6:68%}",
-    "attempt: ${7:var1}",
-    "${3:solvent}: ${8:MeCN}",
-    "${5:yield}: ${9:72%}",
-    ":::"
+    "condition_screen cv_${1:id} for ${2:@rxn_standard} {",
+    "  standard: ${3:@rxn_standard}",
+    "  factor: ${4:[\"solvent\"]}",
+    "  outcome: ${5:[\"yield\"]}",
+    "}"
   ].join("\n"),
   insertTextFormat: "snippet",
   detail: "Condition variation block",
@@ -93,7 +81,14 @@ const snippets: Array<Omit<ChemdCompletionItem, "range">> = [{
 export const getChemdSnippetCompletions = (
   context: ChemdCompletionContext
 ): ChemdCompletionItem[] => {
-  if (context.isFrontmatter || context.isFieldValuePosition || context.isReferencePosition) {
+  if (
+    context.isFrontmatter ||
+    context.isFieldValuePosition ||
+    context.isFieldKeyPosition ||
+    context.isStepFamilyPosition ||
+    context.stepParam ||
+    context.isReferencePosition
+  ) {
     return [];
   }
 

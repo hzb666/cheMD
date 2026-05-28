@@ -2,6 +2,7 @@ import {
   findTokenAtPosition,
   resolveEditorPosition
 } from "./definition-tokens";
+import { findProgramReferenceAtPosition } from "./program-model";
 import type { ChemdEditorPosition } from "./completion-types";
 import type {
   ChemdLanguageCompileOutput,
@@ -67,7 +68,15 @@ export const getChemdDefinitionResult = (
   context: ChemdDefinitionContext = {}
 ): ChemdDefinitionResult => {
   const position = resolveEditorPosition(request);
-  const token = findTokenAtPosition(request.source, position);
+  const programReference = context.compileOutput?.status === "ok"
+    ? findProgramReferenceAtPosition(context.compileOutput.result, request.source, position)
+    : undefined;
+  const token = programReference
+    ? {
+        symbolId: programReference.symbolId,
+        range: programReference.range
+      }
+    : findTokenAtPosition(request.source, position);
   if (!token) {
     return { locations: [], diagnostics: [] };
   }

@@ -1,11 +1,8 @@
 import type {
-  ChemdDocument,
-  ChemdNode,
-  ColNode,
-  MoleculeNode,
-  ReactionNode,
-  StructuredNode,
-  TemplateNode
+  ChemdDeclaration,
+  ChemdProgramDocument,
+  ChemdStringValue,
+  ChemdValue
 } from "@chemd/core";
 import { compileChemd, renderCompiledJson } from "@chemd/compiler";
 
@@ -19,11 +16,12 @@ type JsonTypedGraph = ReturnType<typeof compileChemd>["typedSemanticGraph"];
 type JsonTypedNode = JsonTypedGraph["nodes"][number];
 type JsonReactionNode = Extract<JsonTypedNode, { kind: "reaction" }>;
 type JsonReactionValue = JsonReactionNode["reactants"][number];
+type FieldDeclaration = Extract<ChemdDeclaration, { fields: Record<string, ChemdValue> }>;
 
 interface NormalizedNodeFields {
   smiles?: string;
-  reactants?: string[];
-  products?: string[];
+  reactants?: Array<string | undefined>;
+  products?: Array<string | undefined>;
 }
 
 const resolveChemStringSafely = async (
@@ -54,97 +52,191 @@ const resolveChemStringListSafely = async (
   }
 };
 
-const normalizeMoleculeNodeForJson = async (
-  node: MoleculeNode,
+const hasFields = (declaration: ChemdDeclaration): declaration is FieldDeclaration =>
+  "fields" in declaration;
+
+const readStringValue = (value: ChemdValue | undefined): string | undefined => {
+  if (value?.type === "string") {
+    return value.value;
+  }
+  if (value?.type === "identifier") {
+    return value.name;
+  }
+  return undefined;
+};
+
+const createStringValue = (
+  value: string,
+  sourceValue: ChemdValue | undefined
+): ChemdStringValue => ({
+  ...(sourceValue?.sourceSpan ? { sourceSpan: sourceValue.sourceSpan } : {}),
+  type: "string",
+  raw: JSON.stringify(value),
+  value
+});
+
+const withField = <T extends FieldDeclaration>(
+  declaration: T,
+  field: string,
+  value: ChemdValue
+): T => ({
+  ...declaration,
+  fields: {
+    ...declaration.fields,
+    [field]: value
+  }
+});
+
+const readLiteralFieldItems = (
+  value: ChemdValue | undefined
+): Array<{ index: number; value: string }> => {
+  if (!value) {
+    return [];
+  }
+  if (value.type === "list") {
+    return value.items.flatMap((item, index) => {
+      const text = readStringValue(item);
+      return text ? [{ index, value: text }] : [];
+    });
+  }
+  const text = readStringValue(value);
+  return text ? [{ index: 0, value: text }] : [];
+};
+
+const replaceLiteralFieldItems = (
+  value: ChemdValue,
+  normalizedByIndex: Map<number, string>
+): ChemdValue => {
+  if (value.type === "list") {
+    return {
+      ...value,
+      items: value.items.map((item, index) =>
+        normalizedByIndex.has(index)
+          ? createStringValue(normalizedByIndex.get(index) as string, item)
+          : item
+      )
+    };
+  }
+  return normalizedByIndex.has(0)
+    ? createStringValue(normalizedByIndex.get(0) as string, value)
+    : value;
+};
+
+const normalizeMoleculeDeclarationForJson = async (
+  declaration: FieldDeclaration,
   options: JsonExportOptions
-): Promise<MoleculeNode> => {
+): Promise<FieldDeclaration> => {
   const sourceNotation =
-    typeof node.smiles === "string" && node.smiles.trim().length > 0
-      ? node.smiles
-      : node.cas;
+    readStringValue(declaration.fields.smiles)?.trim()
+    || readStringValue(declaration.fields.cas)?.trim();
+
+  if (!sourceNotation) {
+    return declaration;
+  }
+
+  const normalized = await resolveChemStringSafely(sourceNotation, options);
+  return withField(
+    declaration,
+    "smiles",
+    createStringValue(normalized, declaration.fields.smiles ?? declaration.fields.cas)
+  );
+};
+
+const normalizeLiteralChemField = async (
+  declaration: FieldDeclaration,
+  field: "reactants" | "products",
+  options: JsonExportOptions
+): Promise<{
+  declaration: FieldDeclaration;
+  normalizedValues?: Array<string | undefined>;
+}> => {
+  const fieldValue = declaration.fields[field];
+  const literalItems = readLiteralFieldItems(fieldValue);
+  if (!fieldValue || literalItems.length === 0) {
+    return { declaration };
+  }
+
+  const normalized = await resolveChemStringListSafely(
+    literalItems.map((item) => item.value),
+    options
+  );
+  const normalizedByIndex = new Map<number, string>();
+  literalItems.forEach((item, itemIndex) => {
+    const normalizedValue = normalized?.[itemIndex];
+    if (normalizedValue) {
+      normalizedByIndex.set(item.index, normalizedValue);
+    }
+  });
+
+  const normalizedValues = fieldValue.type === "list"
+    ? fieldValue.items.map((_, index) => normalizedByIndex.get(index))
+    : [normalizedByIndex.get(0)];
 
   return {
-    ...node,
-    smiles:
-      typeof sourceNotation === "string" && sourceNotation.trim().length > 0
-        ? await resolveChemStringSafely(sourceNotation, options)
-        : node.smiles
+    declaration: withField(declaration, field, replaceLiteralFieldItems(fieldValue, normalizedByIndex)),
+    normalizedValues
   };
 };
 
-const normalizeReactionNodeForJson = async (
-  node: ReactionNode,
+const normalizeReactionDeclarationForJson = async (
+  declaration: FieldDeclaration,
   options: JsonExportOptions
-): Promise<ReactionNode> => {
-  const [reactants, products] = await Promise.all([
-    resolveChemStringListSafely(node.reactants, options),
-    resolveChemStringListSafely(node.products, options)
-  ]);
+): Promise<{ declaration: FieldDeclaration; normalized: NormalizedNodeFields }> => {
+  const reactants = await normalizeLiteralChemField(declaration, "reactants", options);
+  const products = await normalizeLiteralChemField(reactants.declaration, "products", options);
 
   return {
-    ...node,
-    reactants,
-    products
+    declaration: products.declaration,
+    normalized: {
+      reactants: reactants.normalizedValues,
+      products: products.normalizedValues
+    }
   };
 };
 
-const normalizeStructuredNodeForJson = async (
-  node: StructuredNode,
+const normalizeDeclarationForJson = async (
+  declaration: ChemdDeclaration,
   options: JsonExportOptions
-): Promise<StructuredNode> => {
-  if (node.type === "molecule") {
-    return normalizeMoleculeNodeForJson(node, options);
+): Promise<{ declaration: ChemdDeclaration; normalized?: NormalizedNodeFields }> => {
+  if (!hasFields(declaration)) {
+    return { declaration };
   }
 
-  if (node.type === "reaction") {
-    return normalizeReactionNodeForJson(node, options);
-  }
-
-  if (node.type === "template") {
+  if (declaration.kind === "molecule") {
+    const normalizedDeclaration = await normalizeMoleculeDeclarationForJson(declaration, options);
     return {
-      ...node,
-      body: await Promise.all(node.body.map((child) => normalizeNodeForJson(child, options)))
-    } satisfies TemplateNode;
+      declaration: normalizedDeclaration,
+      normalized: {
+        smiles: readStringValue(normalizedDeclaration.fields.smiles)
+      }
+    };
   }
 
-  if (node.type === "col") {
-    return {
-      ...node,
-      children: await Promise.all(node.children.map((child) => normalizeNodeForJson(child, options)))
-    } satisfies ColNode;
+  if (declaration.kind === "reaction") {
+    return normalizeReactionDeclarationForJson(declaration, options);
   }
 
-  return node;
+  return { declaration };
 };
-
-const normalizeNodeForJson = async (
-  node: ChemdNode,
-  options: JsonExportOptions
-): Promise<ChemdNode> =>
-  node.type === "markdown" ? node : normalizeStructuredNodeForJson(node, options);
 
 const collectNormalizedFields = (
-  nodes: ChemdNode[],
-  output = new Map<string, NormalizedNodeFields>()
+  normalizedDeclarations: Array<{
+    declaration: ChemdDeclaration;
+    normalized?: NormalizedNodeFields;
+  }>
 ): Map<string, NormalizedNodeFields> => {
-  for (const node of nodes) {
-    if (node.type === "molecule" && node.id) {
-      output.set(node.id, { smiles: node.smiles });
-    } else if (node.type === "reaction" && node.id) {
-      output.set(node.id, { reactants: node.reactants, products: node.products });
-    } else if (node.type === "template") {
-      collectNormalizedFields(node.body, output);
-    } else if (node.type === "col") {
-      collectNormalizedFields(node.children, output);
+  const output = new Map<string, NormalizedNodeFields>();
+  for (const item of normalizedDeclarations) {
+    if (item.normalized) {
+      output.set(item.declaration.id, item.normalized);
     }
   }
-
   return output;
 };
 
 const updateLiteralValues = (
   values: JsonReactionValue[],
-  normalizedValues: string[] | undefined
+  normalizedValues: Array<string | undefined> | undefined
 ) =>
   Array.isArray(values)
     ? values.map((value, index) =>
@@ -180,32 +272,41 @@ const normalizeTypedNodeForJson = (
 
 const normalizeTypedGraphForJson = (
   typedGraph: JsonTypedGraph,
-  document: ChemdDocument
+  normalizedById: Map<string, NormalizedNodeFields>
 ): JsonTypedGraph => {
   // JSON export resolves CAS aliases after compile, so keep literal typedGraph values in sync.
-  const normalizedById = collectNormalizedFields(document.children);
-
   return {
     ...typedGraph,
     nodes: typedGraph.nodes.map((node) => normalizeTypedNodeForJson(node, normalizedById))
   };
 };
 
-export const normalizeDocumentForJson = async (
-  document: ChemdDocument,
+export const normalizeProgramForJson = async (
+  program: ChemdProgramDocument,
   options: JsonExportOptions = {}
-): Promise<ChemdDocument> => ({
-  ...document,
-  children: await Promise.all(document.children.map((child) => normalizeNodeForJson(child, options)))
-});
+): Promise<{
+  program: ChemdProgramDocument;
+  normalizedById: Map<string, NormalizedNodeFields>;
+}> => {
+  const normalizedDeclarations = await Promise.all(
+    program.declarations.map((declaration) => normalizeDeclarationForJson(declaration, options))
+  );
+  return {
+    program: {
+      ...program,
+      declarations: normalizedDeclarations.map((item) => item.declaration)
+    },
+    normalizedById: collectNormalizedFields(normalizedDeclarations)
+  };
+};
 
 export const exportNormalizedJson = async (
   source: string,
   options: JsonExportOptions = {}
 ): Promise<string> => {
   const compileResult = compileChemd(source);
-  const document = await normalizeDocumentForJson(compileResult.document, options);
-  const typedGraph = normalizeTypedGraphForJson(compileResult.typedSemanticGraph, document);
+  const { program, normalizedById } = await normalizeProgramForJson(compileResult.program, options);
+  const typedGraph = normalizeTypedGraphForJson(compileResult.typedSemanticGraph, normalizedById);
 
-  return renderCompiledJson(document, typedGraph);
+  return renderCompiledJson(program, typedGraph);
 };

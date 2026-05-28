@@ -4,26 +4,29 @@ import { compileChemdForEditor } from "@chemd/language-service";
 
 import { buildReactionIntelligenceJob } from "./job";
 
-const sourceWithSmiles = `---
-id: exp-intel
-title: Intelligence fixture
-date: 2026-05-13
----
+const sourceWithSmiles = `module exp_intel
 
-:::chemd #mol-a
-smiles: CCO
-:::
+meta {
+  id: "exp-intel"
+  title: "Intelligence fixture"
+  date: "2026-05-13"
+}
 
-:::chemd #mol-b
-smiles: CC=O
-:::
+molecule mol-a {
+  name: "Ethanol"
+  smiles: "CCO"
+}
 
-:::chemd #rxn-a
-kind: reaction
-reactants: @mol-a
-products: @mol-b
-conditions: air
-:::
+molecule mol-b {
+  name: "Acetaldehyde"
+  smiles: "CC=O"
+}
+
+reaction rxn-a {
+  reactants: [@mol-a]
+  products: [@mol-b]
+  conditions: "air"
+}
 `;
 
 describe("desktop reaction intelligence job builder", () => {
@@ -47,11 +50,18 @@ describe("desktop reaction intelligence job builder", () => {
   });
 
   it("skips reactions instead of inventing RXN SMILES when structures are missing", () => {
-    const source = `:::chemd #rxn-a
-kind: reaction
-reactants: substrate
-products: product
-:::
+    const source = `module exp_intel_missing
+
+meta {
+  id: "exp-intel-missing"
+  title: "Missing structures"
+  date: "2026-05-13"
+}
+
+reaction rxn-a {
+  reactants: [substrate]
+  products: [product]
+}
 `;
     const output = compileChemdForEditor({ source, documentUri: "missing.chemd" });
 

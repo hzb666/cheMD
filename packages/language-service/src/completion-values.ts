@@ -1,6 +1,5 @@
 import {
   BLOCK_SCHEMAS,
-  getBlockFieldSchema,
   getFieldValueSuggestions
 } from "@chemd/core";
 
@@ -17,10 +16,7 @@ const findSchemaSuggestions = (
   const scoped = scopedBlockType
     ? getFieldValueSuggestions(scopedBlockType, fieldKey)
     : [];
-  const scopedField = scopedBlockType
-    ? getBlockFieldSchema(scopedBlockType, fieldKey)
-    : undefined;
-  if (scoped.length > 0 || scopedField) {
+  if (scopedBlockType) {
     return scoped;
   }
 

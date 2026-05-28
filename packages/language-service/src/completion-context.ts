@@ -33,9 +33,10 @@ export const getChemdCompletionContext = (
   const linePrefix = lineText.slice(0, Math.max(position.column - 1, 0));
   const tokenPrefix = readTokenPrefix(linePrefix);
   const range = createCompletionRange(position, tokenPrefix.length);
-  const block = findOpenBlock(lines, position.line);
+  const block = findOpenProgramBlock(lines, position.line) ?? findOpenBlock(lines, position.line);
   const field = readFieldAtCursor(linePrefix);
   const stepParam = readStepParamContext(linePrefix);
+  const stepFamilyPrefix = isStepFamilyPrefix(linePrefix);
 
   return {
     source: request.source,
@@ -50,8 +51,12 @@ export const getChemdCompletionContext = (
     isUseHeaderPosition: isUseHeaderPrefix(linePrefix),
     isReferencePosition: tokenPrefix.startsWith("@") ||
       (request.triggerCharacter === "@" && linePrefix.endsWith("@")),
-    isStepFamilyPosition: isStepFamilyPrefix(linePrefix),
-    isFieldKeyPosition: Boolean(block) && !field.hasColon && !linePrefix.trim().startsWith(":::"),
+    isStepFamilyPosition: stepFamilyPrefix,
+    isFieldKeyPosition: Boolean(block) &&
+      !field.hasColon &&
+      !linePrefix.trim().startsWith(":::") &&
+      !linePrefix.trim().startsWith("}") &&
+      !stepFamilyPrefix,
     isFieldValuePosition: Boolean(block) && field.hasColon,
     fieldKey: field.key,
     fieldPrefix: field.hasColon ? "" : field.key ?? tokenPrefix,
@@ -99,6 +104,52 @@ const createCompletionRange = (
   endLine: position.line,
   endColumn: position.column
 });
+
+const findOpenProgramBlock = (
+  lines: string[],
+  cursorLine: number
+): ChemdCompletionContext["block"] => {
+  const stack: Array<{
+    type: string;
+    id?: string;
+    startLine: number;
+    fields: Map<string, string>;
+  }> = [];
+
+  for (let index = 0; index < cursorLine; index += 1) {
+    const line = lines[index] ?? "";
+    const trimmed = line.trim();
+    const header = readProgramBlockHeader(line);
+    if (header) {
+      stack.push({
+        type: header.type,
+        id: header.id,
+        startLine: index + 1,
+        fields: new Map()
+      });
+      continue;
+    }
+    if (trimmed.startsWith("}") && stack.length > 0) {
+      stack.pop();
+      continue;
+    }
+    const open = stack.at(-1);
+    const field = readFieldLine(line);
+    if (open && field) {
+      const canonicalField = resolveBlockField(open.type, field.key)?.canonicalName ?? field.key;
+      open.fields.set(canonicalField, field.value.trim());
+    }
+  }
+
+  const open = stack.at(-1);
+  return open ? {
+    type: open.type,
+    id: open.id,
+    startLine: open.startLine,
+    kind: inferProgramBlockKind(open.type, open.fields),
+    fields: new Set(open.fields.keys())
+  } : undefined;
+};
 
 const findOpenBlock = (
   lines: string[],
@@ -163,6 +214,16 @@ const inferBlockKind = (
   return "unknown";
 };
 
+const inferProgramBlockKind = (
+  blockType: string,
+  fields: Map<string, string>
+): ChemdCompletionBlockKind => {
+  if (blockType === "meta" || blockType === "agent_run") {
+    return "unknown";
+  }
+  return inferBlockKind(blockType, fields);
+};
+
 const normalizeBlockType = (type: string): string =>
   type === "condition-varies" ? "condition_varies" : type;
 
@@ -217,6 +278,31 @@ const readBlockHeader = (line: string): { type: string; arg?: string } | undefin
   return { type, arg: trimmed.slice(index).trim() };
 };
 
+const readProgramBlockHeader = (
+  line: string
+): { type: string; id?: string } | undefined => {
+  const trimmed = line.trim();
+  if (!trimmed.endsWith("{")) return undefined;
+  if (trimmed === "meta {") {
+    return { type: "meta" };
+  }
+
+  const agent = trimmed.match(/^agent\s+run\s+([A-Za-z_][\w-]*)\s*\{$/u);
+  if (agent) {
+    return { type: "agent_run", id: agent[1] };
+  }
+
+  const declaration = trimmed.match(/^([A-Za-z_][\w-]*)\s+([A-Za-z_][\w-]*)(?:\s+for\s+@[A-Za-z0-9_.#/-]+)?\s*\{$/u);
+  if (!declaration) {
+    return undefined;
+  }
+
+  return {
+    type: normalizeBlockType(declaration[1] ?? ""),
+    id: declaration[2]
+  };
+};
+
 const readFieldLine = (line: string): { key: string; value: string } | undefined => {
   let index = 0;
   while (line[index] === " " || line[index] === "\t") index += 1;
@@ -239,33 +325,60 @@ const isUseHeaderPrefix = (linePrefix: string): boolean => {
 
 const isStepFamilyPrefix = (linePrefix: string): boolean => {
   const field = readFieldLine(linePrefix);
-  return field?.key === "step" && !field.value.includes("|");
+  if (field?.key === "step" && !field.value.includes("|")) {
+    return true;
+  }
+  return /^\s*step\s+[A-Za-z_][\w-]*\s*=\s*[A-Za-z_][\w-]*$/u.test(linePrefix) ||
+    /^\s*step\s+[A-Za-z_][\w-]*\s*=\s*$/u.test(linePrefix);
 };
 
 const readStepParamContext = (
   linePrefix: string
 ): ChemdCompletionContext["stepParam"] => {
   const field = readFieldLine(linePrefix);
-  if (field?.key !== "step" || !field.value.includes("|")) {
-    return undefined;
+  if (field?.key === "step" && field.value.includes("|")) {
+    const segments = field.value.split("|").map((segment) => segment.trim());
+    const family = segments[0]?.split(/\s+/)[0]?.trim();
+    if (!family) {
+      return undefined;
+    }
+
+    const usedParams = new Set<string>();
+    for (const segment of segments.slice(1, -1)) {
+      const equalsIndex = segment.indexOf("=");
+      if (equalsIndex > 0) {
+        usedParams.add(segment.slice(0, equalsIndex).trim());
+      }
+    }
+
+    const current = segments[segments.length - 1] ?? "";
+    if (current.includes("=")) {
+      return undefined;
+    }
+
+    return {
+      family,
+      prefix: current,
+      usedParams
+    };
   }
 
-  const segments = field.value.split("|").map((segment) => segment.trim());
-  const family = segments[0]?.split(/\s+/)[0]?.trim();
-  if (!family) {
+  const programStep = linePrefix.match(/^\s*step\s+[A-Za-z_][\w-]*\s*=\s*([A-Za-z_][\w-]*)\((.*)$/u);
+  if (!programStep) {
     return undefined;
   }
-
+  const family = programStep[1] ?? "";
+  const args = programStep[2] ?? "";
   const usedParams = new Set<string>();
-  for (const segment of segments.slice(1, -1)) {
-    const equalsIndex = segment.indexOf("=");
-    if (equalsIndex > 0) {
-      usedParams.add(segment.slice(0, equalsIndex).trim());
+  const parts = args.split(",");
+  for (const part of parts.slice(0, -1)) {
+    const name = part.trim().match(/^([A-Za-z_][\w-]*)(?=\s*[:=])/u)?.[1];
+    if (name) {
+      usedParams.add(name);
     }
   }
-
-  const current = segments[segments.length - 1] ?? "";
-  if (current.includes("=")) {
+  const current = parts.at(-1)?.trim() ?? "";
+  if (current.includes("=") || current.includes(":")) {
     return undefined;
   }
 

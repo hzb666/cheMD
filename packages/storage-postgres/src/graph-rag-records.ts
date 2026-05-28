@@ -36,6 +36,30 @@ const firstSourceRange = (value: unknown): PostgresSourceRangeRecord | undefined
   return Object.values(value).find(isSourceRange);
 };
 
+const findDeclarationSourceRange = (
+  input: BuildPostgresGraphRagStorageInput,
+  entityId: string
+): PostgresSourceRangeRecord | undefined => {
+  const declarationId = entityId.split(".")[0] ?? entityId;
+  const declaration = input.trainingExport.source_layer.declarations.find((item) =>
+    item.declaration_id === entityId || item.declaration_id === declarationId
+  );
+  return declaration?.source_span;
+};
+
+const findDocCommentSourceRange = (
+  input: BuildPostgresGraphRagStorageInput,
+  entityId: string
+): PostgresSourceRangeRecord | undefined => {
+  const declarationId = entityId.split(".")[0] ?? entityId;
+  const docComment = input.trainingExport.source_layer.doc_comments.find((item) =>
+    item.doc_id === entityId ||
+    item.attached_to === entityId ||
+    item.attached_to === declarationId
+  );
+  return docComment?.source_span;
+};
+
 const findCompiledEntitySourceRange = (
   input: BuildPostgresGraphRagStorageInput,
   entityId: string
@@ -43,19 +67,40 @@ const findCompiledEntitySourceRange = (
   const semanticLayer = input.trainingExport.semantic_layer;
   const groups = [
     semanticLayer.molecules,
+    semanticLayer.materials,
+    semanticLayer.batches,
     semanticLayer.reactions,
     semanticLayer.results,
     semanticLayer.analyses,
     semanticLayer.samples,
     semanticLayer.artifacts,
+    semanticLayer.condition_screens,
     semanticLayer.condition_variations,
     semanticLayer.condition_variation_attempts,
+    semanticLayer.procedures,
+    semanticLayer.traces,
+    semanticLayer.agent_runs,
     semanticLayer.documentation_blocks
   ] as readonly unknown[][];
   const entity = groups.flat().find((item) =>
-    toJsonRecord(item).entity_id === entityId
+    toJsonRecord(item).entity_id === entityId ||
+    toJsonRecord(item).original_id === entityId ||
+    toJsonRecord(item).doc_id === entityId ||
+    toJsonRecord(item).attached_to === entityId
   );
-  return firstSourceRange(toJsonRecord(entity).field_source_spans);
+  const entityRecord = toJsonRecord(entity);
+  const sourceOwnerId = typeof entityRecord.original_id === "string"
+    ? entityRecord.original_id
+    : typeof entityRecord.doc_id === "string"
+      ? entityRecord.doc_id
+      : typeof entityRecord.attached_to === "string"
+        ? entityRecord.attached_to
+        : entityId;
+  return firstSourceRange(entityRecord.field_source_spans)
+    ?? findDeclarationSourceRange(input, sourceOwnerId)
+    ?? findDocCommentSourceRange(input, sourceOwnerId)
+    ?? findDeclarationSourceRange(input, entityId)
+    ?? findDocCommentSourceRange(input, entityId);
 };
 
 const resolveEntitySourceRange = (

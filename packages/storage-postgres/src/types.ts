@@ -1,7 +1,7 @@
 import type {
   ChemdTrainingTaskDatasetV1,
   ChemdRagExportV1,
-  ChemdTrainingExportV2,
+  ChemdTrainingExportV3,
   ChemdTrainingUnderstandingV1,
   ExportedRelationV1,
   TrainingFieldEvidenceV1
@@ -38,7 +38,7 @@ export interface BuildExperimentStorageInput {
   createdAt?: string;
   compileRunId?: string;
   compilerVersion?: string;
-  trainingExport: ChemdTrainingExportV2;
+  trainingExport: ChemdTrainingExportV3;
   ragExport: ChemdRagExportV1;
   trainingUnderstanding: ChemdTrainingUnderstandingV1;
   lnf?: ChemdLnf;
@@ -84,7 +84,7 @@ export interface CompileRunRecord {
 
 export interface CompileArtifactRecord {
   compileRunId: string;
-  trainingExport: ChemdTrainingExportV2;
+  trainingExport: ChemdTrainingExportV3;
   trainingUnderstanding: ChemdTrainingUnderstandingV1;
   ragExport: ChemdRagExportV1;
   lnf?: ChemdLnf;

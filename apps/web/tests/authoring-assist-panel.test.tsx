@@ -37,11 +37,11 @@ describe("AuthoringAssistPanel", () => {
             description: "当前文档只有一个 reaction。",
             category: "reference",
             confidence: "high",
-            target_block_id: "res-main",
+            target: { kind: "declaration", declarationId: "res-main" },
             patch: {
-              kind: "insert_field_line",
-              blockId: "res-main",
-              line: "ref: rxn-main"
+              kind: "insert_declaration_field",
+              declarationId: "res-main",
+              line: "reaction: @rxn-main"
             }
           }]
         }}

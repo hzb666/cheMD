@@ -75,7 +75,7 @@ export const exportDocxDocument = async (input: DocxExportRequest): Promise<Resp
     });
 
     const safeName = sanitizeFileName(
-      input.fileName ?? exportResult.compileResult.document.meta.id ?? exportResult.compileResult.document.meta.title
+      input.fileName ?? exportResult.compileResult.program.meta.id ?? exportResult.compileResult.program.meta.title
     );
     const streamPath = outputPath;
     const stream = createReadStream(streamPath);

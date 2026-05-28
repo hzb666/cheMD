@@ -29,12 +29,19 @@ export const compileChemdForEditor = (
   try {
     const result = compile(input.source, input.options);
     const symbols = buildSymbols(result, input.source);
+    const diagnostics = mapCompilerDiagnostics(input.source, result.diagnostics)
+      .map((diagnostic) => {
+        const symbol = diagnostic.sourceNodeId
+          ? symbols.find((item) => item.id === diagnostic.sourceNodeId)
+          : undefined;
+        return symbol ? { ...diagnostic, range: symbol.range } : diagnostic;
+      });
     return {
       status: "ok",
       documentUri: input.documentUri,
       compiledAt,
       result,
-      diagnostics: mapCompilerDiagnostics(input.source, result.diagnostics),
+      diagnostics,
       outline: buildOutline(result, input.source),
       semanticTokens: buildChemdSemanticTokens(input.source, symbols),
       symbols

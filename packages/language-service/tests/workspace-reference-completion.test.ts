@@ -18,28 +18,50 @@ const withCursor = (source: string): { source: string; cursorOffset: number } =>
   };
 };
 
-const moleculeSource = (id: string): string => `:::chemd #${id}
-kind: molecule
-smiles: CCO
-:::
+const moleculeSource = (id: string): string => `module ${id.replaceAll("-", "_")}
+
+meta {
+  id: "${id}"
+  title: "${id}"
+  date: "2026-05-13"
+}
+
+molecule ${id} {
+  name: "${id}"
+  smiles: "CCO"
+}
 `;
 
-const reactionSource = (id: string): string => `:::chemd #${id}
-kind: reaction
-reactants: mol-a
-products: mol-b
-:::
+const reactionSource = (id: string): string => `module ${id.replaceAll("-", "_")}
+
+meta {
+  id: "${id}"
+  title: "${id}"
+  date: "2026-05-13"
+}
+
+reaction ${id} {
+  reactants: ["mol-a"]
+  products: ["mol-b"]
+}
 `;
 
-const currentSource = `:::chemd #mol-current
-kind: molecule
-smiles: CCN
-:::
+const currentSource = `module current_doc
 
-:::chemd #rxn-current
-kind: reaction
-reactants: |
-:::
+meta {
+  id: "current-doc"
+  title: "Current"
+  date: "2026-05-13"
+}
+
+molecule mol-current {
+  name: "current"
+  smiles: "CCN"
+}
+
+reaction rxn-current {
+  reactants: |
+}
 `;
 
 describe("getChemdWorkspaceReferenceCompletions", () => {
@@ -118,10 +140,9 @@ describe("getChemdWorkspaceReferenceCompletions", () => {
   });
 
   it("sorts by field preference and marks stale symbols", () => {
-    const request = withCursor(`:::chemd #rxn-main
-kind: reaction
-prev: |
-:::
+    const request = withCursor(`reaction rxn-main {
+  prev: |
+}
 `);
     const index = buildChemdWorkspaceSymbolIndex([
       {
@@ -151,10 +172,9 @@ prev: |
   });
 
   it("stably degrades without index, empty index, or failed documents", () => {
-    const request = withCursor(`:::chemd #rxn-main
-kind: reaction
-reactants: @|
-:::
+    const request = withCursor(`reaction rxn-main {
+  reactants: @|
+}
 `);
     const failedOutput = compileChemdForEditor(
       {
