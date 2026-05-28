@@ -45,14 +45,6 @@ export const sourceSpanToRange = (
   };
 };
 
-const readHeaderId = (headerArg: string | undefined): string | undefined => {
-  const trimmed = headerArg?.trim() ?? "";
-  if (!trimmed.startsWith("#")) return undefined;
-  const id = trimmed.slice(1);
-  const end = Array.from(id).findIndex((char) => char === " " || char === "\t");
-  return end >= 0 ? id.slice(0, end) : id;
-};
-
 export const createMetadataRange = (source: string): ChemdSourceRange => {
   const lines = splitSourceLines(source);
   if (lines[0]?.trim() !== "---") {
@@ -81,49 +73,34 @@ export const createSourceHash = (source: string): string => {
 export const buildBlockRangeMap = (source: string): Map<string, ChemdSourceRange> => {
   const ranges = new Map<string, ChemdSourceRange>();
   const lines = splitSourceLines(source);
-  let index = 0;
+  const stack: Array<{ id: string; startIndex: number }> = [];
 
-  while (index < lines.length) {
-    const header = readBlockHeader(lines[index]);
-    const id = header ? readHeaderId(header.arg) : undefined;
-    if (!header || !id) {
-      index += 1;
-      continue;
+  lines.forEach((line, index) => {
+    const declaration = line.match(/^\s*[A-Za-z_][\w-]*\s+([A-Za-z_][\w-]*)(?:\s+for\s+@[A-Za-z0-9_.#/-]+)?\s*\{/u);
+    if (declaration) {
+      stack.push({ id: declaration[1] ?? "unknown", startIndex: index });
+      return;
     }
-
-    let endIndex = index + 1;
-    while (endIndex < lines.length && lines[endIndex].trim() !== ":::") {
-      endIndex += 1;
-    }
-
-    const boundedEndIndex = Math.min(endIndex, lines.length - 1);
-    ranges.set(id, {
-      startLine: index + 1,
+    if (line.trim() !== "}") return;
+    const open = stack.pop();
+    if (!open) return;
+    ranges.set(open.id, {
+      startLine: open.startIndex + 1,
       startColumn: 1,
-      endLine: boundedEndIndex + 1,
-      endColumn: (lines[boundedEndIndex]?.length ?? 0) + 1
+      endLine: index + 1,
+      endColumn: (lines[index]?.length ?? 0) + 1
     });
-    index = endIndex + 1;
+  });
+
+  const endIndex = Math.max(lines.length - 1, 0);
+  for (const open of stack) {
+    ranges.set(open.id, {
+      startLine: open.startIndex + 1,
+      startColumn: 1,
+      endLine: endIndex + 1,
+      endColumn: (lines[endIndex]?.length ?? 0) + 1
+    });
   }
 
   return ranges;
 };
-
-const readBlockHeader = (line: string): { type: string; arg?: string } | undefined => {
-  const trimmed = line.trim();
-  if (!trimmed.startsWith(":::")) return undefined;
-  let index = 3;
-  const first = trimmed[index] ?? "";
-  if (!isBlockTypeChar(first, true)) return undefined;
-  index += 1;
-  while (isBlockTypeChar(trimmed[index] ?? "", false)) index += 1;
-  const type = trimmed.slice(3, index);
-  if (index >= trimmed.length) return { type };
-  if (trimmed[index] !== " " && trimmed[index] !== "\t") return undefined;
-  return { type, arg: trimmed.slice(index).trim() };
-};
-
-const isBlockTypeChar = (char: string, first: boolean): boolean =>
-  (char >= "A" && char <= "Z")
-  || (char >= "a" && char <= "z")
-  || (!first && ((char >= "0" && char <= "9") || char === "_" || char === "-"));

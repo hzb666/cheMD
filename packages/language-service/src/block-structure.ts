@@ -5,7 +5,7 @@ export interface ChemdBlockNode {
   header: string;
   hasClosingFence: boolean;
   label: string;
-  sourceStyle: "fenced" | "inline";
+  sourceStyle: "declaration" | "inline";
   startLine: number;
 }
 
@@ -16,140 +16,94 @@ export interface ChemdFencePair {
   openLine: number;
 }
 
-const blockStartPattern = /^\s*:::\s*([a-z][\w-]*)(?:\s+(.*))?\s*$/i;
-const inlineChildPattern = /^\s*(step|event):\s*(.+)$/i;
+const declarationStartPattern =
+  /^\s*([A-Za-z_][\w-]*)\s+([A-Za-z_][\w-]*)(?:\s+for\s+@[A-Za-z0-9_.#/-]+)?\s*\{\s*$/u;
+const stepPattern = /^\s*step\s+([A-Za-z_][\w-]*)\s*=/u;
 
-const readBlockLabel = (blockType: string, headerArg: string | undefined): string => {
-  const trimmed = headerArg?.trim();
-  if (!trimmed) return blockType;
-
-  const [firstToken] = trimmed.split(/\s+/);
-  if (!firstToken) return blockType;
-
-  return `${blockType} ${firstToken.startsWith("#") ? firstToken.slice(1) : firstToken}`;
-};
-
-const readInlineDeclarationLabel = (blockType: string, body: string): string => {
-  const segments = body.split("|").map((segment) => segment.trim()).filter(Boolean);
-  const explicitId = segments
-    .map((segment) => segment.match(/^id\s*=\s*([^\s|]+)/i)?.[1])
-    .find(Boolean);
-  const firstToken = segments[0]?.split(/\s+/)[0];
-  const labelToken = explicitId ?? firstToken;
-
-  return labelToken ? `${blockType} ${labelToken}` : blockType;
-};
-
-const buildNode = (
+const buildDeclarationNode = (
   blockType: string,
-  headerArg: string | undefined,
+  id: string,
   header: string,
-  startLine: number,
+  startLine: number
 ): ChemdBlockNode => ({
   blockType,
   children: [],
   endLine: startLine,
   header,
   hasClosingFence: false,
-  label: readBlockLabel(blockType, headerArg),
-  sourceStyle: "fenced",
-  startLine,
+  label: `${blockType} ${id}`,
+  sourceStyle: "declaration",
+  startLine
 });
 
-const buildInlineChildNode = (
+const buildInlineNode = (
   blockType: string,
-  body: string,
+  id: string,
   header: string,
-  startLine: number,
+  startLine: number
 ): ChemdBlockNode => ({
   blockType,
   children: [],
   endLine: startLine,
   header,
   hasClosingFence: false,
-  label: readInlineDeclarationLabel(blockType, body),
+  label: `${blockType} ${id}`,
   sourceStyle: "inline",
-  startLine,
+  startLine
 });
 
-const pushNode = (
+const addNode = (
   roots: ChemdBlockNode[],
   stack: ChemdBlockNode[],
-  node: ChemdBlockNode,
-) => {
+  node: ChemdBlockNode
+): void => {
   const parent = stack.at(-1);
   if (parent) {
     parent.children.push(node);
   } else {
     roots.push(node);
   }
-  stack.push(node);
-};
-
-const closeInlineChild = (
-  inlineChildrenByParent: Map<ChemdBlockNode, ChemdBlockNode>,
-  parent: ChemdBlockNode,
-  endLine: number,
-) => {
-  const child = inlineChildrenByParent.get(parent);
-  if (!child) return;
-
-  child.endLine = Math.max(child.startLine, endLine);
-  inlineChildrenByParent.delete(parent);
 };
 
 export const parseChemdBlockStructure = (source: string): ChemdBlockNode[] => {
   const lines = source.split(/\r\n|\r|\n/);
   const roots: ChemdBlockNode[] = [];
   const stack: ChemdBlockNode[] = [];
-  const inlineChildrenByParent = new Map<ChemdBlockNode, ChemdBlockNode>();
 
   lines.forEach((line, index) => {
     const lineNumber = index + 1;
     const trimmed = line.trim();
-    const startMatch = line.match(blockStartPattern);
-    const parent = stack.at(-1);
-
-    if (startMatch) {
-      if (parent) {
-        closeInlineChild(inlineChildrenByParent, parent, lineNumber - 1);
-      }
-      pushNode(
-        roots,
-        stack,
-        buildNode(startMatch[1].toLowerCase(), startMatch[2], trimmed, lineNumber)
+    const declaration = line.match(declarationStartPattern);
+    if (declaration) {
+      const node = buildDeclarationNode(
+        declaration[1] ?? "declaration",
+        declaration[2] ?? "unknown",
+        trimmed,
+        lineNumber
       );
+      addNode(roots, stack, node);
+      stack.push(node);
       return;
     }
 
-    if (trimmed === ":::") {
+    const step = line.match(stepPattern);
+    const parent = stack.at(-1);
+    if (step && parent?.blockType === "procedure") {
+      parent.children.push(buildInlineNode("step", step[1] ?? "unknown", trimmed, lineNumber));
+      return;
+    }
+
+    if (trimmed === "}") {
       const node = stack.pop();
       if (node) {
-        closeInlineChild(inlineChildrenByParent, node, lineNumber - 1);
         node.endLine = lineNumber;
         node.hasClosingFence = true;
       }
-      return;
-    }
-
-    const inlineMatch = line.match(inlineChildPattern);
-    if (parent && inlineMatch) {
-      closeInlineChild(inlineChildrenByParent, parent, lineNumber - 1);
-
-      const node = buildInlineChildNode(
-        inlineMatch[1].toLowerCase(),
-        inlineMatch[2],
-        trimmed,
-        lineNumber,
-      );
-      parent.children.push(node);
-      inlineChildrenByParent.set(parent, node);
     }
   });
 
   const endLine = Math.max(lines.length, 1);
-  for (const node of [...stack].reverse()) {
-    closeInlineChild(inlineChildrenByParent, node, endLine);
+  for (const node of stack.reverse()) {
     node.endLine = endLine;
   }
 
@@ -158,7 +112,7 @@ export const parseChemdBlockStructure = (source: string): ChemdBlockNode[] => {
 
 export const findChemdBlockPathAtLine = (
   nodes: readonly ChemdBlockNode[],
-  lineNumber: number,
+  lineNumber: number
 ): ChemdBlockNode[] => {
   for (const node of nodes) {
     if (lineNumber < node.startLine || lineNumber > node.endLine) {
@@ -172,25 +126,25 @@ export const findChemdBlockPathAtLine = (
 };
 
 export const flattenChemdBlockStructure = (
-  nodes: readonly ChemdBlockNode[],
+  nodes: readonly ChemdBlockNode[]
 ): ChemdBlockNode[] => nodes.flatMap((node) => [
   node,
-  ...flattenChemdBlockStructure(node.children),
+  ...flattenChemdBlockStructure(node.children)
 ]);
 
 export const findChemdFencePairAtLine = (
   nodes: readonly ChemdBlockNode[],
-  lineNumber: number,
+  lineNumber: number
 ): ChemdFencePair | undefined => {
   for (const node of nodes) {
-    if (node.sourceStyle === "fenced" && node.hasClosingFence && (
+    if (node.sourceStyle === "declaration" && node.hasClosingFence && (
       lineNumber === node.startLine || lineNumber === node.endLine
     )) {
       return {
         blockType: node.blockType,
         closeLine: node.endLine,
         label: node.label,
-        openLine: node.startLine,
+        openLine: node.startLine
       };
     }
 

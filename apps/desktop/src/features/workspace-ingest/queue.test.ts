@@ -408,19 +408,23 @@ describe("desktop workspace ingest runner", () => {
     expect(result.summary).toMatchObject({ pendingCount: 1, skippedCount: 1, totalCount: 2 });
   });
 
-  it("keeps legacy .chemd.md files eligible for ingest", async () => {
+  it("skips legacy .chemd.md files during ingest", async () => {
+    const readFile = vi.fn((file: WorkspaceFileEntry) => `source:${file.path}`);
     const result = await runWorkspaceIngest({
       workspaceId: "workspace-alpha",
       files: [fileEntry("experiments/legacy.chemd.md")],
-      readFile: (file) => `source:${file.path}`,
+      readFile,
       compile: (source) => ({ status: "ok", source }),
       createdAt
     });
 
+    expect(readFile).not.toHaveBeenCalled();
     expect(result.items.map((item) => item.documentPath)).toEqual([
       "experiments/legacy.chemd.md"
     ]);
-    expect(result.summary).toMatchObject({ pendingCount: 1, totalCount: 1 });
+    expect(result.items[0].status).toBe("skipped");
+    expect(result.items[0].metadata.skipReason).toBe("non_chemd_markdown");
+    expect(result.summary).toMatchObject({ skippedCount: 1, totalCount: 1 });
   });
 
   it("keeps ingest running when one file fails and redacts bounded failure summaries", async () => {

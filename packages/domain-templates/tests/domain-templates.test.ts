@@ -23,7 +23,10 @@ describe("domain template catalog", () => {
   });
 
   it("renders template source by id", () => {
-    expect(renderDomainTemplate("organic-synthesis/suzuki-screen")).toContain(":::condition-varies");
+    const source = renderDomainTemplate("organic-synthesis/suzuki-screen");
+
+    expect(source).toContain("condition_screen cv_screen");
+    expect(source).not.toContain(":".repeat(3));
     expect(getDomainTemplate("missing/template")).toBeUndefined();
   });
 

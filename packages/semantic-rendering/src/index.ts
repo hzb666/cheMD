@@ -17,6 +17,7 @@ export type {
   ChemdRenderModeV1,
   ChemdRenderPriorityV1,
   ChemdRenderStateV1,
+  ChemdSemanticRenderDocument,
   ChemdSemanticRenderTreeInput,
   ChemdSemanticRenderTreeV1,
   ChemdShellAttributesV1,

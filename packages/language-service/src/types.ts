@@ -58,8 +58,7 @@ export type ChemdOutlineKind =
   | "agent_patch"
   | "agent_decision"
   | "agent_timeline"
-  | "documentation"
-  | "template";
+  | "documentation";
 
 export interface ChemdOutlineItem {
   id: string;

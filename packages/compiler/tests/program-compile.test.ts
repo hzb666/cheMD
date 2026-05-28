@@ -25,11 +25,6 @@ describe("compileChemd program pipeline", () => {
         }
       }
     });
-    expect(result.document).toMatchObject({
-      type: "document",
-      meta: { id: "exp-golden-suzuki-screen" },
-      children: []
-    });
     expect(result.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
     expect(result.program.declarations.map((declaration) => declaration.kind)).toEqual([
       "molecule",

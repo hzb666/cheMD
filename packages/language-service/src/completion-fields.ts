@@ -1,6 +1,4 @@
 import {
-  getBlockChildLineFields,
-  getCompletionBlockFieldSchemas,
   getDeclarationSchema
 } from "@chemd/core";
 import {
@@ -82,29 +80,7 @@ const getFieldsForKind = (
     return [...canonicalEntries, ...aliasEntries];
   }
 
-  const { blockType, semanticKind } = getSchemaContext(kind);
-  const fields = getCompletionBlockFieldSchemas(blockType, semanticKind);
-  const canonicalEntries = fields.map((schema) => ({ name: schema.name, schema }));
-  const aliasEntries = prefix.length === 0
-    ? []
-    : fields.flatMap((schema) =>
-        schema.aliases?.map((alias) => ({ name: alias, aliasOf: schema.name, schema })) ?? []
-      );
-  const childEntries = getBlockChildLineFields(blockType).map((name) => ({ name }));
-
-  return [...canonicalEntries, ...childEntries, ...aliasEntries];
-};
-
-const getSchemaContext = (
-  kind: Exclude<ChemdCompletionBlockKind, "unknown">
-): { blockType: string; semanticKind?: "molecule" | "reaction" } => {
-  if (kind === "molecule" || kind === "reaction") {
-    return { blockType: "chemd", semanticKind: kind };
-  }
-
-  return {
-    blockType: kind === "condition_varies" ? "condition-varies" : kind
-  };
+  return [];
 };
 
 const getStepParamCompletions = (

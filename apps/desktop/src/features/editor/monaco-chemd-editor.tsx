@@ -211,7 +211,7 @@ const registerChemdLanguageMetadata = (monaco: Monaco): void => {
     monaco.languages.register({
       id: CHEMD_LANGUAGE_ID,
       aliases: ["Chemd", "chemd"],
-      extensions: [".chemd", ".chemd.md"]
+      extensions: [".chemd"]
     });
   }
 };
@@ -236,13 +236,13 @@ export const createChemdLanguageConfiguration = (): languages.LanguageConfigurat
   wordPattern: /#?@?[A-Za-z0-9_.#/-]+/u,
   folding: {
     markers: {
-      start: /^\s*:::\s*[a-z][\w-]*(?:\s+.*)?\s*$/iu,
-      end: /^\s*:::\s*$/u
+      start: /^\s*[A-Za-z_][\w-]*\s+[A-Za-z_][\w-]*(?:\s+for\s+@[A-Za-z0-9_.#/-]+)?\s*\{\s*$/u,
+      end: /^\s*\}\s*$/u
     }
   },
   indentationRules: {
-    increaseIndentPattern: /^\s*:::\s*[a-z][\w-]*(?:\s+.*)?\s*$/iu,
-    decreaseIndentPattern: /^\s*:::\s*$/u
+    increaseIndentPattern: /^\s*[A-Za-z_][\w-]*\s+[A-Za-z_][\w-]*(?:\s+for\s+@[A-Za-z0-9_.#/-]+)?\s*\{\s*$/u,
+    decreaseIndentPattern: /^\s*\}\s*$/u
   }
 });
 
@@ -259,11 +259,11 @@ export const createChemdMonarchTokensProvider = (): languages.IMonarchLanguage =
   tokenizer: {
     root: [
       [/^---$/, "delimiter.frontmatter"],
-      [/^:::\s*$/, "delimiter.block"],
-      [/^:::\s*([a-zA-Z][\w-]*)/, "keyword.block"],
+      [/\{|\}/, "delimiter.brace"],
+      [/^\s*(molecule|material|batch|reaction|result|analysis|sample|artifact|condition_screen|procedure|observation|trace|agent)\b/, "keyword.declaration"],
+      [/\b[A-Za-z_][\w-]*(?=\s*\{)/, "identifier.declaration"],
       [/:chem\[[^\]]*\]/, "string.chem"],
       [/@[A-Za-z0-9_.#/-]+/, "identifier.reference"],
-      [/#[A-Za-z0-9_-]+/, "identifier.declaration"],
       [/^\s*[A-Za-z_][\w-]*(?=\s*:)/, "attribute.name"],
       [/\b(kind|reactants|products|conditions|status|yield|amount|smiles|method|target|result)\b(?=\s*:)/, "attribute.name"],
       [/\b(error|failed|warning|pending|accepted|ready|ok)\b/, "keyword.status"],

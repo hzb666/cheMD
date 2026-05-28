@@ -27,7 +27,7 @@ describe("AuthoringAssistPanel", () => {
               kind: "batch",
               patches: [{
                 kind: "append_document_text",
-                text: ":::result #res-main"
+                text: "result res-main {"
               }]
             }
           }],

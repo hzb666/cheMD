@@ -23,6 +23,80 @@ const compile = (source: string): ChemdLanguageCompileOutput =>
     options: { procedureMode: "auto" }
   });
 
+interface SemanticDocumentFixture {
+  type: "document";
+  meta: { id: string; title: string; date: string };
+  children: Array<Record<string, unknown>>;
+  diagnostics: [];
+}
+
+const toProgramFixture = (
+  document: SemanticDocumentFixture
+): ChemdLanguageCompileSuccess["result"]["program"] => ({
+  type: "program_document",
+  schemaVersion: "chemd-program-ast/v1",
+  sourceLanguage: "chemd/program-v1",
+  module: { kind: "module", name: document.meta.id.replace(/-/g, "_"), docs: [] },
+  meta: {
+    kind: "meta",
+    id: document.meta.id,
+    title: document.meta.title,
+    date: document.meta.date,
+    fields: {},
+    docs: []
+  },
+  imports: [],
+  docs: [],
+  declarations: document.children.map((child) => {
+    const kind = child.type === "condition_varies" ? "condition_screen" : child.type;
+    const id = String(child.id ?? child.name ?? kind);
+    if (kind === "procedure") {
+      return {
+        kind: "procedure",
+        id,
+        qualifiedId: `${document.meta.id}.${id}`,
+        docs: [],
+        evidence: [],
+        children: [
+          ...((child.steps as Array<Record<string, unknown>> | undefined) ?? []).map((step) => ({
+            kind: "step" as const,
+            id: String(step.stepId ?? step.id ?? "step"),
+            family: String(step.family ?? "unknown"),
+            args: {},
+            inputs: [],
+            outputs: [],
+            dependsOn: [],
+            sourceSpan: step.sourceSpan
+          })),
+          ...((child.controls as Array<Record<string, unknown>> | undefined) ?? []).map((control) => ({
+            kind: "control" as const,
+            id: String(control.controlId ?? control.id ?? "control"),
+            controlKind: "repeat" as const,
+            args: {},
+            children: [],
+            sourceSpan: control.sourceSpan
+          }))
+        ],
+        sourceSpan: child.sourceSpan
+      };
+    }
+    return {
+      kind,
+      id,
+      qualifiedId: `${document.meta.id}.${id}`,
+      docs: [],
+      fields: Object.fromEntries(
+        Object.entries(child).filter(([key]) =>
+          !["type", "id", "sourceSpan", "fieldSpans", "steps", "controls", "events", "attempts"].includes(key)
+        )
+      ),
+      sourceSpan: child.sourceSpan,
+      fieldSpans: child.fieldSpans
+    };
+  }) as ChemdLanguageCompileSuccess["result"]["program"]["declarations"],
+  diagnostics: document.diagnostics
+});
+
 const outputWithReaction = (): ChemdLanguageCompileSuccess => ({
   status: "ok",
   documentUri: "experiments/map.chemd",
@@ -60,7 +134,7 @@ const outputWithReaction = (): ChemdLanguageCompileSuccess => ({
     }
   ],
   result: ({
-    document: {
+    program: toProgramFixture({
       type: "document",
       meta: {
         id: "map-doc",
@@ -90,7 +164,7 @@ const outputWithReaction = (): ChemdLanguageCompileSuccess => ({
         }
       ],
       diagnostics: []
-    },
+    }),
     diagnostics: []
   } as unknown) as ChemdLanguageCompileSuccess["result"]
 });
@@ -98,7 +172,7 @@ const outputWithReaction = (): ChemdLanguageCompileSuccess => ({
 const outputWithRecentLanguageFeatures = (): ChemdLanguageCompileSuccess => ({
   ...outputWithReaction(),
   result: ({
-    document: {
+    program: toProgramFixture({
       type: "document",
       meta: {
         id: "language-feature-map-doc",
@@ -198,7 +272,7 @@ const outputWithRecentLanguageFeatures = (): ChemdLanguageCompileSuccess => ({
         }
       ],
       diagnostics: []
-    },
+    }),
     diagnostics: []
   } as unknown) as ChemdLanguageCompileSuccess["result"]
 });
@@ -216,7 +290,7 @@ const outputWithManyReactions = (count: number): ChemdLanguageCompileSuccess => 
     ...outputWithReaction(),
     symbols,
     result: ({
-      document: {
+      program: toProgramFixture({
         type: "document",
         meta: {
           id: "large-map-doc",
@@ -236,7 +310,7 @@ const outputWithManyReactions = (count: number): ChemdLanguageCompileSuccess => 
           }
         })),
         diagnostics: []
-      },
+      }),
       diagnostics: []
     } as unknown) as ChemdLanguageCompileSuccess["result"]
   };
@@ -249,10 +323,10 @@ const outputWithManyReactionsWithoutSourceRefs = (
   return {
     ...output,
     result: ({
-      document: {
-        ...output.result.document,
-        children: output.result.document.children.map((child) => ({
-          ...child,
+      program: {
+        ...output.result.program,
+        declarations: output.result.program.declarations.map((declaration) => ({
+          ...declaration,
           sourceSpan: undefined
         }))
       },
@@ -385,58 +459,26 @@ describe("desktop knowledge map view model", () => {
     const flowNodeTypes = viewModel.semanticFlow.nodes.map((node) => node.nodeType);
 
     expect(nodeTypes).toEqual(expect.arrayContaining([
-      "ChemdConditionAttemptNode",
-      "ChemdObservationEventNode",
       "ChemdProcedureControlNode",
-      "ChemdTraceNode",
-      "ChemdTraceEventNode"
+      "ChemdConditionNode",
+      "ChemdTraceNode"
     ]));
     expect(nodeTypes).not.toContain("ChemdUnknownNode");
     expect(flowNodeTypes).toEqual(expect.arrayContaining([
-      "ChemdConditionAttemptNode",
-      "ChemdObservationEventNode",
       "ChemdProcedureControlNode"
     ]));
     expect(flowNodeTypes).not.toContain("ChemdTraceNode");
     expect(flowNodeTypes).not.toContain("ChemdTraceEventNode");
-    expect(viewModel.semanticFlow.nodes.find((node) => node.label === "evt-a")).toMatchObject({
-      laneId: "evidence",
-      component: "ObservationEventBlock"
-    });
-    expect(viewModel.semanticFlow.nodes.find((node) => node.label === "screen-a.a1")).toMatchObject({
+    expect(viewModel.semanticFlow.nodes.find((node) => node.label === "screen-a")).toMatchObject({
       laneId: "reaction",
-      component: "ConditionAttemptBlock"
+      component: "ConditionBlock"
     });
     expect(viewModel.semanticFlow.edges).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        sourceId: "reaction::rxn-a",
-        targetId: "condition-attempt::screen-a.a1",
-        kind: "semantic_relation",
-        label: "attempt reaction"
-      }),
-      expect.objectContaining({
-        sourceId: "condition-attempt::screen-a.a1",
-        targetId: "result::res-a",
-        kind: "semantic_relation",
-        label: "attempt result"
-      }),
       expect.objectContaining({
         sourceId: "result::res-a",
         targetId: "analysis::ana-a",
         kind: "semantic_relation",
         label: "analysis ref"
-      }),
-      expect.objectContaining({
-        sourceId: "procedure-step::s1",
-        targetId: "observation-event::evt-a",
-        kind: "evidence",
-        label: "event step"
-      }),
-      expect.objectContaining({
-        sourceId: "observation-event::evt-a",
-        targetId: "analysis::ana-a",
-        kind: "evidence",
-        label: "event evidence"
       })
     ]));
   });

@@ -190,7 +190,7 @@ export const compileChemdToDocx = async (
   options: CompileChemdToDocxOptions
 ): Promise<CompileChemdToDocxResult> => {
   const compileResult = compileChemd(source, options.compileOptions);
-  const markdown = renderDocxMarkdown(compileResult.document);
+  const markdown = renderDocxMarkdown(compileResult.program);
   const exportResult = await exportMarkdownToDocx(markdown, options);
 
   return {

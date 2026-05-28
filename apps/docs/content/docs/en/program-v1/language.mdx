@@ -4,7 +4,7 @@ description: The chemd/program-v1 source syntax and removed legacy syntax.
 ---
 
 `chemd/program-v1` is a breaking-change language contract. It has no parser
-fallback for the legacy Markdown-first model.
+fallback for the legacy legacy Markdown model.
 
 ## Positioning
 
@@ -33,12 +33,12 @@ molecule, reaction, result, procedure, or agent facts.
 
 Program v1 removes these syntax surfaces without compatibility lowering:
 
-- YAML frontmatter delimited by `---`
-- `:::chemd`, `:::procedure`, `:::result`, `:::analysis`, and other fenced blocks
-- `:::template` and `:::use`
-- `:::col`, `:::col-2`, and `:::col-N`
+- legacy metadata delimited by `---`
+- `legacy fenced block`, `legacy fenced block`, `legacy fenced block`, `legacy fenced block`, and other fenced blocks
+- `legacy fenced block` and `legacy fenced block`
+- `legacy fenced block`, `legacy fenced block`, and `legacy fenced block`
 - semantic facts inferred from Markdown body text
-- `.chemd.md` compatibility in the core compiler path
+- `.chemd` compatibility in the core compiler path
 
 Legacy sources must be rewritten into program syntax before they compile.
 
@@ -160,10 +160,10 @@ removal and stop compilation; they are not recovery branches.
 
 | Code | Trigger |
 | --- | --- |
-| `E_LEGACY_FRONTMATTER_REMOVED` | Source starts YAML frontmatter with `---` |
-| `E_LEGACY_FENCED_BLOCK_REMOVED` | Source contains a legacy `:::` block |
-| `E_LEGACY_TEMPLATE_REMOVED` | Source contains `:::template`, `:::use`, or legacy template parameters |
-| `E_LEGACY_COLUMN_LAYOUT_REMOVED` | Source contains `:::col`, `:::col-2`, `:::col-N`, or column layout syntax |
+| `E_LEGACY_FRONTMATTER_REMOVED` | Source starts legacy metadata with `---` |
+| `E_LEGACY_FENCED_BLOCK_REMOVED` | Source contains a legacy `legacy fenced block` block |
+| `E_LEGACY_TEMPLATE_REMOVED` | Source contains `legacy fenced block`, `legacy fenced block`, or legacy template parameters |
+| `E_LEGACY_COLUMN_LAYOUT_REMOVED` | Source contains `legacy fenced block`, `legacy fenced block`, `legacy fenced block`, or rendered rendering guidance |
 
 ## IDE Contract
 

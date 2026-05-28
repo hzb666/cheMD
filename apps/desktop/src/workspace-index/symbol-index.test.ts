@@ -84,23 +84,23 @@ describe("buildWorkspaceSymbolIndex", () => {
       .toEqual(["rxn-a", "rxn-b"]);
   });
 
-  it("keeps legacy .chemd.md files eligible for symbol indexing", async () => {
+  it("skips legacy .chemd.md files during symbol indexing", async () => {
+    const readFile = vi.fn(() => createSource("rxn-legacy"));
     const result = await buildWorkspaceSymbolIndex({
       workspace,
       files: [fileEntry("experiments/legacy.chemd.md")],
-      readFile: () => createSource("rxn-legacy"),
+      readFile,
       languageServiceDependencies: {
         now: () => new Date("2026-05-13T00:00:00.000Z")
       }
     });
 
-    expect(result.summary.scannedFiles).toBe(1);
-    expect(result.index.symbols).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        localId: "rxn-legacy",
-        documentUri: "workspace://workspace-alpha/experiments/legacy.chemd.md"
-      })
-    ]));
+    expect(readFile).not.toHaveBeenCalled();
+    expect(result.summary.scannedFiles).toBe(0);
+    expect(result.summary.skipped).toEqual([
+      { documentPath: "experiments/legacy.chemd.md", reason: "non_chemd_markdown" }
+    ]);
+    expect(result.index.symbols).toEqual([]);
   });
 
   it("skips plain markdown and unsupported workspace entries without reading them", async () => {
@@ -133,22 +133,24 @@ describe("buildWorkspaceSymbolIndex", () => {
     ]);
   });
 
-  it("treats document-kind markdown as Chemd markdown", async () => {
+  it("skips document-kind markdown when the path is not .chemd", async () => {
+    const readFile = vi.fn(() => createSource("rxn-protocol"));
     const result = await buildWorkspaceSymbolIndex({
       workspace,
       files: [
         fileEntry("experiments/protocol.md", { chemdKind: "document" }),
         fileEntry("notes/protocol.md")
       ],
-      readFile: () => createSource("rxn-protocol")
+      readFile
     });
 
+    expect(readFile).not.toHaveBeenCalled();
     expect(result.summary).toMatchObject({
-      scannedFiles: 1,
-      indexedFiles: 1,
-      skippedFiles: 1
+      scannedFiles: 0,
+      indexedFiles: 0,
+      skippedFiles: 2
     });
-    expect(result.index.symbolIdsByName["rxn-protocol"]).toHaveLength(1);
+    expect(result.index.symbolIdsByName["rxn-protocol"]).toBeUndefined();
   });
 
   it("isolates read and compile failures while indexing healthy files", async () => {

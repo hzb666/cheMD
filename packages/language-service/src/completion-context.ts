@@ -5,14 +5,13 @@ import type {
   ChemdEditorPosition
 } from "./completion-types";
 import {
-  getCompletionBlockFields,
-  isKnownBlockType,
-  normalizeChemdKind,
-  resolveBlockField
+  getDeclarationSchema,
+  isKnownDeclarationKind,
+  resolveDeclarationField
 } from "@chemd/core";
 
-const moleculeCompletionFields = new Set(getCompletionBlockFields("chemd", "molecule"));
-const reactionCompletionFields = new Set(getCompletionBlockFields("chemd", "reaction"));
+const moleculeCompletionFields = new Set(getDeclarationSchema("molecule")?.fields.map((field) => field.name) ?? []);
+const reactionCompletionFields = new Set(getDeclarationSchema("reaction")?.fields.map((field) => field.name) ?? []);
 const moleculeOnlyFields = new Set(
   [...moleculeCompletionFields].filter((field) => !reactionCompletionFields.has(field))
 );
@@ -33,7 +32,7 @@ export const getChemdCompletionContext = (
   const linePrefix = lineText.slice(0, Math.max(position.column - 1, 0));
   const tokenPrefix = readTokenPrefix(linePrefix);
   const range = createCompletionRange(position, tokenPrefix.length);
-  const block = findOpenProgramBlock(lines, position.line) ?? findOpenBlock(lines, position.line);
+  const block = findOpenProgramBlock(lines, position.line);
   const field = readFieldAtCursor(linePrefix);
   const stepParam = readStepParamContext(linePrefix);
   const stepFamilyPrefix = isStepFamilyPrefix(linePrefix);
@@ -47,14 +46,13 @@ export const getChemdCompletionContext = (
     tokenPrefix,
     range,
     isFrontmatter: isInsideFrontmatter(lines, position.line),
-    isChemdBlock: block?.type === "chemd",
-    isUseHeaderPosition: isUseHeaderPrefix(linePrefix),
+    isChemdBlock: Boolean(block),
+    isUseHeaderPosition: false,
     isReferencePosition: tokenPrefix.startsWith("@") ||
       (request.triggerCharacter === "@" && linePrefix.endsWith("@")),
     isStepFamilyPosition: stepFamilyPrefix,
     isFieldKeyPosition: Boolean(block) &&
       !field.hasColon &&
-      !linePrefix.trim().startsWith(":::") &&
       !linePrefix.trim().startsWith("}") &&
       !stepFamilyPrefix,
     isFieldValuePosition: Boolean(block) && field.hasColon,
@@ -136,7 +134,7 @@ const findOpenProgramBlock = (
     const open = stack.at(-1);
     const field = readFieldLine(line);
     if (open && field) {
-      const canonicalField = resolveBlockField(open.type, field.key)?.canonicalName ?? field.key;
+      const canonicalField = resolveDeclarationField(open.type, field.key)?.canonicalName ?? field.key;
       open.fields.set(canonicalField, field.value.trim());
     }
   }
@@ -151,59 +149,10 @@ const findOpenProgramBlock = (
   } : undefined;
 };
 
-const findOpenBlock = (
-  lines: string[],
-  cursorLine: number
-): ChemdCompletionContext["block"] => {
-  let open:
-    | { type: string; id?: string; startLine: number; fields: Map<string, string> }
-    | undefined;
-
-  for (let index = 0; index < cursorLine; index += 1) {
-    const line = lines[index] ?? "";
-    const header = readBlockHeader(line);
-    if (line.trim() === ":::" && open) {
-      open = undefined;
-      continue;
-    }
-    if (header) {
-      open = {
-        type: normalizeBlockType(header.type),
-        id: readBlockId(header.arg),
-        startLine: index + 1,
-        fields: new Map()
-      };
-      continue;
-    }
-    const field = readFieldLine(line);
-    if (open && field) {
-      const schemaBlockType = toSchemaBlockType(open.type);
-      const canonicalField = resolveBlockField(schemaBlockType, field.key)?.canonicalName ?? field.key;
-      open.fields.set(canonicalField, field.value.trim());
-    }
-  }
-
-  return open ? {
-    type: open.type,
-    id: open.id,
-    startLine: open.startLine,
-    kind: inferBlockKind(open.type, open.fields),
-    fields: new Set(open.fields.keys())
-  } : undefined;
-};
-
 const inferBlockKind = (
   blockType: string,
   fields: Map<string, string>
 ): ChemdCompletionBlockKind => {
-  if (blockType !== "chemd") {
-    return isKnownCompletionBlockKind(blockType) ? blockType : "unknown";
-  }
-  const explicitKind = fields.get("kind");
-  const normalizedKind = explicitKind ? normalizeChemdKind(explicitKind) : undefined;
-  if (normalizedKind) {
-    return normalizedKind;
-  }
   if ([...fields.keys()].some((field) => reactionOnlyFields.has(field))) {
     return "reaction";
   }
@@ -218,37 +167,17 @@ const inferProgramBlockKind = (
   blockType: string,
   fields: Map<string, string>
 ): ChemdCompletionBlockKind => {
-  if (blockType === "meta" || blockType === "agent_run") {
+  if (blockType === "meta") {
     return "unknown";
+  }
+  if (isKnownCompletionBlockKind(blockType)) {
+    return blockType;
   }
   return inferBlockKind(blockType, fields);
 };
 
-const normalizeBlockType = (type: string): string =>
-  type === "condition-varies" ? "condition_varies" : type;
-
-const toSchemaBlockType = (type: string): string =>
-  type === "condition_varies" ? "condition-varies" : type;
-
 const isKnownCompletionBlockKind = (type: string): type is ChemdCompletionBlockKind =>
-  [
-    "molecule",
-    "material",
-    "batch",
-    "reaction",
-    "result",
-    "analysis",
-    "procedure",
-    "trace",
-    "observation",
-    "step",
-    "event",
-    "template",
-    "use",
-    "sample",
-    "artifact",
-    "condition_varies"
-  ].includes(type) || isKnownBlockType(toSchemaBlockType(type));
+  type === "step" || isKnownDeclarationKind(type);
 
 const readFieldAtCursor = (linePrefix: string): { hasColon: boolean; key?: string } => {
   const colonIndex = linePrefix.indexOf(":");
@@ -264,19 +193,6 @@ const isNameStart = (char: string): boolean =>
 
 const isNameChar = (char: string): boolean =>
   isNameStart(char) || (char >= "0" && char <= "9") || char === "-";
-
-const readBlockHeader = (line: string): { type: string; arg?: string } | undefined => {
-  const trimmed = line.trim();
-  if (!trimmed.startsWith(":::")) return undefined;
-  let index = 3;
-  if (!isNameStart(trimmed[index] ?? "")) return undefined;
-  index += 1;
-  while (isNameChar(trimmed[index] ?? "")) index += 1;
-  const type = trimmed.slice(3, index);
-  if (index >= trimmed.length) return { type };
-  if (trimmed[index] !== " " && trimmed[index] !== "\t") return undefined;
-  return { type, arg: trimmed.slice(index).trim() };
-};
 
 const readProgramBlockHeader = (
   line: string
@@ -298,7 +214,7 @@ const readProgramBlockHeader = (
   }
 
   return {
-    type: normalizeBlockType(declaration[1] ?? ""),
+    type: declaration[1] ?? "",
     id: declaration[2]
   };
 };
@@ -316,18 +232,7 @@ const readFieldLine = (line: string): { key: string; value: string } | undefined
   return { key, value: line.slice(index + 1) };
 };
 
-const isUseHeaderPrefix = (linePrefix: string): boolean => {
-  const trimmed = linePrefix.trimStart();
-  if (!trimmed.startsWith(":::use")) return false;
-  const rest = trimmed.slice(":::use".length);
-  return rest.length > 0 && rest.trim().length > 0 && !rest.trim().includes(" ");
-};
-
 const isStepFamilyPrefix = (linePrefix: string): boolean => {
-  const field = readFieldLine(linePrefix);
-  if (field?.key === "step" && !field.value.includes("|")) {
-    return true;
-  }
   return /^\s*step\s+[A-Za-z_][\w-]*\s*=\s*[A-Za-z_][\w-]*$/u.test(linePrefix) ||
     /^\s*step\s+[A-Za-z_][\w-]*\s*=\s*$/u.test(linePrefix);
 };
@@ -335,34 +240,6 @@ const isStepFamilyPrefix = (linePrefix: string): boolean => {
 const readStepParamContext = (
   linePrefix: string
 ): ChemdCompletionContext["stepParam"] => {
-  const field = readFieldLine(linePrefix);
-  if (field?.key === "step" && field.value.includes("|")) {
-    const segments = field.value.split("|").map((segment) => segment.trim());
-    const family = segments[0]?.split(/\s+/)[0]?.trim();
-    if (!family) {
-      return undefined;
-    }
-
-    const usedParams = new Set<string>();
-    for (const segment of segments.slice(1, -1)) {
-      const equalsIndex = segment.indexOf("=");
-      if (equalsIndex > 0) {
-        usedParams.add(segment.slice(0, equalsIndex).trim());
-      }
-    }
-
-    const current = segments[segments.length - 1] ?? "";
-    if (current.includes("=")) {
-      return undefined;
-    }
-
-    return {
-      family,
-      prefix: current,
-      usedParams
-    };
-  }
-
   const programStep = linePrefix.match(/^\s*step\s+[A-Za-z_][\w-]*\s*=\s*([A-Za-z_][\w-]*)\((.*)$/u);
   if (!programStep) {
     return undefined;
@@ -387,13 +264,6 @@ const readStepParamContext = (
     prefix: current,
     usedParams
   };
-};
-
-const readBlockId = (headerArg: string | undefined): string | undefined => {
-  const trimmed = headerArg?.trim() ?? "";
-  const end = Array.from(trimmed).findIndex((char) => char === " " || char === "\t");
-  const token = end >= 0 ? trimmed.slice(0, end) : trimmed;
-  return token.startsWith("#") ? token.slice(1) : undefined;
 };
 
 const readTokenPrefix = (linePrefix: string): string => {

@@ -1,4 +1,4 @@
-import type { ChemdDocument, Diagnostic } from "@chemd/core";
+import type { Diagnostic } from "@chemd/core";
 
 export const CHEMD_RENDERABLE_NODE_SCHEMA_VERSION = "chemd-renderable-node/v0.1";
 export const CHEMD_SEMANTIC_RENDER_TREE_SCHEMA_VERSION = "chemd-semantic-render-tree/v0.1";
@@ -26,8 +26,6 @@ export type ChemdRenderableNodeTypeV1 =
   | "ChemdObservationEventNode"
   | "ChemdTraceNode"
   | "ChemdTraceEventNode"
-  | "ChemdTemplateNode"
-  | "ChemdColumnNode"
   | "ChemdUnknownNode";
 
 export type ChemdRenderModeV1 = "inline" | "block" | "panel" | "canvas";
@@ -87,15 +85,27 @@ export interface ChemdSemanticRenderTreeV1 {
   warnings: ChemdNodeDiagnosticV1[];
 }
 
+export interface ChemdSemanticRenderDocument {
+  type: "document";
+  meta: {
+    id: string;
+    title?: string;
+    date?: string;
+    [key: string]: unknown;
+  };
+  children: unknown[];
+  diagnostics: Diagnostic[];
+}
+
 export interface ChemdCompilerResultRenderInput {
-  document: ChemdDocument;
+  document: ChemdSemanticRenderDocument;
   diagnostics?: Diagnostic[];
   sourceHash?: string;
   sourceUri?: string;
 }
 
 export type ChemdSemanticRenderTreeInput =
-  | ChemdDocument
+  | ChemdSemanticRenderDocument
   | ChemdCompilerResultRenderInput;
 
 export type ChemdShellAttributesV1 = Record<`data-chemd-${string}`, string>;

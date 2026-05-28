@@ -2,11 +2,8 @@
   "title": "高级语言特性",
   "pages": [
     "references-and-aliases",
-    "templates",
-    "template-parameters",
     "normalization-semantics",
     "derived-expressions",
-    "layout-syntax",
     "resolver-compiler",
     "compiler-semantics",
     "runtime-preflight",

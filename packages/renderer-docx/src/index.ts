@@ -1,4 +1,3 @@
-import type { ChemdDocument } from "@chemd/core";
 import type { RenderAdapterPayload, RenderOptions } from "@chemd/render-profile";
 import {
   buildProgramRenderDocument,
@@ -39,7 +38,7 @@ export interface DocxBridgeOptions {
   typedGraph?: unknown;
 }
 
-type DocxInput = ChemdDocument | ProgramRenderDocument | Parameters<typeof buildProgramRenderDocument>[0];
+type DocxInput = ProgramRenderDocument | Parameters<typeof buildProgramRenderDocument>[0];
 
 const normalizeWhitespace = (value: string): string => value.replaceAll(/\s+/g, " ").trim();
 
@@ -59,32 +58,8 @@ const toProgramRenderDocument = (
   if (isChemdProgramDocument(document)) {
     return buildProgramRenderDocument(document, { typedGraph: options.typedGraph });
   }
-  return buildLegacyRenderDocument(document, options);
+  return document;
 };
-
-const buildLegacyRenderDocument = (
-  document: ChemdDocument,
-  options: DocxBridgeOptions
-): ProgramRenderDocument => ({
-  schema_version: "chemd-program-render/v1",
-  sourceLanguage: "chemd/program-v1",
-  moduleName: String(document.meta.id || "legacy_document"),
-  meta: {
-    id: String(document.meta.id || "legacy-document"),
-    title: String(document.meta.title || document.meta.id || "Untitled experiment"),
-    date: String(document.meta.date || ""),
-    fields: {},
-    docs: []
-  },
-  imports: [],
-  sections: [],
-  diagnostics: document.diagnostics,
-  semantic: {
-    typedGraph: typeof options.typedGraph === "object" && options.typedGraph !== null
-      ? options.typedGraph as ProgramRenderDocument["semantic"]["typedGraph"]
-      : { documentId: String(document.meta.id || ""), nodes: [], quantities: [], diagnostics: [] }
-  }
-});
 
 const toYamlScalar = (value: unknown): string => {
   if (typeof value === "string") return isSimpleYamlString(value) ? value : JSON.stringify(value);

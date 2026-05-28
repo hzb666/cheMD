@@ -104,8 +104,8 @@ describe("MonacoChemdEditor language helpers", () => {
     expect(config.brackets).toContainEqual(["(", ")"]);
     expect(config.autoClosingPairs).toContainEqual({ open: "{", close: "}" });
     expect(config.surroundingPairs).toContainEqual({ open: "\"", close: "\"" });
-    expect(config.folding?.markers?.start.test(":::procedure #proc-main")).toBe(true);
-    expect(config.folding?.markers?.end.test(":::")).toBe(true);
+    expect(config.folding?.markers?.start.test("procedure proc-main for @rxn-main {")).toBe(true);
+    expect(config.folding?.markers?.end.test("}")).toBe(true);
   });
 
   it("recognizes Chemd-specific lexical classes before semantic analysis runs", () => {
@@ -114,8 +114,8 @@ describe("MonacoChemdEditor language helpers", () => {
       .filter((rule): rule is [RegExp, string] => Array.isArray(rule) && typeof rule[1] === "string")
       .map((rule) => rule[1]);
 
-    expect(tokenNames).toContain("keyword.block");
-    expect(tokenNames).toContain("delimiter.block");
+    expect(tokenNames).toContain("keyword.declaration");
+    expect(tokenNames).toContain("delimiter.brace");
     expect(tokenNames).toContain("identifier.reference");
     expect(tokenNames).toContain("identifier.declaration");
     expect(tokenNames).toContain("string.chem");

@@ -131,7 +131,7 @@ describe("desktop workspace index view model", () => {
     });
   });
 
-  it("keeps legacy .chemd.md documents visible to the workspace index", () => {
+  it("omits legacy .chemd.md documents from the workspace index", () => {
     const viewModel = buildWorkspaceIndexViewModel({
       workspaceId: "workspace-1",
       files: [file("experiments/legacy.chemd.md")],
@@ -142,11 +142,8 @@ describe("desktop workspace index view model", () => {
       compile
     });
 
-    expect(viewModel.state).toBe("ready");
-    expect(viewModel.completionIndex?.symbols[0]).toMatchObject({
-      documentId: "legacy",
-      localId: "rxn-a"
-    });
+    expect(viewModel.state).toBe("empty");
+    expect(viewModel.completionIndex).toBeUndefined();
   });
 
   it("summarizes cross-document references and definitions", () => {

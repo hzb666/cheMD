@@ -9,11 +9,14 @@ const basename = (value: string): string => {
   return normalized.slice(normalized.lastIndexOf("/") + 1);
 };
 
-const trimKnownExtensions = (value: string): string =>
-  value
-    .replace(/\.chemd\.md$/i, "")
+const trimKnownExtensions = (value: string): string => {
+  if (/\.chemd\.md$/i.test(value)) {
+    return value;
+  }
+  return value
     .replace(/\.chemd$/i, "")
     .replace(/\.md$/i, "");
+};
 
 const documentAliases = (symbol: WorkspaceSymbol): Set<string> => {
   const aliases = new Set([symbol.documentUri, basename(symbol.documentUri)]);

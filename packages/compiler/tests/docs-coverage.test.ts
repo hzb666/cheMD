@@ -3,13 +3,9 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
-import { getCanonicalBlockFields } from "@chemd/core";
 
 const workspaceRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const docsRoot = join(workspaceRoot, "apps", "docs", "content", "docs");
-
-const readWorkspaceFile = (...segments: string[]): string =>
-  readFileSync(join(workspaceRoot, ...segments), "utf8");
 
 const readDocsFile = (lang: "en" | "zh", ...segments: string[]): string =>
   readFileSync(join(docsRoot, lang, ...segments), "utf8");
@@ -28,36 +24,7 @@ const collectFiles = (directory: string): string[] =>
 const extractQuotedValues = (source: string): string[] =>
   Array.from(source.matchAll(/["']([^"']+)["']/g), (match) => match[1] ?? "");
 
-const extractParserRegistryBlocks = (): string[] => {
-  const source = readWorkspaceFile("packages", "parser", "src", "body", "block-parsers", "index.ts");
-  const registry = source.match(/const\s+PARSERS\s*=\s*new\s+Map[\s\S]*?\(\s*\[([\s\S]*?)\]\s*\)/m);
-
-  if (!registry) {
-    throw new Error("Cannot find parser block registry");
-  }
-
-  return Array.from(registry[1]?.matchAll(/\[\s*["']([^"']+)["']\s*,/g) ?? [], (match) => match[1] ?? "");
-};
-
 const uniqueSorted = (values: string[]): string[] => Array.from(new Set(values)).sort();
-
-const parserFieldCoverage = (): Record<string, string[]> => {
-  return {
-    chemd: getCanonicalBlockFields("chemd"),
-    result: getCanonicalBlockFields("result"),
-    analysis: getCanonicalBlockFields("analysis"),
-    artifact: getCanonicalBlockFields("artifact"),
-    sample: getCanonicalBlockFields("sample"),
-    "condition-varies": getCanonicalBlockFields("condition-varies"),
-    procedure: getCanonicalBlockFields("procedure"),
-    trace: getCanonicalBlockFields("trace"),
-    step: getCanonicalBlockFields("step"),
-    observation: getCanonicalBlockFields("observation"),
-    event: getCanonicalBlockFields("event"),
-    template: getCanonicalBlockFields("template"),
-    col: ["columns", "col:"]
-  };
-};
 
 const diagnosticSourceDirectories = [
   join(workspaceRoot, "packages", "parser", "src"),
@@ -116,60 +83,21 @@ describe("docs coverage", () => {
     }
   });
 
-  it("documents every parser-supported structured block page in both languages", () => {
-    const expectedPages = uniqueSorted([...extractParserRegistryBlocks(), "template", "step", "event"]);
-
+  it("documents program-first language contract in both languages", () => {
     for (const lang of ["en", "zh"] as const) {
-      const meta = JSON.parse(readDocsFile(lang, "syntax-blocks", "meta.json")) as { pages: string[] };
+      const rootMeta = JSON.parse(readDocsFile(lang, "meta.json")) as { pages: string[] };
+      const programMeta = JSON.parse(readDocsFile(lang, "program-v1", "meta.json")) as { pages: string[] };
+      const content = ["index", ...programMeta.pages]
+        .map((page) => readDocsFile(lang, "program-v1", `${page}.mdx`))
+        .join("\n");
 
-      for (const page of expectedPages) {
-        expect(meta.pages, `${lang} syntax-blocks meta should include ${page}`).toContain(page);
-        expect(() => readDocsFile(lang, "syntax-blocks", `${page}.mdx`), `${lang} ${page}.mdx exists`).not.toThrow();
+      expect(rootMeta.pages, `${lang}/meta.json should include program-v1`).toContain("program-v1");
+      for (const page of ["language", "ast", "exports"]) {
+        expect(programMeta.pages, `${lang}/program-v1/meta.json should include ${page}`).toContain(page);
       }
-    }
-  });
 
-  it("documents parser-accepted fields for every structured block page", () => {
-    const coverage = parserFieldCoverage();
-
-    for (const [page, fields] of Object.entries(coverage)) {
-      for (const lang of ["en", "zh"] as const) {
-        const content = readDocsFile(lang, "syntax-blocks", `${page}.mdx`);
-
-        for (const field of uniqueSorted(fields)) {
-          expect(content, `${lang}/syntax-blocks/${page}.mdx should mention ${field}`).toContain(field);
-        }
-      }
-    }
-  });
-
-  it("keeps the syntax-block index field reference aligned with parser fields", () => {
-    const coverage = parserFieldCoverage();
-
-    for (const lang of ["en", "zh"] as const) {
-      const content = readDocsFile(lang, "syntax-blocks", "index.mdx");
-      const requiredLabel = lang === "en" ? "required" : "必填";
-      const defaultLabel = lang === "en" ? "defaults" : "默认值";
-
-      expect(content, `${lang}/syntax-blocks/index.mdx should explain required fields`).toContain(requiredLabel);
-      expect(content, `${lang}/syntax-blocks/index.mdx should explain defaults`).toContain(defaultLabel);
-
-      for (const [page, fields] of Object.entries(coverage)) {
-        expect(content, `${lang}/syntax-blocks/index.mdx should mention :::${page}`).toContain(`:::${page}`);
-
-        for (const field of uniqueSorted(fields)) {
-          expect(content, `${lang}/syntax-blocks/index.mdx should mention ${page}.${field}`).toContain(field);
-        }
-      }
-    }
-  });
-
-  it("documents TLC spot marker shape, size, and intensity syntax", () => {
-    for (const lang of ["en", "zh"] as const) {
-      const content = readDocsFile(lang, "syntax-blocks", "analysis.mdx");
-
-      for (const token of ["^3(4)", "size_rank", "intensity_rank", "circle", "up", "down"]) {
-        expect(content, `${lang}/syntax-blocks/analysis.mdx should document TLC marker ${token}`).toContain(token);
+      for (const term of ["module", "meta", "molecule", "reaction", "result", "procedure", "agent run"]) {
+        expect(content, `${lang}/program-v1 should mention ${term}`).toContain(term);
       }
     }
   });

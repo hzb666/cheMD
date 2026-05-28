@@ -1,12 +1,10 @@
-import type { ChemdDocument, ChemdNode, ChemdProgramDocument } from "@chemd/core";
+import type { ChemdProgramDocument } from "@chemd/core";
 
 import type {
   ExportedDiagnostic,
   ProgramSourceLayerV1,
   SourceDeclarationSnapshot,
-  SourceDocCommentSnapshot,
-  SourceLayerV1,
-  SourceNodeSnapshot
+  SourceDocCommentSnapshot
 } from "./types";
 import { TRAINING_AUDIT_ONLY_FIELDS } from "./governance";
 
@@ -18,34 +16,7 @@ const toRecord = (value: unknown): Record<string, unknown> => {
   return { ...(value as Record<string, unknown>) };
 };
 
-const getOriginalId = (node: ChemdNode): string | undefined => {
-  if ("id" in node && typeof node.id === "string" && node.id) {
-    return node.id;
-  }
-
-  return undefined;
-};
-
-const readNodeStringField = (node: ChemdNode, field: string): string | undefined => {
-  if (!(field in node)) {
-    return undefined;
-  }
-
-  const value = (node as unknown as Record<string, unknown>)[field];
-  return typeof value === "string" ? value : undefined;
-};
-
-const createSourceSnapshot = (node: ChemdNode, nodeIndex: number): SourceNodeSnapshot => ({
-  node_index: nodeIndex,
-  node_type: node.type,
-  original_id: getOriginalId(node),
-  source_block_type: readNodeStringField(node, "syntaxOrigin") ?? node.type,
-  syntax_origin: readNodeStringField(node, "syntaxOrigin"),
-  declared_kind: readNodeStringField(node, "declaredKind"),
-  raw_payload: toRecord(node)
-});
-
-const createExportedDiagnostic = (diagnostic: ChemdDocument["diagnostics"][number]): ExportedDiagnostic => ({
+const createExportedDiagnostic = (diagnostic: ChemdProgramDocument["diagnostics"][number]): ExportedDiagnostic => ({
   code: diagnostic.code,
   severity: diagnostic.severity,
   message: diagnostic.message,
@@ -123,35 +94,5 @@ export const buildProgramSourceLayer = (program: ChemdProgramDocument): ProgramS
   declarations: program.declarations.map(createDeclarationSnapshot),
   doc_comments: program.docs.map(createDocCommentSnapshot),
   diagnostics: program.diagnostics.map((diagnostic) => createExportedDiagnostic(diagnostic)),
-  audit_only_fields: TRAINING_AUDIT_ONLY_FIELDS
-});
-
-export const buildSourceLayer = (document: ChemdDocument): SourceLayerV1 => ({
-  ...(typeof document.source === "string" ? { raw_source: document.source, resolved_source: document.source } : {}),
-  program: {
-    schema_version: "legacy-chemd-document",
-    source_language: "legacy-chemd",
-    imports: []
-  },
-  module: { name: "legacy_document", docs: [] },
-  meta: {
-    id: document.meta.id,
-    title: document.meta.title,
-    date: document.meta.date,
-    fields: toRecord(document.meta),
-    docs: []
-  },
-  declarations: document.children.map((node, nodeIndex) => {
-    const snapshot = createSourceSnapshot(node, nodeIndex);
-    return {
-      declaration_index: snapshot.node_index,
-      declaration_kind: snapshot.node_type,
-      declaration_id: snapshot.original_id ?? String(snapshot.node_index),
-      raw_payload: snapshot.raw_payload,
-      docs: []
-    };
-  }),
-  doc_comments: [],
-  diagnostics: document.diagnostics.map((diagnostic) => createExportedDiagnostic(diagnostic)),
   audit_only_fields: TRAINING_AUDIT_ONLY_FIELDS
 });

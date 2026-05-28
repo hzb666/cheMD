@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import type { ChemdProgramDocument, ChemdReferenceExpr, ChemdValue } from "@chemd/core";
-import { createDocument } from "@chemd/core";
 import { resolveRenderProfile } from "@chemd/render-profile";
 
 import { renderHtml } from "../src/index";
@@ -140,14 +139,6 @@ describe("renderHtml", () => {
     expect(html).toContain("Agent Audit repair_1");
     expect(html).toContain("Finished");
     expect(html).toContain("W_TEST: Check output");
-  });
-
-  it("renders a document title and Markdown content", () => {
-    const document = createDocument(
-      { id: "exp-html", title: "HTML test", date: "2026-04-17" }
-    );
-
-    expect(renderHtml(document, resolveRenderProfile())).toContain("HTML test");
   });
 
   it("renders documentation markdown markers through bounded scanners", () => {

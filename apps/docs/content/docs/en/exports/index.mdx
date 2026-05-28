@@ -42,55 +42,54 @@ Field value schema metadata is a compiler/tooling contract, not a standalone exp
 
 ## Minimal Source Example
 
-The examples in this section use a compact source record:
+The examples in this section use a compact program-first source record:
 
-```md
----
-id: exp-export-example
-title: Export example
-date: 2026-05-21
-primary_reaction: rxn-main
-primary_result: res-main
----
+```text
+module exp_export_example
 
-:::chemd #mol-a
-name: substrate A
-smiles: CCO
-:::
+meta {
+  id: "exp-export-example"
+  title: "Export example"
+  date: "2026-05-21"
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
 
-:::chemd #mol-b
-name: product B
-smiles: CC=O
-:::
+molecule mol_a {
+  name: "substrate A"
+  smiles: "CCO"
+}
 
-:::chemd #rxn-main
-reactant: @mol-a | 1.0 mmol | 1.0 eq | limiting=true
-product: @mol-b
-solvent: MeCN
-temperature: 60 C
-:::
+molecule mol_b {
+  name: "product B"
+  smiles: "CC=O"
+}
 
-:::result #res-main
-reaction: @rxn-main
-status: success
-yield: 78%
-:::
+reaction rxn_main {
+  reactants: [@mol_a]
+  products: [@mol_b]
+  solvent: "MeCN"
+  temperature: 60 C
+}
 
-:::analysis #nmr-main
-type: nmr
-ref: @res-main
-artifact: @raw-nmr-main
-:::
+result res_main for @rxn_main {
+  status: success
+  yield: 78%
+}
 
-:::procedure #proc-main
-reaction: @rxn-main
-step: add | id=s-add | inputs=@mol-a | outputs=mixture-main
-:::
+analysis ana_main for @res_main {
+  type: nmr
+  ref: @res_main
+}
 
-:::observation #obs-main
-ref: @rxn-main
-event: color_change | id=e-color | linkedStep=s-add | evidence=@nmr-main | color=yellow
-:::
+procedure proc_main for @rxn_main {
+  evidence: [@res_main]
+  step add = add(inputs: [@mol_a], outputs: [@mol_b])
+}
+
+observation obs_main for @rxn_main {
+  notes: "yellow solution"
+}
 ```
 
 Use the following pages for the detailed structures and examples.

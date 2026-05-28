@@ -1,9 +1,6 @@
 import { parseChemdProgram } from "@chemd/parser";
 import type {
-  ChemdDocument,
   ChemdProgramDocument,
-  ChemdReferenceExpr,
-  ChemdValue,
   ReactionRouteContext,
   ReferenceContext,
   RenderSelection
@@ -99,7 +96,6 @@ export type {
 
 export interface CompileResult {
   program: ChemdProgramDocument;
-  document: ChemdDocument;
   diagnostics: ChemdProgramDocument["diagnostics"];
   renderOptions: ReturnType<typeof resolveRenderProfileWithDiagnostics>["options"];
   renderAdapterPayload: ReturnType<typeof mapRenderOptionsToAdapterPayload>;
@@ -149,63 +145,6 @@ export const renderCompiledJson = (
   document: ChemdProgramDocument,
   typedGraph: TypedSemanticGraph
 ): string => renderJson(document, { typedGraph });
-
-const readReferenceTarget = (reference: ChemdReferenceExpr | undefined): string | undefined =>
-  reference ? reference.raw.replace(/^@/, "") || reference.target : undefined;
-
-const toLegacyMetaValue = (value: ChemdValue): unknown => {
-  if (value.type === "string" || value.type === "boolean") {
-    return value.value;
-  }
-  if (value.type === "identifier") {
-    return value.name;
-  }
-  if (value.type === "number" || value.type === "quantity" || value.type === "percent") {
-    return value.raw;
-  }
-  if (value.type === "reference") {
-    return readReferenceTarget(value);
-  }
-  if (value.type === "list") {
-    return value.items.map(toLegacyMetaValue);
-  }
-  if (value.type === "record") {
-    return Object.fromEntries(value.fields.map((field) => [field.key, toLegacyMetaValue(field.value)]));
-  }
-
-  return value.raw;
-};
-
-const createLegacyDocumentBridge = (program: ChemdProgramDocument): ChemdDocument => ({
-  type: "document",
-  meta: {
-    id: program.meta.id,
-    title: program.meta.title,
-    date: program.meta.date,
-    ...Object.fromEntries(
-      Object.entries(program.meta.fields).map(([field, value]) => [field, toLegacyMetaValue(value)])
-    ),
-    ...(readReferenceTarget(program.meta.primary?.molecule)
-      ? { primary_molecule: readReferenceTarget(program.meta.primary?.molecule) }
-      : {}),
-    ...(readReferenceTarget(program.meta.primary?.reaction)
-      ? { primary_reaction: readReferenceTarget(program.meta.primary?.reaction) }
-      : {}),
-    ...(readReferenceTarget(program.meta.primary?.result)
-      ? { primary_result: readReferenceTarget(program.meta.primary?.result) }
-      : {}),
-    ...(readReferenceTarget(program.meta.primary?.analysis)
-      ? { primary_analysis: readReferenceTarget(program.meta.primary?.analysis) }
-      : {}),
-    ...(readReferenceTarget(program.meta.primary?.sample)
-      ? { primary_sample: readReferenceTarget(program.meta.primary?.sample) }
-      : {})
-  },
-  children: [],
-  diagnostics: program.diagnostics,
-  ...(program.source ? { source: program.source } : {}),
-  ...(program.renderSelection ? { renderSelection: program.renderSelection } : {})
-});
 
 export const compileChemd = (source: string, options: CompileOptions = {}): CompileResult => {
   const parsedProgram = parseChemdProgram(source);
@@ -263,7 +202,6 @@ export const compileChemd = (source: string, options: CompileOptions = {}): Comp
         diagnostics: [...renderProgram.diagnostics, ...authoringDiagnostics]
       }
     : renderProgram;
-  const compileDocument = createLegacyDocumentBridge(compileProgram);
   const diagnosis = buildCompilerDiagnosis(compileProgram.diagnostics);
   const renderOptions = renderProfileResolution.options;
   const renderAdapterPayload = mapRenderOptionsToAdapterPayload(renderOptions);
@@ -275,7 +213,6 @@ export const compileChemd = (source: string, options: CompileOptions = {}): Comp
 
   return {
     program: compileProgram,
-    document: compileDocument,
     diagnostics: compileProgram.diagnostics,
     renderOptions,
     renderAdapterPayload,

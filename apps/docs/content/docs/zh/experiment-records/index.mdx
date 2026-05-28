@@ -3,24 +3,6 @@ title: 实验记录建模
 description: 使用 Chemd 表达分子、反应、结果、分析、过程、观察、样品、附件和条件筛选。
 ---
 
-这一组章节面向实验记录使用者，按实验记录的自然组织方式说明 Chemd 对象。每个主题对应使用者需要维护的证据、关联关系和最佳实践样例。
+本文已切换到 program-first 语言契约。请使用 `.chemd` module、`meta`、declaration、`///` doc comment 和 `/*md */` documentation region 描述实验记录。语义事实来自 molecule、reaction、result、analysis、sample、artifact、condition_screen、procedure、trace、observation 和 agent run declarations。
 
-## 记录构建顺序
-
-1. 声明 molecule 与 reaction 对象。
-2. 增加 result 与 analysis。
-3. 增加 procedure 与 observation，并使用显式 step ID 和 event ID。
-4. 增加 sample、artifact 与证据链。
-5. 在实验需要时增加 condition screen、route link 和多文档组织。
-
-## 章节
-
-- [化学对象](/zh/docs/experiment-records/chemd-object)：molecule 与 reaction 的统一写法。
-- [实验结果与分析](/zh/docs/experiment-records/results-analysis)：result、analysis、TLC lane、NMR、HPLC 和结果关联。
-- [实验过程与观察](/zh/docs/experiment-records/procedure-observation)：procedure、step、observation、event 和依赖关系。
-- [样品、附件与证据链](/zh/docs/experiment-records/samples-artifacts)：sample、artifact、派生关系和文件证据。
-- [条件筛选](/zh/docs/experiment-records/condition-varies)：standard、factor、outcome、attempt 和 result 关联。
-- [写作模式教程](/zh/docs/experiment-records/writing-patterns)：一步合成、路线、条件筛选、分析驱动与样品追踪模式。
-- [工作流记录](/zh/docs/experiment-records/workflow-records)：多文档组织与验证流程。
-
-
+参见 [program-v1 语言规格](/zh/docs/program-v1/language)。

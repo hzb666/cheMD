@@ -41,19 +41,19 @@ describe("getChemdCompletions", () => {
     ]));
   });
 
-  it("keeps schema-derived value completion behavior compatible with the old registry", () => {
+  it("keeps schema-derived value completion behavior on program declarations", () => {
     expect(labelsFor(`result res-main {
   status: p|
-}`)).toEqual(["partial", "pending"]);
+}`)).toEqual(["partial"]);
     expect(labelsFor(`procedure proc-main {
   step next = |
-}`)).toEqual(expect.arrayContaining(["add", "stir", "analyze"]));
+}`)).toEqual(expect.arrayContaining(["add", "analyze", "heat"]));
   });
 
   it("suggests enum values from the shared field value schema", () => {
-    expect(labelsFor(`analysis ana-main {
-  type: lc|
-}`)).toEqual(["lcms"]);
+    expect(labelsFor(`reaction rxn-main {
+  atmosphere: ar|
+}`)).toEqual(["argon"]);
   });
 
   it("does not apply global enum fallbacks to scoped non-enum fields", () => {

@@ -3,24 +3,6 @@ title: 高级语言特性
 description: Chemd 的引用、模板、派生表达式、布局语法、compiler 语义、运行预检和工作区索引。
 ---
 
-这一组章节说明 Chemd 中需要跨块、跨阶段或工具链理解的语言特性。内容以使用者可见行为为主，同时标明 parser、resolver 和 typechecker 的实现边界。
+本文已切换到 program-first 语言契约。请使用 `.chemd` module、`meta`、declaration、`///` doc comment 和 `/*md */` documentation region 描述实验记录。语义事实来自 molecule、reaction、result、analysis、sample、artifact、condition_screen、procedure、trace、observation 和 agent run declarations。
 
-## 阅读路径
-
-1. 先阅读引用和模板，因为它们决定源记录如何复用值。
-2. 再阅读归一化语义和派生表达式，因为它们解释类型化值。
-3. 当源记录需要工具链集成时，再阅读布局、resolver、compiler、runtime 和 workspace 相关主题。
-
-## 章节
-
-- [引用、别名与字段访问](/zh/docs/advanced-language/references-and-aliases)：对象引用、字段引用、primary alias、metadata 与模板参数引用。
-- [模板与复用](/zh/docs/advanced-language/templates)：模板定义、调用和展开语义。
-- [模板参数参考](/zh/docs/advanced-language/template-parameters)：`string`、`ref<kind>`、`quantity<class>`、缺省类型和校验边界的细节参考。
-- [归一化语义](/zh/docs/advanced-language/normalization-semantics)：reaction conditions、TLC lane、状态、分析类型、气氛和关系校验。
-- [派生表达式](/zh/docs/advanced-language/derived-expressions)：以 `=` 开头的数量字段表达式、函数和限制。
-- [布局与表现层语法](/zh/docs/advanced-language/layout-syntax)：`:::col` 与语言层边界。
-- [Resolver 与编译语义](/zh/docs/advanced-language/resolver-compiler)：索引、引用解析、模板展开和必填字段。
-- [Compiler 语义路径](/zh/docs/advanced-language/compiler-semantics)：AST 到导出结果的处理链路。
-- [运行预检](/zh/docs/advanced-language/runtime-preflight)：run plan、运行模式、能力要求和人工确认策略。
-- [工作区符号索引](/zh/docs/advanced-language/workspace-index)：面向编辑器与工作区的多文档符号、引用索引。
-
+参见 [program-v1 语言规格](/zh/docs/program-v1/language)。

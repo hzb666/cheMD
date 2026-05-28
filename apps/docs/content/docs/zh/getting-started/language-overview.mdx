@@ -3,42 +3,6 @@ title: Chemd 语言总览
 description: Chemd 源文件、AST、编译输出和当前语言面的实现边界。
 ---
 
+本文已切换到 program-first 语言契约。请使用 `.chemd` module、`meta`、declaration、`///` doc comment 和 `/*md */` documentation region 描述实验记录。语义事实来自 molecule、reaction、result、analysis、sample、artifact、condition_screen、procedure、trace、observation 和 agent run declarations。
 
-## Chemd 的文档模型
-
-Chemd 源文件由 frontmatter、Markdown 正文和结构化块组成。解析结果的根节点为 `ChemdDocument`，包含 `meta`、`children`、`diagnostics`、可选 `source` 和可选 `renderSelection`。
-
-`children` 可以包含 Markdown 节点和结构化节点。结构化节点覆盖分子、反应、物料、批次、结果、分析、过程、运行追踪、观察、样品、附件、条件筛选、模板调用和列布局。
-
-## 使用者输入层、AST 层、编译输出层
-
-使用者输入层包含 YAML frontmatter、Markdown 文本和 `:::` 结构化块。AST 层由 parser 和 resolver 产生，保留字段、引用 token、source span、诊断和默认对象 ID。编译输出层由 `compileChemd` 聚合，当前返回 HTML、JSON、DOCX bridge、LNF、RAG、training understanding、training full export、typed semantic graph、step graph、run plan 和 diagnosis。
-
-## 当前实现支持的语言面
-
-正文解析器注册的结构化块为 `chemd`、`material`、`batch`、`result`、`analysis`、`artifact`、`sample`、`condition-varies`、`procedure`、`trace`、`observation`、`use` 和 `col`。模板块由正文解析流程识别并生成 `template` 节点。
-
-当前语义使用者输入表面使用 `:::chemd` 统一表达 molecule 和 reaction。
-
-## 最小可验证文档
-
-`validate` 命令按当前语言契约编译输入。最小可验证文档需要必需 frontmatter；`:::chemd` 可显式声明 `kind`，也可在字段形态清楚时省略。
-
-```md validate
-module exp_minimal
-
-meta {
-  id: "exp-minimal"
-  title: "Minimal Chemd source"
-  date: "2026-04-24"
-}
-
-molecule mol_main {
-  name: "ethanol"
-  smiles: "CCO"
-}
-```
-
-该示例满足 frontmatter 必需字段和 molecule 身份字段校验。
-
-
+参见 [program-v1 语言规格](/zh/docs/program-v1/language)。

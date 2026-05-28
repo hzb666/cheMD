@@ -11,8 +11,6 @@ import {
   buildReactionEntityIdFromReference,
   buildScopedReferenceId,
   CHEMD_KIND_VALUE_ALIASES,
-  createDocument,
-  createMarkdownNode,
   DECLARATION_KINDS,
   FIELD_VALUE_SCHEMA_COARSE_FIELDS,
   getBlockFieldSchema,
@@ -58,19 +56,6 @@ const collectEnumValueSchemas = (
 };
 
 describe("core AST helpers", () => {
-  it("creates a document with stable metadata and children", () => {
-    const document = createDocument(
-      { id: "exp-core", title: "Core test", date: "2026-04-17" },
-      { children: [createMarkdownNode("hello")] }
-    );
-
-    expect(document.meta.id).toBe("exp-core");
-    expect(document.children[0]).toMatchObject({
-      type: "markdown",
-      value: "hello"
-    });
-  });
-
   it("parses scoped references and derives stable reaction entity ids", () => {
     expect(parseReferenceId("@route-doc#rxn-step-07")).toEqual({
       lookupKey: "route-doc#rxn-step-07",

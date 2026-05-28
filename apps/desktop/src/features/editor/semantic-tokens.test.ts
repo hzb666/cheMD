@@ -8,12 +8,18 @@ import {
   updateChemdSemanticTokenOutput,
 } from "./semantic-tokens";
 
-const source = `:::procedure #proc-main
-ref: rxn-main
-:::step s-heat
-duration: 4 h
-:::
-:::
+const source = `molecule mol_main {
+  smiles: "CCO"
+}
+
+reaction rxn_main {
+  reactants: [@mol_main]
+  products: ["CC=O"]
+}
+
+procedure proc_main for @rxn_main {
+  step s_heat = heat(duration = "4 h")
+}
 `;
 
 describe("Chemd Monaco semantic token providers", () => {
@@ -38,14 +44,13 @@ describe("Chemd Monaco semantic token providers", () => {
 
   it("builds block-aware selection ranges from Chemd structure", () => {
     const ranges = createChemdSelectionRanges(source, {
-      lineNumber: 4,
+      lineNumber: 10,
       column: 5,
     });
 
     expect(ranges).toEqual([
-      { range: { startLineNumber: 4, startColumn: 1, endLineNumber: 4, endColumn: 14 } },
-      { range: { startLineNumber: 3, startColumn: 1, endLineNumber: 5, endColumn: 4 } },
-      { range: { startLineNumber: 1, startColumn: 1, endLineNumber: 6, endColumn: 4 } },
+      { range: { startLineNumber: 10, startColumn: 1, endLineNumber: 10, endColumn: 36 } },
+      { range: { startLineNumber: 10, startColumn: 1, endLineNumber: 12, endColumn: 2 } },
     ]);
   });
 });

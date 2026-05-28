@@ -3,19 +3,6 @@ title: 语言基础
 description: Chemd 源文件的基础语法，包括 frontmatter、Markdown 正文、引用、行内化学表达式和结构化块规则。
 ---
 
-这一组章节说明 Chemd 源文件的基础语法。基础语法适用于所有结构化块，也是 resolver、typechecker 和 compiler 后续处理的输入约束。
+本文已切换到 program-first 语言契约。请使用 `.chemd` module、`meta`、declaration、`///` doc comment 和 `/*md */` documentation region 描述实验记录。语义事实来自 molecule、reaction、result、analysis、sample、artifact、condition_screen、procedure、trace、observation 和 agent run declarations。
 
-## 章节
-
-- [文档结构与 Frontmatter](/zh/docs/language-fundamentals/frontmatter)：`id`、`title`、`date`、`primary_*`、`tags`、`render_profile` 与 `render_overrides`。
-- [Markdown 正文与行内语法](/zh/docs/language-fundamentals/markdown-inline)：普通 Markdown、行内 code、链接安全策略、`:chem[...]`。
-- [引用语法](/zh/docs/language-fundamentals/references)：`@id`、`@id.field`、primary alias、`@meta.field`、`@param.field`。
-- [结构化块与字段](/zh/docs/language-fundamentals/blocks)：`:::` 块、ID、字段行、列表字段、支持的块形式、必填字段和诊断。
-
-## 写作约定
-
-- 需要跨块引用的对象使用显式 ID。
-- 需要语义校验的值写入结构化字段。
-- 补充说明放入 Markdown 段落、`notes` 或 `caption`。
-- 列表字段避免尾随分隔符，防止产生空列表项诊断。
-
+参见 [program-v1 语言规格](/zh/docs/program-v1/language)。

@@ -3,42 +3,6 @@ title: Language Service Contracts
 description: Editor completion, reference assistance, and quick-fix boundaries for the current language service package.
 ---
 
-`@chemd/language-service` is the shared editor API for web and desktop. It does not own a second schema. Field completion reads the core block schema registry, step parameter completion reads StepFamily schemas, and diagnostics come from compiler/typechecker facts.
+This page now follows the program-first language contract. Use `.chemd` modules, `meta`, declarations, `///` doc comments, and `/*md */` documentation regions for experiment records. Semantic facts come from molecule, reaction, result, analysis, sample, artifact, condition_screen, procedure, trace, observation, and agent run declarations.
 
-## Completion Sources
-
-- Block snippets provide common `:::chemd`, `:::result`, and `:::procedure` starts.
-- Field completions come from `@chemd/core` block schemas.
-- `:::chemd` molecule/reaction fields are filtered by schema `completionKinds`.
-- Procedure step parameters come from `@chemd/step-ontology` StepFamily schemas.
-- Reference completion reads current document symbols and workspace symbol indexes.
-
-Examples:
-
-```md
-:::chemd #rxn-main
-reaction_
-```
-
-This can suggest `reaction_smiles:` as an alias of canonical `rxn_smiles`. With no alias prefix, canonical fields are suggested first and aliases are not used to flood the list.
-
-```md
-:::procedure #proc-main
-step: heat | temp
-```
-
-This suggests `temperature=` from the `heat` StepFamily schema.
-
-## Hover and Definition
-
-Hover uses the current compiler output. Symbol hover can include canonical quantities from the typed graph, quantity provenance when present, and interop status for `smiles`, `inchi`, `inchikey`, and `rxn_smiles` fields. Reference hover reports the resolved target and whether the token was explicit (`@id`) or bare.
-
-Definition lookup first checks current-document symbols. If the current document has no target, editor integrations can pass a workspace symbol index; a single workspace match returns that document location, while multiple matches are reported as an ambiguity error.
-
-## Alias and Kind Rules
-
-`kind: mol` and `kind: reac` are official value aliases and normalize to molecule/reaction. Stable omission of `kind` produces no diagnostic. Ambiguous omission remains an error, but the language service does not add a quick fix that guesses molecule or reaction for the user.
-
-## Quick Fix Boundary
-
-Quick fixes are proposals. They should use range edits when possible. Whole-document replacement is reserved for explicit codemods and safe-fix workflows. Editor integrations must show compiler diagnostics as-is and must not downgrade severity locally.
+See the [program-v1 language specification](/en/docs/program-v1/language).

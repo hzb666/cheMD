@@ -30,7 +30,6 @@ export type ChemdCompletionItemKind =
   | "field"
   | "value"
   | "reference"
-  | "template"
   | "quick_fix";
 
 export interface ChemdReferenceCompletionData {
@@ -80,12 +79,10 @@ export type ChemdCompletionBlockKind =
   | "trace"
   | "observation"
   | "step"
-  | "event"
-  | "template"
-  | "use"
   | "sample"
   | "artifact"
-  | "condition_varies"
+  | "condition_screen"
+  | "agent_run"
   | "unknown";
 
 export interface ChemdCompletionContext {

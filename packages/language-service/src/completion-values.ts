@@ -1,28 +1,39 @@
 import {
-  BLOCK_SCHEMAS,
-  getFieldValueSuggestions
+  getDeclarationFieldSchema,
+  type DeclarationFieldValueSchema
 } from "@chemd/core";
+import { STEP_FAMILIES } from "@chemd/step-ontology";
 
 import type { ChemdCompletionContext, ChemdCompletionItem } from "./completion-types";
 
-const toSchemaBlockType = (blockType: string | undefined): string | undefined =>
-  blockType === "condition_varies" ? "condition-varies" : blockType;
+const collectEnumSuggestions = (
+  schema: DeclarationFieldValueSchema | undefined
+): string[] => {
+  if (!schema) return [];
+  if (schema.kind === "enum") {
+    return [...new Set([...schema.values, ...(schema.suggestions ?? [])])];
+  }
+  if (schema.kind === "list") {
+    return collectEnumSuggestions(schema.item);
+  }
+  if (schema.kind === "record") {
+    return [
+      ...collectEnumSuggestions(schema.head),
+      ...Object.values(schema.params).flatMap(collectEnumSuggestions)
+    ];
+  }
+  return [];
+};
 
 const findSchemaSuggestions = (
   blockType: string | undefined,
   fieldKey: string
 ): string[] => {
-  const scopedBlockType = toSchemaBlockType(blockType);
-  const scoped = scopedBlockType
-    ? getFieldValueSuggestions(scopedBlockType, fieldKey)
-    : [];
-  if (scopedBlockType) {
-    return scoped;
+  if (fieldKey === "family") {
+    return [...STEP_FAMILIES].sort();
   }
-
-  return BLOCK_SCHEMAS.map((schema) =>
-    getFieldValueSuggestions(schema.blockType, fieldKey)
-  ).find((values) => values.length > 0) ?? [];
+  const schema = blockType ? getDeclarationFieldSchema(blockType, fieldKey) : undefined;
+  return collectEnumSuggestions(schema?.value);
 };
 
 export const getChemdValueCompletions = (

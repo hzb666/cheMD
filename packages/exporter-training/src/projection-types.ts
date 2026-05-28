@@ -12,9 +12,12 @@ import type {
   ExportedDocumentInfo,
   DataGovernanceInfo,
   ExportedMaterialV1,
-  ExportedMarkdownBlockV1,
   ExportedMoleculeV1,
   ExportedReactionV1,
+  ExportedReferenceTokenV1,
+  ExportedInlineChemTokenV1,
+  ExportedInlineCodeTokenV1,
+  ExportedMarkdownLinkV1,
   ExportedRelationV1,
   ExportedResultV1,
   ExportedSampleV1,
@@ -55,10 +58,14 @@ export type TrainingSampleV1 = Omit<ExportedSampleV1, SourceMetadataKeys | "supp
 export type TrainingArtifactV1 = Omit<ExportedArtifactV1, SourceMetadataKeys | "path">;
 export type TrainingConditionVaryV1 = Omit<ExportedConditionVaryV1, SourceMetadataKeys>;
 export type TrainingConditionVariationAttemptV1 = Omit<ExportedConditionVariationAttemptV1, SourceMetadataKeys>;
-export type TrainingNarrativeBlockV1 = Pick<
-  ExportedMarkdownBlockV1,
-  "entity_id" | "cleaned_text" | "references" | "inline_chem" | "inline_code" | "links"
->;
+export interface TrainingNarrativeBlockV1 {
+  entity_id: string;
+  cleaned_text: string;
+  references: ExportedReferenceTokenV1[];
+  inline_chem: ExportedInlineChemTokenV1[];
+  inline_code: ExportedInlineCodeTokenV1[];
+  links: ExportedMarkdownLinkV1[];
+}
 
 export interface TrainingUnderstandingEntitiesV1 {
   molecules: TrainingMoleculeV1[];

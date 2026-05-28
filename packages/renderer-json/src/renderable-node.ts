@@ -1,4 +1,4 @@
-import type { ChemdDocument, SourceSpan } from "@chemd/core";
+import type { SourceSpan } from "@chemd/core";
 import {
   buildProgramRenderDocument,
   isChemdProgramDocument,
@@ -81,7 +81,6 @@ interface BuildContext {
 }
 
 type RenderableInput =
-  | ChemdDocument
   | ProgramRenderDocument
   | Parameters<typeof buildProgramRenderDocument>[0];
 
@@ -119,37 +118,13 @@ const toProgramRenderDocument = (
   if (isChemdProgramDocument(document)) {
     return buildProgramRenderDocument(document, { typedGraph: options.typedGraph });
   }
-  return buildLegacyRenderDocument(document);
+  return document;
 };
 
 const isProgramRenderDocument = (value: unknown): value is ProgramRenderDocument =>
   typeof value === "object"
   && value !== null
   && (value as { schema_version?: unknown }).schema_version === "chemd-program-render/v1";
-
-const buildLegacyRenderDocument = (document: ChemdDocument): ProgramRenderDocument => ({
-  schema_version: "chemd-program-render/v1",
-  sourceLanguage: "chemd/program-v1",
-  moduleName: String(document.meta.id || "legacy_document"),
-  meta: {
-    id: String(document.meta.id || "legacy-document"),
-    title: String(document.meta.title || document.meta.id || "Untitled experiment"),
-    date: String(document.meta.date || ""),
-    fields: {},
-    docs: []
-  },
-  imports: [],
-  sections: [],
-  diagnostics: document.diagnostics,
-  semantic: {
-    typedGraph: {
-      documentId: document.meta.id,
-      nodes: [],
-      quantities: [],
-      diagnostics: []
-    }
-  }
-});
 
 const buildSectionNode = (
   section: ProgramRenderSection,

@@ -548,7 +548,7 @@ export const getWorkspaceIngestDisabledReason = ({
   if (!files.some((file) => {
     const path = file.path.toLowerCase();
     return file.kind === "file"
-      && (path.endsWith(".chemd") || path.endsWith(".chemd.md") || file.chemdKind === "document");
+      && (path.endsWith(".chemd") || file.chemdKind === "document");
   })) {
     return "No Chemd documents are visible in the current workspace.";
   }

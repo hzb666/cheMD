@@ -61,8 +61,6 @@ export interface ProgramSourceLayerV1 {
   audit_only_fields?: string[];
 }
 
-export type SourceLayerV1 = ProgramSourceLayerV1;
-
 export interface SourceProgramSnapshot {
   schema_version: string;
   source_language: string;
@@ -108,32 +106,6 @@ export interface SourceDocCommentSnapshot {
   raw_markdown: string;
   export_policy: "render_rag" | "render_only" | "audit_only";
   source_span?: SourceSpan;
-}
-
-export interface SourceNodeSnapshot {
-  node_index: number;
-  node_type:
-    | "markdown"
-    | "molecule"
-    | "material"
-    | "batch"
-    | "reaction"
-    | "result"
-    | "analysis"
-    | "procedure"
-    | "trace"
-    | "observation"
-    | "sample"
-    | "artifact"
-    | "condition_varies"
-    | "col"
-    | "template"
-    | "use";
-  original_id?: string;
-  source_block_type?: string;
-  syntax_origin?: string;
-  declared_kind?: string;
-  raw_payload: Record<string, unknown>;
 }
 
 export interface ExportedDiagnostic {
@@ -471,17 +443,6 @@ export interface ExportedMarkdownLinkV1 {
   label: string;
   href: string;
   safe: boolean;
-}
-
-export interface ExportedMarkdownBlockV1 extends ExportedEntityBase {
-  source_node_type: "markdown";
-  raw_text: string;
-  cleaned_text: string;
-  references: ExportedReferenceTokenV1[];
-  inline_chem: ExportedInlineChemTokenV1[];
-  inline_code: ExportedInlineCodeTokenV1[];
-  links: ExportedMarkdownLinkV1[];
-  text_for_embedding?: string;
 }
 
 export interface ExportedDocumentationBlockV1 {

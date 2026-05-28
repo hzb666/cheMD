@@ -70,7 +70,7 @@ export interface WorkspaceIndexViewModel {
 }
 
 export const isChemdDocumentPath = (path: string): boolean =>
-  path.endsWith(".chemd") || path.endsWith(".chemd.md");
+  path.toLowerCase().endsWith(".chemd");
 
 const pathToUri = (workspaceId: string, path: string): string =>
   `chemd-workspace://${encodeURIComponent(workspaceId)}/${path.replace(/\\/g, "/").replace(/^\/+/, "")}`;
@@ -80,7 +80,7 @@ const documentIdFromPath = (path: string): string =>
     .replace(/\\/g, "/")
     .split("/")
     .pop()
-    ?.replace(/\.chemd(?:\.md)?$/u, "")
+    ?.replace(/\.chemd$/u, "")
     || "document";
 
 const buildDocuments = (

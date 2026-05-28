@@ -1,20 +1,21 @@
-import type { ChemdDocument, ChemdProgramDocument, ChemdReferenceExpr, ChemdValue } from "@chemd/core";
+import type { ChemdProgramDocument, ChemdReferenceExpr, ChemdValue } from "@chemd/core";
 import { describe, expect, it } from "vitest";
 
 import {
   buildProgramRenderDocument,
   buildChemdShellAttributes,
-  buildSemanticRenderTree
+  buildSemanticRenderTree,
+  type ChemdSemanticRenderDocument
 } from "../src/index";
 
-const createDocument = (children: unknown[]): ChemdDocument => ({
+const createDocument = (children: unknown[]): ChemdSemanticRenderDocument => ({
   type: "document",
   meta: {
     id: "doc-1",
     title: "Semantic render test",
     date: "2026-05-13"
   },
-  children: children as ChemdDocument["children"],
+  children,
   diagnostics: []
 });
 
@@ -221,26 +222,23 @@ describe("semantic render tree", () => {
     });
   });
 
-  it("preserves procedure, result, and template nodes in document order", () => {
+  it("preserves procedure and result nodes in document order", () => {
     const tree = buildSemanticRenderTree(createDocument([
       { type: "procedure", id: "proc-1", steps: [{ type: "step", stepId: "s1", family: "add" }] },
-      { type: "result", id: "res-1", yield: "83%" },
-      { type: "template", name: "standard-workup", params: ["solvent"], body: [] }
+      { type: "result", id: "res-1", yield: "83%" }
     ]));
 
     expect(tree.nodes.map((node) => node.node_type)).toEqual([
       "ChemdDocumentNode",
       "ChemdProcedureNode",
       "ChemdProcedureStepNode",
-      "ChemdResultNode",
-      "ChemdTemplateNode"
+      "ChemdResultNode"
     ]);
     expect(tree.nodes.map((node) => node.node_id)).toEqual([
       "document::doc-1",
       "procedure::proc-1",
       "procedure-step::s1",
-      "result::res-1",
-      "template::standard-workup"
+      "result::res-1"
     ]);
   });
 

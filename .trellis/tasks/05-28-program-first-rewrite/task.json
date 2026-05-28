@@ -3,7 +3,7 @@
   "name": "program-first-rewrite",
   "title": "Chemd program-first rewrite",
   "description": "Parent Trellis loop for rewriting Chemd from Markdown-first structured blocks to program-first language, including core AST, parser, compiler, renderers, exports, storage, language service, Desktop IDE, docs, and tests.",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": "compiler",
@@ -11,7 +11,7 @@
   "creator": "hzb666",
   "assignee": "hzb666",
   "createdAt": "2026-05-28",
-  "completedAt": null,
+  "completedAt": "2026-05-29T04:19:11+08:00",
   "branch": null,
   "base_branch": "develop",
   "worktree_path": null,
@@ -25,10 +25,24 @@
     "05-28-program-first-phase-3-resolver-typechecker",
     "05-29-05-28-program-first-phase-4-compiler-pipeline",
     "05-29-05-28-program-first-phase-5-render-export",
-    "05-29-05-28-program-first-phase-6-ide-storage"
+    "05-29-05-28-program-first-phase-6-ide-storage",
+    "05-29-05-28-program-first-phase-7-cleanup"
   ],
   "parent": null,
   "relatedFiles": [],
-  "notes": "",
-  "meta": {}
+  "notes": "All planned phases from D:\\download\\chemd-program-rewrite-implementation-plan.md are implemented. Root docs/ was not modified; user-facing docs were updated under apps/docs.",
+  "meta": {
+    "completedThrough": "05-29-05-28-program-first-phase-7-cleanup",
+    "verification": [
+      "pnpm -r --workspace-concurrency=1 typecheck: pass",
+      "pnpm -r --workspace-concurrency=1 test: pass",
+      "pnpm -r --workspace-concurrency=1 build: pass",
+      "apps/docs typecheck/build: pass",
+      "git diff -- docs --name-only: empty"
+    ],
+    "knownBlockedChecks": [
+      "pnpm lint: ESLint scopeManager.addGlobals runtime blocker",
+      "cargo test workspace_tests: keyring API blocker in postgres_profiles.rs"
+    ]
+  }
 }

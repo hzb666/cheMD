@@ -1,4 +1,3 @@
-import type { ChemdDocument } from "@chemd/core";
 import type { RenderOptions } from "@chemd/render-profile";
 import {
   buildProgramRenderDocument,
@@ -28,7 +27,7 @@ export interface RenderHtmlSemanticOptions {
   typedGraph?: unknown;
 }
 
-type RenderHtmlInput = ChemdDocument | ProgramRenderDocument | Parameters<typeof buildProgramRenderDocument>[0];
+type RenderHtmlInput = ProgramRenderDocument | Parameters<typeof buildProgramRenderDocument>[0];
 
 export const renderHtml = (
   document: RenderHtmlInput,
@@ -53,32 +52,8 @@ const toProgramRenderDocument = (
   if (isChemdProgramDocument(document)) {
     return buildProgramRenderDocument(document, { typedGraph: semanticOptions.typedGraph });
   }
-  return buildLegacyRenderDocument(document);
+  return document;
 };
-
-const buildLegacyRenderDocument = (document: ChemdDocument): ProgramRenderDocument => ({
-  schema_version: "chemd-program-render/v1",
-  sourceLanguage: "chemd/program-v1",
-  moduleName: String(document.meta.id || "legacy_document"),
-  meta: {
-    id: String(document.meta.id || "legacy-document"),
-    title: String(document.meta.title || document.meta.id || "Untitled experiment"),
-    date: String(document.meta.date || ""),
-    fields: {},
-    docs: []
-  },
-  imports: [],
-  sections: [],
-  diagnostics: document.diagnostics,
-  semantic: {
-    typedGraph: {
-      documentId: document.meta.id,
-      nodes: [],
-      quantities: [],
-      diagnostics: []
-    }
-  }
-});
 
 const renderProgramHtml = (
   document: ProgramRenderDocument,

@@ -142,8 +142,8 @@ fn lists_workspace_tree_entries_with_default_heavy_directory_ignores() {
     let legacy = entries
         .iter()
         .find(|entry| entry.path == "experiments/legacy.chemd.md")
-        .expect("legacy chemd file should be listed");
-    assert_eq!(legacy.chemd_kind.as_deref(), Some("document"));
+        .expect("legacy markdown file should be listed");
+    assert_eq!(legacy.chemd_kind.as_deref(), Some("unknown"));
     let asset = entries
         .iter()
         .find(|entry| entry.path == "ignore.txt")
@@ -268,6 +268,7 @@ fn query_workspace_documents_filters_chemd_files_and_excludes_current_path() {
     let workspace = TestWorkspace::new("query-documents");
     workspace.write("experiments/alpha.chemd", "alpha");
     workspace.write("experiments/beta.chemd.md", "beta");
+    workspace.write("experiments/gamma.chemd", "gamma");
     workspace.write("notes.md", "note");
     workspace.write("assets/image.txt", "asset");
 
@@ -287,7 +288,7 @@ fn query_workspace_documents_filters_chemd_files_and_excludes_current_path() {
             .iter()
             .map(|entry| entry.path.as_str())
             .collect::<Vec<_>>(),
-        vec!["experiments/beta.chemd.md"]
+        vec!["experiments/gamma.chemd"]
     );
 }
 
@@ -335,6 +336,7 @@ fn query_workspace_index_returns_paged_document_manifest_rows() {
     let workspace = TestWorkspace::new("query-index-page");
     workspace.write("a.chemd", "alpha");
     workspace.write("b.chemd.md", "beta");
+    workspace.write("c.chemd", "gamma");
     workspace.write("notes.md", "note");
 
     let first_page = query_workspace_index_impl(
@@ -365,7 +367,7 @@ fn query_workspace_index_returns_paged_document_manifest_rows() {
     assert_eq!(first_page.rows[0].bytes, 5);
     assert!(first_page.rows[0].modified_at_ms.is_some());
     assert!(first_page.rows[0].revision_key.starts_with("meta:5:"));
-    assert_eq!(second_page.rows[0].path, "b.chemd.md");
+    assert_eq!(second_page.rows[0].path, "c.chemd");
     assert_eq!(second_page.next_cursor, None);
 }
 
@@ -415,6 +417,7 @@ fn build_workspace_ingest_plan_returns_paged_pending_and_skipped_items() {
     let workspace = TestWorkspace::new("ingest-plan-page");
     workspace.write("a.chemd", "alpha");
     workspace.write("b.chemd.md", "beta");
+    workspace.write("c.chemd", "gamma");
     workspace.write("notes.md", "note");
     workspace.write("image.txt", "asset");
 
@@ -438,9 +441,9 @@ fn build_workspace_ingest_plan_returns_paged_pending_and_skipped_items() {
     )
     .expect("second ingest plan page should build");
 
-    assert_eq!(first_page.summary.total_count, 3);
+    assert_eq!(first_page.summary.total_count, 4);
     assert_eq!(first_page.summary.returned_count, 2);
-    assert_eq!(first_page.summary.pending_count, 2);
+    assert_eq!(first_page.summary.pending_count, 1);
     assert_eq!(first_page.next_cursor, Some(2));
     assert_eq!(
         first_page
@@ -450,9 +453,10 @@ fn build_workspace_ingest_plan_returns_paged_pending_and_skipped_items() {
             .collect::<Vec<_>>(),
         vec!["a.chemd", "b.chemd.md"]
     );
-    assert_eq!(second_page.items[0].path, "notes.md");
-    assert_eq!(second_page.items[0].disposition, "skipped");
-    assert_eq!(second_page.items[0].reason, "non_chemd_markdown");
+    assert_eq!(first_page.items[1].disposition, "skipped");
+    assert_eq!(first_page.items[1].reason, "non_chemd_markdown");
+    assert_eq!(second_page.items[0].path, "c.chemd");
+    assert_eq!(second_page.items[0].disposition, "pending");
     assert_eq!(second_page.next_cursor, None);
 }
 

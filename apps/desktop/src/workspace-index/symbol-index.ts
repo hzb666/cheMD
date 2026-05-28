@@ -70,12 +70,7 @@ const isMarkdownFile = (file: WorkspaceFileEntry): boolean =>
 
 const isChemdDocumentFile = (file: WorkspaceFileEntry): boolean => {
   const path = file.path.toLowerCase();
-  return file.kind === "file"
-    && (
-      path.endsWith(".chemd")
-      || path.endsWith(".chemd.md")
-      || file.chemdKind === "document"
-    );
+  return file.kind === "file" && path.endsWith(".chemd");
 };
 
 const getSkipReason = (

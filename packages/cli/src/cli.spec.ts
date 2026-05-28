@@ -849,7 +849,7 @@ result res_main for @rxn_main {
       });
 
       expect(newCode).toBe(EXIT_OK);
-      expect(readFileSync(path.join(dir, "exp.chemd"), "utf8")).toContain(":::condition-varies");
+      expect(readFileSync(path.join(dir, "exp.chemd"), "utf8")).toContain("condition_screen cv_screen");
       expect(newStderr.value).toBe("");
     }));
 

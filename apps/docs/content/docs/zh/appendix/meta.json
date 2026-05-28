@@ -1,10 +1,7 @@
 {
   "title": "附录",
   "pages": [
-    "feature-inventory",
-    "syntax-summary",
     "quantity-units",
-    "syntax-aliases",
     "diagnostic-codes"
   ]
 }

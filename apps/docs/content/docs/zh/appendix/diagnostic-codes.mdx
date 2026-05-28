@@ -29,7 +29,7 @@ description: Chemd parser、resolver、typechecker、compiler 和 runtime 常见
 | `E_CONDITION_ATTEMPT_DUPLICATE_FIELD` | attempt 重复填写已声明的 factor 或 outcome |
 | `E_CONDITION_ATTEMPT_UNKNOWN_FIELD` | attempt 字段未声明为 factor 或 outcome |
 
-## `:::chemd`
+## `legacy fenced block`
 
 | 诊断码 | 含义 |
 | --- | --- |
@@ -46,7 +46,7 @@ description: Chemd parser、resolver、typechecker、compiler 和 runtime 常见
 | `E_MISSING_REQUIRED_FIELD` | 对象缺失 resolver 必填字段 |
 | `W_UNRESOLVED_REFERENCE` | 引用目标或字段无法解析 |
 | `E_INVALID_PRIMARY_REFERENCE` | `primary_*` 指向不存在对象 |
-| `E_UNKNOWN_TEMPLATE` | `:::use` 找不到模板 |
+| `E_UNKNOWN_TEMPLATE` | `legacy fenced block` 找不到模板 |
 | `E_TEMPLATE_CYCLE` | 模板递归 |
 | `E_TEMPLATE_EXPANSION_LIMIT` | 模板展开超过深度或节点限制 |
 | `E_TEMPLATE_PARAM_MISSING` | 模板调用缺少参数 |
@@ -145,10 +145,10 @@ description: Chemd parser、resolver、typechecker、compiler 和 runtime 常见
 | `E_UNRESOLVED_PROGRAM_REFERENCE` | program 引用无法解析 |
 | `W_UNRESOLVED_DOC_REFERENCE` | 文档注释引用无法解析 |
 | `E_LEGACY_` | 检测到已移除的 legacy 语法 |
-| `E_LEGACY_FRONTMATTER_REMOVED` | program-v1 已移除 YAML frontmatter |
-| `E_LEGACY_FENCED_BLOCK_REMOVED` | program-v1 已移除 `:::` 结构块 |
-| `E_LEGACY_TEMPLATE_REMOVED` | program-v1 已移除 template/use 语法 |
-| `E_LEGACY_COLUMN_LAYOUT_REMOVED` | program-v1 已移除 column layout 语法 |
+| `E_LEGACY_FRONTMATTER_REMOVED` | program-v1 已移除 legacy metadata |
+| `E_LEGACY_FENCED_BLOCK_REMOVED` | program-v1 已移除 `legacy fenced block` 结构块 |
+| `E_LEGACY_TEMPLATE_REMOVED` | program-v1 已移除 program declaration reuse 语法 |
+| `E_LEGACY_COLUMN_LAYOUT_REMOVED` | program-v1 已移除 rendered layout 语法 |
 
 ## Program Procedure 与 Agent
 
@@ -196,9 +196,9 @@ description: Chemd parser、resolver、typechecker、compiler 和 runtime 常见
 
 | 诊断码 | 含义 |
 | --- | --- |
-| `W_INVALID_COL_COLUMNS` | `:::col` 列数非法 |
+| `W_INVALID_COL_COLUMNS` | `legacy fenced block` 列数非法 |
 | `W_COL_COUNT_MISMATCH` | `col:` 子项数量与列数不一致 |
-| `W_INVALID_COL_CHILD` | `:::col` 子项行非法 |
+| `W_INVALID_COL_CHILD` | `legacy fenced block` 子项行非法 |
 | `W_UNTERMINATED_BRACE_BLOCK` | `col: { ... }` 内容未闭合 |
 | `W_AUTHORING_FIX_AVAILABLE` | compiler 可提供安全 fix 建议 |
 | `W_AUTHORING_INPUT_REQUIRED` | fix 需要使用者输入 |

@@ -142,12 +142,7 @@ const stableHash = (value: unknown): string =>
 
 const isChemdDocument = (file: WorkspaceFileEntry): boolean => {
   const path = file.path.toLowerCase();
-  return file.kind === "file"
-    && (
-      path.endsWith(".chemd")
-      || path.endsWith(".chemd.md")
-      || file.chemdKind === "document"
-    );
+  return file.kind === "file" && path.endsWith(".chemd");
 };
 const isPlainMarkdown = (file: WorkspaceFileEntry): boolean =>
   file.kind === "file" && file.path.toLowerCase().endsWith(".md");

@@ -1,4 +1,3 @@
-import type { ChemdDocument } from "@chemd/core";
 import {
   buildProgramRenderDocument,
   formatProgramRenderValue,
@@ -15,7 +14,7 @@ export interface RenderJsonOptions {
   typedGraph?: unknown;
 }
 
-type RenderJsonInput = ChemdDocument | ProgramRenderDocument | Parameters<typeof buildProgramRenderDocument>[0];
+type RenderJsonInput = ProgramRenderDocument | Parameters<typeof buildProgramRenderDocument>[0];
 
 export const renderJson = (
   document: RenderJsonInput,
@@ -33,50 +32,13 @@ const toProgramRenderDocument = (
   if (isChemdProgramDocument(document)) {
     return buildProgramRenderDocument(document, { typedGraph: options.typedGraph });
   }
-  return buildLegacyRenderDocument(document, options);
+  return document;
 };
 
 const isProgramRenderDocument = (value: unknown): value is ProgramRenderDocument =>
   typeof value === "object"
   && value !== null
   && (value as { schema_version?: unknown }).schema_version === "chemd-program-render/v1";
-
-const buildLegacyRenderDocument = (
-  document: ChemdDocument,
-  options: RenderJsonOptions
-): ProgramRenderDocument => ({
-  schema_version: "chemd-program-render/v1",
-  sourceLanguage: "chemd/program-v1",
-  moduleName: String(document.meta.id || "legacy_document"),
-  meta: {
-    id: String(document.meta.id || "legacy-document"),
-    title: String(document.meta.title || document.meta.id || "Untitled experiment"),
-    date: String(document.meta.date || ""),
-    fields: {},
-    docs: []
-  },
-  imports: [],
-  sections: [],
-  diagnostics: document.diagnostics,
-  semantic: {
-    typedGraph: normalizeTypedGraph(document.meta.id, options.typedGraph)
-  }
-});
-
-const normalizeTypedGraph = (
-  documentId: unknown,
-  typedGraph: unknown
-): ProgramRenderDocument["semantic"]["typedGraph"] => {
-  if (typeof typedGraph === "object" && typedGraph !== null) {
-    return typedGraph as ProgramRenderDocument["semantic"]["typedGraph"];
-  }
-  return {
-    documentId: typeof documentId === "string" ? documentId : undefined,
-    nodes: [],
-    quantities: [],
-    diagnostics: []
-  };
-};
 
 const toProgramJsonPayload = (document: ProgramRenderDocument): Record<string, unknown> => ({
   program: {

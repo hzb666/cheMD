@@ -1,4 +1,4 @@
-import type { MarkdownNode } from "@chemd/core";
+import type { MarkdownRenderNode } from "./markdown-render";
 import {
   applyMarkdownInlineStylesInHtmlText,
   escapeHtml,
@@ -6,7 +6,7 @@ import {
   stringifyValue
 } from "./shared";
 
-const applyInlineTokens = (escapedValue: string, node: MarkdownNode): string => {
+const applyInlineTokens = (escapedValue: string, node: MarkdownRenderNode): string => {
   let rendered = escapedValue;
 
   for (const reference of node.references) {
@@ -44,7 +44,7 @@ const hasValidSpan = (value: string, raw: string, start?: number, end?: number):
   return value.slice(start, end) === raw;
 };
 
-const applyUnpositionedInlineTokens = (escapedValue: string, node: MarkdownNode): string => {
+const applyUnpositionedInlineTokens = (escapedValue: string, node: MarkdownRenderNode): string => {
   let rendered = escapedValue;
 
   for (const reference of node.references) {
@@ -119,7 +119,7 @@ const findMarkdownLink = (
   return undefined;
 };
 
-const renderTextSegmentByRegex = (value: string, node: MarkdownNode): string => {
+const renderTextSegmentByRegex = (value: string, node: MarkdownRenderNode): string => {
   let rendered = "";
   let cursor = 0;
 
@@ -155,7 +155,7 @@ const renderTextSegmentByRegex = (value: string, node: MarkdownNode): string => 
   return rendered;
 };
 
-const renderInlineTextByRegex = (value: string, node: MarkdownNode): string => {
+const renderInlineTextByRegex = (value: string, node: MarkdownRenderNode): string => {
   let rendered = "";
   let cursor = 0;
 
@@ -243,7 +243,7 @@ const reduceOverlappingRanges = (ranges: TokenRange[]): TokenRange[] => {
   return filtered;
 };
 
-const locateTokenRanges = (value: string, node: MarkdownNode): TokenRange[] => {
+const locateTokenRanges = (value: string, node: MarkdownRenderNode): TokenRange[] => {
   const ranges: TokenRange[] = [];
   appendTokenRanges(ranges, "code", node.inlineCode, value);
   appendTokenRanges(ranges, "link", node.links, value);
@@ -252,7 +252,7 @@ const locateTokenRanges = (value: string, node: MarkdownNode): TokenRange[] => {
   return reduceOverlappingRanges(ranges);
 };
 
-const renderLinkRange = (range: TokenRange, value: string, node: MarkdownNode): string => {
+const renderLinkRange = (range: TokenRange, value: string, node: MarkdownRenderNode): string => {
   const token = node.links[range.tokenIndex];
   const safeHref = token?.safe ? sanitizeHref(token.href) : undefined;
 
@@ -271,7 +271,7 @@ const renderLinkRange = (range: TokenRange, value: string, node: MarkdownNode): 
   return `<a class="chemd-link" href="${escapeHtml(safeHref)}" target="_blank" rel="noreferrer noopener">${labelHtml}</a>`;
 };
 
-const renderReferenceRange = (range: TokenRange, value: string, node: MarkdownNode): string => {
+const renderReferenceRange = (range: TokenRange, value: string, node: MarkdownRenderNode): string => {
   const reference = node.references[range.tokenIndex];
 
   if (reference?.resolution?.status === "resolved") {
@@ -281,7 +281,7 @@ const renderReferenceRange = (range: TokenRange, value: string, node: MarkdownNo
   return escapeHtml(reference?.raw ?? value.slice(range.start, range.end));
 };
 
-const renderRange = (range: TokenRange, value: string, node: MarkdownNode): string => {
+const renderRange = (range: TokenRange, value: string, node: MarkdownRenderNode): string => {
   if (range.kind === "code") {
     const token = node.inlineCode[range.tokenIndex];
     return `<code class="chemd-inline-code">${escapeHtml(token?.value ?? "")}</code>`;
@@ -299,7 +299,7 @@ const renderRange = (range: TokenRange, value: string, node: MarkdownNode): stri
   return renderReferenceRange(range, value, node);
 };
 
-const renderInlineTextWithRanges = (value: string, node: MarkdownNode): string => {
+const renderInlineTextWithRanges = (value: string, node: MarkdownRenderNode): string => {
   const ranges = locateTokenRanges(value, node);
 
   if (ranges.length === 0) {
@@ -324,7 +324,7 @@ const renderInlineTextWithRanges = (value: string, node: MarkdownNode): string =
   return rendered;
 };
 
-export const renderInlineText = (value: string, node: MarkdownNode): string => {
+export const renderInlineText = (value: string, node: MarkdownRenderNode): string => {
   const hasPositionedToken =
     node.references.some((token) => typeof token.start === "number" && typeof token.end === "number")
     || node.inlineChem.some((token) => typeof token.start === "number" && typeof token.end === "number")

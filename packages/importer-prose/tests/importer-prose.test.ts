@@ -193,7 +193,7 @@ describe("prose importer skeleton", () => {
 
     expect(candidate.reactionCandidates).toEqual([]);
     expect(chemd).toContain("procedure import_procedure");
-    expect(chemd).not.toContain(":::chemd");
+    expect(chemd).not.toContain(`${":".repeat(3)}chemd`);
     expect(chemd).toContain("step s1 = add");
     expect(chemd).toContain("materials: \"n-BuLi\"");
     expect(chemd).toContain("observation import_observation");

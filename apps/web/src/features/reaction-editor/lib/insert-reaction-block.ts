@@ -1,6 +1,6 @@
 import type { ReactionEditorDraft } from "../types";
 
-const joinList = (values: string[]): string => values.join(" | ");
+import { serializeProgramStringList } from "../../chem-editor/lib/program-declaration";
 
 export const insertReactionBlock = (
   source: string,
@@ -9,17 +9,16 @@ export const insertReactionBlock = (
 ): string => {
   const trimmed = source.trimEnd();
   const lines = [
-    `:::chemd #${blockId}`,
-    "kind: reaction",
-    `reac: ${joinList(draft.reactants)}`,
-    `prod: ${joinList(draft.products)}`
+    `reaction ${blockId} {`,
+    `  reactants: ${serializeProgramStringList(draft.reactants)}`,
+    `  products: ${serializeProgramStringList(draft.products)}`
   ];
 
   if (draft.conditions.length > 0) {
-    lines.push(`conditions: ${joinList(draft.conditions)}`);
+    lines.push(`  conditions: ${serializeProgramStringList(draft.conditions)}`);
   }
 
-  lines.push(":::");
+  lines.push("}");
   const segment = lines.join("\n");
 
   return trimmed.length === 0 ? segment : `${trimmed}\n\n${segment}\n`;

@@ -3,42 +3,6 @@ title: Chemd Language Overview
 description: Chemd source files, AST layers, compiler outputs, and the implemented language surface.
 ---
 
+This page now follows the program-first language contract. Use `.chemd` modules, `meta`, declarations, `///` doc comments, and `/*md */` documentation regions for experiment records. Semantic facts come from molecule, reaction, result, analysis, sample, artifact, condition_screen, procedure, trace, observation, and agent run declarations.
 
-## Chemd Source Model
-
-A Chemd source consists of frontmatter, Markdown prose, and structured blocks. The parsed root node is `ChemdDocument`, with `meta`, `children`, `diagnostics`, optional `source`, and optional `renderSelection`.
-
-`children` can contain Markdown nodes and structured nodes. Structured nodes cover molecules, reactions, materials, batches, results, analyses, procedures, runtime traces, observations, samples, artifacts, condition screens, template calls, and column layout.
-
-## User Input, AST, and Compiler Output Layers
-
-The user input layer contains YAML frontmatter, Markdown text, and `:::` structured blocks. The AST layer is produced by parser and resolver, preserving fields, reference tokens, source spans, diagnostics, and generated object IDs. The compiler output layer is assembled by `compileChemd`, which currently returns HTML, JSON, DOCX bridge, LNF, RAG export, training understanding, full training export, typed semantic graph, step graph, run plan, and diagnosis.
-
-## Current Implemented Language Surface
-
-The body parser registers `chemd`, `material`, `batch`, `result`, `analysis`, `artifact`, `sample`, `condition-varies`, `procedure`, `trace`, `observation`, `use`, and `col`. Template blocks are recognized by the body parsing flow and produce `template` nodes.
-
-The current semantic usage surface uses `:::chemd` for both molecule and reaction records.
-
-## Minimal Validatable Document
-
-The `validate` command compiles under the current language contract. A minimal validatable document needs required frontmatter; `:::chemd` may declare `kind` explicitly or omit it when the fields make the identity clear.
-
-```md validate
-module exp_minimal
-
-meta {
-  id: "exp-minimal"
-  title: "Minimal Chemd source"
-  date: "2026-04-24"
-}
-
-molecule mol_main {
-  name: "ethanol"
-  smiles: "CCO"
-}
-```
-
-This example satisfies required frontmatter and the molecule identity requirement.
-
-
+See the [program-v1 language specification](/en/docs/program-v1/language).

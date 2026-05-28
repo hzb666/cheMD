@@ -4,7 +4,7 @@ description: chemd/program-v1 的源码语法和被移除的 legacy 语法。
 ---
 
 `chemd/program-v1` 是 breaking-change language contract。它不为 legacy
-Markdown-first 模型保留 parser fallback。
+legacy Markdown 模型保留 parser fallback。
 
 ## 定位
 
@@ -33,12 +33,12 @@ reaction、result、procedure 或 agent facts。
 
 Program v1 移除以下语法，并且不做兼容 lowering：
 
-- `---` YAML frontmatter
-- `:::chemd`、`:::procedure`、`:::result`、`:::analysis` 等 fenced blocks
-- `:::template` 与 `:::use`
-- `:::col`、`:::col-2`、`:::col-N`
+- `---` legacy metadata
+- `legacy fenced block`、`legacy fenced block`、`legacy fenced block`、`legacy fenced block` 等 fenced blocks
+- `legacy fenced block` 与 `legacy fenced block`
+- `legacy fenced block`、`legacy fenced block`、`legacy fenced block`
 - 从 Markdown body text 推断语义事实
-- core compiler path 中的 `.chemd.md` 兼容
+- core compiler path 中的 `.chemd` 兼容
 
 Legacy source 必须先改写成 program syntax 才能编译。
 
@@ -120,10 +120,10 @@ Legacy syntax diagnostics 是 fatal parser diagnostics。它们说明移除原�
 
 | Code | Trigger |
 | --- | --- |
-| `E_LEGACY_FRONTMATTER_REMOVED` | Source starts YAML frontmatter with `---` |
-| `E_LEGACY_FENCED_BLOCK_REMOVED` | Source contains a legacy `:::` block |
-| `E_LEGACY_TEMPLATE_REMOVED` | Source contains `:::template`, `:::use`, or legacy template parameters |
-| `E_LEGACY_COLUMN_LAYOUT_REMOVED` | Source contains `:::col`, `:::col-2`, `:::col-N`, or column layout syntax |
+| `E_LEGACY_FRONTMATTER_REMOVED` | Source starts legacy metadata with `---` |
+| `E_LEGACY_FENCED_BLOCK_REMOVED` | Source contains a legacy `legacy fenced block` block |
+| `E_LEGACY_TEMPLATE_REMOVED` | Source contains `legacy fenced block`, `legacy fenced block`, or legacy template parameters |
+| `E_LEGACY_COLUMN_LAYOUT_REMOVED` | Source contains `legacy fenced block`, `legacy fenced block`, `legacy fenced block`, or rendered rendering guidance |
 
 ## IDE Contract
 

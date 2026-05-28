@@ -23,47 +23,46 @@ const range = (line: number): ChemdSourceRange => ({
   endColumn: 10
 });
 
-const sourceA = `---
-id: route-a
-title: Route A
-date: 2026-05-13
----
+const sourceA = `module route_a
 
-:::chemd #mol-a
-kind: molecule
-smiles: CCO
-:::
+meta {
+  id: "route-a"
+  title: "Route A"
+  date: "2026-05-13"
+}
 
-:::chemd #rxn-a
-kind: reaction
-reactants: @mol-a
-products: mol-b
-prev: route-b#rxn-b
-:::
+molecule mol-a {
+  smiles: "CCO"
+}
 
-:::result #res-a
-reaction: rxn-a
-product: missing-product
-status: success
-:::
+reaction rxn-a {
+  reactants: [@mol-a]
+  products: [@mol-b]
+  prev: [@route-b#rxn-b]
+}
+
+result res-a for @rxn-a {
+  product: @missing-product
+  status: success
+}
 `;
 
-const sourceB = `---
-id: route-b
-title: Route B
-date: 2026-05-13
----
+const sourceB = `module route_b
 
-:::chemd #mol-b
-kind: molecule
-smiles: CC=O
-:::
+meta {
+  id: "route-b"
+  title: "Route B"
+  date: "2026-05-13"
+}
 
-:::chemd #rxn-b
-kind: reaction
-reactants: mol-b
-products: mol-c
-:::
+molecule mol-b {
+  smiles: "CC=O"
+}
+
+reaction rxn-b {
+  reactants: [@mol-b]
+  products: ["mol-c"]
+}
 `;
 
 const workspaceDocuments: WorkspaceDocumentInput[] = [
@@ -89,6 +88,7 @@ const fakeCompileOutput = (
   result: {} as ChemdLanguageCompileSuccess["result"],
   diagnostics: [],
   outline: [],
+  semanticTokens: [],
   symbols
 });
 
@@ -137,12 +137,12 @@ describe("buildWorkspaceSymbolIndex", () => {
       ]);
   });
 
-  it("resolves legacy .chemd.md document aliases against renamed .chemd files", () => {
+  it("does not resolve unsupported .chemd.md document aliases", () => {
     const index = buildWorkspaceSymbolIndex([
       {
         uri: "file:///workspace/route-a.chemd",
         path: "experiments/route-a.chemd",
-        source: sourceA.replace("prev: route-b#rxn-b", "prev: route-b.chemd.md#rxn-b")
+        source: sourceA.replace("@route-b#rxn-b", "@route-b.chemd.md#rxn-b")
       },
       {
         uri: "file:///workspace/route-b.chemd",
@@ -151,11 +151,14 @@ describe("buildWorkspaceSymbolIndex", () => {
       }
     ]);
 
-    expect(findReferences(index, { localId: "rxn-b" })).toEqual([
+    expect(index.references.filter((reference) =>
+      reference.targetText === "route-b.chemd.md#rxn-b"
+    )).toEqual([
       expect.objectContaining({
         documentUri: "file:///workspace/route-a.chemd",
         targetText: "route-b.chemd.md#rxn-b",
-        status: "resolved"
+        status: "unresolved",
+        targetSymbolIds: []
       })
     ]);
   });
@@ -165,7 +168,7 @@ describe("buildWorkspaceSymbolIndex", () => {
       {
         uri: "file:///workspace/route-a.chemd",
         path: "experiments/route-a.chemd",
-        source: sourceA.replace("prev: route-b#rxn-b", "prev: route-b.txt#rxn-b")
+        source: sourceA.replace("@route-b#rxn-b", "@route-b.txt#rxn-b")
       },
       {
         uri: "file:///workspace/route-b.chemd",

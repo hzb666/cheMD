@@ -300,7 +300,7 @@ const reactionFeatureForSymbol = (
 
 const documentIdForOutput = (output: ChemdLanguageCompileOutput): string =>
   output.documentUri?.split(/[\\/]/u).pop()?.replace(/\.chemd(?:\.md)?$/u, "")
-  || output.result?.document.meta.id
+  || output.result?.program.meta.id
   || "current";
 
 const buildReactionInput = (
@@ -539,9 +539,7 @@ const buildSemanticTreeForOutput = (
   output: SuccessfulCompileOutput
 ): ChemdSemanticRenderTreeV1 => {
   const renderInput = {
-    document: output.result.program
-      ? buildProgramSemanticDocument(output.result.program)
-      : output.result.document,
+    document: buildProgramSemanticDocument(output.result.program),
     diagnostics: output.result.diagnostics,
     sourceUri: output.documentUri
   };
@@ -751,7 +749,6 @@ const semanticFlowLanes: SemanticFlowLane[] = [
 const semanticFlowLaneByNodeType: Record<ChemdRenderableNodeV1["node_type"], SemanticFlowLaneId> = {
   ChemdAnalysisNode: "analysis",
   ChemdArtifactNode: "results",
-  ChemdColumnNode: "source",
   ChemdConditionAttemptNode: "reaction",
   ChemdConditionNode: "reaction",
   ChemdDocumentNode: "source",
@@ -770,7 +767,6 @@ const semanticFlowLaneByNodeType: Record<ChemdRenderableNodeV1["node_type"], Sem
   ChemdSampleNode: "materials",
   ChemdSectionNode: "source",
   ChemdTableNode: "source",
-  ChemdTemplateNode: "source",
   ChemdTraceEventNode: "source",
   ChemdTraceNode: "source",
   ChemdUnknownNode: "evidence"
@@ -812,7 +808,6 @@ const isFlowNode = (node: ChemdRenderableNodeV1): boolean =>
   node.node_type !== "ChemdParagraphNode"
   && node.node_type !== "ChemdListNode"
   && node.node_type !== "ChemdTableNode"
-  && node.node_type !== "ChemdColumnNode"
   && node.node_type !== "ChemdTraceNode"
   && node.node_type !== "ChemdTraceEventNode";
 

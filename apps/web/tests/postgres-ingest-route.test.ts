@@ -116,7 +116,7 @@ describe("POST /api/chem/postgres/ingest", () => {
   it("requires a matching session token", async () => {
     const { POST } = await import("../src/app/api/chem/postgres/ingest/route");
     const response = await POST(createRequest({
-      source: ":::chemd #mol-a\nkind: molecule\n:::",
+      source: "molecule mol-a {\n}",
       revisionId: "rev-route-1"
     }, false));
 
@@ -129,7 +129,7 @@ describe("POST /api/chem/postgres/ingest", () => {
 
     const { POST } = await import("../src/app/api/chem/postgres/ingest/route");
     const response = await POST(createRequest({
-      source: "  :::chemd #mol-a\nkind: molecule\nname: ethanol\n:::  ",
+      source: "  molecule mol-a {\n  name: \"ethanol\"\n}  ",
       revisionId: " rev-route-1 ",
       sourceKind: "chemd",
       sourceUri: " file:///exp.chemd ",
@@ -145,7 +145,7 @@ describe("POST /api/chem/postgres/ingest", () => {
 
     expect(response.status).toBe(201);
     expect(persistChemdExperimentWithRuntimeMock).toHaveBeenCalledWith({
-      source: "  :::chemd #mol-a\nkind: molecule\nname: ethanol\n:::  ",
+      source: "  molecule mol-a {\n  name: \"ethanol\"\n}  ",
       revisionId: "rev-route-1",
       sourceKind: "chemd",
       sourceUri: "file:///exp.chemd",
@@ -195,12 +195,12 @@ describe("POST /api/chem/postgres/ingest", () => {
     const { POST } = await import("../src/app/api/chem/postgres/ingest/route");
 
     const sourceKindResponse = await POST(createRequest({
-      source: ":::chemd #mol-a\nkind: molecule\n:::",
+      source: "molecule mol-a {\n}",
       revisionId: "rev-route-1",
       sourceKind: "spreadsheet"
     }));
     const installSchemaResponse = await POST(createRequest({
-      source: ":::chemd #mol-a\nkind: molecule\n:::",
+      source: "molecule mol-a {\n}",
       revisionId: "rev-route-1",
       installSchema: "true"
     }));
@@ -217,7 +217,7 @@ describe("POST /api/chem/postgres/ingest", () => {
 
     const { POST } = await import("../src/app/api/chem/postgres/ingest/route");
     const response = await POST(createRequest({
-      source: ":::chemd #mol-a\nkind: molecule\n:::",
+      source: "molecule mol-a {\n}",
       revisionId: "rev-route-1"
     }));
 
@@ -234,7 +234,7 @@ describe("POST /api/chem/postgres/ingest", () => {
 
     const { POST } = await import("../src/app/api/chem/postgres/ingest/route");
     const response = await POST(createRequest({
-      source: ":::chemd #mol-a\nkind: molecule\n:::",
+      source: "molecule mol-a {\n}",
       revisionId: "rev-route-1"
     }));
 

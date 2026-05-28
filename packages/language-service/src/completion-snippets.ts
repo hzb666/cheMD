@@ -55,16 +55,8 @@ const snippets: Array<Omit<ChemdCompletionItem, "range">> = [{
   detail: "Procedure block",
   sortText: "a-procedure"
 }, {
-  id: "snippet.template",
-  label: "template block",
-  kind: "snippet",
-  insertText: "/*md\n${1:documentation}\n*/",
-  insertTextFormat: "snippet",
-  detail: "Template block",
-  sortText: "a-template"
-}, {
-  id: "snippet.condition_varies",
-  label: "condition-varies block",
+  id: "snippet.condition_screen",
+  label: "condition screen declaration",
   kind: "snippet",
   insertText: [
     "condition_screen cv_${1:id} for ${2:@rxn_standard} {",
@@ -74,8 +66,8 @@ const snippets: Array<Omit<ChemdCompletionItem, "range">> = [{
     "}"
   ].join("\n"),
   insertTextFormat: "snippet",
-  detail: "Condition variation block",
-  sortText: "a-condition-varies"
+  detail: "Condition screen declaration",
+  sortText: "a-condition-screen"
 }];
 
 export const getChemdSnippetCompletions = (

@@ -14,7 +14,7 @@
 
 - [x] Rebuild the Fumadocs content tree around the current manual structure.
 - [x] Create Chinese and English index pages for the manual sections.
-- [ ] Expand the language manual to cover syntax, objects, references, workflows, templates, compiler semantics, diagnostics, and CLI workflows.
+- [ ] Expand the language manual to cover program syntax, declarations, references, workflows, compiler semantics, diagnostics, and CLI workflows.
 - [ ] Add the codebase guide to cover monorepo structure, core packages, parser, resolver, compiler, apps, services, CLI, tests, and contributor workflows.
 - [x] Keep page order explicit through `meta.json`.
 - [ ] Use current code and fixtures as source evidence for implementation details.
@@ -35,126 +35,104 @@
 - Current supported language surface
 - Minimal valid document
 
-### 2. Document Structure and Frontmatter
+### 2. Program Structure and Metadata
 
-- Required `id`, `title`, `date`
-- `primary_*` declarations
+- `module` declaration
+- Required `meta.id`, `meta.title`, `meta.date`
+- `primary_*` references
 - Metadata extensions
 - `tags`
 - `render_profile`
 - `render_overrides`
-- Frontmatter diagnostics
+- Legacy source removal diagnostics
 
 ### 3. Markdown Prose and Inline Syntax
 
-- Markdown paragraphs
+- Doc comments and Markdown documentation blocks
 - Object references
 - Object field references
 - Primary alias references
 - Metadata references
-- Template parameter references
 - Inline chemistry
 - Markdown links
 
-### 4. Structured Block Fundamentals
+### 4. Declaration Fundamentals
 
-- `:::` block syntax
-- Block ID syntax
-- Field line grammar
+- Declaration syntax
+- Declaration ID syntax
+- Field grammar
 - List fields
-- Multi-field physical lines
 - Unknown fields
-- Default object IDs
+- Source ranges
 
 ### 5. Molecules and Reactions
 
-- `:::chemd` as the unified surface
+- `molecule` declarations
+- `reaction` declarations
 - Molecule fields
 - Reaction fields
-- `kind` declaration
-- `kind` inference
 - Reactant and product references
 - Route fields
 - Chemistry feature references
 
 ### 6. Results and Analysis
 
-- `:::result`
+- `result` declarations
 - Result association fields
 - Yield and purity fields
-- `:::analysis`
+- `analysis` declarations
 - TLC lane fields
 - Analysis defaults
 - Required analysis fields
 
 ### 7. Procedures and Observations
 
-- `:::procedure`
-- Inline `step:`
-- Nested `:::step`
+- `procedure` declarations
+- Program `step` statements
 - Step dependencies
 - Evidence and confidence
-- `:::observation`
-- Inline `event:`
+- `observation` declarations
 - Event and step linkage
 
 ### 8. Samples, Artifacts, and Evidence
 
-- `:::sample`
+- `sample` declarations
 - Sample lineage
 - Sample artifacts
-- `:::artifact`
+- `artifact` declarations
 - File evidence
 - Instrument metadata
 - Evidence-chain modeling
 
 ### 9. Condition Screens
 
-- `:::condition-varies`
+- `condition_screen` declarations
 - `standard`
-- `condition`
-- `varies`
-- `varN`
-- `resN`
-- `noteN`
-- `mode=override`
+- `factor`
+- `outcome`
 - Attempt references
 
-### 10. Templates and Layout
-
-- `:::template`
-- `params`
-- String parameters
-- Reference parameters
-- Quantity parameters
-- `bind`
-- `:::use`
-- Expansion limits
-- `:::col`
-
-### 11. Compiler Semantics
+### 10. Compiler Semantics
 
 - Parse stage
 - Resolver stage
-- Object index
+- Program symbol table
 - Reference resolution
 - Required fields
 - Primary reference validation
-- Template expansion
 - Output contracts
 
-### 12. Diagnostics and Repair
+### 11. Diagnostics and Repair
 
-- Frontmatter diagnostics
+- Legacy source diagnostics
 - ID diagnostics
 - Field diagnostics
 - List diagnostics
 - Reference diagnostics
-- Template diagnostics
 - Required-field diagnostics
 - Repairable patterns
 
-### 13. CLI Workflows
+### 12. CLI Workflows
 
 - `validate`
 - `export`

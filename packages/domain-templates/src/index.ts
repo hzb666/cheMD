@@ -22,96 +22,73 @@ const templates = [
     id: "organic-synthesis/suzuki-screen",
     title: "Suzuki Screen",
     category: "organic-synthesis",
-    description: "Reaction screen with material stoichiometry, condition variation, TLC, and result linkage.",
-    feature: "condition-varies with reusable TLC lane notes",
+    description: "Reaction screen with material stoichiometry, condition screening, TLC, and result linkage.",
+    feature: "program-first condition_screen declaration",
     content: trimTemplate(`
----
-id: suzuki-screen
-title: Suzuki screen
-date: 2026-05-20
-primary_reaction: rxn-main
-primary_result: res-var1
-governance:
-  confidentiality: internal
-  review_status: human_reviewed
-  allowed_uses: [rag, eval, regression, audit]
----
+module suzuki_screen
 
-:::chemd #mol-aryl-bromide
-name: aryl bromide
-smiles: Brc1ccccc1
-:::
+meta {
+  id: "suzuki-screen"
+  title: "Suzuki screen"
+  date: "2026-05-20"
+  primary_reaction: @rxn_main
+  primary_result: @res_var1
+  tags: ["suzuki", "screen"]
+}
 
-:::chemd #mol-boronic-acid
-name: boronic acid
-smiles: OB(O)c1ccccc1
-:::
+molecule mol_aryl_bromide {
+  name: "aryl bromide"
+  smiles: "Brc1ccccc1"
+}
 
-:::chemd #mol-product
-name: biaryl product
-smiles: c1ccc(-c2ccccc2)cc1
-:::
+molecule mol_boronic_acid {
+  name: "boronic acid"
+  smiles: "OB(O)c1ccccc1"
+}
 
-:::material #mat-aryl-bromide
-molecule: @mol-aryl-bromide
-purity: 98%
-:::
+molecule mol_product {
+  name: "biaryl product"
+  smiles: "c1ccc(-c2ccccc2)cc1"
+}
 
-:::chemd #rxn-main
-name: Suzuki coupling
-rxn_smiles: Brc1ccccc1.OB(O)c1ccccc1>>c1ccc(-c2ccccc2)cc1
-reactant: @mat-aryl-bromide | 1.0 mmol | 1.0 eq | limiting=true
-reactant: @mol-boronic-acid | 1.5 eq
-product: @mol-product
-solvent: dioxane/water
-temperature: r.t. -> 80 C over 30 min
-time: overnight
-:::
+material mat_aryl_bromide {
+  molecule: @mol_aryl_bromide
+  purity: 98%
+}
 
-:::result #res-var1
-reaction: @rxn-main
-product: @mol-product
-status: success
-yield: 72%
-conversion: 90%
-:::
+reaction rxn_main {
+  name: "Suzuki coupling"
+  reactants: [@mat_aryl_bromide, @mol_boronic_acid]
+  products: [@mol_product]
+  solvent: "dioxane/water"
+  temperature: 80 C
+  time: 16 h
+}
 
-:::condition-varies #cv-screen
-standard: @rxn-main
-factor: base | baseline=K2CO3
-outcome: yield | baseline=72%
+result res_var1 for @rxn_main {
+  product: @mol_product
+  status: success
+  yield: 72%
+  conversion: 90%
+}
 
-attempt: var1
-base: Cs2CO3
-yield: 72%
-:::
+condition_screen cv_screen for @rxn_main {
+  standard: @rxn_main
+  factor: [base]
+  outcome: [yield]
+  notes: "var1 uses Cs2CO3 and gives 72% yield"
+}
 
-:::sample #sample-crude
-name: crude sample
-ref: @rxn-main
-:::
+sample sample_crude {
+  name: "crude sample"
+  derived_from: @rxn_main
+}
 
-:::analysis #ana-tlc
-type: tlc
-ref: @sample-crude
-lane: sm | source=@mat-aryl-bromide
-spot: 0.62 sm
-lane: rxn | source=@sample-crude
-spot: sm
-spot: 0.31 ^3(4) prod
-result: product spot increased
-:::
-
-:::template tlc-lane-note
-params: lane: string | sample: ref<sample>
-
-TLC lane @param.lane records @param.sample.
-:::
-
-:::use tlc-lane-note
-lane: rxn
-sample: sample-crude
-:::
+analysis ana_tlc for @sample_crude {
+  type: tlc
+  ref: @sample_crude
+  notes: "TLC lane rxn records product spot increase"
+}
 `)
   },
   {
@@ -121,105 +98,104 @@ sample: sample-crude
     description: "Procedure-first synthesis template with explicit step schema parameters.",
     feature: "procedure step graph",
     content: trimTemplate(`
----
-id: amide-coupling
-title: Amide coupling
-date: 2026-05-20
-primary_reaction: rxn-main
-primary_result: res-main
----
+module amide_coupling
 
-:::chemd #acid
-name: carboxylic acid
-smiles: CC(=O)O
-:::
+meta {
+  id: "amide-coupling"
+  title: "Amide coupling"
+  date: "2026-05-20"
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
 
-:::chemd #amine
-name: amine
-smiles: CN
-:::
+molecule acid {
+  name: "carboxylic acid"
+  smiles: "CC(=O)O"
+}
 
-:::chemd #amide
-name: amide
-smiles: CC(=O)NC
-:::
+molecule amine {
+  name: "amine"
+  smiles: "CN"
+}
 
-:::chemd #rxn-main
-name: amide coupling
-reactant: @acid | 1.0 mmol | 1.0 eq | limiting=true
-reactant: @amine | 1.2 eq
-product: @amide
-solvent: DMF
-temperature: r.t.
-time: 2 h
-:::
+molecule amide {
+  name: "amide"
+  smiles: "CC(=O)NC"
+}
 
-:::procedure #proc-main
-ref: @rxn-main
-step: charge | id=s-charge | inputs=@acid,@amine | solvent=DMF | vessel=vial
-step: mix | id=s-mix | duration=2 h | dependsOn=s-charge
-step: sample | id=s-sample | outputs=@sample-crude | dependsOn=s-mix
-:::
+reaction rxn_main {
+  name: "amide coupling"
+  reactants: [@acid, @amine]
+  products: [@amide]
+  solvent: "DMF"
+  temperature: 25 C
+  time: 2 h
+}
 
-:::sample #sample-crude
-name: crude aliquot
-ref: @rxn-main
-:::
+procedure proc_main for @rxn_main {
+  step charge = charge(inputs: [@acid, @amine])
+  step mix = mix(duration: 2 h, depends_on: [charge])
+  step sample = sample(outputs: [@sample_crude], depends_on: [mix])
+}
 
-:::result #res-main
-reaction: @rxn-main
-product: @amide
-status: success
-yield: 65%
-:::
+sample sample_crude {
+  name: "crude aliquot"
+  derived_from: @rxn_main
+}
+
+result res_main for @rxn_main {
+  product: @amide
+  status: success
+  yield: 65%
+}
 `)
   },
   {
     id: "organic-synthesis/oxidation",
     title: "Oxidation",
     category: "organic-synthesis",
-    description: "Oxidation record with NMR-style structured peaks.",
-    feature: "NMR spectrum and peak records",
+    description: "Oxidation record with NMR-style analysis notes.",
+    feature: "analysis evidence",
     content: trimTemplate(`
----
-id: oxidation-template
-title: Oxidation
-date: 2026-05-20
-primary_reaction: rxn-main
-primary_analysis: ana-nmr
----
+module oxidation_template
 
-:::chemd #alcohol
-name: alcohol
-smiles: CCO
-:::
+meta {
+  id: "oxidation-template"
+  title: "Oxidation"
+  date: "2026-05-20"
+  primary_reaction: @rxn_main
+  primary_analysis: @ana_nmr
+}
 
-:::chemd #aldehyde
-name: aldehyde
-smiles: CC=O
-:::
+molecule alcohol {
+  name: "alcohol"
+  smiles: "CCO"
+}
 
-:::chemd #rxn-main
-name: oxidation
-reactant: @alcohol | 1.0 mmol | 1.0 eq | limiting=true
-product: @aldehyde
-solvent: DCM
-temperature: 0 C -> r.t. over 30 min
-time: 1 h
-:::
+molecule aldehyde {
+  name: "aldehyde"
+  smiles: "CC=O"
+}
 
-:::sample #sample-product
-name: product sample
-ref: @rxn-main
-:::
+reaction rxn_main {
+  name: "oxidation"
+  reactants: [@alcohol]
+  products: [@aldehyde]
+  solvent: "DCM"
+  temperature: 25 C
+  time: 1 h
+}
 
-:::analysis #ana-nmr
-type: nmr
-ref: @sample-product
-spectrum: 1H NMR (400 MHz, CDCl3)
-peak: 9.78 (s, 1H, CHO)
-peak: 2.21 (s, 3H, CH3)
-:::
+sample sample_product {
+  name: "product sample"
+  derived_from: @rxn_main
+}
+
+analysis ana_nmr for @sample_product {
+  type: nmr
+  ref: @sample_product
+  notes: "1H NMR shows aldehyde resonance at 9.78 ppm"
+}
 `)
   },
   {
@@ -229,91 +205,91 @@ peak: 2.21 (s, 3H, CH3)
     description: "Reduction record with batch and sample lineage.",
     feature: "batch/sample lineage",
     content: trimTemplate(`
----
-id: reduction-template
-title: Reduction
-date: 2026-05-20
-primary_reaction: rxn-main
-primary_sample: sample-nmr
----
+module reduction_template
 
-:::chemd #ketone
-name: ketone
-smiles: CC(=O)C
-:::
+meta {
+  id: "reduction-template"
+  title: "Reduction"
+  date: "2026-05-20"
+  primary_reaction: @rxn_main
+  primary_sample: @sample_nmr
+}
 
-:::chemd #alcohol
-name: alcohol product
-smiles: CC(O)C
-:::
+molecule ketone {
+  name: "ketone"
+  smiles: "CC(=O)C"
+}
 
-:::chemd #rxn-main
-name: reduction
-reactant: @ketone | 1.0 mmol | 1.0 eq | limiting=true
-product: @alcohol
-solvent: MeOH
-temperature: 0 C
-time: 30 min
-:::
+molecule alcohol {
+  name: "alcohol product"
+  smiles: "CC(O)C"
+}
 
-:::batch #batch-crude
-source: @rxn-main
-molecule: @alcohol
-state: crude
-mass: 120 mg
-purity: 84%
-:::
+reaction rxn_main {
+  name: "reduction"
+  reactants: [@ketone]
+  products: [@alcohol]
+  solvent: "MeOH"
+  temperature: 0 C
+  time: 30 min
+}
 
-:::sample #sample-nmr
-name: NMR sample
-ref: @batch-crude
-:::
+batch batch_crude {
+  source: @rxn_main
+  molecule: @alcohol
+  mass: 120 mg
+  purity: 84%
+}
+
+sample sample_nmr {
+  name: "NMR sample"
+  batch: @batch_crude
+}
 `)
   },
   {
     id: "polymer/polymerization",
     title: "Polymerization",
     category: "polymer",
-    description: "Polymerization record with conversion and observation event.",
-    feature: "observation event linkage",
+    description: "Polymerization record with conversion and observation notes.",
+    feature: "observation linkage",
     content: trimTemplate(`
----
-id: polymerization-template
-title: Polymerization
-date: 2026-05-20
-primary_reaction: rxn-main
-primary_result: res-main
----
+module polymerization_template
 
-:::chemd #monomer
-name: monomer
-smiles: C=C
-:::
+meta {
+  id: "polymerization-template"
+  title: "Polymerization"
+  date: "2026-05-20"
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
 
-:::chemd #rxn-main
-name: polymerization
-reactant: @monomer | 5.0 mmol | 1.0 eq | limiting=true
-product: polymer
-temperature: 60 C
-time: 4 h
-:::
+molecule monomer {
+  name: "monomer"
+  smiles: "C=C"
+}
 
-:::procedure #proc-main
-ref: @rxn-main
-step: charge | id=s-charge | inputs=@monomer | vessel=tube
-step: heat | id=s-heat | temperature=60 C | duration=4 h | dependsOn=s-charge
-:::
+reaction rxn_main {
+  name: "polymerization"
+  reactants: [@monomer]
+  products: ["polymer"]
+  temperature: 60 C
+  time: 4 h
+}
 
-:::observation #obs-main
-ref: @rxn-main
-event: phase_change | linkedStep=s-heat | severity=info
-:::
+procedure proc_main for @rxn_main {
+  step charge = charge(inputs: [@monomer])
+  step heat = heat(temperature: 60 C, duration: 4 h, depends_on: [charge])
+}
 
-:::result #res-main
-reaction: @rxn-main
-status: success
-conversion: 82%
-:::
+observation obs_main for @rxn_main {
+  notes: "phase change observed during heating"
+}
+
+result res_main for @rxn_main {
+  status: success
+  conversion: 82%
+}
 `)
   },
   {
@@ -323,26 +299,26 @@ conversion: 82%
     description: "Analytical record for a sample with only NMR evidence.",
     feature: "analysis-only sample evidence",
     content: trimTemplate(`
----
-id: nmr-only-template
-title: NMR only
-date: 2026-05-20
-primary_sample: sample-main
-primary_analysis: ana-nmr
----
+module nmr_only_template
 
-:::sample #sample-main
-name: submitted sample
-notes: isolated material
-:::
+meta {
+  id: "nmr-only-template"
+  title: "NMR only"
+  date: "2026-05-20"
+  primary_sample: @sample_main
+  primary_analysis: @ana_nmr
+}
 
-:::analysis #ana-nmr
-type: nmr
-ref: @sample-main
-spectrum: 1H NMR (400 MHz, CDCl3)
-peak: 7.68-7.59 (m, 2H, ArCH)
-peak: 4.51 (br. s, 1H, NCH2)
-:::
+sample sample_main {
+  name: "submitted sample"
+  notes: "isolated material"
+}
+
+analysis ana_nmr for @sample_main {
+  type: nmr
+  ref: @sample_main
+  notes: "1H NMR evidence recorded"
+}
 `)
   },
   {
@@ -352,39 +328,40 @@ peak: 4.51 (br. s, 1H, NCH2)
     description: "HPLC method/profile template with artifact linkage.",
     feature: "method artifact reference",
     content: trimTemplate(`
----
-id: hplc-purity-template
-title: HPLC purity
-date: 2026-05-20
-primary_sample: sample-main
-primary_analysis: ana-hplc
----
+module hplc_purity_template
 
-:::sample #sample-main
-name: HPLC sample
-notes: diluted product sample
-:::
+meta {
+  id: "hplc-purity-template"
+  title: "HPLC purity"
+  date: "2026-05-20"
+  primary_sample: @sample_main
+  primary_analysis: @ana_hplc
+}
 
-:::artifact #method-hplc-a
-kind: method
-path: methods/hplc-a.json
-notes: C18, water/acetonitrile gradient
-:::
+sample sample_main {
+  name: "HPLC sample"
+  notes: "diluted product sample"
+}
 
-:::artifact #art-hplc
-kind: chromatogram
-ref: @sample-main
-path: data/hplc/sample-main.pdf
-:::
+artifact method_hplc_a {
+  kind: method
+  path: "methods/hplc-a.json"
+  notes: "C18, water/acetonitrile gradient"
+}
 
-:::analysis #ana-hplc
-type: hplc
-ref: @sample-main
-method: @method-hplc-a
-artifact: @art-hplc
-peak: 6.4 min (97%, product)
-result: purity 97%
-:::
+artifact art_hplc {
+  kind: chromatogram
+  ref: @sample_main
+  path: "data/hplc/sample-main.pdf"
+}
+
+analysis ana_hplc for @sample_main {
+  type: hplc
+  ref: @sample_main
+  artifact: [@art_hplc]
+  method: "C18 gradient"
+  notes: "purity 97%"
+}
 `)
   },
   {
@@ -394,36 +371,37 @@ result: purity 97%
     description: "Reaction template with procedure parameters for an electrochemical setup.",
     feature: "procedure adapter/resource parameters",
     content: trimTemplate(`
----
-id: electrochemical-reaction-template
-title: Electrochemical reaction
-date: 2026-05-20
-primary_reaction: rxn-main
----
+module electrochemical_reaction_template
 
-:::chemd #substrate
-name: substrate
-smiles: CCO
-:::
+meta {
+  id: "electrochemical-reaction-template"
+  title: "Electrochemical reaction"
+  date: "2026-05-20"
+  primary_reaction: @rxn_main
+}
 
-:::chemd #product
-name: product
-smiles: CC=O
-:::
+molecule substrate {
+  name: "substrate"
+  smiles: "CCO"
+}
 
-:::chemd #rxn-main
-name: electrochemical oxidation
-reactant: @substrate | 1.0 mmol | 1.0 eq | limiting=true
-product: @product
-solvent: MeCN
-time: 2 h
-:::
+molecule product {
+  name: "product"
+  smiles: "CC=O"
+}
 
-:::procedure #proc-main
-ref: @rxn-main
-step: charge | id=s-charge | inputs=@substrate | solvent=MeCN | vessel=cell
-step: mix | id=s-electrolysis | duration=2 h | adapter=electrochemistry | resource=cell-a | dependsOn=s-charge
-:::
+reaction rxn_main {
+  name: "electrochemical oxidation"
+  reactants: [@substrate]
+  products: [@product]
+  solvent: "MeCN"
+  time: 2 h
+}
+
+procedure proc_main for @rxn_main {
+  step charge = charge(inputs: [@substrate], solvent: "MeCN", vessel: "cell")
+  step electrolysis = mix(duration: 2 h, adapter: electrochemistry, resource: cell_a, depends_on: [charge])
+}
 `)
   },
   {
@@ -433,46 +411,46 @@ step: mix | id=s-electrolysis | duration=2 h | adapter=electrochemistry | resour
     description: "Photoredox reaction template with explicit light setup in procedure params.",
     feature: "procedure free parameter captured by step schema",
     content: trimTemplate(`
----
-id: photoredox-template
-title: Photoredox
-date: 2026-05-20
-primary_reaction: rxn-main
-primary_result: res-main
----
+module photoredox_template
 
-:::chemd #substrate
-name: substrate
-smiles: C=C
-:::
+meta {
+  id: "photoredox-template"
+  title: "Photoredox"
+  date: "2026-05-20"
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
 
-:::chemd #product
-name: product
-smiles: CCC
-:::
+molecule substrate {
+  name: "substrate"
+  smiles: "C=C"
+}
 
-:::chemd #rxn-main
-name: photoredox reaction
-reactant: @substrate | 0.5 mmol | 1.0 eq | limiting=true
-product: @product
-solvent: MeCN
-atmosphere: nitrogen
-temperature: r.t.
-time: 16 h
-:::
+molecule product {
+  name: "product"
+  smiles: "CCC"
+}
 
-:::procedure #proc-main
-ref: @rxn-main
-step: charge | id=s-charge | inputs=@substrate | solvent=MeCN | vessel=sealed tube
-step: mix | id=s-irradiate | duration=16 h | adapter=photoreactor | resource=blue-led | dependsOn=s-charge
-:::
+reaction rxn_main {
+  name: "photoredox reaction"
+  reactants: [@substrate]
+  products: [@product]
+  solvent: "MeCN"
+  atmosphere: nitrogen
+  temperature: 25 C
+  time: 16 h
+}
 
-:::result #res-main
-reaction: @rxn-main
-product: @product
-status: success
-yield: 54%
-:::
+procedure proc_main for @rxn_main {
+  step charge = charge(inputs: [@substrate], solvent: "MeCN", vessel: "sealed tube")
+  step irradiate = mix(duration: 16 h, adapter: photoreactor, resource: blue_led, depends_on: [charge])
+}
+
+result res_main for @rxn_main {
+  product: @product
+  status: success
+  yield: 54%
+}
 `)
   }
 ] satisfies DomainTemplate[];

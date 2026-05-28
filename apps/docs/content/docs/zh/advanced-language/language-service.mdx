@@ -3,42 +3,6 @@ title: Language Service 契约
 description: 当前 language-service package 的编辑器补全、引用辅助和 quick fix 边界。
 ---
 
-`@chemd/language-service` 是 web 与 desktop 共享的编辑器 API。它不拥有第二套 schema。字段补全读取 core block schema registry，step 参数补全读取 StepFamily schema，diagnostics 来自 compiler/typechecker facts。
+本文已切换到 program-first 语言契约。请使用 `.chemd` module、`meta`、declaration、`///` doc comment 和 `/*md */` documentation region 描述实验记录。语义事实来自 molecule、reaction、result、analysis、sample、artifact、condition_screen、procedure、trace、observation 和 agent run declarations。
 
-## Completion 来源
-
-- block snippet 提供常用 `:::chemd`、`:::result` 和 `:::procedure` 起手。
-- field completion 来自 `@chemd/core` block schema。
-- `:::chemd` molecule/reaction 字段通过 schema `completionKinds` 过滤。
-- procedure step 参数来自 `@chemd/step-ontology` StepFamily schema。
-- reference completion 读取当前文档 symbol 和 workspace symbol index。
-
-示例：
-
-```md
-:::chemd #rxn-main
-reaction_
-```
-
-这里可提示 `reaction_smiles:`，并标明它是 canonical `rxn_smiles` 的 alias。没有 alias 前缀时优先提示 canonical 字段，不用 alias 刷屏。
-
-```md
-:::procedure #proc-main
-step: heat | temp
-```
-
-这里会根据 `heat` StepFamily schema 提示 `temperature=`。
-
-## Hover 与 Definition
-
-hover 使用当前 compiler output。symbol hover 可以带出 typed graph 中的 canonical quantity、已有的 quantity provenance，以及 `smiles`、`inchi`、`inchikey`、`rxn_smiles` 的 interop status。reference hover 会显示解析目标，并区分显式引用（`@id`）和 bare token。
-
-definition lookup 先查当前文档 symbol。当前文档没有目标时，编辑器集成可以传入 workspace symbol index；唯一 workspace match 返回对应文档位置，多个 match 会返回 ambiguity error。
-
-## Alias 与 Kind 规则
-
-`kind: mol` 和 `kind: reac` 是正式值别名，并归一为 molecule/reaction。能稳定推断时，省略 `kind` 不产生 diagnostic。无法稳定推断时仍是 error，但 language service 不提供猜测 molecule/reaction 的 quick fix。
-
-## Quick Fix 边界
-
-quick fix 是提案。能用 range edit 时优先 range edit。whole-document replacement 只用于明确 codemod 和 safe-fix 工作流。编辑器集成必须原样展示 compiler diagnostics，不在本地降级 severity。
+参见 [program-v1 语言规格](/zh/docs/program-v1/language)。

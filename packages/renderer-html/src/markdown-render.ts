@@ -1,6 +1,25 @@
-import type { MarkdownNode } from "@chemd/core";
 import { renderInlineText } from "./inline-render";
 import { escapeHtml, normalizeWhitespace } from "./shared";
+
+export interface MarkdownRenderNode {
+  type: "markdown";
+  value: string;
+  references: Array<{
+    raw: string;
+    kind: string;
+    source: string;
+    field?: string;
+    resolution?: {
+      status: "resolved" | "unresolved";
+      value?: unknown;
+    };
+    start?: number;
+    end?: number;
+  }>;
+  inlineChem: Array<{ raw: string; value: string; start?: number; end?: number }>;
+  inlineCode: Array<{ raw: string; value: string; start?: number; end?: number }>;
+  links: Array<{ raw: string; label: string; href: string; safe: boolean; start?: number; end?: number }>;
+}
 
 const getMarkdownIndentLevel = (indent: string): number => {
   let width = 0;
@@ -153,7 +172,7 @@ const isMarkdownTableHeaderCandidate = (line: string): boolean => {
   return cells.length >= 2;
 };
 
-const renderMarkdownTable = (lines: string[], node: MarkdownNode): string => {
+const renderMarkdownTable = (lines: string[], node: MarkdownRenderNode): string => {
   if (lines.length < 2 || !isMarkdownTableSeparatorLine(lines[1])) {
     return lines
       .map((line) => `<p class="chemd-markdown">${renderInlineText(line, node)}</p>`)
@@ -205,7 +224,7 @@ const renderMarkdownTable = (lines: string[], node: MarkdownNode): string => {
   return `<table class="chemd-markdown-table">${thead}${tbody}</table>`;
 };
 
-const renderMarkdownListEntries = (entries: MarkdownListEntry[], node: MarkdownNode): string => {
+const renderMarkdownListEntries = (entries: MarkdownListEntry[], node: MarkdownRenderNode): string => {
   if (entries.length === 0) {
     return "";
   }
@@ -309,7 +328,7 @@ const createMarkdownRenderState = (): MarkdownRenderState => ({
   canSuppressLeadingHeading: true
 });
 
-const flushParagraph = (state: MarkdownRenderState, node: MarkdownNode) => {
+const flushParagraph = (state: MarkdownRenderState, node: MarkdownRenderNode) => {
   if (state.paragraphLines.length === 0) {
     return;
   }
@@ -320,7 +339,7 @@ const flushParagraph = (state: MarkdownRenderState, node: MarkdownNode) => {
   state.paragraphLines = [];
 };
 
-const flushList = (state: MarkdownRenderState, node: MarkdownNode) => {
+const flushList = (state: MarkdownRenderState, node: MarkdownRenderNode) => {
   if (state.listEntries.length === 0) {
     return;
   }
@@ -329,12 +348,12 @@ const flushList = (state: MarkdownRenderState, node: MarkdownNode) => {
   state.listEntries = [];
 };
 
-const flushQuote = (state: MarkdownRenderState, node: MarkdownNode) => {
+const flushQuote = (state: MarkdownRenderState, node: MarkdownRenderNode) => {
   if (state.quoteLines.length === 0) {
     return;
   }
 
-  const quoteNode: MarkdownNode = {
+  const quoteNode: MarkdownRenderNode = {
     ...node,
     value: state.quoteLines.join("\n")
   };
@@ -345,7 +364,7 @@ const flushQuote = (state: MarkdownRenderState, node: MarkdownNode) => {
   state.quoteLines = [];
 };
 
-const flushTable = (state: MarkdownRenderState, node: MarkdownNode) => {
+const flushTable = (state: MarkdownRenderState, node: MarkdownRenderNode) => {
   if (state.tableLines.length === 0) {
     return;
   }
@@ -374,14 +393,14 @@ const flushCodeFence = (state: MarkdownRenderState) => {
   state.inCodeFence = false;
 };
 
-const flushParagraphContext = (state: MarkdownRenderState, node: MarkdownNode) => {
+const flushParagraphContext = (state: MarkdownRenderState, node: MarkdownRenderNode) => {
   flushParagraph(state, node);
   flushList(state, node);
   flushQuote(state, node);
   flushTable(state, node);
 };
 
-const flushListContext = (state: MarkdownRenderState, node: MarkdownNode) => {
+const flushListContext = (state: MarkdownRenderState, node: MarkdownRenderNode) => {
   flushParagraph(state, node);
   flushQuote(state, node);
   flushTable(state, node);
@@ -407,7 +426,7 @@ const handleCodeFenceContent = (
 
 const handleCodeFenceStart = (
   trimmed: string,
-  node: MarkdownNode,
+  node: MarkdownRenderNode,
   state: MarkdownRenderState
 ): boolean => {
   const language = readCodeFenceLanguage(trimmed);
@@ -423,7 +442,7 @@ const handleCodeFenceStart = (
   return true;
 };
 
-const handleBlankLine = (trimmed: string, node: MarkdownNode, state: MarkdownRenderState): boolean => {
+const handleBlankLine = (trimmed: string, node: MarkdownRenderNode, state: MarkdownRenderState): boolean => {
   if (trimmed) {
     return false;
   }
@@ -434,7 +453,7 @@ const handleBlankLine = (trimmed: string, node: MarkdownNode, state: MarkdownRen
 
 const handleTableContinuation = (
   trimmed: string,
-  node: MarkdownNode,
+  node: MarkdownRenderNode,
   state: MarkdownRenderState
 ): boolean => {
   if (state.tableLines.length === 0) {
@@ -453,7 +472,7 @@ const handleTableContinuation = (
 const handleTableStart = (
   trimmed: string,
   nextTrimmed: string,
-  node: MarkdownNode,
+  node: MarkdownRenderNode,
   state: MarkdownRenderState
 ): boolean => {
   if (!isMarkdownTableHeaderCandidate(trimmed) || !isMarkdownTableSeparatorLine(nextTrimmed)) {
@@ -470,7 +489,7 @@ const handleTableStart = (
 
 const handleHorizontalRule = (
   trimmed: string,
-  node: MarkdownNode,
+  node: MarkdownRenderNode,
   state: MarkdownRenderState
 ): boolean => {
   if (!isMarkdownHr(trimmed)) {
@@ -485,7 +504,7 @@ const handleHorizontalRule = (
 
 const handleHeading = (
   trimmed: string,
-  node: MarkdownNode,
+  node: MarkdownRenderNode,
   state: MarkdownRenderState,
   suppressLeadingHeadingText?: string
 ): boolean => {
@@ -517,7 +536,7 @@ const handleHeading = (
 
 const handleUnorderedList = (
   line: string,
-  node: MarkdownNode,
+  node: MarkdownRenderNode,
   state: MarkdownRenderState
 ): boolean => {
   const unordered = readUnorderedListEntry(line);
@@ -541,7 +560,7 @@ const handleUnorderedList = (
 
 const handleOrderedList = (
   line: string,
-  node: MarkdownNode,
+  node: MarkdownRenderNode,
   state: MarkdownRenderState
 ): boolean => {
   const ordered = readOrderedListEntry(line);
@@ -563,7 +582,7 @@ const handleOrderedList = (
 
 const handleQuote = (
   trimmed: string,
-  node: MarkdownNode,
+  node: MarkdownRenderNode,
   state: MarkdownRenderState
 ): boolean => {
   if (!trimmed.startsWith(">")) {
@@ -583,7 +602,7 @@ interface HandleMarkdownLineContext {
   line: string;
   trimmed: string;
   nextTrimmed: string;
-  node: MarkdownNode;
+  node: MarkdownRenderNode;
   state: MarkdownRenderState;
   suppressLeadingHeadingText?: string;
 }
@@ -644,7 +663,7 @@ const handleMarkdownLine = ({
 };
 
 export const renderMarkdownNode = (
-  node: MarkdownNode,
+  node: MarkdownRenderNode,
   options: RenderMarkdownNodeOptions = {}
 ): string => {
   const { suppressLeadingHeadingText } = options;

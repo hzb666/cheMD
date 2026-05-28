@@ -1,4 +1,4 @@
-import type { ChemdDocument, Diagnostic, SourceSpan } from "@chemd/core";
+import type { Diagnostic, SourceSpan } from "@chemd/core";
 import {
   CHEMD_RENDERABLE_NODE_SCHEMA_VERSION,
   CHEMD_SEMANTIC_RENDER_TREE_SCHEMA_VERSION,
@@ -7,6 +7,7 @@ import {
   type ChemdRenderableNodeTypeV1,
   type ChemdRenderableNodeV1,
   type ChemdRenderDirectiveV1,
+  type ChemdSemanticRenderDocument,
   type ChemdSemanticRenderTreeInput,
   type ChemdSemanticRenderTreeV1,
   type ChemdSourceRefV1
@@ -24,11 +25,11 @@ interface BuildContext {
 const isRecord = (value: unknown): value is PlainRecord =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-const isChemdDocument = (value: unknown): value is ChemdDocument =>
+const isSemanticRenderDocument = (value: unknown): value is ChemdSemanticRenderDocument =>
   isRecord(value) && value.type === "document" && isRecord(value.meta) && Array.isArray(value.children);
 
 const isCompilerInput = (value: unknown): value is ChemdCompilerResultRenderInput =>
-  isRecord(value) && isChemdDocument(value.document);
+  isRecord(value) && isSemanticRenderDocument(value.document);
 
 const sanitizeSegment = (value: string): string =>
   value.trim().replace(/[^a-zA-Z0-9_.:-]+/g, "-") || "unnamed";
@@ -54,8 +55,6 @@ const typeToRenderableNodeType = (type: unknown): ChemdRenderableNodeTypeV1 => {
     case "event": return "ChemdObservationEventNode";
     case "trace": return "ChemdTraceNode";
     case "trace_event": return "ChemdTraceEventNode";
-    case "template": return "ChemdTemplateNode";
-    case "col": return "ChemdColumnNode";
     default: return "ChemdUnknownNode";
   }
 };
@@ -280,7 +279,7 @@ const uniqueDiagnostics = (diagnostics: ChemdNodeDiagnosticV1[]): ChemdNodeDiagn
 };
 
 const normalizeInput = (input: ChemdSemanticRenderTreeInput): {
-  document: ChemdDocument;
+  document: ChemdSemanticRenderDocument;
   diagnostics: Diagnostic[];
   sourceHash?: string;
   sourceUri?: string;
@@ -293,10 +292,10 @@ const normalizeInput = (input: ChemdSemanticRenderTreeInput): {
       sourceUri: input.sourceUri
     };
   }
-  if (isChemdDocument(input)) {
+  if (isSemanticRenderDocument(input)) {
     return { document: input, diagnostics: input.diagnostics };
   }
-  throw new TypeError("buildSemanticRenderTree requires a ChemdDocument or compiler result subset");
+  throw new TypeError("buildSemanticRenderTree requires a semantic render document or compiler result subset");
 };
 
 export const buildSemanticRenderTree = (

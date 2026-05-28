@@ -18,32 +18,30 @@ interface QueryCall {
   values?: readonly unknown[];
 }
 
-const source = `---
-id: exp-ingest-storage
-title: Ingest Storage
-date: 2026-04-22
-primary_result: res-main
----
+const source = `module exp_ingest_storage
 
-:::chemd #mol-a
-kind: molecule
-name: ethanol
-smiles: CCO
-:::
+meta {
+  id: "exp-ingest-storage"
+  title: "Ingest Storage"
+  date: "2026-04-22"
+  primary_result: @res-main
+}
 
-:::chemd #rxn-main
-kind: reaction
-reactants: @mol-a
-products: product
-solvent: THF
-yield: 81%
-:::
+molecule mol-a {
+  name: "ethanol"
+  smiles: "CCO"
+}
 
-:::result #res-main
-reaction: @rxn-main
-status: success
-yield: 80%
-:::
+reaction rxn-main {
+  reactants: [@mol-a]
+  products: ["product"]
+  solvent: "THF"
+}
+
+result res-main for @rxn-main {
+  status: success
+  yield: 80%
+}
 `;
 
 const createClient = (failOn?: string): PostgresQueryClient & { calls: QueryCall[] } => {

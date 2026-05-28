@@ -17,7 +17,6 @@ describe("program compiler integration", () => {
       sourceLanguage: "chemd/program-v1",
       meta: { id: "exp-golden-suzuki-screen" }
     });
-    expect(result.document.children).toEqual([]);
     expect(result.program.declarations.map((node) => node.kind)).toEqual([
       "molecule",
       "molecule",

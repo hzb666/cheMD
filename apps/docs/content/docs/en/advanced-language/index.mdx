@@ -1,26 +1,8 @@
 ---
 title: Advanced Language Features
-description: Chemd references, templates, derived expressions, layout syntax, compiler semantics, runtime preflight, and workspace index.
+description: Chemd references, derived expressions, program rendering guidance, compiler semantics, runtime preflight, and workspace index.
 ---
 
-These chapters cover language features that depend on cross-block semantics or compiler stages. The focus stays on user-visible behavior while identifying parser, resolver, and typechecker boundaries.
+This page now follows the program-first language contract. Use `.chemd` modules, `meta`, declarations, `///` doc comments, and `/*md */` documentation regions for experiment records. Semantic facts come from molecule, reaction, result, analysis, sample, artifact, condition_screen, procedure, trace, observation, and agent run declarations.
 
-## Reading Path
-
-1. Start with references and templates, because they affect how source records share values.
-2. Continue with normalization and derived expressions, because they explain typed values.
-3. Read layout, resolver, compiler, runtime, and workspace topics when source records need tooling integration.
-
-## Chapters
-
-- [References, Aliases, and Field Access](/en/docs/advanced-language/references-and-aliases): object references, field references, primary aliases, metadata, and template parameter references.
-- [Templates and Reuse](/en/docs/advanced-language/templates): template definitions, calls, and expansion semantics.
-- [Template Parameter Reference](/en/docs/advanced-language/template-parameters): detailed `string`, `ref<kind>`, `quantity<class>`, default types, and validation boundaries.
-- [Normalization Semantics](/en/docs/advanced-language/normalization-semantics): reaction conditions, TLC lanes, status, analysis type, atmosphere, and relationship checks.
-- [Derived Expressions](/en/docs/advanced-language/derived-expressions): `=` quantity field expressions, functions, and limits.
-- [Layout and Presentation Syntax](/en/docs/advanced-language/layout-syntax): `:::col` and the language-presentational boundary.
-- [Resolver and Compiler Semantics](/en/docs/advanced-language/resolver-compiler): indexes, reference resolution, template expansion, and required fields.
-- [Compiler Semantic Path](/en/docs/advanced-language/compiler-semantics): processing from AST to exported outputs.
-- [Runtime Preflight](/en/docs/advanced-language/runtime-preflight): run plans, runtime modes, capabilities, and manual confirmation strategy.
-- [Workspace Symbol Index](/en/docs/advanced-language/workspace-index): multi-document symbol and reference indexing for editor and workspace use.
-
+See the [program-v1 language specification](/en/docs/program-v1/language).

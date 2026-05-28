@@ -1,4 +1,4 @@
-import type { ChemdDocument, ChemdNode } from "@chemd/core";
+import type { ChemdDeclaration, ChemdProgramDocument } from "@chemd/core";
 
 const OBJECT_NODE_TYPES = new Set([
   "molecule",
@@ -8,10 +8,10 @@ const OBJECT_NODE_TYPES = new Set([
   "procedure",
   "observation",
   "sample",
-  "condition_varies"
+  "condition_screen"
 ]);
 
-const INTERNAL_FIELDS = new Set(["type", "id", "syntaxOrigin", "declaredKind"]);
+const INTERNAL_FIELDS = new Set(["kind", "id", "qualifiedId", "docs", "sourceSpan", "fieldSpans"]);
 
 export interface SemanticFieldChange {
   field: string;
@@ -78,22 +78,22 @@ const escapeRegExp = (value: string): string =>
 
 const isGeneratedObjectId = (
   documentId: string,
-  node: ChemdNode & { id: string }
+  node: ChemdDeclaration & { id: string }
 ): boolean => {
-  const pattern = new RegExp(`^${escapeRegExp(documentId)}-${node.type}-\\d+$`);
+  const pattern = new RegExp(`^${escapeRegExp(documentId)}-${node.kind}-\\d+$`);
   return pattern.test(node.id);
 };
 
 const isObjectNode = (
   documentId: string,
-  node: ChemdNode
-): node is ChemdNode & { id: string } =>
-  OBJECT_NODE_TYPES.has(node.type)
+  node: ChemdDeclaration
+): node is ChemdDeclaration & { id: string } =>
+  OBJECT_NODE_TYPES.has(node.kind)
   && "id" in node
   && typeof node.id === "string"
-  && !isGeneratedObjectId(documentId, node as ChemdNode & { id: string });
+  && !isGeneratedObjectId(documentId, node as ChemdDeclaration & { id: string });
 
-const collectComparableFields = (node: ChemdNode): Record<string, unknown> =>
+const collectComparableFields = (node: ChemdDeclaration): Record<string, unknown> =>
   Object.fromEntries(
     Object.entries(node)
       .filter(([key, value]) => !INTERNAL_FIELDS.has(key) && value !== undefined)
@@ -103,25 +103,15 @@ const collectComparableFields = (node: ChemdNode): Record<string, unknown> =>
 
 const collectObjects = (
   documentId: string,
-  nodes: ChemdNode[],
+  declarations: ChemdDeclaration[],
   output = new Map<string, ComparableObject>()
 ): Map<string, ComparableObject> => {
-  for (const node of nodes) {
-    if (node.type === "col") {
-      collectObjects(documentId, node.children, output);
-      continue;
-    }
-
-    if (node.type === "template") {
-      collectObjects(documentId, node.body, output);
-      continue;
-    }
-
+  for (const node of declarations) {
     if (isObjectNode(documentId, node)) {
-      output.set(`${node.type}:${node.id}`, {
+      output.set(`${node.kind}:${node.id}`, {
         fields: collectComparableFields(node),
         nodeId: node.id,
-        nodeType: node.type
+        nodeType: node.kind
       });
     }
   }
@@ -195,11 +185,11 @@ const pushAddedAndChanged = (
 };
 
 export const buildSemanticDiff = (
-  beforeDocument: ChemdDocument,
-  afterDocument: ChemdDocument
+  beforeDocument: ChemdProgramDocument,
+  afterDocument: ChemdProgramDocument
 ): SemanticDiff => {
-  const beforeObjects = collectObjects(beforeDocument.meta.id, beforeDocument.children);
-  const afterObjects = collectObjects(afterDocument.meta.id, afterDocument.children);
+  const beforeObjects = collectObjects(beforeDocument.meta.id, beforeDocument.declarations);
+  const afterObjects = collectObjects(afterDocument.meta.id, afterDocument.declarations);
   const changes: SemanticDiffChange[] = [];
 
   pushRemovedChanges(changes, beforeObjects, afterObjects);

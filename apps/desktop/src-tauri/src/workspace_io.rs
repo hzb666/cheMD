@@ -431,10 +431,7 @@ fn should_ignore_name(name: &std::ffi::OsStr, ignore_names: &[String]) -> bool {
 }
 
 fn is_chemd_document_entry(entry: &WorkspaceFileEntry) -> bool {
-    entry.kind == "file"
-        && (entry.chemd_kind.as_deref() == Some("document")
-            || entry.path.ends_with(".chemd")
-            || entry.path.ends_with(".chemd.md"))
+    entry.kind == "file" && entry.path.to_ascii_lowercase().ends_with(".chemd")
 }
 
 fn is_plain_markdown_entry(entry: &WorkspaceFileEntry) -> bool {
@@ -518,9 +515,7 @@ fn ingest_plan_item(
 ) -> Result<WorkspaceIngestPlanItem, CommandError> {
     let row = index_row(root, entry)?;
     let normalized_path = normalize_workspace_path(&row.path);
-    let is_document = row.chemd_kind.as_deref() == Some("document")
-        || row.path.ends_with(".chemd")
-        || row.path.ends_with(".chemd.md");
+    let is_document = row.path.to_ascii_lowercase().ends_with(".chemd");
     let (disposition, reason) = if !is_document {
         ("skipped", "non_chemd_markdown")
     } else if known_revisions

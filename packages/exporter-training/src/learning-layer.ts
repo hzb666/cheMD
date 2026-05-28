@@ -1,4 +1,3 @@
-import type { ChemdDocument, ChemdNode, ObservationNode } from "@chemd/core";
 import type { StepGraph } from "@chemd/step-ontology";
 
 import type {
@@ -20,7 +19,6 @@ import type {
 
 export interface BuildLearningLayerInput {
   document: ExportedDocumentInfo;
-  sourceDocument?: ChemdDocument;
   semanticLayer: SemanticLayerV1;
   stepGraph?: StepGraph;
 }
@@ -50,74 +48,16 @@ const buildProcedurePairs = (stepGraph: StepGraph | undefined): ProcedureToSteps
     diagnostics: procedure.diagnostics.map(exportDiagnostic)
   })) ?? [];
 
-const collectObservationNodes = (nodes: ChemdNode[]): ObservationNode[] =>
-  nodes.flatMap((node): ObservationNode[] => {
-    if (node.type === "observation") {
-      return [node];
-    }
-    if (node.type === "col") {
-      return collectObservationNodes(node.children);
-    }
-    if (node.type === "template") {
-      return collectObservationNodes(node.body);
-    }
-    return [];
-  });
-
-const normalizeReferenceId = (value: string): string =>
-  (value.trim().startsWith("@") ? value.trim().slice(1) : value.trim()).trim();
-
-const findTargetEntity = (
-  semanticLayer: SemanticLayerV1,
-  rawRef: string | undefined
-): { entity_id: string; source_node_type: string } | undefined => {
-  if (!rawRef) {
-    return undefined;
-  }
-
-  const fullRef = normalizeReferenceId(rawRef);
-  const baseRef = fullRef.split(".")[0] ?? fullRef;
-  return [
-    ...semanticLayer.condition_variation_attempts,
-    ...semanticLayer.condition_variations,
-    ...semanticLayer.reactions,
-    ...semanticLayer.results,
-    ...semanticLayer.analyses,
-    ...semanticLayer.samples,
-    ...semanticLayer.artifacts,
-    ...semanticLayer.molecules
-  ].find((entity) => entity.original_id === fullRef || entity.original_id === baseRef);
-};
-
 const buildObservationPairs = (
-  stepGraph: StepGraph | undefined,
-  sourceDocument: ChemdDocument | undefined,
-  semanticLayer: SemanticLayerV1
-): ObservationToEventsPairV03[] => {
-  const observationById = new Map(
-    collectObservationNodes(sourceDocument?.children ?? [])
-      .filter((observation) => observation.id)
-      .map((observation) => [observation.id as string, observation])
-  );
-
-  return stepGraph?.observations.map((observation, index) => {
-    const sourceObservation = observation.observationId
-      ? observationById.get(observation.observationId)
-      : undefined;
-    const target = findTargetEntity(semanticLayer, sourceObservation?.ref);
-
-    return {
+  stepGraph: StepGraph | undefined
+): ObservationToEventsPairV03[] =>
+  stepGraph?.observations.map((observation, index) => ({
     pair_id: `observation_to_events::${observation.observationId ?? index}`,
     observation_id: observation.observationId,
-    ref_raw: sourceObservation?.ref,
-    target_entity_id: target?.entity_id,
-    target_entity_type: target?.source_node_type,
     source_text: observation.events[0]?.rawText ?? "",
     events: observation.events,
     diagnostics: observation.diagnostics.map(exportDiagnostic)
-    };
-  }) ?? [];
-};
+  })) ?? [];
 
 const compactText = (...parts: Array<string | undefined>): string =>
   parts
@@ -616,7 +556,7 @@ const buildPredictionInstances = (
 
 export const buildLearningLayer = (input: BuildLearningLayerInput): LearningLayerV1 => {
   const procedurePairs = buildProcedurePairs(input.stepGraph);
-  const observationPairs = buildObservationPairs(input.stepGraph, input.sourceDocument, input.semanticLayer);
+  const observationPairs = buildObservationPairs(input.stepGraph);
 
   return {
     retrieval_chunks: buildRetrievalChunks(input.document, input.semanticLayer),

@@ -3,32 +3,6 @@ title: 领域模板库
 description: synthesis、analytical、polymer、electrochemistry 和 photochemistry 记录的共享起始模板。
 ---
 
-领域模板用于创建完整 `.chemd` 文件。它不同于文件内 `:::template` 与 `:::use`；后者只在单个源文件内复用片段。
+本文已切换到 program-first 语言契约。请使用 `.chemd` module、`meta`、declaration、`///` doc comment 和 `/*md */` documentation region 描述实验记录。语义事实来自 molecule、reaction、result、analysis、sample、artifact、condition_screen、procedure、trace、observation 和 agent run declarations。
 
-共享 catalog 位于 `@chemd/domain-templates`。CLI、web 和 desktop 都应读取这个 package，不复制模板正文。
-
-```bash
-pnpm chemd templates
-pnpm chemd templates --json
-pnpm chemd templates organic-synthesis/suzuki-screen
-pnpm chemd new organic-synthesis/suzuki-screen --out exp.chemd
-pnpm chemd new analytical/hplc-purity --out hplc.chemd --dry-run
-```
-
-## 当前 Template ID
-
-- `organic-synthesis/suzuki-screen`
-- `organic-synthesis/amide-coupling`
-- `organic-synthesis/oxidation`
-- `organic-synthesis/reduction`
-- `polymer/polymerization`
-- `analytical/nmr-only`
-- `analytical/hplc-purity`
-- `electrochemistry/electrochemical-reaction`
-- `photochemistry/photoredox`
-
-每个 catalog entry 都在测试中按当前语言契约编译。模板使用语言手册中的当前语法：`:::chemd` 对象、必要时的 material/batch 记录、结构化 reaction participant、类型化 analysis block、condition screen section、procedure controls 和 trace events。
-
-## 模板内部复用
-
-catalog 模板可以包含普通 Chemd `:::template` block，用于在生成文件里复用常见句子、method note 或 TLC lane note。method/profile reference 应表达为普通对象或引用，例如 HPLC method artifact 被 `analysis.method` 引用。
+参见 [program-v1 语言规格](/zh/docs/program-v1/language)。

@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 
-const CHEMD_GLOBS = ["*.chemd", "*.chemd.md"] as const;
+const CHEMD_GLOBS = ["*.chemd"] as const;
 
 export interface GitChangedFile {
   status: string;
@@ -22,6 +22,7 @@ export type GitRunner = (
 ) => GitRunResult;
 
 const normalizeGitPath = (filePath: string): string => filePath.replaceAll("\\", "/");
+const isChemdPath = (filePath: string): boolean => normalizeGitPath(filePath).toLowerCase().endsWith(".chemd");
 
 const defaultGitRunner: GitRunner = (args, options) => spawnSync("git", args, {
   cwd: options.cwd,
@@ -140,7 +141,7 @@ export const discoverChangedChemdFiles = ({
   return uniqueRecords([
     ...parseDiffNameStatus(tracked),
     ...parseUntrackedFiles(untracked)
-  ]);
+  ]).filter((record) => isChemdPath(record.path));
 };
 
 export const readGitFileAtRef = ({

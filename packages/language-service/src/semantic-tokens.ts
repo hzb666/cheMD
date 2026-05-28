@@ -25,7 +25,7 @@ export const CHEMD_SEMANTIC_TOKEN_MODIFIERS = [
   "sample",
   "procedure",
   "observation",
-  "template"
+  "condition_screen"
 ] as const;
 
 export type ChemdSemanticTokenType = typeof CHEMD_SEMANTIC_TOKEN_TYPES[number];
@@ -37,7 +37,6 @@ export interface ChemdSemanticToken {
   modifiers: ChemdSemanticTokenModifier[];
 }
 
-const blockHeaderPattern = /^(\s*:::)(\s*)([A-Za-z][\w-]*)(?:\s+(#[A-Za-z0-9_-]+))?/u;
 const programDeclarationPattern = /^(\s*)(molecule|material|batch|reaction|result|analysis|sample|artifact|condition_screen|procedure|observation|trace)\s+([A-Za-z_][\w-]*)(?:\s+for\s+@[A-Za-z0-9_.#/-]+)?\s*\{/u;
 const programModulePattern = /^(\s*)(module)\s+([A-Za-z_][\w-]*)/u;
 const programMetaPattern = /^(\s*)(meta)\s*\{/u;
@@ -214,32 +213,6 @@ export const buildChemdSemanticTokens = (
         type: "variable",
         modifiers: ["declaration"]
       });
-    }
-
-    const headerMatch = line.match(blockHeaderPattern);
-    if (headerMatch) {
-      const blockType = headerMatch[3] ?? "";
-      const blockTypeStart = (headerMatch[1]?.length ?? 0) + (headerMatch[2]?.length ?? 0);
-      pushToken(tokens, {
-        range: toRange(lineNumber, blockTypeStart, blockTypeStart + blockType.length),
-        type: "keyword",
-        modifiers: ["block"]
-      });
-
-      const declaration = headerMatch[4];
-      if (declaration) {
-        const declarationStart = line.indexOf(declaration);
-        const symbol = symbolById.get(declaration.slice(1));
-        const kindModifier = symbolKindModifier(symbol);
-        pushToken(tokens, {
-          range: toRange(lineNumber, declarationStart, declarationStart + declaration.length),
-          type: "variable",
-          modifiers: [
-            "declaration",
-            ...(kindModifier ? [kindModifier] : [])
-          ]
-        });
-      }
     }
 
     const fieldMatch = line.match(fieldPattern);

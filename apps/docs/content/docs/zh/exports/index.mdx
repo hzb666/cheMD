@@ -42,55 +42,54 @@ Field value schema metadata 是 compiler/tooling contract，不是单独的导�
 
 ## 最小源文件示例
 
-本节示例使用下面的紧凑记录：
+本节示例使用下面的 program-first 紧凑记录：
 
-```md
----
-id: exp-export-example
-title: Export example
-date: 2026-05-21
-primary_reaction: rxn-main
-primary_result: res-main
----
+```text
+module exp_export_example
 
-:::chemd #mol-a
-name: substrate A
-smiles: CCO
-:::
+meta {
+  id: "exp-export-example"
+  title: "Export example"
+  date: "2026-05-21"
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
 
-:::chemd #mol-b
-name: product B
-smiles: CC=O
-:::
+molecule mol_a {
+  name: "substrate A"
+  smiles: "CCO"
+}
 
-:::chemd #rxn-main
-reactant: @mol-a | 1.0 mmol | 1.0 eq | limiting=true
-product: @mol-b
-solvent: MeCN
-temperature: 60 C
-:::
+molecule mol_b {
+  name: "product B"
+  smiles: "CC=O"
+}
 
-:::result #res-main
-reaction: @rxn-main
-status: success
-yield: 78%
-:::
+reaction rxn_main {
+  reactants: [@mol_a]
+  products: [@mol_b]
+  solvent: "MeCN"
+  temperature: 60 C
+}
 
-:::analysis #nmr-main
-type: nmr
-ref: @res-main
-artifact: @raw-nmr-main
-:::
+result res_main for @rxn_main {
+  status: success
+  yield: 78%
+}
 
-:::procedure #proc-main
-reaction: @rxn-main
-step: add | id=s-add | inputs=@mol-a | outputs=mixture-main
-:::
+analysis ana_main for @res_main {
+  type: nmr
+  ref: @res_main
+}
 
-:::observation #obs-main
-ref: @rxn-main
-event: color_change | id=e-color | linkedStep=s-add | evidence=@nmr-main | color=yellow
-:::
+procedure proc_main for @rxn_main {
+  evidence: [@res_main]
+  step add = add(inputs: [@mol_a], outputs: [@mol_b])
+}
+
+observation obs_main for @rxn_main {
+  notes: "yellow solution"
+}
 ```
 
 后续页面分别说明每种导出结构和示例。

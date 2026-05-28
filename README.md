@@ -27,9 +27,8 @@ playground, a Tauri desktop IDE, and local chemistry services.
 - Program-first Chemd authoring with modules, meta declarations, imports,
   doc comments, molecules, reactions, results, analyses, samples, procedures,
   observations, traces, and agent audit declarations.
-- `.chemd` source files for product-facing authoring. Legacy frontmatter,
-  `:::` structured blocks, `template/use`, column layout syntax, and
-  `.chemd.md` compatibility are being removed by the program-v1 rewrite.
+- `.chemd` source files for product-facing authoring with program-v1 modules,
+  declarations, imports, doc comments, and Markdown documentation regions.
 - Experiment-logic enrichment that connects raw records to typed entities,
   resolved references, procedure steps, observations, field evidence,
   normalization facts, and knowledge-graph edges.
@@ -236,9 +235,9 @@ and declarations are the only semantic source of truth. Markdown remains
 available only through explicit documentation comments and `/*md */` regions;
 it is renderable and retrievable narrative, not a source of experiment facts.
 
-Legacy YAML frontmatter, `:::` structured blocks, `template/use`, column
-layout syntax, and `.chemd.md` compatibility are removed from the program-v1
-compiler path.
+The program-v1 compiler path accepts declaration syntax directly; older
+Markdown documents must be rewritten into modules and declarations before
+compilation.
 
 Program syntax:
 
@@ -561,8 +560,8 @@ and TLS termination belong at the reverse proxy in front of the web service.
 
 ## Runtime Notes
 
-- `.chemd` is the program-first authoring extension. `.chemd.md` compatibility
-  is being removed from the core compiler, workspace index, and desktop IDE.
+- `.chemd` is the program-first authoring extension used by the compiler,
+  workspace index, and desktop IDE.
 - RDKit-backed rendering requires the Python runtime to import RDKit
   successfully.
 - OCR defaults to placeholder providers; production OCR requires provider URLs

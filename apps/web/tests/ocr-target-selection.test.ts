@@ -4,36 +4,32 @@ import { selectTargetMolecule } from "../src/features/ocr/lib/select-target-mole
 import { selectTargetReaction } from "../src/features/ocr/lib/select-target-reaction";
 
 describe("OCR target selection", () => {
-  it("uses explicit reaction kind before field-shape inference", () => {
+  it("selects reaction declarations by declaration kind", () => {
     const source = [
-      ":::chemd #rxn-placeholder",
-      "kind: reaction",
-      ":::"
+      "reaction rxn-placeholder {",
+      "}",
     ].join("\n");
 
     expect(selectTargetReaction(source)?.blockId).toBe("rxn-placeholder");
     expect(selectTargetMolecule(source)).toBeNull();
   });
 
-  it("uses explicit molecule kind before reaction-shaped fields", () => {
+  it("selects molecule declarations even with reaction-shaped fields", () => {
     const source = [
-      ":::chemd #mol-conflict",
-      "kind: molecule",
-      "reactants: @a",
-      "products: @b",
-      ":::"
+      "molecule mol-conflict {",
+      "  reactants: [@a]",
+      "  products: [@b]",
+      "}",
     ].join("\n");
 
     expect(selectTargetMolecule(source)?.blockId).toBe("mol-conflict");
     expect(selectTargetReaction(source)).toBeNull();
   });
 
-  it("does not select kind-less chemd blocks as canonical edit targets", () => {
+  it("does not select plain fields as canonical edit targets", () => {
     const source = [
-      ":::chemd #rxn-main",
-      "reactants: @a",
-      "products: @b",
-      ":::"
+      "reactants: [@a]",
+      "products: [@b]",
     ].join("\n");
 
     expect(selectTargetReaction(source)).toBeNull();

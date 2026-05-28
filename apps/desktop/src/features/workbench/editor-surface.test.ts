@@ -66,15 +66,13 @@ describe("editor bottom panel sizing", () => {
 });
 
 describe("editor breadcrumbs", () => {
-  it("includes nested Chemd block labels for the active cursor line", () => {
-    const source = `:::procedure #proc-main
-:::step s-heat
-family: heat
-:::
-:::
+  it("includes nested Chemd declaration labels for the active cursor line", () => {
+    const source = `procedure proc-main {
+  step s-heat = heat(duration: 2 h)
+}
 `;
 
-    expect(getEditorBreadcrumbItems(source, 3, "run.chemd")).toEqual([
+    expect(getEditorBreadcrumbItems(source, 2, "run.chemd")).toEqual([
       "run.chemd",
       "procedure proc-main",
       "step s-heat",

@@ -64,13 +64,13 @@ export const buildSemanticPreview = (
     return buildFallbackPreview(input, "compile_failed", `Compile failed: ${input.error.message}`);
   }
 
-  const renderInput = input.result.program ?? input.result.document;
+  const renderInput = input.result.program;
   if (!renderInput) {
     return buildFallbackPreview(input, "missing_semantic_input", missingSemanticInputMessage);
   }
 
   const tree = buildRenderableNodeTree(renderInput, {
-    sourceId: input.documentUri ?? input.result.document.meta.id,
+    sourceId: input.documentUri ?? input.result.program.meta.id,
     typedGraph: input.result.typedSemanticGraph
   });
 
