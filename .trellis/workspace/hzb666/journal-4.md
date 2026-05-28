@@ -936,3 +936,37 @@ Changed RDKit reaction fingerprints from XOR change blocks to directional gained
 ### Next Steps
 
 - None - task complete
+
+
+## Session 163: Phase 0 program-first contract
+
+**Date**: 2026-05-28
+**Task**: Phase 0 program-first contract
+**Package**: desktop
+**Branch**: `develop`
+
+### Summary
+
+Published program-v1 language, AST, and export contracts in apps/docs, updated README positioning, completed the Phase 0 Trellis task, and verified docs coverage, docs typecheck, docs build, and diff whitespace checks.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `454aad1` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
