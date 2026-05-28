@@ -4,7 +4,7 @@ description: chemd/program-v1 的源码语法和被移除的 legacy 语法。
 ---
 
 `chemd/program-v1` 是 breaking-change language contract。它不为 legacy
-legacy Markdown 模型保留 parser fallback。
+Markdown 模型保留 parser fallback。
 
 ## 定位
 
@@ -34,11 +34,11 @@ reaction、result、procedure 或 agent facts。
 Program v1 移除以下语法，并且不做兼容 lowering：
 
 - `---` legacy metadata
-- `legacy fenced block`、`legacy fenced block`、`legacy fenced block`、`legacy fenced block` 等 fenced blocks
-- `legacy fenced block` 与 `legacy fenced block`
-- `legacy fenced block`、`legacy fenced block`、`legacy fenced block`
+- `:::chemd`、`:::procedure`、`:::result`、`:::analysis` 等 fenced blocks
+- `:::template`、`:::use` 和 template parameters
+- `:::col-N`、`col:` 和 rendered column layout syntax
 - 从 Markdown body text 推断语义事实
-- core compiler path 中的 `.chemd` 兼容
+- core compiler path 中的 `.chemd.md` 兼容
 
 Legacy source 必须先改写成 program syntax 才能编译。
 
@@ -88,6 +88,23 @@ procedure proc_var1 for @rxn_var1 {
   step charge = charge(inputs: [@mol_aryl])
   step heat = heat(temperature: 40 C, duration: 2 h, depends_on: [charge])
 }
+
+agent run repair_001 {
+  goal: "validate selected variant and bind primary result"
+  status: completed
+
+  tool compile_current_file {
+    status: ok
+    evidence: [@rxn_var1, @res_var1]
+  }
+
+  patch proposed {
+    title: "bind primary_result"
+    edit meta.primary_result = @res_var1
+  }
+
+  decision approved
+}
 ```
 
 ## Grammar Sketch
@@ -102,6 +119,9 @@ declaration      := molecule_decl | material_decl | batch_decl | reaction_decl
                   | result_decl | analysis_decl | sample_decl | artifact_decl
                   | condition_screen_decl | procedure_decl | observation_decl
                   | trace_decl | agent_run_decl
+result_decl      := "result" ident ("for" reference)? block
+procedure_decl   := "procedure" ident ("for" reference)? procedure_block
+agent_run_decl   := "agent" "run" ident block
 reference        := "@" reference_target ("." ident)?
 reference_target := ident | ident "." ident | ident "#" ident
 ```
@@ -121,12 +141,13 @@ Legacy syntax diagnostics 是 fatal parser diagnostics。它们说明移除原�
 | Code | Trigger |
 | --- | --- |
 | `E_LEGACY_FRONTMATTER_REMOVED` | Source starts legacy metadata with `---` |
-| `E_LEGACY_FENCED_BLOCK_REMOVED` | Source contains a legacy `legacy fenced block` block |
-| `E_LEGACY_TEMPLATE_REMOVED` | Source contains `legacy fenced block`, `legacy fenced block`, or legacy template parameters |
-| `E_LEGACY_COLUMN_LAYOUT_REMOVED` | Source contains `legacy fenced block`, `legacy fenced block`, `legacy fenced block`, or rendered rendering guidance |
+| `E_LEGACY_FENCED_BLOCK_REMOVED` | Source contains a legacy `:::` fenced block |
+| `E_LEGACY_TEMPLATE_REMOVED` | Source contains `:::template`, `:::use`, or legacy template parameters |
+| `E_LEGACY_COLUMN_LAYOUT_REMOVED` | Source contains `:::col-N`, `col:`, or rendered column layout syntax |
 
 ## IDE Contract
 
 Language service 基于 program declarations 工作，而不是 Markdown blocks。Outline、
 hover、completion、diagnostics、source ranges 和 patch targets 必须使用
 declaration IDs、field paths、doc comment IDs、procedure step IDs 和 agent run IDs。
+Legacy block snippets 不应再出现在 completion 中。

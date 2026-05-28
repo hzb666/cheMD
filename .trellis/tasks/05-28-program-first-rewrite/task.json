@@ -26,11 +26,12 @@
     "05-29-05-28-program-first-phase-4-compiler-pipeline",
     "05-29-05-28-program-first-phase-5-render-export",
     "05-29-05-28-program-first-phase-6-ide-storage",
-    "05-29-05-28-program-first-phase-7-cleanup"
+    "05-29-05-28-program-first-phase-7-cleanup",
+    "05-29-program-first-docs-plan-comparison"
   ],
   "parent": null,
   "relatedFiles": [],
-  "notes": "All planned phases from D:\\download\\chemd-program-rewrite-implementation-plan.md are implemented. Root docs/ was not modified; user-facing docs were updated under apps/docs.",
+  "notes": "All planned phases from D:\\download\\chemd-program-rewrite-implementation-plan.md are implemented. A follow-up comparison closed remaining apps/docs drift. Root docs/ was not modified; user-facing docs were updated under apps/docs.",
   "meta": {
     "completedThrough": "05-29-05-28-program-first-phase-7-cleanup",
     "verification": [

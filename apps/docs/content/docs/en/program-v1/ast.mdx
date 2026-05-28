@@ -4,8 +4,7 @@ description: ChemdProgramDocument, declarations, values, doc comments, and migra
 ---
 
 `chemd-program-ast/v1` is the public AST contract for the program-first
-rewrite. Runtime code changes come later, but downstream packages should align
-to this shape.
+rewrite. Downstream packages should align to this shape.
 
 ## Removed Public Contract
 
@@ -22,8 +21,9 @@ ColNode
 syntaxOrigin
 ```
 
-There is no legacy lowering path from frontmatter, `legacy fenced block` blocks,
-`program declaration reuse`, or rendered layout nodes into program AST.
+There is no legacy lowering path from frontmatter, `:::chemd`/`:::procedure`
+fenced blocks, `:::template`/`:::use` reuse, or `:::col-N` rendered layout nodes
+into program AST.
 
 ## Program Document
 

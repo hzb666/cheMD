@@ -29,7 +29,7 @@ The following reference lists common diagnostics by source and purpose. Use it t
 | `E_CONDITION_ATTEMPT_DUPLICATE_FIELD` | Attempt repeats a declared factor or outcome field |
 | `E_CONDITION_ATTEMPT_UNKNOWN_FIELD` | Attempt field was not declared as a factor or outcome |
 
-## `legacy fenced block`
+## Removed Legacy Blocks
 
 | Code | Meaning |
 | --- | --- |
@@ -46,7 +46,7 @@ The following reference lists common diagnostics by source and purpose. Use it t
 | `E_MISSING_REQUIRED_FIELD` | Missing resolver-required object field |
 | `W_UNRESOLVED_REFERENCE` | Reference target or field cannot be resolved |
 | `E_INVALID_PRIMARY_REFERENCE` | `primary_*` points to a missing object |
-| `E_UNKNOWN_TEMPLATE` | `legacy fenced block` references a missing template |
+| `E_UNKNOWN_TEMPLATE` | Legacy `:::use` references a missing `:::template` |
 | `E_TEMPLATE_CYCLE` | Recursive template expansion |
 | `E_TEMPLATE_EXPANSION_LIMIT` | Template expansion exceeds depth or node limits |
 | `E_TEMPLATE_PARAM_MISSING` | Template call is missing a parameter |
@@ -146,9 +146,9 @@ The following reference lists common diagnostics by source and purpose. Use it t
 | `W_UNRESOLVED_DOC_REFERENCE` | Documentation reference cannot be resolved |
 | `E_LEGACY_` | Removed legacy syntax was detected |
 | `E_LEGACY_FRONTMATTER_REMOVED` | legacy metadata is removed in program-v1 |
-| `E_LEGACY_FENCED_BLOCK_REMOVED` | `legacy fenced block` structured blocks are removed in program-v1 |
-| `E_LEGACY_TEMPLATE_REMOVED` | Legacy program declaration reuse syntax is removed in program-v1 |
-| `E_LEGACY_COLUMN_LAYOUT_REMOVED` | Legacy rendered rendering guidance is removed in program-v1 |
+| `E_LEGACY_FENCED_BLOCK_REMOVED` | Legacy `:::` structured blocks are removed in program-v1 |
+| `E_LEGACY_TEMPLATE_REMOVED` | Legacy `:::template` and `:::use` syntax is removed in program-v1 |
+| `E_LEGACY_COLUMN_LAYOUT_REMOVED` | Legacy `:::col-N` rendered layout syntax is removed in program-v1 |
 
 ## Program Procedure and Agent
 
@@ -196,9 +196,9 @@ The following reference lists common diagnostics by source and purpose. Use it t
 
 | Code | Meaning |
 | --- | --- |
-| `W_INVALID_COL_COLUMNS` | Invalid `legacy fenced block` column count |
+| `W_INVALID_COL_COLUMNS` | Invalid legacy `:::col-N` column count |
 | `W_COL_COUNT_MISMATCH` | `col:` child count differs from column count |
-| `W_INVALID_COL_CHILD` | Invalid child line inside `legacy fenced block` |
+| `W_INVALID_COL_CHILD` | Invalid child line inside legacy `:::col-N` |
 | `W_UNTERMINATED_BRACE_BLOCK` | `col: { ... }` content is not closed |
 | `W_AUTHORING_FIX_AVAILABLE` | Compiler can provide a safe fix suggestion |
 | `W_AUTHORING_INPUT_REQUIRED` | Fix requires user input |
@@ -216,4 +216,3 @@ The following reference lists common diagnostics by source and purpose. Use it t
 ## Fix Order
 
 Fix errors before warnings. A stable order is frontmatter, block IDs, unknown fields, required fields, references, template parameters, quantities, step dependencies, and route graph diagnostics.
-

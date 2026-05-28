@@ -4,7 +4,7 @@ description: ChemdProgramDocument、declarations、values、doc comments 和迁�
 ---
 
 `chemd-program-ast/v1` 是 program-first rewrite 的 public AST contract。
-运行时代码在后续阶段迁移，但下游 packages 应对齐这个形状。
+下游 packages 应对齐这个形状。
 
 ## 移除的 Public Contract
 
@@ -21,8 +21,8 @@ ColNode
 syntaxOrigin
 ```
 
-frontmatter、`legacy fenced block` blocks、`program declaration reuse` 或 rendered layout nodes 不会 legacy
-lowering 到 program AST。
+frontmatter、`:::chemd`/`:::procedure` fenced blocks、`:::template`/`:::use`
+复用语法，或 `:::col-N` rendered layout nodes 都不会 legacy lowering 到 program AST。
 
 ## Program Document
 
