@@ -20,7 +20,8 @@
   "subtasks": [],
   "children": [
     "05-28-program-first-phase-0-spec",
-    "05-28-program-first-phase-1-core-ast"
+    "05-28-program-first-phase-1-core-ast",
+    "05-28-program-first-phase-2-parser"
   ],
   "parent": null,
   "relatedFiles": [],

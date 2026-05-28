@@ -1,18 +1,17 @@
-import { createDocument } from "@chemd/core";
-import { parseBody } from "./body/parse-body";
-import type { ParserOptions } from "./body/block-parsers/types";
-import { parseFrontmatter } from "./frontmatter/parse-frontmatter";
+import {
+  parseChemdProgram,
+  type ParseChemdProgramOptions
+} from "./program";
 
-export type ParseChemdOptions = ParserOptions;
+export type ParseChemdOptions = ParseChemdProgramOptions;
 
-export const parseChemd = (source: string, options: ParseChemdOptions = {}) => {
-  const parsed = parseFrontmatter(source);
-  const body = parseBody(parsed.body, options);
+export const parseChemd = (
+  source: string,
+  options: ParseChemdOptions = {}
+) => parseChemdProgram(source, options);
 
-  return createDocument(parsed.meta, {
-    children: body.children,
-    diagnostics: [...parsed.diagnostics, ...body.diagnostics],
-    source,
-    renderSelection: parsed.renderSelection
-  });
-};
+export {
+  parseChemdProgram,
+  ProgramParserCursor,
+  type ParseChemdProgramOptions
+} from "./program";
