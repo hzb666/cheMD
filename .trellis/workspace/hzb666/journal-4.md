@@ -970,3 +970,48 @@ Published program-v1 language, AST, and export contracts in apps/docs, updated R
 ### Next Steps
 
 - None - task complete
+
+
+## Session 164: Phase 1 core program AST
+
+**Date**: 2026-05-28
+**Task**: Phase 1 core program AST
+**Package**: core
+**Branch**: `develop`
+
+### Summary
+
+Added additive program-first core AST and declaration schema contracts with focused tests and Trellis Phase 1 status.
+
+### Main Changes
+
+- Introduced additive program-first AST contracts under packages/core/src/program-ast.
+- Added declaration schema and program-specific declaration value schema helpers.
+- Exported the new contracts from @chemd/core while preserving legacy AST/block-schema APIs.
+- Added focused core tests for program document shape, reference forms, doc attachments, and declaration schema lookup.
+- Addressed read-only review findings before commit: program reference targets, agent cancelled status, and documented reference raw syntax.
+
+Verification:
+- pnpm --filter @chemd/core test: passed, 1 file / 15 tests.
+- pnpm --filter @chemd/core typecheck: passed.
+- python .trellis\scripts\task.py validate .trellis\tasks\05-28-program-first-phase-1-core-ast: passed.
+- git diff --check: passed with CRLF warnings only.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `00bb45b` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
