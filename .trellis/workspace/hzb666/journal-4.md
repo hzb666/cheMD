@@ -1062,3 +1062,67 @@ Verification:
 ### Next Steps
 
 - None - task complete
+
+
+## Session 166: Phase 3 resolver and typechecker
+
+**Date**: 2026-05-29
+**Task**: Phase 3 resolver and typechecker
+**Package**: core
+**Branch**: `develop`
+
+### Summary
+
+Replaced resolver/typechecker with program-first symbol resolution, schema validation, typed graph generation, route augmentation, procedure control lowering, and agent timeline validation.
+
+### Main Changes
+
+Phase 3 completed resolver/typechecker replacement.
+
+Commit: ea02a77
+
+Scope:
+- Replaced resolver public path with ChemdProgramDocument symbols and reference resolution.
+- Replaced typechecker public path with program declaration schema validation and typed graph generation.
+- Added program reaction route augmentation with external route context.
+- Added agent audit timeline parsing and terminal status validation.
+- Added recursive procedure control lowering.
+- Removed legacy resolver/typechecker traversal helpers and tests from public Phase 3 paths.
+
+Review:
+- Subagent 019e6f44-1055-75e1-8453-7d178485d926 reviewed Phase 3.
+- Addressed route options/next/cycle/orphan coverage.
+- Addressed agent terminal timeline parse/positive coverage.
+- Addressed nested procedure control lowering coverage.
+- Kept legacy type aliases only for temporary compatibility while adding ProgramSourceMetadata.
+
+Verification:
+- pnpm --filter @chemd/resolver test
+- pnpm --filter @chemd/resolver typecheck
+- pnpm --filter @chemd/typechecker test
+- pnpm --filter @chemd/typechecker typecheck
+- pnpm --filter @chemd/parser test
+- pnpm --filter @chemd/parser typecheck
+- pnpm --filter @chemd/core test
+- pnpm --filter @chemd/core typecheck
+- git diff --check
+- git diff -- docs apps\docs --name-only
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ea02a77` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-4.md`
-- **Total Sessions**: 165
-- **Last Active**: 2026-05-28
+- **Total Sessions**: 166
+- **Last Active**: 2026-05-29
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-4.md` | ~1064 | Active |
+| `journal-4.md` | ~1128 | Active |
 | `journal-3.md` | ~1994 | Archived |
 | `journal-2.md` | ~1956 | Archived |
 | `journal-1.md` | ~1998 | Archived |
@@ -32,6 +32,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 166 | 2026-05-29 | Phase 3 resolver and typechecker | `ea02a77` | `develop` |
 | 165 | 2026-05-28 | Phase 2 parser replacement | `a865a6c` | `develop` |
 | 164 | 2026-05-28 | Phase 1 core program AST | `00bb45b` | `develop` |
 | 163 | 2026-05-28 | Phase 0 program-first contract | `454aad1` | `develop` |
