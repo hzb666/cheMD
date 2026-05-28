@@ -2,98 +2,77 @@ import { describe, expect, it } from "vitest";
 
 import { applyDiagnosticQuickFix, type DiagnosticWithQuickFixes } from "../src/index";
 
+const diagnostic: DiagnosticWithQuickFixes = {
+  code: "W_AUTHORING_FIX_AVAILABLE",
+  severity: "warning",
+  message: "Declaration is missing a conservative program field.",
+  sourceLayer: "compiler",
+  sourceNodeId: "res_main"
+};
+
 describe("applyDiagnosticQuickFix", () => {
-  it("inserts a selected chemd kind into the matching block", () => {
-    const source = `:::chemd #rxn-main
-reactants: @a
-products: @b
-:::`;
-    const diagnostic: DiagnosticWithQuickFixes = {
-      code: "W_CHEMD_KIND_AMBIGUOUS",
-      severity: "error",
-      message: "Chemd block kind cannot be inferred; declare kind explicitly.",
-      sourceNodeId: "rxn-main"
-    };
+  it("applies a conservative declaration field patch", () => {
+    const source = `module exp_quick_fix
+
+meta {
+  id: "exp-quick-fix"
+  title: "Quick fix"
+  date: "2026-05-29"
+}
+
+result res_main {
+  status: success
+}
+`;
 
     expect(applyDiagnosticQuickFix(source, diagnostic, {
-      title: "Insert kind",
-      kind: "insert_chemd_kind",
-      patch: { source_node_id: "rxn-main", kind: "reaction" }
-    })).toBe(`:::chemd #rxn-main
-kind: reaction
-reactants: @a
-products: @b
-:::`);
-  });
-
-  it("infers a missing chemd kind from block fields when the patch omits kind", () => {
-    const source = `:::chemd #mol-main
-smiles: CCO
-:::`;
-    const diagnostic: DiagnosticWithQuickFixes = {
-      code: "W_CHEMD_KIND_AMBIGUOUS",
-      severity: "error",
-      message: "Chemd block should declare kind.",
-      sourceNodeId: "mol-main"
-    };
-
-    expect(applyDiagnosticQuickFix(source, diagnostic, {
-      title: "Insert kind",
-      kind: "insert_chemd_kind",
-      patch: { source_node_id: "mol-main" }
-    })).toBe(`:::chemd #mol-main
-kind: molecule
-smiles: CCO
-:::`);
-  });
-
-  it("does not patch anonymous chemd blocks without a stable target id", () => {
-    const source = [
-      ":::chemd",
-      "smiles: CCO",
-      ":::",
-      "",
-      ":::chemd",
-      "reactants: @a",
-      "products: @b",
-      ":::"
-    ].join("\n");
-    const diagnostic: DiagnosticWithQuickFixes = {
-      code: "W_CHEMD_KIND_AMBIGUOUS",
-      severity: "error",
-      message: "Chemd block kind cannot be inferred; declare kind explicitly."
-    };
-
-    expect(applyDiagnosticQuickFix(source, diagnostic, {
-      title: "Insert kind",
-      kind: "insert_chemd_kind",
-      patch: { kind: "reaction" }
-    })).toBe(source);
-  });
-
-  it("applies a conservative authoring patch quick fix", () => {
-    const source = `:::result #res-main
-status: success
-:::`;
-    const diagnostic: DiagnosticWithQuickFixes = {
-      code: "W_AUTHORING_FIX_AVAILABLE",
-      severity: "warning",
-      message: "Result block is missing a reaction ref.",
-      sourceLayer: "compiler",
-      sourceNodeId: "res-main"
-    };
-
-    expect(applyDiagnosticQuickFix(source, diagnostic, {
-      title: "为 res-main 补 ref",
+      title: "Bind result",
       kind: "apply_authoring_patch",
       patch: {
-        kind: "insert_field_line",
-        blockId: "res-main",
-        line: "ref: rxn-main"
+        kind: "insert_declaration_field",
+        declarationId: "res_main",
+        line: "reaction: @rxn_main"
       }
-    })).toBe(`:::result #res-main
-ref: rxn-main
-status: success
-:::`);
+    })).toContain(`result res_main {
+  status: success
+  reaction: @rxn_main
+}`);
+  });
+
+  it("applies a conservative meta field patch", () => {
+    const source = `module exp_quick_fix
+
+meta {
+  id: "exp-quick-fix"
+  title: "Quick fix"
+  date: "2026-05-29"
+}
+`;
+
+    expect(applyDiagnosticQuickFix(source, diagnostic, {
+      title: "Bind primary result",
+      kind: "apply_authoring_patch",
+      patch: {
+        kind: "insert_meta_field",
+        line: "primary_result: @res_main",
+        anchorFields: ["date"]
+      }
+    })).toContain(`  date: "2026-05-29"
+  primary_result: @res_main`);
+  });
+
+  it("ignores removed legacy quick-fix kinds", () => {
+    const source = `module exp_quick_fix
+
+reaction rxn_main {
+  reactants: [substrate]
+}
+`;
+
+    expect(applyDiagnosticQuickFix(source, diagnostic, {
+      title: "Insert kind",
+      kind: "insert_chemd_kind",
+      patch: { source_node_id: "rxn_main", kind: "reaction" }
+    })).toBe(source);
   });
 });

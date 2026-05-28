@@ -4,6 +4,7 @@ import type { ChemdTrainingExportV2 } from "@chemd/exporter-training";
 import type {
   AuthoringAssistance,
   AuthoringPatch,
+  AuthoringTarget,
   AuthoringSuggestion
 } from "./authoring-types";
 
@@ -27,10 +28,31 @@ const readSourceField = (patch: AuthoringPatch): string | undefined => {
     })[0];
   }
 
-  return patch.kind === "insert_field_line"
-    || patch.kind === "insert_frontmatter_line"
+  return patch.kind === "insert_declaration_field"
+    || patch.kind === "insert_meta_field"
     ? readFieldFromLine(patch.line)
     : undefined;
+};
+
+const readSourceNodeId = (target: AuthoringTarget | undefined): string | undefined => {
+  if (!target) return undefined;
+  if (target.kind === "document") return target.documentId;
+  if (target.kind === "declaration") return target.declarationId;
+  if (target.kind === "declaration_field") return target.declarationId;
+  if (target.kind === "doc_comment") return target.docId;
+  return undefined;
+};
+
+const readTargetFacts = (target: AuthoringTarget | undefined): Record<string, string> => {
+  if (!target) return {};
+  if (target.kind === "declaration_field") {
+    return {
+      target_kind: target.kind,
+      target_declaration_id: target.declarationId,
+      target_field: target.field
+    };
+  }
+  return { target_kind: target.kind };
 };
 
 const createApplyPatchQuickFix = (
@@ -47,13 +69,14 @@ const buildSuggestionDiagnostic = (suggestion: AuthoringSuggestion): Diagnostic 
     code: "W_AUTHORING_FIX_AVAILABLE",
     severity: "warning",
     message: suggestion.description,
-    nodeId: suggestion.target_block_id,
+    nodeId: readSourceNodeId(suggestion.target),
     sourceLayer: "compiler",
-    sourceNodeId: suggestion.target_block_id,
+    sourceNodeId: readSourceNodeId(suggestion.target),
     sourceField: readSourceField(suggestion.patch),
     facts: {
       authoring_category: suggestion.category,
-      suggestion_id: suggestion.suggestion_id
+      suggestion_id: suggestion.suggestion_id,
+      ...readTargetFacts(suggestion.target)
     },
     quickFixes: [createApplyPatchQuickFix(suggestion.title, suggestion.patch)]
   });
@@ -89,7 +112,7 @@ export const buildAuthoringDiagnostics = (
     || trainingExport.semantic_layer.condition_variations.length > 0
     || trainingExport.semantic_layer.condition_variation_attempts.length > 0
     || trainingExport.source_layer.raw_children.some((node) =>
-      ["procedure", "observation", "result", "analysis", "reaction", "condition_varies"].includes(node.node_type)
+      ["procedure", "observation", "result", "analysis", "reaction", "condition_screen"].includes(node.node_type)
     )
       ? assistance.minimal_sets
       : []

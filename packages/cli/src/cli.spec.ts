@@ -15,8 +15,14 @@ import {
 } from "./cli";
 import type { GitRunner } from "./git-changed";
 
+type CliRunOptions = NonNullable<Parameters<typeof runChemdCli>[1]>;
+
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const exampleAgentLoopDriverPath = path.join(packageRoot, "examples", "mock-agent-loop-driver.mjs");
+const programGoldenFixture = readFileSync(
+  path.join(packageRoot, "..", "compiler", "fixtures", "program-golden-suzuki-screen.chemd"),
+  "utf8"
+);
 
 const createWriter = () => {
   let value = "";
@@ -42,186 +48,204 @@ const withTempDir = async <T>(callback: (dir: string) => Promise<T>): Promise<T>
   }
 };
 
-const validSource = `---
-id: exp-cli-valid
-title: CLI Valid
-date: 2026-04-19
----
+const validSource = `module exp_cli_valid
 
-:::chemd #mol-main
-kind: molecule
-smiles: CCO
-:::
+meta {
+  id: "exp-cli-valid"
+  title: "CLI Valid"
+  date: "2026-04-19"
+  primary_molecule: @mol_main
+}
+
+/// Main molecule.
+molecule mol_main {
+  smiles: "CCO"
+}
 `;
 
-const invalidKindSource = `---
-id: exp-cli-invalid
-title: CLI Invalid
-date: 2026-04-19
----
+const invalidKindSource = `module exp_cli_invalid
 
-:::chemd #mol-main
-kind: reagent
-smiles: CCO
-:::
+meta {
+  id: "exp-cli-invalid"
+  title: "CLI Invalid"
+  date: "2026-04-19"
+}
+
+INVALID_PROGRAM
 `;
 
-const fixableSource = `---
-id: exp-cli-fix
-title: CLI Fix
-date: 2026-04-24
----
+const fixableSource = `module exp_cli_fix
 
-:::chemd #rxn-main
-kind: reaction
-reactants: substrate
-products: product
-:::
+meta {
+  id: "exp-cli-fix"
+  title: "CLI Fix"
+  date: "2026-04-24"
+}
 
-:::result #res-main
-status: success
-yield: 72%
-:::
+reaction rxn_main {
+  reactants: [substrate]
+  products: [product]
+}
 
-:::analysis #ana-main
-type: tlc
-result: one major spot
-:::
+result res_main {
+  status: success
+  yield: 72%
+}
+
+analysis ana_main {
+  type: tlc
+  notes: "one major spot"
+}
 `;
 
-const fixNeedsInputSource = `---
-id: exp-cli-fix-input
-title: CLI Fix Input
-date: 2026-04-24
----
+const fixNeedsInputSource = `module exp_cli_fix_input
 
-:::chemd #rxn-main
-kind: reaction
-reactants: substrate
-products: product
-:::
+meta {
+  id: "exp-cli-fix-input"
+  title: "CLI Fix Input"
+  date: "2026-04-24"
+}
+
+reaction rxn_open {
+  reactants: [substrate]
 `;
 
-const beforeDiffSource = `---
-id: exp-cli-diff
-title: CLI Diff Before
-date: 2026-04-19
----
+const agentLoopNeedsRewriteSource = `module exp_cli_agent_bad
 
-:::chemd #rxn-main
-kind: reaction
-reac: CCO
-prod: CC=O
-temperature: 25 C
-:::
+meta {
+  id: "exp-cli-agent-bad"
+  title: "CLI Agent Bad"
+  date: "2026-04-24"
+}
 
-:::result #res-main
-yield: 23%
-:::
-
-:::sample #sample-old
-name: old sample
-:::
+INVALID_PROGRAM
 `;
 
-const afterDiffSource = `---
-id: exp-cli-diff
-title: CLI Diff After
-date: 2026-04-19
----
+const beforeDiffSource = `module exp_cli_diff
 
-:::chemd #rxn-main
-kind: reaction
-reac: CCO
-prod: CC=O
-temperature: 80 C
-:::
+meta {
+  id: "exp-cli-diff"
+  title: "CLI Diff Before"
+  date: "2026-04-19"
+}
 
-:::result #res-main
-yield: 41%
-:::
+reaction rxn_main {
+  reac: "CCO"
+  prod: "CC=O"
+  temperature: 25 C
+}
 
-:::analysis #ana-new
-type: tlc
-result: clean
-:::
+result res_main for @rxn_main {
+  yield: 23%
+}
+
+sample sample_old {
+  name: "old sample"
+}
 `;
 
-const noExplicitIdBeforeSource = `---
-id: exp-cli-no-id
-title: CLI No ID Before
-date: 2026-04-19
----
+const afterDiffSource = `module exp_cli_diff
 
-:::chemd
-kind: molecule
-smiles: CCO
-:::
+meta {
+  id: "exp-cli-diff"
+  title: "CLI Diff After"
+  date: "2026-04-19"
+}
+
+reaction rxn_main {
+  reac: "CCO"
+  prod: "CC=O"
+  temperature: 80 C
+}
+
+result res_main for @rxn_main {
+  yield: 41%
+}
+
+analysis ana_new for @res_main {
+  type: tlc
+  result: "clean"
+}
 `;
 
-const noExplicitIdAfterSource = `---
-id: exp-cli-no-id
-title: CLI No ID After
-date: 2026-04-19
----
+const noExplicitIdBeforeSource = `module exp_cli_no_id
 
-:::chemd
-kind: molecule
-smiles: CCC
-:::
+meta {
+  id: "exp-cli-no-id"
+  title: "CLI No ID Before"
+  date: "2026-04-19"
+}
 `;
 
-const graphFamilyASource = `---
-id: exp-cli-graph-a
-title: CLI Graph A
-date: 2026-04-21
----
+const noExplicitIdAfterSource = `module exp_cli_no_id
 
-:::chemd #rxn-a
-kind: reaction
-name: esterification of acid A
-reactants: acid-a | alcohol
-products: ester-a
-:::
-
-:::procedure #proc-a
-step: add | materials=acid-a
-step: add | materials=alcohol
-step: hold | duration=12 h
-step: concentrate
-:::
+meta {
+  id: "exp-cli-no-id"
+  title: "CLI No ID After"
+  date: "2026-04-19"
+}
 `;
 
-const graphFamilyBSource = `---
-id: exp-cli-graph-b
-title: CLI Graph B
-date: 2026-04-23
----
+const graphFamilyASource = `module exp_cli_graph_a
 
-:::chemd #rxn-b
-kind: reaction
-name: esterification of acid B
-reactants: acid-b | alcohol
-products: ester-b
-:::
+meta {
+  id: "exp-cli-graph-a"
+  title: "CLI Graph A"
+  date: "2026-04-21"
+}
 
-:::procedure #proc-b
-step: add | materials=acid-b
-step: add | materials=alcohol
-step: hold | duration=12 h
-step: concentrate
-:::
+reaction rxn_a {
+  name: "esterification of acid A"
+  reactants: ["acid-a", "alcohol"]
+  products: ["ester-a"]
+}
+
+procedure proc_a for @rxn_a {
+  step add_acid = add(materials: ["acid-a"])
+  step add_alcohol = add(materials: ["alcohol"])
+  step hold = hold(duration: 12 h)
+  step concentrate = concentrate()
+}
 `;
 
-const preflightSource = `---
-id: exp-cli-preflight
-title: CLI Preflight
-date: 2026-05-20
----
+const graphFamilyBSource = `module exp_cli_graph_b
 
-:::procedure #proc-main
-step: heat | id=s-heat | temperature=80 C | duration=30 min
-:::
+meta {
+  id: "exp-cli-graph-b"
+  title: "CLI Graph B"
+  date: "2026-04-23"
+}
+
+reaction rxn_b {
+  name: "esterification of acid B"
+  reactants: ["acid-b", "alcohol"]
+  products: ["ester-b"]
+}
+
+procedure proc_b for @rxn_b {
+  step add_acid = add(materials: ["acid-b"])
+  step add_alcohol = add(materials: ["alcohol"])
+  step hold = hold(duration: 12 h)
+  step concentrate = concentrate()
+}
+`;
+
+const preflightSource = `module exp_cli_preflight
+
+meta {
+  id: "exp-cli-preflight"
+  title: "CLI Preflight"
+  date: "2026-05-20"
+}
+
+reaction rxn_main {
+  reactants: [substrate]
+  products: [product]
+}
+
+procedure proc_main for @rxn_main {
+  step s_heat = heat(temperature: 80 C, duration: 30 min)
+}
 `;
 
 const proseImportSource = "加入 n-BuLi 后体系逐渐变深红色。";
@@ -231,7 +255,7 @@ const proseImportPartialCoverageSource =
 const runInTempDir = async (
   argv: string[],
   files: Record<string, string>,
-  options: { gitRunner?: GitRunner } = {}
+  options: CliRunOptions = {}
 ) => withTempDir(async (dir) => {
   for (const [fileName, source] of Object.entries(files)) {
     writeFileSync(path.join(dir, fileName), source);
@@ -271,7 +295,233 @@ const createGitRunner = ({
   return { status: 1, stdout: "", stderr: `unexpected git args: ${args.join(" ")}` };
 };
 
-describe("chemd cli help validation export and fix", () => {
+const parseProgramFields = (body: string): Record<string, unknown> =>
+  Object.fromEntries(
+    [...body.matchAll(/^\s*([A-Za-z_][\w-]*):\s*(.+)$/gm)]
+      .map(([, key, value]) => [key, value.replace(/^"|"$/g, "")])
+  );
+
+const createProgramCompileResult = (source: string) => {
+  const id = source.match(/id:\s*"([^"]+)"/)?.[1] ?? "exp-cli-mock";
+  const moduleName = source.match(/^module\s+([A-Za-z_][\w]*)/m)?.[1] ?? "exp_cli_mock";
+  const diagnostics = source.includes("INVALID_PROGRAM")
+    ? [{
+        code: "E_PROGRAM_DECLARATION_EXPECTED",
+        severity: "error" as const,
+        message: "Expected a program declaration."
+      }]
+    : [];
+  const governanceDiagnostics = source.includes("PII_PROGRAM")
+    ? [
+        {
+          code: "E_TRAINING_PII_PRESENT",
+          message: "PII is present in the program.",
+          severity: "error" as const
+        },
+        {
+          code: "W_TRAINING_RAG_NOT_ALLOWED",
+          message: "RAG reuse is not allowed.",
+          severity: "warning" as const
+        },
+        {
+          code: "W_TRAINING_AUDIT_ONLY",
+          message: "Only audit reuse is allowed.",
+          severity: "warning" as const
+        }
+      ]
+    : [];
+  const declarations = [...source.matchAll(
+    /^(molecule|reaction|result|analysis|sample|procedure)\s+([A-Za-z_][\w]*)[^{]*\{([\s\S]*?)^}/gm
+  )].map(([, kind, declarationId, body]) => ({
+    docs: [],
+    fields: parseProgramFields(body),
+    id: declarationId,
+    kind,
+    qualifiedId: `${moduleName}.${declarationId}`
+  }));
+  const docs = [...source.matchAll(/^\/\/\/\s?(.*)$/gm)]
+    .map(([, markdown], index) => ({
+      attachment: { kind: "file" },
+      id: `doc_${index + 1}`,
+      markdown,
+      type: "doc_comment"
+    }));
+  const program = {
+    declarations,
+    diagnostics,
+    docs,
+    imports: [],
+    meta: {
+      date: "2026-04-19",
+      id,
+      title: "CLI Program"
+    },
+    module: {
+      docs: [],
+      kind: "module",
+      name: moduleName
+    },
+    schemaVersion: "chemd-program-ast/v1",
+    sourceLanguage: "chemd/program-v1",
+    type: "program_document"
+  };
+
+  return {
+    authoringAssistance: {},
+    declarations,
+    diagnostics,
+    docxBridge: "",
+    docs,
+    document: program,
+    html: "",
+    json: JSON.stringify(program),
+    lnf: { schemaVersion: "chemd-lnf/v0.5" },
+    program,
+    ragExport: {
+      chunks: [{ id: `${id}:summary`, text: "program summary" }],
+      governance: { allowed_uses: ["rag"] },
+      schema_version: "chemd-rag-export/v0.1"
+    },
+    renderAdapterPayload: {},
+    renderOptions: {},
+    runPlan: {},
+    runtimePreflight: {},
+    stepGraph: {},
+    trainingExport: {
+      governance: { source: "workspace_policy" },
+      quality_layer: {
+        governance_quality: { diagnostics: governanceDiagnostics },
+        training_quality: { review_required: source.includes("PII_PROGRAM"), review_reasons: [] }
+      },
+      schema_version: "chemd-training-export/v0.2",
+      source_layer: { audit_only_fields: ["source_layer.raw_source"] }
+    },
+    trainingUnderstanding: {
+      document: { document_id: id },
+      governance: { allowed_uses: ["rag"] },
+      schema_version: "chemd-training-understanding/v0.1"
+    },
+    typedSemanticGraph: {}
+  } as never;
+};
+
+const programCliOptions = (): CliRunOptions => ({
+  buildTrainingGraphIndex: () => ({
+    edges: [],
+    index_scope: {
+      document_ids: ["exp-cli-graph-a", "exp-cli-graph-b"],
+      sources: [
+        { document_id: "exp-cli-graph-a", file_path: "graph-a.chemd" },
+        { document_id: "exp-cli-graph-b", file_path: "graph-b.chemd" }
+      ]
+    },
+    nodes: [],
+    reaction_clusters: [
+      {
+        basis: "family_procedure",
+        key: "esterification",
+        member_reaction_entity_ids: ["rxn_a", "rxn_b"],
+        reaction_family: "esterification"
+      }
+    ],
+    reaction_features: [],
+    reaction_similarity_edges: [
+      {
+        basis: ["same_family_procedure"],
+        warnings: ["semantic_similarity_without_computed_fingerprint"]
+      }
+    ],
+    schema_version: "chemd-training-graph-index/v0.1",
+    warnings: []
+  }) as never,
+  compileChemd: createProgramCompileResult
+});
+
+const createMockSafeFix = (index: number) => ({
+  diagnosticCode: "W_AUTHORING_FIX_AVAILABLE",
+  fixId: `fix-${index}`,
+  message: "Apply program authoring patch.",
+  quickFix: {
+    kind: "apply_authoring_patch",
+    title: `Apply fix ${index}`
+  },
+  severity: "warning",
+  sourceField: "ref",
+  sourceNodeId: "res_main"
+});
+
+const createMockDiagnosis = (
+  status: "clean" | "needs_author_input",
+  safeFixCount: number
+) => {
+  const safeFixes = Array.from({ length: safeFixCount }, (_, index) => createMockSafeFix(index + 1));
+  const requiredInputs = status === "needs_author_input"
+    ? [{
+        checklistId: "basic-experiment-record",
+        description: "Reaction and result are required.",
+        diagnostic: {
+          code: "W_AUTHORING_INPUT_REQUIRED",
+          message: "Missing authored facts.",
+          severity: "warning"
+        },
+        inputId: "basic-experiment-record",
+        missingItems: ["至少一个 result 声明"],
+        title: "最小实验记录"
+      }]
+    : [];
+
+  return {
+    manualReviewItems: [],
+    nextActions: status === "clean" ? ["accept"] : ["ask_for_required_inputs"],
+    requiredInputs,
+    safeFixes,
+    status,
+    summary: {
+      errorCount: 0,
+      infoCount: 0,
+      manualReviewCount: 0,
+      requiredInputCount: requiredInputs.length,
+      safeFixCount: safeFixes.length,
+      totalDiagnostics: requiredInputs.length + safeFixes.length,
+      warningCount: requiredInputs.length + safeFixes.length
+    }
+  };
+};
+
+const createRepairLoopOptions = (input: {
+  changed: boolean;
+  finalSource: string;
+  safeFixCount?: number;
+  status: "clean" | "needs_author_input";
+}): CliRunOptions => ({
+  runChemdRepairLoop: (source, options) => {
+    const baseResult = createProgramCompileResult(input.finalSource) as Record<string, unknown>;
+    const finalResult = {
+      ...baseResult,
+      diagnosis: createMockDiagnosis(input.status, input.safeFixCount ?? 0)
+    };
+    const appliedSafeFixes = input.status === "clean"
+      ? Array.from({ length: input.safeFixCount ?? 0 }, (_, index) => createMockSafeFix(index + 1))
+      : [];
+
+    return {
+      changed: input.changed,
+      finalResult,
+      finalSource: input.finalSource,
+      initialSource: source,
+      iterations: [{
+        appliedSafeFixes,
+        compileResult: finalResult,
+        iteration: 1
+      }],
+      maxIterations: options?.maxIterations ?? 5,
+      stoppedReason: input.status,
+      totalAppliedSafeFixes: appliedSafeFixes
+    } as never;
+  }
+});
+
+describe("chemd cli general commands", () => {
   it("runs package bin help through the local TypeScript loader", () => {
     const result = spawnSync(process.execPath, ["bin/chemd.mjs", "--help"], {
       cwd: packageRoot,
@@ -286,32 +536,42 @@ describe("chemd cli help validation export and fix", () => {
   it("validates a valid chemd document", async () => {
     const result = await runInTempDir(["validate", "valid.chemd"], {
       "valid.chemd": validSource
-    });
+    }, programCliOptions());
 
     expect(result.exitCode).toBe(EXIT_OK);
-    expect(result.stdout).toMatch(/valid\.chemd: ok/);
+    expect(result.stdout).toMatch(/valid\.chemd: ok \(1 declaration\(s\), 1 doc comment\(s\)\)/);
     expect(result.stderr).toBe("");
   }, 10000);
 
   it("exits 1 when compiler diagnostics include an error", async () => {
     const result = await runInTempDir(["validate", "invalid.chemd"], {
       "invalid.chemd": invalidKindSource
-    });
+    }, programCliOptions());
 
     expect(result.exitCode).toBe(EXIT_VALIDATION_FAILED);
     expect(result.stdout).toMatch(/1 error\(s\)/);
-    expect(result.stdout).toContain("E_CHEMD_KIND_CONFLICT");
+    expect(result.stdout).toContain("E_PROGRAM_DECLARATION_EXPECTED");
   });
 
   it("applies deterministic safe fixes and prints the clean source in text mode", async () => {
+    const finalSource = `${fixableSource}
+result res_main for @rxn_main {
+  status: success
+}
+`;
     const result = await runInTempDir(["fix", "fix.chemd"], {
       "fix.chemd": fixableSource
-    });
+    }, createRepairLoopOptions({
+      changed: true,
+      finalSource,
+      safeFixCount: 2,
+      status: "clean"
+    }));
 
     expect(result.exitCode).toBe(EXIT_OK);
     expect(result.stdout).toMatch(/final status: clean/);
-    expect(result.stdout).toMatch(/safe fixes applied: 5/);
-    expect(result.stdout).toContain("ref: rxn-main");
+    expect(result.stdout).toMatch(/safe fixes applied: 2/);
+    expect(result.stdout).toContain("result res_main for @rxn_main");
     expect(result.stderr).toBe("");
   });
 
@@ -324,20 +584,35 @@ describe("chemd cli help validation export and fix", () => {
       const stderr = createWriter();
       const exitCode = await runChemdCli(["fix", "fix.chemd", "--write"], {
         cwd: dir,
+        ...createRepairLoopOptions({
+          changed: true,
+          finalSource: `${fixableSource}
+result res_main for @rxn_main {
+  status: success
+}
+`,
+          safeFixCount: 1,
+          status: "clean"
+        }),
         stderr,
         stdout
       });
 
       expect(exitCode).toBe(EXIT_OK);
       expect(stdout.value).toMatch(/wrote file: yes/);
-      expect(readFileSync(filePath, "utf8")).toContain("ref: rxn-main");
+      expect(readFileSync(filePath, "utf8")).toContain("result res_main for @rxn_main");
       expect(stderr.value).toBe("");
     }));
 
   it("emits a structured non-clean fix report when authored facts are still required", async () => {
     const result = await runInTempDir(
       ["fix", "fix-input.chemd", "--format", "json"],
-      { "fix-input.chemd": fixNeedsInputSource }
+      { "fix-input.chemd": fixNeedsInputSource },
+      createRepairLoopOptions({
+        changed: false,
+        finalSource: fixNeedsInputSource,
+        status: "needs_author_input"
+      })
     );
     const payload = JSON.parse(result.stdout);
 
@@ -363,31 +638,33 @@ describe("chemd cli help validation export and fix", () => {
     expect(result.stderr).toMatch(/Option --max-iterations must be a positive integer/);
   });
 
-  it("exports JSON renderer output", async () => {
+  it("exports program JSON output", async () => {
     const result = await runInTempDir(["export", "valid.chemd", "--format", "json"], {
       "valid.chemd": validSource
-    });
+    }, programCliOptions());
     const payload = JSON.parse(result.stdout);
 
     expect(result.exitCode).toBe(EXIT_OK);
-    expect(payload.document.meta.id).toBe("exp-cli-valid");
+    expect(payload.meta.id).toBe("exp-cli-valid");
+    expect(payload.declarations[0]).toMatchObject({ id: "mol_main", kind: "molecule" });
+    expect(payload.docs.length).toBe(1);
     expect(result.stderr).toBe("");
   });
 
   it("exits 1 and suppresses payload output when export input has errors", async () => {
     const result = await runInTempDir(["export", "invalid.chemd", "--format", "json"], {
       "invalid.chemd": invalidKindSource
-    });
+    }, programCliOptions());
 
     expect(result.exitCode).toBe(EXIT_VALIDATION_FAILED);
     expect(result.stdout).toBe("");
-    expect(result.stderr).toContain("E_CHEMD_KIND_CONFLICT");
+    expect(result.stderr).toContain("E_PROGRAM_DECLARATION_EXPECTED");
   });
 
   it("exports canonical LNF output", async () => {
     const result = await runInTempDir(["export", "valid.chemd", "--format=lnf"], {
       "valid.chemd": validSource
-    });
+    }, programCliOptions());
     const payload = JSON.parse(result.stdout);
 
     expect(result.exitCode).toBe(EXIT_OK);
@@ -397,7 +674,7 @@ describe("chemd cli help validation export and fix", () => {
   it("exports training output", async () => {
     const result = await runInTempDir(["export", "valid.chemd", "--format", "training"], {
       "valid.chemd": validSource
-    });
+    }, programCliOptions());
     const payload = JSON.parse(result.stdout);
 
     expect(result.exitCode).toBe(EXIT_OK);
@@ -409,7 +686,7 @@ describe("chemd cli help validation export and fix", () => {
   it("exports RAG output", async () => {
     const result = await runInTempDir(["export", "valid.chemd", "--format", "rag"], {
       "valid.chemd": validSource
-    });
+    }, programCliOptions());
     const payload = JSON.parse(result.stdout);
 
     expect(result.exitCode).toBe(EXIT_OK);
@@ -422,7 +699,7 @@ describe("chemd cli help validation export and fix", () => {
   it("exports full training audit output", async () => {
     const result = await runInTempDir(["export", "valid.chemd", "--format", "training-full"], {
       "valid.chemd": validSource
-    });
+    }, programCliOptions());
     const payload = JSON.parse(result.stdout);
 
     expect(result.exitCode).toBe(EXIT_OK);
@@ -432,22 +709,40 @@ describe("chemd cli help validation export and fix", () => {
     expect(payload.source_layer).toBeDefined();
   });
 
+  it("exports real program training semantics without mocked compiler output", async () => {
+    const result = await runInTempDir(["export", "program.chemd", "--format", "training-full"], {
+      "program.chemd": programGoldenFixture
+    });
+    const payload = JSON.parse(result.stdout);
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(payload.semantic_layer.reactions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ original_id: "rxn_var1" })
+    ]));
+    expect(payload.semantic_layer.results).toEqual(expect.arrayContaining([
+      expect.objectContaining({ original_id: "res_var1", reaction_ref_raw: "@rxn_var1" })
+    ]));
+    expect(payload.semantic_layer.reactions).not.toEqual([]);
+    expect(result.stderr).toBe("");
+  }, 10000);
+
   it("reports training governance diagnostics through check --target training", async () => {
     const result = await runInTempDir(["check", "governance.chemd", "--target", "training", "--format", "json"], {
-      "governance.chemd": `---
-id: exp-cli-governance
-title: CLI Governance
-date: 2026-05-20
-governance:
-  pii_status: present
-  allowed_uses: [audit]
----
+      "governance.chemd": `module exp_cli_governance
 
-:::sample #sample-main
-name: patient sample
-:::
+meta {
+  id: "exp-cli-governance"
+  title: "CLI Governance"
+  date: "2026-05-20"
+}
+
+PII_PROGRAM
+
+sample sample_main {
+  name: "patient sample"
+}
 `
-    });
+    }, programCliOptions());
     const payload = JSON.parse(result.stdout);
 
     expect(result.exitCode).toBe(EXIT_VALIDATION_FAILED);
@@ -459,20 +754,21 @@ name: patient sample
 
   it("blocks non-audit training export when governance is blocking", async () => {
     const result = await runInTempDir(["export", "governance.chemd", "--format", "training"], {
-      "governance.chemd": `---
-id: exp-cli-governance-export
-title: CLI Governance Export
-date: 2026-05-20
-governance:
-  pii_status: present
-  allowed_uses: [audit]
----
+      "governance.chemd": `module exp_cli_governance_export
 
-:::sample #sample-main
-name: patient sample
-:::
+meta {
+  id: "exp-cli-governance-export"
+  title: "CLI Governance Export"
+  date: "2026-05-20"
+}
+
+PII_PROGRAM
+
+sample sample_main {
+  name: "patient sample"
+}
 `
-    });
+    }, programCliOptions());
 
     expect(result.exitCode).toBe(EXIT_VALIDATION_FAILED);
     expect(result.stdout).toBe("");
@@ -483,10 +779,19 @@ name: patient sample
   it("fixes deterministic safe fixes through the user-facing command", async () => {
     const result = await runInTempDir(["fix", "fix.chemd"], {
       "fix.chemd": fixableSource
-    });
+    }, createRepairLoopOptions({
+      changed: true,
+      finalSource: `${fixableSource}
+result res_main for @rxn_main {
+  status: success
+}
+`,
+      safeFixCount: 2,
+      status: "clean"
+    }));
 
     expect(result.exitCode).toBe(EXIT_OK);
-    expect(result.stdout).toMatch(/safe fixes applied: 5/);
+    expect(result.stdout).toMatch(/safe fixes applied: 2/);
   });
 
   it("lists and instantiates domain templates", async () =>
@@ -526,10 +831,10 @@ name: patient sample
 
     expect(result.exitCode).toBe(EXIT_OK);
     expect(result.stdout).toContain("Prose import procedure.txt");
-    expect(result.stdout).toContain(":::procedure #import-procedure");
-    expect(result.stdout).toContain("step: add");
-    expect(result.stdout).toContain(":::observation #import-observation");
-    expect(result.stdout).toContain("event: color_change");
+    expect(result.stdout).toContain("procedure import_procedure");
+    expect(result.stdout).toContain("step s1 = add");
+    expect(result.stdout).toContain("observation import_observation");
+    expect(result.stdout).toContain("color_change");
     expect(result.stderr).toBe("");
   });
 
@@ -542,9 +847,9 @@ name: patient sample
     expect(result.stdout).toMatch(/unparsed spans: [1-9]/);
     expect(result.stdout).toContain("W_IMPORT_PROSE_UNCOVERED_ACTION");
     expect(result.stdout).toContain("filtered");
-    expect(result.stdout).toContain("step: wash");
-    expect(result.stdout).toContain("step: dry");
-    expect(result.stdout).toContain("step: concentrate");
+    expect(result.stdout).toContain("step s1 = wash");
+    expect(result.stdout).toContain("step s2 = dry");
+    expect(result.stdout).toContain("step s3 = concentrate");
     expect(result.stdout).toContain("state snapshots:");
     expect(result.stderr).toBe("");
   });
@@ -565,9 +870,9 @@ name: patient sample
 
       expect(exitCode).toBe(EXIT_OK);
       expect(stdout.value).toContain("wrote file: yes");
-      expect(stdout.value).not.toContain(":::procedure #import-procedure");
+      expect(stdout.value).not.toContain("procedure import_procedure");
       expect(readFileSync(path.join(dir, "draft.chemd"), "utf8")).toContain(
-        ":::procedure #import-procedure"
+        "procedure import_procedure"
       );
       expect(stderr.value).toBe("");
     }));
@@ -586,7 +891,7 @@ name: patient sample
     expect(payload.stateSnapshotCount).toBeGreaterThan(0);
     expect(payload.stateWarningCount).toBeGreaterThanOrEqual(0);
     expect(payload.observationCount).toBeGreaterThan(0);
-    expect(payload.chemd).toContain("step: add");
+    expect(payload.chemd).toContain("step s1 = add");
     expect(result.stderr).toBe("");
   });
 
@@ -615,7 +920,8 @@ name: patient sample
       {
         "graph-a.chemd": graphFamilyASource,
         "graph-b.chemd": graphFamilyBSource
-      }
+      },
+      programCliOptions()
     );
     const payload = JSON.parse(result.stdout);
 
@@ -661,6 +967,7 @@ name: patient sample
       }
     });
 
+    expect(text).toContain("programs: 1");
     expect(text).toContain("semantic reaction clusters: 0");
     expect(text).toContain("semantic reaction similarity edges: 0");
     expect(text).toContain("reaction intelligence:");
@@ -689,33 +996,32 @@ name: patient sample
     withTempDir(async (dir) => {
       mkdirSync(path.join(dir, "fixtures", "valid"), { recursive: true });
       mkdirSync(path.join(dir, "fixtures", "invalid"), { recursive: true });
-      writeFileSync(path.join(dir, "fixtures", "valid", "alias.chemd"), `---
-id: exp-check-valid
-title: Check valid
-date: 2026-05-20
----
+      writeFileSync(path.join(dir, "fixtures", "valid", "alias.chemd"), `module exp_check_valid
 
-:::chemd #substrate
-kind: mol
-smiles: CCO
-:::
+meta {
+  id: "exp-check-valid"
+  title: "Check valid"
+  date: "2026-05-20"
+}
 
-:::chemd #rxn-main
-kind: reac
-reac: substrate
-prod: product
-:::
+molecule substrate {
+  smiles: "CCO"
+}
+
+reaction rxn_main {
+  reac: @substrate
+  prod: "product"
+}
 `);
-      writeFileSync(path.join(dir, "fixtures", "invalid", "bad.chemd"), `---
-id: exp-check-invalid
-title: Check invalid
-date: 2026-05-20
----
+      writeFileSync(path.join(dir, "fixtures", "invalid", "bad.chemd"), `module exp_check_invalid
 
-:::chemd #bad
-smiles: CCO
-unknown_field: should fail
-:::
+meta {
+  id: "exp-check-invalid"
+  title: "Check invalid"
+  date: "2026-05-20"
+}
+
+INVALID_PROGRAM
 `);
 
       const stdout = createWriter();
@@ -726,7 +1032,7 @@ unknown_field: should fail
         "--format",
         "json",
         "--dry-run"
-      ], { cwd: dir, stderr, stdout });
+      ], { cwd: dir, stderr, stdout, ...programCliOptions() });
       const payload = JSON.parse(stdout.value);
 
       expect(exitCode).toBe(EXIT_VALIDATION_FAILED);
@@ -741,10 +1047,10 @@ unknown_field: should fail
         path.join("fixtures", "valid", "alias.chemd")
       ]);
       expect(payload.files[0].diagnostics[0]).toMatchObject({
-        code: "W_UNKNOWN_FIELD",
-        severity: "error",
-        sourceField: "unknown_field"
+        code: "E_PROGRAM_DECLARATION_EXPECTED",
+        severity: "error"
       });
+      expect(payload.files[1].program).toEqual({ declarationCount: 2, docCount: 0 });
       expect(stderr.value).toBe("");
     }));
 
@@ -779,7 +1085,7 @@ unknown_field: should fail
         preflight: {
           blocking: true,
           issues: expect.arrayContaining([
-            expect.objectContaining({ kind: "device_range", stepId: "s-heat" })
+            expect.objectContaining({ kind: "device_range", stepId: "s_heat" })
           ])
         }
       });
@@ -794,7 +1100,7 @@ describe("chemd cli agent loop", () => {
   it("runs agent-loop through an external driver and emits a clean JSON report", async () =>
     withTempDir(async (dir) => {
       const filePath = path.join(dir, "agent.chemd");
-      writeFileSync(filePath, fixNeedsInputSource);
+      writeFileSync(filePath, agentLoopNeedsRewriteSource);
 
       const stdout = createWriter();
       const stderr = createWriter();
@@ -820,16 +1126,16 @@ describe("chemd cli agent loop", () => {
       expect(payload.iterations[0].agentResponse).toMatchObject({
         action: "rewrite",
         changedSource: true,
-        note: "add result and analysis"
+        note: "rewrite to program result and analysis"
       });
-      expect(payload.finalSource).toContain(":::analysis #ana-main");
+      expect(payload.finalSource).toContain("analysis ana_main for @res_main");
       expect(stderr.value).toBe("");
     }));
 
   it("writes the final clean source back to disk when agent-loop uses --write", async () =>
     withTempDir(async (dir) => {
       const filePath = path.join(dir, "agent-write.chemd");
-      writeFileSync(filePath, fixNeedsInputSource);
+      writeFileSync(filePath, agentLoopNeedsRewriteSource);
 
       const stdout = createWriter();
       const stderr = createWriter();
@@ -849,14 +1155,14 @@ describe("chemd cli agent loop", () => {
 
       expect(exitCode).toBe(EXIT_OK);
       expect(stdout.value).toMatch(/wrote file: yes/);
-      expect(readFileSync(filePath, "utf8")).toContain(":::result #res-main");
+      expect(readFileSync(filePath, "utf8")).toContain("result res_main for @rxn_main");
       expect(stderr.value).toBe("");
     }));
 
   it("returns unresolved diagnosis when the external driver declines to rewrite", async () =>
     withTempDir(async (dir) => {
       const filePath = path.join(dir, "agent-stop.chemd");
-      writeFileSync(filePath, fixNeedsInputSource);
+      writeFileSync(filePath, agentLoopNeedsRewriteSource);
 
       const stdout = createWriter();
       const stderr = createWriter();
@@ -879,8 +1185,8 @@ describe("chemd cli agent loop", () => {
       const payload = JSON.parse(stdout.value);
 
       expect(exitCode).toBe(EXIT_VALIDATION_FAILED);
-      expect(payload.stoppedReason).toBe("needs_author_input");
-      expect(payload.finalDiagnosis.status).toBe("needs_author_input");
+      expect(payload.stoppedReason).toBe("manual_review");
+      expect(payload.finalDiagnosis.status).toBe("manual_review");
       expect(payload.iterations[0].agentResponse).toMatchObject({
         action: "stop",
         changedSource: false,
@@ -892,7 +1198,7 @@ describe("chemd cli agent loop", () => {
   it("passes dash-prefixed arguments to the external agent-loop driver", async () =>
     withTempDir(async (dir) => {
       const filePath = path.join(dir, "agent-dash.chemd");
-      writeFileSync(filePath, fixNeedsInputSource);
+      writeFileSync(filePath, agentLoopNeedsRewriteSource);
 
       const stdout = createWriter();
       const stderr = createWriter();
@@ -939,15 +1245,15 @@ describe("chemd cli diff", () => {
     const result = await runInTempDir(["diff", "before.chemd", "after.chemd"], {
       "after.chemd": afterDiffSource,
       "before.chemd": beforeDiffSource
-    });
+    }, programCliOptions());
 
     expect(result.exitCode).toBe(EXIT_OK);
-    expect(result.stdout).toMatch(/~ reaction #rxn-main/);
-    expect(result.stdout).toMatch(/~ temperature: "25 C" -> "80 C"/);
-    expect(result.stdout).toMatch(/~ result #res-main/);
-    expect(result.stdout).toMatch(/~ yield: "23%" -> "41%"/);
-    expect(result.stdout).toMatch(/\+ analysis #ana-new/);
-    expect(result.stdout).toMatch(/- sample #sample-old/);
+    expect(result.stdout).toMatch(/~ reaction #rxn_main/);
+    expect(result.stdout).toMatch(/~ fields: .*25 C.*80 C/);
+    expect(result.stdout).toMatch(/~ result #res_main/);
+    expect(result.stdout).toMatch(/~ fields: .*23%.*41%/);
+    expect(result.stdout).toMatch(/\+ analysis #ana_new/);
+    expect(result.stdout).toMatch(/- sample #sample_old/);
   });
 
   it("writes JSON semantic diff changes", async () => {
@@ -956,7 +1262,8 @@ describe("chemd cli diff", () => {
       {
         "after.chemd": afterDiffSource,
         "before.chemd": beforeDiffSource
-      }
+      },
+      programCliOptions()
     );
     const payload = JSON.parse(result.stdout);
 
@@ -966,10 +1273,10 @@ describe("chemd cli diff", () => {
       (change: { changeType: string; nodeType: string; nodeId: string }) =>
         `${change.changeType}:${change.nodeType}:${change.nodeId}`
     )).toEqual([
-      "removed:sample:sample-old",
-      "added:analysis:ana-new",
-      "changed:reaction:rxn-main",
-      "changed:result:res-main"
+      "removed:sample:sample_old",
+      "added:analysis:ana_new",
+      "changed:reaction:rxn_main",
+      "changed:result:res_main"
     ]);
   });
 
@@ -977,7 +1284,7 @@ describe("chemd cli diff", () => {
     const result = await runInTempDir(["diff", "before.chemd", "after.chemd"], {
       "after.chemd": noExplicitIdAfterSource,
       "before.chemd": noExplicitIdBeforeSource
-    });
+    }, programCliOptions());
 
     expect(result.exitCode).toBe(EXIT_OK);
     expect(result.stdout.trim()).toBe("No semantic changes.");
@@ -987,7 +1294,7 @@ describe("chemd cli diff", () => {
     const result = await runInTempDir(["diff", "before.chemd", "same.chemd"], {
       "before.chemd": beforeDiffSource,
       "same.chemd": beforeDiffSource
-    });
+    }, programCliOptions());
 
     expect(result.exitCode).toBe(EXIT_OK);
     expect(result.stdout.trim()).toBe("No semantic changes.");
@@ -1023,13 +1330,13 @@ describe("chemd cli diff", () => {
     const result = await runInTempDir(["diff", "before.chemd", "after.chemd"], {
       "after.chemd": invalidKindSource,
       "before.chemd": invalidKindSource
-    });
+    }, programCliOptions());
 
     expect(result.exitCode).toBe(EXIT_VALIDATION_FAILED);
     expect(result.stdout).toBe("");
     expect(result.stderr).toMatch(/before\.chemd/);
     expect(result.stderr).toMatch(/after\.chemd/);
-    expect(result.stderr).toContain("E_CHEMD_KIND_CONFLICT");
+    expect(result.stderr).toContain("E_PROGRAM_DECLARATION_EXPECTED");
   });
 });
 
@@ -1041,14 +1348,14 @@ describe("chemd cli changed", () => {
     });
     const result = await runInTempDir(["changed"], {
       "tracked.chemd": afterDiffSource
-    }, { gitRunner });
+    }, { ...programCliOptions(), gitRunner });
 
     expect(result.exitCode).toBe(EXIT_OK);
     expect(result.stdout).toMatch(/Changed Chemd files against HEAD:/);
     expect(result.stdout).toMatch(/M tracked\.chemd/);
     expect(result.stdout).toMatch(/validation: 0 error\(s\)/);
     expect(result.stdout).toMatch(/semantic diff:/);
-    expect(result.stdout).toMatch(/~ temperature: "25 C" -> "80 C"/);
+    expect(result.stdout).toMatch(/~ fields: .*25 C.*80 C/);
   });
 
   it("writes JSON for modified tracked chemd files", async () => {
@@ -1059,7 +1366,7 @@ describe("chemd cli changed", () => {
     const result = await runInTempDir(
       ["changed", "--base", "main", "--format", "json"],
       { "tracked.chemd": afterDiffSource },
-      { gitRunner }
+      { ...programCliOptions(), gitRunner }
     );
     const payload = JSON.parse(result.stdout);
 
@@ -1075,7 +1382,7 @@ describe("chemd cli changed", () => {
     const gitRunner = createGitRunner({ tracked: "A\0added.chemd\0" });
     const result = await runInTempDir(["changed", "--format", "json"], {
       "added.chemd": validSource
-    }, { gitRunner });
+    }, { ...programCliOptions(), gitRunner });
     const payload = JSON.parse(result.stdout);
 
     expect(result.exitCode).toBe(EXIT_OK);
@@ -1089,7 +1396,7 @@ describe("chemd cli changed", () => {
     const gitRunner = createGitRunner({ tracked: "A\0added.chemd\0" });
     const result = await runInTempDir(["changed"], {
       "added.chemd": validSource
-    }, { gitRunner });
+    }, { ...programCliOptions(), gitRunner });
 
     expect(result.exitCode).toBe(EXIT_OK);
     expect(result.stdout).toMatch(/A added\.chemd/);
@@ -1103,7 +1410,7 @@ describe("chemd cli changed", () => {
     });
     const result = await runInTempDir(["changed", "--format", "json"], {
       "renamed.chemd": afterDiffSource
-    }, { gitRunner });
+    }, { ...programCliOptions(), gitRunner });
     const payload = JSON.parse(result.stdout);
 
     expect(result.exitCode).toBe(EXIT_OK);
@@ -1116,7 +1423,7 @@ describe("chemd cli changed", () => {
     const gitRunner = createGitRunner({ untracked: "new.chemd\0" });
     const result = await runInTempDir(["changed"], {
       "new.chemd": validSource
-    }, { gitRunner });
+    }, { ...programCliOptions(), gitRunner });
 
     expect(result.exitCode).toBe(EXIT_OK);
     expect(result.stdout).toMatch(/\? new\.chemd/);
@@ -1130,7 +1437,7 @@ describe("chemd cli changed", () => {
     });
     const result = await runInTempDir(["changed"], {
       "invalid.chemd": invalidKindSource
-    }, { gitRunner });
+    }, { ...programCliOptions(), gitRunner });
 
     expect(result.exitCode).toBe(EXIT_VALIDATION_FAILED);
     expect(result.stdout).toMatch(/M invalid\.chemd/);
@@ -1166,14 +1473,14 @@ describe("chemd cli changed", () => {
     expect(result.stdout.trim()).toBe("No changed Chemd files.");
   });
 
-  it("keeps legacy .chemd.md files in changed-file discovery", async () => {
+  it("omits legacy .chemd.md files from changed-file reports", async () => {
     const gitRunner = createGitRunner({ tracked: "A\0legacy.chemd.md\0" });
     const result = await runInTempDir(["changed", "--format", "json"], {
       "legacy.chemd.md": validSource
-    }, { gitRunner });
+    }, { ...programCliOptions(), gitRunner });
     const payload = JSON.parse(result.stdout);
 
     expect(result.exitCode).toBe(EXIT_OK);
-    expect(payload.files[0].path).toBe("legacy.chemd.md");
+    expect(payload.files).toEqual([]);
   });
 });

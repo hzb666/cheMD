@@ -1,10 +1,3 @@
-import {
-  getBlockFieldListMode,
-  getBlockFieldSchema,
-  getBlockSchema,
-  getQuantityFieldClass
-} from "@chemd/core";
-
 import type {
   ObservationFrame,
   ProseImportCandidate,
@@ -17,11 +10,10 @@ import type {
 
 const RENDER_CONFIDENCE_THRESHOLD = 0.75;
 const REACTION_ID_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
-const QUANTITY_REACTION_FIELDS = new Set(["temperature", "time", "pressure", "yield"]);
 
 const REACTION_ROLE_FIELDS: Record<ReactionFactRole, string> = {
-  reactant: "reactant",
-  product: "product",
+  reactant: "reactants",
+  product: "products",
   reagent: "reagents",
   solvent: "solvent",
   temperature: "temperature",
@@ -37,6 +29,16 @@ const sanitizeValue = (value: unknown): string =>
     .replace(/\|/g, "/")
     .trim();
 
+const renderStringValue = (value: unknown): string =>
+  JSON.stringify(sanitizeValue(value));
+
+const renderProgramValue = (value: unknown): string => {
+  const text = sanitizeValue(value).replace(/\s*°C\b/g, " C");
+  return /^-?\d+(?:\.\d+)?\s*(?:%|[A-Za-z]+)$/.test(text)
+    ? text
+    : renderStringValue(text);
+};
+
 const sanitizeReactionValue = (value: string): string =>
   value
     .replace(/\r?\n/g, " ")
@@ -50,27 +52,17 @@ const renderableFactValue = (fact: ReactionFactCandidate): string | undefined =>
 };
 
 const formatReactionId = (id: string): string => {
-  const cleaned = id.replace(/^[#@]+/, "").replace(/[^a-zA-Z0-9_-]/g, "-");
+  const cleaned = id.replace(/^[#@]+/, "").replace(/[^a-zA-Z0-9_]/g, "_");
   if (REACTION_ID_PATTERN.test(cleaned)) {
     return cleaned;
   }
 
   const fallback = cleaned.length > 0 ? cleaned : "reaction";
-  return `rxn-${fallback}`;
+  return `rxn_${fallback}`;
 };
 
 const getReactionFieldForRole = (role: ReactionFactRole): string | undefined => {
-  const field = REACTION_ROLE_FIELDS[role];
-  const schema = getBlockFieldSchema("chemd", field);
-  if (!schema?.completionKinds?.includes("reaction")) {
-    return undefined;
-  }
-
-  if (QUANTITY_REACTION_FIELDS.has(field) && !getQuantityFieldClass("chemd", field)) {
-    return undefined;
-  }
-
-  return field;
+  return REACTION_ROLE_FIELDS[role];
 };
 
 const getRenderableFacts = (
@@ -100,18 +92,15 @@ const formatParam = ([key, value]: [string, unknown]): string | undefined => {
   if (value === undefined || value === null || value === "") {
     return undefined;
   }
-  return `${key}=${sanitizeValue(value)}`;
+  return `${key}: ${renderProgramValue(value)}`;
 };
 
 const renderStepLine = (step: StepFrame, index: number): string => {
-  const params = Object.entries({
-    id: `s${index + 1}`,
-    ...step.params
-  })
+  const params = Object.entries(step.params)
     .map(formatParam)
     .filter((item): item is string => Boolean(item));
 
-  return [`step: ${step.family}`, ...params].join(" | ");
+  return `  step s${index + 1} = ${step.family}(${params.join(", ")})`;
 };
 
 const renderListRoleLines = (
@@ -126,11 +115,9 @@ const renderListRoleLines = (
   const values = getRenderableFacts(candidate, role)
     .map(renderableFactValue)
     .filter((item): item is string => Boolean(item));
-  const listMode = getBlockFieldListMode("chemd", field);
-
-  return listMode === "repeat"
-    ? values.map((value) => `${field}: ${value}`)
-    : values.length > 0 ? [`${field}: ${values.join(" | ")}`] : [];
+  return values.length > 0
+    ? [`  ${field}: [${values.map(renderStringValue).join(", ")}]`]
+    : [];
 };
 
 const renderReagentsLine = (candidate: ReactionCandidate): string[] => {
@@ -143,7 +130,7 @@ const renderReagentsLine = (candidate: ReactionCandidate): string[] => {
     .map(renderableFactValue)
     .filter((item): item is string => Boolean(item));
 
-  return values.length > 0 ? [`${field}: ${values.join(" | ")}`] : [];
+  return values.length > 0 ? [`  ${field}: ${renderStringValue(values.join(", "))}`] : [];
 };
 
 const renderScalarRoleLine = (
@@ -154,14 +141,10 @@ const renderScalarRoleLine = (
   const fact = pickHighestConfidenceFact(candidate, role);
   const value = fact ? renderableFactValue(fact) : undefined;
 
-  return field && value ? [`${field}: ${value}`] : [];
+  return field && value ? [`  ${field}: ${renderProgramValue(value)}`] : [];
 };
 
 export const renderReactionBlock = (candidate: ReactionCandidate): string[] => {
-  if (!getBlockSchema("chemd")) {
-    return [];
-  }
-
   const fieldLines = [
     ...renderListRoleLines(candidate, "reactant"),
     ...renderListRoleLines(candidate, "product"),
@@ -178,10 +161,9 @@ export const renderReactionBlock = (candidate: ReactionCandidate): string[] => {
   }
 
   return [
-    `:::chemd #${formatReactionId(candidate.id)}`,
-    "kind: reaction",
+    `reaction ${formatReactionId(candidate.id)} {`,
     ...fieldLines,
-    ":::"
+    "}"
   ];
 };
 
@@ -231,7 +213,10 @@ const renderObservationEvent = (
     .map(formatParam)
     .filter((item): item is string => Boolean(item));
 
-  return [`event: ${observation.eventType}`, ...params].join(" | ");
+  return `  event_${index + 1}: ${renderStringValue([
+    observation.eventType,
+    ...params
+  ].join(" | "))}`;
 };
 
 const renderProcedureBlock = (
@@ -243,10 +228,9 @@ const renderProcedureBlock = (
   }
 
   return [
-    ":::procedure #import-procedure",
-    ...(reactionId ? [`reaction: @${reactionId}`] : []),
+    `procedure import_procedure${reactionId ? ` for @${reactionId}` : ""} {`,
     ...candidate.steps.map(renderStepLine),
-    ":::"
+    "}"
   ];
 };
 
@@ -260,9 +244,9 @@ const renderObservationBlock = (candidate: ProseImportCandidate): string[] => {
   );
 
   return [
-    ":::observation #import-observation",
-    ...lines,
-    ":::"
+    "observation import_observation {",
+    `  notes: ${renderStringValue(lines.join("; "))}`,
+    "}"
   ];
 };
 
@@ -270,12 +254,17 @@ export const renderChemdDraft = (
   candidate: ProseImportCandidate,
   options: RenderChemdDraftOptions = {}
 ): string => {
+  const moduleName = (options.documentId ?? "imported-prose")
+    .replace(/[^a-zA-Z0-9_]/g, "_")
+    .replace(/^[^a-zA-Z_]+/, "exp_") || "imported_prose";
   const frontmatter = [
-    "---",
-    `id: ${options.documentId ?? "imported-prose"}`,
-    `title: ${options.title ?? "Imported prose"}`,
-    `date: ${options.date ?? todayIsoDate()}`,
-    "---"
+    `module ${moduleName}`,
+    "",
+    "meta {",
+    `  id: ${renderStringValue(options.documentId ?? "imported-prose")}`,
+    `  title: ${renderStringValue(options.title ?? "Imported prose")}`,
+    `  date: ${renderStringValue(options.date ?? todayIsoDate())}`,
+    "}"
   ];
   const reactionBlocks = renderLinkedReactionBlocks(candidate.reactionCandidates);
   const blocks = [

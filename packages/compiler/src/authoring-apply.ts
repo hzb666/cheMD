@@ -4,11 +4,9 @@ import type {
   AuthoringTemplate
 } from "./authoring-types";
 
-const BLOCK_CLOSE_RE = /^\s*:::\s*$/;
-const FRONTMATTER_BOUNDARY_RE = /^\s*---\s*$/;
-
-const escapeRegExp = (value: string): string =>
-  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const DECLARATION_RE = /^\s*(molecule|material|batch|reaction|result|analysis|sample|artifact|condition_screen|procedure|observation|trace|agent\s+run)\s+([A-Za-z_][\w-]*)\b/;
+const META_RE = /^\s*meta\s*\{\s*$/;
+const MODULE_RE = /^\s*module\b/;
 
 const readEol = (source: string): string => (source.includes("\r\n") ? "\r\n" : "\n");
 
@@ -16,41 +14,44 @@ const splitText = (value: string): string[] => value.split(/\r?\n/);
 
 const splitSource = (source: string): string[] => source.split(/\r?\n/);
 
-const buildBlockHeaderRe = (blockId: string): RegExp =>
-  new RegExp(`^\\s*:::[^\\n#]*\\s+#${escapeRegExp(blockId)}(?:\\s|$)`);
-
-const buildFieldLineRe = (field: string): RegExp =>
-  new RegExp(`^\\s*${escapeRegExp(field)}\\s*:`,"i");
-
 const readFieldFromLine = (line: string): string | undefined => {
   const separatorIndex = line.indexOf(":");
-  if (separatorIndex <= 0) {
-    return undefined;
-  }
-
+  if (separatorIndex <= 0) return undefined;
   const field = line.slice(0, separatorIndex).trim();
   return field.length > 0 ? field : undefined;
 };
 
-const findBlockRange = (
+const buildFieldLineRe = (field: string): RegExp =>
+  new RegExp(`^\\s*${field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*:`, "i");
+
+const countChar = (line: string, char: "{" | "}"): number =>
+  [...line].filter((item) => item === char).length;
+
+const findBraceRange = (
   lines: string[],
-  blockId: string
-): { headerIndex: number; endIndex: number } | undefined => {
-  const headerRe = buildBlockHeaderRe(blockId);
-
-  for (let index = 0; index < lines.length; index += 1) {
-    if (!headerRe.test(lines[index] ?? "")) {
-      continue;
+  startIndex: number
+): { startIndex: number; endIndex: number } | undefined => {
+  let depth = 0;
+  for (let index = startIndex; index < lines.length; index += 1) {
+    depth += countChar(lines[index] ?? "", "{");
+    depth -= countChar(lines[index] ?? "", "}");
+    if (depth === 0 && index > startIndex) {
+      return { startIndex, endIndex: index };
     }
-
-    let endIndex = index + 1;
-    while (endIndex < lines.length && !BLOCK_CLOSE_RE.test(lines[endIndex] ?? "")) {
-      endIndex += 1;
-    }
-
-    return { headerIndex: index, endIndex };
   }
+  return undefined;
+};
 
+const findDeclarationRange = (
+  lines: string[],
+  declarationId: string
+): { startIndex: number; endIndex: number } | undefined => {
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = DECLARATION_RE.exec(lines[index] ?? "");
+    if (match?.[2] === declarationId) {
+      return findBraceRange(lines, index);
+    }
+  }
   return undefined;
 };
 
@@ -66,7 +67,6 @@ const insertSegment = (
     ...segmentLines,
     ...(needsTrailingBlank ? [""] : [])
   ];
-
   return [...lines.slice(0, insertIndex), ...insertLines, ...lines.slice(insertIndex)];
 };
 
@@ -74,148 +74,89 @@ const applyAppendDocumentText = (source: string, text: string): string => {
   const eol = readEol(source);
   const trimmed = source.trimEnd();
   const segment = text.trim();
-
-  if (!segment) {
-    return source;
-  }
-
-  return trimmed.length === 0
-    ? `${segment}${eol}`
-    : `${trimmed}${eol}${eol}${segment}${eol}`;
-};
-
-const applyInsertAfterBlock = (
-  source: string,
-  blockId: string,
-  text: string
-): string => {
-  const lines = splitSource(source);
-  const block = findBlockRange(lines, blockId);
-  if (!block) {
-    return applyAppendDocumentText(source, text);
-  }
-
-  const nextLines = insertSegment(lines, block.endIndex + 1, splitText(text.trim()));
-  return nextLines.join(readEol(source));
+  if (!segment) return source;
+  return trimmed.length === 0 ? `${segment}${eol}` : `${trimmed}${eol}${eol}${segment}${eol}`;
 };
 
 const findAnchorIndex = (
-  lines: string[],
-  headerIndex: number,
-  endIndex: number,
-  anchorFields: string[] | undefined
-): number => {
-  if (!anchorFields || anchorFields.length === 0) {
-    return headerIndex;
-  }
-
-  for (let fieldIndex = anchorFields.length - 1; fieldIndex >= 0; fieldIndex -= 1) {
-    const anchorRe = buildFieldLineRe(anchorFields[fieldIndex] ?? "");
-    for (let scan = endIndex - 1; scan > headerIndex; scan -= 1) {
-      if (anchorRe.test(lines[scan] ?? "")) {
-        return scan;
-      }
-    }
-  }
-
-  return headerIndex;
-};
-
-const applyInsertFieldLine = (
-  source: string,
-  blockId: string,
-  line: string,
-  anchorFields?: string[]
-): string => {
-  const lines = splitSource(source);
-  const block = findBlockRange(lines, blockId);
-  if (!block) {
-    return source;
-  }
-
-  const normalizedLine = line.trim();
-  const bodyLines = lines.slice(block.headerIndex + 1, block.endIndex);
-  if (bodyLines.some((bodyLine) => bodyLine.trim() === normalizedLine)) {
-    return source;
-  }
-
-  const anchorIndex = findAnchorIndex(lines, block.headerIndex, block.endIndex, anchorFields);
-  const nextLines = [...lines];
-  nextLines.splice(anchorIndex + 1, 0, line);
-  return nextLines.join(readEol(source));
-};
-
-const findFrontmatterRange = (lines: string[]): { startIndex: number; endIndex: number } | undefined => {
-  if (!FRONTMATTER_BOUNDARY_RE.test(lines[0] ?? "")) {
-    return undefined;
-  }
-
-  for (let index = 1; index < lines.length; index += 1) {
-    if (FRONTMATTER_BOUNDARY_RE.test(lines[index] ?? "")) {
-      return { startIndex: 0, endIndex: index };
-    }
-  }
-
-  return undefined;
-};
-
-const findFrontmatterAnchorIndex = (
   lines: string[],
   startIndex: number,
   endIndex: number,
   anchorFields: string[] | undefined
 ): number => {
-  if (!anchorFields || anchorFields.length === 0) {
-    return endIndex - 1;
-  }
-
-  for (let fieldIndex = anchorFields.length - 1; fieldIndex >= 0; fieldIndex -= 1) {
-    const anchorRe = buildFieldLineRe(anchorFields[fieldIndex] ?? "");
+  for (let fieldIndex = (anchorFields?.length ?? 0) - 1; fieldIndex >= 0; fieldIndex -= 1) {
+    const anchorRe = buildFieldLineRe(anchorFields?.[fieldIndex] ?? "");
     for (let scan = endIndex - 1; scan > startIndex; scan -= 1) {
-      if (anchorRe.test(lines[scan] ?? "")) {
-        return scan;
-      }
+      if (anchorRe.test(lines[scan] ?? "")) return scan;
     }
   }
-
   return endIndex - 1;
 };
 
-const applyInsertFrontmatterLine = (
+const normalizeFieldLine = (line: string): string =>
+  line.startsWith("  ") ? line : `  ${line.trim()}`;
+
+const applyInsertAfterDeclaration = (
+  source: string,
+  declarationId: string,
+  text: string
+): string => {
+  const lines = splitSource(source);
+  const declaration = findDeclarationRange(lines, declarationId);
+  if (!declaration) return applyAppendDocumentText(source, text);
+  return insertSegment(lines, declaration.endIndex + 1, splitText(text.trim())).join(readEol(source));
+};
+
+const applyInsertDeclarationField = (
+  source: string,
+  declarationId: string,
+  line: string,
+  anchorFields?: string[]
+): string => {
+  const lines = splitSource(source);
+  const declaration = findDeclarationRange(lines, declarationId);
+  if (!declaration) return source;
+  const normalizedLine = normalizeFieldLine(line);
+  const bodyLines = lines.slice(declaration.startIndex + 1, declaration.endIndex);
+  if (bodyLines.some((bodyLine) => bodyLine.trim() === normalizedLine.trim())) return source;
+  const anchorIndex = findAnchorIndex(lines, declaration.startIndex, declaration.endIndex, anchorFields);
+  const nextLines = [...lines];
+  nextLines.splice(anchorIndex + 1, 0, normalizedLine);
+  return nextLines.join(readEol(source));
+};
+
+const findMetaRange = (lines: string[]): { startIndex: number; endIndex: number } | undefined => {
+  for (let index = 0; index < lines.length; index += 1) {
+    if (META_RE.test(lines[index] ?? "")) return findBraceRange(lines, index);
+  }
+  return undefined;
+};
+
+const createMetaBlock = (source: string, line: string): string => {
+  const eol = readEol(source);
+  const lines = splitSource(source);
+  const moduleIndex = lines.findIndex((item) => MODULE_RE.test(item));
+  const insertIndex = moduleIndex >= 0 ? moduleIndex + 1 : 0;
+  const metaLines = ["", "meta {", normalizeFieldLine(line), "}"];
+  return [...lines.slice(0, insertIndex), ...metaLines, ...lines.slice(insertIndex)].join(eol);
+};
+
+const applyInsertMetaField = (
   source: string,
   line: string,
   anchorFields?: string[]
 ): string => {
-  const eol = readEol(source);
   const lines = splitSource(source);
-  const normalizedLine = line.trim();
+  const normalizedLine = normalizeFieldLine(line);
   const field = readFieldFromLine(normalizedLine);
-  const frontmatter = findFrontmatterRange(lines);
-
-  if (!frontmatter) {
-    const trimmed = source.trimStart();
-    const prefix = ["---", normalizedLine, "---", ""].join(eol);
-    return trimmed.length > 0 ? `${prefix}${trimmed}` : `${prefix}`;
-  }
-
-  const bodyLines = lines.slice(frontmatter.startIndex + 1, frontmatter.endIndex);
-  if (field && bodyLines.some((bodyLine) => buildFieldLineRe(field).test(bodyLine))) {
-    return source;
-  }
-
-  if (bodyLines.some((bodyLine) => bodyLine.trim() === normalizedLine)) {
-    return source;
-  }
-
-  const anchorIndex = findFrontmatterAnchorIndex(
-    lines,
-    frontmatter.startIndex,
-    frontmatter.endIndex,
-    anchorFields
-  );
+  const meta = findMetaRange(lines);
+  if (!meta) return createMetaBlock(source, normalizedLine);
+  const bodyLines = lines.slice(meta.startIndex + 1, meta.endIndex);
+  if (field && bodyLines.some((bodyLine) => buildFieldLineRe(field).test(bodyLine))) return source;
+  const anchorIndex = findAnchorIndex(lines, meta.startIndex, meta.endIndex, anchorFields);
   const nextLines = [...lines];
   nextLines.splice(anchorIndex + 1, 0, normalizedLine);
-  return nextLines.join(eol);
+  return nextLines.join(readEol(source));
 };
 
 export const applyAuthoringPatch = (source: string, patch: AuthoringPatch): string => {
@@ -225,20 +166,14 @@ export const applyAuthoringPatch = (source: string, patch: AuthoringPatch): stri
       source
     );
   }
-
-  if (patch.kind === "append_document_text") {
-    return applyAppendDocumentText(source, patch.text);
+  if (patch.kind === "append_document_text") return applyAppendDocumentText(source, patch.text);
+  if (patch.kind === "insert_after_declaration") {
+    return applyInsertAfterDeclaration(source, patch.declarationId, patch.text);
   }
-
-  if (patch.kind === "insert_after_block") {
-    return applyInsertAfterBlock(source, patch.blockId, patch.text);
+  if (patch.kind === "insert_meta_field") {
+    return applyInsertMetaField(source, patch.line, patch.anchorFields);
   }
-
-  if (patch.kind === "insert_frontmatter_line") {
-    return applyInsertFrontmatterLine(source, patch.line, patch.anchorFields);
-  }
-
-  return applyInsertFieldLine(source, patch.blockId, patch.line, patch.anchorFields);
+  return applyInsertDeclarationField(source, patch.declarationId, patch.line, patch.anchorFields);
 };
 
 export const applyAuthoringSuggestion = (

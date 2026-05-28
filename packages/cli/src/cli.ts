@@ -36,7 +36,6 @@ import {
   type GitRunner
 } from "./git-changed";
 import {
-  buildSemanticDiff,
   formatSemanticDiffText,
   type SemanticDiff
 } from "./semantic-diff";
@@ -154,6 +153,7 @@ type CliCommand =
   | { type: "fix"; filePath: string; format: TextFormat; maxIterations: number; write: boolean };
 
 interface RunOptions {
+  buildTrainingGraphIndex?: BuildTrainingGraphIndex;
   compileChemd?: CompileChemd;
   cwd?: string;
   gitRunner?: GitRunner;
@@ -164,6 +164,7 @@ interface RunOptions {
 }
 
 interface NormalizedRunOptions {
+  buildTrainingGraphIndex?: BuildTrainingGraphIndex;
   compileChemd?: CompileChemd;
   cwd: string;
   gitRunner?: GitRunner;
@@ -179,10 +180,16 @@ interface DiagnosticCounts {
   info: number;
 }
 
+interface ProgramSummary {
+  declarationCount: number;
+  docCount: number;
+}
+
 interface ValidationReport {
   filePath?: string;
   counts: DiagnosticCounts;
   diagnostics: Diagnostic[];
+  program?: ProgramSummary;
 }
 
 interface CheckReport {
@@ -303,6 +310,29 @@ interface GraphIndexReactionIntelligenceSummary {
 
 type GraphIndexWithOptionalReactionIntelligence = ChemdTrainingGraphIndexV1 & {
   reaction_intelligence?: GraphIndexReactionIntelligenceSummary;
+};
+
+interface ProgramDeclarationLike {
+  id: string;
+  kind: string;
+  [key: string]: unknown;
+}
+
+interface ProgramDocumentLike {
+  declarations: ProgramDeclarationLike[];
+  diagnostics?: Diagnostic[];
+  docs: unknown[];
+  meta: {
+    id: string;
+    [key: string]: unknown;
+  };
+}
+
+type CompileResultWithProgram = CompileResult & {
+  declarations?: ProgramDeclarationLike[];
+  docs?: unknown[];
+  document?: ProgramDocumentLike;
+  program?: ProgramDocumentLike;
 };
 
 interface CliCompilerServices {
@@ -869,6 +899,53 @@ const countDiagnostics = (diagnostics: Diagnostic[]): DiagnosticCounts => ({
   info: diagnostics.filter((diagnostic) => diagnostic.severity === "info").length
 });
 
+const isProgramDocumentLike = (value: unknown): value is ProgramDocumentLike => {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<ProgramDocumentLike>;
+  return Boolean(candidate.meta)
+    && typeof candidate.meta?.id === "string"
+    && Array.isArray(candidate.declarations)
+    && Array.isArray(candidate.docs);
+};
+
+const getCompileProgram = (result: CompileResult): ProgramDocumentLike => {
+  const candidate = result as CompileResultWithProgram;
+  const program = candidate.program ?? candidate.document;
+  if (isProgramDocumentLike(program)) {
+    return program;
+  }
+
+  if (
+    candidate.document
+    && typeof candidate.document.meta?.id === "string"
+    && Array.isArray(candidate.declarations)
+    && Array.isArray(candidate.docs)
+  ) {
+    return {
+      declarations: candidate.declarations,
+      diagnostics: candidate.diagnostics,
+      docs: candidate.docs,
+      meta: candidate.document.meta
+    };
+  }
+
+  throw new Error("Compiler result does not expose a program document.");
+};
+
+const getCompileDiagnostics = (result: CompileResult): Diagnostic[] =>
+  result.diagnostics ?? getCompileProgram(result).diagnostics ?? [];
+
+const summarizeProgram = (program: ProgramDocumentLike): ProgramSummary => ({
+  declarationCount: program.declarations.length,
+  docCount: program.docs.length
+});
+
+const formatProgramSummary = (summary: ProgramSummary): string =>
+  `${summary.declarationCount} declaration(s), ${summary.docCount} doc comment(s)`;
+
 const countImportDiagnostics = (
   diagnostics: readonly ImportDiagnostic[]
 ): DiagnosticCounts => ({
@@ -885,7 +962,7 @@ const getTargetDiagnostics = (
   target: CheckTarget
 ): Diagnostic[] => {
   if (target !== "training") {
-    return result.diagnostics ?? [];
+    return getCompileDiagnostics(result);
   }
 
   const governanceDiagnostics = getTrainingGovernanceDiagnostics(result);
@@ -904,7 +981,7 @@ const getTargetDiagnostics = (
     : [];
 
   return [
-    ...(result.diagnostics ?? []),
+    ...getCompileDiagnostics(result),
     ...governanceDiagnostics,
     ...reviewDiagnostic
   ];
@@ -933,12 +1010,12 @@ const getExportDiagnostics = (
 
   if (format === "rag") {
     return [
-      ...(result.diagnostics ?? []),
+      ...getCompileDiagnostics(result),
       ...getTrainingGovernanceDiagnostics(result)
     ];
   }
 
-  return result.diagnostics ?? [];
+  return getCompileDiagnostics(result);
 };
 
 const sumDiagnosticCounts = (reports: ValidationReport[]): DiagnosticCounts =>
@@ -967,16 +1044,19 @@ const formatDiagnostic = (filePath: string, diagnostic: Diagnostic): string => [
 const writeDiagnosticResult = (
   writer: CliWriter,
   filePath: string,
-  diagnostics: Diagnostic[]
+  diagnostics: Diagnostic[],
+  program?: ProgramSummary
 ) => {
+  const programSuffix = program ? ` (${formatProgramSummary(program)})` : "";
+
   if (diagnostics.length === 0) {
-    writer.write(`${filePath}: ok\n`);
+    writer.write(`${filePath}: ok${programSuffix}\n`);
     return;
   }
 
   const counts = countDiagnostics(diagnostics);
   writer.write(
-    `${filePath}: ${counts.error} error(s), ${counts.warning} warning(s), ${counts.info} info\n`
+    `${filePath}: ${counts.error} error(s), ${counts.warning} warning(s), ${counts.info} info${programSuffix}\n`
   );
 
   for (const diagnostic of diagnostics) {
@@ -989,12 +1069,12 @@ const writeErrorsIfPresent = (
   result: CompileResult,
   stderr: CliWriter
 ): boolean => {
-  const diagnostics = result.diagnostics ?? [];
+  const diagnostics = getCompileDiagnostics(result);
   if (!hasErrorDiagnostics(diagnostics)) {
     return false;
   }
 
-  writeDiagnosticResult(stderr, filePath, diagnostics);
+  writeDiagnosticResult(stderr, filePath, diagnostics, summarizeProgram(getCompileProgram(result)));
   return true;
 };
 
@@ -1021,16 +1101,17 @@ const validateFiles = (
   for (const filePath of command.filePaths) {
     const source = readSource(filePath, options.cwd);
     const result = compileChemd(source);
-    const diagnostics = result.diagnostics ?? [];
+    const program = getCompileProgram(result);
+    const diagnostics = getCompileDiagnostics(result);
     hasErrors = hasErrors || hasErrorDiagnostics(diagnostics);
-    writeDiagnosticResult(options.stdout, filePath, diagnostics);
+    writeDiagnosticResult(options.stdout, filePath, diagnostics, summarizeProgram(program));
   }
 
   return hasErrors ? EXIT_VALIDATION_FAILED : EXIT_OK;
 };
 
 const isChemdFilePath = (filePath: string): boolean =>
-  filePath.endsWith(".chemd") || filePath.endsWith(".chemd.md");
+  filePath.endsWith(".chemd");
 
 const collectChemdFilesFromDirectory = (dirPath: string): string[] =>
   readdirSync(dirPath, { withFileTypes: true })
@@ -1076,12 +1157,14 @@ const checkPaths = (
   const files = collectCheckFilePaths(command.paths, options.cwd).map((filePath) => {
     const source = readSource(filePath, options.cwd);
     const result = compileChemd(source);
+    const program = getCompileProgram(result);
     const diagnostics = getTargetDiagnostics(result, command.target);
 
     return {
       filePath: path.relative(options.cwd, filePath) || filePath,
       counts: countDiagnostics(diagnostics),
-      diagnostics
+      diagnostics,
+      program: summarizeProgram(program)
     };
   });
   const report: CheckReport = {
@@ -1112,6 +1195,7 @@ const formatCheckReport = (report: CheckReport): string => {
     lines.push(
       `${file.filePath}: ${file.counts.error} error(s), `
       + `${file.counts.warning} warning(s), ${file.counts.info} info`
+      + (file.program ? ` (${formatProgramSummary(file.program)})` : "")
     );
     for (const diagnostic of file.diagnostics) {
       lines.push(formatDiagnostic(file.filePath ?? "", diagnostic));
@@ -1206,7 +1290,7 @@ const preflightFile = (
 
 const selectExportPayload = (result: CompileResult, format: ExportFormat): unknown => {
   if (format === "json") {
-    return JSON.parse(result.json);
+    return getCompileProgram(result);
   }
 
   if (format === "lnf") {
@@ -1439,7 +1523,7 @@ const appendReactionIntelligenceSummary = (
 export const formatGraphIndexText = (index: GraphIndexWithOptionalReactionIntelligence): string => {
   const lines = [
     "Chemd graph index",
-    `  documents: ${index.index_scope.document_ids.length}`,
+    `  programs: ${index.index_scope.document_ids.length}`,
     `  nodes: ${index.nodes.length}`,
     `  edges: ${index.edges.length}`,
     `  reactions: ${index.reaction_features.length}`,
@@ -1482,7 +1566,7 @@ const graphFiles = (
 
   const index = buildTrainingGraphIndex(compiled.map((item) => item.result.trainingUnderstanding), {
     document_sources: compiled.map((item) => ({
-      document_id: item.result.trainingUnderstanding.document.document_id,
+      document_id: getCompileProgram(item.result).meta.id,
       file_path: item.filePath
     }))
   });
@@ -1503,6 +1587,137 @@ const compileSourceFile = (
   return compileChemd(source);
 };
 
+const PROGRAM_DIFF_INTERNAL_FIELDS = new Set([
+  "id",
+  "kind",
+  "qualifiedId",
+  "docs",
+  "sourceSpan",
+  "fieldSpans"
+]);
+
+const normalizeProgramDiffValue = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeProgramDiffValue(item));
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([key, nestedValue]) =>
+          key !== "resolved"
+          && key !== "sourceSpan"
+          && key !== "fieldSpans"
+          && nestedValue !== undefined
+        )
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, nestedValue]) => [key, normalizeProgramDiffValue(nestedValue)])
+    );
+  }
+
+  return value;
+};
+
+const stableProgramDiffValue = (value: unknown): string =>
+  JSON.stringify(normalizeProgramDiffValue(value));
+
+const collectProgramDeclarationFields = (
+  declaration: ProgramDeclarationLike
+): Record<string, unknown> =>
+  Object.fromEntries(
+    Object.entries(declaration)
+      .filter(([key, value]) =>
+        !PROGRAM_DIFF_INTERNAL_FIELDS.has(key)
+        && value !== undefined
+      )
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, value]) => [key, normalizeProgramDiffValue(value)])
+  );
+
+const compareProgramFields = (
+  beforeFields: Record<string, unknown>,
+  afterFields: Record<string, unknown>
+): Array<{ field: string; before: unknown; after: unknown }> => {
+  const fieldNames = new Set([...Object.keys(beforeFields), ...Object.keys(afterFields)]);
+  const changes: Array<{ field: string; before: unknown; after: unknown }> = [];
+
+  for (const field of [...fieldNames].sort()) {
+    const before = beforeFields[field];
+    const after = afterFields[field];
+    if (stableProgramDiffValue(before) !== stableProgramDiffValue(after)) {
+      changes.push({ field, before, after });
+    }
+  }
+
+  return changes;
+};
+
+const buildProgramSemanticDiff = (
+  before: CompileResult,
+  after: CompileResult
+): SemanticDiff => {
+  const beforeProgram = getCompileProgram(before);
+  const afterProgram = getCompileProgram(after);
+  const beforeDeclarations = new Map(beforeProgram.declarations.map((declaration) => [
+    `${declaration.kind}:${declaration.id}`,
+    {
+      fields: collectProgramDeclarationFields(declaration),
+      nodeId: declaration.id,
+      nodeType: declaration.kind
+    }
+  ]));
+  const afterDeclarations = new Map(afterProgram.declarations.map((declaration) => [
+    `${declaration.kind}:${declaration.id}`,
+    {
+      fields: collectProgramDeclarationFields(declaration),
+      nodeId: declaration.id,
+      nodeType: declaration.kind
+    }
+  ]));
+  const changes: SemanticDiff["changes"] = [];
+
+  for (const [key, declaration] of [...beforeDeclarations].sort()) {
+    if (!afterDeclarations.has(key)) {
+      changes.push({
+        changeType: "removed",
+        nodeId: declaration.nodeId,
+        nodeType: declaration.nodeType,
+        before: declaration.fields
+      });
+    }
+  }
+
+  for (const [key, declaration] of [...afterDeclarations].sort()) {
+    const beforeDeclaration = beforeDeclarations.get(key);
+    if (!beforeDeclaration) {
+      changes.push({
+        changeType: "added",
+        nodeId: declaration.nodeId,
+        nodeType: declaration.nodeType,
+        after: declaration.fields
+      });
+      continue;
+    }
+
+    const fields = compareProgramFields(beforeDeclaration.fields, declaration.fields);
+    if (fields.length > 0) {
+      changes.push({
+        changeType: "changed",
+        nodeId: declaration.nodeId,
+        nodeType: declaration.nodeType,
+        fields
+      });
+    }
+  }
+
+  return {
+    schemaVersion: "chemd-semantic-diff/v0.1",
+    beforeDocumentId: beforeProgram.meta.id,
+    afterDocumentId: afterProgram.meta.id,
+    changes
+  };
+};
+
 const diffFiles = (
   command: Extract<CliCommand, { type: "diff" }>,
   compileChemd: CompileChemd,
@@ -1517,7 +1732,7 @@ const diffFiles = (
     return EXIT_VALIDATION_FAILED;
   }
 
-  const diff = buildSemanticDiff(before.document, after.document);
+  const diff = buildProgramSemanticDiff(before, after);
   const output = command.format === "json"
     ? JSON.stringify(diff, null, 2)
     : formatSemanticDiffText(diff);
@@ -1543,13 +1758,17 @@ const buildChangedFileReport = (
   options: NormalizedRunOptions
 ): ChangedFileReport => {
   const current = compileCurrentChangedFile(record, compileChemd, options);
-  const diagnostics = current?.diagnostics ?? [];
+  const diagnostics = current ? getCompileDiagnostics(current) : [];
   const report: ChangedFileReport = {
     path: record.path,
     status: record.status,
     ...(record.previousPath ? { previousPath: record.previousPath } : {}),
     validation: current
-      ? { counts: countDiagnostics(diagnostics), diagnostics }
+      ? {
+          counts: countDiagnostics(diagnostics),
+          diagnostics,
+          program: summarizeProgram(getCompileProgram(current))
+        }
       : { skipped: true, reason: "deleted" }
   };
 
@@ -1568,7 +1787,7 @@ const buildChangedFileReport = (
 
   return {
     ...report,
-    diff: buildSemanticDiff(before.document, current.document)
+    diff: buildProgramSemanticDiff(before, current)
   };
 };
 
@@ -1581,7 +1800,7 @@ const buildChangedReport = (
     base: command.base,
     cwd: options.cwd,
     gitRunner: options.gitRunner
-  });
+  }).filter((record) => isChemdFilePath(record.path));
 
   return {
     schemaVersion: "chemd-changed/v0.1",
@@ -1596,7 +1815,8 @@ const formatValidationSummary = (validation: ChangedFileReport["validation"]): s
   }
 
   const { error, warning, info } = validation.counts;
-  return `validation: ${error} error(s), ${warning} warning(s), ${info} info`;
+  const programSuffix = validation.program ? ` (${formatProgramSummary(validation.program)})` : "";
+  return `validation: ${error} error(s), ${warning} warning(s), ${info} info${programSuffix}`;
 };
 
 const indent = (value: string): string =>
@@ -1892,6 +2112,7 @@ const agentLoopFile = async (
 };
 
 const normalizeRunOptions = (options: RunOptions): NormalizedRunOptions => ({
+  buildTrainingGraphIndex: options.buildTrainingGraphIndex,
   compileChemd: options.compileChemd,
   cwd: options.cwd ?? process.cwd(),
   gitRunner: options.gitRunner,
@@ -1975,7 +2196,8 @@ export const runChemdCli = async (
 
     const compiler = await loadCompiler();
     const compileChemd = options.compileChemd ?? compiler.compileChemd;
-    const buildTrainingGraphIndex = compiler.buildTrainingGraphIndexFromUnderstandings;
+    const buildTrainingGraphIndex = options.buildTrainingGraphIndex
+      ?? compiler.buildTrainingGraphIndexFromUnderstandings;
     const runChemdAgentLoop = options.runChemdAgentLoop ?? compiler.runChemdAgentLoop;
     const runChemdRepairLoop = options.runChemdRepairLoop ?? compiler.runChemdRepairLoop;
 

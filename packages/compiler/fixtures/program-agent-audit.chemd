@@ -1,0 +1,48 @@
+module exp_program_agent
+
+meta {
+  id: "exp-program-agent"
+  title: "Program agent audit"
+  date: "2026-05-29"
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
+
+reaction rxn_main {
+  reactants: [substrate]
+  products: [product]
+}
+
+result res_main for @rxn_main {
+  status: success
+}
+
+agent run repair_001 {
+  goal: "validate selected result"
+  status: completed
+  evidence: [@rxn_main, @res_main]
+
+  tool compile_current_file {
+    status: ok
+    evidence: [@rxn_main, @res_main]
+  }
+
+  patch proposed {
+    title: "bind primary result"
+    edit meta.primary_result = @res_main
+  }
+
+  decision approved {
+    patch: "proposed"
+    rationale: "res_main is selected"
+  }
+
+  timeline completed {
+    at: "2026-05-29T00:00:00Z"
+    actor: "codex"
+    summary: "validated"
+    tool: "compile_current_file"
+    patch: "proposed"
+    evidence: [@res_main]
+  }
+}

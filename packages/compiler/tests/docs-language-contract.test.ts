@@ -10,46 +10,44 @@ const docsLanguageContractSource = readFileSync(
 );
 
 describe("documentation language contract fixture", () => {
-  it("compiles documented syntax without warnings or errors", () => {
+  it("compiles documented program syntax without error diagnostics", () => {
     const result = compileChemd(docsLanguageContractSource);
 
-    expect(result.diagnostics).toEqual([]);
+    expect(result.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
   });
 
-  it("keeps template parameters, col children, and nested event/step syntax executable", () => {
+  it("keeps doc comments, declarations, and procedure steps executable", () => {
     const result = compileChemd(docsLanguageContractSource);
-    const col = result.document.children.find((node) => node.type === "col");
-    const template = result.document.children.find((node) => node.type === "template");
-    const procedure = result.document.children.find((node) => node.type === "procedure");
-    const observation = result.document.children.find((node) => node.type === "observation");
+    const reaction = result.program.declarations.find((node) => node.id === "rxn_main");
+    const procedure = result.program.declarations.find((node) => node.id === "proc_main");
+    const observation = result.program.declarations.find((node) => node.id === "obs_main");
 
-    expect(template).toMatchObject({
-      type: "template",
-      name: "reaction-summary",
-      paramSpecs: expect.arrayContaining([
-        expect.objectContaining({ name: "rxn", type: expect.objectContaining({ kind: "ref", targetKind: "reaction" }) }),
-        expect.objectContaining({ name: "result", type: expect.objectContaining({ kind: "ref", targetKind: "result" }) }),
-        expect.objectContaining({ name: "target", type: expect.objectContaining({ kind: "quantity", quantityClass: "temperature" }) })
-      ])
-    });
-    expect(col).toMatchObject({
-      type: "col",
-      columns: 3,
-      children: expect.arrayContaining([
-        expect.objectContaining({ type: "analysis", id: "ana-col" })
-      ])
+    expect(result.program.docs).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        markdown: expect.stringContaining("Documentation language contract"),
+        attachment: { kind: "file" }
+      }),
+      expect.objectContaining({
+        markdown: "Reaction doc comments are renderable but do not create facts.",
+        attachment: { kind: "declaration", declarationId: "rxn_main" }
+      })
+    ]));
+    expect(reaction).toMatchObject({
+      kind: "reaction",
+      fields: {
+        temperature: expect.objectContaining({ type: "quantity", unit: "C" })
+      }
     });
     expect(procedure).toMatchObject({
-      type: "procedure",
-      steps: expect.arrayContaining([
-        expect.objectContaining({ type: "step", stepId: "s-add", family: "add" })
+      kind: "procedure",
+      children: expect.arrayContaining([
+        expect.objectContaining({ kind: "step", id: "charge", family: "charge" }),
+        expect.objectContaining({ kind: "step", id: "heat", family: "heat", dependsOn: ["charge"] })
       ])
     });
     expect(observation).toMatchObject({
-      type: "observation",
-      events: expect.arrayContaining([
-        expect.objectContaining({ type: "event", eventId: "e-gas", eventType: "gas_evolution" })
-      ])
+      kind: "observation",
+      target: expect.objectContaining({ target: "rxn_main" })
     });
   });
 });

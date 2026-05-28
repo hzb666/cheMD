@@ -125,6 +125,52 @@ description: Chemd parser、resolver、typechecker、compiler 和 runtime 常见
 | `E_TRACE_EVENT_PAYLOAD` | trace event payload 缺少必填字段 |
 | `W_TRACE_STEP_STATE` | trace step 状态顺序可疑，或对 replay 非法 |
 
+## Program Language
+
+| 诊断码 | 含义 |
+| --- | --- |
+| `E_PROGRAM_META_EXPECTED` | 缺少 `meta` 声明 |
+| `E_PROGRAM_DECLARATION_EXPECTED` | 解析器需要一个 program 声明 |
+| `E_PROGRAM_DECLARATION_KIND_UNKNOWN` | program-v1 不支持该声明类型 |
+| `E_PROGRAM_BLOCK_OPEN_EXPECTED` | 声明或字段块缺少 `{` |
+| `E_PROGRAM_BLOCK_CLOSE_EXPECTED` | 声明或字段块缺少 `}` |
+| `E_PROGRAM_FIELD_NAME_EXPECTED` | 缺少字段名 |
+| `E_PROGRAM_FIELD_COLON_EXPECTED` | 字段名后缺少 `:` |
+| `E_PROGRAM_FIELD_UNKNOWN` | 当前声明不接受该字段 |
+| `E_PROGRAM_EXPECTED_VALUE` | 字段值无法解析 |
+| `E_PROGRAM_EXPECTED_CALL_ARG_ASSIGNMENT` | 调用参数缺少 `:` 赋值 |
+| `E_PROGRAM_UNEXPECTED_TOKEN` | 解析器遇到意外 token |
+| `E_DUPLICATE_DECLARATION` | 声明 ID 重复 |
+| `E_DUPLICATE_QUALIFIED_DECLARATION` | 完整声明 ID 重复 |
+| `E_UNRESOLVED_PROGRAM_REFERENCE` | program 引用无法解析 |
+| `W_UNRESOLVED_DOC_REFERENCE` | 文档注释引用无法解析 |
+| `E_LEGACY_` | 检测到已移除的 legacy 语法 |
+| `E_LEGACY_FRONTMATTER_REMOVED` | program-v1 已移除 YAML frontmatter |
+| `E_LEGACY_FENCED_BLOCK_REMOVED` | program-v1 已移除 `:::` 结构块 |
+| `E_LEGACY_TEMPLATE_REMOVED` | program-v1 已移除 template/use 语法 |
+| `E_LEGACY_COLUMN_LAYOUT_REMOVED` | program-v1 已移除 column layout 语法 |
+
+## Program Procedure 与 Agent
+
+| 诊断码 | 含义 |
+| --- | --- |
+| `E_PROGRAM_PROCEDURE_EXPECTED` | 解析器需要 procedure 声明 |
+| `E_PROGRAM_PROCEDURE_ID_EXPECTED` | procedure 声明缺少 ID |
+| `E_PROGRAM_PROCEDURE_BLOCK_EXPECTED` | procedure 缺少块体 |
+| `E_PROGRAM_PROCEDURE_STATEMENT_EXPECTED` | procedure 语句无法解析 |
+| `E_PROGRAM_PROCEDURE_STEP_EXPECTED` | 解析器需要 `step` 语句 |
+| `E_PROGRAM_PROCEDURE_STEP_ID_EXPECTED` | procedure step 缺少 ID |
+| `E_PROGRAM_PROCEDURE_STEP_ASSIGN_EXPECTED` | procedure step 缺少 `=` |
+| `E_PROGRAM_PROCEDURE_STEP_CALL_EXPECTED` | procedure step 缺少调用表达式 |
+| `E_PROGRAM_AGENT_EXPECTED` | 解析器需要 agent 声明 |
+| `E_PROGRAM_AGENT_RUN_EXPECTED` | 解析器需要 `agent run` |
+| `E_PROGRAM_AGENT_RUN_ID_EXPECTED` | agent run 缺少 ID |
+| `E_PROGRAM_AGENT_BLOCK_EXPECTED` | agent run 缺少块体 |
+| `E_AGENT_TOOL_UNKNOWN` | agent tool 名称未知 |
+| `E_AGENT_PATCH_TARGET_UNRESOLVED` | agent patch 目标无法解析 |
+| `E_AGENT_PATCH_DECISION_ORPHAN` | agent decision 未关联已有 patch |
+| `E_AGENT_RUN_STATUS_INCOMPLETE` | completed agent run 缺少终态审计事件 |
+
 ## Interoperability 与 Training Governance
 
 | 诊断码 | 含义 |

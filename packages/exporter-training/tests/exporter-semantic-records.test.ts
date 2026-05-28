@@ -10,6 +10,12 @@ import {
   exportTrainingRecordFromDocument
 } from "../src/index";
 
+const toLnfDocumentInfo = (document: { meta: { id: string; title: string; date: string } }) => ({
+  id: document.meta.id,
+  title: document.meta.title,
+  date: document.meta.date
+});
+
 describe("training export semantic records", () => {
   it("preserves all explicit step source text in procedure learning pairs", () => {
     const document = resolveChemd(parseChemd(`---
@@ -360,7 +366,7 @@ purity: 95%
 `));
     const checked = typecheckDocument(document);
     const lnf = buildCanonicalLnf({
-      document,
+      document: toLnfDocumentInfo(document),
       typedGraph: checked.typedGraph,
       stepGraph: checked.stepGraph,
       diagnostics: checked.diagnostics

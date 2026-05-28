@@ -24,21 +24,28 @@ export type AuthoringPatch =
       text: string;
     }
   | {
-      kind: "insert_after_block";
-      blockId: string;
+      kind: "insert_after_declaration";
+      declarationId: string;
       text: string;
     }
   | {
-      kind: "insert_field_line";
-      blockId: string;
+      kind: "insert_declaration_field";
+      declarationId: string;
       line: string;
       anchorFields?: string[];
     }
   | {
-      kind: "insert_frontmatter_line";
+      kind: "insert_meta_field";
       line: string;
       anchorFields?: string[];
     };
+
+export type AuthoringTarget =
+  | { kind: "document"; documentId: string }
+  | { kind: "meta_field"; field: string }
+  | { kind: "declaration"; declarationId: string }
+  | { kind: "declaration_field"; declarationId: string; field: string }
+  | { kind: "doc_comment"; docId: string };
 
 export interface AuthoringSuggestion {
   suggestion_id: string;
@@ -46,7 +53,7 @@ export interface AuthoringSuggestion {
   description: string;
   category: AuthoringSuggestionCategory;
   confidence: "high" | "medium";
-  target_block_id?: string;
+  target?: AuthoringTarget;
   patch: AuthoringPatch;
 }
 

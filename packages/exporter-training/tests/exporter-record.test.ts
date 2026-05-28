@@ -19,6 +19,12 @@ const parseTaskUserInput = (example: TaskExample | undefined): Record<string, un
 const parseTaskAssistantOutput = (example: TaskExample | undefined): Record<string, unknown> =>
   JSON.parse(example?.messages.find((message) => message.role === "assistant")?.content ?? "{}") as Record<string, unknown>;
 
+const toLnfDocumentInfo = (document: { meta: { id: string; title: string; date: string } }) => ({
+  id: document.meta.id,
+  title: document.meta.title,
+  date: document.meta.date
+});
+
 const artifactTrainingSource = `---
 id: exp-export-artifacts
 title: Export artifacts
@@ -105,7 +111,7 @@ solvent: THF
 `));
     const checked = typecheckDocument(document);
     const lnf = buildCanonicalLnf({
-      document,
+      document: toLnfDocumentInfo(document),
       typedGraph: checked.typedGraph,
       stepGraph: checked.stepGraph,
       diagnostics: checked.diagnostics

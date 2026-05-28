@@ -25,16 +25,18 @@ The current semantic usage surface uses `:::chemd` for both molecule and reactio
 The `validate` command compiles under the current language contract. A minimal validatable document needs required frontmatter; `:::chemd` may declare `kind` explicitly or omit it when the fields make the identity clear.
 
 ```md validate
----
-id: exp-minimal
-title: Minimal Chemd source
-date: 2026-04-24
----
+module exp_minimal
 
-:::chemd #mol-main
-name: ethanol
-smiles: CCO
-:::
+meta {
+  id: "exp-minimal"
+  title: "Minimal Chemd source"
+  date: "2026-04-24"
+}
+
+molecule mol_main {
+  name: "ethanol"
+  smiles: "CCO"
+}
 ```
 
 This example satisfies required frontmatter and the molecule identity requirement.

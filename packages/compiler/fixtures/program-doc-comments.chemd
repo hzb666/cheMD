@@ -1,0 +1,30 @@
+module exp_program_docs
+
+/*md
+# Narrative documentation
+
+This block should remain documentation, not a semantic fact.
+*/
+meta {
+  id: "exp-program-docs"
+  title: "Program docs"
+  date: "2026-05-29"
+}
+
+/// Molecule narrative.
+molecule mol_main {
+  name: "ethanol"
+  smiles: "CCO"
+}
+
+/// Reaction narrative with @mol_main mention.
+reaction rxn_main {
+  reactants: [@mol_main]
+  products: [product]
+}
+
+analysis ana_main for @rxn_main {
+  type: tlc
+  ref: @rxn_main
+  notes: "one spot"
+}

@@ -22,7 +22,8 @@
     "05-28-program-first-phase-0-spec",
     "05-28-program-first-phase-1-core-ast",
     "05-28-program-first-phase-2-parser",
-    "05-28-program-first-phase-3-resolver-typechecker"
+    "05-28-program-first-phase-3-resolver-typechecker",
+    "05-29-05-28-program-first-phase-4-compiler-pipeline"
   ],
   "parent": null,
   "relatedFiles": [],

@@ -1,6 +1,5 @@
 import type {
-  ChemdDocument,
-  ObjectNode
+  ChemdProgramDocument
 } from "@chemd/core";
 import type {
   ChemdTrainingExportV2,
@@ -10,9 +9,10 @@ import type {
 } from "@chemd/exporter-training";
 
 import {
-  collectNodeIds,
-  collectObjectNodes,
-  findLastObjectNodeId
+  collectDeclarationIds,
+  collectObjectDeclarations,
+  findLastDeclarationId,
+  type AuthoringDeclaration
 } from "./authoring-document";
 import type {
   AuthoringPatch,
@@ -42,54 +42,51 @@ const buildPatch = (patches: AuthoringPatch[]): AuthoringPatch =>
 
 const buildResultBlockText = (resultId: string, reactionId: string): string =>
   [
-    `:::result #${resultId}`,
-    `ref: ${reactionId}`,
-    "status: success",
-    "yield: 0%",
-    ":::"
+    `result ${resultId} for @${reactionId} {`,
+    "  status: success",
+    "  yield: 0%",
+    "}"
   ].join("\n");
 
 const buildAnalysisBlockText = (analysisId: string, ref: string): string =>
   [
-    `:::analysis #${analysisId}`,
-    "type: tlc",
-    `ref: ${ref}`,
-    "result: one major spot",
-    ":::"
+    `analysis ${analysisId} for ${ref.startsWith("@") ? ref : `@${ref}`} {`,
+    "  type: tlc",
+    "  notes: \"one major spot\"",
+    "}"
   ].join("\n");
 
 const buildObservationBlockText = (observationId: string, ref: string): string =>
   [
-    `:::observation #${observationId}`,
-    `ref: ${ref}`,
-    "Observation placeholder.",
-    ":::"
+    `observation ${observationId} for ${ref.startsWith("@") ? ref : `@${ref}`} {`,
+    "  notes: \"Observation placeholder.\"",
+    "}"
   ].join("\n");
 
 const collectSupportNodeIds = (
-  nodes: ObjectNode[],
+  nodes: AuthoringDeclaration[],
   type: "analysis" | "observation",
   ref: string
 ): string[] =>
   nodes.flatMap((node) =>
-    node.type === type && node.id && node.ref === ref ? [node.id] : []
+    node.kind === type && node.id && node.ref === ref ? [node.id] : []
   );
 
 const hasUnlinkedSupportNode = (
-  nodes: ObjectNode[],
+  nodes: AuthoringDeclaration[],
   type: "analysis" | "observation"
 ): boolean =>
-  nodes.some((node) => node.type === type && Boolean(node.id) && !node.ref);
+  nodes.some((node) => node.kind === type && Boolean(node.id) && !node.ref);
 
-const hasUnlinkedResultNode = (nodes: ObjectNode[]): boolean =>
-  nodes.some((node) => node.type === "result" && Boolean(node.id) && !node.ref && !node.reaction);
+const hasUnlinkedResultNode = (nodes: AuthoringDeclaration[]): boolean =>
+  nodes.some((node) => node.kind === "result" && Boolean(node.id) && !node.ref);
 
 const readAnchorId = (
-  nodes: ObjectNode[],
+  nodes: AuthoringDeclaration[],
   fallbackId: string,
   candidateIds: string[]
 ): string =>
-  findLastObjectNodeId(nodes, candidateIds) ?? fallbackId;
+  findLastDeclarationId(nodes, candidateIds) ?? fallbackId;
 
 const findLinkedResultOriginalId = (
   semanticLayer: ChemdTrainingExportV2["semantic_layer"],
@@ -156,7 +153,7 @@ interface ReactionScaffoldState {
 
 const buildReactionScaffoldState = (input: {
   reaction: ExportedReactionV1;
-  objectNodes: ObjectNode[];
+  objectNodes: AuthoringDeclaration[];
   semanticLayer: ChemdTrainingExportV2["semantic_layer"];
   canReuseUnlinkedBlocks: boolean;
 }): ReactionScaffoldState => {
@@ -209,8 +206,8 @@ const appendReactionResultPatch = (input: {
   const resultId = createUnusedId(`res-${input.stem}`, input.usedIds);
   input.usedIds.add(resultId);
   input.patches.push({
-    kind: "insert_after_block",
-    blockId: input.anchorId,
+    kind: "insert_after_declaration",
+    declarationId: input.anchorId,
     text: buildResultBlockText(resultId, input.reactionId)
   });
   return resultId;
@@ -224,17 +221,17 @@ const appendSupportPatch = (input: {
   ref: string;
   usedIds: Set<string>;
 }): string => {
-  const blockId = createUnusedId(`${input.prefix}-${input.stem}`, input.usedIds);
+  const declarationId = createUnusedId(`${input.prefix}-${input.stem}`, input.usedIds);
   const text = input.prefix === "ana"
-    ? buildAnalysisBlockText(blockId, input.ref)
-    : buildObservationBlockText(blockId, input.ref);
-  input.usedIds.add(blockId);
+    ? buildAnalysisBlockText(declarationId, input.ref)
+    : buildObservationBlockText(declarationId, input.ref);
+  input.usedIds.add(declarationId);
   input.patches.push({
-    kind: "insert_after_block",
-    blockId: input.anchorId,
+    kind: "insert_after_declaration",
+    declarationId: input.anchorId,
     text
   });
-  return blockId;
+  return declarationId;
 };
 
 interface AttemptScaffoldState {
@@ -250,7 +247,7 @@ interface AttemptScaffoldState {
 const buildAttemptScaffoldState = (input: {
   variation: ExportedConditionVaryV1;
   attempt: ExportedConditionVariationAttemptV1;
-  objectNodes: ObjectNode[];
+  objectNodes: AuthoringDeclaration[];
   semanticLayer: ChemdTrainingExportV2["semantic_layer"];
   canReuseUnlinkedBlocks: boolean;
 }): AttemptScaffoldState => {
@@ -294,9 +291,29 @@ const buildAttemptScaffoldState = (input: {
   };
 };
 
+const appendReactionSupportPatches = (input: {
+  state: ReactionScaffoldState;
+  patches: AuthoringPatch[];
+  anchorId: string;
+  reactionId: string;
+  stem: string;
+  usedIds: Set<string>;
+}): void => {
+  let anchorId = input.anchorId;
+  if (!input.state.resultSatisfied) {
+    anchorId = appendReactionResultPatch({ ...input, anchorId, reactionId: input.reactionId });
+  }
+  if (!input.state.analysisSatisfied) {
+    anchorId = appendSupportPatch({ ...input, anchorId, prefix: "ana", ref: input.reactionId });
+  }
+  if (!input.state.observationSatisfied) {
+    appendSupportPatch({ ...input, anchorId, prefix: "obs", ref: input.reactionId });
+  }
+};
+
 const buildReactionScaffoldTemplate = (input: {
   reaction: ExportedReactionV1;
-  objectNodes: ObjectNode[];
+  objectNodes: AuthoringDeclaration[];
   semanticLayer: ChemdTrainingExportV2["semantic_layer"];
   usedIds: Set<string>;
   canReuseUnlinkedBlocks: boolean;
@@ -317,7 +334,7 @@ const buildReactionScaffoldTemplate = (input: {
     return null;
   }
 
-  let anchorId = readAnchorId(
+  const anchorId = readAnchorId(
     objectNodes,
     reaction.original_id,
     state.anchorIds
@@ -325,37 +342,14 @@ const buildReactionScaffoldTemplate = (input: {
   const patches: AuthoringPatch[] = [];
   const stem = readIdStem(reaction.original_id, "rxn");
 
-  if (!state.resultSatisfied) {
-    anchorId = appendReactionResultPatch({
-      patches,
-      anchorId,
-      reactionId: reaction.original_id,
-      stem,
-      usedIds
-    });
-  }
-
-  if (!state.analysisSatisfied) {
-    anchorId = appendSupportPatch({
-      patches,
-      anchorId,
-      prefix: "ana",
-      stem,
-      ref: reaction.original_id,
-      usedIds
-    });
-  }
-
-  if (!state.observationSatisfied) {
-    appendSupportPatch({
-      patches,
-      anchorId,
-      prefix: "obs",
-      stem,
-      ref: reaction.original_id,
-      usedIds
-    });
-  }
+  appendReactionSupportPatches({
+    state,
+    patches,
+    anchorId,
+    reactionId: reaction.original_id,
+    stem,
+    usedIds
+  });
 
   return {
     template_id: `scaffold-reaction-support-${reaction.original_id}`,
@@ -371,16 +365,64 @@ const buildAttemptResultLinkPatch = (
   attemptId: string,
   resultId: string
 ): AuthoringPatch => ({
-  kind: "insert_field_line",
-  blockId: variationId,
+  kind: "insert_declaration_field",
+  declarationId: variationId,
   line: `result: @${resultId}`,
   anchorFields: ["attempt"]
 });
 
+const appendAttemptResultPatches = (input: {
+  state: AttemptScaffoldState;
+  patches: AuthoringPatch[];
+  anchorId: string;
+  variationId: string;
+  attempt: ExportedConditionVariationAttemptV1;
+  stem: string;
+  usedIds: Set<string>;
+}): { resultId?: string; anchorId: string } => {
+  if (!input.state.existingResultId && input.attempt.reaction_ref_raw) {
+    const resultId = createUnusedId(`res-${input.stem}`, input.usedIds);
+    input.usedIds.add(resultId);
+    input.patches.push(buildAttemptResultLinkPatch(input.variationId, input.attempt.attempt_id, resultId));
+    input.patches.push({
+      kind: "insert_after_declaration",
+      declarationId: input.anchorId,
+      text: buildResultBlockText(resultId, input.attempt.reaction_ref_raw)
+    });
+    return { resultId, anchorId: resultId };
+  }
+  if (input.state.needsResultLink && input.state.existingResultId) {
+    input.patches.push(buildAttemptResultLinkPatch(
+      input.variationId,
+      input.attempt.attempt_id,
+      input.state.existingResultId
+    ));
+    return { resultId: input.state.existingResultId, anchorId: input.state.existingResultId };
+  }
+  return { resultId: input.state.existingResultId, anchorId: input.anchorId };
+};
+
+const appendAttemptSupportPatches = (input: {
+  state: AttemptScaffoldState;
+  patches: AuthoringPatch[];
+  anchorId: string;
+  stem: string;
+  attemptRef: string;
+  usedIds: Set<string>;
+}): void => {
+  let anchorId = input.anchorId;
+  if (!input.state.analysisSatisfied) {
+    anchorId = appendSupportPatch({ ...input, anchorId, prefix: "ana", ref: input.attemptRef });
+  }
+  if (!input.state.observationSatisfied) {
+    appendSupportPatch({ ...input, anchorId, prefix: "obs", ref: input.attemptRef });
+  }
+};
+
 const buildAttemptScaffoldTemplate = (input: {
   variation: ExportedConditionVaryV1;
   attempt: ExportedConditionVariationAttemptV1;
-  objectNodes: ObjectNode[];
+  objectNodes: AuthoringDeclaration[];
   semanticLayer: ChemdTrainingExportV2["semantic_layer"];
   usedIds: Set<string>;
   canReuseUnlinkedBlocks: boolean;
@@ -389,7 +431,6 @@ const buildAttemptScaffoldTemplate = (input: {
   if (!variation.original_id || !attempt.original_id) {
     return null;
   }
-
   const attemptRef = `@${attempt.original_id}`;
   const state = buildAttemptScaffoldState({
     variation,
@@ -398,57 +439,26 @@ const buildAttemptScaffoldTemplate = (input: {
     semanticLayer,
     canReuseUnlinkedBlocks
   });
-
   if (state.missingLabels.length === 0) {
     return null;
   }
-
-  let resultId = state.existingResultId;
-  let anchorId = readAnchorId(
+  const initialAnchorId = readAnchorId(
     objectNodes,
     variation.original_id,
     state.anchorIds
   );
   const patches: AuthoringPatch[] = [];
   const stem = readIdStem(attempt.attempt_id, "var");
-
-  if (!resultId && attempt.reaction_ref_raw) {
-    resultId = createUnusedId(`res-${stem}`, usedIds);
-    usedIds.add(resultId);
-    patches.push(buildAttemptResultLinkPatch(variation.original_id, attempt.attempt_id, resultId));
-    patches.push({
-      kind: "insert_after_block",
-      blockId: anchorId,
-      text: buildResultBlockText(resultId, attempt.reaction_ref_raw)
-    });
-    anchorId = resultId;
-  } else if (state.needsResultLink && resultId) {
-    patches.push(buildAttemptResultLinkPatch(variation.original_id, attempt.attempt_id, resultId));
-    anchorId = resultId;
-  }
-
-  if (!state.analysisSatisfied) {
-    anchorId = appendSupportPatch({
-      patches,
-      anchorId,
-      prefix: "ana",
-      stem,
-      ref: attemptRef,
-      usedIds
-    });
-  }
-
-  if (!state.observationSatisfied) {
-    appendSupportPatch({
-      patches,
-      anchorId,
-      prefix: "obs",
-      stem,
-      ref: attemptRef,
-      usedIds
-    });
-  }
-
+  const result = appendAttemptResultPatches({
+    state,
+    patches,
+    anchorId: initialAnchorId,
+    variationId: variation.original_id,
+    attempt,
+    stem,
+    usedIds
+  });
+  appendAttemptSupportPatches({ state, patches, anchorId: result.anchorId, stem, attemptRef, usedIds });
   return {
     template_id: `scaffold-condition-attempt-${attempt.original_id}`,
     title: `为 ${attempt.original_id} 插入 Attempt Scaffold`,
@@ -471,18 +481,16 @@ const buildReactionResultStarter = (usedIds: Set<string>): AuthoringTemplate => 
     patch: {
       kind: "append_document_text",
       text: [
-        `:::chemd #${reactionId}`,
-        "kind: reaction",
-        "reactants: substrate",
-        "products: product",
-        "solvent: THF",
-        ":::",
+        `reaction ${reactionId} {`,
+        "  reactants: [substrate]",
+        "  products: [product]",
+        "  solvent: \"THF\"",
+        "}",
         "",
-        `:::result #${resultId}`,
-        `ref: ${reactionId}`,
-        "status: success",
-        "yield: 0%",
-        ":::"
+        `result ${resultId} for @${reactionId} {`,
+        "  status: success",
+        "  yield: 0%",
+        "}"
       ].join("\n")
     }
   };
@@ -499,83 +507,95 @@ const buildConditionScreenTemplate = (
   return {
     template_id: `optimization-condition-screen-${standardId}`,
     title: "插入 Condition Screen 模板",
-    description: "为条件优化补一个 condition-varies 块，预填 standard 和一次尝试。",
+    description: "为条件优化补一个 condition_screen 声明，预填 standard 和一次尝试。",
     category: "optimization",
     patch: {
       kind: "append_document_text",
       text: [
-        `:::condition-varies #${conditionId}`,
-        `standard: ${standardId}`,
-        "factor: solvent | baseline=THF",
-        "factor: temperature | baseline=25 C",
-        "outcome: conversion | baseline=85%",
-        "attempt: var1",
-        `reaction: ${fallbackCandidate}`,
-        "result: @res-var1",
-        "solvent: MeCN",
-        "temperature: 40 C",
-        "conversion: 90%",
-        "note: conversion improved",
-        ":::"
+        `condition_screen ${conditionId} for @${standardId} {`,
+        `  standard: @${standardId}`,
+        "  factor: solvent | baseline=THF",
+        "  factor: temperature | baseline=25 C",
+        "  outcome: conversion | baseline=85%",
+        "  attempt: var1",
+        `  reaction: @${fallbackCandidate}`,
+        "  result: @res-var1",
+        "  solvent: \"MeCN\"",
+        "  temperature: 40 C",
+        "  conversion: 90%",
+        "  notes: \"conversion improved\"",
+        "}"
       ].join("\n")
     }
   };
 };
 
+const buildReactionScaffoldTemplates = (input: {
+  objectNodes: AuthoringDeclaration[];
+  reactionIds: string[];
+  semanticLayer: ChemdTrainingExportV2["semantic_layer"];
+  usedIds: Set<string>;
+}): AuthoringTemplate[] => {
+  const attemptReactionIds = new Set(
+    input.semanticLayer.condition_variation_attempts
+      .map((attempt) => attempt.reaction_ref_raw)
+      .filter((value): value is string => typeof value === "string" && value.length > 0)
+  );
+
+  return input.semanticLayer.reactions.flatMap((reaction) => {
+    if (!reaction.original_id || attemptReactionIds.has(reaction.original_id)) return [];
+    const template = buildReactionScaffoldTemplate({
+      reaction,
+      objectNodes: input.objectNodes,
+      semanticLayer: input.semanticLayer,
+      usedIds: input.usedIds,
+      canReuseUnlinkedBlocks: input.reactionIds.length === 1
+    });
+    return template ? [template] : [];
+  });
+};
+
+const buildAttemptScaffoldTemplates = (input: {
+  objectNodes: AuthoringDeclaration[];
+  semanticLayer: ChemdTrainingExportV2["semantic_layer"];
+  usedIds: Set<string>;
+}): AuthoringTemplate[] => {
+  const canReuseUnlinkedBlocks = input.semanticLayer.condition_variation_attempts.length === 1;
+  return input.semanticLayer.condition_variation_attempts.flatMap((attempt) => {
+    const variation = input.semanticLayer.condition_variations.find((item) =>
+      item.entity_id === attempt.parent_condition_variation_id
+    );
+    if (!variation) return [];
+    const template = buildAttemptScaffoldTemplate({
+      variation,
+      attempt,
+      objectNodes: input.objectNodes,
+      semanticLayer: input.semanticLayer,
+      usedIds: input.usedIds,
+      canReuseUnlinkedBlocks
+    });
+    return template ? [template] : [];
+  });
+};
+
 export const buildAuthoringTemplates = (
-  document: ChemdDocument,
+  document: ChemdProgramDocument,
   semanticLayer: ChemdTrainingExportV2["semantic_layer"]
 ): AuthoringTemplate[] => {
-  const usedIds = new Set(collectNodeIds(document.children));
-  const objectNodes = collectObjectNodes(document.children);
+  const usedIds = new Set(collectDeclarationIds(document));
+  const objectNodes = collectObjectDeclarations(document);
   const reactionIds = semanticLayer.reactions
     .map((reaction) => reaction.original_id)
     .filter((value): value is string => typeof value === "string" && value.length > 0);
-  const canReuseUnlinkedReactionBlocks = reactionIds.length === 1;
-  const canReuseUnlinkedAttemptBlocks = semanticLayer.condition_variation_attempts.length === 1;
 
   if (reactionIds.length === 0) {
     return [buildReactionResultStarter(usedIds)];
   }
 
-  const attemptReactionIds = new Set(
-    semanticLayer.condition_variation_attempts
-      .map((attempt) => attempt.reaction_ref_raw)
-      .filter((value): value is string => typeof value === "string" && value.length > 0)
-  );
-  const reactionScaffolds = semanticLayer.reactions.flatMap((reaction) => {
-    if (!reaction.original_id || attemptReactionIds.has(reaction.original_id)) {
-      return [];
-    }
-
-    const template = buildReactionScaffoldTemplate({
-      reaction,
-      objectNodes,
-      semanticLayer,
-      usedIds,
-      canReuseUnlinkedBlocks: canReuseUnlinkedReactionBlocks
-    });
-    return template ? [template] : [];
-  });
-  const attemptScaffolds = semanticLayer.condition_variation_attempts.flatMap((attempt) => {
-    const variation = semanticLayer.condition_variations.find((item) =>
-      item.entity_id === attempt.parent_condition_variation_id
-    );
-    if (!variation) {
-      return [];
-    }
-
-    const template = buildAttemptScaffoldTemplate({
-      variation,
-      attempt,
-      objectNodes,
-      semanticLayer,
-      usedIds,
-      canReuseUnlinkedBlocks: canReuseUnlinkedAttemptBlocks
-    });
-    return template ? [template] : [];
-  });
-  const templates = [...reactionScaffolds, ...attemptScaffolds];
+  const templates = [
+    ...buildReactionScaffoldTemplates({ objectNodes, reactionIds, semanticLayer, usedIds }),
+    ...buildAttemptScaffoldTemplates({ objectNodes, semanticLayer, usedIds })
+  ];
 
   if (reactionIds.length >= 2 || semanticLayer.condition_variations.length === 0) {
     templates.push(buildConditionScreenTemplate(reactionIds[0], reactionIds[1], usedIds));

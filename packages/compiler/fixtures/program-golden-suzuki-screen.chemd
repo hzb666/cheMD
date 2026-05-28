@@ -1,0 +1,39 @@
+module exp_golden_suzuki_screen
+
+meta {
+  id: "exp-golden-suzuki-screen"
+  title: "Suzuki coupling solvent screen"
+  date: "2026-05-29"
+  primary_reaction: @rxn_var1
+  primary_result: @res_var1
+  tags: ["suzuki", "screen"]
+}
+
+molecule mol_aryl {
+  name: "aryl bromide"
+  role: substrate
+}
+
+molecule mol_product {
+  name: "biaryl product"
+  role: product
+}
+
+reaction rxn_var1 {
+  reactants: [@mol_aryl]
+  products: [@mol_product]
+  solvent: "MeCN"
+  temperature: 40 C
+}
+
+result res_var1 for @rxn_var1 {
+  product: @mol_product
+  status: success
+  yield: 78%
+}
+
+procedure proc_var1 for @rxn_var1 {
+  evidence: [@res_var1]
+  step charge = charge(inputs: [@mol_aryl])
+  step heat = heat(duration: 2 h, depends_on: [charge])
+}

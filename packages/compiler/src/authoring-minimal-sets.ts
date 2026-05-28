@@ -1,6 +1,7 @@
-import type { ChemdDocument } from "@chemd/core";
+import type { ChemdProgramDocument } from "@chemd/core";
 import type { ChemdTrainingExportV2 } from "@chemd/exporter-training";
 
+import { collectObjectDeclarations } from "./authoring-document";
 import type {
   AuthoringMinimalSet,
   AuthoringMinimalSetStatus,
@@ -33,37 +34,98 @@ const createMinimalSet = (input: {
   suggestion_ids: uniqueStrings(input.suggestion_ids)
 });
 
-interface ReferenceNodeStatus {
-  nodeId: string;
+interface ReferenceDeclarationStatus {
+  declarationId: string;
   hasRef: boolean;
 }
 
-const collectReferenceNodes = (document: ChemdDocument): ReferenceNodeStatus[] =>
-  document.children.flatMap((node) => {
-    if (
-      (node.type === "analysis" || node.type === "procedure" || node.type === "observation")
-      && typeof node.id === "string"
-      && node.id.length > 0
-    ) {
-      return [{
-        nodeId: node.id,
-        hasRef: typeof node.ref === "string" && node.ref.trim().length > 0
-      }];
-    }
+const collectReferenceDeclarations = (
+  document: ChemdProgramDocument
+): ReferenceDeclarationStatus[] =>
+  collectObjectDeclarations(document)
+    .filter((item) => item.kind === "analysis" || item.kind === "procedure" || item.kind === "observation")
+    .map((item) => ({
+      declarationId: item.id,
+      hasRef: typeof item.ref === "string" && item.ref.trim().length > 0
+    }));
 
-    if (node.type === "col" && Array.isArray(node.children)) {
-      return collectReferenceNodes({ ...document, children: node.children });
-    }
+const targetsDeclaration = (suggestion: AuthoringSuggestion, declarationId: string): boolean =>
+  (suggestion.target?.kind === "declaration" && suggestion.target.declarationId === declarationId)
+  || (
+    suggestion.target?.kind === "declaration_field"
+    && suggestion.target.declarationId === declarationId
+  );
 
-    if (node.type === "template" && Array.isArray(node.body)) {
-      return collectReferenceNodes({ ...document, children: node.body });
-    }
+const suggestionsForDeclaration = (
+  suggestions: AuthoringSuggestion[],
+  declarationId: string
+): AuthoringSuggestion[] =>
+  suggestions.filter((item) => targetsDeclaration(item, declarationId));
 
-    return [];
+const hasDeclarationSuggestion = (
+  suggestions: AuthoringSuggestion[],
+  declarationId: string | undefined
+): boolean =>
+  Boolean(declarationId && suggestionsForDeclaration(suggestions, declarationId).length > 0);
+
+const buildReferenceSet = (
+  referenceDeclarations: ReferenceDeclarationStatus[],
+  suggestions: AuthoringSuggestion[]
+): AuthoringMinimalSet | null =>
+  referenceDeclarations.length > 0
+    ? createMinimalSet({
+        checklist_id: "linked-supporting-declarations",
+        title: "辅助记录引用",
+        description: "analysis / procedure / observation 应尽量显式或可保守推断地指向 reaction 或 attempt。",
+        missing_items: referenceDeclarations.flatMap(({ declarationId, hasRef }) =>
+          !hasRef && !hasDeclarationSuggestion(suggestions, declarationId) ? [`${declarationId}.ref`] : []
+        ),
+        inferable_items: referenceDeclarations.flatMap(({ declarationId, hasRef }) =>
+          !hasRef && hasDeclarationSuggestion(suggestions, declarationId) ? [`${declarationId}.ref`] : []
+        ),
+        suggestion_ids: referenceDeclarations.flatMap(({ declarationId, hasRef }) =>
+          !hasRef ? suggestionsForDeclaration(suggestions, declarationId).map((item) => item.suggestion_id) : []
+        )
+      })
+    : null;
+
+const buildConditionSet = (
+  semanticLayer: ChemdTrainingExportV2["semantic_layer"],
+  suggestions: AuthoringSuggestion[],
+  hasRouteGraphSemantics: boolean
+): AuthoringMinimalSet | null => {
+  const conditionVariationsPresent = semanticLayer.condition_variations.length > 0
+    || (semanticLayer.reactions.length > 1 && !hasRouteGraphSemantics);
+  if (!conditionVariationsPresent) return null;
+
+  return createMinimalSet({
+    checklist_id: "condition-optimization",
+    title: "条件优化记录",
+    description: "多反应筛选或 condition_screen 记录应显式标明 standard、factor baseline 与 attempt 结果配对。",
+    missing_items: [
+      ...(semanticLayer.condition_variations.length === 0 ? ["condition_screen 声明"] : []),
+      ...semanticLayer.condition_variations.flatMap((variation) =>
+        !variation.standard_ref_raw && !hasDeclarationSuggestion(suggestions, variation.original_id)
+          ? [`${variation.original_id}.standard`]
+          : []
+      )
+    ],
+    inferable_items: semanticLayer.condition_variations.flatMap((variation) => [
+      ...(!variation.standard_ref_raw && hasDeclarationSuggestion(suggestions, variation.original_id)
+        ? [`${variation.original_id}.standard`]
+        : []),
+      ...(!variation.factors?.length && suggestions.some((item) =>
+        item.suggestion_id.includes(`baseline-${variation.original_id}`)
+      ) ? [`${variation.original_id}.factor`] : [])
+    ]),
+    suggestion_ids: suggestions
+      .filter((item) => item.suggestion_id.startsWith("suggest-condition-"))
+      .map((item) => item.suggestion_id)
   });
+};
 
 export const buildAuthoringMinimalSets = (
-  document: ChemdDocument,
+  document: ChemdProgramDocument,
   semanticLayer: ChemdTrainingExportV2["semantic_layer"],
   suggestions: AuthoringSuggestion[]
 ): AuthoringMinimalSet[] => {
@@ -72,79 +134,21 @@ export const buildAuthoringMinimalSets = (
     || (reaction.prev_refs_raw?.length ?? 0) > 0
     || (reaction.next_refs_raw?.length ?? 0) > 0
   );
-  const referenceNodes = collectReferenceNodes(document);
-  const basicMissing = [
-    ...(semanticLayer.reactions.length === 0 ? ["至少一个 reaction 块"] : []),
-    ...(semanticLayer.results.length === 0 ? ["至少一个 result 块"] : [])
-  ];
-  const basicInferable = semanticLayer.results
-    .filter((result) => !result.ref_raw && !result.reaction_ref_raw)
-    .flatMap((result) =>
-      suggestions.some((item) => item.target_block_id === result.original_id)
-        ? [`${result.original_id}.ref`]
-        : []
-    );
-  const referenceSet = referenceNodes.length > 0
-    ? createMinimalSet({
-        checklist_id: "linked-supporting-blocks",
-        title: "辅助记录引用",
-        description: "analysis / procedure / observation 应尽量显式或可保守推断地指向 reaction 或 attempt。",
-        missing_items: referenceNodes.flatMap(({ nodeId, hasRef }) =>
-          !hasRef && !suggestions.some((item) => item.target_block_id === nodeId)
-            ? [`${nodeId}.ref`]
-            : []
-        ),
-        inferable_items: referenceNodes.flatMap(({ nodeId, hasRef }) =>
-          !hasRef && suggestions.some((item) => item.target_block_id === nodeId)
-            ? [`${nodeId}.ref`]
-            : []
-        ),
-        suggestion_ids: referenceNodes.flatMap(({ nodeId, hasRef }) =>
-          !hasRef
-            ? suggestions.filter((item) => item.target_block_id === nodeId).map((item) => item.suggestion_id)
-            : []
-        )
-      })
-    : null;
-  const conditionVariationsPresent = semanticLayer.condition_variations.length > 0
-    || (semanticLayer.reactions.length > 1 && !hasRouteGraphSemantics);
-  const conditionSet = conditionVariationsPresent
-    ? createMinimalSet({
-        checklist_id: "condition-optimization",
-        title: "条件优化记录",
-        description: "多反应筛选或 condition-varies 记录应显式标明 standard、factor baseline 与 attempt 结果配对。",
-        missing_items: [
-          ...(semanticLayer.condition_variations.length === 0 ? ["condition-varies 块"] : []),
-          ...semanticLayer.condition_variations.flatMap((variation) =>
-            !variation.standard_ref_raw
-            && !suggestions.some((item) => item.target_block_id === variation.original_id)
-              ? [`${variation.original_id}.standard`]
-              : []
-          )
-        ],
-        inferable_items: semanticLayer.condition_variations.flatMap((variation) => [
-          ...(!variation.standard_ref_raw
-            && suggestions.some((item) => item.target_block_id === variation.original_id)
-            ? [`${variation.original_id}.standard`]
-            : []),
-          ...(!variation.factors?.length
-            && suggestions.some((item) => item.suggestion_id.includes(`baseline-${variation.original_id}`))
-            ? [`${variation.original_id}.factor`]
-            : [])
-        ]),
-        suggestion_ids: suggestions
-          .filter((item) => item.suggestion_id.startsWith("suggest-condition-"))
-          .map((item) => item.suggestion_id)
-      })
-    : null;
+  const referenceSet = buildReferenceSet(collectReferenceDeclarations(document), suggestions);
+  const conditionSet = buildConditionSet(semanticLayer, suggestions, hasRouteGraphSemantics);
 
   return [
     createMinimalSet({
       checklist_id: "basic-experiment-record",
       title: "最小实验记录",
       description: "常见实验至少应包含 reaction 与 result，并尽量把 result 指回 reaction。",
-      missing_items: basicMissing,
-      inferable_items: basicInferable,
+      missing_items: [
+        ...(semanticLayer.reactions.length === 0 ? ["至少一个 reaction 声明"] : []),
+        ...(semanticLayer.results.length === 0 ? ["至少一个 result 声明"] : [])
+      ],
+      inferable_items: semanticLayer.results.flatMap((result) =>
+        hasDeclarationSuggestion(suggestions, result.original_id) ? [`${result.original_id}.ref`] : []
+      ),
       suggestion_ids: suggestions
         .filter((item) => item.suggestion_id.startsWith("suggest-result-ref-"))
         .map((item) => item.suggestion_id)

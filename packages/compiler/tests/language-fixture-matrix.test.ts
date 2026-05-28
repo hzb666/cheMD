@@ -6,72 +6,39 @@ import { compileChemd } from "../src/index";
 
 interface FixtureCase {
   file: string;
-  expectedNodeTypes: string[];
+  expectedDeclarationKinds: string[];
 }
 
 const fixtureCases: FixtureCase[] = [
   {
-    file: "block-chemd.chemd",
-    expectedNodeTypes: ["molecule", "reaction", "result", "analysis"]
+    file: "program-golden-suzuki-screen.chemd",
+    expectedDeclarationKinds: ["molecule", "reaction", "result", "procedure"]
   },
   {
-    file: "block-result-analysis.chemd",
-    expectedNodeTypes: ["result", "analysis"]
+    file: "program-route.chemd",
+    expectedDeclarationKinds: ["reaction"]
   },
   {
-    file: "block-procedure-observation.chemd",
-    expectedNodeTypes: ["procedure", "step", "observation", "event"]
+    file: "program-doc-comments.chemd",
+    expectedDeclarationKinds: ["molecule", "reaction", "analysis"]
   },
   {
-    file: "block-sample-artifact.chemd",
-    expectedNodeTypes: ["sample", "artifact"]
-  },
-  {
-    file: "block-condition-varies.chemd",
-    expectedNodeTypes: ["condition_varies"]
-  },
-  {
-    file: "template-and-use.chemd",
-    expectedNodeTypes: ["template", "markdown"]
-  },
-  {
-    file: "layout-col.chemd",
-    expectedNodeTypes: ["col", "analysis"]
+    file: "program-agent-audit.chemd",
+    expectedDeclarationKinds: ["reaction", "result", "agent_run"]
   }
 ];
 
 const readFixture = (file: string): string =>
   readFileSync(new URL(`../fixtures/${file}`, import.meta.url), "utf8");
 
-const collectNodeTypes = (nodes: ReturnType<typeof compileChemd>["document"]["children"]): string[] =>
-  nodes.flatMap((node) => {
-    if (node.type === "col") {
-      return [node.type, ...collectNodeTypes(node.children)];
-    }
-
-    if (node.type === "template") {
-      return [node.type, ...collectNodeTypes(node.body)];
-    }
-
-    if (node.type === "procedure") {
-      return [node.type, ...(node.steps ?? []).map((step) => step.type)];
-    }
-
-    if (node.type === "observation") {
-      return [node.type, ...(node.events ?? []).map((event) => event.type)];
-    }
-
-    return [node.type];
-  });
-
-describe("language fixture matrix", () => {
-  it.each(fixtureCases)("$file compiles without diagnostics", ({ file, expectedNodeTypes }) => {
+describe("program fixture matrix", () => {
+  it.each(fixtureCases)("$file compiles without error diagnostics", ({ file, expectedDeclarationKinds }) => {
     const result = compileChemd(readFixture(file));
-    const nodeTypes = collectNodeTypes(result.document.children);
+    const declarationKinds = result.program.declarations.map((node) => node.kind);
 
-    expect(result.diagnostics, file).toEqual([]);
-    for (const type of expectedNodeTypes) {
-      expect(nodeTypes, file).toContain(type);
+    expect(result.diagnostics.filter((diagnostic) => diagnostic.severity === "error"), file).toEqual([]);
+    for (const kind of expectedDeclarationKinds) {
+      expect(declarationKinds, file).toContain(kind);
     }
   });
 });

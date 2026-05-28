@@ -1,7 +1,7 @@
-import type { ChemdDocument } from "@chemd/core";
+import type { ChemdDocument, ChemdProgramDocument } from "@chemd/core";
 import type { ChemdLnf } from "@chemd/lnf";
 import type { StepGraph } from "@chemd/step-ontology";
-import { buildTypedSemanticGraph, type TypedSemanticGraph } from "@chemd/typechecker";
+import type { TypedSemanticGraph } from "@chemd/typechecker";
 
 import { buildLearningLayer } from "./learning-layer";
 import { buildDataGovernanceInfo } from "./governance";
@@ -58,22 +58,48 @@ const createStableHash = (value: string): string => {
   return (hash >>> 0).toString(16).padStart(8, "0");
 };
 
+const createEmptyTypedGraph = (documentId: string): TypedSemanticGraph => ({
+  documentId,
+  nodes: [],
+  quantities: [],
+  diagnostics: []
+});
+
+const isChemdDocument = (document: ChemdDocument | ChemdProgramDocument): document is ChemdDocument =>
+  document.type === "document";
+
+const createProgramLegacyBridge = (program: ChemdProgramDocument): ChemdDocument => ({
+  type: "document",
+  meta: {
+    id: program.meta.id,
+    title: program.meta.title,
+    date: program.meta.date
+  },
+  children: [],
+  diagnostics: program.diagnostics,
+  ...(program.source ? { source: program.source } : {}),
+  ...(program.renderSelection ? { renderSelection: program.renderSelection } : {})
+});
+
 export const exportTrainingRecordFromDocument = (
-  document: ChemdDocument,
+  document: ChemdDocument | ChemdProgramDocument,
   options: ExportTrainingRecordOptions = {}
 ): ChemdTrainingExportV2 => {
+  const sourceDocument = isChemdDocument(document)
+    ? document
+    : createProgramLegacyBridge(document);
   const exportedAt = options.exportedAt ?? new Date().toISOString();
   const fingerprint = createStableHash(
-    typeof document.source === "string"
-      ? document.source
-      : JSON.stringify({ meta: document.meta, children: document.children })
+    typeof sourceDocument.source === "string"
+      ? sourceDocument.source
+      : JSON.stringify({ meta: sourceDocument.meta, children: sourceDocument.children })
   );
-  const exportId = options.exportId ?? `export::${document.meta.id}::${fingerprint}`;
-  const documentInfo = toDocumentInfo(document);
-  const sourceLayer = buildSourceLayer(document);
-  const governance = buildDataGovernanceInfo(document.meta);
-  const typedGraph = options.typedGraph ?? buildTypedSemanticGraph(document);
-  const baseSemanticLayer = buildSemanticLayer(document, {
+  const exportId = options.exportId ?? `export::${sourceDocument.meta.id}::${fingerprint}`;
+  const documentInfo = toDocumentInfo(sourceDocument);
+  const sourceLayer = buildSourceLayer(sourceDocument);
+  const governance = buildDataGovernanceInfo(sourceDocument.meta);
+  const typedGraph = options.typedGraph ?? createEmptyTypedGraph(sourceDocument.meta.id);
+  const baseSemanticLayer = buildSemanticLayer(sourceDocument, {
     typedGraph
   });
   const semanticLayer = {
@@ -82,11 +108,11 @@ export const exportTrainingRecordFromDocument = (
   };
   const learningLayer = buildLearningLayer({
     document: documentInfo,
-    sourceDocument: document,
+    sourceDocument,
     semanticLayer,
     stepGraph: options.stepGraph
   });
-  const qualityLayer = buildQualityLayer(document.diagnostics, learningLayer, governance);
+  const qualityLayer = buildQualityLayer(sourceDocument.diagnostics, learningLayer, governance);
 
   return {
     schema_version: "chemd-training-export/v0.2",

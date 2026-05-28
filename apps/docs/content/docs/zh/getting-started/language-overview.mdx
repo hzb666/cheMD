@@ -25,16 +25,18 @@ Chemd 源文件由 frontmatter、Markdown 正文和结构化块组成。解析�
 `validate` 命令按当前语言契约编译输入。最小可验证文档需要必需 frontmatter；`:::chemd` 可显式声明 `kind`，也可在字段形态清楚时省略。
 
 ```md validate
----
-id: exp-minimal
-title: Minimal Chemd source
-date: 2026-04-24
----
+module exp_minimal
 
-:::chemd #mol-main
-name: ethanol
-smiles: CCO
-:::
+meta {
+  id: "exp-minimal"
+  title: "Minimal Chemd source"
+  date: "2026-04-24"
+}
+
+molecule mol_main {
+  name: "ethanol"
+  smiles: "CCO"
+}
 ```
 
 该示例满足 frontmatter 必需字段和 molecule 身份字段校验。

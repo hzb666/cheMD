@@ -14,25 +14,37 @@ if (mode === "stop") {
   process.exit(0);
 }
 
-const nextSource = request.source.includes(":::result #res-main")
+const nextSource = request.source.includes("result res_main")
   ? request.source
-  : `${request.source}
-:::result #res-main
-ref: rxn-main
-status: success
-yield: 72%
-:::
+  : `module exp_cli_agent_fixed
 
-:::analysis #ana-main
-ref: rxn-main
-type: tlc
-result: one major spot
-:::
+meta {
+  id: "exp-cli-agent-fixed"
+  title: "CLI Agent Fixed"
+  date: "2026-04-24"
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
+
+reaction rxn_main {
+  reactants: [substrate]
+  products: [product]
+}
+
+result res_main for @rxn_main {
+  status: success
+  yield: 72%
+}
+
+analysis ana_main for @res_main {
+  type: tlc
+  notes: "one major spot"
+}
 `;
 
 process.stdout.write(JSON.stringify({
   schemaVersion,
   action: "rewrite",
-  note: "add result and analysis",
+  note: "rewrite to program result and analysis",
   nextSource
 }));

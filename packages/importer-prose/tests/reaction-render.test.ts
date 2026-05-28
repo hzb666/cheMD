@@ -95,17 +95,15 @@ describe("reaction block rendering", () => {
     const lines = renderReactionBlock(reactionCandidate);
 
     expect(lines).toEqual([
-      ":::chemd #rxn1",
-      "kind: reaction",
-      "reactant: substrate6",
-      "reactant: acyl-silane7",
-      "product: azetidine5",
-      "reagents: TMEDA | sBuLi",
-      "solvent: THF",
-      "temperature: -78 °C",
-      "time: 15 min",
-      "atmosphere: nitrogen",
-      ":::"
+      "reaction rxn1 {",
+      "  reactants: [\"substrate6\", \"acyl-silane7\"]",
+      "  products: [\"azetidine5\"]",
+      "  reagents: \"TMEDA, sBuLi\"",
+      "  solvent: \"THF\"",
+      "  temperature: -78 C",
+      "  time: 15 min",
+      "  atmosphere: \"nitrogen\"",
+      "}"
     ]);
   });
 
@@ -132,11 +130,11 @@ describe("reaction block rendering", () => {
     });
     const result = compileChemd(chemd);
 
-    expect(chemd.indexOf(":::chemd #rxn1")).toBeLessThan(
-      chemd.indexOf(":::procedure #import-procedure")
+    expect(chemd.indexOf("reaction rxn1")).toBeLessThan(
+      chemd.indexOf("procedure import_procedure")
     );
-    expect(chemd).toContain("reaction: @rxn1");
-    expect(chemd).toContain("step: add | id=s1 | materials=sBuLi");
+    expect(chemd).toContain("procedure import_procedure for @rxn1");
+    expect(chemd).toContain("step s1 = add");
     expect(result.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
   });
 
@@ -160,8 +158,8 @@ describe("reaction block rendering", () => {
     const result = compileChemd(chemd);
 
     expect(renderReactionBlock(reactionCandidate)).toEqual([]);
-    expect(chemd).not.toContain(":::chemd #rxn-low");
-    expect(chemd).not.toContain("reaction: @rxn-low");
+    expect(chemd).not.toContain("reaction rxn_low");
+    expect(chemd).not.toContain("for @rxn_low");
     expect(result.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
   });
 });

@@ -183,7 +183,7 @@ describe("prose importer skeleton", () => {
     ]);
   });
 
-  it("renders import IR to existing Chemd block syntax", async () => {
+  it("renders import IR to program Chemd syntax", async () => {
     const candidate = await importProse("加入 n-BuLi 后体系逐渐变深红色。");
     const chemd = renderChemdDraft(candidate, {
       documentId: "exp-import-test",
@@ -192,11 +192,12 @@ describe("prose importer skeleton", () => {
     });
 
     expect(candidate.reactionCandidates).toEqual([]);
-    expect(chemd).toContain(":::procedure #import-procedure");
+    expect(chemd).toContain("procedure import_procedure");
     expect(chemd).not.toContain(":::chemd");
-    expect(chemd).toContain("step: add | id=s1 | materials=n-BuLi");
-    expect(chemd).toContain(":::observation #import-observation");
-    expect(chemd).toContain("event: color_change | id=e1 | linkedStep=s1 | confidence=0.78");
+    expect(chemd).toContain("step s1 = add");
+    expect(chemd).toContain("materials: \"n-BuLi\"");
+    expect(chemd).toContain("observation import_observation");
+    expect(chemd).toContain("color_change");
   });
 
   it("validates rendered Chemd through the compiler", async () => {
@@ -241,7 +242,7 @@ describe("prose importer skeleton", () => {
       "hold"
     ]);
     expect(result.chemd).toContain("7-(difluoromethylsulfonyl)-4-fluoro-indan-1-one");
-    expect(result.chemd).toContain("step: hold | id=s3 | duration=1 h | condition=room temperature");
+    expect(result.chemd).toContain("step s3 = hold(duration: 1 h, condition: \"room temperature\")");
     expect(result.candidate.materials).toContainEqual(expect.objectContaining({
       normalizedName: "sodium borohydride",
       source: "rxn-action"
@@ -303,7 +304,7 @@ describe("prose importer skeleton", () => {
 
     expect(result.valid).toBe(true);
     expect(result.candidate.reactionCandidates).toEqual([]);
-    expect(result.chemd).not.toContain(":::chemd #import-reaction-1");
+    expect(result.chemd).not.toContain("reaction import_reaction_1");
     expect(result.candidate.diagnostics).toContainEqual(expect.objectContaining({
       code: "W_IMPORT_REACTION_PRODUCT_REQUIRED",
       severity: "warning"
@@ -323,22 +324,22 @@ describe("prose importer skeleton", () => {
     const extractSteps = result.candidate.steps.filter((step) => step.family === "extract");
     const addSteps = result.candidate.steps.filter((step) => step.family === "add");
     const reactionCandidate = result.candidate.reactionCandidates[0];
+    const reactionStart = result.chemd.indexOf("reaction import_reaction_1");
     const reactionBlock = result.chemd.slice(
-      result.chemd.indexOf(":::chemd #import-reaction-1"),
-      result.chemd.indexOf(":::", result.chemd.indexOf("kind: reaction"))
+      reactionStart,
+      result.chemd.indexOf("}", reactionStart)
     );
 
     expect(result.valid).toBe(true);
     expect(result.candidate.reactionCandidates).not.toEqual([]);
-    expect(result.chemd).toContain(":::chemd #import-reaction-1");
-    expect(result.chemd).toContain("kind: reaction");
-    expect(reactionBlock).toContain("reactant:");
+    expect(result.chemd).toContain("reaction import_reaction_1");
+    expect(reactionBlock).toContain("reactants:");
     expect(reactionBlock).toContain("reagents:");
-    expect(reactionBlock).toContain("solvent: THF");
-    expect(reactionBlock).toContain("temperature: -78 °C");
+    expect(reactionBlock).toContain("solvent: \"THF\"");
+    expect(reactionBlock).toContain("temperature: -78 C");
     expect(reactionBlock).toContain("time: 15 min");
-    expect(reactionBlock).not.toContain("solvent: EtOAc");
-    expect(reactionBlock).not.toContain("reagents: EtOAc");
+    expect(reactionBlock).not.toContain("solvent: \"EtOAc\"");
+    expect(reactionBlock).not.toContain("reagents: \"EtOAc\"");
     expect(reactionBlock).not.toContain("MgSO4");
     expect(reactionBlock).not.toContain("H2O");
     expect(reactionCandidate.rejectedFacts.map((fact) => fact.raw)).toEqual(expect.arrayContaining([
@@ -381,8 +382,8 @@ describe("prose importer skeleton", () => {
     expect(addSteps.every((step) => typeof step.params.materials === "string")).toBe(true);
     expect(extractSteps.every((step) => step.params.solvent === "EtOAc")).toBe(true);
     expect(extractSteps.every((step) => step.params.repeats === 3)).toBe(true);
-    expect(result.chemd).toContain("target_temperature=-78 °C");
-    expect(result.chemd).toContain("solvent=EtOAc");
-    expect(result.chemd).toContain("technique=flash column chromatography");
+    expect(result.chemd).toContain("target_temperature: -78 C");
+    expect(result.chemd).toContain("solvent: \"EtOAc\"");
+    expect(result.chemd).toContain("technique: \"flash column chromatography\"");
   });
 });

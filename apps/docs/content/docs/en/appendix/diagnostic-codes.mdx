@@ -125,6 +125,52 @@ The following reference lists common diagnostics by source and purpose. Use it t
 | `E_TRACE_EVENT_PAYLOAD` | Trace event payload is missing required fields |
 | `W_TRACE_STEP_STATE` | Trace step state order is suspicious or invalid for replay |
 
+## Program Language
+
+| Code | Meaning |
+| --- | --- |
+| `E_PROGRAM_META_EXPECTED` | Program source is missing a `meta` declaration |
+| `E_PROGRAM_DECLARATION_EXPECTED` | Parser expected a program declaration |
+| `E_PROGRAM_DECLARATION_KIND_UNKNOWN` | Declaration kind is not supported by program-v1 |
+| `E_PROGRAM_BLOCK_OPEN_EXPECTED` | Declaration or field block is missing `{` |
+| `E_PROGRAM_BLOCK_CLOSE_EXPECTED` | Declaration or field block is missing `}` |
+| `E_PROGRAM_FIELD_NAME_EXPECTED` | Field name is missing |
+| `E_PROGRAM_FIELD_COLON_EXPECTED` | Field name is not followed by `:` |
+| `E_PROGRAM_FIELD_UNKNOWN` | Field is not accepted for the declaration kind |
+| `E_PROGRAM_EXPECTED_VALUE` | Field value cannot be parsed |
+| `E_PROGRAM_EXPECTED_CALL_ARG_ASSIGNMENT` | Call argument is missing `:` assignment |
+| `E_PROGRAM_UNEXPECTED_TOKEN` | Parser reached an unexpected token |
+| `E_DUPLICATE_DECLARATION` | Declaration ID is duplicated |
+| `E_DUPLICATE_QUALIFIED_DECLARATION` | Qualified declaration ID is duplicated |
+| `E_UNRESOLVED_PROGRAM_REFERENCE` | Program reference cannot be resolved |
+| `W_UNRESOLVED_DOC_REFERENCE` | Documentation reference cannot be resolved |
+| `E_LEGACY_` | Removed legacy syntax was detected |
+| `E_LEGACY_FRONTMATTER_REMOVED` | YAML frontmatter is removed in program-v1 |
+| `E_LEGACY_FENCED_BLOCK_REMOVED` | `:::` structured blocks are removed in program-v1 |
+| `E_LEGACY_TEMPLATE_REMOVED` | Legacy template/use syntax is removed in program-v1 |
+| `E_LEGACY_COLUMN_LAYOUT_REMOVED` | Legacy column layout syntax is removed in program-v1 |
+
+## Program Procedure and Agent
+
+| Code | Meaning |
+| --- | --- |
+| `E_PROGRAM_PROCEDURE_EXPECTED` | Parser expected a procedure declaration |
+| `E_PROGRAM_PROCEDURE_ID_EXPECTED` | Procedure declaration is missing an ID |
+| `E_PROGRAM_PROCEDURE_BLOCK_EXPECTED` | Procedure body is missing a block |
+| `E_PROGRAM_PROCEDURE_STATEMENT_EXPECTED` | Procedure statement cannot be parsed |
+| `E_PROGRAM_PROCEDURE_STEP_EXPECTED` | Parser expected a `step` statement |
+| `E_PROGRAM_PROCEDURE_STEP_ID_EXPECTED` | Procedure step is missing an ID |
+| `E_PROGRAM_PROCEDURE_STEP_ASSIGN_EXPECTED` | Procedure step is missing `=` |
+| `E_PROGRAM_PROCEDURE_STEP_CALL_EXPECTED` | Procedure step is missing a call expression |
+| `E_PROGRAM_AGENT_EXPECTED` | Parser expected an agent declaration |
+| `E_PROGRAM_AGENT_RUN_EXPECTED` | Parser expected `agent run` |
+| `E_PROGRAM_AGENT_RUN_ID_EXPECTED` | Agent run is missing an ID |
+| `E_PROGRAM_AGENT_BLOCK_EXPECTED` | Agent run body is missing a block |
+| `E_AGENT_TOOL_UNKNOWN` | Agent tool name is unknown |
+| `E_AGENT_PATCH_TARGET_UNRESOLVED` | Agent patch target cannot be resolved |
+| `E_AGENT_PATCH_DECISION_ORPHAN` | Agent decision does not reference an existing patch |
+| `E_AGENT_RUN_STATUS_INCOMPLETE` | Completed agent run has no terminal audit event |
+
 ## Interoperability and Training Governance
 
 | Code | Meaning |

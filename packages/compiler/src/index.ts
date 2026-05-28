@@ -1,5 +1,13 @@
-import { parseChemd } from "@chemd/parser";
-import type { ChemdDocument, ReactionRouteContext, ReferenceContext, RenderSelection } from "@chemd/core";
+import { parseChemdProgram } from "@chemd/parser";
+import type {
+  ChemdDocument,
+  ChemdProgramDocument,
+  ChemdReferenceExpr,
+  ChemdValue,
+  ReactionRouteContext,
+  ReferenceContext,
+  RenderSelection
+} from "@chemd/core";
 import {
   buildRagExportFromTrainingRecord,
   buildTrainingUnderstandingFromRecord,
@@ -27,14 +35,15 @@ import {
   type PreflightResult,
   type RunPlan
 } from "@chemd/runtime-lab";
-import { typecheckDocument, type TypedSemanticGraph } from "@chemd/typechecker";
+import { typecheckProgram, type TypedSemanticGraph } from "@chemd/typechecker";
 import type { StepGraph } from "@chemd/step-ontology";
-import { buildAuthoringAssistance } from "./authoring-assistance";
-import { buildAuthoringDiagnostics } from "./authoring-diagnostics";
 import {
   buildCompilerDiagnosis,
   type CompilerDiagnosis
 } from "./diagnosis";
+import { buildAuthoringAssistance } from "./authoring-assistance";
+import { buildAuthoringDiagnostics } from "./authoring-diagnostics";
+import { applyProgramSemanticLayer } from "./program-training-export";
 import type { AuthoringAssistance } from "./authoring-types";
 export {
   applyDiagnosticQuickFix,
@@ -90,8 +99,9 @@ export type {
 } from "./repair-loop";
 
 export interface CompileResult {
-  document: ReturnType<typeof resolveChemd>;
-  diagnostics: ReturnType<typeof resolveChemd>["diagnostics"];
+  program: ChemdProgramDocument;
+  document: ChemdDocument;
+  diagnostics: ChemdProgramDocument["diagnostics"];
   renderOptions: ReturnType<typeof resolveRenderProfileWithDiagnostics>["options"];
   renderAdapterPayload: ReturnType<typeof mapRenderOptionsToAdapterPayload>;
   typedSemanticGraph: TypedSemanticGraph;
@@ -141,33 +151,91 @@ export const renderCompiledJson = (
   typedGraph: TypedSemanticGraph
 ): string => renderJson(document, { typedGraph });
 
+const readReferenceTarget = (reference: ChemdReferenceExpr | undefined): string | undefined =>
+  reference ? reference.raw.replace(/^@/, "") || reference.target : undefined;
+
+const toLegacyMetaValue = (value: ChemdValue): unknown => {
+  if (value.type === "string" || value.type === "boolean") {
+    return value.value;
+  }
+  if (value.type === "identifier") {
+    return value.name;
+  }
+  if (value.type === "number" || value.type === "quantity" || value.type === "percent") {
+    return value.raw;
+  }
+  if (value.type === "reference") {
+    return readReferenceTarget(value);
+  }
+  if (value.type === "list") {
+    return value.items.map(toLegacyMetaValue);
+  }
+  if (value.type === "record") {
+    return Object.fromEntries(value.fields.map((field) => [field.key, toLegacyMetaValue(field.value)]));
+  }
+
+  return value.raw;
+};
+
+const createLegacyDocumentBridge = (program: ChemdProgramDocument): ChemdDocument => ({
+  type: "document",
+  meta: {
+    id: program.meta.id,
+    title: program.meta.title,
+    date: program.meta.date,
+    ...Object.fromEntries(
+      Object.entries(program.meta.fields).map(([field, value]) => [field, toLegacyMetaValue(value)])
+    ),
+    ...(readReferenceTarget(program.meta.primary?.molecule)
+      ? { primary_molecule: readReferenceTarget(program.meta.primary?.molecule) }
+      : {}),
+    ...(readReferenceTarget(program.meta.primary?.reaction)
+      ? { primary_reaction: readReferenceTarget(program.meta.primary?.reaction) }
+      : {}),
+    ...(readReferenceTarget(program.meta.primary?.result)
+      ? { primary_result: readReferenceTarget(program.meta.primary?.result) }
+      : {}),
+    ...(readReferenceTarget(program.meta.primary?.analysis)
+      ? { primary_analysis: readReferenceTarget(program.meta.primary?.analysis) }
+      : {}),
+    ...(readReferenceTarget(program.meta.primary?.sample)
+      ? { primary_sample: readReferenceTarget(program.meta.primary?.sample) }
+      : {})
+  },
+  children: [],
+  diagnostics: program.diagnostics,
+  ...(program.source ? { source: program.source } : {}),
+  ...(program.renderSelection ? { renderSelection: program.renderSelection } : {})
+});
+
 export const compileChemd = (source: string, options: CompileOptions = {}): CompileResult => {
-  const parsedDocument = parseChemd(source);
-  const resolvedDocument = resolveChemd(parsedDocument);
-  const typecheckResult = typecheckDocument(resolvedDocument, {
+  const parsedProgram = parseChemdProgram(source);
+  const resolvedProgram = resolveChemd(parsedProgram);
+  const typecheckResult = typecheckProgram(resolvedProgram, {
     procedureMode: options.procedureMode,
     referenceContext: options.referenceContext,
     reactionRouteContext: options.reactionRouteContext
   });
-  const semanticDocument = typecheckResult.diagnostics.length
+  const semanticProgram = typecheckResult.diagnostics.length
     ? {
-        ...resolvedDocument,
-        diagnostics: [...resolvedDocument.diagnostics, ...typecheckResult.diagnostics]
+        ...resolvedProgram,
+        diagnostics: [...resolvedProgram.diagnostics, ...typecheckResult.diagnostics]
       }
-    : resolvedDocument;
+    : resolvedProgram;
   const renderSelection = mergeRenderSelection(
-    semanticDocument.renderSelection,
+    semanticProgram.renderSelection,
     options.renderSelection
   );
   const renderProfileResolution = resolveRenderProfileWithDiagnostics(renderSelection);
-  const document = renderProfileResolution.diagnostics.length
+  const renderProgram = renderProfileResolution.diagnostics.length
     ? {
-        ...semanticDocument,
-        diagnostics: [...semanticDocument.diagnostics, ...renderProfileResolution.diagnostics]
+        ...semanticProgram,
+        diagnostics: [...semanticProgram.diagnostics, ...renderProfileResolution.diagnostics]
       }
-    : semanticDocument;
+    : semanticProgram;
+  const legacyDocument = createLegacyDocumentBridge(renderProgram);
   const runPlan = buildRunPlan({
-    documentId: document.meta.id,
+    documentId: renderProgram.meta.id,
     typedGraph: typecheckResult.typedGraph,
     stepGraph: typecheckResult.stepGraph
   });
@@ -175,29 +243,30 @@ export const compileChemd = (source: string, options: CompileOptions = {}): Comp
     capabilities: DEFAULT_RUNTIME_CAPABILITIES
   });
   const lnf = buildCanonicalLnf({
-    document,
+    document: legacyDocument,
     typedGraph: typecheckResult.typedGraph,
     stepGraph: typecheckResult.stepGraph,
-    diagnostics: document.diagnostics,
+    diagnostics: legacyDocument.diagnostics,
     runPlan,
     runtimePreflight
   });
-  const trainingExport = exportTrainingRecordFromDocument(document, {
+  const trainingExport = applyProgramSemanticLayer(exportTrainingRecordFromDocument(legacyDocument, {
     stepGraph: typecheckResult.stepGraph,
     typedGraph: typecheckResult.typedGraph,
     lnf
-  });
+  }), renderProgram);
   const ragExport = buildRagExportFromTrainingRecord(trainingExport);
   const trainingUnderstanding = buildTrainingUnderstandingFromRecord(trainingExport);
-  const authoringAssistance = buildAuthoringAssistance(document, trainingExport);
+  const authoringAssistance = buildAuthoringAssistance(renderProgram, trainingExport);
   const authoringDiagnostics = buildAuthoringDiagnostics(authoringAssistance, trainingExport);
-  const compileDocument = authoringDiagnostics.length > 0
+  const compileProgram = authoringDiagnostics.length
     ? {
-        ...document,
-        diagnostics: [...document.diagnostics, ...authoringDiagnostics]
+        ...renderProgram,
+        diagnostics: [...renderProgram.diagnostics, ...authoringDiagnostics]
       }
-    : document;
-  const diagnosis = buildCompilerDiagnosis(compileDocument.diagnostics);
+    : renderProgram;
+  const compileDocument = createLegacyDocumentBridge(compileProgram);
+  const diagnosis = buildCompilerDiagnosis(compileProgram.diagnostics);
   const renderOptions = renderProfileResolution.options;
   const renderAdapterPayload = mapRenderOptionsToAdapterPayload(renderOptions);
   const html = renderHtml(compileDocument, renderOptions, { typedGraph: typecheckResult.typedGraph });
@@ -207,8 +276,9 @@ export const compileChemd = (source: string, options: CompileOptions = {}): Comp
   });
 
   return {
+    program: compileProgram,
     document: compileDocument,
-    diagnostics: compileDocument.diagnostics,
+    diagnostics: compileProgram.diagnostics,
     renderOptions,
     renderAdapterPayload,
     typedSemanticGraph: typecheckResult.typedGraph,

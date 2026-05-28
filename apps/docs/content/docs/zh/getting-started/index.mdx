@@ -13,37 +13,38 @@ description: Chemd 使用手册的起点，覆盖文档模型、文件扩展名�
 ## 推荐起始样例
 
 ```md validate
----
-id: exp-minimal
-title: Minimal Chemd experiment
-date: 2026-04-24
-primary_reaction: rxn-main
-primary_result: res-main
----
+module exp_minimal
 
-:::chemd #mol-a
-name: substrate A
-smiles: CCO
-:::
+meta {
+  id: "exp-minimal"
+  title: "Minimal Chemd experiment"
+  date: "2026-04-24"
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
 
-:::chemd #mol-b
-name: product B
-smiles: CC=O
-:::
+molecule mol_a {
+  name: "substrate A"
+  smiles: "CCO"
+}
 
-:::chemd #rxn-main
-reactant: @mol-a | 1.0 mmol | 1.0 eq | limiting=true
-product: @mol-b
-temperature: 25 C
-time: 1 h
-:::
+molecule mol_b {
+  name: "product B"
+  smiles: "CC=O"
+}
 
-:::result #res-main
-reaction: @rxn-main
-product: @mol-b
-status: success
-yield: 65%
-:::
+reaction rxn_main {
+  reactants: [@mol_a]
+  products: [@mol_b]
+  temperature: 25 C
+  time: 1 h
+}
+
+result res_main for @rxn_main {
+  product: @mol_b
+  status: success
+  yield: 65%
+}
 ```
 
 该样例覆盖核心字段：文档 `id`、`title`、`date`，molecule identity，reaction participant，以及与 reaction 相连的 result。

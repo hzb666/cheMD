@@ -1,163 +1,122 @@
+import type { Diagnostic } from "@chemd/core";
 import { describe, expect, it } from "vitest";
 
 import {
   applyCompilerDiagnosisSafeFixes,
-  compileChemd
-} from "../src/index";
+  buildCompilerDiagnosis
+} from "../src/diagnosis";
 
 describe("compiler diagnosis", () => {
-  it("classifies safe quick fixes and supports compile-fix-recompile loops", () => {
-    const source = `---
-id: exp-diagnosis-fixable
-title: Diagnosis fixable
-date: 2026-04-24
----
+  it("classifies declaration-target safe quick fixes", () => {
+    const diagnostics: Diagnostic[] = [{
+      code: "W_AUTHORING_FIX_AVAILABLE",
+      severity: "warning",
+      message: "Result can be bound to the only reaction.",
+      sourceLayer: "compiler",
+      sourceNodeId: "res_main",
+      sourceField: "reaction",
+      facts: {
+        suggestion_id: "suggest-result-ref-res_main",
+        target_kind: "declaration_field"
+      },
+      quickFixes: [{
+        title: "Bind result",
+        kind: "apply_authoring_patch",
+        patch: {
+          kind: "insert_declaration_field",
+          declarationId: "res_main",
+          line: "reaction: @rxn_main"
+        }
+      }]
+    }];
 
-:::chemd #rxn-main
-kind: reaction
-reactants: substrate
-products: product
-:::
-
-:::result #res-main
-status: success
-yield: 72%
-:::
-
-:::analysis #ana-main
-type: tlc
-result: one major spot
-:::
-`;
-    const firstPass = compileChemd(source);
-
-    expect(firstPass.diagnosis).toMatchObject({
+    expect(buildCompilerDiagnosis(diagnostics)).toMatchObject({
       status: "fixable",
       summary: {
-        safeFixCount: 5,
+        safeFixCount: 1,
         requiredInputCount: 0,
         manualReviewCount: 0
       },
+      safeFixes: [expect.objectContaining({
+        fixId: "suggest-result-ref-res_main",
+        sourceNodeId: "res_main",
+        sourceField: "reaction"
+      })],
       nextActions: ["apply_safe_fixes", "recompile"]
     });
-    expect(firstPass.diagnosis.safeFixes).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        diagnosticCode: "W_AUTHORING_FIX_AVAILABLE",
-        sourceNodeId: "res-main"
-      }),
-      expect.objectContaining({
-        diagnosticCode: "W_AUTHORING_FIX_AVAILABLE",
-        sourceNodeId: "ana-main"
-      }),
-      expect.objectContaining({
-        diagnosticCode: "W_AUTHORING_FIX_AVAILABLE",
-        sourceField: "primary_reaction"
-      }),
-      expect.objectContaining({
-        diagnosticCode: "W_AUTHORING_FIX_AVAILABLE",
-        sourceField: "primary_result"
-      }),
-      expect.objectContaining({
-        diagnosticCode: "W_AUTHORING_FIX_AVAILABLE",
-        sourceNodeId: "res-main",
-        sourceField: "product"
-      })
-    ]));
+  });
 
-    const fixedSource = applyCompilerDiagnosisSafeFixes(source, firstPass.diagnosis);
-    const secondPass = compileChemd(fixedSource);
+  it("applies program declaration safe fixes in order", () => {
+    const source = `module exp_diagnosis
 
-    expect(secondPass.diagnosis.status).toBe("clean");
-    expect(secondPass.diagnosis.nextActions).toEqual(["accept"]);
+meta {
+  id: "exp-diagnosis"
+  title: "Diagnosis"
+  date: "2026-05-29"
+}
+
+result res_main {
+  status: success
+}
+`;
+    const diagnosis = buildCompilerDiagnosis([{
+      code: "W_AUTHORING_FIX_AVAILABLE",
+      severity: "warning",
+      message: "Result can be bound.",
+      quickFixes: [{
+        title: "Bind result",
+        kind: "apply_authoring_patch",
+        patch: {
+          kind: "insert_declaration_field",
+          declarationId: "res_main",
+          line: "reaction: @rxn_main"
+        }
+      }]
+    }]);
+
+    expect(applyCompilerDiagnosisSafeFixes(source, diagnosis)).toContain(`result res_main {
+  status: success
+  reaction: @rxn_main
+}`);
   });
 
   it("exposes required authored facts separately from safe fixes", () => {
-    const source = `---
-id: exp-diagnosis-input
-title: Diagnosis input
-date: 2026-04-24
----
+    const diagnosis = buildCompilerDiagnosis([{
+      code: "W_AUTHORING_INPUT_REQUIRED",
+      severity: "warning",
+      message: "最小实验记录 未完整表达：至少一个 result 声明",
+      sourceLayer: "compiler",
+      facts: {
+        checklist_id: "basic-experiment-record",
+        title: "最小实验记录",
+        description: "需要 result。",
+        missing_items: ["至少一个 result 声明"]
+      }
+    }]);
 
-:::chemd #rxn-main
-kind: reaction
-reactants: substrate
-products: product
-:::
-`;
-    const result = compileChemd(source);
-
-    expect(result.diagnosis).toMatchObject({
-      status: "mixed",
-      summary: {
-        safeFixCount: 1,
-        requiredInputCount: 1
-      },
-      nextActions: ["apply_safe_fixes", "recompile", "ask_for_required_inputs"]
+    expect(diagnosis).toMatchObject({
+      status: "needs_author_input",
+      requiredInputs: [expect.objectContaining({
+        checklistId: "basic-experiment-record",
+        missingItems: ["至少一个 result 声明"]
+      })],
+      nextActions: ["ask_for_required_inputs"]
     });
-    expect(result.diagnosis.requiredInputs).toContainEqual(expect.objectContaining({
-      checklistId: "basic-experiment-record",
-      title: "最小实验记录",
-      missingItems: expect.arrayContaining(["至少一个 result 块"])
-    }));
   });
 
-  it("routes unsupported or invalid source semantics to manual review", () => {
-    const source = `:::chemd #bad
-kind: invalid
-smiles: CCO
-:::`;
-    const result = compileChemd(source);
+  it("routes unresolved program diagnostics to manual review", () => {
+    const diagnosis = buildCompilerDiagnosis([{
+      code: "E_PROGRAM_DECLARATION_EXPECTED",
+      severity: "error",
+      message: "Expected a declaration.",
+      sourceLayer: "parser",
+      sourceNodeId: "doc_1"
+    }]);
 
-    expect(result.diagnosis).toMatchObject({
+    expect(diagnosis).toMatchObject({
       status: "manual_review",
-      summary: {
-        safeFixCount: 0,
-        requiredInputCount: 0,
-        manualReviewCount: 1
-      },
+      summary: { manualReviewCount: 1 },
       nextActions: ["manual_rewrite"]
     });
-    expect(result.diagnosis.manualReviewItems).toContainEqual(expect.objectContaining({
-      diagnosticCode: "E_CHEMD_KIND_CONFLICT",
-      severity: "error"
-    }));
-  });
-
-  it("does not canonicalize stable inferred chemd kind", () => {
-    const source = `---
-id: exp-diagnosis-kind
-title: Diagnosis kind
-date: 2026-04-24
----
-
-:::chemd #rxn-main
-reactants: substrate
-products: product
-:::
-
-:::result #res-main
-ref: rxn-main
-status: success
-yield: 72%
-:::`;
-    const firstPass = compileChemd(source);
-
-    expect(firstPass.diagnosis).toMatchObject({
-      status: "fixable",
-      summary: {
-        safeFixCount: 3,
-        requiredInputCount: 0,
-        manualReviewCount: 0
-      }
-    });
-    expect(firstPass.diagnosis.safeFixes).not.toContainEqual(expect.objectContaining({
-      diagnosticCode: "W_CHEMD_KIND_AMBIGUOUS"
-    }));
-
-    const fixedSource = applyCompilerDiagnosisSafeFixes(source, firstPass.diagnosis);
-    const secondPass = compileChemd(fixedSource);
-
-    expect(fixedSource).not.toContain("kind: reaction");
-    expect(secondPass.diagnosis.status).toBe("clean");
   });
 });

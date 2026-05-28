@@ -65,37 +65,38 @@ status: success ;; yield: 82% ;; purity: 96%
 一份实验记录通常按对象依赖顺序编写：先声明 molecule，再声明 reaction，随后记录 procedure、observation、analysis、result、sample 和 artifact。条件筛选记录以 standard reaction 和 variation reaction 为中心组织。
 
 ```md validate
----
-id: exp-user-guide
-title: User guide example
-date: 2026-05-19
-primary_reaction: rxn-main
-primary_result: res-main
----
+module exp_user_guide
 
-:::chemd #mol-substrate
-name: substrate
-smiles: CCO
-:::
+meta {
+  id: "exp-user-guide"
+  title: "User guide example"
+  date: "2026-05-19"
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
 
-:::chemd #mol-product
-name: product
-smiles: CC=O
-:::
+molecule mol_substrate {
+  name: "substrate"
+  smiles: "CCO"
+}
 
-:::chemd #rxn-main
-reactant: @mol-substrate | 1.00 mmol | 1.0 eq | limiting=true
-product: @mol-product
-solvent: MeCN
-temperature: 60 C
-time: 3 h
-:::
+molecule mol_product {
+  name: "product"
+  smiles: "CC=O"
+}
 
-:::result #res-main
-reaction: @rxn-main
-product: @mol-product
-status: success
-yield: 74%
-:::
+reaction rxn_main {
+  reactants: [@mol_substrate]
+  products: [@mol_product]
+  solvent: "MeCN"
+  temperature: 60 C
+  time: 3 h
+}
+
+result res_main for @rxn_main {
+  product: @mol_product
+  status: success
+  yield: 74%
+}
 ```
 

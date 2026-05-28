@@ -65,37 +65,38 @@ List handling is block-specific. The default list fields are `reactants`, `produ
 A typical experiment record declares molecules first, then reactions, followed by procedure, observation, analysis, result, sample, and artifact blocks. Condition screening records should organize standard and variation reactions around the screening block.
 
 ```md validate
----
-id: exp-user-guide
-title: User guide example
-date: 2026-05-19
-primary_reaction: rxn-main
-primary_result: res-main
----
+module exp_user_guide
 
-:::chemd #mol-substrate
-name: substrate
-smiles: CCO
-:::
+meta {
+  id: "exp-user-guide"
+  title: "User guide example"
+  date: "2026-05-19"
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
 
-:::chemd #mol-product
-name: product
-smiles: CC=O
-:::
+molecule mol_substrate {
+  name: "substrate"
+  smiles: "CCO"
+}
 
-:::chemd #rxn-main
-reactant: @mol-substrate | 1.00 mmol | 1.0 eq | limiting=true
-product: @mol-product
-solvent: MeCN
-temperature: 60 C
-time: 3 h
-:::
+molecule mol_product {
+  name: "product"
+  smiles: "CC=O"
+}
 
-:::result #res-main
-reaction: @rxn-main
-product: @mol-product
-status: success
-yield: 74%
-:::
+reaction rxn_main {
+  reactants: [@mol_substrate]
+  products: [@mol_product]
+  solvent: "MeCN"
+  temperature: 60 C
+  time: 3 h
+}
+
+result res_main for @rxn_main {
+  product: @mol_product
+  status: success
+  yield: 74%
+}
 ```
 
