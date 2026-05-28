@@ -1,0 +1,123 @@
+---
+title: Program AST Contract
+description: ChemdProgramDocument、declarations、values、doc comments 和迁移边界。
+---
+
+`chemd-program-ast/v1` 是 program-first rewrite 的 public AST contract。
+运行时代码在后续阶段迁移，但下游 packages 应对齐这个形状。
+
+## 移除的 Public Contract
+
+compiler boundary 不再以这些类型作为主 contract：
+
+```ts
+ChemdDocument.children
+MarkdownNode
+StructuredNode
+ChemdNode
+TemplateNode
+UseNode
+ColNode
+syntaxOrigin
+```
+
+frontmatter、`:::` blocks、`template/use` 或 column layout nodes 不会 legacy
+lowering 到 program AST。
+
+## Program Document
+
+```ts
+export interface ChemdProgramDocument extends SourceMappedNode {
+  type: "program_document";
+  schemaVersion: "chemd-program-ast/v1";
+  sourceLanguage: "chemd/program-v1";
+  module: ChemdModuleDeclaration;
+  meta: ChemdMetaDeclaration;
+  imports: ChemdImportDeclaration[];
+  declarations: ChemdDeclaration[];
+  docs: ChemdDocComment[];
+  diagnostics: Diagnostic[];
+  source?: string;
+  renderSelection?: RenderSelection;
+}
+```
+
+`module` 和 `meta` 必填。`declarations` 只包含 semantic declarations。
+`docs` 包含导出的 Markdown documentation comments，不包含顶层 Markdown body nodes。
+
+## Declarations
+
+```ts
+export type ChemdDeclaration =
+  | MoleculeDeclaration
+  | MaterialDeclaration
+  | BatchDeclaration
+  | ReactionDeclaration
+  | ResultDeclaration
+  | AnalysisDeclaration
+  | SampleDeclaration
+  | ArtifactDeclaration
+  | ConditionScreenDeclaration
+  | ProcedureDeclaration
+  | ObservationDeclaration
+  | TraceDeclaration
+  | AgentRunDeclaration;
+```
+
+Declaration IDs 在 module 内唯一。Resolver 负责生成 `qualifiedId`，例如
+`exp_golden_suzuki_screen.rxn_var1`。
+
+## Values
+
+Parser 负责分类 value syntax 并保留 raw text。Typechecker 负责校验和归一化。
+
+```ts
+export interface ChemdReferenceExpr extends ChemdValueBase {
+  type: "reference";
+  refKind: "local" | "field" | "module" | "external_document";
+  target: string;
+  moduleName?: string;
+  externalDocumentId?: string;
+  field?: string;
+  resolved?: ReferenceResolution;
+}
+```
+
+Reference identity 支持 local declarations、field references、
+module-qualified declarations、imported aliases，以及
+`@external_doc#rxn_step_01` 这样的 external document anchors。
+
+## Documentation Comments
+
+```ts
+export interface ChemdDocComment extends SourceMappedNode {
+  type: "doc_comment";
+  id: string;
+  markdown: string;
+  attachment:
+    | { kind: "file" }
+    | { kind: "module"; moduleName: string }
+    | { kind: "declaration"; declarationId: string }
+    | { kind: "field"; declarationId: string; fieldName: string }
+    | { kind: "procedure_step"; declarationId: string; stepId: string }
+    | { kind: "agent_statement"; runId: string; statementId: string };
+  exportPolicy: "render_rag" | "render_only" | "audit_only";
+}
+```
+
+Doc references 是 documentation links，不创建 semantic facts。Declaration
+field references 未解析是 error；doc-comment references 未解析是 warning，除非该
+doc 是 `audit_only`。
+
+## Migration Implications
+
+Resolver 必须停止遍历 `document.children`，改为从 module、imports、meta、
+declarations 和 docs 构建 `ProgramSymbolTable`。
+
+Typechecker 必须用 `collectDeclarations(program.declarations)` 替代
+`collectNodes(document.children)`。
+
+Compiler 和 exporters 必须把 `program.schemaVersion`、`program.sourceLanguage`、
+declaration IDs、field source spans 和 doc comment IDs 传递到 typed graph
+metadata、diagnostics、semantic diff、training exports、language service navigation
+和 storage records。

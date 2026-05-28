@@ -1,0 +1,162 @@
+---
+title: Program AST Contract
+description: ChemdProgramDocument, declarations, values, doc comments, and migration boundaries.
+---
+
+`chemd-program-ast/v1` is the public AST contract for the program-first
+rewrite. Runtime code changes come later, but downstream packages should align
+to this shape.
+
+## Removed Public Contract
+
+The compiler boundary no longer exposes these as the primary contract:
+
+```ts
+ChemdDocument.children
+MarkdownNode
+StructuredNode
+ChemdNode
+TemplateNode
+UseNode
+ColNode
+syntaxOrigin
+```
+
+There is no legacy lowering path from frontmatter, `:::` blocks,
+`template/use`, or column layout nodes into program AST.
+
+## Program Document
+
+```ts
+export interface ChemdProgramDocument extends SourceMappedNode {
+  type: "program_document";
+  schemaVersion: "chemd-program-ast/v1";
+  sourceLanguage: "chemd/program-v1";
+  module: ChemdModuleDeclaration;
+  meta: ChemdMetaDeclaration;
+  imports: ChemdImportDeclaration[];
+  declarations: ChemdDeclaration[];
+  docs: ChemdDocComment[];
+  diagnostics: Diagnostic[];
+  source?: string;
+  renderSelection?: RenderSelection;
+}
+```
+
+`module` and `meta` are required. `declarations` contains semantic declarations
+only. `docs` contains exported Markdown documentation comments, not top-level
+Markdown body nodes.
+
+## Declarations
+
+```ts
+export type ChemdDeclaration =
+  | MoleculeDeclaration
+  | MaterialDeclaration
+  | BatchDeclaration
+  | ReactionDeclaration
+  | ResultDeclaration
+  | AnalysisDeclaration
+  | SampleDeclaration
+  | ArtifactDeclaration
+  | ConditionScreenDeclaration
+  | ProcedureDeclaration
+  | ObservationDeclaration
+  | TraceDeclaration
+  | AgentRunDeclaration;
+
+export interface ChemdDeclarationBase extends SourceMappedNode {
+  kind: string;
+  id: string;
+  qualifiedId: string;
+  docs: ChemdDocCommentRef[];
+  annotations?: ChemdAnnotation[];
+}
+```
+
+Declaration IDs are local to the module. The resolver owns `qualifiedId`, for
+example `exp_golden_suzuki_screen.rxn_var1`.
+
+## Values
+
+The parser classifies value syntax and preserves raw text. The typechecker
+validates and normalizes values.
+
+```ts
+export type ChemdValue =
+  | ChemdStringValue
+  | ChemdIdentifierValue
+  | ChemdBooleanValue
+  | ChemdNumberValue
+  | ChemdQuantityValue
+  | ChemdPercentValue
+  | ChemdReferenceExpr
+  | ChemdListValue
+  | ChemdRecordValue
+  | ChemdCallExpr
+  | ChemdPatchExpr;
+
+export interface ChemdReferenceExpr extends ChemdValueBase {
+  type: "reference";
+  refKind: "local" | "field" | "module" | "external_document";
+  target: string;
+  moduleName?: string;
+  externalDocumentId?: string;
+  field?: string;
+  resolved?: ReferenceResolution;
+}
+```
+
+Supported reference identities include local declarations, field references,
+module-qualified declarations, imported aliases, and external document anchors
+such as `@external_doc#rxn_step_01`.
+
+## Documentation Comments
+
+```ts
+export interface ChemdDocComment extends SourceMappedNode {
+  type: "doc_comment";
+  id: string;
+  markdown: string;
+  attachment:
+    | { kind: "file" }
+    | { kind: "module"; moduleName: string }
+    | { kind: "declaration"; declarationId: string }
+    | { kind: "field"; declarationId: string; fieldName: string }
+    | { kind: "procedure_step"; declarationId: string; stepId: string }
+    | { kind: "agent_statement"; runId: string; statementId: string };
+  references: ReferenceToken[];
+  inlineChem: InlineChemToken[];
+  inlineCode: InlineCodeToken[];
+  links: MarkdownLinkToken[];
+  exportPolicy: "render_rag" | "render_only" | "audit_only";
+}
+```
+
+Doc references are documentation links. They do not create semantic facts.
+Unresolved declaration field references are errors. Unresolved doc-comment
+references are warnings unless the doc is `audit_only`.
+
+## Procedure and Agent Declarations
+
+`ProcedureDeclaration` owns declaration-native procedure statements. It no
+longer lowers from `ProcedureNode.steps`, nested Markdown nodes, or fenced
+blocks.
+
+`AgentRunDeclaration` records source-level audit intent: goals, tool calls,
+evidence, patch proposals, decisions, and timeline data. It maps to runtime
+agent DTOs and storage records, but patch targets must resolve to program
+declarations, fields, meta fields, or doc comments.
+
+## Migration Implications
+
+Resolver code must stop traversing `document.children`; it builds a
+`ProgramSymbolTable` from module, imports, meta, declarations, and docs.
+
+Typechecker code must replace `collectNodes(document.children)` with
+`collectDeclarations(program.declarations)`.
+
+Compiler and exporters must carry `program.schemaVersion`,
+`program.sourceLanguage`, declaration IDs, field source spans, and doc comment
+IDs into typed graph metadata, diagnostics, semantic diff, training exports,
+language service navigation, and storage records.

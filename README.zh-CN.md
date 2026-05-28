@@ -15,12 +15,12 @@
 
 [简体中文](./README.zh-CN.md) | [English](./README.md)
 
-`chemd` 是基于 Markdown 的化学文档系统，用于书写、校验、渲染和运营化实验记录。研究人员可以保留实验叙述，编译器会抽取实体、引用、步骤逻辑、观察、证据关系和知识图谱边，用于检索、训练和下游推理。当前代码库包含 Chemd 类型化文档语言、TypeScript 编译包、浏览器 playground、Tauri Desktop IDE 和本地 chemistry service。
+`chemd` 正在迁移为 program-first 的化学语言，用于书写、校验、渲染和运营化实验记录。一个 `.chemd` 文件就是一个模块：declaration 承载语义事实，Markdown 只通过显式 doc comment 作为文档和 RAG 叙事来源。当前代码库包含 Chemd 语言、TypeScript 编译包、浏览器 playground、Tauri Desktop IDE 和本地 chemistry service。
 
 ## 产品范围
 
-- 接近代码的 Chemd 专用文档写作模型，覆盖 frontmatter、Markdown 风格正文、行内化学、引用、分子、反应、结果、分析、样品、步骤、观察、模板和列布局。
-- 面向产品写作的 `.chemd` 源文件格式，并兼容已有 workspace 中的 `.chemd.md` 文件。
+- Program-first 的 Chemd 写作模型，覆盖 module、meta、import、doc comment、分子、反应、结果、分析、样品、步骤、观察、trace 和 agent audit declaration。
+- 面向产品写作的 `.chemd` 源文件格式。program-v1 rewrite 会移除 legacy frontmatter、`:::` 结构块、`template/use`、列布局语法和 `.chemd.md` 兼容路径。
 - 实验逻辑增强：将原始记录连接到 typed entities、resolved references、procedure steps、observations、field evidence、normalization facts 和 knowledge-graph edges。
 - 浏览器工作台，支持源码编辑、渲染预览、diagnostics、结构化输出、导出动作、OCR 入口和 chemistry editor 集成。
 - Desktop IDE 支持本地 workspace、Monaco 编辑、文件标签、自动保存、冲突保护保存、diagnostics、语义预览、workspace index、Graph/RAG 视图、PostgreSQL profile 绑定和 Agent patch review。
@@ -63,13 +63,13 @@ chemd/
 |   |-- agent-tools/         # Agent run、evidence、patch 与 audit primitives
 |   |-- language-service/    # Editor diagnostics、outline、completion、hover、Graph/RAG DTOs
 |   |-- lnf/                 # Canonical LNF builder
-|   |-- parser/              # Frontmatter、blocks、inline tokens、references
+|   |-- parser/              # Program grammar、doc comments、values、references
 |   |-- reaction-map/        # Reaction graph layout 与 intelligence contracts
 |   |-- render-profile/      # Render profiles 与 override validation
 |   |-- renderer-docx/       # DOCX bridge renderer
 |   |-- renderer-html/       # HTML preview renderer
 |   |-- renderer-json/       # JSON renderer
-|   |-- resolver/            # Reference resolution 与 template expansion
+|   |-- resolver/            # Program symbol tables 与 reference resolution
 |   |-- runtime-lab/         # Runtime plan 与 preflight model
 |   |-- runtime-trace/       # Runtime trace events 与 replay helpers
 |   |-- step-ontology/       # Procedure、observation、analysis lowering
@@ -180,8 +180,8 @@ poetry run python -m unittest discover
 根目录通过 `chemd` script 调用 CLI：
 
 ```bash
-pnpm chemd validate packages/compiler/fixtures/golden-experiment-record.chemd
-pnpm chemd export packages/compiler/fixtures/golden-experiment-record.chemd --format training-full
+pnpm chemd validate file.chemd
+pnpm chemd export file.chemd --format training-full
 pnpm chemd diff before.chemd after.chemd --format json
 pnpm chemd graph reports/*.chemd --format json
 pnpm chemd repair draft.chemd --format text
@@ -204,108 +204,93 @@ pnpm chemd agent-loop draft.chemd --format json --max-iterations 3
 
 ## 文档语言
 
-Chemd 文档使用 Markdown 兼容文本和结构化 chemistry blocks。主文件扩展名是 `.chemd`；编译器、workspace index 和 Desktop IDE 继续支持已有 `.chemd.md` 文件。
+Chemd program-v1 是 program-first 语言。一个 `.chemd` 文件就是一个
+module，declaration 是唯一语义事实来源。Markdown 只通过显式
+documentation comments 和 `/*md */` 区域进入编译器；它可以渲染和检索，
+但不创建实验事实。
 
-必需 frontmatter：
+Legacy YAML frontmatter、`:::` 结构块、`template/use`、列布局语法和
+`.chemd.md` 兼容路径都会从 program-v1 compiler path 移除。
 
-- `id`
-- `title`
-- `date`
-
-支持的 metadata 包括 render profile、render overrides、tags，以及 reaction、result、product、sample、molecule、analysis 的 primary alias。
-
-行内语法：
+Program 语法：
 
 | 语法 | 含义 |
 | --- | --- |
-| `:chem[H2O]` | 行内化学 token |
-| `` `inline code` `` | 行内代码 token |
-| `[label](https://example.com)` | 带 safety metadata 的 Markdown link token |
-| `@rxn-main` | Entity reference |
-| `@res-main.yield` | Entity field reference |
-| `@meta.title` | Metadata reference |
-| `@result.yield` | Primary alias field reference |
-| `@param.amount` | Template parameter reference |
-
-结构化块：
-
-| Block | 作用 |
-| --- | --- |
-| `:::chemd` | Molecule 或 reaction block；`kind` 可显式写出，也可由稳定反应字段推断 |
-| `:::result` | Outcome status、yield、conversion、selectivity、purity、notes |
-| `:::analysis` | Analysis records 和 TLC-style lane data |
-| `:::sample` | Sample metadata 与 lineage references |
-| `:::procedure` | Procedure text 或 explicit steps |
-| `:::observation` | Observation text 或 explicit events |
-| `:::template` | 可复用文档模板 |
-| `:::use` | 模板调用 |
-| `:::col-N` | 列布局块 |
+| `module exp_demo` | 文件级 module scope |
+| `meta { ... }` | 必需 metadata declaration |
+| `import shared as s from "./shared.chemd"` | 外部 program symbols |
+| `molecule mol_a { ... }` | 语义 molecule declaration |
+| `reaction rxn_main { ... }` | 语义 reaction declaration |
+| `result res_main for @rxn_main { ... }` | 绑定到 reaction 的 result |
+| `procedure proc_main for @rxn_main { ... }` | declaration-native procedure steps |
+| `agent run repair_001 { ... }` | source-level agent audit record |
+| `/// ...` 和 `/*md ... */` | Markdown documentation comments |
 
 示例：
 
-```md
----
-id: exp-demo
-title: Ethanol oxidation
-date: 2026-04-17
-render_profile: publication-acs
-primary_reaction: rxn-main
-primary_result: res-main
-tags:
-  - demo
-  - oxidation
----
+```chemd
+module exp_demo
 
-:::chemd #rxn-main
-kind: reaction
-reactants: CCO | O=O
-products: CC(=O)O
-conditions: THF | -78 C | 30 min | nitrogen
-:::
+meta {
+  id: "exp-demo"
+  title: "Ethanol oxidation"
+  date: 2026-04-17
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
 
-:::procedure #proc-main
-step: cool | id=cool-main | target_temperature=-78 C
-step: add | id=add-oxidant | dependsOn=cool-main
-:::
+/*md
+# Ethanol oxidation
 
-:::analysis #ana-tlc
-type: tlc
-ref: rxn-main
-result: partial_conversion
-data: TLC shows starting material remains
-:::
+This section is documentation. It can be rendered and retrieved, but it does
+not create molecule, reaction, result, procedure, or agent facts.
+*/
 
-:::result #res-main
-ref: rxn-main
-status: partial
-yield: 23%
-purity: 91%
-:::
+molecule mol_ethanol {
+  name: "ethanol"
+  smiles: "CCO"
+  role: substrate
+}
 
-Yield: @res-main.yield
+reaction rxn_main {
+  reactants: [@mol_ethanol]
+  products: ["CC(=O)O"]
+  solvent: "THF"
+  temperature: -78 C
+  atmosphere: nitrogen
+}
+
+result res_main for @rxn_main {
+  status: success
+  yield: 72%
+}
+
+procedure proc_main for @rxn_main {
+  step charge = charge(inputs: [@mol_ethanol], purpose: "assemble reaction")
+  step cool = cool(temperature: -78 C, depends_on: [charge])
+}
 ```
 
-更完整的写作规范与 companion fixture 示例见：
+Program-first contracts：
 
-- `docs/chemd-syntax-best-practices.zh-CN.md`
-- `packages/compiler/fixtures/best-practice-total-synthesis.chemd`
-- `packages/compiler/fixtures/best-practice-one-step-synthesis.chemd`
-- `packages/compiler/fixtures/best-practice-condition-screen.chemd`
+- `/zh/docs/program-v1/language`
+- `/zh/docs/program-v1/ast`
+- `/zh/docs/program-v1/exports`
 
 ## 常用使用流程
 
 创建或打开 Chemd 记录后，可以先运行校验：
 
 ```bash
-pnpm chemd validate packages/compiler/fixtures/golden-experiment-record.chemd
+pnpm chemd validate file.chemd
 ```
 
 导出应用与模型流水线需要的数据：
 
 ```bash
-pnpm chemd export packages/compiler/fixtures/golden-experiment-record.chemd --format json
-pnpm chemd export packages/compiler/fixtures/golden-experiment-record.chemd --format rag
-pnpm chemd export packages/compiler/fixtures/golden-experiment-record.chemd --format training
+pnpm chemd export file.chemd --format json
+pnpm chemd export file.chemd --format rag
+pnpm chemd export file.chemd --format training
 ```
 
 查看 workspace 级 reaction graph：
@@ -326,15 +311,15 @@ pnpm chemd agent-loop draft.chemd --write --max-iterations 3
 `@chemd/compiler` 暴露 `compileChemd(source, options)`。
 
 ```text
-source markdown
-  -> parseChemd()
-  -> resolveChemd()
-  -> typecheckDocument()
+source program
+  -> parseChemdProgram()
+  -> resolveProgram()
+  -> typecheckProgram()
   -> resolveRenderProfileWithDiagnostics()
   -> buildRunPlan()
   -> preflightRun()
   -> buildCanonicalLnf()
-  -> exportTrainingRecordFromDocument()
+  -> exportTrainingRecordFromProgram()
   -> buildRagExportFromTrainingRecord()
   -> buildTrainingUnderstandingFromRecord()
   -> renderHtml()
@@ -342,7 +327,7 @@ source markdown
   -> renderDocxBridge()
 ```
 
-编译输出包含 diagnostics、resolved document、typed semantic graph、lowered step graph、runtime plan、preflight results、LNF、HTML、JSON、DOCX bridge Markdown、RAG export、training understanding export 和 full audit export。
+编译输出包含 diagnostics、resolved program、typed semantic graph、lowered step graph、runtime plan、preflight results、LNF、HTML、JSON、DOCX bridge Markdown、RAG export、training understanding export 和 full audit export。
 
 数据导出职责：
 
@@ -353,7 +338,7 @@ source markdown
 | Graph index export | repo/campaign graph indexing、reaction clustering 与 similarity traversal |
 | Full audit export | 检查、调试与可追溯性 |
 
-Graph index 是推断式导出。作者只需要写真实实验事实，例如 `reactants`、`products`、`result.ref`、`analysis.ref`、`sample.derived_from`、`route`、`prev` 和 `condition-varies`。导出层会从这些事实生成图索引和聚类视图，报告本身保持实验事实写作。
+Graph index 是推断式导出。作者只需要在 declarations 中写真实实验事实，例如 `reactants`、`products`、result target、analysis target、sample lineage、route edges 和 condition screens。导出层会从这些事实生成图索引和聚类视图，报告本身保持实验事实写作。
 repo 级 graph index 会在一个或多个文档编译成 training understanding 后，通过 `buildTrainingGraphIndexFromUnderstandings()` 生成。
 
 ## Web Playground
@@ -385,7 +370,7 @@ Chemd Desktop IDE 是面向本地 workspace 的日常写作产品。它基于 Ta
 Desktop 功能：
 
 - 打开本地文件夹，浏览 Chemd 文档和关联 assets。
-- 在 Monaco 中编辑 `.chemd` 和 `.chemd.md` 文件，获得来自 `@chemd/language-service` 的 diagnostics、outline、hover、completion、source ranges 和 quick-fix proposals。
+- 在 Monaco 中编辑 `.chemd` program files，获得来自 `@chemd/language-service` 的 diagnostics、outline、hover、completion、source ranges 和 quick-fix proposals。
 - 使用文件标签、breadcrumbs、状态栏、自动保存、`Ctrl+S` / `Cmd+S` 和带冲突保护的保存流程。
 - 编辑时查看编译后的文档预览和 semantic tree。
 - 构建本地 workspace index，用于 symbols、references、document candidates 和 RAG citation candidates。
@@ -450,8 +435,8 @@ Chemistry service routes：
 | `@chemd/cli` | CLI validation、graph export、repair loop、semantic diff 与 agent-loop integration |
 | `@chemd/agent-tools` | Agent runs、cited evidence、patch decisions 与 audit timelines |
 | `@chemd/core` | 共享 AST、diagnostics、render overrides、chemistry primitives |
-| `@chemd/parser` | Frontmatter、Markdown、inline token、block、reference parsing |
-| `@chemd/resolver` | References、aliases、template expansion、semantic cleanup |
+| `@chemd/parser` | Program grammar、doc comments、values、references |
+| `@chemd/resolver` | Program symbol tables、imports、references、semantic cleanup |
 | `@chemd/diagnostics` | Diagnostic model、bands、quick-fix metadata |
 | `@chemd/typechecker` | Typed semantic graph 与 value diagnostics |
 | `@chemd/step-ontology` | Procedure、observation、analysis lowering |
@@ -533,7 +518,7 @@ Web service 是公网边界。Chemistry service 应位于 web app 后方或可�
 
 ## 运行说明
 
-- `.chemd` 是主写作扩展名。已有 `.chemd.md` 文件仍可用于旧 workspace 与 alias 兼容。
+- `.chemd` 是 program-first 写作扩展名。`.chemd.md` 兼容路径会从 core compiler、workspace index 和 Desktop IDE 移除。
 - RDKit 渲染要求 Python runtime 能成功 import RDKit。
 - OCR 默认使用 placeholder providers；生产 OCR 需要配置 provider URLs 与 keys。
 - DOCX 文件生成依赖 Pandoc。没有 Pandoc 时 compiler 仍可生成 DOCX bridge Markdown。

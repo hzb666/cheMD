@@ -1,0 +1,140 @@
+---
+title: Export and Storage Contract
+description: Program-first compile pipeline, renderer/export contracts, RAG truth boundaries, storage, and Desktop IDE integration.
+---
+
+Program-first exports treat declarations as semantic truth. Markdown appears
+only as documentation attached through doc comments.
+
+## Removed Export Concepts
+
+- `ChemdDocument.children`
+- top-level `MarkdownNode`
+- renderer/exporter `StructuredNode` unions
+- `source_layer.raw_children`
+- `semantic_layer.markdown_blocks`
+- LNF legacy migration summaries
+- patching over legacy `:::` fenced blocks
+- `template`, `use`, and `col` compatibility payloads
+
+The public function name `compileChemd(source, options)` may remain, but its
+implementation and return value become program-first.
+
+## Compile Pipeline
+
+```text
+source program
+  -> parseChemdProgram()
+  -> resolveProgram()
+  -> typecheckProgram()
+  -> resolveRenderProfileWithDiagnostics()
+  -> buildRunPlan()
+  -> preflightRun()
+  -> buildCanonicalLnf()
+  -> exportTrainingRecordFromProgram()
+  -> buildRagExportFromTrainingRecord()
+  -> buildTrainingUnderstandingFromRecord()
+  -> buildProgramRenderDocument()
+  -> renderHtml()
+  -> renderJson()
+  -> renderDocxBridge()
+```
+
+`parseChemdProgram()` produces `ChemdProgramDocument`. Renderers consume
+`ProgramRenderDocument`, not raw AST unions. Storage consumes compiled export
+payloads and must not parse source.
+
+## Compile Result
+
+```ts
+export interface CompileResult {
+  program: ChemdProgramDocument;
+  diagnostics: Diagnostic[];
+  renderOptions: RenderOptions;
+  renderAdapterPayload: RenderAdapterPayload;
+  typedSemanticGraph: TypedSemanticGraph;
+  stepGraph: StepGraph;
+  runPlan: RunPlan;
+  runtimePreflight: PreflightResult;
+  lnf: ChemdLnfCanonicalV1;
+  ragExport: ChemdRagExportV1;
+  trainingUnderstanding: ChemdTrainingUnderstandingV1;
+  trainingExport: ChemdTrainingExportV3;
+  authoringAssistance: AuthoringAssistance;
+  diagnosis: CompilerDiagnosis;
+  html: string;
+  json: string;
+  docxBridge: string;
+}
+```
+
+## Renderer Contracts
+
+HTML renders module header, meta summary, file documentation, declaration
+cards, procedure timeline, condition screen matrix, agent audit timeline, trace
+summary, and diagnostics.
+
+JSON export emits `program`, `semantic`, `exports`, and `diagnostics`; it must
+not contain `body`, `raw_children`, `markdown_blocks`, `template`, `use`, or
+flattened `col` entries.
+
+DOCX bridge payload version is `v1.0` and carries program metadata,
+documentation, declarations, render view model, and optional semantic graph.
+
+## Training, RAG, and LNF
+
+Training export version is `chemd-training-export/v0.3`.
+
+`ProgramSourceLayerV1` replaces `source_layer.raw_children` with module, meta,
+declarations, doc comments, diagnostics, and audit-only field markers.
+
+`ProgramSemanticLayerV1` replaces `semantic_layer.markdown_blocks` with
+`documentation_blocks`. Documentation blocks have `fact_status:
+"narrative_only"`.
+
+RAG chunks preserve truth boundaries:
+
+```ts
+export type ProgramRagChunkKind =
+  | "semantic_fact"
+  | "narrative_doc"
+  | "agent_audit"
+  | "runtime_trace";
+
+export interface ProgramRagChunkV1 {
+  chunk_id: string;
+  chunk_kind: ProgramRagChunkKind;
+  truth_source: "declaration" | "doc_comment" | "agent_run" | "trace";
+  fact_status: "source_truth" | "narrative_only" | "audit_only" | "runtime_only";
+  source_ids: string[];
+  text: string;
+  citations: ProgramCitationV1[];
+  metadata?: Record<string, unknown>;
+}
+```
+
+LNF version is `chemd-lnf/v1.0`. It removes legacy migration summaries and
+uses source completeness instead: declaration count, documentation count,
+unresolved reference count, incomplete declaration count, and agent audit run
+count.
+
+## Storage and Desktop
+
+`@chemd/storage-postgres` remains pure: no DB connections, environment reads,
+compiler calls, embeddings, SQL execution, or source parsing. Program storage
+adds records for declarations, doc comments, symbol references, RAG citations,
+reaction graph nodes/edges, and agent audit records.
+
+Desktop IDE and Graph/RAG surfaces consume program-level identities:
+
+- module name
+- declaration ID and kind
+- declaration field
+- doc comment ID
+- procedure step ID
+- agent run, tool call, patch, and decision IDs
+- trace and runtime event IDs
+
+Source jumps target `declaration:<id>`, `field:<id>.<field>`, `doc:<id>`,
+`agent:<run_id>`, `agent_patch:<patch_id>`, or `trace:<trace_id>`. They must
+not jump to legacy block IDs or fenced block ranges.

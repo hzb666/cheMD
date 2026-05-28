@@ -1,0 +1,124 @@
+---
+title: 导出与存储契约
+description: Program-first 编译管线、renderer/export contracts、RAG truth boundaries、storage 和 Desktop IDE 集成。
+---
+
+Program-first exports 把 declarations 视为语义事实。Markdown 只作为 doc
+comments 附着的文档存在。
+
+## 移除的导出概念
+
+- `ChemdDocument.children`
+- top-level `MarkdownNode`
+- renderer/exporter `StructuredNode` unions
+- `source_layer.raw_children`
+- `semantic_layer.markdown_blocks`
+- LNF legacy migration summaries
+- 对 legacy `:::` fenced blocks 的 patch
+- `template`、`use` 和 `col` compatibility payloads
+
+public function name `compileChemd(source, options)` 可以保留，但实现和返回值变为
+program-first。
+
+## Compile Pipeline
+
+```text
+source program
+  -> parseChemdProgram()
+  -> resolveProgram()
+  -> typecheckProgram()
+  -> resolveRenderProfileWithDiagnostics()
+  -> buildRunPlan()
+  -> preflightRun()
+  -> buildCanonicalLnf()
+  -> exportTrainingRecordFromProgram()
+  -> buildRagExportFromTrainingRecord()
+  -> buildTrainingUnderstandingFromRecord()
+  -> buildProgramRenderDocument()
+  -> renderHtml()
+  -> renderJson()
+  -> renderDocxBridge()
+```
+
+`parseChemdProgram()` 产出 `ChemdProgramDocument`。Renderers 消费
+`ProgramRenderDocument`，而不是 raw AST unions。Storage 消费已编译的 export
+payloads，不解析 source。
+
+## Compile Result
+
+```ts
+export interface CompileResult {
+  program: ChemdProgramDocument;
+  diagnostics: Diagnostic[];
+  typedSemanticGraph: TypedSemanticGraph;
+  stepGraph: StepGraph;
+  runPlan: RunPlan;
+  runtimePreflight: PreflightResult;
+  lnf: ChemdLnfCanonicalV1;
+  ragExport: ChemdRagExportV1;
+  trainingUnderstanding: ChemdTrainingUnderstandingV1;
+  trainingExport: ChemdTrainingExportV3;
+  authoringAssistance: AuthoringAssistance;
+  diagnosis: CompilerDiagnosis;
+  html: string;
+  json: string;
+  docxBridge: string;
+}
+```
+
+## Training、RAG 与 LNF
+
+Training export version 是 `chemd-training-export/v0.3`。
+
+`ProgramSourceLayerV1` 用 module、meta、declarations、doc comments、diagnostics
+和 audit-only field markers 替代 `source_layer.raw_children`。
+
+`ProgramSemanticLayerV1` 用 `documentation_blocks` 替代
+`semantic_layer.markdown_blocks`。Documentation blocks 的 `fact_status` 是
+`"narrative_only"`。
+
+RAG chunks 保留 truth boundaries：
+
+```ts
+export type ProgramRagChunkKind =
+  | "semantic_fact"
+  | "narrative_doc"
+  | "agent_audit"
+  | "runtime_trace";
+
+export interface ProgramRagChunkV1 {
+  chunk_id: string;
+  chunk_kind: ProgramRagChunkKind;
+  truth_source: "declaration" | "doc_comment" | "agent_run" | "trace";
+  fact_status: "source_truth" | "narrative_only" | "audit_only" | "runtime_only";
+  source_ids: string[];
+  text: string;
+  citations: ProgramCitationV1[];
+  metadata?: Record<string, unknown>;
+}
+```
+
+LNF version 是 `chemd-lnf/v1.0`。它移除 legacy migration summaries，改用 source
+completeness：declaration count、documentation count、unresolved reference count、
+incomplete declaration count 和 agent audit run count。
+
+## Storage and Desktop
+
+`@chemd/storage-postgres` 保持 pure：不打开数据库连接、不读取环境变量、不调用
+compiler、不生成 embeddings、不执行 SQL、不解析 source。Program storage 会新增
+declarations、doc comments、symbol references、RAG citations、reaction graph
+nodes/edges 和 agent audit records。
+
+Desktop IDE 和 Graph/RAG surfaces 消费 program-level identities：
+
+- module name
+- declaration ID and kind
+- declaration field
+- doc comment ID
+- procedure step ID
+- agent run, tool call, patch, and decision IDs
+- trace and runtime event IDs
+
+Source jumps 目标是 `declaration:<id>`、`field:<id>.<field>`、`doc:<id>`、
+`agent:<run_id>`、`agent_patch:<patch_id>` 或 `trace:<trace_id>`，不能跳到 legacy
+block IDs 或 fenced block ranges。

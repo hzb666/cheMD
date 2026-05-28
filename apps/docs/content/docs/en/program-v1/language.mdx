@@ -1,0 +1,173 @@
+---
+title: Language Specification
+description: The chemd/program-v1 source syntax and removed legacy syntax.
+---
+
+`chemd/program-v1` is a breaking-change language contract. It has no parser
+fallback for the legacy Markdown-first model.
+
+## Positioning
+
+One `.chemd` file is one module and one program.
+
+```text
+.chemd source
+  -> chemd/program-v1 module
+  -> declarations
+  -> compiler facts, rendering inputs, exports, storage records, IDE symbols
+```
+
+Program declarations are the semantic truth. Molecules, reactions, results,
+procedures, samples, analyses, observations, traces, and agent audit records
+exist only when the source contains declarations for them.
+
+Markdown enters the compiler only as documentation:
+
+- `///` line doc comments
+- `/*md ... */` Markdown documentation regions
+
+Documentation can render and feed narrative RAG chunks, but it must not create
+molecule, reaction, result, procedure, or agent facts.
+
+## Removed Syntax
+
+Program v1 removes these syntax surfaces without compatibility lowering:
+
+- YAML frontmatter delimited by `---`
+- `:::chemd`, `:::procedure`, `:::result`, `:::analysis`, and other fenced blocks
+- `:::template` and `:::use`
+- `:::col`, `:::col-2`, and `:::col-N`
+- semantic facts inferred from Markdown body text
+- `.chemd.md` compatibility in the core compiler path
+
+Legacy sources must be rewritten into program syntax before they compile.
+
+## Source Example
+
+```text
+module exp_golden_suzuki_screen
+
+import shared_solvents as solvents from "./shared-solvents.chemd"
+
+meta {
+  id: "exp-golden-suzuki-screen"
+  title: "Suzuki coupling solvent screen"
+  date: 2026-04-24
+  primary_reaction: @rxn_var1
+  primary_result: @res_var1
+  tags: ["suzuki", "screen"]
+}
+
+/*md
+# Suzuki coupling solvent screen
+
+This region is documentation. It is renderable and retrievable, but it does
+not create molecule, reaction, result, procedure, or agent facts.
+*/
+
+molecule mol_aryl {
+  name: "aryl bromide"
+  smiles: "Brc1ccccc1"
+  role: substrate
+}
+
+molecule mol_boron {
+  name: "phenylboronic acid"
+  smiles: "OB(O)c1ccccc1"
+  role: coupling_partner
+}
+
+molecule mol_product {
+  name: "biphenyl product"
+  smiles: "c1ccc(-c2ccccc2)cc1"
+  role: product
+}
+
+/// Selected variant. This doc comment attaches to rxn_var1.
+reaction rxn_var1 {
+  reactants: [@mol_aryl, @mol_boron]
+  products: [@mol_product]
+  solvent: "MeCN"
+  temperature: 40 C
+  time: 2 h
+  atmosphere: nitrogen
+}
+
+result res_var1 for @rxn_var1 {
+  product: @mol_product
+  status: success
+  yield: 78%
+}
+
+procedure proc_var1 for @rxn_var1 {
+  step charge = charge(inputs: [@mol_aryl, @mol_boron])
+  step heat = heat(temperature: 40 C, duration: 2 h, depends_on: [charge])
+}
+
+agent run repair_001 {
+  goal: "validate selected variant and bind primary result"
+  status: completed
+
+  tool compile_current_file {
+    status: ok
+    evidence: [@rxn_var1, @res_var1]
+  }
+
+  patch proposed {
+    title: "bind primary_result"
+    edit meta.primary_result = @res_var1
+  }
+
+  decision approved
+}
+```
+
+## Grammar Sketch
+
+```text
+program          := module_decl import_decl* meta_decl top_decl*
+module_decl      := doc_comment* "module" ident
+import_decl      := doc_comment* "import" ident ("as" ident)? "from" string
+meta_decl        := doc_comment* "meta" block
+top_decl         := doc_comment* declaration
+declaration      := molecule_decl | material_decl | batch_decl | reaction_decl
+                  | result_decl | analysis_decl | sample_decl | artifact_decl
+                  | condition_screen_decl | procedure_decl | observation_decl
+                  | trace_decl | agent_run_decl
+result_decl      := "result" ident ("for" reference)? block
+procedure_decl   := "procedure" ident ("for" reference)? procedure_block
+agent_run_decl   := "agent" "run" ident block
+block            := "{" block_item* "}"
+field            := ident ":" value
+value            := string | identifier | boolean | number | quantity | percent
+                  | reference | list | record | call
+reference        := "@" reference_target ("." ident)?
+reference_target := ident | ident "." ident | ident "#" ident
+```
+
+Reference forms:
+
+- `@rxn_var1` resolves a local declaration.
+- `@rxn_var1.yield` resolves a local declaration field.
+- `@module_name.rxn_var1` resolves a module-qualified declaration.
+- `@external_doc#rxn_step_01` resolves an external document anchor supplied by
+  resolver context.
+
+## Diagnostics
+
+Legacy syntax diagnostics are fatal parser diagnostics. They explain the
+removal and stop compilation; they are not recovery branches.
+
+| Code | Trigger |
+| --- | --- |
+| `E_LEGACY_FRONTMATTER_REMOVED` | Source starts YAML frontmatter with `---` |
+| `E_LEGACY_FENCED_BLOCK_REMOVED` | Source contains a legacy `:::` block |
+| `E_LEGACY_TEMPLATE_REMOVED` | Source contains `:::template`, `:::use`, or legacy template parameters |
+| `E_LEGACY_COLUMN_LAYOUT_REMOVED` | Source contains `:::col`, `:::col-2`, `:::col-N`, or column layout syntax |
+
+## IDE Contract
+
+The language service works over program declarations, not Markdown blocks. It
+must use declaration IDs, field paths, doc comment IDs, procedure step IDs, and
+agent run IDs for outline, hover, completion, diagnostics, source ranges, and
+patch targets. Legacy block snippets must not be offered.

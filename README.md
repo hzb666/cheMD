@@ -15,21 +15,21 @@
 
 [简体中文](./README.zh-CN.md) | [English](./README.md)
 
-`chemd` is a Markdown-based chemistry document system for writing, validating,
-rendering, and operationalizing experiment records. Researchers keep the
-readable narrative of an experiment, while the compiler extracts entities,
-references, procedure logic, observations, evidence links, and knowledge-graph
-relations for retrieval, training, and downstream reasoning. The workspace
-combines a typed Chemd language, TypeScript compiler packages, a browser
+`chemd` is moving to a program-first chemistry language for writing,
+validating, rendering, and operationalizing experiment records. One `.chemd`
+file is one module: declarations hold the semantic truth, while Markdown is
+kept as documentation and RAG narrative through explicit doc comments. The
+workspace combines the Chemd language, TypeScript compiler packages, a browser
 playground, a Tauri desktop IDE, and local chemistry services.
 
 ## Product Scope
 
-- Code-like Chemd authoring with frontmatter, Markdown-style prose, inline chemistry,
-  references, molecules, reactions, results, analyses, samples, procedures,
-  observations, templates, and column layouts.
-- `.chemd` source files for product-facing authoring, with legacy `.chemd.md`
-  compatibility for existing workspaces.
+- Program-first Chemd authoring with modules, meta declarations, imports,
+  doc comments, molecules, reactions, results, analyses, samples, procedures,
+  observations, traces, and agent audit declarations.
+- `.chemd` source files for product-facing authoring. Legacy frontmatter,
+  `:::` structured blocks, `template/use`, column layout syntax, and
+  `.chemd.md` compatibility are being removed by the program-v1 rewrite.
 - Experiment-logic enrichment that connects raw records to typed entities,
   resolved references, procedure steps, observations, field evidence,
   normalization facts, and knowledge-graph edges.
@@ -85,13 +85,13 @@ chemd/
 |   |-- agent-tools/         # Agent run, evidence, patch, and audit primitives
 |   |-- language-service/    # Editor diagnostics, outline, completion, hover, Graph/RAG DTOs
 |   |-- lnf/                 # Canonical LNF builder
-|   |-- parser/              # Frontmatter, blocks, inline tokens, references
+|   |-- parser/              # Program grammar, doc comments, values, references
 |   |-- reaction-map/        # Reaction graph layout and intelligence contracts
 |   |-- render-profile/      # Render profiles and override validation
 |   |-- renderer-docx/       # DOCX bridge renderer
 |   |-- renderer-html/       # HTML preview renderer
 |   |-- renderer-json/       # JSON renderer
-|   |-- resolver/            # Reference resolution and template expansion
+|   |-- resolver/            # Program symbol tables and reference resolution
 |   |-- runtime-lab/         # Runtime plan and preflight model
 |   |-- runtime-trace/       # Runtime trace events and replay helpers
 |   |-- step-ontology/       # Procedure, observation, analysis lowering
@@ -202,8 +202,8 @@ poetry run python -m unittest discover
 The package CLI is available through the root `chemd` script:
 
 ```bash
-pnpm chemd validate packages/compiler/fixtures/golden-experiment-record.chemd
-pnpm chemd export packages/compiler/fixtures/golden-experiment-record.chemd --format training-full
+pnpm chemd validate file.chemd
+pnpm chemd export file.chemd --format training-full
 pnpm chemd diff before.chemd after.chemd --format json
 pnpm chemd graph reports/*.chemd --format json
 pnpm chemd repair draft.chemd --format text
@@ -231,112 +231,94 @@ and keeps semantic similarity distinct from RDKit/Tanimoto similarity.
 
 ## Document Language
 
-Chemd documents use Markdown-compatible text with structured chemistry blocks.
-The primary file extension is `.chemd`; existing `.chemd.md` files remain
-supported by the compiler, workspace index, and desktop IDE.
+Chemd program-v1 is a program-first language. One `.chemd` file is one module,
+and declarations are the only semantic source of truth. Markdown remains
+available only through explicit documentation comments and `/*md */` regions;
+it is renderable and retrievable narrative, not a source of experiment facts.
 
-Required frontmatter:
+Legacy YAML frontmatter, `:::` structured blocks, `template/use`, column
+layout syntax, and `.chemd.md` compatibility are removed from the program-v1
+compiler path.
 
-- `id`
-- `title`
-- `date`
-
-Supported metadata includes render profile selection, render overrides, tags,
-and primary aliases for reaction, result, product, sample, molecule, and
-analysis entities.
-
-Inline syntax:
+Program syntax:
 
 | Syntax | Meaning |
 | --- | --- |
-| `:chem[H2O]` | Inline chemistry token |
-| `` `inline code` `` | Inline code token |
-| `[label](https://example.com)` | Markdown link token with safety metadata |
-| `@rxn-main` | Entity reference |
-| `@res-main.yield` | Entity field reference |
-| `@meta.title` | Metadata reference |
-| `@result.yield` | Primary alias field reference |
-| `@param.amount` | Template parameter reference |
-
-Structured blocks:
-
-| Block | Role |
-| --- | --- |
-| `:::chemd` | Molecule or reaction block; `kind` can be explicit or compiler-inferred from stable reaction fields |
-| `:::result` | Outcome status, yield, conversion, selectivity, purity, notes |
-| `:::analysis` | Analysis records and TLC-style lane data |
-| `:::sample` | Sample metadata and lineage references |
-| `:::procedure` | Procedure text or explicit steps |
-| `:::observation` | Observation text or explicit events |
-| `:::template` | Reusable document template |
-| `:::use` | Template invocation |
-| `:::col-N` | Column layout block |
+| `module exp_demo` | File-level module scope |
+| `meta { ... }` | Required metadata declaration |
+| `import shared as s from "./shared.chemd"` | External program symbols |
+| `molecule mol_a { ... }` | Semantic molecule declaration |
+| `reaction rxn_main { ... }` | Semantic reaction declaration |
+| `result res_main for @rxn_main { ... }` | Result bound to a reaction |
+| `procedure proc_main for @rxn_main { ... }` | Declaration-native procedure steps |
+| `agent run repair_001 { ... }` | Source-level agent audit record |
+| `/// ...` and `/*md ... */` | Markdown documentation comments |
 
 Example:
 
-```md
----
-id: exp-demo
-title: Ethanol oxidation
-date: 2026-04-17
-render_profile: publication-acs
-primary_reaction: rxn-main
-primary_result: res-main
-tags:
-  - demo
-  - oxidation
----
+```chemd
+module exp_demo
 
-:::chemd #rxn-main
-kind: reaction
-reactants: CCO | O=O
-products: CC(=O)O
-conditions: THF | -78 C | 30 min | nitrogen
-:::
+meta {
+  id: "exp-demo"
+  title: "Ethanol oxidation"
+  date: 2026-04-17
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
 
-:::procedure #proc-main
-step: cool | id=cool-main | target_temperature=-78 C
-step: add | id=add-oxidant | dependsOn=cool-main
-:::
+/*md
+# Ethanol oxidation
 
-:::analysis #ana-tlc
-type: tlc
-ref: rxn-main
-result: partial_conversion
-data: TLC shows starting material remains
-:::
+This section is documentation. It can be rendered and retrieved, but it does
+not create molecule, reaction, result, procedure, or agent facts.
+*/
 
-:::result #res-main
-ref: rxn-main
-status: partial
-yield: 23%
-purity: 91%
-:::
+molecule mol_ethanol {
+  name: "ethanol"
+  smiles: "CCO"
+  role: substrate
+}
 
-Yield: @res-main.yield
+reaction rxn_main {
+  reactants: [@mol_ethanol]
+  products: ["CC(=O)O"]
+  solvent: "THF"
+  temperature: -78 C
+  atmosphere: nitrogen
+}
+
+result res_main for @rxn_main {
+  status: success
+  yield: 72%
+}
+
+procedure proc_main for @rxn_main {
+  step charge = charge(inputs: [@mol_ethanol], purpose: "assemble reaction")
+  step cool = cool(temperature: -78 C, depends_on: [charge])
+}
 ```
 
-More authoring references:
+Program-first contracts:
 
-- `docs/chemd-syntax-best-practices.zh-CN.md`
-- `packages/compiler/fixtures/best-practice-total-synthesis.chemd`
-- `packages/compiler/fixtures/best-practice-one-step-synthesis.chemd`
-- `packages/compiler/fixtures/best-practice-condition-screen.chemd`
+- `/en/docs/program-v1/language`
+- `/en/docs/program-v1/ast`
+- `/en/docs/program-v1/exports`
 
 ## Common Workflows
 
 Create or open a Chemd record:
 
 ```bash
-pnpm chemd validate packages/compiler/fixtures/golden-experiment-record.chemd
+pnpm chemd validate file.chemd
 ```
 
 Export compiler data for applications and model pipelines:
 
 ```bash
-pnpm chemd export packages/compiler/fixtures/golden-experiment-record.chemd --format json
-pnpm chemd export packages/compiler/fixtures/golden-experiment-record.chemd --format rag
-pnpm chemd export packages/compiler/fixtures/golden-experiment-record.chemd --format training
+pnpm chemd export file.chemd --format json
+pnpm chemd export file.chemd --format rag
+pnpm chemd export file.chemd --format training
 ```
 
 Inspect a workspace-level reaction graph:
@@ -357,15 +339,15 @@ pnpm chemd agent-loop draft.chemd --write --max-iterations 3
 `@chemd/compiler` exposes `compileChemd(source, options)`.
 
 ```text
-source markdown
-  -> parseChemd()
-  -> resolveChemd()
-  -> typecheckDocument()
+source program
+  -> parseChemdProgram()
+  -> resolveProgram()
+  -> typecheckProgram()
   -> resolveRenderProfileWithDiagnostics()
   -> buildRunPlan()
   -> preflightRun()
   -> buildCanonicalLnf()
-  -> exportTrainingRecordFromDocument()
+  -> exportTrainingRecordFromProgram()
   -> buildRagExportFromTrainingRecord()
   -> buildTrainingUnderstandingFromRecord()
   -> renderHtml()
@@ -373,7 +355,7 @@ source markdown
   -> renderDocxBridge()
 ```
 
-Compile output includes diagnostics, resolved document data, typed semantic
+Compile output includes diagnostics, resolved program data, typed semantic
 graph, lowered step graph, runtime plan, preflight results, LNF, HTML, JSON,
 DOCX bridge Markdown, RAG export, training understanding export, and full audit
 export.
@@ -388,9 +370,9 @@ Data export responsibilities:
 | Full audit export | Inspection, debugging, and traceability |
 
 Graph-index output is intentionally inference-driven. Authors write the
-strong experimental facts that belong in a report, such as `reactants`,
-`products`, `result.ref`, `analysis.ref`, `sample.derived_from`, `route`,
-`prev`, and `condition-varies`. The exporter derives the graph and clustering
+strong experimental facts that belong in declarations, such as `reactants`,
+`products`, result targets, analysis targets, sample lineage, route edges,
+and condition screens. The exporter derives the graph and clustering
 projection from those facts, so authors can keep reports focused on experiment
 evidence.
 Repo-level graph indexes are built after compiling one or more documents into
@@ -428,7 +410,7 @@ commands.
 Desktop features:
 
 - Open local folders and browse Chemd documents alongside related assets.
-- Edit `.chemd` and `.chemd.md` files in Monaco with diagnostics, outline,
+- Edit `.chemd` program files in Monaco with diagnostics, outline,
   hover, completion, source ranges, and quick-fix proposals from
   `@chemd/language-service`.
 - Use tabs, breadcrumbs, status bar metadata, autosave, `Ctrl+S`/`Cmd+S`, and
@@ -492,8 +474,8 @@ Chemistry service routes:
 | `@chemd/cli` | CLI validation, graph export, repair loop, semantic diff, and agent-loop integration |
 | `@chemd/agent-tools` | Agent runs, cited evidence, patch decisions, and audit timelines |
 | `@chemd/core` | Shared AST, diagnostics, render overrides, chemistry primitives |
-| `@chemd/parser` | Frontmatter, Markdown, inline token, block, reference parsing |
-| `@chemd/resolver` | References, aliases, template expansion, semantic cleanup |
+| `@chemd/parser` | Program grammar, doc comments, values, references |
+| `@chemd/resolver` | Program symbol tables, imports, references, semantic cleanup |
 | `@chemd/diagnostics` | Diagnostic model, bands, quick-fix metadata |
 | `@chemd/typechecker` | Typed semantic graph and value diagnostics |
 | `@chemd/step-ontology` | Procedure, observation, analysis lowering |
@@ -579,8 +561,8 @@ and TLS termination belong at the reverse proxy in front of the web service.
 
 ## Runtime Notes
 
-- `.chemd` is the primary authoring extension. `.chemd.md` remains accepted for
-  older workspaces and aliases.
+- `.chemd` is the program-first authoring extension. `.chemd.md` compatibility
+  is being removed from the core compiler, workspace index, and desktop IDE.
 - RDKit-backed rendering requires the Python runtime to import RDKit
   successfully.
 - OCR defaults to placeholder providers; production OCR requires provider URLs

@@ -1,0 +1,18 @@
+---
+title: Program v1 Rewrite
+description: program-first Chemd 语言的 breaking-change contract。
+---
+
+Chemd program v1 会把 Chemd 从 Markdown-first 文档格式重写为
+program-first 实验语言。一个 `.chemd` 文件就是一个 module。Program
+declarations 是语义事实来源。Markdown 只在 `///` doc comments 或
+`/*md */` 区域中作为文档存在。
+
+本节是 rewrite 的 Phase 0 contract。运行时代码会在后续阶段迁移，但新的
+实现工作应对齐这些契约。
+
+## 阅读路径
+
+1. [语言规格](/zh/docs/program-v1/language)
+2. [Program AST Contract](/zh/docs/program-v1/ast)
+3. [导出与存储契约](/zh/docs/program-v1/exports)

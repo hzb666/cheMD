@@ -1,0 +1,18 @@
+---
+title: Program v1 Rewrite
+description: Breaking-change contract for the program-first Chemd language.
+---
+
+Chemd program v1 rewrites Chemd from a Markdown-first document format into a
+program-first experiment language. One `.chemd` file is one module. Program
+declarations are the semantic source of truth. Markdown is documentation only
+when it appears in `///` doc comments or `/*md */` regions.
+
+This section is the Phase 0 contract for the rewrite. Runtime packages still
+migrate in later phases, but new work should align to these contracts.
+
+## Reading Path
+
+1. [Language Specification](/en/docs/program-v1/language)
+2. [Program AST Contract](/en/docs/program-v1/ast)
+3. [Export and Storage Contract](/en/docs/program-v1/exports)

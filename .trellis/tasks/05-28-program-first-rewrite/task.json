@@ -1,0 +1,28 @@
+{
+  "id": "program-first-rewrite",
+  "name": "program-first-rewrite",
+  "title": "Chemd program-first rewrite",
+  "description": "Parent Trellis loop for rewriting Chemd from Markdown-first structured blocks to program-first language, including core AST, parser, compiler, renderers, exports, storage, language service, Desktop IDE, docs, and tests.",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "compiler",
+  "priority": "P0",
+  "creator": "hzb666",
+  "assignee": "hzb666",
+  "createdAt": "2026-05-28",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "develop",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "05-28-program-first-phase-0-spec"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
