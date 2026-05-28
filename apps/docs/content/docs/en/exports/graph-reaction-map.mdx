@@ -253,10 +253,13 @@ contains RDKit path fingerprint `1024` bits plus Morgan radius-2 fingerprint
 `1024` bits; the final vector has `8192` dimensions. RDKit pair similarity still
 uses Tanimoto inside each block, then combines the blocks as `0.20` reactant,
 `0.20` product, `0.30` gained, and `0.30` lost. The RDKit contribution uses
-hybrid weight `0.30`, RXNFP cosine uses `0.25`, reaction center support uses
-`0.25`, and Chemd semantic context uses `0.20`. Missing provider components are
-ignored and the available weights are renormalized. A reaction center conflict
-with low RDKit support is reported as
+base hybrid weight `0.30`, RXNFP cosine uses `0.25`, reaction center support
+uses `0.25`, and Chemd semantic context uses `0.20`. When RDKit is available,
+missing component weights are assigned to RDKit instead of being discarded. For
+example, if RXNFP and reaction-center evidence are missing, RDKit carries
+`0.80` and semantic context keeps `0.20`. If RDKit is unavailable, the remaining
+available weights are renormalized without fabricating RDKit evidence. A
+reaction center conflict with low RDKit support is reported as
 `strict_cluster_hard_reject:reaction_center_conflict_low_rdkit`; later cluster
 builders must not promote that edge into a strict reaction cluster.
 

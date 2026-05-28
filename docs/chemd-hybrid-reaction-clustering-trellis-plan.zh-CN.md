@@ -168,7 +168,7 @@ if only procedure / condition matches:
 
 - hybrid edge 输出总分、basis、provider ids、warnings。
 - contribution-level evidence 可见。
-- missing computed support 不会静默当作 0；可用权重归一化。
+- missing computed support 不会静默当作 0；RDKit 可用时，缺失 component 的权重全部回补给 RDKit。只有 RDKit 不可用时，才对剩余可用权重归一化。
 - semantic-only support 仍标记为 semantic warning。
 
 验证：

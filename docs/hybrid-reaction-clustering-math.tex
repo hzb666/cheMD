@@ -197,7 +197,7 @@ S_{ij}
 
 \section{混合相似度}
 
-混合相似度 \(H_{ij}\) 是可用证据的归一化加权平均。不可用值 \(\varnothing\) 不按 \(0\) 处理，而是从分子和分母中同时移除。这样可以避免因为某个证据源暂时缺失而系统性压低反应对的相似度。
+混合相似度 \(H_{ij}\) 使用带 RDKit 回补的加权策略。不可用值 \(\varnothing\) 不按 \(0\) 处理；当 RDKit 指纹相似度可用时，缺失证据的设计权重全部回补给 RDKit。这样可以让本地、确定性的 RDKit 指纹成为模型或 mapper 缺失时的主锚点，而不是让缺失的 RXNFP 或 reaction-center provider 扭曲总分。只有当 RDKit 不可用时，才退回到可用证据的归一化加权平均。
 
 定义可用性指示函数：
 
@@ -221,7 +221,42 @@ w_S &= 0.20.
 \end{aligned}
 \end{equation}
 
-混合相似度写为：
+设可用证据集合为
+
+\begin{equation}
+\mathcal A_{ij}
+=
+\{Q\in\{R,X,C,S\}\mid Q_{ij}\neq\varnothing\}.
+\end{equation}
+
+若 \(R_{ij}\neq\varnothing\)，有效权重定义为：
+
+\begin{equation}
+\begin{aligned}
+\alpha_R
+&=
+w_R
++ w_X(1-\delta_X)
++ w_C(1-\delta_C)
++ w_S(1-\delta_S), \\
+\alpha_X &= w_X\delta_X,\quad
+\alpha_C = w_C\delta_C,\quad
+\alpha_S = w_S\delta_S.
+\end{aligned}
+\end{equation}
+
+此时混合相似度写为：
+
+\begin{equation}
+H_{ij}
+=
+\alpha_R R_{ij}
++ \alpha_X X_{ij}
++ \alpha_C C_{ij}
++ \alpha_S S_{ij}.
+\end{equation}
+
+若 \(R_{ij}=\varnothing\)，则不能凭空制造 RDKit 证据，退回到可用项归一化：
 
 \begin{equation}
 \begin{aligned}

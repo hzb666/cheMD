@@ -250,10 +250,12 @@ product-gained 和 reactant-lost blocks 构成的 sparse directional vector。�
 包含 RDKit path fingerprint `1024` bits 与 Morgan radius-2 fingerprint `1024`
 bits；最终 vector 是 `8192` 维。RDKit pair similarity 仍然在每个 block 内使用
 Tanimoto，然后按 `0.20` reactant、`0.20` product、`0.30` gained、`0.30` lost
-合成。RDKit contribution 在 hybrid 中权重为 `0.30`，RXNFP cosine 为 `0.25`，
-reaction center support 为 `0.25`，Chemd semantic context 为 `0.20`。缺失的 provider
-component 不会按 0 分处理，而是只对可用权重重新归一化。reaction center 冲突且
-RDKit support 低时会报告
+合成。RDKit contribution 在 hybrid 中基础权重为 `0.30`，RXNFP cosine 为
+`0.25`，reaction center support 为 `0.25`，Chemd semantic context 为 `0.20`。
+当 RDKit 可用时，缺失 component 的权重会全部回补给 RDKit，而不是丢弃。比如
+RXNFP 和 reaction-center evidence 缺失时，RDKit 使用 `0.80`，semantic context
+保留 `0.20`。如果 RDKit 不可用，才对剩余可用权重重新归一化，且不会伪造 RDKit
+evidence。reaction center 冲突且 RDKit support 低时会报告
 `strict_cluster_hard_reject:reaction_center_conflict_low_rdkit`；后续 cluster builder
 不能把这类 edge 提升为 strict reaction cluster。
 

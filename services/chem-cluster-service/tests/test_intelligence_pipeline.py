@@ -96,8 +96,8 @@ class ReactionIntelligencePipelineTests(unittest.TestCase):
                 "cluster_id": "strict-reaction-cluster::rxn-a::rxn-b",
                 "reaction_entity_ids": ["rxn-a", "rxn-b"],
                 "representative_reaction_entity_id": "rxn-a",
-                "mean_score": 0.84,
-                "min_edge_score": 0.84,
+                "mean_score": 0.82,
+                "min_edge_score": 0.82,
                 "basis_summary": [
                     "hybrid_consensus",
                     "rdkit_fingerprint_tanimoto",

@@ -95,13 +95,13 @@ class HybridSimilarityTests(unittest.TestCase):
         )
         self.assertEqual(validate_artifact(artifact(edges)), [])
 
-    def test_renormalizes_weights_when_provider_components_are_missing(self):
+    def test_assigns_missing_provider_weights_to_rdkit_when_available(self):
         edges = build_hybrid_similarity_edges(
             [semantic_edge("rxn-a", "rxn-b", 0.9, ["same_reaction_family"])],
             [computed_edge("rxn-a", "rxn-b", 0.6, "rdkit_fingerprint_tanimoto")],
         )
 
-        self.assertEqual(edges[0]["score"], 0.72)
+        self.assertEqual(edges[0]["score"], 0.66)
         self.assertEqual(edges[0]["confidence"], "medium")
         self.assertEqual(
             edges[0]["contributions"],
@@ -115,7 +115,7 @@ class HybridSimilarityTests(unittest.TestCase):
                 {
                     "component": "rdkit",
                     "score": 0.6,
-                    "weight": 0.3,
+                    "weight": 0.8,
                     "basis": ["rdkit_fingerprint_tanimoto"],
                 },
             ],
@@ -212,7 +212,7 @@ class HybridSimilarityTests(unittest.TestCase):
             ],
         )
 
-        self.assertEqual(edges[0]["score"], 0.218182)
+        self.assertEqual(edges[0]["score"], 0.3)
         self.assertEqual(
             edges[0]["basis"],
             ["rdkit_fingerprint_tanimoto", "conflicting_reaction_center", "hybrid_consensus"],

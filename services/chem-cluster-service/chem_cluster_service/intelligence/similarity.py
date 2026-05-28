@@ -158,13 +158,28 @@ def _to_edge(aggregate: _PairAggregate, provider_id: str) -> ComputedSimilarityE
 
 
 def _weighted_score(scores: Mapping[str, float]) -> float:
-    weight_total = sum(COMPONENT_WEIGHTS[item] for item in scores if item in COMPONENT_WEIGHTS)
-    if weight_total == 0:
+    weights = _effective_weights(scores)
+    if not weights:
         return 0.0
-    weighted = sum(
-        scores[item] * COMPONENT_WEIGHTS[item] for item in scores if item in COMPONENT_WEIGHTS
-    )
-    return round(weighted / weight_total, 6)
+    return round(sum(scores[item] * weight for item, weight in weights.items()), 6)
+
+
+def _effective_weights(scores: Mapping[str, float]) -> dict[str, float]:
+    available = [item for item in COMPONENT_WEIGHTS if item in scores]
+    if not available:
+        return {}
+    if "rdkit" in scores:
+        weights = {item: COMPONENT_WEIGHTS[item] for item in available}
+        missing_weight = sum(
+            weight for item, weight in COMPONENT_WEIGHTS.items() if item not in scores
+        )
+        weights["rdkit"] += missing_weight
+        return weights
+
+    weight_total = sum(COMPONENT_WEIGHTS[item] for item in available)
+    if weight_total == 0:
+        return {}
+    return {item: COMPONENT_WEIGHTS[item] / weight_total for item in available}
 
 
 def _is_hard_reject(aggregate: _PairAggregate) -> bool:
@@ -176,11 +191,12 @@ def _is_hard_reject(aggregate: _PairAggregate) -> bool:
 
 
 def _contributions(aggregate: _PairAggregate) -> list[dict[str, object]]:
+    weights = _effective_weights(aggregate.scores)
     return [
         {
             "component": component,
             "score": round(aggregate.scores[component], 6),
-            "weight": COMPONENT_WEIGHTS[component],
+            "weight": weights[component],
             "basis": _ordered_basis(
                 {
                     basis
