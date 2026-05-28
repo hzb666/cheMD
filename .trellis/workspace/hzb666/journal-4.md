@@ -941,8 +941,8 @@ Changed RDKit reaction fingerprints from XOR change blocks to directional gained
 ## Session 163: Phase 0 program-first contract
 
 **Date**: 2026-05-28
-**Task**: Phase 0 program-first contract
-**Package**: desktop
+**Task**: Phase 0: Program-first breaking-change spec
+**Package**: core
 **Branch**: `develop`
 
 ### Summary
