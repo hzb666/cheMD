@@ -664,7 +664,15 @@ Added service job conversion from canonical reaction input, skipped-reaction war
 
 ### Main Changes
 
-(Add details)
+- Added `ProgramRenderDocument` and moved HTML/JSON/DOCX render/export paths
+  to program declarations, doc comments, procedures, traces, and agent audit
+  sections.
+- Upgraded program JSON, DOCX bridge, LNF, training export, and RAG chunks to
+  `chemd-program-json/v1`, DOCX `v1.0`, `chemd-lnf/v1.0`, and
+  `chemd-training-export/v0.3`.
+- Updated compiler/CLI integration, exporter-training projections,
+  storage/language-service Graph/RAG fallout, and `apps/docs` export docs.
+- Confirmed root `docs/` was not modified.
 
 ### Git Commits
 
@@ -675,7 +683,12 @@ Added service job conversion from canonical reaction input, skipped-reaction war
 
 ### Testing
 
-- [OK] (Add test results)
+- [OK] compiler, CLI, renderer, semantic-rendering, LNF, exporter-training,
+  storage-postgres, docs typecheck/build, and export smoke checks.
+- [OK] `git diff -- docs --name-only`
+- [OK] `git diff --check`
+- [DEFERRED] language-service and desktop legacy `:::` fixture cleanup moved
+  to Phase 6/7.
 
 ### Status
 
@@ -683,7 +696,7 @@ Added service job conversion from canonical reaction input, skipped-reaction war
 
 ### Next Steps
 
-- None - task complete
+- Continue Phase 6 for language service, Desktop IDE, storage, and web.
 
 
 ## Session 154: Hybrid clustering Trellis plan document
@@ -699,7 +712,17 @@ Recorded the remaining hybrid reaction clustering Trellis plan in docs/chemd-hyb
 
 ### Main Changes
 
-(Add details)
+- Added program declaration/source-range helpers for language-service outline,
+  symbols, completion, hover, definition, semantic tokens, workspace references,
+  diagnostics, and Graph/RAG records.
+- Updated Desktop IDE semantic preview, knowledge map, reaction intelligence,
+  workspace index, persistence tests, and bundled `.chemd` samples to
+  program-first compile output.
+- Migrated storage-postgres and web/playground JSON/DOCX/Postgres training
+  export paths to training export v0.3 and program declaration/doc contracts.
+- Updated web Next 16 build config so `pnpm --filter @chemd/web build` uses
+  the existing webpack config explicitly.
+- Confirmed root `docs/` was not modified.
 
 ### Git Commits
 
@@ -709,7 +732,23 @@ Recorded the remaining hybrid reaction clustering Trellis plan in docs/chemd-hyb
 
 ### Testing
 
-- [OK] (Add test results)
+- [OK] `pnpm --filter @chemd/language-service test`
+- [OK] `pnpm --filter @chemd/language-service typecheck`
+- [OK] `pnpm --filter @chemd/desktop test`
+- [OK] `pnpm --filter @chemd/desktop typecheck`
+- [OK] `pnpm --filter @chemd/storage-postgres test`
+- [OK] `pnpm --filter @chemd/storage-postgres typecheck`
+- [OK] `pnpm --filter @chemd/web test`
+- [OK] `pnpm --filter @chemd/web typecheck`
+- [OK] `pnpm --filter @chemd/web build`
+- [OK] `pnpm --filter @chemd/compiler test`
+- [OK] `pnpm --filter @chemd/compiler typecheck`
+- [OK] `pnpm --filter @chemd/cli test`
+- [OK] `pnpm --filter @chemd/cli typecheck`
+- [OK] `pnpm --filter @chemd/docs typecheck`
+- [OK] `pnpm --filter @chemd/docs build`
+- [OK] `git diff -- docs --name-only`
+- [OK] `git diff --check`
 
 ### Status
 
@@ -717,7 +756,8 @@ Recorded the remaining hybrid reaction clustering Trellis plan in docs/chemd-hyb
 
 ### Next Steps
 
-- None - task complete
+- Continue Phase 7 full cleanup: delete legacy parser/files/tests and remove
+  remaining `:::` dependencies.
 
 
 ## Session 155: Hybrid reaction similarity scoring
@@ -1243,6 +1283,40 @@ Replaced program-native renderer/export contracts, LNF v1.0, training export v0.
 | Hash | Message |
 |------|---------|
 | `b165692` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 169: Phase 6 IDE storage language-service migration
+
+**Date**: 2026-05-29
+**Task**: Phase 6 IDE storage language-service migration
+**Package**: desktop
+**Branch**: `develop`
+
+### Summary
+
+Migrated language-service, Desktop IDE, storage, and web/playground surfaces to program declarations, source ranges, training export v0.3, and program JSON contracts.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8a5637a` | (see git log) |
 
 ### Testing
 
