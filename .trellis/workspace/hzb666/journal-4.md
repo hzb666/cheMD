@@ -594,7 +594,15 @@ Marked the phase one Trellis task completed and linked it to the implementation 
 
 ### Main Changes
 
-(Add details)
+- Added `ProgramRenderDocument` and routed HTML/JSON/DOCX exports through
+  program-native declarations, documentation blocks, procedures, traces, and
+  agent audit sections.
+- Upgraded JSON export, DOCX bridge, LNF, training export, and RAG chunk
+  contracts to `chemd-program-json/v1`, DOCX `v1.0`, `chemd-lnf/v1.0`, and
+  `chemd-training-export/v0.3`.
+- Updated compiler/CLI integration, exporter-training projections,
+  storage/language-service Graph/RAG fallout, and `apps/docs` export docs.
+- Confirmed root `docs/` was not modified.
 
 ### Git Commits
 
@@ -604,7 +612,35 @@ Marked the phase one Trellis task completed and linked it to the implementation 
 
 ### Testing
 
-- [OK] (Add test results)
+- [OK] `pnpm --filter @chemd/compiler test`
+- [OK] `pnpm --filter @chemd/compiler typecheck`
+- [OK] `pnpm --filter @chemd/cli test`
+- [OK] `pnpm --filter @chemd/cli typecheck`
+- [OK] `pnpm --filter @chemd/semantic-rendering test`
+- [OK] `pnpm --filter @chemd/semantic-rendering typecheck`
+- [OK] `pnpm --filter @chemd/renderer-html test`
+- [OK] `pnpm --filter @chemd/renderer-html typecheck`
+- [OK] `pnpm --filter @chemd/renderer-json test`
+- [OK] `pnpm --filter @chemd/renderer-json typecheck`
+- [OK] `pnpm --filter @chemd/renderer-docx test`
+- [OK] `pnpm --filter @chemd/renderer-docx typecheck`
+- [OK] `pnpm --filter @chemd/lnf test`
+- [OK] `pnpm --filter @chemd/lnf typecheck`
+- [OK] `pnpm --filter @chemd/exporter-training test`
+  (legacy exporter fixture suites intentionally skipped)
+- [OK] `pnpm --filter @chemd/exporter-training typecheck`
+- [OK] `pnpm --filter @chemd/storage-postgres test`
+- [OK] `pnpm --filter @chemd/storage-postgres typecheck`
+- [OK] `pnpm --filter @chemd/language-service typecheck`
+- [OK] `pnpm --filter @chemd/desktop typecheck`
+- [OK] `pnpm --filter @chemd/docs typecheck`
+- [OK] `pnpm --filter @chemd/docs build`
+- [OK] CLI export smoke for JSON, LNF, training export, and RAG
+- [OK] `git diff -- docs --name-only`
+- [OK] `git diff --check`
+- [DEFERRED] `pnpm --filter @chemd/language-service test` and
+  `pnpm --filter @chemd/desktop test` still use old `:::` editor/workspace
+  fixtures and move to Phase 6.
 
 ### Status
 
@@ -612,7 +648,7 @@ Marked the phase one Trellis task completed and linked it to the implementation 
 
 ### Next Steps
 
-- None - task complete
+- Start Phase 6 for language service, Desktop IDE, and storage/UI fixtures.
 
 
 ## Session 153: Hybrid reaction evidence contract
@@ -1173,6 +1209,40 @@ Replaced compiler and CLI integration with program-first parse/resolve/typecheck
 | Hash | Message |
 |------|---------|
 | `331adbe` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 168: Phase 5 renderer and export replacement
+
+**Date**: 2026-05-29
+**Task**: Phase 5 renderer and export replacement
+**Package**: compiler
+**Branch**: `develop`
+
+### Summary
+
+Replaced program-native renderer/export contracts, LNF v1.0, training export v0.3, RAG chunk typing, apps/docs export pages, and downstream Graph/RAG fallout.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b165692` | (see git log) |
 
 ### Testing
 
