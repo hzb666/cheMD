@@ -1363,3 +1363,37 @@ Completed the final program-first cleanup: removed legacy fenced-block parser an
 ### Next Steps
 
 - None - task complete
+
+
+## Session 171: Docs comparison against program rewrite plan
+
+**Date**: 2026-05-29
+**Task**: Docs comparison against program rewrite plan
+**Package**: compiler
+**Branch**: `develop`
+
+### Summary
+
+Compared the implementation plan against apps/docs, fixed remaining program-v1 documentation drift, added the missing ZH agent run example, clarified removed legacy syntax, and verified docs typecheck/build plus docs coverage.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5560a42` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
