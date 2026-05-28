@@ -1,7 +1,8 @@
 import type {
   AnalysisNode,
   ArtifactNode,
-  ChemdDocument,
+  ChemdProgramDeclarationKind,
+  ChemdProgramDocument,
   ChemdNode,
   ConditionVariesNode,
   ExternalReferenceTarget,
@@ -90,10 +91,19 @@ export type ReferenceOrLiteral = ReferenceType | { kind: "literal"; raw: string 
 export interface TypedNodeBase {
   nodeId: string;
   kind: string;
-  sourceNodeType: ChemdNode["type"];
+  sourceMetadata?: ProgramSourceMetadata;
+  sourceNodeType: ChemdNode["type"] | ChemdProgramDeclarationKind;
   syntaxOrigin?: string;
   declaredKind?: string;
   diagnostics?: V03Diagnostic[];
+}
+
+export interface ProgramSourceMetadata {
+  sourceKind: "declaration" | "procedure_step" | "agent_run" | "doc_comment";
+  declarationKind?: ChemdProgramDeclarationKind;
+  declarationId?: string;
+  field?: string;
+  sourceSpan?: SourceSpan;
 }
 
 export interface TypedMoleculeNode extends TypedNodeBase {
@@ -291,6 +301,26 @@ export interface TypedConditionVariesNode extends TypedNodeBase {
   notes?: string;
 }
 
+export interface TypedConditionScreenNode extends TypedNodeBase {
+  kind: "condition_screen";
+  reaction?: ReferenceOrLiteral;
+  standard?: ReferenceOrLiteral;
+  factors?: string[];
+  outcomes?: string[];
+  notes?: string;
+}
+
+export interface TypedAgentRunNode extends TypedNodeBase {
+  kind: "agent_run";
+  goal: string;
+  status: string;
+  targetFiles: string[];
+  toolCalls: Array<{ id: string; name: string; status: string }>;
+  patches: Array<{ id: string; status: string; editCount: number }>;
+  decisions: Array<{ id: string; decision: string; patchId?: string }>;
+  evidence: string[];
+}
+
 export type TypedSemanticNode =
   | TypedMoleculeNode
   | TypedMaterialNode
@@ -305,7 +335,9 @@ export type TypedSemanticNode =
   | TypedObservationEventNode
   | TypedSampleNode
   | TypedArtifactNode
-  | TypedConditionVariesNode;
+  | TypedConditionVariesNode
+  | TypedConditionScreenNode
+  | TypedAgentRunNode;
 
 export interface TypedSemanticGraph {
   documentId: string;
@@ -315,7 +347,8 @@ export interface TypedSemanticGraph {
 }
 
 export interface TypecheckResult {
-  document: ChemdDocument;
+  program: ChemdProgramDocument;
+  document: ChemdProgramDocument;
   typedGraph: TypedSemanticGraph;
   stepGraph: StepGraph;
   diagnostics: V03Diagnostic[];

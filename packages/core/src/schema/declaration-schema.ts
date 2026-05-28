@@ -114,6 +114,8 @@ export const DECLARATION_SCHEMAS: readonly DeclarationSchema[] = [
     kind: "reaction",
     fields: [
       field("name", { value: stringValue }),
+      field("route", { value: stringValue }),
+      field("prev", { list: true, value: listValue(refOrLiteralValue("reaction")) }),
       field("reactants", { list: true, value: listValue(participantValue) }),
       field("products", { list: true, value: listValue(participantValue) }),
       field("reagents", { value: textValue }),

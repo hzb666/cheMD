@@ -1,4 +1,6 @@
 import type {
+  AgentAuditEventDeclaration,
+  AgentAuditEventKind,
   AgentEvidenceDeclaration,
   AgentPatchDecision,
   AgentPatchDecisionDeclaration,
@@ -19,6 +21,7 @@ import type { ProgramParserContext, ProgramParserCursor } from "./parser";
 import { tokenValue } from "./parser";
 import {
   AGENT_STATUSES,
+  AUDIT_EVENTS,
   createEvidence,
   DECISIONS,
   parsePatchTarget,
@@ -114,6 +117,8 @@ const parseAgentEntry = (
     state.patches.push(parsePatchProposal(cursor, context, runId, docs));
   } else if (key === "decision") {
     state.decisions.push(parseDecision(cursor, context, runId, docs));
+  } else if (key === "timeline") {
+    state.auditTimeline.push(parseTimelineEvent(cursor, runId));
   } else if (isAgentField(key)) {
     parseAgentField(cursor, state);
   } else {
@@ -255,6 +260,32 @@ const parseDecision = (
     ...(fields.decided_by ? { decidedBy: valueAsString(fields.decided_by) } : {}),
     ...(fields.decided_at ? { decidedAt: valueAsString(fields.decided_at) } : {}),
     sourceSpan: cursor.sourceSpanFrom(start, parsed?.endToken ?? id)
+  };
+};
+
+const parseTimelineEvent = (
+  cursor: ProgramParserCursor,
+  runId: string
+): AgentAuditEventDeclaration => {
+  const start = cursor.expectValue("timeline", "E_PROGRAM_AGENT_TIMELINE_EXPECTED");
+  const eventToken = cursor.expectIdentifier("E_PROGRAM_AGENT_TIMELINE_EVENT_EXPECTED", "timeline event");
+  const eventValue = tokenValue(eventToken) ?? "created";
+  const event = AUDIT_EVENTS.has(eventValue as AgentAuditEventKind)
+    ? eventValue as AgentAuditEventKind
+    : "created";
+  const parsed = tokenValue(cursor.peek()) === "{" ? parseFieldBlock(cursor) : undefined;
+  const fields = parsed?.fields ?? {};
+  return {
+    kind: "timeline_event",
+    id: `${runId}:${event}:${cursor.sourceSpanFrom(start, parsed?.endToken ?? eventToken).start}`,
+    event,
+    ...(fields.at ? { at: valueAsString(fields.at) } : {}),
+    ...(fields.actor ? { actor: valueAsString(fields.actor) } : {}),
+    ...(fields.summary ? { summary: valueAsString(fields.summary) } : {}),
+    ...(fields.tool ? { relatedToolCallId: valueAsString(fields.tool) } : {}),
+    ...(fields.patch ? { relatedPatchId: valueAsString(fields.patch) } : {}),
+    ...(valueAsReferenceList(fields.evidence) ? { evidence: valueAsReferenceList(fields.evidence) } : {}),
+    sourceSpan: cursor.sourceSpanFrom(start, parsed?.endToken ?? eventToken)
   };
 };
 

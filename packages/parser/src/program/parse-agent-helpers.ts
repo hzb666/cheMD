@@ -1,5 +1,6 @@
 import type {
   AgentEvidenceDeclaration,
+  AgentAuditEventKind,
   AgentPatchDecision,
   AgentPatchProposalStatus,
   AgentRunStatus,
@@ -46,6 +47,18 @@ export const DECISIONS = new Set<AgentPatchDecision>([
   "needs_changes",
   "deferred",
   "superseded"
+]);
+
+export const AUDIT_EVENTS = new Set<AgentAuditEventKind>([
+  "created",
+  "started",
+  "tool_called",
+  "evidence_recorded",
+  "patch_proposed",
+  "decision_recorded",
+  "completed",
+  "failed",
+  "cancelled"
 ]);
 
 export const parsePatchTarget = (

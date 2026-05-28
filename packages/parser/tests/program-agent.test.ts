@@ -41,6 +41,15 @@ agent run repair_001 {
   decision approved {
     rationale: "res_var1 is the selected result"
   }
+
+  timeline completed {
+    at: "2026-05-28T15:00:00Z"
+    actor: "codex"
+    summary: "finished"
+    tool: "compile_current_file"
+    patch: "proposed"
+    evidence: [@res_var1]
+  }
 }
 `);
 
@@ -105,6 +114,18 @@ agent run repair_001 {
           decision: "approved",
           rationale: "res_var1 is the selected result",
           sourceSpan: expect.objectContaining({ endLine: 37 })
+        }
+      ],
+      auditTimeline: [
+        {
+          kind: "timeline_event",
+          event: "completed",
+          at: "2026-05-28T15:00:00Z",
+          actor: "codex",
+          summary: "finished",
+          relatedToolCallId: "compile_current_file",
+          relatedPatchId: "proposed",
+          evidence: [expect.objectContaining({ target: "res_var1" })]
         }
       ]
     });
