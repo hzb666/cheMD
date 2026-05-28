@@ -1,0 +1,6 @@
+{"file": "D:\\download\\chemd-program-rewrite-implementation-plan.md", "reason": "Source implementation plan for program-first rewrite"}
+{"file": "apps/docs/content/docs/en/program-v1/ast.mdx", "reason": "Phase 0 AST contract"}
+{"file": "packages/core/src/ast.ts", "reason": "Core AST contract implementation target"}
+{"file": "packages/core/src/schema/block-schema.ts", "reason": "Legacy schema baseline and value schema reuse"}
+{"file": "packages/core/src/index.ts", "reason": "Core public exports"}
+{"file": "packages/core/tests/core.test.ts", "reason": "Core verification target"}

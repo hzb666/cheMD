@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import type { FieldValueSchema } from "../src/index";
+import type {
+  ChemdDocComment,
+  ChemdProgramDocument,
+  ChemdReferenceExpr,
+  FieldValueSchema
+} from "../src/index";
 import {
   BLOCK_SCHEMAS,
   buildReactionEntityIdFromReference,
@@ -8,13 +13,16 @@ import {
   CHEMD_KIND_VALUE_ALIASES,
   createDocument,
   createMarkdownNode,
+  DECLARATION_KINDS,
   FIELD_VALUE_SCHEMA_COARSE_FIELDS,
   getBlockFieldSchema,
   getBlockFieldListMode,
   getBlockListFieldSet,
   getCanonicalBlockFields,
+  getCanonicalDeclarationFields,
   getCompletionBlockFieldSchemas,
   getCoarseFieldValueSchema,
+  getDeclarationFieldSchema,
   getDomainFieldKind,
   getEnumFieldValues,
   getFieldValueSchema,
@@ -23,6 +31,7 @@ import {
   getRecordFieldHeadSchema,
   getRecordFieldParamSchema,
   getReferenceTargetKinds,
+  isKnownDeclarationKind,
   parseReferenceId
 } from "../src/index";
 
@@ -78,6 +87,162 @@ describe("core AST helpers", () => {
     });
     expect(buildScopedReferenceId("route-doc", "rxn-step-07")).toBe("route-doc#rxn-step-07");
     expect(buildReactionEntityIdFromReference("route-doc#rxn-step-07")).toBe("rxn::route-doc::rxn-step-07");
+  });
+});
+
+describe("program AST contracts", () => {
+  it("models a program document with module, meta, imports, docs, and declarations", () => {
+    const reference: ChemdReferenceExpr = {
+      type: "reference",
+      refKind: "local",
+      target: "rxn-001",
+      raw: "@rxn-001"
+    };
+    const document = {
+      type: "program_document",
+      schemaVersion: "chemd-program-ast/v1",
+      sourceLanguage: "chemd/program-v1",
+      module: { kind: "module", name: "route.suzuki", docs: [] },
+      meta: {
+        kind: "meta",
+        id: "route-suzuki",
+        title: "Suzuki route",
+        date: "2026-05-28",
+        fields: {},
+        primary: { reaction: reference },
+        docs: []
+      },
+      imports: [
+        {
+          kind: "import",
+          moduleName: "shared.solvents",
+          from: "./solvents.chemd",
+          docs: []
+        }
+      ],
+      declarations: [
+        {
+          kind: "reaction",
+          id: "rxn-001",
+          qualifiedId: "route.suzuki.rxn-001",
+          fields: {},
+          docs: []
+        }
+      ],
+      docs: [],
+      diagnostics: []
+    } satisfies ChemdProgramDocument;
+
+    expect(document.sourceLanguage).toBe("chemd/program-v1");
+    expect(document.declarations[0].kind).toBe("reaction");
+  });
+
+  it("keeps reference forms and doc attachment targets explicit", () => {
+    const references: ChemdReferenceExpr[] = [
+      { type: "reference", refKind: "local", target: "rxn-001", raw: "@rxn-001" },
+      {
+        type: "reference",
+        refKind: "field",
+        target: "rxn-001",
+        field: "temperature",
+        raw: "@rxn-001.temperature"
+      },
+      {
+        type: "reference",
+        refKind: "module",
+        moduleName: "shared.solvents",
+        target: "solvent.dmf",
+        raw: "@shared.solvents.solvent.dmf"
+      },
+      {
+        type: "reference",
+        refKind: "external_document",
+        externalDocumentId: "eln-42",
+        target: "sample-a",
+        field: "purity",
+        raw: "@eln-42#sample-a.purity"
+      }
+    ];
+    const docs: ChemdDocComment[] = [
+      {
+        type: "doc_comment",
+        id: "doc-step",
+        markdown: "Charge the reactor.",
+        attachment: {
+          kind: "procedure_step",
+          declarationId: "proc-001",
+          stepId: "charge"
+        },
+        references: [],
+        inlineChem: [],
+        inlineCode: [],
+        links: [],
+        exportPolicy: "render_rag"
+      },
+      {
+        type: "doc_comment",
+        id: "doc-agent",
+        markdown: "Agent reviewed the patch.",
+        attachment: {
+          kind: "agent_statement",
+          runId: "agent-001",
+          statementId: "decision-001"
+        },
+        references: [],
+        inlineChem: [],
+        inlineCode: [],
+        links: [],
+        exportPolicy: "audit_only"
+      }
+    ];
+
+    expect(references.map((item) => item.refKind)).toEqual([
+      "local",
+      "field",
+      "module",
+      "external_document"
+    ]);
+    expect(docs.map((item) => item.attachment.kind)).toEqual([
+      "procedure_step",
+      "agent_statement"
+    ]);
+  });
+
+  it("exposes declaration schema helpers for program-first declarations", () => {
+    expect(DECLARATION_KINDS).toEqual([
+      "molecule",
+      "material",
+      "batch",
+      "reaction",
+      "result",
+      "analysis",
+      "sample",
+      "artifact",
+      "condition_screen",
+      "procedure",
+      "observation",
+      "trace",
+      "agent_run"
+    ]);
+    expect(getCanonicalDeclarationFields("reaction")).toEqual(
+      expect.arrayContaining([
+        "reactants",
+        "products",
+        "temperature",
+        "time",
+        "atmosphere"
+      ])
+    );
+    expect(getDeclarationFieldSchema("result", "ref")?.name).toBe("reaction");
+    expect(getDeclarationFieldSchema("agent_run", "targetFiles")?.name).toBe(
+      "target_files"
+    );
+    expect(getDeclarationFieldSchema("agent_run", "status")?.value).toMatchObject({
+      kind: "enum",
+      values: expect.arrayContaining(["blocked", "cancelled"])
+    });
+    expect(isKnownDeclarationKind("condition_screen")).toBe(true);
+    expect(isKnownDeclarationKind("condition_varies")).toBe(false);
   });
 });
 

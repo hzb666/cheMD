@@ -19,7 +19,8 @@
   "pr_url": null,
   "subtasks": [],
   "children": [
-    "05-28-program-first-phase-0-spec"
+    "05-28-program-first-phase-0-spec",
+    "05-28-program-first-phase-1-core-ast"
   ],
   "parent": null,
   "relatedFiles": [],
