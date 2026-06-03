@@ -1,0 +1,6 @@
+{"file":"packages/language-service/src/diagnostics.ts","reason":"Maps compiler diagnostics to editor ranges and quick-fixes."}
+{"file":"packages/language-service/src/ranges.ts","reason":"SourceSpan-to-range conversion."}
+{"file":"packages/language-service/src/compile.ts","reason":"Compiler output to language-service result mapping."}
+{"file":"packages/language-service/tests/language-service.test.ts","reason":"Language-service integration coverage."}
+{"file":"packages/language-service/tests/hover-definition.test.ts","reason":"Hover diagnostics and source evidence coverage."}
+{"file":"packages/compiler/tests/language-fixture-matrix.test.ts","reason":"Compiler matrix remains green if affected."}

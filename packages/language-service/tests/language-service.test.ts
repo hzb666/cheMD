@@ -238,6 +238,38 @@ describe("compileChemdForEditor", () => {
       .toEqual(expect.any(Array));
   });
 
+  it("preserves compiler diagnostic source spans instead of widening to symbol ranges", () => {
+    const output = compileChemdForEditor({
+      source: `module exp_nested_ls
+
+meta {
+  id: "exp-nested-ls"
+  title: "Nested language service"
+  date: "2026-05-28"
+}
+
+molecule mol_a {
+  name: "A"
+}
+
+reaction rxn_nested {
+  reactants: [{material: @mol_a, mystery: 1}]
+}
+`
+    });
+
+    expect(output.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "E_PROGRAM_RECORD_FIELD_UNKNOWN",
+        sourceNodeId: "rxn_nested",
+        range: expect.objectContaining({
+          startLine: 14,
+          startColumn: 34
+        })
+      })
+    );
+  });
+
   it("keeps empty and incomplete documents inside stable editor ranges", () => {
     const emptyOutput = compileChemdForEditor({ source: "" });
     const incompleteOutput = compileChemdForEditor({

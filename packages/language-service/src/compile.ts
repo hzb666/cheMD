@@ -3,7 +3,7 @@ import {
   type CompileOptions,
   type CompileResult
 } from "@chemd/compiler";
-import { createFailedDiagnostic, mapCompilerDiagnostics } from "./diagnostics";
+import { createFailedDiagnostic, mapCompilerDiagnostic } from "./diagnostics";
 import { buildOutline, buildSymbols } from "./outline";
 import { buildChemdSemanticTokens } from "./semantic-tokens";
 import type {
@@ -19,6 +19,17 @@ export interface ChemdLanguageServiceDependencies {
 const readErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : "Unknown compiler failure";
 
+const hasMappableDiagnosticRange = (
+  diagnostic: CompileResult["diagnostics"][number]
+): boolean =>
+  Boolean(diagnostic.position)
+    || (
+      typeof diagnostic.sourceSpan?.startLine === "number"
+      && typeof diagnostic.sourceSpan.startColumn === "number"
+      && typeof diagnostic.sourceSpan.endLine === "number"
+      && typeof diagnostic.sourceSpan.endColumn === "number"
+    );
+
 export const compileChemdForEditor = (
   input: ChemdLanguageCompileInput,
   dependencies: ChemdLanguageServiceDependencies = {}
@@ -29,9 +40,10 @@ export const compileChemdForEditor = (
   try {
     const result = compile(input.source, input.options);
     const symbols = buildSymbols(result, input.source);
-    const diagnostics = mapCompilerDiagnostics(input.source, result.diagnostics)
-      .map((diagnostic) => {
-        const symbol = diagnostic.sourceNodeId
+    const diagnostics = result.diagnostics
+      .map((compilerDiagnostic) => {
+        const diagnostic = mapCompilerDiagnostic(input.source, compilerDiagnostic);
+        const symbol = !hasMappableDiagnosticRange(compilerDiagnostic) && diagnostic.sourceNodeId
           ? symbols.find((item) => item.id === diagnostic.sourceNodeId)
           : undefined;
         return symbol ? { ...diagnostic, range: symbol.range } : diagnostic;
