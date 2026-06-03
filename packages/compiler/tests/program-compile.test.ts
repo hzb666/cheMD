@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { compileChemd } from "../src/index";
+import { compileChemd, compileChemdCore } from "../src/index";
 
 const readFixture = (name: string): string =>
   readFileSync(new URL(`../fixtures/${name}`, import.meta.url), "utf8");
@@ -80,5 +80,21 @@ meta {
       diagnostic.code === "E_UNRESOLVED_PROGRAM_REFERENCE"
         && diagnostic.nodeId === "missing_rxn"
     )).toHaveLength(1);
+  });
+
+  it("exposes a pure language core compile result without training outputs", () => {
+    const result = compileChemdCore(readFixture("program-golden-suzuki-screen.chemd"));
+
+    expect(result.program).toMatchObject({
+      type: "program_document",
+      sourceLanguage: "chemd/program-v1"
+    });
+    expect(result.typedSemanticGraph.documentId).toBe("exp-golden-suzuki-screen");
+    expect(result.stepGraph.steps.map((step) => step.stepId)).toEqual(["charge", "heat"]);
+    expect(result.runPlan.documentId).toBe("exp-golden-suzuki-screen");
+    expect(result.lnf.experiment.document.id).toBe("exp-golden-suzuki-screen");
+    expect("trainingExport" in result).toBe(false);
+    expect("trainingUnderstanding" in result).toBe(false);
+    expect("ragExport" in result).toBe(false);
   });
 });

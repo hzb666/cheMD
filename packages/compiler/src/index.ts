@@ -94,7 +94,7 @@ export type {
   ChemdRepairLoopStoppedReason
 } from "./repair-loop";
 
-export interface CompileResult {
+export interface CompileCoreResult {
   program: ChemdProgramDocument;
   diagnostics: ChemdProgramDocument["diagnostics"];
   renderOptions: ReturnType<typeof resolveRenderProfileWithDiagnostics>["options"];
@@ -104,14 +104,17 @@ export interface CompileResult {
   runPlan: RunPlan;
   runtimePreflight: PreflightResult;
   lnf: ChemdLnf;
+  html: string;
+  json: string;
+  docxBridge: string;
+}
+
+export interface CompileResult extends CompileCoreResult {
   ragExport: ChemdRagExportV1;
   trainingUnderstanding: ChemdTrainingUnderstandingV1;
   trainingExport: ChemdTrainingExportV2;
   authoringAssistance: AuthoringAssistance;
   diagnosis: CompilerDiagnosis;
-  html: string;
-  json: string;
-  docxBridge: string;
 }
 
 export interface CompileOptions {
@@ -178,7 +181,7 @@ export const renderCompiledJson = (
   typedGraph: TypedSemanticGraph
 ): string => renderJson(document, { typedGraph });
 
-export const compileChemd = (source: string, options: CompileOptions = {}): CompileResult => {
+export const compileChemdCore = (source: string, options: CompileOptions = {}): CompileCoreResult => {
   const parsedProgram = parseChemdProgram(source);
   const resolvedProgram = resolveChemd(parsedProgram);
   const typecheckResult = typecheckProgram(resolvedProgram, {
@@ -219,37 +222,17 @@ export const compileChemd = (source: string, options: CompileOptions = {}): Comp
     runPlan,
     runtimePreflight
   });
-  const trainingExport = exportTrainingRecordFromDocument(renderProgram, {
-    stepGraph: typecheckResult.stepGraph,
-    typedGraph: typecheckResult.typedGraph,
-    lnf
-  });
-  const ragExport = buildRagExportFromTrainingRecord(trainingExport);
-  const trainingUnderstanding = buildTrainingUnderstandingFromRecord(trainingExport);
-  const authoringAssistance = buildAuthoringAssistance(renderProgram, trainingExport);
-  const authoringDiagnostics = buildAuthoringDiagnostics(
-    authoringAssistance,
-    trainingExport,
-    renderProgram
-  );
-  const compileProgram = authoringDiagnostics.length
-    ? {
-        ...renderProgram,
-        diagnostics: mergeDiagnostics(renderProgram.diagnostics, authoringDiagnostics)
-      }
-    : renderProgram;
-  const diagnosis = buildCompilerDiagnosis(compileProgram.diagnostics);
   const renderOptions = renderProfileResolution.options;
   const renderAdapterPayload = mapRenderOptionsToAdapterPayload(renderOptions);
-  const html = renderHtml(compileProgram, renderOptions, { typedGraph: typecheckResult.typedGraph });
-  const json = renderCompiledJson(compileProgram, typecheckResult.typedGraph);
-  const docxBridge = renderDocxBridge(compileProgram, renderOptions, renderAdapterPayload, {
+  const html = renderHtml(renderProgram, renderOptions, { typedGraph: typecheckResult.typedGraph });
+  const json = renderCompiledJson(renderProgram, typecheckResult.typedGraph);
+  const docxBridge = renderDocxBridge(renderProgram, renderOptions, renderAdapterPayload, {
     typedGraph: typecheckResult.typedGraph
   });
 
   return {
-    program: compileProgram,
-    diagnostics: compileProgram.diagnostics,
+    program: renderProgram,
+    diagnostics: renderProgram.diagnostics,
     renderOptions,
     renderAdapterPayload,
     typedSemanticGraph: typecheckResult.typedGraph,
@@ -257,6 +240,49 @@ export const compileChemd = (source: string, options: CompileOptions = {}): Comp
     runPlan,
     runtimePreflight,
     lnf,
+    html,
+    json,
+    docxBridge
+  };
+};
+
+export const compileChemd = (source: string, options: CompileOptions = {}): CompileResult => {
+  const coreResult = compileChemdCore(source, options);
+  const trainingExport = exportTrainingRecordFromDocument(coreResult.program, {
+    stepGraph: coreResult.stepGraph,
+    typedGraph: coreResult.typedSemanticGraph,
+    lnf: coreResult.lnf
+  });
+  const ragExport = buildRagExportFromTrainingRecord(trainingExport);
+  const trainingUnderstanding = buildTrainingUnderstandingFromRecord(trainingExport);
+  const authoringAssistance = buildAuthoringAssistance(coreResult.program, trainingExport);
+  const authoringDiagnostics = buildAuthoringDiagnostics(
+    authoringAssistance,
+    trainingExport,
+    coreResult.program
+  );
+  const compileProgram = authoringDiagnostics.length
+    ? {
+        ...coreResult.program,
+        diagnostics: mergeDiagnostics(coreResult.program.diagnostics, authoringDiagnostics)
+      }
+    : coreResult.program;
+  const diagnosis = buildCompilerDiagnosis(compileProgram.diagnostics);
+  const html = renderHtml(compileProgram, coreResult.renderOptions, {
+    typedGraph: coreResult.typedSemanticGraph
+  });
+  const json = renderCompiledJson(compileProgram, coreResult.typedSemanticGraph);
+  const docxBridge = renderDocxBridge(
+    compileProgram,
+    coreResult.renderOptions,
+    coreResult.renderAdapterPayload,
+    { typedGraph: coreResult.typedSemanticGraph }
+  );
+
+  return {
+    ...coreResult,
+    program: compileProgram,
+    diagnostics: compileProgram.diagnostics,
     ragExport,
     trainingUnderstanding,
     trainingExport,

@@ -1,0 +1,28 @@
+{
+  "id": "language-core-completion",
+  "name": "language-core-completion",
+  "title": "Complete Chemd language core",
+  "description": "Complete Chemd as a programming language core only: compiler core, module linker, expression diagnostics, incremental analysis, semantic diff, and runtime error model. Excludes training/RAG/docs/IDE.",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": "compiler",
+  "priority": "P0",
+  "creator": "hzb666",
+  "assignee": "hzb666",
+  "createdAt": "2026-06-04",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "develop",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "06-04-language-core-phase-13-pure-core-compiler-entry"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
