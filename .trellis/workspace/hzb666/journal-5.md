@@ -141,3 +141,37 @@ Added a typechecker program field type index exposing expected schema kind, actu
 ### Next Steps
 
 - None - task complete
+
+
+## Session 193: Fix language layer correctness gaps
+
+**Date**: 2026-06-04
+**Task**: Fix language layer correctness gaps
+**Package**: compiler
+**Branch**: `develop`
+
+### Summary
+
+(Add summary)
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `79c3065` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

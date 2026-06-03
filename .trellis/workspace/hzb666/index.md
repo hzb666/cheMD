@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-5.md`
-- **Total Sessions**: 192
+- **Total Sessions**: 193
 - **Last Active**: 2026-06-04
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-5.md` | ~143 | Active |
+| `journal-5.md` | ~177 | Active |
 | `journal-4.md` | ~1977 | Archived |
 | `journal-3.md` | ~1994 | Archived |
 | `journal-2.md` | ~1956 | Archived |
@@ -33,6 +33,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 193 | 2026-06-04 | Fix language layer correctness gaps | `79c3065` | `develop` |
 | 192 | 2026-06-04 | Language core phase 20 program type index | `8cc790a` | `develop` |
 | 191 | 2026-06-04 | Language core phase 19 program language contract | `724d0a6` | `develop` |
 | 190 | 2026-06-04 | Language core phase 18 structured runtime errors | `89ae968` | `develop` |
