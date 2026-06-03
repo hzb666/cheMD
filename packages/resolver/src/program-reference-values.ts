@@ -1,5 +1,6 @@
 import type {
   ChemdCallExpr,
+  ChemdPatchExpr,
   ChemdRecordValue,
   ChemdReferenceExpr,
   ChemdValue,
@@ -39,6 +40,9 @@ export const resolveValue = (
   }
   if (value.type === "call") {
     return resolveCallValue(value, symbols, diagnostics);
+  }
+  if (value.type === "patch") {
+    return resolvePatchValue(value, symbols, diagnostics);
   }
   return value;
 };
@@ -95,4 +99,13 @@ const resolveCallValue = (
     ...arg,
     value: resolveValue(arg.value, symbols, diagnostics)
   }))
+});
+
+const resolvePatchValue = (
+  value: ChemdPatchExpr,
+  symbols: ProgramSymbolTable,
+  diagnostics: Diagnostic[]
+): ChemdPatchExpr => ({
+  ...value,
+  value: resolveValue(value.value, symbols, diagnostics)
 });

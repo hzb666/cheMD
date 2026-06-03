@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { parseChemd } from "@chemd/parser";
+import type { ChemdPatchExpr, ChemdProgramDocument } from "@chemd/core";
 
 import {
   buildProgramSymbolTable,
@@ -14,6 +15,13 @@ const findDeclaration = (
   document: ReturnType<typeof resolve>,
   id: string
 ) => document.declarations.find((declaration) => declaration.id === id);
+
+const findAgentRun = (
+  document: ChemdProgramDocument,
+  id: string
+) => document.declarations.find(
+  (declaration) => declaration.kind === "agent_run" && declaration.id === id
+);
 
 describe("resolveChemd program references", () => {
   it("builds a program symbol table with declarations, qualified ids, aliases, and imports", () => {
@@ -129,6 +137,83 @@ analysis ana_var1 for @res_var1.yield {
         status: "resolved",
         value: expect.objectContaining({ type: "percent", value: 78 })
       });
+  });
+
+  it("resolves references nested inside patch expression values", () => {
+    const parsed = parseChemd(`module exp_patch_value
+
+meta {
+  id: "exp-patch-value"
+  title: "Patch value"
+  date: "2026-05-28"
+}
+
+reaction rxn_var1 {
+  yield: 77%
+}
+
+agent run run_patch {
+  goal: "patch output"
+  tool make_patch {
+    status: ok
+    output: "placeholder"
+  }
+}
+`);
+    const patchValue: ChemdPatchExpr = {
+      type: "patch",
+      raw: "patch(rxn_var1.yield = @rxn_var1.yield)",
+      target: {
+        kind: "declaration_field",
+        declarationId: "rxn_var1",
+        field: "yield"
+      },
+      value: {
+        type: "reference",
+        refKind: "field",
+        raw: "@rxn_var1.yield",
+        target: "rxn_var1",
+        field: "yield",
+        sourceSpan: {
+          startLine: 15,
+          startColumn: 13
+        }
+      },
+      sourceSpan: {
+        startLine: 15,
+        startColumn: 5
+      }
+    };
+    const document = resolveChemd({
+      ...parsed,
+      declarations: parsed.declarations.map((declaration) =>
+        declaration.kind === "agent_run"
+          ? {
+              ...declaration,
+              toolCalls: declaration.toolCalls.map((tool) => ({
+                ...tool,
+                output: patchValue
+              }))
+            }
+          : declaration
+      )
+    });
+    const agentRun = findAgentRun(document, "run_patch");
+    const output = agentRun?.kind === "agent_run"
+      ? agentRun.toolCalls[0]?.output
+      : undefined;
+
+    expect(document.diagnostics).toEqual([]);
+    expect(output).toMatchObject({
+      type: "patch",
+      value: {
+        type: "reference",
+        resolved: {
+          status: "resolved",
+          value: expect.objectContaining({ type: "percent", value: 77 })
+        }
+      }
+    });
   });
 
   it("reports unresolved declaration references as errors", () => {

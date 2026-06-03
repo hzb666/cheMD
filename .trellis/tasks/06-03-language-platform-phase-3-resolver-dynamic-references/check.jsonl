@@ -1,0 +1,5 @@
+{"file":"packages/resolver/tests/program-resolver.test.ts","reason":"Focused resolver behavior tests must pass."}
+{"file":"packages/resolver/src/program-references.ts","reason":"Resolver typecheck and behavior verification."}
+{"file":"packages/resolver/src/program-reference-values.ts","reason":"Nested value resolution verification."}
+{"file":"packages/compiler/tests/language-fixture-matrix.test.ts","reason":"Affected compiler fixture matrix should remain green if resolver behavior changes compile output."}
+{"file":".trellis/tasks/06-03-language-platform-phase-3-resolver-dynamic-references/task.json","reason":"Trellis task metadata must remain valid before closeout."}
