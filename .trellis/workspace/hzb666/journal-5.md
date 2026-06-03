@@ -175,3 +175,37 @@ Added a typechecker program field type index exposing expected schema kind, actu
 ### Next Steps
 
 - None - task complete
+
+
+## Session 194: Complete language and CLI parity
+
+**Date**: 2026-06-04
+**Task**: Complete language and CLI parity
+**Package**: cli
+**Branch**: `develop`
+
+### Summary
+
+Added source-level procedure controls, strengthened meta/external reference validation, registered language/runtime diagnostic codes, and exposed source-aware CLI diagnostics.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9912f83` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
