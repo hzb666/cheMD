@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-4.md`
-- **Total Sessions**: 184
-- **Last Active**: 2026-06-03
+- **Total Sessions**: 185
+- **Last Active**: 2026-06-04
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-4.md` | ~1841 | Active |
+| `journal-4.md` | ~1875 | Active |
 | `journal-3.md` | ~1994 | Archived |
 | `journal-2.md` | ~1956 | Archived |
 | `journal-1.md` | ~1998 | Archived |
@@ -32,6 +32,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 185 | 2026-06-04 | Phase 13 pure core compiler entry | `e51c94b` | `develop` |
 | 184 | 2026-06-03 | Phase 12 compiler diagnostic dedupe | `be5a165` | `develop` |
 | 183 | 2026-06-03 | Phase 11 workspace index AST references | `a051a13` | `develop` |
 | 182 | 2026-06-03 | Phase 10 typechecker upstream diagnostic spans | `c9c9ffb` | `develop` |

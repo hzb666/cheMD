@@ -1839,3 +1839,37 @@ Deduplicated compiler diagnostic merges so upstream resolver/parser diagnostics 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 185: Phase 13 pure core compiler entry
+
+**Date**: 2026-06-04
+**Task**: Phase 13 pure core compiler entry
+**Package**: compiler
+**Branch**: `develop`
+
+### Summary
+
+Added compileChemdCore for language-core compilation without training/RAG outputs while preserving compileChemd compatibility; verified compiler targeted tests, typecheck, fixture matrix, Trellis validation, and diff check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e51c94b` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
