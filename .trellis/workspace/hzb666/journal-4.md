@@ -1907,3 +1907,37 @@ Added a language-core module linker that compiles provided Chemd modules, builds
 ### Next Steps
 
 - None - task complete
+
+
+## Session 187: Language core phase 15 diagnostic-first expressions
+
+**Date**: 2026-06-04
+**Task**: Language core phase 15 diagnostic-first expressions
+**Package**: typechecker
+**Branch**: `develop`
+
+### Summary
+
+Added structured ExpressionError codes and facts for derived expression tokenizer, parser, reference, function, and arithmetic failures while preserving the existing E_DERIVED_EXPRESSION_INVALID surface. Validation: expression diagnostics tests, program typechecker tests, typechecker typecheck, Trellis validate, and git diff --check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `fe0be3f` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
