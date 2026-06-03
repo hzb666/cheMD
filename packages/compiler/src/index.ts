@@ -93,6 +93,15 @@ export type {
   ChemdRepairLoopResult,
   ChemdRepairLoopStoppedReason
 } from "./repair-loop";
+export {
+  linkChemdModules,
+  type ChemdModuleImportEdge,
+  type ChemdModuleImportGraph,
+  type ChemdModuleInput,
+  type LinkedChemdModule,
+  type LinkChemdModulesOptions,
+  type LinkChemdModulesResult
+} from "./module-linker";
 
 export interface CompileCoreResult {
   program: ChemdProgramDocument;

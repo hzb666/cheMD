@@ -19,7 +19,8 @@
   "pr_url": null,
   "subtasks": [],
   "children": [
-    "06-04-language-core-phase-13-pure-core-compiler-entry"
+    "06-04-language-core-phase-13-pure-core-compiler-entry",
+    "06-04-06-04-language-core-phase-14-module-linker"
   ],
   "parent": null,
   "relatedFiles": [],

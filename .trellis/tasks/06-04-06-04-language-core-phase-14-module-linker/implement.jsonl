@@ -1,0 +1,4 @@
+{"file":"packages/compiler/src/module-linker.ts","reason":"Module linker API and implementation."}
+{"file":"packages/compiler/src/module-linker-internals.ts","reason":"Module linker private graph, cycle, and symbol validation helpers."}
+{"file":"packages/compiler/src/index.ts","reason":"Compiler package public exports."}
+{"file":"packages/compiler/tests/module-linker.test.ts","reason":"Module linker behavior and regression coverage."}

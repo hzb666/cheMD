@@ -1,0 +1,124 @@
+import { describe, expect, it } from "vitest";
+
+import { linkChemdModules } from "../src/index";
+
+describe("linkChemdModules", () => {
+  it("links provided modules and validates imported symbols", () => {
+    const result = linkChemdModules([
+      {
+        path: "entry.chemd",
+        source: `module exp_entry
+
+import shared_solvents as solvents from "./shared-solvents.chemd"
+
+meta {
+  id: "exp-entry"
+  title: "Entry"
+  date: "2026-06-04"
+}
+
+result res_entry for @solvents.rxn_shared {
+  yield: 78%
+}
+`
+      },
+      {
+        path: "./shared-solvents.chemd",
+        source: `module shared_solvents
+
+meta {
+  id: "shared-solvents"
+  title: "Shared solvents"
+  date: "2026-06-04"
+}
+
+reaction rxn_shared {
+  name: "shared"
+}
+`
+      }
+    ]);
+
+    expect(result.entry.moduleName).toBe("exp_entry");
+    expect(result.modules.map((item) => item.moduleName)).toEqual([
+      "exp_entry",
+      "shared_solvents"
+    ]);
+    expect(result.importGraph.edges).toEqual([
+      expect.objectContaining({
+        fromModule: "exp_entry",
+        toModule: "shared_solvents",
+        importModuleName: "shared_solvents",
+        importFrom: "./shared-solvents.chemd",
+        status: "resolved"
+      })
+    ]);
+    expect(result.diagnostics.filter((item) => item.severity === "error")).toEqual([]);
+  });
+
+  it("diagnoses missing modules, cycles, and missing imported symbols", () => {
+    const result = linkChemdModules([
+      {
+        path: "entry.chemd",
+        source: `module exp_entry
+
+import shared_solvents as solvents from "./shared-solvents.chemd"
+import missing_mod from "./missing.chemd"
+
+meta {
+  id: "exp-entry"
+  title: "Entry"
+  date: "2026-06-04"
+}
+
+result res_entry for @solvents.rxn_missing {
+  yield: 78%
+}
+`
+      },
+      {
+        path: "./shared-solvents.chemd",
+        source: `module shared_solvents
+
+import exp_entry from "entry.chemd"
+
+meta {
+  id: "shared-solvents"
+  title: "Shared solvents"
+  date: "2026-06-04"
+}
+
+reaction rxn_shared {
+  name: "shared"
+}
+`
+      }
+    ]);
+
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: "E_MODULE_IMPORT_NOT_FOUND",
+        sourceLayer: "module-linker",
+        facts: expect.objectContaining({
+          moduleName: "missing_mod",
+          from: "./missing.chemd"
+        })
+      }),
+      expect.objectContaining({
+        code: "E_MODULE_IMPORT_CYCLE",
+        sourceLayer: "module-linker",
+        facts: expect.objectContaining({
+          cycle: ["exp_entry", "shared_solvents", "exp_entry"]
+        })
+      }),
+      expect.objectContaining({
+        code: "E_MODULE_SYMBOL_NOT_FOUND",
+        sourceLayer: "module-linker",
+        facts: expect.objectContaining({
+          moduleName: "shared_solvents",
+          target: "rxn_missing"
+        })
+      })
+    ]));
+  });
+});
