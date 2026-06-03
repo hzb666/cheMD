@@ -102,6 +102,14 @@ export {
   type LinkChemdModulesOptions,
   type LinkChemdModulesResult
 } from "./module-linker";
+export {
+  createChemdIncrementalCompiler,
+  type ChemdIncrementalCacheInfo,
+  type ChemdIncrementalCacheStatus,
+  type ChemdIncrementalCompileOutput,
+  type ChemdIncrementalCompiler,
+  type ChemdIncrementalCompilerSnapshot
+} from "./incremental-compiler";
 
 export interface CompileCoreResult {
   program: ChemdProgramDocument;

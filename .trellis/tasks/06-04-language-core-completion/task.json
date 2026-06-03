@@ -21,7 +21,8 @@
   "children": [
     "06-04-language-core-phase-13-pure-core-compiler-entry",
     "06-04-06-04-language-core-phase-14-module-linker",
-    "06-04-06-04-language-core-phase-15-diagnostic-first-expressions"
+    "06-04-06-04-language-core-phase-15-diagnostic-first-expressions",
+    "06-04-06-04-language-core-phase-16-incremental-core-compiler-cache"
   ],
   "parent": null,
   "relatedFiles": [],

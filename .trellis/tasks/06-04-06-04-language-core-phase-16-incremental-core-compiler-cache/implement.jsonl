@@ -1,0 +1,3 @@
+{"file":"packages/compiler/src/incremental-compiler.ts","reason":"Incremental compiler cache API and implementation."}
+{"file":"packages/compiler/src/index.ts","reason":"Compiler package public exports."}
+{"file":"packages/compiler/tests/incremental-compiler.test.ts","reason":"Incremental cache behavior regression coverage."}
