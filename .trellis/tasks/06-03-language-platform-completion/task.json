@@ -23,7 +23,8 @@
     "06-03-language-platform-phase-1-program-contract",
     "06-03-language-platform-phase-2-parser-recovery-source-maps",
     "06-03-language-platform-phase-3-resolver-dynamic-references",
-    "06-03-language-platform-phase-4-compiler-authoring-hints"
+    "06-03-language-platform-phase-4-compiler-authoring-hints",
+    "06-03-language-platform-phase-5-state-trace-diff"
   ],
   "parent": null,
   "relatedFiles": [],

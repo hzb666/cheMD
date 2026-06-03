@@ -249,6 +249,7 @@ describe("runtime trace replay", () => {
 
     expect(replay.deviationCount).toBe(1);
     expect(state.status).toBe("completed");
+    expect(state.currentStepId).toBeUndefined();
     expect(state.stepStates).toContainEqual(expect.objectContaining({ stepId: "s1", status: "completed" }));
     expect(state.controlStates).toContainEqual(expect.objectContaining({
       controlId: "operator-approval",
@@ -264,5 +265,64 @@ describe("runtime trace replay", () => {
       expect.objectContaining({ traceId: "evt-control", type: "control_completed", controlId: "operator-approval" }),
       expect.objectContaining({ traceId: "evt-obs", type: "observation_recorded", stepId: "s1" })
     ]));
+  });
+
+  it("selects the running replay step as the current step", () => {
+    const plan = buildRunPlan({
+      documentId: "trace-current-step",
+      stepGraph: {
+        procedures: [],
+        observations: [],
+        diagnostics: [],
+        steps: [
+          {
+            stepId: "s1",
+            family: "mix",
+            params: {},
+            source: {
+              sourceNodeType: "procedure",
+              sourceNodeId: "proc-1",
+              sourceType: "explicit_step",
+              rawText: "step: mix"
+            },
+            loweringConfidence: 1
+          },
+          {
+            stepId: "s2",
+            family: "observe",
+            params: {},
+            dependsOn: ["s1"],
+            source: {
+              sourceNodeType: "procedure",
+              sourceNodeId: "proc-1",
+              sourceType: "explicit_step",
+              rawText: "step: observe"
+            },
+            loweringConfidence: 1
+          }
+        ]
+      }
+    });
+    const events = [
+      createTraceEvent({
+        eventId: "evt-start",
+        runId: "run-current",
+        timestamp: "2026-05-20T10:02:00.000Z",
+        type: "step_started",
+        stepId: "s1"
+      })
+    ];
+    const state = replayTraceToLabState(plan, {
+      runId: "run-current",
+      stepIds: ["s1", "s2"],
+      events
+    });
+
+    expect(state.status).toBe("running");
+    expect(state.currentStepId).toBe("s1");
+    expect(state.stepStates).toContainEqual(expect.objectContaining({
+      stepId: "s1",
+      status: "running"
+    }));
   });
 });

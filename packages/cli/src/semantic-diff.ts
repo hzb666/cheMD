@@ -2,16 +2,21 @@ import type { ChemdDeclaration, ChemdProgramDocument } from "@chemd/core";
 
 const OBJECT_NODE_TYPES = new Set([
   "molecule",
+  "material",
+  "batch",
   "reaction",
   "result",
   "analysis",
   "procedure",
   "observation",
   "sample",
+  "artifact",
+  "trace",
   "condition_screen"
 ]);
 
 const INTERNAL_FIELDS = new Set(["kind", "id", "qualifiedId", "docs", "sourceSpan", "fieldSpans"]);
+const VOLATILE_NESTED_FIELDS = new Set(["docs", "resolved", "sourceSpan", "fieldSpans"]);
 
 export interface SemanticFieldChange {
   field: string;
@@ -60,7 +65,9 @@ const normalizeValue = (value: unknown): unknown => {
   if (value && typeof value === "object") {
     return Object.fromEntries(
       Object.entries(value)
-        .filter(([, nestedValue]) => nestedValue !== undefined)
+        .filter(([key, nestedValue]) =>
+          !VOLATILE_NESTED_FIELDS.has(key) && nestedValue !== undefined
+        )
         .sort(([left], [right]) => left.localeCompare(right))
         .map(([key, nestedValue]) => [key, normalizeValue(nestedValue)])
     );

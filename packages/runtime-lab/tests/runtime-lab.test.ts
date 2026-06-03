@@ -4,7 +4,11 @@ import {
   buildRunPlan,
   completeStep,
   confirmStep,
+  createLabStateStack,
   createInitialLabState,
+  pushLabStateSnapshot,
+  restoreCurrentLabStateSnapshot,
+  restoreLabStateSnapshot,
   preflightRun,
   startStep
 } from "../src/index";
@@ -339,5 +343,59 @@ describe("runtime lab state machine", () => {
         sourceLayer: "runtime_preflight"
       })
     );
+  });
+
+  it("keeps a restorable runtime state stack", () => {
+    const plan = buildRunPlan({
+      documentId: "exp-runtime-stack",
+      stepGraph: {
+        procedures: [],
+        observations: [],
+        diagnostics: [],
+        steps: [
+          {
+            stepId: "s1",
+            family: "add",
+            params: { materials: "A" },
+            source: {
+              sourceNodeType: "procedure",
+              sourceNodeId: "proc-1",
+              sourceType: "explicit_step",
+              rawText: "step: add"
+            },
+            loweringConfidence: 1
+          }
+        ]
+      }
+    });
+    const initial = createInitialLabState(plan, { runId: "run-stack" });
+    const stack = createLabStateStack(initial, {
+      now: "2026-06-03T00:00:00.000Z",
+      snapshotId: "snap-initial",
+      reason: "initial"
+    });
+    const running = startStep(
+      confirmStep(initial, plan, "s1"),
+      plan,
+      "s1"
+    );
+    const updated = pushLabStateSnapshot(stack, running, {
+      now: "2026-06-03T00:01:00.000Z",
+      snapshotId: "snap-running",
+      reason: "started"
+    });
+
+    expect(updated.snapshots.map((snapshot) => snapshot.snapshotId)).toEqual([
+      "snap-initial",
+      "snap-running"
+    ]);
+    expect(restoreLabStateSnapshot(updated, "snap-initial")?.stepStates[0])
+      .toMatchObject({ stepId: "s1", status: "waiting_confirmation" });
+    expect(restoreCurrentLabStateSnapshot(updated)?.stepStates[0])
+      .toMatchObject({ stepId: "s1", status: "running" });
+
+    running.stepStates[0]!.status = "failed";
+    expect(restoreCurrentLabStateSnapshot(updated)?.stepStates[0])
+      .toMatchObject({ stepId: "s1", status: "running" });
   });
 });

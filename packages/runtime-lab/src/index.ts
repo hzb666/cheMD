@@ -27,6 +27,15 @@ export {
   type RuntimeStepState,
   type RuntimeTraceEvent
 } from "./state-machine";
+export {
+  createLabStateStack,
+  pushLabStateSnapshot,
+  restoreCurrentLabStateSnapshot,
+  restoreLabStateSnapshot,
+  type LabStateSnapshot,
+  type LabStateStack,
+  type PushLabStateSnapshotOptions
+} from "./state-stack";
 
 export type RuntimeMode = "dry-run" | "human-run" | "robot-run" | "replay-run";
 

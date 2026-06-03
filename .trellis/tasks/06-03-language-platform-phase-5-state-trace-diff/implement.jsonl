@@ -1,0 +1,8 @@
+{"file":"packages/runtime-lab/src/state-machine.ts","reason":"Runtime state transition and trace event implementation."}
+{"file":"packages/runtime-lab/src/index.ts","reason":"Runtime-lab public state/run-plan API."}
+{"file":"packages/runtime-lab/tests/runtime-lab.test.ts","reason":"Runtime state stack regression coverage."}
+{"file":"packages/runtime-trace/src/index.ts","reason":"Runtime trace event/output implementation."}
+{"file":"packages/runtime-trace/tests/runtime-trace.test.ts","reason":"Runtime trace regression coverage."}
+{"file":"packages/cli/src/semantic-diff.ts","reason":"Program semantic diff output implementation."}
+{"file":"packages/cli/src/cli.spec.ts","reason":"CLI diff behavior regression coverage."}
+{"file":"packages/compiler/tests/language-fixture-matrix.test.ts","reason":"Compiler matrix if touched behavior affects compile output."}

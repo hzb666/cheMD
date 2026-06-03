@@ -269,6 +269,7 @@ export const replayTraceToLabState = (
   return {
     ...state,
     status: readReplayStatus(runEvents, input.stepIds),
+    currentStepId: selectReplayCurrentStepId(runEvents, input.stepIds),
     stepStates: state.stepStates.map((step) => ({
       ...step,
       status: readStepReplayStatus(step.stepId, runEvents)
@@ -288,6 +289,12 @@ export const replayTraceToLabState = (
     trace: createReplayRuntimeTrace(runEvents)
   };
 };
+
+const selectReplayCurrentStepId = (
+  events: TraceEvent[],
+  stepIds: string[]
+): string | undefined =>
+  stepIds.find((stepId) => readStepReplayStatus(stepId, events) === "running");
 
 const readReplayStatus = (
   events: TraceEvent[],

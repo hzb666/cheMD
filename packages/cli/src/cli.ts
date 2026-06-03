@@ -36,6 +36,7 @@ import {
   type GitRunner
 } from "./git-changed";
 import {
+  buildSemanticDiff,
   formatSemanticDiffText,
   type SemanticDiff
 } from "./semantic-diff";
@@ -938,6 +939,8 @@ const getCompileProgram = (result: CompileResult): ProgramDocumentLike => {
 const getCompileDiagnostics = (result: CompileResult): Diagnostic[] =>
   result.diagnostics ?? getCompileProgram(result).diagnostics ?? [];
 
+const getStrictCompileProgram = (result: CompileResult) => result.program;
+
 const summarizeProgram = (program: ProgramDocumentLike): ProgramSummary => ({
   declarationCount: program.declarations.length,
   docCount: program.docs.length
@@ -1587,136 +1590,13 @@ const compileSourceFile = (
   return compileChemd(source);
 };
 
-const PROGRAM_DIFF_INTERNAL_FIELDS = new Set([
-  "id",
-  "kind",
-  "qualifiedId",
-  "docs",
-  "sourceSpan",
-  "fieldSpans"
-]);
-
-const normalizeProgramDiffValue = (value: unknown): unknown => {
-  if (Array.isArray(value)) {
-    return value.map((item) => normalizeProgramDiffValue(item));
-  }
-
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value)
-        .filter(([key, nestedValue]) =>
-          key !== "resolved"
-          && key !== "sourceSpan"
-          && key !== "fieldSpans"
-          && nestedValue !== undefined
-        )
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, nestedValue]) => [key, normalizeProgramDiffValue(nestedValue)])
-    );
-  }
-
-  return value;
-};
-
-const stableProgramDiffValue = (value: unknown): string =>
-  JSON.stringify(normalizeProgramDiffValue(value));
-
-const collectProgramDeclarationFields = (
-  declaration: ProgramDeclarationLike
-): Record<string, unknown> =>
-  Object.fromEntries(
-    Object.entries(declaration)
-      .filter(([key, value]) =>
-        !PROGRAM_DIFF_INTERNAL_FIELDS.has(key)
-        && value !== undefined
-      )
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, value]) => [key, normalizeProgramDiffValue(value)])
-  );
-
-const compareProgramFields = (
-  beforeFields: Record<string, unknown>,
-  afterFields: Record<string, unknown>
-): Array<{ field: string; before: unknown; after: unknown }> => {
-  const fieldNames = new Set([...Object.keys(beforeFields), ...Object.keys(afterFields)]);
-  const changes: Array<{ field: string; before: unknown; after: unknown }> = [];
-
-  for (const field of [...fieldNames].sort()) {
-    const before = beforeFields[field];
-    const after = afterFields[field];
-    if (stableProgramDiffValue(before) !== stableProgramDiffValue(after)) {
-      changes.push({ field, before, after });
-    }
-  }
-
-  return changes;
-};
-
 const buildProgramSemanticDiff = (
   before: CompileResult,
   after: CompileResult
-): SemanticDiff => {
-  const beforeProgram = getCompileProgram(before);
-  const afterProgram = getCompileProgram(after);
-  const beforeDeclarations = new Map(beforeProgram.declarations.map((declaration) => [
-    `${declaration.kind}:${declaration.id}`,
-    {
-      fields: collectProgramDeclarationFields(declaration),
-      nodeId: declaration.id,
-      nodeType: declaration.kind
-    }
-  ]));
-  const afterDeclarations = new Map(afterProgram.declarations.map((declaration) => [
-    `${declaration.kind}:${declaration.id}`,
-    {
-      fields: collectProgramDeclarationFields(declaration),
-      nodeId: declaration.id,
-      nodeType: declaration.kind
-    }
-  ]));
-  const changes: SemanticDiff["changes"] = [];
-
-  for (const [key, declaration] of [...beforeDeclarations].sort()) {
-    if (!afterDeclarations.has(key)) {
-      changes.push({
-        changeType: "removed",
-        nodeId: declaration.nodeId,
-        nodeType: declaration.nodeType,
-        before: declaration.fields
-      });
-    }
-  }
-
-  for (const [key, declaration] of [...afterDeclarations].sort()) {
-    const beforeDeclaration = beforeDeclarations.get(key);
-    if (!beforeDeclaration) {
-      changes.push({
-        changeType: "added",
-        nodeId: declaration.nodeId,
-        nodeType: declaration.nodeType,
-        after: declaration.fields
-      });
-      continue;
-    }
-
-    const fields = compareProgramFields(beforeDeclaration.fields, declaration.fields);
-    if (fields.length > 0) {
-      changes.push({
-        changeType: "changed",
-        nodeId: declaration.nodeId,
-        nodeType: declaration.nodeType,
-        fields
-      });
-    }
-  }
-
-  return {
-    schemaVersion: "chemd-semantic-diff/v0.1",
-    beforeDocumentId: beforeProgram.meta.id,
-    afterDocumentId: afterProgram.meta.id,
-    changes
-  };
-};
+): SemanticDiff => buildSemanticDiff(
+  getStrictCompileProgram(before),
+  getStrictCompileProgram(after)
+);
 
 const diffFiles = (
   command: Extract<CliCommand, { type: "diff" }>,
