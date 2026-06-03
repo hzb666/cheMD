@@ -1771,3 +1771,37 @@ Preserved upstream diagnostic sourceSpan through typechecker diagnostics; verifi
 ### Next Steps
 
 - None - task complete
+
+
+## Session 183: Phase 11 workspace index AST references
+
+**Date**: 2026-06-03
+**Task**: Phase 11 workspace index AST references
+**Package**: compiler
+**Branch**: `develop`
+
+### Summary
+
+Added AST-derived program references to workspace indexing while preserving text fallback and avoiding string false positives; verified workspace-index tests/typecheck, language-service typecheck, compiler fixture matrix, Trellis validation, and diff check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a051a13` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
