@@ -1601,3 +1601,37 @@ Added runtime-lab state stack snapshots, replay current-step restoration, and un
 ### Next Steps
 
 - None - task complete
+
+
+## Session 178: Phase 6 typechecker semantic graph hardening
+
+**Date**: 2026-06-03
+**Task**: Phase 6 typechecker semantic graph hardening
+**Package**: typechecker
+**Branch**: `develop`
+
+### Summary
+
+Added V03Diagnostic sourceSpan support and mapped typechecker program diagnostics to declaration, field, and nested value source spans; verified diagnostics/typechecker/language-service typechecks, typechecker tests, compiler fixture matrix, Trellis validation, and diff check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ab44ced` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
