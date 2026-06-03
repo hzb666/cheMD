@@ -73,3 +73,37 @@ Added structured runtime preflight issue codes and facts, generated diagnostics 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 191: Language core phase 19 program language contract
+
+**Date**: 2026-06-04
+**Task**: Language core phase 19 program language contract
+**Package**: core
+**Branch**: `develop`
+
+### Summary
+
+Expanded the machine-readable Chemd language contract with program token, keyword, declaration, module, import, meta, reference, value, and parser capability metadata, and re-exported it from the parser package. Validation: core language contract tests, core typecheck, parser typecheck, Trellis validate, and git diff --check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `724d0a6` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

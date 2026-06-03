@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-5.md`
-- **Total Sessions**: 190
+- **Total Sessions**: 191
 - **Last Active**: 2026-06-04
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-5.md` | ~75 | Active |
+| `journal-5.md` | ~109 | Active |
 | `journal-4.md` | ~1977 | Archived |
 | `journal-3.md` | ~1994 | Archived |
 | `journal-2.md` | ~1956 | Archived |
@@ -33,6 +33,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 191 | 2026-06-04 | Language core phase 19 program language contract | `724d0a6` | `develop` |
 | 190 | 2026-06-04 | Language core phase 18 structured runtime errors | `89ae968` | `develop` |
 | 189 | 2026-06-04 | Language core phase 17 AST-aware semantic diff | `3fcf4ab` | `develop` |
 | 188 | 2026-06-04 | Language core phase 16 incremental compiler cache | `6d490b5` | `develop` |
