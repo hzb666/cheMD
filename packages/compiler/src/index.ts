@@ -195,7 +195,11 @@ export const compileChemd = (source: string, options: CompileOptions = {}): Comp
   const ragExport = buildRagExportFromTrainingRecord(trainingExport);
   const trainingUnderstanding = buildTrainingUnderstandingFromRecord(trainingExport);
   const authoringAssistance = buildAuthoringAssistance(renderProgram, trainingExport);
-  const authoringDiagnostics = buildAuthoringDiagnostics(authoringAssistance, trainingExport);
+  const authoringDiagnostics = buildAuthoringDiagnostics(
+    authoringAssistance,
+    trainingExport,
+    renderProgram
+  );
   const compileProgram = authoringDiagnostics.length
     ? {
         ...renderProgram,

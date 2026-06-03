@@ -1,4 +1,5 @@
 import type { ChemdTrainingExportV2 } from "@chemd/exporter-training";
+import { parseChemdProgram } from "@chemd/parser";
 import { describe, expect, it } from "vitest";
 
 import { buildAuthoringDiagnostics } from "../src/authoring-diagnostics";
@@ -50,6 +51,57 @@ describe("authoring diagnostics", () => {
           target_kind: "declaration_field",
           target_declaration_id: "res_main",
           target_field: "reaction"
+        })
+      })
+    );
+  });
+
+  it("maps authoring fix diagnostics to target declaration source spans", () => {
+    const document = parseChemdProgram(`module exp_authoring_spans
+
+meta {
+  id: "exp-authoring-spans"
+  title: "Authoring spans"
+  date: "2026-05-29"
+}
+
+reaction rxn_main {
+  name: "main"
+}
+
+result res_main {
+  status: success
+}
+`);
+    const assistance: AuthoringAssistance = {
+      minimal_sets: [],
+      templates: [],
+      suggestions: [{
+        suggestion_id: "suggest-result-ref-res_main",
+        title: "Bind result",
+        description: "Result can be bound to the only reaction.",
+        category: "reference",
+        confidence: "high",
+        target: {
+          kind: "declaration_field",
+          declarationId: "res_main",
+          field: "reaction"
+        },
+        patch: {
+          kind: "insert_declaration_field",
+          declarationId: "res_main",
+          line: "reaction: @rxn_main"
+        }
+      }]
+    };
+
+    expect(buildAuthoringDiagnostics(assistance, trainingExport, document)).toContainEqual(
+      expect.objectContaining({
+        code: "W_AUTHORING_FIX_AVAILABLE",
+        sourceNodeId: "res_main",
+        sourceSpan: expect.objectContaining({
+          startLine: 13,
+          startColumn: 1
         })
       })
     );

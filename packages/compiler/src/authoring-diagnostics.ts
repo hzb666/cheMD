@@ -1,4 +1,11 @@
-import { createDiagnostic, type Diagnostic, type DiagnosticQuickFix } from "@chemd/core";
+import {
+  createDiagnostic,
+  type ChemdDeclaration,
+  type ChemdProgramDocument,
+  type Diagnostic,
+  type DiagnosticQuickFix,
+  type SourceSpan
+} from "@chemd/core";
 import type { ChemdTrainingExportV2 } from "@chemd/exporter-training";
 
 import type {
@@ -64,7 +71,10 @@ const createApplyPatchQuickFix = (
   patch
 });
 
-const buildSuggestionDiagnostic = (suggestion: AuthoringSuggestion): Diagnostic =>
+const buildSuggestionDiagnostic = (
+  suggestion: AuthoringSuggestion,
+  document?: ChemdProgramDocument
+): Diagnostic =>
   createDiagnostic({
     code: "W_AUTHORING_FIX_AVAILABLE",
     severity: "warning",
@@ -78,8 +88,42 @@ const buildSuggestionDiagnostic = (suggestion: AuthoringSuggestion): Diagnostic 
       suggestion_id: suggestion.suggestion_id,
       ...readTargetFacts(suggestion.target)
     },
+    sourceSpan: readTargetSourceSpan(document, suggestion.target),
     quickFixes: [createApplyPatchQuickFix(suggestion.title, suggestion.patch)]
   });
+
+const readTargetSourceSpan = (
+  document: ChemdProgramDocument | undefined,
+  target: AuthoringTarget | undefined
+): SourceSpan | undefined => {
+  if (!document || !target) return undefined;
+  if (target.kind === "meta_field") {
+    return document.meta.fieldSpans?.[target.field] ?? document.meta.sourceSpan;
+  }
+  if (target.kind === "doc_comment") {
+    return document.docs.find((doc) => doc.id === target.docId)?.sourceSpan;
+  }
+  if (target.kind === "declaration" || target.kind === "declaration_field") {
+    const declaration = findDeclaration(document, target.declarationId);
+    if (!declaration) return undefined;
+    return target.kind === "declaration_field"
+      ? readDeclarationFieldSpan(declaration, target.field) ?? declaration.sourceSpan
+      : declaration.sourceSpan;
+  }
+  return undefined;
+};
+
+const findDeclaration = (
+  document: ChemdProgramDocument,
+  declarationId: string
+): ChemdDeclaration | undefined =>
+  document.declarations.find((declaration) => declaration.id === declarationId);
+
+const readDeclarationFieldSpan = (
+  declaration: ChemdDeclaration,
+  field: string
+): SourceSpan | undefined =>
+  "fieldSpans" in declaration ? declaration.fieldSpans?.[field] : undefined;
 
 const buildChecklistDiagnostic = (input: {
   checklistId: string;
@@ -116,9 +160,12 @@ const hasProgramSemanticContent = (trainingExport: ChemdTrainingExportV2): boole
 
 export const buildAuthoringDiagnostics = (
   assistance: AuthoringAssistance,
-  trainingExport: ChemdTrainingExportV2
+  trainingExport: ChemdTrainingExportV2,
+  document?: ChemdProgramDocument
 ): Diagnostic[] => [
-  ...assistance.suggestions.map(buildSuggestionDiagnostic),
+  ...assistance.suggestions.map((suggestion) =>
+    buildSuggestionDiagnostic(suggestion, document)
+  ),
   ...(
     hasProgramSemanticContent(trainingExport) ? assistance.minimal_sets : []
   )
