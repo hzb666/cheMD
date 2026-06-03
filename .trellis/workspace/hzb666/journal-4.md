@@ -1669,3 +1669,37 @@ Extended LNF source completeness to count unresolved references in agent tool ar
 ### Next Steps
 
 - None - task complete
+
+
+## Session 180: Phase 8 language service diagnostic ranges
+
+**Date**: 2026-06-03
+**Task**: Phase 8 language service diagnostic ranges
+**Package**: compiler
+**Branch**: `develop`
+
+### Summary
+
+Preserved source-mapped compiler/typechecker diagnostic ranges through language-service compile output; verified language-service tests/typecheck, compiler fixture matrix, Trellis validation, and diff check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ddbe962` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
