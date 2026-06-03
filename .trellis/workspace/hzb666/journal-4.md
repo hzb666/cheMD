@@ -1941,3 +1941,37 @@ Added structured ExpressionError codes and facts for derived expression tokenize
 ### Next Steps
 
 - None - task complete
+
+
+## Session 188: Language core phase 16 incremental compiler cache
+
+**Date**: 2026-06-04
+**Task**: Language core phase 16 incremental compiler cache
+**Package**: compiler
+**Branch**: `develop`
+
+### Summary
+
+Added a pure in-memory incremental compiler around compileChemdCore with source/options hashes, cache hit/cold/changed status, revision metadata, invalidate, and snapshot APIs. Validation: incremental compiler tests, program compile tests, module linker tests, compiler typecheck, Trellis validate, and git diff --check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6d490b5` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
