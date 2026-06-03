@@ -15,8 +15,10 @@ describe("CHEMD_LANGUAGE_CONTRACT", () => {
       "from",
       "meta",
       "for",
-      "step"
+      "step",
+      "timeline"
     ]));
+    expect(CHEMD_LANGUAGE_CONTRACT.program.keywords).not.toContain("audit");
     expect(CHEMD_LANGUAGE_CONTRACT.program.tokenTypes).toEqual(expect.arrayContaining([
       "identifier",
       "string",

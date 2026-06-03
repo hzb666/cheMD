@@ -25,9 +25,11 @@ export const parseProgramValue = (
   const lexed = lexProgram(source);
   const tokens = lexed.tokens.filter((token) => token.type !== "comment");
   const parser = new ProgramValueParser(source, tokens, lexed.diagnostics, options);
+  const value = parser.parseValue();
+  parser.diagnoseTrailingTokens();
 
   return {
-    value: parser.parseValue(),
+    value,
     diagnostics: parser.diagnostics,
     tokens: lexed.tokens
   };

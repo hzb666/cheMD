@@ -57,4 +57,20 @@ molecule mol_1 {}`);
       }
     });
   });
+
+  it("adds source spans to unsafe markdown link diagnostics", () => {
+    const result = parseProgramDocComments(
+      "/// See [bad](javascript:alert(1)) before running."
+    );
+
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "W_UNSAFE_LINK_HREF",
+        sourceSpan: expect.objectContaining({
+          startLine: 1,
+          startColumn: 5
+        })
+      })
+    );
+  });
 });

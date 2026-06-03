@@ -22,6 +22,7 @@ import {
 import type { ProgramFieldDeclaration, ProgramSymbolTable } from "./program-utils";
 import type {
   QuantityType,
+  TypecheckOptions,
   TypedSemanticGraph,
   TypedSemanticNode
 } from "./types";
@@ -34,7 +35,8 @@ interface ProgramGraphResult {
 export const buildProgramTypedGraph = (
   program: ChemdProgramDocument,
   symbols: ProgramSymbolTable,
-  diagnostics: V03Diagnostic[]
+  diagnostics: V03Diagnostic[],
+  options: Pick<TypecheckOptions, "procedureMode"> = {}
 ): ProgramGraphResult => {
   const quantities: QuantityType[] = [];
   const typedNodes: TypedSemanticNode[] = [];
@@ -44,7 +46,7 @@ export const buildProgramTypedGraph = (
   const stepDiagnostics: V03Diagnostic[] = [];
 
   for (const declaration of program.declarations) {
-    const built = buildDeclarationNodes(declaration, symbols);
+    const built = buildDeclarationNodes(declaration, symbols, options);
     typedNodes.push(...built.nodes);
     quantities.push(...built.quantities);
     diagnostics.push(...built.diagnostics);
@@ -81,7 +83,8 @@ const createGraphResult = (
 
 const buildDeclarationNodes = (
   declaration: ChemdDeclaration,
-  symbols: ProgramSymbolTable
+  symbols: ProgramSymbolTable,
+  options: Pick<TypecheckOptions, "procedureMode">
 ): {
   nodes: TypedSemanticNode[];
   quantities: QuantityType[];
@@ -89,7 +92,7 @@ const buildDeclarationNodes = (
   procedure?: ProcedureBuildResult;
 } => {
   if (declaration.kind === "procedure") {
-    return buildProcedureDeclaration(declaration, symbols);
+    return buildProcedureDeclaration(declaration, symbols, options);
   }
   if (declaration.kind === "agent_run") {
     return { nodes: [buildAgentRunNode(declaration)], quantities: [], diagnostics: [] };

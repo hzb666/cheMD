@@ -20,8 +20,14 @@ import {
   valueToText,
   type ProgramSymbolTable
 } from "./program-utils";
+import {
+  validateDependencyCycles,
+  validateDependencyRefs,
+  validateStepIds
+} from "./step-rules";
 import type {
   QuantityType,
+  TypecheckOptions,
   TypedSemanticNode,
   TypedStepNode
 } from "./types";
@@ -57,9 +63,10 @@ const STEP_FAMILIES = new Set<StepFamily>([
 
 export const buildProcedureDeclaration = (
   declaration: ProcedureDeclaration,
-  symbols: ProgramSymbolTable
+  symbols: ProgramSymbolTable,
+  options: Pick<TypecheckOptions, "procedureMode"> = {}
 ) => {
-  const built = lowerProgramProcedure(declaration, symbols);
+  const built = lowerProgramProcedure(declaration, symbols, options);
   const node: TypedSemanticNode = {
     nodeId: declaration.id,
     kind: "procedure_narrative",
@@ -70,7 +77,7 @@ export const buildProcedureDeclaration = (
     structureHint: "explicit_steps"
   };
   return {
-    nodes: [node],
+    nodes: options.procedureMode === "lowered" ? [] : [node],
     quantities: [],
     diagnostics: [],
     procedure: built
@@ -79,7 +86,8 @@ export const buildProcedureDeclaration = (
 
 const lowerProgramProcedure = (
   declaration: ProcedureDeclaration,
-  symbols: ProgramSymbolTable
+  symbols: ProgramSymbolTable,
+  options: Pick<TypecheckOptions, "procedureMode">
 ): ProcedureBuildResult => {
   const diagnostics: V03Diagnostic[] = [];
   const steps: CanonicalStepNode[] = [];
@@ -88,6 +96,7 @@ const lowerProgramProcedure = (
   for (const statement of declaration.children) {
     appendProcedureStatement(statement, declaration, symbols, steps, typedSteps, controls, diagnostics, []);
   }
+  diagnostics.push(...validateProgramProcedure(declaration, steps, controls, options));
   return {
     lowering: {
       procedureId: declaration.id,
@@ -102,6 +111,27 @@ const lowerProgramProcedure = (
     quantities: collectProcedureQuantities(declaration)
   };
 };
+
+const validateProgramProcedure = (
+  declaration: ProcedureDeclaration,
+  steps: CanonicalStepNode[],
+  controls: CanonicalProcedureControlNode[],
+  options: Pick<TypecheckOptions, "procedureMode">
+): V03Diagnostic[] => [
+  ...(options.procedureMode === "explicit" && steps.length === 0
+    ? [createProgramDiagnostic(
+        "E_STEP_MISSING_FIELD",
+        "procedureMode=explicit requires procedure step entries.",
+        declaration,
+        "step",
+        "error",
+        { field: "step" }
+      )]
+    : []),
+  ...validateStepIds(steps),
+  ...validateDependencyRefs(steps, controls.map((control) => control.controlId)),
+  ...validateDependencyCycles(steps)
+];
 
 const appendProcedureStatement = (
   statement: ProcedureStatement,

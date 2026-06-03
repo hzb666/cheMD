@@ -27,7 +27,7 @@ export const buildProgramSymbolTable = (
     declarationsById: new Map(),
     declarationsByQualifiedId: new Map(),
     primaryAliases: new Map(),
-    imports: buildImportSymbolMap(program.imports)
+    imports: buildImportSymbolMap(program.imports, diagnostics)
   };
 
   for (const declaration of program.declarations) {

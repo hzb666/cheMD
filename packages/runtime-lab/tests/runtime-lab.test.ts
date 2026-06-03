@@ -119,7 +119,7 @@ describe("runtime lab planner", () => {
           {
             stepId: "s-heat",
             family: "heat",
-            params: { temperature: "150 C", duration: "30 min" },
+            params: { target_temperature: "150 C", duration: "30 min" },
             inputs: [{ raw: "@mat-base" }],
             source: {
               sourceNodeType: "procedure",
@@ -353,6 +353,14 @@ describe("runtime lab state machine", () => {
         code: "E_RUNTIME_UNKNOWN_STEP",
         severity: "error",
         sourceLayer: "runtime_preflight"
+      })
+    );
+    expect(preflight.issues).toContainEqual(
+      expect.objectContaining({
+        code: "E_RUNTIME_UNKNOWN_STEP",
+        kind: "adapter",
+        stepId: "s1",
+        severity: "error"
       })
     );
   });

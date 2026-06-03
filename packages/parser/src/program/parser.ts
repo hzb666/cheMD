@@ -76,6 +76,7 @@ export const parseChemdProgram = (
     docs,
     diagnostics,
     source,
+    sourceSpan: sourceSpanForSource(source),
     renderSelection: options.renderSelection
   };
 };
@@ -179,10 +180,24 @@ const createEmptyProgramDocument = (
   docs: [],
   diagnostics,
   source,
+  sourceSpan: sourceSpanForSource(source),
   renderSelection: options.renderSelection
 });
 
 const emptySpan = (): SourceSpan => ({});
+
+const sourceSpanForSource = (source: string): SourceSpan => {
+  const lines = source.split(/\r\n|\n|\r/);
+  const lastLine = lines[lines.length - 1] ?? "";
+  return {
+    start: 0,
+    end: source.length,
+    startLine: 1,
+    startColumn: 1,
+    endLine: lines.length,
+    endColumn: lastLine.length + 1
+  };
+};
 
 const decodeStringToken = (token?: { raw: string }): string => {
   if (!token) {

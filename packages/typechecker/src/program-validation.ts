@@ -3,14 +3,16 @@ import {
   getDeclarationSchema,
   resolveDeclarationField,
   type DeclarationFieldSchema,
-  type DeclarationFieldValueSchema
+  type DeclarationFieldValueSchema,
+  type DeclarationReferenceTargetKind
 } from "@chemd/core";
-import type { ChemdDeclaration, ChemdValue } from "@chemd/core";
+import type { ChemdDeclaration, ChemdReferenceExpr, ChemdValue } from "@chemd/core";
 import type { V03Diagnostic } from "@chemd/diagnostics";
 
 import {
   createProgramDiagnostic,
-  hasFields
+  hasFields,
+  type ProgramSymbolTable
 } from "./program-utils";
 
 const SCALAR_VALUE_TYPES = new Set<ChemdValue["type"]>([
@@ -21,11 +23,15 @@ const SCALAR_VALUE_TYPES = new Set<ChemdValue["type"]>([
 ]);
 
 export const validateProgramDeclarationSchemas = (
-  declarations: ChemdDeclaration[]
+  declarations: ChemdDeclaration[],
+  symbols: ProgramSymbolTable
 ): V03Diagnostic[] =>
-  declarations.flatMap(validateDeclarationSchema);
+  declarations.flatMap((declaration) => validateDeclarationSchema(declaration, symbols));
 
-const validateDeclarationSchema = (declaration: ChemdDeclaration): V03Diagnostic[] => {
+const validateDeclarationSchema = (
+  declaration: ChemdDeclaration,
+  symbols: ProgramSymbolTable
+): V03Diagnostic[] => {
   const schema = getDeclarationSchema(declaration.kind);
   if (!schema) {
     return [
@@ -38,20 +44,21 @@ const validateDeclarationSchema = (declaration: ChemdDeclaration): V03Diagnostic
   }
 
   const fieldDiagnostics = hasFields(declaration)
-    ? validateFieldDeclaration(declaration, schema.fields)
+    ? validateFieldDeclaration(declaration, schema.fields, symbols)
     : validateNonFieldDeclaration(declaration, schema.fields);
   return [...fieldDiagnostics, ...validateUnknownFields(declaration, schema.allowsArbitraryFields === true)];
 };
 
 const validateFieldDeclaration = (
   declaration: Extract<ChemdDeclaration, { fields: Record<string, ChemdValue> }>,
-  fields: DeclarationFieldSchema[]
+  fields: DeclarationFieldSchema[],
+  symbols: ProgramSymbolTable
 ): V03Diagnostic[] =>
   fields.flatMap((field) => {
     const value = readFieldValue(declaration.fields, field);
     return [
       ...validateRequiredField(declaration, field, value),
-      ...validateValueSchema(declaration, field.name, value, field.value)
+      ...validateValueSchema(declaration, field.name, value, field.value, symbols)
     ];
   });
 
@@ -122,37 +129,43 @@ const validateValueSchema = (
   declaration: ChemdDeclaration,
   field: string,
   value: ChemdValue | undefined,
-  schema: DeclarationFieldValueSchema | undefined
+  schema: DeclarationFieldValueSchema | undefined,
+  symbols: ProgramSymbolTable
 ): V03Diagnostic[] => {
   if (!value || !schema) return [];
-  if (schema.kind === "list") return validateListValue(declaration, field, value, schema);
-  if (schema.kind === "record") return validateRecordValue(declaration, field, value, schema);
-  return valueMatchesSchema(value, schema)
-    ? []
-    : [createValueDiagnostic(declaration, field, value, schema.kind)];
+  if (schema.kind === "list") return validateListValue(declaration, field, value, schema, symbols);
+  if (schema.kind === "record") return validateRecordValue(declaration, field, value, schema, symbols);
+  if (!valueMatchesSchema(value, schema)) {
+    return [createValueDiagnostic(declaration, field, value, schema.kind)];
+  }
+  return validateReferenceTargetKind(declaration, field, value, schema, symbols);
 };
 
 const validateListValue = (
   declaration: ChemdDeclaration,
   field: string,
   value: ChemdValue,
-  schema: Extract<DeclarationFieldValueSchema, { kind: "list" }>
+  schema: Extract<DeclarationFieldValueSchema, { kind: "list" }>,
+  symbols: ProgramSymbolTable
 ): V03Diagnostic[] => {
   if (value.type !== "list") {
     return [createValueDiagnostic(declaration, field, value, "list")];
   }
-  return value.items.flatMap((item) => validateValueSchema(declaration, field, item, schema.item));
+  return value.items.flatMap((item) =>
+    validateValueSchema(declaration, field, item, schema.item, symbols)
+  );
 };
 
 const validateRecordValue = (
   declaration: ChemdDeclaration,
   field: string,
   value: ChemdValue,
-  schema: Extract<DeclarationFieldValueSchema, { kind: "record" }>
+  schema: Extract<DeclarationFieldValueSchema, { kind: "record" }>,
+  symbols: ProgramSymbolTable
 ): V03Diagnostic[] => {
   if (value.type !== "record") {
-    if (schema.head && valueMatchesSchema(value, schema.head as Exclude<DeclarationFieldValueSchema, { kind: "list" | "record" }>)) {
-      return [];
+    if (schema.head && recordHeadAcceptsValue(value, schema.head)) {
+      return validateValueSchema(declaration, field, value, schema.head, symbols);
     }
     return [createValueDiagnostic(declaration, field, value, "record")];
   }
@@ -171,8 +184,17 @@ const validateRecordValue = (
         )
       ];
     }
-    return validateValueSchema(declaration, field, recordField.value, fieldSchema);
+    return validateValueSchema(declaration, field, recordField.value, fieldSchema, symbols);
   });
+};
+
+const recordHeadAcceptsValue = (
+  value: ChemdValue,
+  schema: DeclarationFieldValueSchema
+): boolean => {
+  if (schema.kind === "list") return value.type === "list";
+  if (schema.kind === "record") return value.type === "record";
+  return valueMatchesSchema(value, schema);
 };
 
 const valueMatchesSchema = (
@@ -191,6 +213,61 @@ const valueMatchesSchema = (
   }
   return value.type === "call" || value.type === "record" || value.type === "list" || SCALAR_VALUE_TYPES.has(value.type);
 };
+
+const validateReferenceTargetKind = (
+  declaration: ChemdDeclaration,
+  field: string,
+  value: ChemdValue,
+  schema: Exclude<DeclarationFieldValueSchema, { kind: "list" | "record" }>,
+  symbols: ProgramSymbolTable
+): V03Diagnostic[] => {
+  if (value.type !== "reference") return [];
+  if (schema.kind !== "reference" && schema.kind !== "ref_or_literal") return [];
+  const actualKind = referenceTargetKind(value, symbols);
+  if (!actualKind) return [];
+  const expectedKinds = normalizeTargetKinds(schema.targetKind);
+  return expectedKinds.includes(actualKind as DeclarationReferenceTargetKind)
+    ? []
+    : [createReferenceTargetDiagnostic(declaration, field, value, expectedKinds, actualKind)];
+};
+
+const normalizeTargetKinds = (
+  targetKind: DeclarationReferenceTargetKind | readonly DeclarationReferenceTargetKind[]
+): DeclarationReferenceTargetKind[] =>
+  typeof targetKind === "string" ? [targetKind] : [...targetKind];
+
+const referenceTargetKind = (
+  reference: ChemdReferenceExpr,
+  symbols: ProgramSymbolTable
+): string | undefined => {
+  if (reference.refKind === "external_document") return undefined;
+  if (reference.refKind === "field") return "field";
+  if (reference.refKind === "module") {
+    return symbols.get(`${reference.moduleName}.${reference.target}`)?.kind;
+  }
+  return symbols.get(reference.target)?.kind;
+};
+
+const createReferenceTargetDiagnostic = (
+  declaration: ChemdDeclaration,
+  field: string,
+  value: ChemdReferenceExpr,
+  expectedKinds: DeclarationReferenceTargetKind[],
+  actualKind: string
+): V03Diagnostic =>
+  createProgramDiagnostic(
+    "E_PROGRAM_REFERENCE_TARGET_KIND",
+    `Field '${field}' on ${declaration.kind} expected reference target ${expectedKinds.join(" or ")}, got ${actualKind}.`,
+    declaration,
+    field,
+    "error",
+    {
+      expectedTargetKind: expectedKinds,
+      actualTargetKind: actualKind,
+      referenceTarget: value.target
+    },
+    value.sourceSpan
+  );
 
 const createValueDiagnostic = (
   declaration: ChemdDeclaration,

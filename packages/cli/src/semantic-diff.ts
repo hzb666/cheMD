@@ -71,7 +71,7 @@ const normalizeValue = (value: unknown): unknown => {
     return Object.fromEntries(
       Object.entries(value)
         .filter(([key, nestedValue]) =>
-          !VOLATILE_NESTED_FIELDS.has(key) && nestedValue !== undefined
+          !isVolatileField(value, key) && nestedValue !== undefined
         )
         .sort(([left], [right]) => left.localeCompare(right))
         .map(([key, nestedValue]) => [key, normalizeValue(nestedValue)])
@@ -80,6 +80,12 @@ const normalizeValue = (value: unknown): unknown => {
 
   return value;
 };
+
+const isVolatileField = (owner: object, key: string): boolean =>
+  VOLATILE_NESTED_FIELDS.has(key) || key === "raw" && isChemdValueLike(owner);
+
+const isChemdValueLike = (value: object): boolean =>
+  "type" in value && typeof (value as { type?: unknown }).type === "string";
 
 const stableValue = (value: unknown): string => JSON.stringify(normalizeValue(value));
 

@@ -137,6 +137,15 @@ export const referenceToTyped = (
   reference: ChemdReferenceExpr,
   symbols: ProgramSymbolTable
 ): ReferenceType => {
+  const imported = readImportedModuleReference(reference);
+  if (imported) {
+    return {
+      kind: "reference",
+      refId: `${imported.moduleName}.${imported.target}`,
+      targetKind: "unknown",
+      resolved: true
+    };
+  }
   const refId = reference.refKind === "external_document"
     ? `${reference.externalDocumentId}#${reference.target}`
     : normalizeRef(reference.target);
@@ -147,6 +156,20 @@ export const referenceToTyped = (
     targetKind: target ? TARGET_KIND_BY_DECLARATION[target.kind] : "unknown",
     resolved: Boolean(target)
   };
+};
+
+const readImportedModuleReference = (
+  reference: ChemdReferenceExpr
+): { moduleName: string; target: string } | undefined => {
+  const value = reference.resolved?.value;
+  if (!value || typeof value !== "object") return undefined;
+  if ((value as { kind?: unknown }).kind !== "imported_module_reference") {
+    return undefined;
+  }
+  const imported = value as { moduleName?: unknown; target?: unknown };
+  return typeof imported.moduleName === "string" && typeof imported.target === "string"
+    ? { moduleName: imported.moduleName, target: imported.target }
+    : undefined;
 };
 
 export const valueToReferenceOrLiteral = (

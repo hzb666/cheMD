@@ -1384,7 +1384,7 @@ describe("chemd cli changed", () => {
     expect(result.stdout).toMatch(/M tracked\.chemd/);
     expect(result.stdout).toMatch(/validation: 0 error\(s\)/);
     expect(result.stdout).toMatch(/semantic diff:/);
-    expect(result.stdout).toMatch(/~ fields: .*25 C.*80 C/);
+    expect(result.stdout).toMatch(/~ fields\.temperature: .*25 C.*80 C/);
   });
 
   it("writes JSON for modified tracked chemd files", async () => {

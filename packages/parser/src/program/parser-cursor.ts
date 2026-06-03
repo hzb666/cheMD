@@ -86,6 +86,14 @@ export class ProgramParserCursor {
 
   parseValue(): ChemdValue {
     const range = this.consumeValueRange();
+    if (!range) {
+      return {
+        type: "identifier",
+        raw: "",
+        name: "unknown",
+        sourceSpan: {}
+      };
+    }
     const raw = this.source.slice(range.start.start, range.end.end);
     const result = parseProgramValue(raw, {
       references: { moduleNames: this.referenceModuleNames }
@@ -176,10 +184,11 @@ export class ProgramParserCursor {
     }
   }
 
-  private consumeValueRange(): { start: ProgramToken; end: ProgramToken } {
+  private consumeValueRange(): { start: ProgramToken; end: ProgramToken } | undefined {
     const start = this.peek();
     if (!start) {
-      throw new Error("Cannot parse a value at end of program tokens.");
+      this.syntaxError("E_PROGRAM_EXPECTED_VALUE", "Expected a program value.");
+      return undefined;
     }
     let depth = 0;
     let endIndex = this.index;

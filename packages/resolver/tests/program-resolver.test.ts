@@ -350,4 +350,30 @@ reaction mol_a {
       })
     );
   });
+
+  it("reports duplicate import names and aliases before reference resolution", () => {
+    const document = resolve(`module exp_import_alias
+
+import shared_a as shared from "./a.chemd"
+import shared_b as shared from "./b.chemd"
+
+meta {
+  id: "exp-import-alias"
+  title: "Import alias"
+  date: "2026-06-04"
+}
+
+reaction rxn_1 {
+  imported: @shared.rxn_x
+}
+`);
+
+    expect(document.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "E_DUPLICATE_IMPORT_ALIAS",
+        severity: "error",
+        nodeId: "shared"
+      })
+    );
+  });
 });

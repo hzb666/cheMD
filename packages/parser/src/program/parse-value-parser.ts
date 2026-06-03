@@ -55,6 +55,18 @@ export class ProgramValueParser {
     return undefined;
   }
 
+  diagnoseTrailingTokens(): void {
+    const token = this.current();
+    if (token.type === "eof") {
+      return;
+    }
+    this.addDiagnostic(
+      token,
+      "E_PROGRAM_UNEXPECTED_TRAILING_TOKEN",
+      "Unexpected token after program value."
+    );
+  }
+
   consumeClosing(type: ProgramTokenType, fallback: ProgramToken): ProgramToken {
     return this.consume(type, `Expected '${closingRaw(type)}'.`) ?? fallback;
   }

@@ -172,6 +172,72 @@ reaction rxn_nested {
     );
   });
 
+  it("validates reference target kinds declared by field schemas", () => {
+    const result = typecheckDocument(parse(`module exp_ref_kind
+
+meta {
+  id: "exp-ref-kind"
+  title: "Reference kind"
+  date: "2026-06-04"
+}
+
+molecule mol_a {
+  name: "A"
+}
+
+reaction rxn_1 {
+  reactants: [@mol_a]
+}
+
+result res_bad for @rxn_1 {
+  reaction: @mol_a
+}
+`));
+
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "E_PROGRAM_REFERENCE_TARGET_KIND",
+        sourceNodeId: "res_bad",
+        sourceField: "reaction",
+        facts: expect.objectContaining({
+          actualTargetKind: "molecule",
+          expectedTargetKind: ["reaction"]
+        })
+      })
+    );
+  });
+
+  it("validates reference target kinds inside nested lists", () => {
+    const result = typecheckDocument(parse(`module exp_ref_list_kind
+
+meta {
+  id: "exp-ref-list-kind"
+  title: "Reference list kind"
+  date: "2026-06-04"
+}
+
+result res_bad {
+  status: success
+}
+
+reaction rxn_bad {
+  reactants: [@res_bad]
+}
+`));
+
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "E_PROGRAM_REFERENCE_TARGET_KIND",
+        sourceNodeId: "rxn_bad",
+        sourceField: "reactants",
+        facts: expect.objectContaining({
+          actualTargetKind: "result",
+          expectedTargetKind: ["molecule", "material", "batch"]
+        })
+      })
+    );
+  });
+
   it("preserves upstream diagnostic source layers", () => {
     const program = parse(`module exp_upstream_diag
 

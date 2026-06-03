@@ -57,6 +57,31 @@ describe("buildSemanticDiff", () => {
     expect(diff.changes).toEqual([]);
   });
 
+  it("ignores raw spelling when typed Chemd values are semantically equal", () => {
+    const before = document(10, 10);
+    const after: ChemdProgramDocument = {
+      ...document(10, 10),
+      declarations: before.declarations.map((item) =>
+        item.kind === "result"
+          ? {
+              ...item,
+              fields: {
+                ...item.fields,
+                yield: {
+                  type: "percent",
+                  raw: "77.0%",
+                  value: 77
+                }
+              }
+            }
+          : item
+      )
+    };
+    const diff = buildSemanticDiff(before, after);
+
+    expect(diff.changes).toEqual([]);
+  });
+
   it("diffs module meta imports and declaration field paths from the AST", () => {
     const before = document(10, 10);
     const after: ChemdProgramDocument = {
@@ -130,8 +155,8 @@ describe("buildSemanticDiff", () => {
         fields: expect.arrayContaining([
           expect.objectContaining({
             field: "fields.yield",
-            before: expect.objectContaining({ raw: "77%" }),
-            after: expect.objectContaining({ raw: "80%" })
+            before: expect.objectContaining({ type: "percent", value: 77 }),
+            after: expect.objectContaining({ type: "percent", value: 80 })
           })
         ])
       })

@@ -1,4 +1,3 @@
-import { createV03Diagnostic, type V03Diagnostic } from "@chemd/diagnostics";
 import {
   isRobotRunnableStep,
   STEP_FAMILIES,
@@ -13,18 +12,18 @@ import type {
 } from "./index";
 import { createPreflightDiagnostic, type PreflightIssue, type PreflightResult } from "./runtime-errors";
 
-const createUnknownRobotStepDiagnostic = (step: RuntimeStep): V03Diagnostic =>
-  createV03Diagnostic({
+const createUnknownRobotStepIssue = (step: RuntimeStep): PreflightIssue => ({
     code: "E_RUNTIME_UNKNOWN_STEP",
     severity: "error",
     message: `Step family cannot enter robot-run without adapter support: ${step.family}`,
-    sourceLayer: "runtime_preflight",
-    sourceNodeType: step.source.sourceNodeType,
-    sourceNodeId: step.source.sourceNodeId,
+    kind: "adapter",
+    stepId: step.stepId,
     facts: {
+      step_id: step.stepId,
       step_family: step.family,
       mode: "robot-run"
-    }
+    },
+    requiredAction: "provide_adapter"
   });
 
 const isKnownStepFamily = (family: StepFamily): boolean =>
@@ -49,21 +48,21 @@ export const preflightRun = (plan: RunPlan, context: RuntimeContext): PreflightR
         requiredAction: "change_context"
       }))
   );
-  const robotDiagnostics = context.mode === "robot-run"
+  const robotIssues = context.mode === "robot-run"
     ? plan.steps
         .filter((step) => !isKnownStepFamily(step.family) || !isRobotRunnableStep(step.family))
-        .map((step) => createUnknownRobotStepDiagnostic(step))
+        .map((step) => createUnknownRobotStepIssue(step))
     : [];
   const issues = [
     ...capabilityIssues,
+    ...robotIssues,
     ...collectDeviceRangeIssues(plan, context),
     ...collectInventoryIssues(plan, context),
     ...collectSafetyIssues(plan, context),
     ...collectControlIssues(plan, context)
   ];
   const diagnostics = [
-    ...issues.map(createPreflightDiagnostic),
-    ...robotDiagnostics
+    ...issues.map(createPreflightDiagnostic)
   ];
 
   return {
@@ -97,7 +96,7 @@ const collectDeviceRangeIssues = (
   plan.steps.flatMap((step) =>
     step.requiredCapabilities.flatMap((capability) => {
       const device = context.devices?.find((item) => item.capability === capability);
-      const candidate = readNumericParam(step.params.temperature ?? step.params.pressure ?? step.params.rpm ?? step.params.rate);
+      const candidate = readDeviceCandidate(step.params, capability);
       if (!device || candidate === undefined) {
         return [];
       }
@@ -122,6 +121,32 @@ const collectDeviceRangeIssues = (
       return [];
     })
   );
+
+const readDeviceCandidate = (
+  params: RuntimeStep["params"],
+  capability: RuntimeStep["requiredCapabilities"][number]
+): number | undefined => {
+  for (const key of deviceParamKeys(capability)) {
+    const candidate = readNumericParam(params[key]);
+    if (candidate !== undefined) return candidate;
+  }
+  return undefined;
+};
+
+const deviceParamKeys = (
+  capability: RuntimeStep["requiredCapabilities"][number]
+): string[] => {
+  if (capability === "heating" || capability === "cooling") {
+    return ["temperature", "target_temperature", "targetTemperature"];
+  }
+  if (capability === "vacuum") {
+    return ["pressure", "target_pressure", "targetPressure"];
+  }
+  if (capability === "stirring") {
+    return ["rpm", "rate", "stir_rate", "stirRate"];
+  }
+  return ["temperature", "target_temperature", "pressure", "rpm", "rate"];
+};
 
 const normalizeMaterialId = (value: string): string =>
   value.trim().replace(/^@/, "");

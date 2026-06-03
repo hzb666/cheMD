@@ -6,6 +6,7 @@ import type {
 } from "@chemd/core";
 
 import type { ProgramParserContext, ProgramParserCursor } from "./parser";
+import { tokenValue } from "./parser";
 import { parseFieldBlock, valueAsString } from "./parse-declarations";
 
 const PRIMARY_FIELD_TARGETS: Record<string, keyof ChemdMetaPrimaryReferences> = {
@@ -20,6 +21,15 @@ export const parseMetaDeclaration = (
   cursor: ProgramParserCursor,
   context: ProgramParserContext
 ): ChemdMetaDeclaration => {
+  if (tokenValue(cursor.peekAfterDocs()) !== "meta") {
+    cursor.syntaxError(
+      "E_PROGRAM_META_EXPECTED",
+      "Expected 'meta' declaration.",
+      cursor.peekAfterDocs()
+    );
+    return createEmptyMetaDeclaration();
+  }
+
   const docs = cursor.collectDocs();
   const start = cursor.expectValue("meta", "E_PROGRAM_META_EXPECTED");
   const parsed = parseFieldBlock(cursor);
@@ -37,6 +47,17 @@ export const parseMetaDeclaration = (
     fieldSpans: parsed.fieldSpans
   };
 };
+
+const createEmptyMetaDeclaration = (): ChemdMetaDeclaration => ({
+  kind: "meta",
+  id: "",
+  title: "",
+  date: "",
+  fields: {},
+  docs: [],
+  sourceSpan: {},
+  fieldSpans: {}
+});
 
 const collectPrimaryReferences = (
   fields: Record<string, ChemdValue>

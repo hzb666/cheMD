@@ -39,7 +39,7 @@ export const CHEMD_LANGUAGE_CONTRACT = {
       "tool",
       "patch",
       "decision",
-      "audit"
+      "timeline"
     ],
     declarationKinds: [
       "molecule",

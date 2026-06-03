@@ -92,6 +92,69 @@ procedure proc_1 {
     expect(result.typedGraph.quantities.map((item) => item.raw)).toContain("1 mmol");
   });
 
+  it("validates duplicate procedure step ids dependency refs and cycles", () => {
+    const result = typecheckProgram(parse(`module exp_proc_invalid
+
+meta {
+  id: "exp-proc-invalid"
+  title: "Procedure invalid"
+  date: "2026-06-04"
+}
+
+procedure proc_1 {
+  step charge = charge(depends_on: [heat])
+  step charge = heat(depends_on: [charge])
+}
+`));
+
+    expect(result.diagnostics.map((item) => item.code)).toEqual(
+      expect.arrayContaining([
+        "E_STEP_ID_DUPLICATE",
+        "E_STEP_DEPENDENCY_CYCLE"
+      ])
+    );
+  });
+
+  it("diagnoses missing explicit steps when procedureMode is explicit", () => {
+    const result = typecheckProgram(parse(`module exp_proc_empty
+
+meta {
+  id: "exp-proc-empty"
+  title: "Procedure empty"
+  date: "2026-06-04"
+}
+
+procedure proc_1 {
+}
+`), { procedureMode: "explicit" });
+
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({ code: "E_STEP_MISSING_FIELD" })
+    );
+  });
+
+  it("can emit lowered-only procedure graph nodes", () => {
+    const result = typecheckProgram(parse(`module exp_proc_lowered
+
+meta {
+  id: "exp-proc-lowered"
+  title: "Procedure lowered"
+  date: "2026-06-04"
+}
+
+procedure proc_1 {
+  step charge = charge(amount: 1 mmol)
+}
+`), { procedureMode: "lowered" });
+
+    expect(result.typedGraph.nodes).toContainEqual(
+      expect.objectContaining({ kind: "step", nodeId: "charge" })
+    );
+    expect(result.typedGraph.nodes).not.toContainEqual(
+      expect.objectContaining({ kind: "procedure_narrative", nodeId: "proc_1" })
+    );
+  });
+
   it("validates agent tool patch decision and terminal status fields", () => {
     const result = typecheckProgram(parse(`module exp_agent
 

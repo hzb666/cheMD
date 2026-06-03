@@ -50,4 +50,17 @@ describe("createChemdIncrementalCompiler", () => {
     expect(changed.cache.revision).toBe(first.cache.revision + 1);
     expect(changed.cache.optionsHash).not.toBe(first.cache.optionsHash);
   });
+
+  it("protects stored cache metadata from returned object mutation", () => {
+    const compiler = createChemdIncrementalCompiler();
+    const first = compiler.compile(baseSource);
+    first.cache.revision = 999;
+    compiler.snapshot().entries[0]!.revision = 777;
+
+    const second = compiler.compile(baseSource);
+
+    expect(second.cache.status).toBe("hit");
+    expect(second.cache.revision).toBe(1);
+    expect(compiler.snapshot().entries[0]!.revision).toBe(1);
+  });
 });

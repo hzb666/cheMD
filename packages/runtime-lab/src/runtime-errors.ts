@@ -10,7 +10,8 @@ export type RuntimeIssueCode =
   | "E_RUNTIME_RESOURCE_CONFLICT"
   | "E_RUNTIME_SAFETY_CONFIRMATION"
   | "E_RUNTIME_SAFETY_RULE"
-  | "E_RUNTIME_SAFETY_TAG";
+  | "E_RUNTIME_SAFETY_TAG"
+  | "E_RUNTIME_UNKNOWN_STEP";
 
 export interface PreflightIssue {
   code: RuntimeIssueCode;
@@ -62,6 +63,7 @@ export const createPreflightDiagnostic = (issue: PreflightIssue): V03Diagnostic 
 
 const codeForPreflightIssue = (issue: PreflightIssue): string => {
   if (issue.code === "E_RUNTIME_CAPABILITY_MISSING") return "E605";
+  if (issue.code === "E_RUNTIME_UNKNOWN_STEP") return "E_RUNTIME_UNKNOWN_STEP";
   if (issue.kind === "device_range") return "E_RUNTIME_DEVICE_RANGE";
   if (issue.kind === "inventory") return "E_RUNTIME_INVENTORY";
   if (issue.kind === "adapter") return "E_RUNTIME_ADAPTER";

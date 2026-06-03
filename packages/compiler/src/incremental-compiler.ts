@@ -32,6 +32,8 @@ export interface ChemdIncrementalCompiler {
 interface CacheEntry {
   result: CompileCoreResult;
   info: ChemdIncrementalCacheInfo;
+  source: string;
+  optionsKey: string;
 }
 
 export const createChemdIncrementalCompiler = (): ChemdIncrementalCompiler => {
@@ -41,11 +43,12 @@ export const createChemdIncrementalCompiler = (): ChemdIncrementalCompiler => {
   return {
     compile(source, options = {}) {
       const sourceHash = hashString(source);
-      const optionsHash = hashString(stableStringify(options));
+      const optionsKey = stableStringify(options);
+      const optionsHash = hashString(optionsKey);
       const cacheKey = `${sourceHash}:${optionsHash}`;
       const cached = entries.get(cacheKey);
 
-      if (cached) {
+      if (cached?.source === source && cached.optionsKey === optionsKey) {
         return {
           result: cached.result,
           cache: { ...cached.info, status: "hit" }
@@ -61,9 +64,14 @@ export const createChemdIncrementalCompiler = (): ChemdIncrementalCompiler => {
         optionsHash,
         revision
       };
-      entries.set(cacheKey, { result, info });
+      entries.set(cacheKey, {
+        result,
+        info: { ...info },
+        source,
+        optionsKey
+      });
 
-      return { result, cache: info };
+      return { result, cache: { ...info } };
     },
     invalidate(cacheKey) {
       if (cacheKey) {
@@ -74,7 +82,7 @@ export const createChemdIncrementalCompiler = (): ChemdIncrementalCompiler => {
     },
     snapshot() {
       return {
-        entries: [...entries.values()].map((item) => item.info)
+        entries: [...entries.values()].map((item) => ({ ...item.info }))
       };
     }
   };

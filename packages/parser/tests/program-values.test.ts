@@ -149,4 +149,16 @@ describe("program value parser", () => {
       ]
     });
   });
+
+  it("diagnoses trailing tokens after one complete value", () => {
+    const result = parseProgramValue("@rxn @extra");
+
+    expect(result.value).toMatchObject({ type: "reference", target: "rxn" });
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "E_PROGRAM_UNEXPECTED_TRAILING_TOKEN",
+        sourceSpan: expect.objectContaining({ startColumn: 6 })
+      })
+    );
+  });
 });

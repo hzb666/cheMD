@@ -260,4 +260,46 @@ reaction rxn_recover {
       }
     });
   });
+
+  it("keeps declarations when meta block is missing", () => {
+    const document = parseChemdProgram(`module exp_missing_meta
+
+molecule mol_a {
+  name: "A"
+}
+`);
+
+    expect(document.meta).toMatchObject({
+      kind: "meta",
+      id: "",
+      title: "",
+      date: ""
+    });
+    expect(document.declarations).toHaveLength(1);
+    expect(document.declarations[0]).toMatchObject({
+      kind: "molecule",
+      id: "mol_a"
+    });
+    expect(document.diagnostics).toContainEqual(
+      expect.objectContaining({ code: "E_PROGRAM_META_EXPECTED" })
+    );
+  });
+
+  it("adds a source span to the full program document", () => {
+    const document = parseChemdProgram(`module exp_span
+
+meta {
+  id: "exp-span"
+  title: "Span"
+  date: "2026-06-04"
+}
+`);
+
+    expect(document.sourceSpan).toMatchObject({
+      start: 0,
+      startLine: 1,
+      startColumn: 1,
+      endLine: 8
+    });
+  });
 });

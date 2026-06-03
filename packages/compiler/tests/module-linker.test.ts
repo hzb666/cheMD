@@ -121,4 +121,79 @@ reaction rxn_shared {
       })
     ]));
   });
+
+  it("diagnoses a missing entry module without silently selecting it", () => {
+    const result = linkChemdModules([
+      {
+        path: "entry.chemd",
+        source: `module exp_entry
+
+meta {
+  id: "exp-entry"
+  title: "Entry"
+  date: "2026-06-04"
+}
+`
+      }
+    ], { entry: "missing.chemd" });
+
+    expect(result.entry.moduleName).toBe("exp_entry");
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "E_MODULE_ENTRY_NOT_FOUND",
+        sourceLayer: "module-linker",
+        facts: expect.objectContaining({ entry: "missing.chemd" })
+      })
+    );
+  });
+
+  it("materializes cross-module reference target kinds in linked typed graphs", () => {
+    const result = linkChemdModules([
+      {
+        path: "entry.chemd",
+        source: `module exp_entry
+
+import shared_solvents as solvents from "./shared-solvents.chemd"
+
+meta {
+  id: "exp-entry"
+  title: "Entry"
+  date: "2026-06-04"
+}
+
+result res_entry for @solvents.rxn_shared {
+  yield: 78%
+}
+`
+      },
+      {
+        path: "./shared-solvents.chemd",
+        source: `module shared_solvents
+
+meta {
+  id: "shared-solvents"
+  title: "Shared solvents"
+  date: "2026-06-04"
+}
+
+reaction rxn_shared {
+  name: "shared"
+}
+`
+      }
+    ]);
+    const entryResult = result.entry.coreResult.typedSemanticGraph.nodes.find(
+      (node) => node.nodeId === "res_entry"
+    );
+
+    expect(entryResult).toMatchObject({
+      kind: "result",
+      reaction: {
+        kind: "reference",
+        refId: "shared_solvents.rxn_shared",
+        targetKind: "reaction",
+        resolved: true
+      }
+    });
+  });
 });

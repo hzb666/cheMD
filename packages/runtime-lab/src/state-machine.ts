@@ -70,6 +70,9 @@ export interface CompleteStepOptions extends RuntimeActionOptions {
   observations?: RuntimeObservationRecord[];
 }
 
+type RuntimeTraceEventDraft = Omit<RuntimeTraceEvent, "traceId" | "timestamp"> &
+  Partial<Pick<RuntimeTraceEvent, "traceId" | "timestamp">>;
+
 export const initializeStepStates = (steps: RuntimeStep[]): RuntimeStepState[] =>
   steps.map((step) => ({
     stepId: step.stepId,
@@ -99,9 +102,7 @@ const cloneState = (state: LabState): LabState => ({
 const createTraceEvent = (
   type: RuntimeTraceEventType,
   input: Omit<RuntimeTraceEvent, "traceId" | "timestamp" | "type">
-): RuntimeTraceEvent => ({
-  traceId: `trace-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-  timestamp: new Date().toISOString(),
+): RuntimeTraceEventDraft => ({
   type,
   ...input
 });
@@ -112,10 +113,25 @@ const findStepState = (state: LabState, stepId: string): RuntimeStepState | unde
 const findRuntimeStep = (plan: RunPlan, stepId: string): RuntimeStep | undefined =>
   plan.steps.find((step) => step.stepId === stepId);
 
-const appendTrace = (state: LabState, ...events: RuntimeTraceEvent[]): LabState => ({
+const appendTrace = (state: LabState, ...events: RuntimeTraceEventDraft[]): LabState => ({
   ...state,
-  trace: [...state.trace, ...events]
+  trace: [...state.trace, ...stampTraceEvents(state, events)]
 });
+
+const stampTraceEvents = (
+  state: LabState,
+  events: RuntimeTraceEventDraft[]
+): RuntimeTraceEvent[] => events.map((event, index) => {
+  const sequence = state.trace.length + index + 1;
+  return {
+    traceId: event.traceId ?? `${state.runId}:trace:${sequence}`,
+    timestamp: event.timestamp ?? timestampForSequence(sequence),
+    ...event
+  };
+});
+
+const timestampForSequence = (sequence: number): string =>
+  new Date(sequence).toISOString();
 
 const createStepNotReadyDiagnostic = (
   step: RuntimeStep | undefined,
@@ -150,7 +166,7 @@ const withStepStatus = (
   ...state,
   stepStates: state.stepStates.map((step) =>
     step.stepId === stepId
-      ? { ...step, status, ...(timestampField ? { [timestampField]: new Date().toISOString() } : {}) }
+      ? { ...step, status, ...(timestampField ? { [timestampField]: timestampForSequence(state.trace.length + 1) } : {}) }
       : step
   )
 });
@@ -285,7 +301,7 @@ const linkObservationsToStep = (
 const createOutputTraceEvents = (
   stepId: string,
   options: CompleteStepOptions
-): RuntimeTraceEvent[] => [
+): RuntimeTraceEventDraft[] => [
   ...linkArtifactsToStep(options.artifacts, stepId).map((artifact) =>
     createTraceEvent("artifact_generated", { stepId, artifact })
   ),

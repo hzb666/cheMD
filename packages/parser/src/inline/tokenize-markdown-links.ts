@@ -105,7 +105,8 @@ export const tokenizeMarkdownLinks = (
         code: "W_UNSAFE_LINK_HREF",
         severity: "error",
         message: `Unsafe markdown link href: ${href}`,
-        sourceLayer: "parser"
+        sourceLayer: "parser",
+        sourceSpan: getSpanFromOffsets(value, labelStart, hrefEnd)
       });
     }
 

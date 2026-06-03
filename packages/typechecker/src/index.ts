@@ -62,10 +62,10 @@ export const typecheckProgram = (
   const diagnostics = program.diagnostics.map(toTypecheckDiagnostic);
   const symbols = buildProgramSymbolTable(program);
   diagnostics.push(
-    ...validateProgramDeclarationSchemas(program.declarations),
+    ...validateProgramDeclarationSchemas(program.declarations, symbols),
     ...validateProgramAgentRuns(program, symbols)
   );
-  const { typedGraph: baseGraph, stepGraph } = buildProgramTypedGraph(program, symbols, diagnostics);
+  const { typedGraph: baseGraph, stepGraph } = buildProgramTypedGraph(program, symbols, diagnostics, options);
   const routeAugmentation = augmentProgramReactionRouteGraph({
     documentId: program.meta.id,
     nodes: baseGraph.nodes,
