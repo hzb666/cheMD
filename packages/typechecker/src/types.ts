@@ -1,35 +1,35 @@
 import type {
-  AnalysisNode,
-  ArtifactNode,
   ChemdProgramDeclarationKind,
   ChemdProgramDocument,
-  ChemdNode,
-  ConditionVariesNode,
   ExternalReferenceTarget,
-  BatchNode,
-  MaterialNode,
   ReactionRouteContext,
   ReferenceContext,
   ReferenceTargetKind,
-  MoleculeNode,
-  ObservationNode,
   ProvenanceInfo,
-  ProcedureNode,
   QuantityClass,
   QuantityComparator,
   QuantityShorthand,
   QuantityValueKind,
-  ReactionNode,
-  ResultNode,
   SourceSpan,
-  SampleNode,
-  TraceNode
-} from "@chemd/core";
-import type {
   NormalizedReactionConditions,
   NormalizedAnalysis,
   NormalizedTlcAnalysis
 } from "@chemd/core";
+import type {
+  AnalysisNode,
+  ArtifactNode,
+  BatchNode,
+  ChemdNode,
+  ConditionVariesNode,
+  MaterialNode,
+  MoleculeNode,
+  ObservationNode,
+  ProcedureNode,
+  ReactionNode,
+  ResultNode,
+  SampleNode,
+  TraceNode
+} from "@chemd/core/compat";
 import type { V03Diagnostic } from "@chemd/diagnostics";
 import type { CanonicalStepNode, ObservationEventNode, StepGraph } from "@chemd/step-ontology";
 

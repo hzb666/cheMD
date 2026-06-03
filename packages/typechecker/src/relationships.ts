@@ -1,5 +1,5 @@
 import { createV03Diagnostic, type V03Diagnostic } from "@chemd/diagnostics";
-import type { ResultNode, SampleNode } from "@chemd/core";
+import type { ResultNode, SampleNode } from "@chemd/core/compat";
 
 import { resolveOptionalReference } from "./reference-rules";
 import type { ExternalTargetIndex, ObjectNode, ReferenceOrLiteral } from "./types";

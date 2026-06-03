@@ -3,35 +3,37 @@ import { describe, expect, it } from "vitest";
 import type {
   ChemdDocComment,
   ChemdProgramDocument,
-  ChemdReferenceExpr,
-  FieldValueSchema
+  ChemdReferenceExpr
 } from "../src/index";
 import {
-  BLOCK_SCHEMAS,
   buildReactionEntityIdFromReference,
   buildScopedReferenceId,
-  CHEMD_KIND_VALUE_ALIASES,
   DECLARATION_KINDS,
+  getCanonicalDeclarationFields,
+  getDeclarationFieldSchema,
+  isKnownDeclarationKind,
+  parseReferenceId
+} from "../src/index";
+import type { FieldValueSchema } from "../src/compat";
+import {
+  BLOCK_SCHEMAS,
+  CHEMD_KIND_VALUE_ALIASES,
   FIELD_VALUE_SCHEMA_COARSE_FIELDS,
   getBlockFieldSchema,
   getBlockFieldListMode,
   getBlockListFieldSet,
   getCanonicalBlockFields,
-  getCanonicalDeclarationFields,
   getCompletionBlockFieldSchemas,
   getCoarseFieldValueSchema,
-  getDeclarationFieldSchema,
   getDomainFieldKind,
   getEnumFieldValues,
   getFieldValueSchema,
   getFieldValueSuggestions,
   getQuantityFieldClass,
-  getRecordFieldHeadSchema,
-  getRecordFieldParamSchema,
   getReferenceTargetKinds,
-  isKnownDeclarationKind,
-  parseReferenceId
-} from "../src/index";
+  getRecordFieldHeadSchema,
+  getRecordFieldParamSchema
+} from "../src/compat";
 
 const collectEnumValueSchemas = (
   value: FieldValueSchema | undefined
@@ -338,7 +340,7 @@ describe("block field schema baseline", () => {
     expect(domainFields).toEqual(exceptions);
   });
 
-  it("keeps legacy value maps aligned with enum value schemas", () => {
+  it("keeps compatibility value maps aligned with enum value schemas", () => {
     const mismatches = BLOCK_SCHEMAS.flatMap((schema) =>
       schema.fields.flatMap((field) => {
         if (!field.values) {

@@ -1,4 +1,10 @@
-import type { ProcedureChildNode, ProcedureControlKind, ProcedureControlNode, ProcedureNode, ProcedureStepNode } from "@chemd/core";
+import type {
+  ProcedureChildNode,
+  ProcedureControlKind,
+  ProcedureControlNode,
+  ProcedureNode,
+  ProcedureStepNode
+} from "@chemd/core/compat";
 import { createV03Diagnostic, type V03Diagnostic } from "@chemd/diagnostics";
 import {
   lowerProcedureToSteps,

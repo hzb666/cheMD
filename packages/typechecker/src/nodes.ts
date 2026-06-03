@@ -1,3 +1,4 @@
+import type { SourceSpan } from "@chemd/core";
 import type {
   AnalysisNode,
   ArtifactNode,
@@ -10,9 +11,8 @@ import type {
   ReactionNode,
   ResultNode,
   SampleNode,
-  SourceSpan,
   TraceNode
-} from "@chemd/core";
+} from "@chemd/core/compat";
 import {
   classifyReactionConditions,
   classifyTlcAnalysis,

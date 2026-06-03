@@ -1,4 +1,4 @@
-import { createInlineCodeToken, type InlineCodeToken } from "@chemd/core";
+import { createInlineCodeToken, type InlineCodeToken } from "@chemd/core/compat";
 
 import { getMatchSpan } from "../shared/source-location";
 

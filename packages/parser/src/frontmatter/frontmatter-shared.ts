@@ -1,4 +1,4 @@
-import type { ChemdMeta } from "@chemd/core";
+import type { ChemdMeta } from "@chemd/core/compat";
 
 export const DEFAULT_META: ChemdMeta = {
   id: "draft-document",

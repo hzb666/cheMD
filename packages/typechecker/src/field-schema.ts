@@ -1,8 +1,8 @@
 import {
   getEnumFieldValues,
-  getQuantityFieldClass,
-  type QuantityClass
-} from "@chemd/core";
+  getQuantityFieldClass
+} from "@chemd/core/compat";
+import type { QuantityClass } from "@chemd/core";
 
 export const getTypecheckerQuantityFieldClass = (
   blockType: string,

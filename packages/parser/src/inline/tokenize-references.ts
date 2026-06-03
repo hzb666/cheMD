@@ -1,4 +1,4 @@
-import { createReferenceToken, type ReferenceKind, type ReferenceToken } from "@chemd/core";
+import { createReferenceToken, type ReferenceKind, type ReferenceToken } from "@chemd/core/compat";
 
 import { getMatchSpan } from "../shared/source-location";
 

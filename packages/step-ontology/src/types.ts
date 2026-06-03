@@ -1,5 +1,6 @@
 import type { V03Diagnostic } from "@chemd/diagnostics";
-import type { ProcedureControlKind, ProvenanceInfo, SourceSpan } from "@chemd/core";
+import type { ProvenanceInfo, SourceSpan } from "@chemd/core";
+import type { ProcedureControlKind } from "@chemd/core/compat";
 
 export type StepFamily =
   | "charge"

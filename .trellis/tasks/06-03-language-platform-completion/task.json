@@ -19,7 +19,8 @@
   "pr_url": null,
   "subtasks": [],
   "children": [
-    "06-03-language-platform-phase-0-matrix-specs"
+    "06-03-language-platform-phase-0-matrix-specs",
+    "06-03-language-platform-phase-1-program-contract"
   ],
   "parent": null,
   "relatedFiles": [],

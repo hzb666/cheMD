@@ -1,0 +1,15 @@
+{"file":".trellis/tasks/archive/2026-06/06-03-language-platform-phase-0-matrix-specs/feature-matrix.md","reason":"Phase 0 matrix defines the Phase 1 program contract gap and acceptance target."}
+{"file":"packages/core/src/index.ts","reason":"Root public @chemd/core surface to harden."}
+{"file":"packages/core/src/program.ts","reason":"Explicit program-first core surface."}
+{"file":"packages/core/src/compat.ts","reason":"Explicit compatibility surface for older AST and block-schema contracts."}
+{"file":"packages/core/src/program-ast.ts","reason":"Program-first AST aggregate export."}
+{"file":"packages/core/src/ast.ts","reason":"Legacy AST/shared primitive source that must be selectively exposed."}
+{"file":"packages/core/src/ast-factories.ts","reason":"Legacy AST factory surface to quarantine."}
+{"file":"packages/core/src/schema/block-schema.ts","reason":"Legacy block-schema surface to quarantine."}
+{"file":"packages/core/package.json","reason":"Subpath exports may be needed for explicit program and compat surfaces."}
+{"file":"tsconfig.base.json","reason":"TypeScript path aliases may be needed if package subpaths are introduced."}
+{"file":"packages/core/tests/core.test.ts","reason":"Core public-surface regression tests."}
+{"file":"packages/parser/src/program/parser.ts","reason":"Program-first parser consumer of core document contracts."}
+{"file":"packages/resolver/src/index.ts","reason":"Program-first resolver consumer of core document contracts."}
+{"file":"packages/typechecker/src/index.ts","reason":"Program-first typechecker consumer of core document contracts."}
+{"file":"packages/compiler/src/index.ts","reason":"Compiler-facing package must remain program-first."}

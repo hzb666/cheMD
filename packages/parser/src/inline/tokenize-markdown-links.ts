@@ -1,4 +1,5 @@
-import { createMarkdownLinkToken, type Diagnostic, type MarkdownLinkToken } from "@chemd/core";
+import type { Diagnostic } from "@chemd/core";
+import { createMarkdownLinkToken, type MarkdownLinkToken } from "@chemd/core/compat";
 
 import { getSpanFromOffsets } from "../shared/source-location";
 import { isSafeMarkdownHref } from "./markdown-link-policy";

@@ -1,8 +1,8 @@
 import {
-  type ChemdMeta,
   type Diagnostic,
   type RenderSelection
 } from "@chemd/core";
+import type { ChemdMeta } from "@chemd/core/compat";
 import { LineCounter, isMap, parseDocument } from "yaml";
 import { createFrontmatterDiagnostic } from "./frontmatter-diagnostics";
 import {

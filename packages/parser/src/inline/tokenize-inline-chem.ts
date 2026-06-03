@@ -1,4 +1,4 @@
-import { createInlineChemToken, type InlineChemToken } from "@chemd/core";
+import { createInlineChemToken, type InlineChemToken } from "@chemd/core/compat";
 
 import { getSpanFromOffsets } from "../shared/source-location";
 

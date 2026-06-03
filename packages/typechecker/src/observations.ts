@@ -1,4 +1,4 @@
-import type { ObservationNode } from "@chemd/core";
+import type { ObservationNode } from "@chemd/core/compat";
 import { createV03Diagnostic, type V03Diagnostic } from "@chemd/diagnostics";
 import {
   lowerObservationToEvents,

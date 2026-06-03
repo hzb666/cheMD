@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./program": "./src/program.ts",
+    "./compat": "./src/compat.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json --noEmit",
