@@ -1737,3 +1737,37 @@ Merged typedGraph diagnostics into exporter-training outputs and preserved diagn
 ### Next Steps
 
 - None - task complete
+
+
+## Session 182: Phase 10 typechecker upstream diagnostic spans
+
+**Date**: 2026-06-03
+**Task**: Phase 10 typechecker upstream diagnostic spans
+**Package**: compiler
+**Branch**: `develop`
+
+### Summary
+
+Preserved upstream diagnostic sourceSpan through typechecker diagnostics; verified typechecker tests/typecheck, compiler fixture matrix, Trellis validation, and diff check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c9c9ffb` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
