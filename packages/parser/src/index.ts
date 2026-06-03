@@ -15,3 +15,7 @@ export {
   ProgramParserCursor,
   type ParseChemdProgramOptions
 } from "./program";
+export {
+  CHEMD_LANGUAGE_CONTRACT,
+  type ChemdLanguageContract
+} from "@chemd/core";
