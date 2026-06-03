@@ -1397,3 +1397,37 @@ Compared the implementation plan against apps/docs, fixed remaining program-v1 d
 ### Next Steps
 
 - None - task complete
+
+
+## Session 172: Phase 0 language platform matrix and spec alignment
+
+**Date**: 2026-06-03
+**Task**: Phase 0 language platform matrix and spec alignment
+**Package**: compiler
+**Branch**: `develop`
+
+### Summary
+
+Created the language-platform parent plan and Phase 0 child task, added the feature matrix, and aligned parser/resolver/compiler Trellis specs to the program-first pipeline.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `af3ad03` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

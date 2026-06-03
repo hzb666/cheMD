@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-4.md`
-- **Total Sessions**: 171
-- **Last Active**: 2026-05-29
+- **Total Sessions**: 172
+- **Last Active**: 2026-06-03
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-4.md` | ~1399 | Active |
+| `journal-4.md` | ~1433 | Active |
 | `journal-3.md` | ~1994 | Archived |
 | `journal-2.md` | ~1956 | Archived |
 | `journal-1.md` | ~1998 | Archived |
@@ -32,6 +32,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 172 | 2026-06-03 | Phase 0 language platform matrix and spec alignment | `af3ad03` | `develop` |
 | 171 | 2026-05-29 | Docs comparison against program rewrite plan | `5560a42` | `develop` |
 | 170 | 2026-05-29 | Phase 7 full program-first cleanup | `1b5ba6b` | `develop` |
 | 169 | 2026-05-29 | Phase 6 IDE storage language-service migration | `8a5637a` | `develop` |
