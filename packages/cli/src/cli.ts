@@ -181,6 +181,8 @@ interface DiagnosticCounts {
   info: number;
 }
 
+type DiagnosticCodeCounts = Record<string, number>;
+
 interface ProgramSummary {
   declarationCount: number;
   docCount: number;
@@ -188,6 +190,7 @@ interface ProgramSummary {
 
 interface ValidationReport {
   filePath?: string;
+  codes: DiagnosticCodeCounts;
   counts: DiagnosticCounts;
   diagnostics: Diagnostic[];
   program?: ProgramSummary;
@@ -199,6 +202,7 @@ interface CheckReport {
   files: ValidationReport[];
   target: CheckTarget;
   totals: DiagnosticCounts;
+  codes: DiagnosticCodeCounts;
 }
 
 interface SkippedValidation {
@@ -1031,18 +1035,51 @@ const sumDiagnosticCounts = (reports: ValidationReport[]): DiagnosticCounts =>
     { error: 0, warning: 0, info: 0 }
   );
 
+const countDiagnosticCodes = (diagnostics: Diagnostic[]): DiagnosticCodeCounts =>
+  diagnostics.reduce<DiagnosticCodeCounts>((codes, diagnostic) => {
+    codes[diagnostic.code] = (codes[diagnostic.code] ?? 0) + 1;
+    return codes;
+  }, {});
+
+const sumDiagnosticCodeCounts = (reports: ValidationReport[]): DiagnosticCodeCounts =>
+  reports.reduce<DiagnosticCodeCounts>((codes, report) => {
+    for (const [code, count] of Object.entries(report.codes)) {
+      codes[code] = (codes[code] ?? 0) + count;
+    }
+    return codes;
+  }, {});
+
 const formatDiagnosticLocation = (diagnostic: Diagnostic): string => {
-  const start = diagnostic.position?.start;
+  const start = diagnostic.position?.start
+    ?? (diagnostic.sourceSpan?.startLine && diagnostic.sourceSpan.startColumn
+      ? {
+          line: diagnostic.sourceSpan.startLine,
+          column: diagnostic.sourceSpan.startColumn
+        }
+      : undefined);
 
   return start ? `:${start.line}:${start.column}` : "";
+};
+
+const formatDiagnosticContext = (diagnostic: Diagnostic): string => {
+  const parts = [
+    diagnostic.sourceLayer,
+    diagnostic.sourceNodeType
+      ? `${diagnostic.sourceNodeType}${diagnostic.sourceNodeId ? `#${diagnostic.sourceNodeId}` : ""}`
+      : undefined,
+    diagnostic.sourceField ? `field=${diagnostic.sourceField}` : undefined
+  ].filter(Boolean);
+
+  return parts.length > 0 ? `[${parts.join(" ")}]` : "";
 };
 
 const formatDiagnostic = (filePath: string, diagnostic: Diagnostic): string => [
   `${filePath}${formatDiagnosticLocation(diagnostic)}`,
   diagnostic.severity,
   diagnostic.code,
+  formatDiagnosticContext(diagnostic),
   diagnostic.message
-].join(" ");
+].filter(Boolean).join(" ");
 
 const writeDiagnosticResult = (
   writer: CliWriter,
@@ -1165,6 +1202,7 @@ const checkPaths = (
 
     return {
       filePath: path.relative(options.cwd, filePath) || filePath,
+      codes: countDiagnosticCodes(diagnostics),
       counts: countDiagnostics(diagnostics),
       diagnostics,
       program: summarizeProgram(program)
@@ -1175,7 +1213,8 @@ const checkPaths = (
     dryRun: command.dryRun,
     files,
     target: command.target,
-    totals: sumDiagnosticCounts(files)
+    totals: sumDiagnosticCounts(files),
+    codes: sumDiagnosticCodeCounts(files)
   };
 
   if (command.format === "json") {
@@ -1253,7 +1292,7 @@ const formatPreflightReport = (report: PreflightReport): string => {
 
   for (const issue of report.preflight.issues) {
     lines.push(
-      `${issue.severity} ${issue.kind} ${issue.stepId ?? issue.controlId ?? ""} ${issue.message}`.trim()
+      `${issue.severity} ${issue.code} ${issue.kind} ${issue.stepId ?? issue.controlId ?? ""} ${issue.message}`.trim()
     );
   }
   for (const diagnostic of report.preflight.diagnostics) {
@@ -1645,6 +1684,7 @@ const buildChangedFileReport = (
     ...(record.previousPath ? { previousPath: record.previousPath } : {}),
     validation: current
       ? {
+          codes: countDiagnosticCodes(diagnostics),
           counts: countDiagnostics(diagnostics),
           diagnostics,
           program: summarizeProgram(getCompileProgram(current))

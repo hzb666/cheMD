@@ -8,7 +8,10 @@ import { augmentProgramReactionRouteGraph } from "./program-reaction-routes";
 import {
   buildProgramSymbolTable
 } from "./program-utils";
-import { validateProgramDeclarationSchemas } from "./program-validation";
+import {
+  validateProgramDeclarationSchemas,
+  validateProgramMetaSchema
+} from "./program-validation";
 import type {
   TypecheckOptions,
   TypecheckResult,
@@ -62,7 +65,8 @@ export const typecheckProgram = (
   const diagnostics = program.diagnostics.map(toTypecheckDiagnostic);
   const symbols = buildProgramSymbolTable(program);
   diagnostics.push(
-    ...validateProgramDeclarationSchemas(program.declarations, symbols),
+    ...validateProgramMetaSchema(program.meta),
+    ...validateProgramDeclarationSchemas(program.declarations, symbols, options),
     ...validateProgramAgentRuns(program, symbols)
   );
   const { typedGraph: baseGraph, stepGraph } = buildProgramTypedGraph(program, symbols, diagnostics, options);

@@ -238,6 +238,65 @@ reaction rxn_bad {
     );
   });
 
+  it("validates required meta fields with source-aware diagnostics", () => {
+    const result = typecheckDocument(parse(`module exp_meta_required
+
+meta {
+  id: "exp-meta-required"
+  date: "2026-06-04"
+}
+
+molecule mol_a {
+  name: "A"
+}
+`));
+
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "E_PROGRAM_META_FIELD_REQUIRED",
+        sourceNodeType: "meta",
+        sourceField: "title",
+        sourceSpan: expect.objectContaining({
+          startLine: 3
+        })
+      })
+    );
+  });
+
+  it("validates external reference target kinds from reference context", () => {
+    const result = typecheckDocument(parse(`module exp_external_ref_kind
+
+meta {
+  id: "exp-external-ref-kind"
+  title: "External reference kind"
+  date: "2026-06-04"
+}
+
+result res_bad {
+  reaction: @route-doc#mol_ext
+}
+`), {
+      referenceContext: {
+        externalTargets: [{
+          refId: "route-doc#mol_ext",
+          targetKind: "molecule"
+        }]
+      }
+    });
+
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "E_PROGRAM_REFERENCE_TARGET_KIND",
+        sourceNodeId: "res_bad",
+        sourceField: "reaction",
+        facts: expect.objectContaining({
+          actualTargetKind: "molecule",
+          expectedTargetKind: ["reaction"]
+        })
+      })
+    );
+  });
+
   it("preserves upstream diagnostic source layers", () => {
     const program = parse(`module exp_upstream_diag
 

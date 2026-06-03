@@ -118,6 +118,24 @@ describe("v0.3 diagnostics registry", () => {
     expect(getDiagnosticSpec("E_OBSERVATION_LINKED_STEP_MISSING")?.band).toBe("reference");
   });
 
+  it("classifies program language diagnostics", () => {
+    expect(getDiagnosticSpec("E_PROGRAM_META_EXPECTED")?.band).toBe("syntax");
+    expect(getDiagnosticSpec("E_PROGRAM_UNEXPECTED_TRAILING_TOKEN")?.band).toBe("syntax");
+    expect(getDiagnosticSpec("E_PROGRAM_META_FIELD_REQUIRED")?.band).toBe("type");
+    expect(getDiagnosticSpec("E_PROGRAM_REFERENCE_TARGET_KIND")?.band).toBe("reference");
+    expect(getDiagnosticSpec("E_MODULE_ENTRY_NOT_FOUND")?.band).toBe("reference");
+  });
+
+  it("classifies procedure control diagnostics", () => {
+    expect(getDiagnosticSpec("E_PROCEDURE_CONTROL_CONDITION")?.band).toBe("procedure");
+    expect(getDiagnosticSpec("E_PROCEDURE_CONTROL_PARALLEL")?.band).toBe("procedure");
+    expect(getDiagnosticSpec("E_PROCEDURE_CONTROL_ID_DUPLICATE")?.band).toBe("procedure");
+    expect(getDiagnosticSpec("W_PROCEDURE_CONTROL_DYNAMIC")).toMatchObject({
+      band: "procedure",
+      defaultSeverity: "warning"
+    });
+  });
+
   it("classifies template parameter diagnostics", () => {
     expect(getDiagnosticSpec("E_TEMPLATE_PARAM_MISSING")?.band).toBe("type");
     expect(getDiagnosticSpec("E_TEMPLATE_PARAM_TYPE_MISMATCH")?.band).toBe("type");
@@ -133,6 +151,8 @@ describe("v0.3 diagnostics registry", () => {
   it("classifies runtime diagnostics", () => {
     expect(getDiagnosticSpec("E_RUNTIME_UNKNOWN_STEP")?.band).toBe("runtime");
     expect(getDiagnosticSpec("E_RUNTIME_STEP_NOT_READY")?.band).toBe("runtime");
+    expect(getDiagnosticSpec("E_RUNTIME_CONTROL_DYNAMIC")?.band).toBe("runtime");
+    expect(getDiagnosticSpec("E_RUNTIME_RESOURCE_CONFLICT")?.band).toBe("runtime");
     expect(getLegacyDiagnosticBand("E_RUNTIME_UNKNOWN_STEP")).toBe("runtime");
     expect(getLegacyDiagnosticBand("E_RUNTIME_STEP_NOT_READY")).toBe("runtime");
   });

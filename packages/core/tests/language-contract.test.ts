@@ -16,6 +16,12 @@ describe("CHEMD_LANGUAGE_CONTRACT", () => {
       "meta",
       "for",
       "step",
+      "repeat",
+      "until",
+      "branch",
+      "parallel",
+      "wait",
+      "abort_if",
       "timeline"
     ]));
     expect(CHEMD_LANGUAGE_CONTRACT.program.keywords).not.toContain("audit");

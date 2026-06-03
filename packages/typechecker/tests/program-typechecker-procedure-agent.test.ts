@@ -74,7 +74,14 @@ procedure proc_1 {
                   kind: "control",
                   id: "repeat_1",
                   controlKind: "repeat",
-                  args: {},
+                  args: {
+                    count: {
+                      type: "number",
+                      raw: "2",
+                      value: 2,
+                      sourceSpan: {}
+                    }
+                  },
                   children: [procedure.children[0]]
                 }
               ]
@@ -90,6 +97,110 @@ procedure proc_1 {
       expect.objectContaining({ stepId: "charge", controlPath: ["repeat_1"] })
     ]);
     expect(result.typedGraph.quantities.map((item) => item.raw)).toContain("1 mmol");
+  });
+
+  it("parses and validates source-level procedure controls", () => {
+    const result = typecheckProgram(parse(`module exp_control_source
+
+meta {
+  id: "exp-control-source"
+  title: "Control source"
+  date: "2026-06-04"
+}
+
+procedure proc_1 {
+  repeat repeat_charge(count: 2) {
+    step charge = charge(amount: 1 mmol)
+  }
+
+  until until_clear(condition: "sensor.ph > 7", max_iterations: 3) {
+    step sample = sample(depends_on: [charge])
+  }
+
+  branch branch_workup {
+    case acidic(condition: "sensor.ph < 7") {
+      step neutralize = add(depends_on: [sample])
+    }
+    default {
+      step hold = hold(depends_on: [neutralize])
+    }
+  }
+
+  parallel parallel_workup {
+    path organic {
+      step extract = extract(depends_on: [hold])
+    }
+    path aqueous {
+      step wash = wash(depends_on: [hold])
+    }
+  }
+
+  wait operator_confirm(condition: "operator.confirmed")
+  abort_if temp_high(condition: "sensor.temperature > 80")
+}
+`));
+
+    expect(result.diagnostics).not.toContainEqual(expect.objectContaining({
+      severity: "error"
+    }));
+    expect(result.stepGraph.controls).toEqual(expect.arrayContaining([
+      expect.objectContaining({ controlId: "repeat_charge", kind: "repeat", dynamic: false }),
+      expect.objectContaining({ controlId: "until_clear", kind: "until", dynamic: true }),
+      expect.objectContaining({ controlId: "branch_workup", kind: "branch", dynamic: true }),
+      expect.objectContaining({ controlId: "parallel_workup", kind: "parallel", dynamic: false }),
+      expect.objectContaining({ controlId: "operator_confirm", kind: "wait", dynamic: true }),
+      expect.objectContaining({ controlId: "temp_high", kind: "abort_if", dynamic: true })
+    ]));
+    expect(result.stepGraph.steps.find((step) => step.stepId === "neutralize")?.controlPath).toEqual([
+      "branch_workup",
+      "branch_workup.acidic"
+    ]);
+  });
+
+  it("diagnoses invalid source-level procedure controls", () => {
+    const result = typecheckProgram(parse(`module exp_control_invalid
+
+meta {
+  id: "exp-control-invalid"
+  title: "Control invalid"
+  date: "2026-06-04"
+}
+
+procedure proc_1 {
+  repeat bad_repeat(count: 0) {
+  }
+
+  until bad_until {
+    step observe_1 = observe()
+  }
+
+  branch bad_branch {
+    case first {
+      step branch_step = observe()
+    }
+  }
+
+  parallel bad_parallel {
+    path only {
+    }
+  }
+
+  wait wait_bad
+  abort_if abort_bad(condition: "lab.temperature")
+}
+`));
+
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "E_PROCEDURE_CONTROL_COUNT", sourceField: "repeat" }),
+      expect.objectContaining({ code: "E_PROCEDURE_CONTROL_BODY", sourceField: "repeat" }),
+      expect.objectContaining({ code: "E_PROCEDURE_CONTROL_CONDITION", sourceField: "until" }),
+      expect.objectContaining({ code: "W_PROCEDURE_CONTROL_DYNAMIC", sourceField: "until" }),
+      expect.objectContaining({ code: "E_PROCEDURE_CONTROL_BRANCH", sourceField: "branch" }),
+      expect.objectContaining({ code: "E_PROCEDURE_CONTROL_PARALLEL", sourceField: "parallel" }),
+      expect.objectContaining({ code: "E_PROCEDURE_CONTROL_BODY", sourceField: "path" }),
+      expect.objectContaining({ code: "E_PROCEDURE_CONTROL_CONDITION", sourceField: "wait" }),
+      expect.objectContaining({ code: "E_PROCEDURE_CONTROL_CONDITION", sourceField: "abort_if" })
+    ]));
   });
 
   it("validates duplicate procedure step ids dependency refs and cycles", () => {

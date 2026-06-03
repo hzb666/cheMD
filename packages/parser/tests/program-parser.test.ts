@@ -302,4 +302,71 @@ meta {
       endLine: 8
     });
   });
+
+  it("parses procedure control blocks as first-class statements", () => {
+    const document = parseChemdProgram(`module exp_controls
+
+meta {
+  id: "exp-controls"
+  title: "Controls"
+  date: "2026-06-04"
+}
+
+procedure proc_control {
+  repeat repeat_charge(count: 2) {
+    step charge = add(materials: ["A"])
+  }
+
+  until until_clear(condition: "@ana_tlc.status == clean", max_iterations: 3) {
+    step sample = sample()
+  }
+
+  branch branch_workup {
+    case acidic(condition: "sensor.ph < 7") {
+      step neutralize = add(materials: ["base"])
+    }
+    default {
+      step hold = hold(duration: 10 min)
+    }
+  }
+
+  parallel parallel_workup {
+    path organic {
+      step extract = extract()
+    }
+    path aqueous {
+      step wash = wash()
+    }
+  }
+
+  wait operator_confirm(condition: "operator.confirmed")
+  abort_if temp_high(condition: "sensor.temperature > 80")
+}
+`);
+    const procedure = document.declarations.find((item) => item.kind === "procedure");
+
+    expect(document.diagnostics).toEqual([]);
+    expect(procedure).toMatchObject({
+      kind: "procedure",
+      children: [
+        {
+          kind: "control",
+          id: "repeat_charge",
+          controlKind: "repeat",
+          args: { count: expect.objectContaining({ type: "number", value: 2 }) },
+          children: [expect.objectContaining({ kind: "step", id: "charge" })]
+        },
+        {
+          kind: "control",
+          id: "until_clear",
+          controlKind: "until",
+          children: [expect.objectContaining({ kind: "step", id: "sample" })]
+        },
+        expect.objectContaining({ controlKind: "branch" }),
+        expect.objectContaining({ controlKind: "parallel" }),
+        expect.objectContaining({ controlKind: "wait", children: [] }),
+        expect.objectContaining({ controlKind: "abort_if", children: [] })
+      ]
+    });
+  });
 });

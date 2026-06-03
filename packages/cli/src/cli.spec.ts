@@ -248,6 +248,40 @@ procedure proc_main for @rxn_main {
 }
 `;
 
+const controlPreflightSource = `module exp_cli_control_preflight
+
+meta {
+  id: "exp-cli-control-preflight"
+  title: "CLI Control Preflight"
+  date: "2026-06-04"
+}
+
+reaction rxn_main {
+  reactants: [substrate]
+  products: [product]
+}
+
+procedure proc_main for @rxn_main {
+  branch branch_decision {
+    case acidic(condition: "sensor.ph < 7") {
+      step neutralize = add(materials: ["base"])
+    }
+    default {
+      step hold = hold(duration: 10 min)
+    }
+  }
+
+  parallel parallel_workup {
+    path organic {
+      step extract = extract(depends_on: [hold])
+    }
+    path aqueous {
+      step wash = wash(depends_on: [hold])
+    }
+  }
+}
+`;
+
 const proseImportSource = "加入 n-BuLi 后体系逐渐变深红色。";
 const proseImportPartialCoverageSource =
   "The organic phases were washed with brine, dried over Na2SO4, filtered, and concentrated under reduced pressure.";
@@ -1079,9 +1113,82 @@ INVALID_PROGRAM
         code: "E_PROGRAM_DECLARATION_EXPECTED",
         severity: "error"
       });
+      expect(payload.codes).toMatchObject({
+        E_PROGRAM_DECLARATION_EXPECTED: 1
+      });
+      expect(payload.files[0].codes).toMatchObject({
+        E_PROGRAM_DECLARATION_EXPECTED: 1
+      });
       expect(payload.files[1].program).toEqual({ declarationCount: 2, docCount: 0 });
       expect(stderr.value).toBe("");
     }));
+
+  it("prints source-aware language diagnostics in check text output", async () => {
+    const result = await runInTempDir(["check", "invalid-control.chemd"], {
+      "invalid-control.chemd": `module exp_cli_invalid_control
+
+meta {
+  id: "exp-cli-invalid-control"
+  date: "2026-06-04"
+}
+
+procedure proc_main {
+  repeat bad_repeat(count: 0) {
+  }
+
+  wait wait_bad
+}
+`
+    });
+
+    expect(result.exitCode).toBe(EXIT_VALIDATION_FAILED);
+    expect(result.stdout).toContain(
+      "invalid-control.chemd:3:1 error E_PROGRAM_META_FIELD_REQUIRED [typechecker meta#exp-cli-invalid-control field=title]"
+    );
+    expect(result.stdout).toContain(
+      "E_PROCEDURE_CONTROL_COUNT [typechecker procedure#proc_main field=repeat]"
+    );
+    expect(result.stdout).toContain(
+      "E_PROCEDURE_CONTROL_CONDITION [typechecker procedure#proc_main field=wait]"
+    );
+    expect(result.stderr).toBe("");
+  });
+
+  it("summarizes language diagnostic codes in check JSON output", async () => {
+    const result = await runInTempDir(["check", "invalid-control.chemd", "--format", "json"], {
+      "invalid-control.chemd": `module exp_cli_invalid_control_json
+
+meta {
+  id: "exp-cli-invalid-control-json"
+  date: "2026-06-04"
+}
+
+procedure proc_main {
+  until bad_until {
+    step observe_1 = observe()
+  }
+}
+`
+    });
+    const payload = JSON.parse(result.stdout);
+
+    expect(result.exitCode).toBe(EXIT_VALIDATION_FAILED);
+    expect(payload.codes).toMatchObject({
+      E_PROGRAM_META_FIELD_REQUIRED: 1,
+      E_PROCEDURE_CONTROL_CONDITION: 1,
+      W_PROCEDURE_CONTROL_DYNAMIC: 1
+    });
+    expect(payload.files[0].diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: "E_PROCEDURE_CONTROL_CONDITION",
+        sourceLayer: "typechecker",
+        sourceNodeType: "procedure",
+        sourceNodeId: "proc_main",
+        sourceField: "until"
+      })
+    ]));
+    expect(result.stderr).toBe("");
+  });
 
   it("runs runtime preflight with a user-provided lab context", async () =>
     withTempDir(async (dir) => {
@@ -1121,6 +1228,25 @@ INVALID_PROGRAM
       expect(payload.preflight.diagnostics).toEqual(expect.arrayContaining([
         expect.objectContaining({ code: "E_RUNTIME_DEVICE_RANGE" })
       ]));
+      expect(stderr.value).toBe("");
+    }));
+
+  it("prints runtime preflight issue codes for source-level controls", async () =>
+    withTempDir(async (dir) => {
+      writeFileSync(path.join(dir, "control.chemd"), controlPreflightSource);
+
+      const stdout = createWriter();
+      const stderr = createWriter();
+      const exitCode = await runChemdCli([
+        "preflight",
+        "control.chemd",
+        "--mode",
+        "robot-run"
+      ], { cwd: dir, stderr, stdout });
+
+      expect(exitCode).toBe(EXIT_VALIDATION_FAILED);
+      expect(stdout.value).toContain("error E_RUNTIME_CONTROL_DYNAMIC control branch_decision");
+      expect(stdout.value).toContain("error E_RUNTIME_RESOURCE_CONFLICT resource_conflict parallel_workup");
       expect(stderr.value).toBe("");
     }));
 });
