@@ -1465,3 +1465,37 @@ Hardened @chemd/core public contracts by adding program and compat subpath surfa
 ### Next Steps
 
 - None - task complete
+
+
+## Session 174: Phase 2 parser recovery and source maps
+
+**Date**: 2026-06-03
+**Task**: Phase 2 parser recovery and source maps
+**Package**: parser
+**Branch**: `develop`
+
+### Summary
+
+Hardened program parser recovery and full-document value source maps; verified parser tests, parser typecheck, compiler fixture matrix, Trellis validation, and diff check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c919ab4` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
