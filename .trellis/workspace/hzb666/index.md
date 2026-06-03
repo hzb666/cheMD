@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-4.md`
-- **Total Sessions**: 174
+- **Total Sessions**: 175
 - **Last Active**: 2026-06-03
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-4.md` | ~1501 | Active |
+| `journal-4.md` | ~1535 | Active |
 | `journal-3.md` | ~1994 | Archived |
 | `journal-2.md` | ~1956 | Archived |
 | `journal-1.md` | ~1998 | Archived |
@@ -32,6 +32,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 175 | 2026-06-03 | Phase 3 resolver dynamic references | `7829c15` | `develop` |
 | 174 | 2026-06-03 | Phase 2 parser recovery and source maps | `c919ab4` | `develop` |
 | 173 | 2026-06-03 | Phase 1 program contract hardening | `38cc7ef` | `develop` |
 | 172 | 2026-06-03 | Phase 0 language platform matrix and spec alignment | `af3ad03` | `develop` |

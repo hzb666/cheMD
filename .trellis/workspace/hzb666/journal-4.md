@@ -1499,3 +1499,37 @@ Hardened program parser recovery and full-document value source maps; verified p
 ### Next Steps
 
 - None - task complete
+
+
+## Session 175: Phase 3 resolver dynamic references
+
+**Date**: 2026-06-03
+**Task**: Phase 3 resolver dynamic references
+**Package**: resolver
+**Branch**: `develop`
+
+### Summary
+
+Added recursive resolver support for ChemdPatchExpr values and regression coverage for patch expression references; verified resolver tests, resolver typecheck, compiler fixture matrix, Trellis validation, and diff check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7829c15` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
