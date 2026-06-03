@@ -1703,3 +1703,37 @@ Preserved source-mapped compiler/typechecker diagnostic ranges through language-
 ### Next Steps
 
 - None - task complete
+
+
+## Session 181: Phase 9 exporter training diagnostic evidence
+
+**Date**: 2026-06-03
+**Task**: Phase 9 exporter training diagnostic evidence
+**Package**: exporter-training
+**Branch**: `develop`
+
+### Summary
+
+Merged typedGraph diagnostics into exporter-training outputs and preserved diagnostic source evidence fields; verified exporter-training tests/typecheck, compiler fixture matrix, Trellis validation, and diff check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `cf251b2` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
