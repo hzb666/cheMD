@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-4.md`
-- **Total Sessions**: 178
+- **Total Sessions**: 179
 - **Last Active**: 2026-06-03
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-4.md` | ~1637 | Active |
+| `journal-4.md` | ~1671 | Active |
 | `journal-3.md` | ~1994 | Archived |
 | `journal-2.md` | ~1956 | Archived |
 | `journal-1.md` | ~1998 | Archived |
@@ -32,6 +32,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 179 | 2026-06-03 | Phase 7 LNF exporter completeness | `7127147` | `develop` |
 | 178 | 2026-06-03 | Phase 6 typechecker semantic graph hardening | `ab44ced` | `develop` |
 | 177 | 2026-06-03 | Phase 5 state trace and semantic diff | `66a65fb` | `develop` |
 | 176 | 2026-06-03 | Phase 4 compiler authoring hints | `ee98bfc` | `develop` |
