@@ -1,4 +1,4 @@
-import type { SymbolValue, Token } from "./expression-types";
+import { expressionError, type SymbolValue, type Token } from "./expression-types";
 
 const isUnitChar = (char: string | undefined): boolean =>
   Boolean(char && /[a-zA-Z%°℃]/.test(char));
@@ -105,7 +105,11 @@ export const tokenizeExpression = (expression: string): Token[] => {
       tokens.push({ type: "symbol", value: char as SymbolValue });
       index += 1;
     } else {
-      throw new Error(`Unsupported expression token: ${char}`);
+      throw expressionError(
+        "E_EXPRESSION_UNSUPPORTED_TOKEN",
+        `Unsupported expression token: ${char}`,
+        { token: char, index }
+      );
     }
   }
 

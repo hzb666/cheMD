@@ -6,6 +6,7 @@ import {
   resolveReferenceValue,
   subtractValues
 } from "./expression-functions";
+import { expressionError } from "./expression-types";
 import type {
   ExpressionContext,
   ExpressionValue,
@@ -24,7 +25,12 @@ export class ExpressionParser {
   parse(): ExpressionValue {
     const value = this.parseAdditive();
     if (this.peek()) {
-      throw new Error("Unexpected trailing expression token");
+      const token = this.peek()!;
+      throw expressionError(
+        "E_EXPRESSION_TRAILING_TOKEN",
+        "Unexpected trailing expression token",
+        { token: token.value, token_type: token.type }
+      );
     }
     return value;
   }
@@ -62,20 +68,28 @@ export class ExpressionParser {
     if (value.kind === "number" || value.kind === "quantity") {
       return { ...value, value: -value.value };
     }
-    throw new Error("Unary minus only supports numeric expressions");
+    throw expressionError(
+      "E_EXPRESSION_UNARY_TYPE",
+      "Unary minus only supports numeric expressions",
+      { operator: "-", value_kind: value.kind }
+    );
   }
 
   private parsePrimary(): ExpressionValue {
     const token = this.advance();
 
     if (!token) {
-      throw new Error("Unexpected end of expression");
+      throw expressionError("E_EXPRESSION_UNEXPECTED_END", "Unexpected end of expression");
     }
 
     if (token.type === "number") {
       const value = Number(token.value);
       if (!Number.isFinite(value)) {
-        throw new Error("Invalid numeric literal");
+        throw expressionError(
+          "E_EXPRESSION_INVALID_NUMBER",
+          "Invalid numeric literal",
+          { literal: token.value }
+        );
       }
       return { kind: "number", value };
     }
@@ -98,13 +112,21 @@ export class ExpressionParser {
       return value;
     }
 
-    throw new Error(`Unexpected token: ${token.value}`);
+    throw expressionError(
+      "E_EXPRESSION_UNEXPECTED_TOKEN",
+      `Unexpected token: ${token.value}`,
+      { token: token.value, token_type: token.type }
+    );
   }
 
   private parseQuantityToken(valueRaw: string, unit: string): ExpressionValue {
     const value = Number(valueRaw);
     if (!Number.isFinite(value)) {
-      throw new Error("Invalid quantity literal");
+      throw expressionError(
+        "E_EXPRESSION_INVALID_QUANTITY",
+        "Invalid quantity literal",
+        { literal: valueRaw, unit }
+      );
     }
     return { kind: "quantity", value, unit };
   }
@@ -134,7 +156,11 @@ export class ExpressionParser {
 
   private consumeSymbol(value: SymbolValue): void {
     if (!this.matchSymbol(value)) {
-      throw new Error(`Expected "${value}"`);
+      throw expressionError(
+        "E_EXPRESSION_EXPECTED_SYMBOL",
+        `Expected "${value}"`,
+        { expected: value, actual: this.peek()?.value }
+      );
     }
   }
 

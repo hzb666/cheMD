@@ -21,6 +21,45 @@ export interface ExpressionContext {
   field: string;
 }
 
+export type ExpressionErrorCode =
+  | "E_EXPRESSION_DIVISION_BY_ZERO"
+  | "E_EXPRESSION_DIVISION_DENOMINATOR_TYPE"
+  | "E_EXPRESSION_EXPECTED_NUMERIC"
+  | "E_EXPRESSION_EXPECTED_SYMBOL"
+  | "E_EXPRESSION_FUNCTION_NOT_ALLOWED"
+  | "E_EXPRESSION_INVALID_NUMBER"
+  | "E_EXPRESSION_INVALID_QUANTITY"
+  | "E_EXPRESSION_MISSING_ARGUMENT"
+  | "E_EXPRESSION_PERCENT_DENOMINATOR_ZERO"
+  | "E_EXPRESSION_RATIO_DENOMINATOR_ZERO"
+  | "E_EXPRESSION_REFERENCE_INVALID"
+  | "E_EXPRESSION_REFERENCE_UNRESOLVED"
+  | "E_EXPRESSION_TO_UNIT_TYPE"
+  | "E_EXPRESSION_TRAILING_TOKEN"
+  | "E_EXPRESSION_UNARY_TYPE"
+  | "E_EXPRESSION_UNIT_CONVERSION_UNSUPPORTED"
+  | "E_EXPRESSION_UNIT_MISMATCH"
+  | "E_EXPRESSION_UNEXPECTED_END"
+  | "E_EXPRESSION_UNEXPECTED_TOKEN"
+  | "E_EXPRESSION_UNSUPPORTED_TOKEN";
+
+export class ExpressionError extends Error {
+  constructor(
+    readonly code: ExpressionErrorCode,
+    message: string,
+    readonly facts: Record<string, unknown> = {}
+  ) {
+    super(message);
+    this.name = "ExpressionError";
+  }
+}
+
+export const expressionError = (
+  code: ExpressionErrorCode,
+  message: string,
+  facts: Record<string, unknown> = {}
+): ExpressionError => new ExpressionError(code, message, facts);
+
 const formatNumber = (value: number): string =>
   Number.isInteger(value) ? String(value) : String(Number(value.toFixed(6)));
 

@@ -3,10 +3,14 @@ import { createV03Diagnostic, type V03Diagnostic } from "@chemd/diagnostics";
 
 import { ExpressionParser } from "./expression-parser";
 import type { ExpressionContext } from "./expression-types";
-import { serializeValue } from "./expression-types";
+import { ExpressionError, serializeValue } from "./expression-types";
 import { tokenizeExpression } from "./expression-tokenizer";
 
-const createExpressionDiagnostic = (raw: string, context: ExpressionContext): V03Diagnostic =>
+const createExpressionDiagnostic = (
+  raw: string,
+  context: ExpressionContext,
+  error: unknown
+): V03Diagnostic =>
   createV03Diagnostic({
     code: "E_DERIVED_EXPRESSION_INVALID",
     severity: "error",
@@ -17,9 +21,22 @@ const createExpressionDiagnostic = (raw: string, context: ExpressionContext): V0
     sourceField: context.field,
     facts: {
       field: context.field,
-      raw_expression: raw
+      raw_expression: raw,
+      ...readExpressionErrorFacts(error)
     }
   });
+
+const readExpressionErrorFacts = (error: unknown): Record<string, unknown> =>
+  error instanceof ExpressionError
+    ? {
+        expression_error_code: error.code,
+        expression_error_message: error.message,
+        ...error.facts
+      }
+    : {
+        expression_error_code: "E_EXPRESSION_UNKNOWN",
+        expression_error_message: error instanceof Error ? error.message : String(error)
+      };
 
 const createDerivedProvenance = (context: ExpressionContext): ProvenanceInfo => ({
   origin: "inferred",
@@ -45,7 +62,7 @@ export const resolveDerivedField = (
       value: serializeValue(value),
       provenance: createDerivedProvenance(context)
     };
-  } catch {
-    return { diagnostic: createExpressionDiagnostic(raw, context) };
+  } catch (error) {
+    return { diagnostic: createExpressionDiagnostic(raw, context, error) };
   }
 };

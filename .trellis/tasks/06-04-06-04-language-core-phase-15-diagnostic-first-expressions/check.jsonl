@@ -1,0 +1,6 @@
+{"file":"packages/typechecker/tests/expression-diagnostics.test.ts","reason":"Derived expression diagnostic tests must pass."}
+{"file":"packages/typechecker/src/expressions.ts","reason":"Diagnostic entry must typecheck."}
+{"file":"packages/typechecker/src/expression-types.ts","reason":"Shared expression error types must typecheck."}
+{"file":"packages/typechecker/src/expression-tokenizer.ts","reason":"Tokenizer changes must typecheck."}
+{"file":"packages/typechecker/src/expression-parser.ts","reason":"Parser changes must typecheck."}
+{"file":"packages/typechecker/src/expression-functions.ts","reason":"Evaluator changes must typecheck."}

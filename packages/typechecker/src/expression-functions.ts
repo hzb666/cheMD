@@ -1,6 +1,7 @@
 import {
   type ExpressionContext,
   type ExpressionValue,
+  expressionError,
   parseValueLiteral
 } from "./expression-types";
 
@@ -25,7 +26,11 @@ const PURE_FUNCTIONS = new Set([
 const requireArg = (args: ExpressionValue[], index: number, name: string): ExpressionValue => {
   const value = args[index];
   if (!value) {
-    throw new Error(`${name} requires argument ${index + 1}`);
+    throw expressionError(
+      "E_EXPRESSION_MISSING_ARGUMENT",
+      `${name} requires argument ${index + 1}`,
+      { function_name: name, argument_index: index }
+    );
   }
   return value;
 };
@@ -37,7 +42,11 @@ export const toNumber = (value: ExpressionValue): number => {
 
   const parsed = Number(value.value);
   if (!Number.isFinite(parsed)) {
-    throw new Error("Expected numeric expression value");
+    throw expressionError(
+      "E_EXPRESSION_EXPECTED_NUMERIC",
+      "Expected numeric expression value",
+      { value: value.value, value_kind: value.kind }
+    );
   }
 
   return parsed;
@@ -48,7 +57,11 @@ const isMissingValue = (value: ExpressionValue): boolean =>
 
 const assertSameUnit = (left: ExpressionValue, right: ExpressionValue): string => {
   if (left.kind !== "quantity" || right.kind !== "quantity" || left.unit !== right.unit) {
-    throw new Error("Quantity arithmetic requires matching units");
+    throw expressionError(
+      "E_EXPRESSION_UNIT_MISMATCH",
+      "Quantity arithmetic requires matching units",
+      { left_kind: left.kind, right_kind: right.kind }
+    );
   }
 
   return left.unit;
@@ -84,11 +97,19 @@ export const multiplyValues = (left: ExpressionValue, right: ExpressionValue): E
 
 export const divideValues = (left: ExpressionValue, right: ExpressionValue): ExpressionValue => {
   if (right.kind !== "number") {
-    throw new Error("Division denominator must be numeric");
+    throw expressionError(
+      "E_EXPRESSION_DIVISION_DENOMINATOR_TYPE",
+      "Division denominator must be numeric",
+      { operator: "/", denominator_kind: right.kind }
+    );
   }
 
   if (right.value === 0) {
-    throw new Error("Division by zero is not allowed");
+    throw expressionError(
+      "E_EXPRESSION_DIVISION_BY_ZERO",
+      "Division by zero is not allowed",
+      { operator: "/" }
+    );
   }
 
   if (left.kind === "quantity") {
@@ -101,7 +122,11 @@ export const divideValues = (left: ExpressionValue, right: ExpressionValue): Exp
 export const resolveReferenceValue = (reference: string, context: ExpressionContext): ExpressionValue => {
   const match = reference.match(/^@([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)$/);
   if (!match) {
-    throw new Error(`Invalid field reference: ${reference}`);
+    throw expressionError(
+      "E_EXPRESSION_REFERENCE_INVALID",
+      `Invalid field reference: ${reference}`,
+      { reference }
+    );
   }
 
   const [, nodeId, field] = match;
@@ -109,7 +134,11 @@ export const resolveReferenceValue = (reference: string, context: ExpressionCont
   const value = node ? (node as unknown as Record<string, unknown>)[field] : undefined;
 
   if (typeof value !== "string") {
-    throw new Error(`Unable to resolve field reference: ${reference}`);
+    throw expressionError(
+      "E_EXPRESSION_REFERENCE_UNRESOLVED",
+      `Unable to resolve field reference: ${reference}`,
+      { reference, node_id: nodeId, field }
+    );
   }
 
   return parseValueLiteral(value);
@@ -117,7 +146,11 @@ export const resolveReferenceValue = (reference: string, context: ExpressionCont
 
 export const evaluateFunction = (name: string, args: ExpressionValue[]): ExpressionValue => {
   if (!PURE_FUNCTIONS.has(name)) {
-    throw new Error(`Function is not allowed: ${name}`);
+    throw expressionError(
+      "E_EXPRESSION_FUNCTION_NOT_ALLOWED",
+      `Function is not allowed: ${name}`,
+      { function_name: name }
+    );
   }
 
   if (name === "percent") {
@@ -146,7 +179,11 @@ export const evaluateFunction = (name: string, args: ExpressionValue[]): Express
 const evaluatePercent = (args: ExpressionValue[]): ExpressionValue => {
   const denominator = toNumber(requireArg(args, 1, "percent"));
   if (denominator === 0) {
-    throw new Error("percent denominator cannot be zero");
+    throw expressionError(
+      "E_EXPRESSION_PERCENT_DENOMINATOR_ZERO",
+      "percent denominator cannot be zero",
+      { function_name: "percent", argument_index: 1 }
+    );
   }
 
   return {
@@ -159,7 +196,11 @@ const evaluatePercent = (args: ExpressionValue[]): ExpressionValue => {
 const evaluateRatio = (args: ExpressionValue[]): ExpressionValue => {
   const denominator = toNumber(requireArg(args, 1, "ratio"));
   if (denominator === 0) {
-    throw new Error("ratio denominator cannot be zero");
+    throw expressionError(
+      "E_EXPRESSION_RATIO_DENOMINATOR_ZERO",
+      "ratio denominator cannot be zero",
+      { function_name: "ratio", argument_index: 1 }
+    );
   }
 
   return { kind: "number", value: toNumber(requireArg(args, 0, "ratio")) / denominator };
@@ -167,13 +208,21 @@ const evaluateRatio = (args: ExpressionValue[]): ExpressionValue => {
 
 const convertUnit = (quantity: ExpressionValue, unitValue: ExpressionValue): ExpressionValue => {
   if (quantity.kind !== "quantity" || unitValue.kind !== "string") {
-    throw new Error("to_unit expects a quantity and unit");
+    throw expressionError(
+      "E_EXPRESSION_TO_UNIT_TYPE",
+      "to_unit expects a quantity and unit",
+      { function_name: "to_unit" }
+    );
   }
 
   const targetUnit = unitValue.value;
   const factor = UNIT_FACTORS[targetUnit.toLowerCase()]?.[quantity.unit.toLowerCase()];
   if (factor === undefined) {
-    throw new Error(`Unsupported unit conversion: ${quantity.unit} to ${targetUnit}`);
+    throw expressionError(
+      "E_EXPRESSION_UNIT_CONVERSION_UNSUPPORTED",
+      `Unsupported unit conversion: ${quantity.unit} to ${targetUnit}`,
+      { function_name: "to_unit", from_unit: quantity.unit, to_unit: targetUnit }
+    );
   }
 
   return {
