@@ -159,7 +159,17 @@ const validateRecordValue = (
   return value.fields.flatMap((recordField) => {
     const fieldSchema = schema.params[recordField.key];
     if (!fieldSchema && schema.openParams !== true) {
-      return [createProgramDiagnostic("E_PROGRAM_RECORD_FIELD_UNKNOWN", `Unknown record field '${recordField.key}'.`, declaration, field)];
+      return [
+        createProgramDiagnostic(
+          "E_PROGRAM_RECORD_FIELD_UNKNOWN",
+          `Unknown record field '${recordField.key}'.`,
+          declaration,
+          field,
+          "error",
+          { recordField: recordField.key },
+          recordField.sourceSpan
+        )
+      ];
     }
     return validateValueSchema(declaration, field, recordField.value, fieldSchema);
   });
@@ -194,7 +204,8 @@ const createValueDiagnostic = (
     declaration,
     field,
     "error",
-    { expectedKind: expected, actualKind: value.type }
+    { expectedKind: expected, actualKind: value.type },
+    value.sourceSpan
   );
 
 export const fieldValue = (

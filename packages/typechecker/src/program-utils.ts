@@ -77,7 +77,8 @@ export const createProgramDiagnostic = (
   declaration: ChemdDeclaration,
   field?: string,
   severity: V03Diagnostic["severity"] = "error",
-  facts: Record<string, unknown> = {}
+  facts: Record<string, unknown> = {},
+  sourceSpan?: SourceSpan
 ): V03Diagnostic => ({
   code,
   severity,
@@ -86,8 +87,17 @@ export const createProgramDiagnostic = (
   sourceNodeType: declaration.kind,
   sourceNodeId: declaration.id,
   sourceField: field,
+  sourceSpan: sourceSpan ?? readDeclarationFieldSpan(declaration, field) ?? declaration.sourceSpan,
   facts: { declarationKind: declaration.kind, declarationId: declaration.id, ...facts }
 });
+
+const readDeclarationFieldSpan = (
+  declaration: ChemdDeclaration,
+  field: string | undefined
+): SourceSpan | undefined =>
+  field && "fieldSpans" in declaration
+    ? declaration.fieldSpans?.[field]
+    : undefined;
 
 export const sourceForDeclaration = (
   declaration: ChemdDeclaration,

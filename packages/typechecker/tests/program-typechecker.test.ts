@@ -138,6 +138,40 @@ analysis ana_arbitrary {
     );
   });
 
+  it("maps nested value schema diagnostics to nested source spans", () => {
+    const result = typecheckDocument(parse(`module exp_nested_schema
+
+meta {
+  id: "exp-nested-schema"
+  title: "Nested schema"
+  date: "2026-05-28"
+}
+
+molecule mol_a {
+  name: "A"
+}
+
+reaction rxn_nested {
+  reactants: [{material: @mol_a, mystery: 1}]
+}
+`));
+
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "E_PROGRAM_RECORD_FIELD_UNKNOWN",
+        sourceNodeId: "rxn_nested",
+        sourceField: "reactants",
+        sourceSpan: expect.objectContaining({
+          startLine: 14,
+          startColumn: 34
+        }),
+        facts: expect.objectContaining({
+          recordField: "mystery"
+        })
+      })
+    );
+  });
+
   it("preserves upstream diagnostic source layers", () => {
     const program = parse(`module exp_upstream_diag
 

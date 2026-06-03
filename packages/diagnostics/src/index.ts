@@ -1,4 +1,4 @@
-import type { DiagnosticSeverity, SourceRange } from "@chemd/core";
+import type { DiagnosticSeverity, SourceRange, SourceSpan } from "@chemd/core";
 
 export type DiagnosticSourceLayer =
   | "frontmatter"
@@ -34,6 +34,7 @@ export interface V03Diagnostic {
   severity: DiagnosticSeverity;
   message: string;
   position?: SourceRange;
+  sourceSpan?: SourceSpan;
   nodeId?: string;
   sourceLayer: DiagnosticSourceLayer;
   sourceNodeType?: string;
