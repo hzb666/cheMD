@@ -1,4 +1,5 @@
 import type { ChemdSourceRange } from "@chemd/language-service";
+import type { ChemdProgramReference } from "@chemd/language-service";
 import type { WorkspaceDocumentInput, WorkspaceReference } from "./types";
 
 const REFERENCE_FIELDS = new Set([
@@ -138,7 +139,14 @@ const extractFieldCandidates = (
 
 const extractAtCandidates = (line: string, lineIndex: number): ReferenceCandidate[] => {
   const candidates: ReferenceCandidate[] = [];
+  let quote: "\"" | "'" | undefined;
   for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    if ((char === "\"" || char === "'") && line[index - 1] !== "\\") {
+      quote = quote === char ? undefined : quote ?? char;
+      continue;
+    }
+    if (quote) continue;
     if (line[index] !== "@") continue;
     let end = index + 1;
     while (isTargetChar(line[end] ?? "") || line[end] === "#") end += 1;
@@ -187,5 +195,50 @@ export const extractReferenceCandidates = (
         targetSymbolIds: []
       }];
     });
+  });
+};
+
+export const referencesFromProgramReferences = (
+  document: WorkspaceDocumentInput,
+  references: readonly ChemdProgramReference[]
+): WorkspaceReference[] => {
+  const seen = new Set<string>();
+  return references.flatMap((reference) => {
+    const target = splitTarget(reference.symbolId);
+    if (!target) return [];
+    const candidate: ReferenceCandidate = {
+      field: reference.field ?? reference.refKind,
+      rawText: reference.raw,
+      ...target,
+      range: reference.range
+    };
+    const key = candidateKey(candidate);
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return [{
+      referenceId: `${document.uri}:${candidate.range.startLine}:${candidate.range.startColumn}:${candidate.targetText}`,
+      documentUri: document.uri,
+      documentPath: document.path,
+      field: candidate.field,
+      rawText: candidate.rawText,
+      targetText: candidate.targetText,
+      targetDocumentAlias: candidate.targetDocumentAlias,
+      targetLocalId: candidate.targetLocalId,
+      range: candidate.range,
+      status: "unresolved",
+      targetSymbolIds: []
+    }];
+  });
+};
+
+export const mergeWorkspaceReferences = (
+  references: readonly WorkspaceReference[]
+): WorkspaceReference[] => {
+  const seen = new Set<string>();
+  return references.filter((reference) => {
+    const key = `${reference.range.startLine}:${reference.range.startColumn}:${reference.targetText}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
   });
 };

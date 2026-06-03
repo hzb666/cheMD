@@ -126,3 +126,8 @@ export {
 export {
   createSourceHash
 } from "./ranges";
+export {
+  collectProgramReferences,
+  findProgramReferenceAtPosition,
+  type ChemdProgramReference
+} from "./program-model";

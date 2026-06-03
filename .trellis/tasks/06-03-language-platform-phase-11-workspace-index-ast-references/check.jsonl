@@ -1,0 +1,6 @@
+{"file":"packages/workspace-index/tests/workspace-index.test.ts","reason":"Workspace-index regression tests must pass."}
+{"file":"packages/workspace-index/src/build.ts","reason":"Workspace-index AST reference path must typecheck."}
+{"file":"packages/workspace-index/src/references.ts","reason":"Fallback reference extraction must typecheck."}
+{"file":"packages/language-service/src/index.ts","reason":"New language-service export must typecheck."}
+{"file":"packages/language-service/src/program-model.ts","reason":"Program reference collection must typecheck."}
+{"file":"packages/compiler/tests/language-fixture-matrix.test.ts","reason":"Compiler matrix remains green if affected."}

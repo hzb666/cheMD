@@ -1,10 +1,15 @@
 import {
+  collectProgramReferences,
   compileChemdForEditor,
   type ChemdLanguageCompileOutput
 } from "@chemd/language-service";
 import { createCompileFailureDiagnostic, createReferenceDiagnostics } from "./diagnostics";
 import { hashSource } from "./hash";
-import { extractReferenceCandidates } from "./references";
+import {
+  extractReferenceCandidates,
+  mergeWorkspaceReferences,
+  referencesFromProgramReferences
+} from "./references";
 import { resolveReferences } from "./resolve";
 import type {
   WorkspaceDocumentInput,
@@ -116,6 +121,22 @@ const sortDiagnostics = (
     || left.diagnostic.code.localeCompare(right.diagnostic.code)
   );
 
+const buildReferences = (
+  document: WorkspaceDocumentInput,
+  output: ChemdLanguageCompileOutput | WorkspaceIndexDiagnostic
+) => {
+  const textReferences = extractReferenceCandidates(document);
+  if ("diagnostic" in output || output.status === "failed") {
+    return textReferences;
+  }
+  if (!output.result?.program) return textReferences;
+  const programReferences = referencesFromProgramReferences(
+    document,
+    collectProgramReferences(output.result, document.source)
+  );
+  return mergeWorkspaceReferences([...textReferences, ...programReferences]);
+};
+
 export const buildWorkspaceSymbolIndex = (
   documents: readonly WorkspaceDocumentInput[],
   compile: WorkspaceIndexCompileFn = defaultCompile
@@ -130,14 +151,14 @@ export const buildWorkspaceSymbolIndex = (
     indexedDocuments.push(buildIndexedDocument(document, output, sourceHash));
     if ("diagnostic" in output) {
       diagnostics.push(output);
-      return extractReferenceCandidates(document);
+      return buildReferences(document, output);
     }
     diagnostics.push(...output.diagnostics.map((diagnostic) => ({
       documentUri: document.uri,
       diagnostic
     })));
     symbols.push(...buildSymbols(document, output, sourceHash, symbolIdCounts));
-    return extractReferenceCandidates(document);
+    return buildReferences(document, output);
   });
 
   const resolvedReferences = resolveReferences(references, symbols);

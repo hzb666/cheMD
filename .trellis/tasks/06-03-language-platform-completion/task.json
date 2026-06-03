@@ -29,7 +29,8 @@
     "06-03-language-platform-phase-7-lnf-exporter-completeness",
     "06-03-language-platform-phase-8-language-service-diagnostic-ranges",
     "06-03-06-03-language-platform-phase-9-exporter-training-diagnostic-evidence",
-    "06-03-language-platform-phase-10-typechecker-upstream-diagnostic-spans"
+    "06-03-language-platform-phase-10-typechecker-upstream-diagnostic-spans",
+    "06-03-language-platform-phase-11-workspace-index-ast-references"
   ],
   "parent": null,
   "relatedFiles": [],

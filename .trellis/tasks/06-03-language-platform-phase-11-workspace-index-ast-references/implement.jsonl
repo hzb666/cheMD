@@ -1,0 +1,6 @@
+{"file":"packages/language-service/src/program-model.ts","reason":"Contains compiled program reference collection."}
+{"file":"packages/language-service/src/index.ts","reason":"Exports language-service APIs consumed by workspace-index."}
+{"file":"packages/workspace-index/src/build.ts","reason":"Builds workspace references from compile output."}
+{"file":"packages/workspace-index/src/references.ts","reason":"Current text-scan fallback for reference candidates."}
+{"file":"packages/workspace-index/tests/workspace-index.test.ts","reason":"Workspace reference regression coverage."}
+{"file":"packages/compiler/tests/language-fixture-matrix.test.ts","reason":"Regression matrix for compiler language fixtures."}

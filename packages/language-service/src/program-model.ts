@@ -28,6 +28,7 @@ export interface ChemdProgramReference {
   raw: string;
   range: ChemdSourceRange;
   refKind: ChemdReferenceExpr["refKind"];
+  field?: string;
 }
 
 const declarationSymbolKinds = new Set<string>([
@@ -359,11 +360,11 @@ export const collectProgramReferences = (
 ): ChemdProgramReference[] => {
   const fallback = createDocumentRange(source);
   return [
-    ...Object.values(result.program.meta.primary ?? {}).flatMap((value) =>
-      collectValueReferences(value, fallback)
+    ...Object.entries(result.program.meta.primary ?? {}).flatMap(([field, value]) =>
+      collectValueReferences(value, fallback, field)
     ),
-    ...Object.values(result.program.meta.fields).flatMap((value) =>
-      collectValueReferences(value, fallback)
+    ...Object.entries(result.program.meta.fields).flatMap(([field, value]) =>
+      collectValueReferences(value, fallback, field)
     ),
     ...result.program.declarations.flatMap((declaration) =>
       collectDeclarationReferences(declaration, fallback)
@@ -373,7 +374,8 @@ export const collectProgramReferences = (
         symbolId: reference.source.replace(/^@/, ""),
         raw: reference.raw,
         refKind: "local" as const,
-        range: sourceSpanToRange(reference, fallback)
+        range: sourceSpanToRange(reference, fallback),
+        field: "doc_comment_reference"
       }))
     )
   ].sort((left, right) =>
@@ -397,16 +399,16 @@ const collectDeclarationReferences = (
 ): ChemdProgramReference[] => {
   const references: ChemdProgramReference[] = [];
   if ("target" in declaration && declaration.target) {
-    references.push(...collectValueReferences(declaration.target, fallback));
+    references.push(...collectValueReferences(declaration.target, fallback, "target"));
   }
   if (declaration.kind === "procedure" && declaration.evidence) {
     references.push(...declaration.evidence.flatMap((value) =>
-      collectValueReferences(value, fallback)
+      collectValueReferences(value, fallback, "evidence")
     ));
   }
   if ("fields" in declaration) {
-    references.push(...Object.values(declaration.fields).flatMap((value) =>
-      collectValueReferences(value, fallback)
+    references.push(...Object.entries(declaration.fields).flatMap(([field, value]) =>
+      collectValueReferences(value, fallback, field)
     ));
   }
   if (declaration.kind === "procedure") {
@@ -425,14 +427,17 @@ const collectProcedureStatementReferences = (
   fallback: ChemdSourceRange
 ): ChemdProgramReference[] => {
   if (statement.kind === "doc") return [];
-  const own = Object.values(statement.args).flatMap((value) =>
-    collectValueReferences(value, fallback)
+  const own = Object.entries(statement.args).flatMap(([field, value]) =>
+    collectValueReferences(value, fallback, field)
   );
   const direct = [
-    ...((statement.kind === "step" ? statement.inputs ?? [] : []) as ChemdValue[]),
-    ...((statement.kind === "step" ? statement.outputs ?? [] : []) as ChemdValue[]),
+    ...((statement.kind === "step" ? statement.inputs ?? [] : []) as ChemdValue[])
+      .flatMap((value) => collectValueReferences(value, fallback, "inputs")),
+    ...((statement.kind === "step" ? statement.outputs ?? [] : []) as ChemdValue[])
+      .flatMap((value) => collectValueReferences(value, fallback, "outputs")),
     ...((statement.kind === "step" ? statement.evidence ?? [] : []) as ChemdValue[])
-  ].flatMap((value) => collectValueReferences(value, fallback));
+      .flatMap((value) => collectValueReferences(value, fallback, "evidence"))
+  ];
   return statement.kind === "control"
     ? [
         ...own,
@@ -448,25 +453,30 @@ const collectAgentReferences = (
   fallback: ChemdSourceRange
 ): ChemdProgramReference[] => [
   ...declaration.evidence.flatMap((item) =>
-    item.refs?.flatMap((value) => collectValueReferences(value, fallback)) ?? []
+    item.refs?.flatMap((value) => collectValueReferences(value, fallback, "evidence")) ?? []
   ),
   ...declaration.toolCalls.flatMap((item) => [
-    ...(item.evidence?.flatMap((value) => collectValueReferences(value, fallback)) ?? []),
-    ...(item.args ? Object.values(item.args).flatMap((value) => collectValueReferences(value, fallback)) : []),
-    ...(item.output ? collectValueReferences(item.output, fallback) : [])
+    ...(item.evidence?.flatMap((value) => collectValueReferences(value, fallback, "evidence")) ?? []),
+    ...(item.args
+      ? Object.entries(item.args).flatMap(([field, value]) =>
+          collectValueReferences(value, fallback, field)
+        )
+      : []),
+    ...(item.output ? collectValueReferences(item.output, fallback, "output") : [])
   ]),
   ...declaration.patches.flatMap((item) => [
-    ...(item.evidence?.flatMap((value) => collectValueReferences(value, fallback)) ?? []),
-    ...item.edits.flatMap((edit) => collectValueReferences(edit.value, fallback))
+    ...(item.evidence?.flatMap((value) => collectValueReferences(value, fallback, "evidence")) ?? []),
+    ...item.edits.flatMap((edit) => collectValueReferences(edit.value, fallback, edit.target.kind))
   ]),
   ...declaration.auditTimeline.flatMap((item) =>
-    item.evidence?.flatMap((value) => collectValueReferences(value, fallback)) ?? []
+    item.evidence?.flatMap((value) => collectValueReferences(value, fallback, "evidence")) ?? []
   )
 ];
 
 const collectValueReferences = (
   value: ChemdValue | undefined,
-  fallback: ChemdSourceRange
+  fallback: ChemdSourceRange,
+  field?: string
 ): ChemdProgramReference[] => {
   if (!value) return [];
   if (value.type === "reference") {
@@ -476,20 +486,23 @@ const collectValueReferences = (
         : value.target,
       raw: value.raw,
       refKind: value.refKind,
-      range: sourceSpanToRange(value.sourceSpan, fallback)
+      range: sourceSpanToRange(value.sourceSpan, fallback),
+      ...(field ? { field } : {})
     }];
   }
   if (value.type === "list") {
-    return value.items.flatMap((item) => collectValueReferences(item, fallback));
+    return value.items.flatMap((item) => collectValueReferences(item, fallback, field));
   }
   if (value.type === "record") {
-    return value.fields.flatMap((field) => collectValueReferences(field.value, fallback));
+    return value.fields.flatMap((recordField) =>
+      collectValueReferences(recordField.value, fallback, recordField.key)
+    );
   }
   if (value.type === "call") {
-    return value.args.flatMap((arg) => collectValueReferences(arg.value, fallback));
+    return value.args.flatMap((arg) => collectValueReferences(arg.value, fallback, arg.name));
   }
   if (value.type === "patch") {
-    return collectValueReferences(value.value, fallback);
+    return collectValueReferences(value.value, fallback, value.target.kind);
   }
   return [];
 };

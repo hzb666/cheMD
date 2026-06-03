@@ -137,6 +137,37 @@ describe("buildWorkspaceSymbolIndex", () => {
       ]);
   });
 
+  it("does not create workspace references from at signs inside strings", () => {
+    const index = buildWorkspaceSymbolIndex([
+      {
+        uri: "file:///workspace/string-at.chemd",
+        source: `module exp_string_at
+
+meta {
+  id: "exp-string-at"
+  title: "literal @not-a-reference"
+  date: "2026-05-13"
+}
+
+molecule mol_a {
+  name: "quoted @not-a-reference"
+}
+`
+      }
+    ]);
+
+    expect(index.references.map((reference) => reference.targetText))
+      .not.toContain("not-a-reference");
+    expect(index.diagnostics).not.toContainEqual(
+      expect.objectContaining({
+        diagnostic: expect.objectContaining({
+          code: "W_WORKSPACE_REFERENCE_UNRESOLVED",
+          message: expect.stringContaining("not-a-reference")
+        })
+      })
+    );
+  });
+
   it("does not resolve unsupported .chemd.md document aliases", () => {
     const index = buildWorkspaceSymbolIndex([
       {
