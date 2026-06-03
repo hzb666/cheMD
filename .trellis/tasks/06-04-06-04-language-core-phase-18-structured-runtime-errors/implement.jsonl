@@ -1,0 +1,4 @@
+{"file":"packages/runtime-lab/src/runtime-errors.ts","reason":"Runtime issue code, issue, and preflight result types."}
+{"file":"packages/runtime-lab/src/index.ts","reason":"Runtime package public type exports."}
+{"file":"packages/runtime-lab/src/preflight.ts","reason":"Preflight issue construction and diagnostic mapping."}
+{"file":"packages/runtime-lab/tests/runtime-lab.test.ts","reason":"Runtime preflight regression coverage."}

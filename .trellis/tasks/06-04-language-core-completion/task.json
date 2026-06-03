@@ -23,7 +23,8 @@
     "06-04-06-04-language-core-phase-14-module-linker",
     "06-04-06-04-language-core-phase-15-diagnostic-first-expressions",
     "06-04-06-04-language-core-phase-16-incremental-core-compiler-cache",
-    "06-04-06-04-language-core-phase-17-ast-aware-semantic-diff"
+    "06-04-06-04-language-core-phase-17-ast-aware-semantic-diff",
+    "06-04-06-04-language-core-phase-18-structured-runtime-errors"
   ],
   "parent": null,
   "relatedFiles": [],

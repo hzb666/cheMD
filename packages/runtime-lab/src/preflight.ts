@@ -7,38 +7,11 @@ import {
 } from "@chemd/step-ontology";
 
 import type {
-  PreflightIssue,
-  PreflightResult,
   RuntimeContext,
   RuntimeStep,
   RunPlan
 } from "./index";
-
-const createPreflightDiagnostic = (issue: PreflightIssue): V03Diagnostic =>
-  createV03Diagnostic({
-    code: codeForPreflightIssue(issue),
-    severity: issue.severity,
-    message: issue.message,
-    sourceLayer: "runtime_preflight",
-    sourceNodeType: issue.stepId ? "step" : "procedure",
-    sourceNodeId: issue.stepId ?? issue.controlId,
-    facts: {
-      kind: issue.kind,
-      step_id: issue.stepId,
-      control_id: issue.controlId,
-      required_action: issue.requiredAction
-    }
-  });
-
-const codeForPreflightIssue = (issue: PreflightIssue): string => {
-  if (issue.kind === "capability") return "E605";
-  if (issue.kind === "device_range") return "E_RUNTIME_DEVICE_RANGE";
-  if (issue.kind === "inventory") return "E_RUNTIME_INVENTORY";
-  if (issue.kind === "adapter") return "E_RUNTIME_ADAPTER";
-  if (issue.kind === "control") return "E_RUNTIME_CONTROL";
-  if (issue.kind === "resource_conflict") return "E_RUNTIME_RESOURCE_CONFLICT";
-  return "W_RUNTIME_SAFETY";
-};
+import { createPreflightDiagnostic, type PreflightIssue, type PreflightResult } from "./runtime-errors";
 
 const createUnknownRobotStepDiagnostic = (step: RuntimeStep): V03Diagnostic =>
   createV03Diagnostic({
@@ -64,9 +37,15 @@ export const preflightRun = (plan: RunPlan, context: RuntimeContext): PreflightR
       .filter((capability) => !available.has(capability))
       .map((capability) => ({
         severity: "error",
+        code: "E_RUNTIME_CAPABILITY_MISSING",
         kind: "capability",
         stepId: step.stepId,
         message: `Step ${step.stepId} requires missing capability: ${capability}`,
+        facts: {
+          step_id: step.stepId,
+          missing_capability: capability,
+          mode: context.mode ?? "dry-run"
+        },
         requiredAction: "change_context"
       }))
   );
@@ -125,9 +104,18 @@ const collectDeviceRangeIssues = (
       if ((device.min !== undefined && candidate < device.min) || (device.max !== undefined && candidate > device.max)) {
         return [{
           severity: "error" as const,
+          code: "E_RUNTIME_DEVICE_RANGE" as const,
           kind: "device_range" as const,
           stepId: step.stepId,
           message: `Step ${step.stepId} is outside ${capability} device range.`,
+          facts: {
+            step_id: step.stepId,
+            capability,
+            candidate,
+            min: device.min,
+            max: device.max,
+            unit: device.unit
+          },
           requiredAction: "change_context" as const
         }];
       }
@@ -179,18 +167,22 @@ const collectInventoryIssues = (
       if (!material || !material.available) {
         return [{
           severity: "error" as const,
+          code: "E_RUNTIME_INVENTORY_UNAVAILABLE" as const,
           kind: "inventory" as const,
           stepId: step.stepId,
           message: `Step ${step.stepId} requires unavailable inventory: ${materialId}`,
+          facts: { step_id: step.stepId, material_id: materialId },
           requiredAction: "change_context" as const
         }];
       }
       if (material.expired) {
         return [{
           severity: "warning" as const,
+          code: "E_RUNTIME_INVENTORY_EXPIRED" as const,
           kind: "inventory" as const,
           stepId: step.stepId,
           message: `Step ${step.stepId} uses expired inventory: ${materialId}`,
+          facts: { step_id: step.stepId, material_id: materialId },
           requiredAction: "change_context" as const
         }];
       }
@@ -210,9 +202,11 @@ const collectSafetyIssues = (
     const confirmationIssue: PreflightIssue[] = step.requiresConfirmation
       ? [{
           severity: context.mode === "robot-run" ? "error" : "warning",
+          code: "E_RUNTIME_SAFETY_CONFIRMATION",
           kind: "safety",
           stepId: step.stepId,
           message: `Step ${step.stepId} requires manual confirmation.`,
+          facts: { step_id: step.stepId, mode: context.mode ?? "dry-run" },
           requiredAction: "manual_confirmation"
         }]
       : [];
@@ -220,9 +214,11 @@ const collectSafetyIssues = (
       severity: context.mode === "robot-run" && ["hazardous_reagent", "quench", "exotherm"].includes(tag)
         ? "error"
         : "warning",
+      code: "E_RUNTIME_SAFETY_TAG",
       kind: "safety",
       stepId: step.stepId,
       message: `Step ${step.stepId} has safety tag: ${tag}`,
+      facts: { step_id: step.stepId, safety_tag: tag },
       requiredAction: "manual_confirmation"
     }));
     const ruleIssues = (context.safetyRules ?? [])
@@ -233,9 +229,11 @@ const collectSafetyIssues = (
       )
       .map((rule): PreflightIssue => ({
         severity: context.mode === "robot-run" && rule.robotRunSeverity ? rule.robotRunSeverity : rule.severity,
+        code: "E_RUNTIME_SAFETY_RULE",
         kind: "safety",
         stepId: step.stepId,
         message: rule.message,
+        facts: { step_id: step.stepId, rule_id: rule.ruleId },
         requiredAction: rule.requiresConfirmation ? "manual_confirmation" : "change_context"
       }));
 
@@ -256,18 +254,22 @@ const collectControlIssues = (
     const dynamicIssue: PreflightIssue[] = control.dynamic
       ? [{
           severity: context.mode === "robot-run" && !hasAdapterFor(context, control.kind) ? "error" : "warning",
+          code: "E_RUNTIME_CONTROL_DYNAMIC",
           kind: "control",
           controlId: control.controlId,
           message: `Control ${control.controlId} requires runtime decision: ${control.kind}`,
+          facts: { control_id: control.controlId, control_kind: control.kind },
           requiredAction: context.mode === "robot-run" ? "provide_adapter" : "manual_confirmation"
         }]
       : [];
     const parallelIssue: PreflightIssue[] = control.kind === "parallel"
       ? [{
           severity: context.mode === "robot-run" ? "error" : "warning",
+          code: "E_RUNTIME_RESOURCE_CONFLICT",
           kind: "resource_conflict",
           controlId: control.controlId,
           message: `Parallel control ${control.controlId} requires resource conflict review.`,
+          facts: { control_id: control.controlId, control_kind: control.kind },
           requiredAction: "reduce_parallelism"
         }]
       : [];
@@ -275,9 +277,11 @@ const collectControlIssues = (
       .filter((rule) => rule.trigger.controlKind === control.kind)
       .map((rule): PreflightIssue => ({
         severity: context.mode === "robot-run" && rule.robotRunSeverity ? rule.robotRunSeverity : rule.severity,
+        code: "E_RUNTIME_SAFETY_RULE",
         kind: "safety",
         controlId: control.controlId,
         message: rule.message,
+        facts: { control_id: control.controlId, rule_id: rule.ruleId },
         requiredAction: rule.requiresConfirmation ? "manual_confirmation" : "change_procedure"
       }));
 

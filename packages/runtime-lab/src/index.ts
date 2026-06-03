@@ -17,6 +17,11 @@ import {
   type RuntimeTraceEvent
 } from "./state-machine";
 export { preflightRun } from "./preflight";
+export type {
+  PreflightIssue,
+  PreflightResult,
+  RuntimeIssueCode
+} from "./runtime-errors";
 export {
   completeStep,
   confirmStep,
@@ -139,34 +144,6 @@ export interface SafetyRule {
   requiresConfirmation?: boolean;
   robotRunSeverity?: "warning" | "error";
   message: string;
-}
-
-export interface PreflightIssue {
-  severity: "info" | "warning" | "error";
-  kind:
-    | "capability"
-    | "device_range"
-    | "inventory"
-    | "safety"
-    | "environment"
-    | "adapter"
-    | "control"
-    | "resource_conflict";
-  stepId?: string;
-  controlId?: string;
-  message: string;
-  requiredAction?:
-    | "manual_confirmation"
-    | "change_context"
-    | "change_procedure"
-    | "provide_adapter"
-    | "reduce_parallelism";
-}
-
-export interface PreflightResult {
-  blocking: boolean;
-  issues: PreflightIssue[];
-  diagnostics: V03Diagnostic[];
 }
 
 export interface RuntimeControl {

@@ -41,7 +41,19 @@ describe("runtime lab planner", () => {
     });
     expect(state.status).toBe("planned");
     expect(preflight.blocking).toBe(true);
+    expect(preflight.issues[0]).toMatchObject({
+      code: "E_RUNTIME_CAPABILITY_MISSING",
+      facts: {
+        step_id: "s1",
+        missing_capability: "cooling",
+        mode: "dry-run"
+      }
+    });
     expect(preflight.diagnostics[0]?.code).toBe("E605");
+    expect(preflight.diagnostics[0]?.facts).toMatchObject({
+      runtime_issue_code: "E_RUNTIME_CAPABILITY_MISSING",
+      missing_capability: "cooling"
+    });
   });
 
   it("preserves step provenance and applies inferred-step confirmation", () => {
