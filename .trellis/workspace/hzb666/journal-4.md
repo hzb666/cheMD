@@ -1873,3 +1873,37 @@ Added compileChemdCore for language-core compilation without training/RAG output
 ### Next Steps
 
 - None - task complete
+
+
+## Session 186: Language core phase 14 module linker
+
+**Date**: 2026-06-04
+**Task**: Language core phase 14 module linker
+**Package**: compiler
+**Branch**: `develop`
+
+### Summary
+
+Added a language-core module linker that compiles provided Chemd modules, builds an import graph, and reports missing module, import cycle, and missing imported symbol diagnostics. Validation: compiler module-linker/program-compile/reaction-route tests, compiler typecheck, Trellis validate, and git diff --check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `30bc25a` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
