@@ -1431,3 +1431,37 @@ Created the language-platform parent plan and Phase 0 child task, added the feat
 ### Next Steps
 
 - None - task complete
+
+
+## Session 173: Phase 1 program contract hardening
+
+**Date**: 2026-06-03
+**Task**: Phase 1 program contract hardening
+**Package**: core
+**Branch**: `develop`
+
+### Summary
+
+Hardened @chemd/core public contracts by adding program and compat subpath surfaces, removing older AST/block-schema exports from root, and migrating compatibility consumers while keeping core and compiler-facing typechecks passing.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `38cc7ef` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
