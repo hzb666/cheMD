@@ -39,3 +39,37 @@ Enhanced the existing semantic diff to compare module, meta, import, and declara
 ### Next Steps
 
 - None - task complete
+
+
+## Session 190: Language core phase 18 structured runtime errors
+
+**Date**: 2026-06-04
+**Task**: Language core phase 18 structured runtime errors
+**Package**: runtime-lab
+**Branch**: `develop`
+
+### Summary
+
+Added structured runtime preflight issue codes and facts, generated diagnostics from runtime issue metadata, and moved preflight issue/result types out of the oversized runtime index barrel. Validation: runtime-lab tests, runtime-lab typecheck, Trellis validate, and git diff --check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `89ae968` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
