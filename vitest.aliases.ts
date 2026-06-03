@@ -6,6 +6,8 @@ export const chemdPackageAliases = {
   "@chemd/cli": `${repoRoot}/packages/cli/src/index.ts`,
   "@chemd/compiler": `${repoRoot}/packages/compiler/src/index.ts`,
   "@chemd/compiler/node": `${repoRoot}/packages/compiler/src/node.ts`,
+  "@chemd/core/compat": `${repoRoot}/packages/core/src/compat.ts`,
+  "@chemd/core/program": `${repoRoot}/packages/core/src/program.ts`,
   "@chemd/core": `${repoRoot}/packages/core/src/index.ts`,
   "@chemd/diagnostics": `${repoRoot}/packages/diagnostics/src/index.ts`,
   "@chemd/domain-templates": `${repoRoot}/packages/domain-templates/src/index.ts`,

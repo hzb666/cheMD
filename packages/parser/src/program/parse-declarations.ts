@@ -81,7 +81,10 @@ export const parseFieldBlock = (cursor: ProgramParserCursor): ParsedFieldBlock =
       cursor.consume();
       continue;
     }
-    cursor.expectValue(":", "E_PROGRAM_FIELD_COLON_EXPECTED");
+    const colon = cursor.expectValue(":", "E_PROGRAM_FIELD_COLON_EXPECTED");
+    if (!colon && isLikelyNextLineField(cursor, fieldStart)) {
+      continue;
+    }
     const value = cursor.parseValue();
     const fieldName = tokenValue(fieldStart) ?? "unknown";
     fields[fieldName] = value;
@@ -147,6 +150,17 @@ export const consumeOptionalSeparator = (cursor: ProgramParserCursor): void => {
   if ([",", ";"].includes(tokenValue(cursor.peek()) ?? "")) {
     cursor.consume();
   }
+};
+
+const isLikelyNextLineField = (
+  cursor: ProgramParserCursor,
+  fieldStart: ProgramToken
+): boolean => {
+  const next = cursor.peek();
+  return !!next
+    && next.line > fieldStart.endLine
+    && isIdentifierToken(next)
+    && tokenValue(cursor.peek(1)) === ":";
 };
 
 export const parseTargetReference = (

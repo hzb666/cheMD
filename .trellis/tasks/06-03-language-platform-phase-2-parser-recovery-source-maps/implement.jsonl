@@ -1,0 +1,11 @@
+{"file":"packages/parser/src/program/parser-cursor.ts","reason":"Owns value scanning, diagnostics, and source span mapping."}
+{"file":"packages/parser/src/program/parse-declarations.ts","reason":"Owns field block recovery and field source spans."}
+{"file":"packages/parser/src/program/parse-values.ts","reason":"Program value parser API and diagnostics output."}
+{"file":"packages/parser/src/program/parse-value-parser.ts","reason":"Value parser diagnostics and recovery behavior."}
+{"file":"packages/parser/src/program/parse-value-nodes.ts","reason":"Value node source spans for nested references, lists, records, and calls."}
+{"file":"packages/parser/src/program/tokens.ts","reason":"Token/source-span helpers used by parser and value parser."}
+{"file":"packages/parser/tests/program-parser.test.ts","reason":"Program parser recovery and source-map tests."}
+{"file":"packages/parser/tests/program-values.test.ts","reason":"Value parser source-span and diagnostic tests."}
+{"file":"packages/compiler/tests/language-fixture-matrix.test.ts","reason":"Compiler fixture smoke test for parser behavior."}
+{"file":"packages/compiler/fixtures/program-golden-suzuki-screen.chemd","reason":"Representative valid fixture for compile smoke."}
+{"file":"vitest.aliases.ts","reason":"Test runtime aliases must resolve core subpath exports used by parser dependencies."}

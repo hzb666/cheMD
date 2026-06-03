@@ -202,4 +202,62 @@ reaction rxn_open {
       })
     );
   });
+
+  it("maps value diagnostics to full source spans", () => {
+    const document = parseChemdProgram(`module exp_bad_value
+
+meta {
+  id: "exp-bad-value"
+  title: "Bad value"
+  date: "2026-05-28"
+}
+
+reaction rxn_bad {
+  refs: [@]
+}
+`);
+    const diagnostic = document.diagnostics.find((item) =>
+      item.message === "Expected reference target after '@'."
+    );
+
+    expect(diagnostic).toMatchObject({
+      code: "E_PROGRAM_UNEXPECTED_TOKEN",
+      sourceSpan: {
+        startLine: 10,
+        startColumn: 11
+      }
+    });
+  });
+
+  it("recovers later fields after a missing field colon", () => {
+    const document = parseChemdProgram(`module exp_recover
+
+meta {
+  id: "exp-recover"
+  title: "Recover"
+  date: "2026-05-28"
+}
+
+reaction rxn_recover {
+  broken
+  solvent: "MeCN"
+  temperature: 40 C
+}
+`);
+    const reaction = document.declarations.find((item) => item.kind === "reaction");
+
+    expect(document.diagnostics).toContainEqual(
+      expect.objectContaining({ code: "E_PROGRAM_FIELD_COLON_EXPECTED" })
+    );
+    expect(reaction).toMatchObject({
+      fields: {
+        solvent: expect.objectContaining({ type: "string", value: "MeCN" }),
+        temperature: expect.objectContaining({ type: "quantity", unit: "C" })
+      },
+      fieldSpans: {
+        solvent: { startLine: 11 },
+        temperature: { startLine: 12 }
+      }
+    });
+  });
 });

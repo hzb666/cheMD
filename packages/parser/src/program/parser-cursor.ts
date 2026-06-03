@@ -90,8 +90,14 @@ export class ProgramParserCursor {
     const result = parseProgramValue(raw, {
       references: { moduleNames: this.referenceModuleNames }
     });
-    this.diagnostics.push(...result.diagnostics);
-    return result.value ?? fallbackIdentifier(raw, range);
+    this.diagnostics.push(
+      ...result.diagnostics.map((diagnostic) =>
+        offsetDiagnosticSourceSpan(diagnostic, range.start)
+      )
+    );
+    return result.value
+      ? offsetValueSourceSpans(result.value, range.start)
+      : fallbackIdentifier(raw, range);
   }
 
   collectDocs(): ChemdDocComment[] {
@@ -213,6 +219,95 @@ const fallbackIdentifier = (
   name: raw,
   sourceSpan: spanFromTokens(range.start, range.end)
 });
+
+const offsetDiagnosticSourceSpan = (
+  diagnostic: Diagnostic,
+  base: ProgramToken
+): Diagnostic => ({
+  ...diagnostic,
+  sourceSpan: offsetSourceSpan(diagnostic.sourceSpan, base)
+});
+
+const offsetValueSourceSpans = (
+  value: ChemdValue,
+  base: ProgramToken
+): ChemdValue => {
+  switch (value.type) {
+    case "list":
+      return {
+        ...value,
+        sourceSpan: offsetSourceSpan(value.sourceSpan, base),
+        items: value.items.map((item) => offsetValueSourceSpans(item, base))
+      };
+    case "record":
+      return {
+        ...value,
+        sourceSpan: offsetSourceSpan(value.sourceSpan, base),
+        fields: value.fields.map((field) => ({
+          ...field,
+          sourceSpan: offsetSourceSpan(field.sourceSpan, base),
+          value: offsetValueSourceSpans(field.value, base)
+        }))
+      };
+    case "call":
+      return {
+        ...value,
+        sourceSpan: offsetSourceSpan(value.sourceSpan, base),
+        args: value.args.map((arg) => ({
+          ...arg,
+          sourceSpan: offsetSourceSpan(arg.sourceSpan, base),
+          value: offsetValueSourceSpans(arg.value, base)
+        }))
+      };
+    case "patch":
+      return {
+        ...value,
+        sourceSpan: offsetSourceSpan(value.sourceSpan, base),
+        value: offsetValueSourceSpans(value.value, base)
+      };
+    default:
+      return {
+        ...value,
+        sourceSpan: offsetSourceSpan(value.sourceSpan, base)
+      };
+  }
+};
+
+const offsetSourceSpan = (
+  span: SourceSpan | undefined,
+  base: ProgramToken
+): SourceSpan | undefined => {
+  if (!span) {
+    return undefined;
+  }
+
+  return {
+    ...span,
+    start: span.start === undefined ? undefined : base.start + span.start,
+    end: span.end === undefined ? undefined : base.start + span.end,
+    startLine: offsetLine(span.startLine, base),
+    startColumn: offsetColumn(span.startLine, span.startColumn, base),
+    endLine: offsetLine(span.endLine, base),
+    endColumn: offsetColumn(span.endLine, span.endColumn, base)
+  };
+};
+
+const offsetLine = (
+  line: number | undefined,
+  base: ProgramToken
+): number | undefined =>
+  line === undefined ? undefined : base.line + line - 1;
+
+const offsetColumn = (
+  line: number | undefined,
+  column: number | undefined,
+  base: ProgramToken
+): number | undefined =>
+  column === undefined
+    ? undefined
+    : line === 1
+      ? base.column + column - 1
+      : column;
 
 const sourceSpanFromPoint = (point?: ProgramToken | SourceSpan): SourceSpan => {
   if (!point) {
