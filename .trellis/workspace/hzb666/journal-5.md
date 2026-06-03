@@ -107,3 +107,37 @@ Expanded the machine-readable Chemd language contract with program token, keywor
 ### Next Steps
 
 - None - task complete
+
+
+## Session 192: Language core phase 20 program type index
+
+**Date**: 2026-06-04
+**Task**: Language core phase 20 program type index
+**Package**: typechecker
+**Branch**: `develop`
+
+### Summary
+
+Added a typechecker program field type index exposing expected schema kind, actual AST value kind, canonical field, alias status, required status, validity, and related diagnostic codes. Validation: type index tests, program typechecker tests, expression diagnostics tests, typechecker typecheck, Trellis validate, and git diff --check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8cc790a` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
