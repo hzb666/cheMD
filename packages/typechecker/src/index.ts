@@ -16,6 +16,11 @@ import type {
 } from "./types";
 
 export * from "./types";
+export {
+  buildProgramTypeIndex,
+  type ProgramFieldTypeInfo,
+  type ProgramTypeIndex
+} from "./type-index";
 
 const DIAGNOSTIC_SOURCE_LAYERS = new Set<V03Diagnostic["sourceLayer"]>([
   "frontmatter",

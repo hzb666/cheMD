@@ -1,0 +1,3 @@
+{"file":"packages/typechecker/src/type-index.ts","reason":"Program field type index implementation and types."}
+{"file":"packages/typechecker/src/index.ts","reason":"Typechecker public export."}
+{"file":"packages/typechecker/tests/type-index.test.ts","reason":"Type index regression coverage."}

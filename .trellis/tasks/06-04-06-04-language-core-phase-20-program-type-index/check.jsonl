@@ -1,0 +1,3 @@
+{"file":"packages/typechecker/tests/type-index.test.ts","reason":"Type index tests must pass."}
+{"file":"packages/typechecker/src/type-index.ts","reason":"Type index implementation must typecheck."}
+{"file":"packages/typechecker/src/index.ts","reason":"Public export must typecheck."}

@@ -25,7 +25,8 @@
     "06-04-06-04-language-core-phase-16-incremental-core-compiler-cache",
     "06-04-06-04-language-core-phase-17-ast-aware-semantic-diff",
     "06-04-06-04-language-core-phase-18-structured-runtime-errors",
-    "06-04-06-04-language-core-phase-19-program-language-contract"
+    "06-04-06-04-language-core-phase-19-program-language-contract",
+    "06-04-06-04-language-core-phase-20-program-type-index"
   ],
   "parent": null,
   "relatedFiles": [],
