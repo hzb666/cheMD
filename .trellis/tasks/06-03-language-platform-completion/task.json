@@ -25,7 +25,8 @@
     "06-03-language-platform-phase-3-resolver-dynamic-references",
     "06-03-language-platform-phase-4-compiler-authoring-hints",
     "06-03-language-platform-phase-5-state-trace-diff",
-    "06-03-language-platform-phase-6-typechecker-semantic-graph"
+    "06-03-language-platform-phase-6-typechecker-semantic-graph",
+    "06-03-language-platform-phase-7-lnf-exporter-completeness"
   ],
   "parent": null,
   "relatedFiles": [],

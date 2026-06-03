@@ -168,13 +168,57 @@ const countValueUnresolvedReferences = (value: ChemdValue): number => {
   return value.type === "patch" ? countValueUnresolvedReferences(value.value) : 0;
 };
 
+const countReferenceUnresolved = (reference: ChemdReferenceExpr): number =>
+  reference.resolved?.status === "unresolved" ? 1 : 0;
+
+const countReferenceListUnresolved = (
+  references: ChemdReferenceExpr[] | undefined
+): number =>
+  (references ?? []).reduce(
+    (count, reference) => count + countReferenceUnresolved(reference),
+    0
+  );
+
 const countDeclarationUnresolvedReferences = (declaration: ChemdDeclaration): number =>
-  hasFields(declaration)
-    ? Object.values(declaration.fields).reduce(
+  isAgentRun(declaration)
+    ? countAgentRunUnresolvedReferences(declaration)
+    : hasFields(declaration)
+      ? Object.values(declaration.fields).reduce(
         (count, value) => count + countValueUnresolvedReferences(value),
         0
       )
-    : 0;
+      : 0;
+
+const countAgentRunUnresolvedReferences = (run: AgentRunDeclaration): number =>
+  run.toolCalls.reduce(
+    (count, tool) =>
+      count
+      + Object.values(tool.args ?? {}).reduce(
+        (argCount, value) => argCount + countValueUnresolvedReferences(value),
+        0
+      )
+      + (tool.output ? countValueUnresolvedReferences(tool.output) : 0)
+      + countReferenceListUnresolved(tool.evidence),
+    0
+  )
+  + run.evidence.reduce(
+    (count, evidence) => count + countReferenceListUnresolved(evidence.refs),
+    0
+  )
+  + run.patches.reduce(
+    (count, patch) =>
+      count
+      + countReferenceListUnresolved(patch.evidence)
+      + patch.edits.reduce(
+        (editCount, edit) => editCount + countValueUnresolvedReferences(edit.value),
+        0
+      ),
+    0
+  )
+  + run.auditTimeline.reduce(
+    (count, event) => count + countReferenceListUnresolved(event.evidence),
+    0
+  );
 
 const diagnosticReferencesDeclaration = (
   diagnostic: Diagnostic | V03Diagnostic,

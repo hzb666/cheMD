@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { AgentRunDeclaration, ChemdReferenceExpr } from "@chemd/core";
 
 import { buildCanonicalLnf } from "../src/index";
 import { createProgram, declaration, refValue } from "./fixtures";
@@ -122,11 +123,52 @@ describe("canonical LNF builder", () => {
   });
 
   it("reports source completeness from unresolved references and declaration diagnostics", () => {
+    const unresolvedRef = (raw: string, target: string): ChemdReferenceExpr =>
+      refValue(raw, target, "unresolved") as ChemdReferenceExpr;
+    const agentWithUnresolvedRefs: AgentRunDeclaration = {
+      kind: "agent_run",
+      id: "agent-unresolved",
+      qualifiedId: "lnf.agent-unresolved",
+      docs: [],
+      goal: "Review missing refs.",
+      status: "completed",
+      toolCalls: [{
+        kind: "tool",
+        id: "tool-unresolved",
+        name: "inspect",
+        status: "ok",
+        args: {
+          target: refValue("@missing-tool-target", "missing-tool-target", "unresolved")
+        }
+      }],
+      evidence: [{
+        kind: "evidence",
+        id: "evidence-unresolved",
+        evidenceKind: "source",
+        refs: [unresolvedRef("@missing-evidence", "missing-evidence")]
+      }],
+      patches: [{
+        kind: "patch",
+        id: "patch-unresolved",
+        status: "proposed",
+        edits: [{
+          target: {
+            kind: "declaration_field",
+            declarationId: "rxn-main",
+            field: "solvent"
+          },
+          value: refValue("@missing-patch-value", "missing-patch-value", "unresolved")
+        }]
+      }],
+      decisions: [],
+      auditTimeline: []
+    };
     const lnf = buildCanonicalLnf({
       document: createProgram([
         declaration("result", "result-missing", {
           reaction: refValue("@missing-rxn", "missing-rxn", "unresolved")
-        })
+        }),
+        agentWithUnresolvedRefs
       ]),
       typedGraph: {
         documentId: "exp-lnf",
@@ -183,10 +225,11 @@ describe("canonical LNF builder", () => {
       observationEvents: [{ observationId: "obs-main", eventId: "obs-main::event-1" }]
     });
     expect(lnf.experiment.quality.sourceCompleteness).toMatchObject({
-      declarationCount: 12,
+      declarationCount: 13,
       documentationCount: 1,
-      unresolvedReferenceCount: 1,
-      incompleteDeclarationCount: 1
+      unresolvedReferenceCount: 4,
+      incompleteDeclarationCount: 1,
+      agentAuditRunCount: 2
     });
   });
 
