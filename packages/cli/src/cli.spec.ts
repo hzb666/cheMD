@@ -1278,9 +1278,9 @@ describe("chemd cli diff", () => {
 
     expect(result.exitCode).toBe(EXIT_OK);
     expect(result.stdout).toMatch(/~ reaction #rxn_main/);
-    expect(result.stdout).toMatch(/~ fields: .*25 C.*80 C/);
+    expect(result.stdout).toMatch(/~ fields\.temperature: .*25 C.*80 C/);
     expect(result.stdout).toMatch(/~ result #res_main/);
-    expect(result.stdout).toMatch(/~ fields: .*23%.*41%/);
+    expect(result.stdout).toMatch(/~ fields\.yield: .*23%.*41%/);
     expect(result.stdout).toMatch(/\+ analysis #ana_new/);
     expect(result.stdout).toMatch(/- sample #sample_old/);
   });

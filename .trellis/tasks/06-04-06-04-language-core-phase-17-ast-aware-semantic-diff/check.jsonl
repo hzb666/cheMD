@@ -1,0 +1,3 @@
+{"file":"packages/cli/src/semantic-diff.test.ts","reason":"Semantic diff tests must pass."}
+{"file":"packages/cli/src/cli.spec.ts","reason":"CLI diff text output tests must pass."}
+{"file":"packages/cli/src/semantic-diff.ts","reason":"Semantic diff implementation must typecheck."}

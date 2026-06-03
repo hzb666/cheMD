@@ -1,4 +1,9 @@
-import type { ChemdDeclaration, ChemdProgramDocument } from "@chemd/core";
+import type {
+  ChemdDeclaration,
+  ChemdImportDeclaration,
+  ChemdProgramDocument,
+  ChemdValue
+} from "@chemd/core";
 
 const OBJECT_NODE_TYPES = new Set([
   "molecule",
@@ -101,20 +106,61 @@ const isObjectNode = (
   && !isGeneratedObjectId(documentId, node as ChemdDeclaration & { id: string });
 
 const collectComparableFields = (node: ChemdDeclaration): Record<string, unknown> =>
-  Object.fromEntries(
-    Object.entries(node)
-      .filter(([key, value]) => !INTERNAL_FIELDS.has(key) && value !== undefined)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, value]) => [key, normalizeValue(value)])
+  collectStructuredFields(
+    Object.fromEntries(
+      Object.entries(node)
+        .filter(([key, value]) => !INTERNAL_FIELDS.has(key) && value !== undefined)
+    )
   );
 
+const collectStructuredFields = (
+  fields: Record<string, unknown>
+): Record<string, unknown> => Object.fromEntries(
+  Object.entries(fields)
+    .flatMap<[string, unknown]>(([key, value]) =>
+      key === "fields" && isValueRecord(value)
+        ? flattenFieldRecord(key, value)
+        : [[key, normalizeValue(value)]]
+    )
+    .sort(([left], [right]) => left.localeCompare(right))
+);
+
+const flattenFieldRecord = (
+  prefix: string,
+  fields: Record<string, ChemdValue>
+): Array<[string, unknown]> => Object.entries(fields).map(([key, value]) => [
+  `${prefix}.${key}`,
+  normalizeValue(value)
+]);
+
+const isValueRecord = (value: unknown): value is Record<string, ChemdValue> =>
+  Boolean(value && typeof value === "object" && !Array.isArray(value));
+
 const collectObjects = (
-  documentId: string,
-  declarations: ChemdDeclaration[],
+  document: ChemdProgramDocument,
   output = new Map<string, ComparableObject>()
 ): Map<string, ComparableObject> => {
-  for (const node of declarations) {
-    if (isObjectNode(documentId, node)) {
+  output.set("$module", {
+    fields: { name: document.module.name },
+    nodeId: "module",
+    nodeType: "module"
+  });
+  output.set("$meta", {
+    fields: collectStructuredFields({
+      id: document.meta.id,
+      title: document.meta.title,
+      date: document.meta.date,
+      fields: document.meta.fields,
+      primary: document.meta.primary
+    }),
+    nodeId: document.meta.id,
+    nodeType: "meta"
+  });
+  for (const item of document.imports) {
+    output.set(`import:${item.from}`, collectImportObject(item));
+  }
+  for (const node of document.declarations) {
+    if (isObjectNode(document.meta.id, node)) {
       output.set(`${node.kind}:${node.id}`, {
         fields: collectComparableFields(node),
         nodeId: node.id,
@@ -125,6 +171,16 @@ const collectObjects = (
 
   return output;
 };
+
+const collectImportObject = (item: ChemdImportDeclaration): ComparableObject => ({
+  fields: collectStructuredFields({
+    moduleName: item.moduleName,
+    from: item.from,
+    alias: item.alias
+  }),
+  nodeId: item.alias ?? item.moduleName,
+  nodeType: "import"
+});
 
 const compareFields = (
   beforeFields: Record<string, unknown>,
@@ -195,8 +251,8 @@ export const buildSemanticDiff = (
   beforeDocument: ChemdProgramDocument,
   afterDocument: ChemdProgramDocument
 ): SemanticDiff => {
-  const beforeObjects = collectObjects(beforeDocument.meta.id, beforeDocument.declarations);
-  const afterObjects = collectObjects(afterDocument.meta.id, afterDocument.declarations);
+  const beforeObjects = collectObjects(beforeDocument);
+  const afterObjects = collectObjects(afterDocument);
   const changes: SemanticDiffChange[] = [];
 
   pushRemovedChanges(changes, beforeObjects, afterObjects);
