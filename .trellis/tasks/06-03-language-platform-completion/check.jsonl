@@ -1,0 +1,12 @@
+{"file":"packages/compiler/tests/program-compile.test.ts","reason":"End-to-end compiler pipeline regression target"}
+{"file":"packages/compiler/tests/language-fixture-matrix.test.ts","reason":"Program fixture matrix regression target"}
+{"file":"packages/compiler/tests/docs-coverage.test.ts","reason":"Docs and diagnostic drift guard"}
+{"file":"packages/parser/tests/program-parser.test.ts","reason":"Parser program contract tests"}
+{"file":"packages/resolver/tests/program-resolver.test.ts","reason":"Resolver program reference tests"}
+{"file":"packages/typechecker/tests/program-typechecker.test.ts","reason":"Typed semantic graph tests"}
+{"file":"packages/typechecker/tests/program-typechecker-routes.test.ts","reason":"Reaction route and external context tests"}
+{"file":"packages/workspace-index/tests/workspace-index.test.ts","reason":"Workspace symbol/reference graph tests"}
+{"file":"packages/cli/src/cli.spec.ts","reason":"CLI command, changed, diff, and fix workflow tests"}
+{"file":"packages/runtime-lab/tests/runtime-lab.test.ts","reason":"Runtime plan/preflight/state-machine tests"}
+{"file":"packages/runtime-trace/tests/runtime-trace.test.ts","reason":"Trace replay tests"}
+{"file":"packages/storage-postgres/src/memory-loop.spec.ts","reason":"Memory semantic diff and storage projection tests"}

@@ -16,25 +16,29 @@ packages/parser/
     +-- *.test.ts
 ```
 
-Some packages split implementation files below `src`, for example `packages/parser/src/frontmatter/*` and `packages/renderer-html/src/*`. Follow the local split when adding related behavior.
+Some packages split implementation files below `src`, for example
+`packages/parser/src/program/*` and `packages/renderer-html/src/*`. Follow the
+local split when adding related behavior.
 
 ## Module Organization
 
 - Public API: export from `src/index.ts`; consumers should import `@chemd/*`, not deep relative paths.
-- Internal helpers: keep beside the feature they serve, such as parser block parsers under `src/body/block-parsers`.
+- Internal helpers: keep beside the feature they serve, such as program parser
+  helpers under `src/program`.
 - Cross-package contracts: define shared AST and diagnostic shapes in `@chemd/core` first.
 - Node-only adapters: isolate them behind explicit exports, as in `@chemd/compiler/node`.
 
 ## Naming Conventions
 
-- Use kebab-case package folders and file names that describe behavior, such as `parse-frontmatter.ts`.
+- Use kebab-case package folders and file names that describe behavior, such as
+  `parse-declarations.ts`.
 - Use `camelCase` functions and `PascalCase` exported interfaces/types.
 - Use diagnostic codes with stable `E_` or `W_` prefixes.
 
 ## Examples
 
 - `packages/parser/src/index.ts`
-- `packages/parser/src/frontmatter/parse-frontmatter.ts`
+- `packages/parser/src/program/parser.ts`
 - `packages/parser/tests/parser.test.ts`
 
 ## Anti-Patterns

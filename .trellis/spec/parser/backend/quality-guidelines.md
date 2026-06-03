@@ -13,15 +13,13 @@
 - Keep public API boundaries typed with exported interfaces or discriminated unions.
 - Keep functions focused; root ESLint enforces complexity, max params, nesting, statements, and function length.
 - Prefer pure transforms from input data to output data.
-- Public author-facing block names may use kebab-case when needed
-  (`:::condition-varies`), but AST node discriminants must stay stable
-  snake_case (`type: "condition_varies"`). Register the block parser in
-  `packages/parser/src/body/block-parsers/index.ts` and add public parser
-  tests for the exact fence syntax.
-- `condition-varies` supports concise optimization rows: `condition` declares
-  baseline variables, `varN` declares one attempt, and `resN`/`noteN` bind to
-  the matching attempt suffix. Preserve `@cv.varN` as an attempt reference
-  target rather than flattening it to the parent block.
+- Public author-facing declaration and field names may use kebab-case when the
+  language grammar requires it, but AST discriminants must stay stable
+  snake_case. Register new program-v1 grammar behavior in the program parser
+  modules and add public parser tests for the exact source syntax.
+- `condition_screen` declarations support concise optimization attempts.
+  Preserve attempt references as addressable program facts rather than
+  flattening them into the parent declaration.
 
 ## Tests
 
@@ -32,8 +30,8 @@
 ## Examples
 
 - `packages/parser/src/index.ts`
-- `packages/parser/src/frontmatter/parse-frontmatter.ts`
-- `packages/parser/tests/parser.test.ts`
+- `packages/parser/src/program/parser.ts`
+- `packages/parser/tests/program-parser.test.ts`
 
 ## Anti-Patterns
 

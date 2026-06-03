@@ -2,7 +2,9 @@
 
 ## Overview
 
-Prefer explicit diagnostics and typed return values over thrown errors for document problems. Throw only for impossible local invariants or Node IO failures that cannot be represented in a `ChemdDocument`.
+Prefer explicit diagnostics and typed return values over thrown errors for
+document problems. Throw only for impossible local invariants or Node IO
+failures that cannot be represented in a `ChemdProgramDocument`.
 
 ## Diagnostic Contract
 
@@ -20,15 +22,17 @@ interface Diagnostic {
 
 ## Patterns
 
-- Parser errors should append diagnostics and keep parsing when possible.
+- Parser errors should append diagnostics and keep parsing program-v1 source when possible.
 - Resolver validation should append diagnostics and keep unrelated content renderable.
 - Render profile failures should append diagnostics and fall back to `eln-default` when a requested profile is missing.
 - Compiler code should merge diagnostics from each stage instead of replacing earlier diagnostics.
 
 ## Examples
 
-- `packages/parser/src/frontmatter/parse-frontmatter.ts` records invalid YAML/frontmatter diagnostics and still returns a document body.
-- `packages/resolver/src/index.ts` reports duplicate ids, unresolved references, template cycles, and expansion limits without dropping unrelated content.
+- `packages/parser/src/program/parser.ts` records legacy syntax and malformed
+  program diagnostics while still returning a `ChemdProgramDocument`.
+- `packages/resolver/src/index.ts` reports duplicate ids and unresolved
+  program references without dropping unrelated declarations.
 - `packages/render-profile/src/index.ts` reports invalid profile values and clamps unsafe numeric options.
 
 ## Throwing Rules

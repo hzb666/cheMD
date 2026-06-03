@@ -2,7 +2,9 @@
 
 ## Overview
 
-Prefer explicit diagnostics and typed return values over thrown errors for document problems. Throw only for impossible local invariants or Node IO failures that cannot be represented in a `ChemdDocument`.
+Prefer explicit diagnostics and typed return values over thrown errors for
+document problems. Throw only for impossible local invariants or Node IO
+failures that cannot be represented in a `ChemdProgramDocument`.
 
 ## Diagnostic Contract
 
@@ -31,8 +33,10 @@ interface Diagnostic {
 
 ## Examples
 
-- `packages/parser/src/frontmatter/parse-frontmatter.ts` records invalid YAML/frontmatter diagnostics and still returns a document body.
-- `packages/resolver/src/index.ts` reports duplicate ids, unresolved references, template cycles, and expansion limits without dropping unrelated content.
+- `packages/parser/src/program/parser.ts` records legacy syntax and malformed
+  program diagnostics while still returning a `ChemdProgramDocument`.
+- `packages/resolver/src/index.ts` reports duplicate ids and unresolved
+  program references without dropping unrelated declarations.
 - `packages/render-profile/src/index.ts` reports invalid profile values and clamps unsafe numeric options.
 - `packages/compiler/src/authoring-diagnostics.ts` turns conservative authoring suggestions into actionable compile diagnostics and leaves non-conservative scaffolds out of diagnostics.
 - `packages/compiler/src/diagnosis.ts` classifies final diagnostics into safe fixes, required inputs, and manual-review items for automated compile-fix-recompile loops.

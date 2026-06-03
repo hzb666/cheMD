@@ -1,0 +1,12 @@
+{"file":"packages/core/src/index.ts","reason":"Audit program-first public exports and legacy surface leakage"}
+{"file":"packages/core/src/program-ast/document.ts","reason":"Program AST contract baseline"}
+{"file":"packages/parser/src/program/parser.ts","reason":"Program parser entry and source-language contract"}
+{"file":"packages/resolver/src/index.ts","reason":"Reference resolution orchestration"}
+{"file":"packages/typechecker/src/index.ts","reason":"Typecheck orchestration and typed graph output"}
+{"file":"packages/compiler/src/index.ts","reason":"Full compile pipeline and output contract"}
+{"file":"packages/workspace-index/src/build.ts","reason":"Workspace symbol/reference index baseline"}
+{"file":"packages/cli/src/semantic-diff.ts","reason":"Current semantic diff schema and formatting"}
+{"file":"packages/runtime-lab/src/index.ts","reason":"Run plan and lab state baseline"}
+{"file":"packages/runtime-trace/src/index.ts","reason":"Trace replay baseline"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Required cross-layer planning guide"}
+{"file":".trellis/tasks/05-28-program-first-rewrite/task.json","reason":"Prior program-first parent task completion record"}

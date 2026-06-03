@@ -83,6 +83,28 @@ After implementation:
 - [ ] Verified error handling at each boundary
 - [ ] Checked data survives round-trip
 
+## Chemd Language Platform Features
+
+For language-platform work, start from the active task's feature matrix before
+editing code. Map the pipeline as:
+
+```
+program-v1 source -> ChemdProgramDocument -> resolved program -> typed graph ->
+step graph -> runtime/export/diff/CLI contracts
+```
+
+Before implementation:
+
+- [ ] Classify the feature as AST, parser, resolver, typechecker, diagnostics,
+  compiler, runtime, diff, export, storage, CLI, docs, or excluded IDE UI.
+- [ ] Identify the first package that owns the contract and the downstream
+  packages that must only consume it.
+- [ ] Decide whether the current phase needs product code, spec/docs, tests, or
+  all three.
+- [ ] Keep full compile as the oracle when adding project graph, diff, or
+  incremental compile behavior.
+- [ ] Update the active task feature matrix when evidence changes.
+
 ---
 
 ## When to Create Flow Documentation
