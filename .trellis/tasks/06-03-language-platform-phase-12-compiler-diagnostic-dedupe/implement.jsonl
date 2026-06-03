@@ -1,0 +1,3 @@
+{"file":"packages/compiler/src/index.ts","reason":"Main compiler diagnostic merge path."}
+{"file":"packages/compiler/tests/program-compile.test.ts","reason":"Compiler program pipeline regression coverage."}
+{"file":"packages/compiler/tests/language-fixture-matrix.test.ts","reason":"Compiler fixture matrix regression coverage."}

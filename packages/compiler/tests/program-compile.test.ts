@@ -64,4 +64,21 @@ describe("compileChemd program pipeline", () => {
     expect(result.json).toEqual(expect.any(String));
     expect(result.docxBridge).toEqual(expect.any(String));
   });
+
+  it("does not duplicate upstream resolver diagnostics in compiler output", () => {
+    const result = compileChemd(`module exp_duplicate_diagnostics
+
+meta {
+  id: "exp-duplicate-diagnostics"
+  title: "Duplicate diagnostics"
+  date: "2026-05-29"
+  primary_reaction: @missing_rxn
+}
+`);
+
+    expect(result.diagnostics.filter((diagnostic) =>
+      diagnostic.code === "E_UNRESOLVED_PROGRAM_REFERENCE"
+        && diagnostic.nodeId === "missing_rxn"
+    )).toHaveLength(1);
+  });
 });

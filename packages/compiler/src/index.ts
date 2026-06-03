@@ -141,6 +141,38 @@ const mergeRenderSelection = (
   };
 };
 
+type CompilerDiagnostic = ChemdProgramDocument["diagnostics"][number];
+
+const diagnosticKey = (diagnostic: CompilerDiagnostic): string =>
+  [
+    diagnostic.code,
+    diagnostic.severity,
+    diagnostic.message,
+    diagnostic.nodeId ?? "",
+    diagnostic.sourceLayer ?? "",
+    diagnostic.sourceNodeType ?? "",
+    diagnostic.sourceNodeId ?? "",
+    diagnostic.sourceField ?? "",
+    JSON.stringify(diagnostic.sourceSpan ?? null),
+    JSON.stringify(diagnostic.facts ?? null)
+  ].join("\u0000");
+
+const mergeDiagnostics = (
+  ...groups: Array<readonly CompilerDiagnostic[]>
+): CompilerDiagnostic[] => {
+  const seen = new Set<string>();
+  const merged: CompilerDiagnostic[] = [];
+
+  for (const diagnostic of groups.flat()) {
+    const key = diagnosticKey(diagnostic);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(diagnostic);
+  }
+
+  return merged;
+};
+
 export const renderCompiledJson = (
   document: ChemdProgramDocument,
   typedGraph: TypedSemanticGraph
@@ -157,7 +189,7 @@ export const compileChemd = (source: string, options: CompileOptions = {}): Comp
   const semanticProgram = typecheckResult.diagnostics.length
     ? {
         ...resolvedProgram,
-        diagnostics: [...resolvedProgram.diagnostics, ...typecheckResult.diagnostics]
+        diagnostics: mergeDiagnostics(resolvedProgram.diagnostics, typecheckResult.diagnostics)
       }
     : resolvedProgram;
   const renderSelection = mergeRenderSelection(
@@ -168,7 +200,7 @@ export const compileChemd = (source: string, options: CompileOptions = {}): Comp
   const renderProgram = renderProfileResolution.diagnostics.length
     ? {
         ...semanticProgram,
-        diagnostics: [...semanticProgram.diagnostics, ...renderProfileResolution.diagnostics]
+        diagnostics: mergeDiagnostics(semanticProgram.diagnostics, renderProfileResolution.diagnostics)
       }
     : semanticProgram;
   const runPlan = buildRunPlan({
@@ -203,7 +235,7 @@ export const compileChemd = (source: string, options: CompileOptions = {}): Comp
   const compileProgram = authoringDiagnostics.length
     ? {
         ...renderProgram,
-        diagnostics: [...renderProgram.diagnostics, ...authoringDiagnostics]
+        diagnostics: mergeDiagnostics(renderProgram.diagnostics, authoringDiagnostics)
       }
     : renderProgram;
   const diagnosis = buildCompilerDiagnosis(compileProgram.diagnostics);
