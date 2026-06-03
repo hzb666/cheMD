@@ -1,4 +1,4 @@
-import type { ChemdProgramDocument } from "@chemd/core";
+import type { ChemdProgramDocument, Diagnostic } from "@chemd/core";
 
 import type {
   ExportedDiagnostic,
@@ -16,11 +16,17 @@ const toRecord = (value: unknown): Record<string, unknown> => {
   return { ...(value as Record<string, unknown>) };
 };
 
-const createExportedDiagnostic = (diagnostic: ChemdProgramDocument["diagnostics"][number]): ExportedDiagnostic => ({
+const createExportedDiagnostic = (diagnostic: Diagnostic): ExportedDiagnostic => ({
   code: diagnostic.code,
   severity: diagnostic.severity,
   message: diagnostic.message,
   ...(diagnostic.nodeId ? { node_id: diagnostic.nodeId } : {}),
+  ...(diagnostic.sourceLayer ? { source_layer: diagnostic.sourceLayer } : {}),
+  ...(diagnostic.sourceNodeType ? { source_node_type: diagnostic.sourceNodeType } : {}),
+  ...(diagnostic.sourceNodeId ? { source_node_id: diagnostic.sourceNodeId } : {}),
+  ...(diagnostic.sourceField ? { source_field: diagnostic.sourceField } : {}),
+  ...(diagnostic.sourceSpan ? { source_span: diagnostic.sourceSpan } : {}),
+  ...(diagnostic.facts ? { facts: toRecord(diagnostic.facts) } : {}),
   ...(diagnostic.position
     ? {
         position: {
@@ -64,7 +70,10 @@ const createDocCommentSnapshot = (
   source_span: doc.sourceSpan
 });
 
-export const buildProgramSourceLayer = (program: ChemdProgramDocument): ProgramSourceLayerV1 => ({
+export const buildProgramSourceLayer = (
+  program: ChemdProgramDocument,
+  diagnostics: readonly Diagnostic[] = program.diagnostics
+): ProgramSourceLayerV1 => ({
   ...(typeof program.source === "string" ? { raw_source: program.source, resolved_source: program.source } : {}),
   program: {
     schema_version: program.schemaVersion,
@@ -93,6 +102,6 @@ export const buildProgramSourceLayer = (program: ChemdProgramDocument): ProgramS
   },
   declarations: program.declarations.map(createDeclarationSnapshot),
   doc_comments: program.docs.map(createDocCommentSnapshot),
-  diagnostics: program.diagnostics.map((diagnostic) => createExportedDiagnostic(diagnostic)),
+  diagnostics: diagnostics.map((diagnostic) => createExportedDiagnostic(diagnostic)),
   audit_only_fields: TRAINING_AUDIT_ONLY_FIELDS
 });

@@ -219,4 +219,50 @@ describe("program training export v0.3", () => {
       entity_id: expect.stringMatching(/^doc_/)
     });
   });
+
+  it("exports typechecker diagnostic source evidence from typed graph diagnostics", () => {
+    const program = parseChemdProgram(`module exp_training_diagnostics
+
+meta {
+  id: "exp-training-diagnostics"
+  title: "Training diagnostics"
+  date: "2026-05-29"
+}
+
+molecule mol_a {
+  name: "A"
+}
+
+reaction rxn_nested {
+  reactants: [{material: @mol_a, mystery: 1}]
+}
+`);
+    const checked = typecheckProgram(program);
+    const record = exportTrainingRecordFromDocument(program, {
+      typedGraph: checked.typedGraph,
+      stepGraph: checked.stepGraph,
+      exportedAt: "2026-05-29T00:00:00.000Z"
+    });
+
+    expect(record.source_layer.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "E_PROGRAM_RECORD_FIELD_UNKNOWN",
+        source_layer: "typechecker",
+        source_node_type: "reaction",
+        source_node_id: "rxn_nested",
+        source_field: "reactants",
+        source_span: expect.objectContaining({
+          startLine: 14,
+          startColumn: 34
+        }),
+        facts: expect.objectContaining({
+          recordField: "mystery"
+        })
+      })
+    );
+    expect(record.quality_layer.parse_quality).toMatchObject({
+      diagnostic_counts: expect.objectContaining({ error: expect.any(Number) }),
+      has_errors: true
+    });
+  });
 });

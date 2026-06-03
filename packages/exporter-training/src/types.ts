@@ -114,6 +114,12 @@ export interface ExportedDiagnostic {
   message: string;
   node_index?: number;
   node_id?: string;
+  source_layer?: string;
+  source_node_type?: string;
+  source_node_id?: string;
+  source_field?: string;
+  source_span?: SourceSpan;
+  facts?: Record<string, unknown>;
   position?: {
     start?: { line: number; column: number };
     end?: { line: number; column: number };

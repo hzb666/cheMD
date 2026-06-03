@@ -1,4 +1,4 @@
-import type { ChemdProgramDocument } from "@chemd/core";
+import type { ChemdProgramDocument, Diagnostic } from "@chemd/core";
 import type { ChemdLnf } from "@chemd/lnf";
 import type { StepGraph } from "@chemd/step-ontology";
 import type { TypedSemanticGraph } from "@chemd/typechecker";
@@ -78,6 +78,35 @@ const createEmptyTypedGraph = (documentId: string): TypedSemanticGraph => ({
   diagnostics: []
 });
 
+const diagnosticKey = (diagnostic: Diagnostic): string =>
+  [
+    diagnostic.code,
+    diagnostic.severity,
+    diagnostic.message,
+    diagnostic.nodeId ?? "",
+    diagnostic.sourceLayer ?? "",
+    diagnostic.sourceNodeType ?? "",
+    diagnostic.sourceNodeId ?? "",
+    diagnostic.sourceField ?? ""
+  ].join("\u0000");
+
+const mergeDiagnostics = (
+  documentDiagnostics: readonly Diagnostic[],
+  typedGraphDiagnostics: readonly Diagnostic[] = []
+): Diagnostic[] => {
+  const seen = new Set<string>();
+  const merged: Diagnostic[] = [];
+
+  for (const diagnostic of [...documentDiagnostics, ...typedGraphDiagnostics]) {
+    const key = diagnosticKey(diagnostic);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(diagnostic);
+  }
+
+  return merged;
+};
+
 export const exportTrainingRecordFromDocument = (
   document: ChemdProgramDocument,
   options: ExportTrainingRecordOptions = {}
@@ -90,7 +119,8 @@ export const exportTrainingRecordFromDocument = (
   );
   const exportId = options.exportId ?? `export::${document.meta.id}::${fingerprint}`;
   const documentInfo = toDocumentInfo(document);
-  const sourceLayer = buildProgramSourceLayer(document);
+  const diagnostics = mergeDiagnostics(document.diagnostics, options.typedGraph?.diagnostics);
+  const sourceLayer = buildProgramSourceLayer(document, diagnostics);
   const governance = buildDataGovernanceInfo(document.meta.fields);
   const typedGraph = options.typedGraph ?? createEmptyTypedGraph(document.meta.id);
   const baseSemanticLayer = buildProgramSemanticLayer(document, typedGraph);
@@ -103,7 +133,7 @@ export const exportTrainingRecordFromDocument = (
     semanticLayer,
     stepGraph: options.stepGraph
   });
-  const qualityLayer = buildQualityLayer(document.diagnostics, learningLayer, governance);
+  const qualityLayer = buildQualityLayer(diagnostics, learningLayer, governance);
 
   return {
     schema_version: "chemd-training-export/v0.3",
