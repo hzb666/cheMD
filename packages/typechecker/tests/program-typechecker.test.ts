@@ -193,7 +193,15 @@ molecule mol_a {
           severity: "error",
           message: "Unable to resolve reference @missing_rxn",
           sourceLayer: "resolver",
-          sourceNodeId: "missing_rxn"
+          sourceNodeId: "missing_rxn",
+          sourceSpan: {
+            start: 88,
+            end: 100,
+            startLine: 9,
+            startColumn: 9,
+            endLine: 9,
+            endColumn: 21
+          }
         }
       ]
     });
@@ -201,7 +209,13 @@ molecule mol_a {
     expect(result.diagnostics).toContainEqual(expect.objectContaining({
       code: "E_UNRESOLVED_PROGRAM_REFERENCE",
       sourceLayer: "resolver",
-      sourceNodeId: "missing_rxn"
+      sourceNodeId: "missing_rxn",
+      sourceSpan: expect.objectContaining({
+        startLine: 9,
+        startColumn: 9,
+        endLine: 9,
+        endColumn: 21
+      })
     }));
   });
 

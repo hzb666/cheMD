@@ -42,6 +42,7 @@ const toTypecheckDiagnostic = (diagnostic: Diagnostic): V03Diagnostic => ({
   message: diagnostic.message,
   sourceLayer: toDiagnosticSourceLayer(diagnostic.sourceLayer),
   ...(diagnostic.position ? { position: diagnostic.position } : {}),
+  ...(diagnostic.sourceSpan ? { sourceSpan: diagnostic.sourceSpan } : {}),
   ...(diagnostic.nodeId ? { nodeId: diagnostic.nodeId } : {}),
   ...(diagnostic.sourceNodeType ? { sourceNodeType: diagnostic.sourceNodeType } : {}),
   ...(diagnostic.sourceNodeId ? { sourceNodeId: diagnostic.sourceNodeId } : {}),
