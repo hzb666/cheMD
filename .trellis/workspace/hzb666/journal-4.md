@@ -1805,3 +1805,37 @@ Added AST-derived program references to workspace indexing while preserving text
 ### Next Steps
 
 - None - task complete
+
+
+## Session 184: Phase 12 compiler diagnostic dedupe
+
+**Date**: 2026-06-03
+**Task**: Phase 12 compiler diagnostic dedupe
+**Package**: compiler
+**Branch**: `develop`
+
+### Summary
+
+Deduplicated compiler diagnostic merges so upstream resolver/parser diagnostics are not repeated after typechecker aggregation; verified compiler tests/typecheck, fixture matrix, Trellis validation, and diff check.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `be5a165` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
