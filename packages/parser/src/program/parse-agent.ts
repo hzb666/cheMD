@@ -51,7 +51,7 @@ export const parseAgentRunDeclaration = (
 
   const state: AgentRunBuilder = {
     goal: "",
-    status: "planned",
+    status: "",
     targetFiles: undefined,
     toolCalls: [],
     evidence: [],
@@ -80,7 +80,7 @@ export const parseAgentRunDeclaration = (
     id: runId,
     qualifiedId: `${context.moduleName}.${runId}`,
     goal: state.goal,
-    status: state.status,
+    status: state.status as AgentRunStatus,
     ...(state.targetFiles ? { targetFiles: state.targetFiles } : {}),
     toolCalls: state.toolCalls,
     evidence: state.evidence,
@@ -94,7 +94,7 @@ export const parseAgentRunDeclaration = (
 
 interface AgentRunBuilder {
   goal: string;
-  status: AgentRunStatus;
+  status: AgentRunStatus | "";
   targetFiles?: string[];
   toolCalls: AgentToolCallDeclaration[];
   evidence: AgentEvidenceDeclaration[];

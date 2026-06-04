@@ -385,4 +385,45 @@ procedure proc_control {
       }
     });
   });
+
+  it("parses quoted strings percent quantities and lists in control conditions", () => {
+    const document = parseChemdProgram(`module exp_condition_expr
+
+meta {
+  id: "exp-condition-expr"
+  title: "Condition Expr"
+  date: "2026-06-04"
+}
+
+procedure proc_condition {
+  abort_if low_yield(condition: "@res_main.yield in [50%, 60%]")
+  wait clean(condition: "@ana_tlc.status == \\"clean\\"")
+}
+`);
+    const procedure = document.declarations.find((item) => item.kind === "procedure");
+
+    expect(document.diagnostics).toEqual([]);
+    expect(procedure?.kind === "procedure" ? procedure.children[0] : undefined).toMatchObject({
+      kind: "control",
+      controlKind: "abort_if",
+      condition: {
+        kind: "binary",
+        op: "in",
+        right: {
+          kind: "list",
+          items: [
+            { kind: "quantity", value: 50, unit: "%" },
+            { kind: "quantity", value: 60, unit: "%" }
+          ]
+        }
+      }
+    });
+    expect(procedure?.kind === "procedure" ? procedure.children[1] : undefined).toMatchObject({
+      kind: "control",
+      condition: {
+        kind: "binary",
+        right: { kind: "literal", value: "clean", valueKind: "string" }
+      }
+    });
+  });
 });

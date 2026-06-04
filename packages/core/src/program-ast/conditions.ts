@@ -6,7 +6,8 @@ export type ProgramConditionExpression =
   | ProgramConditionReferenceExpr
   | ProgramConditionRuntimeRefExpr
   | ProgramConditionLiteralExpr
-  | ProgramConditionQuantityExpr;
+  | ProgramConditionQuantityExpr
+  | ProgramConditionListExpr;
 
 export type ProgramConditionBinaryOperator =
   | "=="
@@ -61,4 +62,9 @@ export interface ProgramConditionQuantityExpr extends ProgramConditionExpression
   kind: "quantity";
   value: number;
   unit: string;
+}
+
+export interface ProgramConditionListExpr extends ProgramConditionExpressionBase {
+  kind: "list";
+  items: ProgramConditionExpression[];
 }

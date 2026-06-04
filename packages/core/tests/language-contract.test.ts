@@ -14,6 +14,8 @@ describe("CHEMD_LANGUAGE_CONTRACT", () => {
       "as",
       "from",
       "meta",
+      "agent",
+      "run",
       "for",
       "step",
       "repeat",
@@ -70,7 +72,7 @@ describe("CHEMD_LANGUAGE_CONTRACT", () => {
       "abort_if"
     ]);
     expect(CHEMD_LANGUAGE_CONTRACT.program.procedures.conditionExpressions).toMatchObject({
-      nodeKinds: expect.arrayContaining(["binary", "runtime_reference", "quantity"]),
+      nodeKinds: expect.arrayContaining(["binary", "runtime_reference", "quantity", "list"]),
       binaryOperators: expect.arrayContaining(["==", ">", "and"]),
       runtimeNamespaces: ["operator", "sensor", "time", "run"],
       supportsQuantityComparisons: true,

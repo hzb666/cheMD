@@ -92,6 +92,7 @@ export const linkChemdModules = (
   diagnostics.push(...findImportCycleDiagnostics(importGraph));
   diagnostics.push(...findMissingImportedSymbolDiagnostics(modules, lookup));
   const linkedModules = materializeLinkedTypedGraphs(modules);
+  diagnostics.push(...validateLinkedReferenceTargetKinds(linkedModules));
   const buildGraph = buildModuleBuildGraph(linkedModules, importGraph);
 
   return {
@@ -222,6 +223,108 @@ const materializeLinkedTypedGraphs = (
     }
   }));
 };
+
+const validateLinkedReferenceTargetKinds = (
+  modules: LinkedChemdModule[]
+): Diagnostic[] =>
+  modules.flatMap((module) =>
+    module.coreResult.typedSemanticGraph.nodes.flatMap((node) => {
+      const diagnostics: Diagnostic[] = [];
+      const nodeRecord = node as unknown as Record<string, unknown>;
+      for (const rule of linkedReferenceRulesForNode(node)) {
+        const value = nodeRecord[rule.field];
+        diagnostics.push(
+          ...collectReferenceValues(value).flatMap((reference) =>
+            rule.expected.includes(reference.targetKind)
+              ? []
+              : [createLinkedReferenceTargetDiagnostic(module, node, rule.field, rule.expected, reference)]
+          )
+        );
+      }
+      return diagnostics;
+    })
+  );
+
+const linkedReferenceRulesForNode = (
+  node: { kind: string }
+): Array<{ field: string; expected: ReferenceTargetKind[] }> => {
+  if (node.kind === "result") {
+    return [
+      { field: "reaction", expected: ["reaction"] },
+      { field: "product", expected: ["molecule", "batch", "sample"] }
+    ];
+  }
+  if (node.kind === "material") {
+    return [{ field: "molecule", expected: ["molecule"] }];
+  }
+  if (node.kind === "batch") {
+    return [
+      { field: "source", expected: ["reaction", "result", "sample", "batch"] },
+      { field: "molecule", expected: ["molecule"] },
+      { field: "artifacts", expected: ["artifact"] }
+    ];
+  }
+  if (node.kind === "analysis") {
+    return [
+      { field: "ref", expected: ["reaction", "result", "sample", "batch", "material"] },
+      { field: "artifacts", expected: ["artifact"] }
+    ];
+  }
+  if (node.kind === "trace") {
+    return [{ field: "plan", expected: ["procedure"] }];
+  }
+  if (node.kind === "sample") {
+    return [
+      { field: "ref", expected: ["reaction", "result", "sample", "batch"] },
+      { field: "derivedFrom", expected: ["sample", "batch", "result", "reaction"] },
+      { field: "aliquotOf", expected: ["sample"] },
+      { field: "batchOf", expected: ["batch"] },
+      { field: "artifacts", expected: ["artifact"] }
+    ];
+  }
+  if (node.kind === "artifact") {
+    return [{ field: "ref", expected: ["reaction", "result", "analysis", "sample", "batch", "material"] }];
+  }
+  if (node.kind === "condition_varies" || node.kind === "condition_screen") {
+    return [
+      { field: "reaction", expected: ["reaction"] },
+      { field: "standard", expected: ["reaction", "result"] }
+    ];
+  }
+  return [];
+};
+
+const collectReferenceValues = (value: unknown): ReferenceType[] => {
+  if (Array.isArray(value)) return value.flatMap(collectReferenceValues);
+  if (!value || typeof value !== "object") return [];
+  if (isTypedReference(value)) {
+    return value.resolved && value.targetKind !== "unknown" ? [value] : [];
+  }
+  return Object.values(value).flatMap(collectReferenceValues);
+};
+
+const createLinkedReferenceTargetDiagnostic = (
+  module: LinkedChemdModule,
+  node: { kind: string; nodeId?: string },
+  field: string,
+  expected: ReferenceTargetKind[],
+  reference: ReferenceType
+): Diagnostic => ({
+  code: "E_PROGRAM_REFERENCE_TARGET_KIND",
+  severity: "error",
+  message: `Field '${field}' on ${node.kind} expected reference target ${expected.join(" or ")}, got ${reference.targetKind}.`,
+  nodeId: node.nodeId,
+  sourceLayer: "module-linker",
+  sourceNodeType: node.kind,
+  sourceNodeId: node.nodeId,
+  sourceField: field,
+  facts: {
+    moduleName: module.moduleName,
+    expectedTargetKind: expected,
+    actualTargetKind: reference.targetKind,
+    referenceTarget: reference.refId
+  }
+});
 
 const buildLinkedReferenceIndex = (
   modules: LinkedChemdModule[]

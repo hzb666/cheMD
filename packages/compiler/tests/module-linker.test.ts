@@ -244,6 +244,54 @@ reaction rxn_shared {
     });
   });
 
+  it("diagnoses linked cross-module reference target kind mismatches", () => {
+    const result = linkChemdModules([
+      {
+        path: "entry.chemd",
+        source: `module exp_entry
+
+import shared_solvents as solvents from "./shared-solvents.chemd"
+
+meta {
+  id: "exp-entry"
+  title: "Entry"
+  date: "2026-06-04"
+}
+
+result res_entry for @solvents.mol_shared {
+  yield: 78%
+}
+`
+      },
+      {
+        path: "./shared-solvents.chemd",
+        source: `module shared_solvents
+
+meta {
+  id: "shared-solvents"
+  title: "Shared solvents"
+  date: "2026-06-04"
+}
+
+molecule mol_shared {
+  name: "shared molecule"
+}
+`
+      }
+    ]);
+
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({
+      code: "E_PROGRAM_REFERENCE_TARGET_KIND",
+      sourceLayer: "module-linker",
+      sourceNodeId: "res_entry",
+      sourceField: "reaction",
+      facts: expect.objectContaining({
+        actualTargetKind: "molecule",
+        referenceTarget: "shared_solvents.mol_shared"
+      })
+    }));
+  });
+
   it("accepts linked module references in procedure control conditions", () => {
     const result = linkChemdModules([
       {

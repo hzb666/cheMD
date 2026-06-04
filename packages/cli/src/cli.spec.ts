@@ -1200,6 +1200,50 @@ reaction rxn_shared {
       expect(stderr.value).toBe("");
     }));
 
+  it("prints link diagnostics in CLI text output", async () =>
+    withTempDir(async (dir) => {
+      writeFileSync(path.join(dir, "entry.chemd"), `module exp_entry
+
+import shared_solvents as solvents from "./shared.chemd"
+
+meta {
+  id: "exp-entry"
+  title: "Entry"
+  date: "2026-06-04"
+}
+
+result res_entry for @solvents.missing_rxn {
+  yield: 78%
+}
+`);
+      writeFileSync(path.join(dir, "shared.chemd"), `module shared_solvents
+
+meta {
+  id: "shared-solvents"
+  title: "Shared"
+  date: "2026-06-04"
+}
+
+reaction rxn_shared {
+  name: "shared"
+}
+`);
+
+      const stdout = createWriter();
+      const stderr = createWriter();
+      const exitCode = await runChemdCli([
+        "link",
+        "entry.chemd",
+        "shared.chemd"
+      ], { cwd: dir, stderr, stdout });
+
+      expect(exitCode).toBe(EXIT_VALIDATION_FAILED);
+      expect(stdout.value).toContain("diagnostics:");
+      expect(stdout.value).toContain("error E_MODULE_SYMBOL_NOT_FOUND");
+      expect(stdout.value).toContain("Unable to find symbol missing_rxn in module shared_solvents");
+      expect(stderr.value).toBe("");
+    }));
+
   it("exposes incremental compile cache status through the CLI", async () => {
     const result = await runInTempDir(["incremental", "valid.chemd", "valid.chemd", "--format", "json"], {
       "valid.chemd": validSource
@@ -1214,6 +1258,17 @@ reaction rxn_shared {
         expect.objectContaining({ cache: expect.objectContaining({ status: "hit" }) })
       ]
     });
+    expect(result.stderr).toBe("");
+  });
+
+  it("prints incremental diagnostics in CLI text output", async () => {
+    const result = await runInTempDir(["incremental", "invalid.chemd"], {
+      "invalid.chemd": invalidKindSource
+    });
+
+    expect(result.exitCode).toBe(EXIT_VALIDATION_FAILED);
+    expect(result.stdout).toContain("diagnostics:");
+    expect(result.stdout).toContain("error E_PROGRAM_DECLARATION_EXPECTED");
     expect(result.stderr).toBe("");
   });
 

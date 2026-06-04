@@ -33,11 +33,22 @@ export const validateControlCondition = (
   }
 
   const diagnostics: V03Diagnostic[] = [];
+  const looksStructured = /(?:==|!=|<=|>=|<|>|\bexists\b|\bin\b|\bmatches\b|\band\b|\bor\b|\bnot\b|\[|\]|"|\d+%)/.test(condition);
   const hasStructuredExpression = control.condition
     ? isStructuredCondition(control.condition)
-    : /(?:==|!=|<=|>=|<|>|\bexists\b|\bin\b|\bmatches\b|\band\b|\bor\b|\bnot\b)/.test(condition);
+    : looksStructured;
   const isRuntimeBoolean = control.condition?.kind === "runtime_reference"
     || /^(?:operator|sensor|time|run)\.[A-Za-z0-9_.-]+$/.test(condition.trim());
+  if (!control.condition && looksStructured) {
+    diagnostics.push(createProgramControlDiagnostic(
+      "E_PROCEDURE_CONTROL_CONDITION",
+      "error",
+      `Control condition could not be parsed: ${condition}`,
+      procedure,
+      control,
+      { condition }
+    ));
+  }
   if (!hasStructuredExpression && !isRuntimeBoolean) {
     diagnostics.push(createProgramControlDiagnostic(
       "E_PROCEDURE_CONTROL_CONDITION",
@@ -90,6 +101,9 @@ const collectConditionReferences = (
   }
   if (expression.kind === "unary") {
     return collectConditionReferences(expression.argument);
+  }
+  if (expression.kind === "list") {
+    return expression.items.flatMap(collectConditionReferences);
   }
   return [];
 };

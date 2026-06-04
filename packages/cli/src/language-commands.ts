@@ -264,6 +264,7 @@ const formatLinkText = (report: LinkReport): string => {
     lines.push(`  affected modules: ${report.affectedModules.join(", ")}`);
   }
 
+  lines.push(...formatDiagnostics(report.diagnostics));
   return lines.join("\n");
 };
 
@@ -297,9 +298,32 @@ const formatIncrementalText = (report: IncrementalReport): string => {
       `  - ${item.filePath}: ${item.cache.status} rev=${item.cache.revision} `
       + `${item.counts.error} error(s), ${item.counts.warning} warning(s)`
     );
+    lines.push(...formatDiagnostics(item.diagnostics, `    `));
   }
 
   return lines.join("\n");
+};
+
+const formatDiagnostics = (
+  diagnostics: Diagnostic[],
+  indent = "  "
+): string[] => {
+  if (diagnostics.length === 0) return [];
+  return [
+    `${indent}diagnostics:`,
+    ...diagnostics.map((diagnostic) =>
+      `${indent}- ${diagnostic.severity} ${diagnostic.code} ${formatDiagnosticSource(diagnostic)}${diagnostic.message}`
+    )
+  ];
+};
+
+const formatDiagnosticSource = (diagnostic: Diagnostic): string => {
+  const parts = [
+    diagnostic.sourceNodeType,
+    diagnostic.sourceNodeId,
+    diagnostic.sourceField
+  ].filter(Boolean);
+  return parts.length > 0 ? `${parts.join(".")}: ` : "";
 };
 
 const countDiagnostics = (diagnostics: Diagnostic[]): DiagnosticCounts =>

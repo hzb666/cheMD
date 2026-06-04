@@ -354,6 +354,65 @@ procedure proc_1 {
     }));
   });
 
+  it("validates condition lists strings percentages and malformed structures", () => {
+    const result = typecheckProgram(parse(`module exp_condition_lists
+
+meta {
+  id: "exp-condition-lists"
+  title: "Condition Lists"
+  date: "2026-06-04"
+}
+
+analysis ana_tlc {
+  type: tlc
+}
+
+result res_main {
+  yield: 55%
+}
+
+procedure proc_1 {
+  abort_if low_yield(condition: "@res_main.yield in [50%, 60%]")
+  wait clean(condition: "@ana_tlc.status == \\"clean\\"")
+  abort_if malformed(condition: "sensor.temperature > [80 C")
+}
+`));
+
+    expect(result.diagnostics).not.toContainEqual(expect.objectContaining({
+      code: "E_CONDITION_TYPE_MISMATCH",
+      sourceNodeId: "proc_1"
+    }));
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({
+      code: "E_PROCEDURE_CONTROL_CONDITION",
+      sourceField: "abort_if",
+      facts: expect.objectContaining({
+        condition: "sensor.temperature > [80 C"
+      })
+    }));
+  });
+
+  it("requires explicit agent run status", () => {
+    const result = typecheckProgram(parse(`module exp_agent_required
+
+meta {
+  id: "exp-agent-required"
+  title: "Agent Required"
+  date: "2026-06-04"
+}
+
+agent run repair_1 {
+  goal: "repair source"
+}
+`));
+
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({
+      code: "E301",
+      sourceNodeType: "agent_run",
+      sourceNodeId: "repair_1",
+      sourceField: "status"
+    }));
+  });
+
   it("diagnoses invalid procedure state transitions", () => {
     const result = typecheckProgram(parse(`module exp_state_invalid
 

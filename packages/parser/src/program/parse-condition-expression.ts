@@ -6,11 +6,15 @@ import type {
 } from "@chemd/core";
 
 type ConditionTokenKind =
+  | "bracket"
+  | "comma"
   | "identifier"
   | "number"
   | "operator"
   | "paren"
-  | "reference";
+  | "percent"
+  | "reference"
+  | "string";
 
 interface ConditionToken {
   kind: ConditionTokenKind;
@@ -80,6 +84,18 @@ const readToken = (
   if (["(", ")"].includes(char)) {
     return { kind: "paren", raw: char, start, end: start + 1 };
   }
+  if (["[", "]"].includes(char)) {
+    return { kind: "bracket", raw: char, start, end: start + 1 };
+  }
+  if (char === ",") {
+    return { kind: "comma", raw: char, start, end: start + 1 };
+  }
+  if (char === "%") {
+    return { kind: "percent", raw: char, start, end: start + 1 };
+  }
+  if (char === "\"") {
+    return readString(raw, start);
+  }
   if (char === "@") {
     return readPattern(raw, start, /@[A-Za-z0-9_.#:-]+/y, "reference");
   }
@@ -102,6 +118,25 @@ const readPattern = (
   const match = pattern.exec(raw);
   const token = match?.[0];
   return token ? { kind, raw: token, start, end: start + token.length } : undefined;
+};
+
+const readString = (
+  raw: string,
+  start: number
+): ConditionToken | undefined => {
+  let index = start + 1;
+  while (index < raw.length) {
+    const char = raw[index];
+    if (char === "\\") {
+      index += 2;
+      continue;
+    }
+    if (char === "\"") {
+      return { kind: "string", raw: raw.slice(start, index + 1), start, end: index + 1 };
+    }
+    index += 1;
+  }
+  return undefined;
 };
 
 class ConditionParser {
@@ -157,8 +192,20 @@ class ConditionParser {
       const expression = this.parseExpression();
       return expression && this.match(")") ? expression : undefined;
     }
+    if (token.raw === "[") {
+      return this.parseList(token);
+    }
     if (token.kind === "reference") {
       return { kind: "reference", refId: token.raw.slice(1), raw: token.raw, sourceSpan: this.sourceSpan };
+    }
+    if (token.kind === "string") {
+      return {
+        kind: "literal",
+        value: decodeStringToken(token.raw),
+        valueKind: "string",
+        raw: token.raw,
+        sourceSpan: this.sourceSpan
+      };
     }
     if (token.kind === "number") {
       return this.parseNumberOrQuantity(token);
@@ -176,7 +223,40 @@ class ConditionParser {
     return undefined;
   }
 
+  private parseList(startToken: ConditionToken): ProgramConditionExpression | undefined {
+    const items: ProgramConditionExpression[] = [];
+    if (this.match("]")) {
+      return { kind: "list", items, raw: "[]", sourceSpan: this.sourceSpan };
+    }
+    while (!this.isAtEnd()) {
+      const item = this.parseExpression();
+      if (!item) return undefined;
+      items.push(item);
+      if (this.match("]")) {
+        const endRaw = items.at(-1)?.raw ?? startToken.raw;
+        return {
+          kind: "list",
+          items,
+          raw: this.sliceRaw(startToken.raw, endRaw, ""),
+          sourceSpan: this.sourceSpan
+        };
+      }
+      if (!this.match(",")) return undefined;
+    }
+    return undefined;
+  }
+
   private parseNumberOrQuantity(token: ConditionToken): ProgramConditionExpression {
+    if (this.peek()?.kind === "percent") {
+      const percent = this.advance();
+      return {
+        kind: "quantity",
+        value: Number(token.raw),
+        unit: percent?.raw ?? "%",
+        raw: `${token.raw}%`,
+        sourceSpan: this.sourceSpan
+      };
+    }
     const next = this.peek();
     if (next?.kind === "identifier" && !this.peekBinaryOperator()) {
       this.advance();
@@ -231,3 +311,11 @@ class ConditionParser {
       : `${leftRaw} ${operatorRaw} ${rightRaw}`;
   }
 }
+
+const decodeStringToken = (raw: string): string => {
+  try {
+    return JSON.parse(raw) as string;
+  } catch {
+    return raw.slice(1, -1);
+  }
+};

@@ -3,6 +3,8 @@ import { createV03Diagnostic, type V03Diagnostic } from "@chemd/diagnostics";
 import type {
   LabState,
   RunPlan,
+  RuntimeControl,
+  RuntimeControlState,
   RuntimeStep,
   RuntimeStepStatus
 } from "./index";
@@ -70,6 +72,12 @@ export interface CompleteStepOptions extends RuntimeActionOptions {
   observations?: RuntimeObservationRecord[];
 }
 
+export type RuntimeControlStatus = RuntimeControlState["status"];
+
+export interface RuntimeControlActionOptions extends RuntimeActionOptions {
+  message?: string;
+}
+
 type RuntimeTraceEventDraft = Omit<RuntimeTraceEvent, "traceId" | "timestamp"> &
   Partial<Pick<RuntimeTraceEvent, "traceId" | "timestamp">>;
 
@@ -113,6 +121,12 @@ const findStepState = (state: LabState, stepId: string): RuntimeStepState | unde
 const findRuntimeStep = (plan: RunPlan, stepId: string): RuntimeStep | undefined =>
   plan.steps.find((step) => step.stepId === stepId);
 
+const findControlState = (state: LabState, controlId: string): RuntimeControlState | undefined =>
+  state.controlStates.find((control) => control.controlId === controlId);
+
+const findRuntimeControl = (plan: RunPlan, controlId: string): RuntimeControl | undefined =>
+  plan.controls.find((control) => control.controlId === controlId);
+
 const appendTrace = (state: LabState, ...events: RuntimeTraceEventDraft[]): LabState => ({
   ...state,
   trace: [...state.trace, ...stampTraceEvents(state, events)]
@@ -151,6 +165,24 @@ const createStepNotReadyDiagnostic = (
     }
   });
 
+const createControlNotReadyDiagnostic = (
+  control: RuntimeControl | undefined,
+  controlId: string,
+  status: RuntimeControlStatus | undefined
+): V03Diagnostic =>
+  createV03Diagnostic({
+    code: "E_RUNTIME_CONTROL",
+    severity: "error",
+    message: `Control ${controlId} cannot transition from status ${status ?? "missing"}`,
+    sourceLayer: "runtime_preflight",
+    sourceNodeType: "procedure",
+    sourceNodeId: control?.controlId,
+    facts: {
+      control_id: controlId,
+      status
+    }
+  });
+
 const addDiagnostic = (state: LabState, diagnostic: V03Diagnostic, stepId?: string): LabState =>
   appendTrace(
     { ...state, diagnostics: [...state.diagnostics, diagnostic] },
@@ -170,6 +202,130 @@ const withStepStatus = (
       : step
   )
 });
+
+const withControlStatus = (
+  state: LabState,
+  controlId: string,
+  status: RuntimeControlStatus
+): LabState => ({
+  ...state,
+  controlStates: state.controlStates.map((control) =>
+    control.controlId === controlId ? { ...control, status } : control
+  )
+});
+
+export const enterControl = (
+  state: LabState,
+  plan: RunPlan,
+  controlId: string,
+  options: RuntimeControlActionOptions = {}
+): LabState => {
+  const controlState = findControlState(state, controlId);
+  if (!controlState || !["planned", "waiting_adapter"].includes(controlState.status)) {
+    return addDiagnostic(
+      cloneState(state),
+      createControlNotReadyDiagnostic(findRuntimeControl(plan, controlId), controlId, controlState?.status)
+    );
+  }
+
+  return appendTrace(
+    {
+      ...withControlStatus(cloneState(state), controlId, "running"),
+      status: "running"
+    },
+    createTraceEvent("control_entered", {
+      controlId,
+      operatorId: options.operatorId,
+      message: options.message
+    })
+  );
+};
+
+export const completeControl = (
+  state: LabState,
+  plan: RunPlan,
+  controlId: string,
+  options: RuntimeControlActionOptions = {}
+): LabState => {
+  const controlState = findControlState(state, controlId);
+  if (controlState?.status !== "running") {
+    return addDiagnostic(
+      cloneState(state),
+      createControlNotReadyDiagnostic(findRuntimeControl(plan, controlId), controlId, controlState?.status)
+    );
+  }
+
+  const completed = withControlStatus(cloneState(state), controlId, "completed");
+  const readyState = refreshReadySteps(completed, plan);
+  return appendTrace(
+    {
+      ...readyState,
+      status: readyState.stepStates.every((step) => ["completed", "skipped"].includes(step.status))
+        ? "completed"
+        : "running",
+      currentStepId: selectCurrentStepId(readyState)
+    },
+    createTraceEvent("control_completed", {
+      controlId,
+      operatorId: options.operatorId,
+      message: options.message
+    })
+  );
+};
+
+export const blockControl = (
+  state: LabState,
+  plan: RunPlan,
+  controlId: string,
+  options: RuntimeControlActionOptions = {}
+): LabState => {
+  const controlState = findControlState(state, controlId);
+  if (!controlState) {
+    return addDiagnostic(
+      cloneState(state),
+      createControlNotReadyDiagnostic(findRuntimeControl(plan, controlId), controlId, undefined)
+    );
+  }
+
+  return appendTrace(
+    {
+      ...withControlStatus(cloneState(state), controlId, "blocked"),
+      status: "paused"
+    },
+    createTraceEvent("control_blocked", {
+      controlId,
+      operatorId: options.operatorId,
+      message: options.message
+    })
+  );
+};
+
+export const abortControl = (
+  state: LabState,
+  plan: RunPlan,
+  controlId: string,
+  options: RuntimeControlActionOptions = {}
+): LabState => {
+  const controlState = findControlState(state, controlId);
+  if (!controlState) {
+    return addDiagnostic(
+      cloneState(state),
+      createControlNotReadyDiagnostic(findRuntimeControl(plan, controlId), controlId, undefined)
+    );
+  }
+
+  return appendTrace(
+    {
+      ...withControlStatus(cloneState(state), controlId, "aborted"),
+      status: "aborted"
+    },
+    createTraceEvent("control_aborted", {
+      controlId,
+      operatorId: options.operatorId,
+      message: options.message
+    })
+  );
+};
 
 export const confirmStep = (
   state: LabState,

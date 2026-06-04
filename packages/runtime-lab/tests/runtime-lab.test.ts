@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  abortControl,
   buildRunPlan,
+  completeControl,
   completeStep,
   confirmStep,
   createLabStateStack,
   createInitialLabState,
+  enterControl,
   pushLabStateSnapshot,
   restoreCurrentLabStateSnapshot,
   restoreLabStateSnapshot,
@@ -417,6 +420,84 @@ describe("runtime lab state machine", () => {
     running.stepStates[0]!.status = "failed";
     expect(restoreCurrentLabStateSnapshot(updated)?.stepStates[0])
       .toMatchObject({ stepId: "s1", status: "running" });
+  });
+
+  it("drives dynamic control states and releases dependent steps", () => {
+    const plan = buildRunPlan({
+      documentId: "exp-runtime-control",
+      stepGraph: {
+        procedures: [],
+        observations: [],
+        diagnostics: [],
+        steps: [
+          {
+            stepId: "s1",
+            family: "mix",
+            params: {},
+            dependsOn: ["operator_gate"],
+            source: {
+              sourceNodeType: "procedure",
+              sourceNodeId: "proc-1",
+              sourceType: "explicit_step",
+              rawText: "step: mix"
+            },
+            loweringConfidence: 1
+          }
+        ],
+        controls: [
+          {
+            controlId: "operator_gate",
+            kind: "wait",
+            params: { condition: "operator.confirmed" },
+            controlPath: ["operator_gate"],
+            dynamic: true,
+            source: {
+              sourceNodeType: "procedure",
+              sourceNodeId: "proc-1",
+              rawText: "wait: operator_gate"
+            }
+          }
+        ]
+      }
+    });
+    const initialState = createInitialLabState(plan, { runId: "run-control" });
+    const runningControl = enterControl(initialState, plan, "operator_gate", { operatorId: "chemist-1" });
+    const completedControl = completeControl(runningControl, plan, "operator_gate", { operatorId: "chemist-1" });
+
+    expect(initialState.controlStates[0]).toMatchObject({ controlId: "operator_gate", status: "waiting_adapter" });
+    expect(initialState.stepStates[0]).toMatchObject({ stepId: "s1", status: "planned" });
+    expect(runningControl.controlStates[0]).toMatchObject({ controlId: "operator_gate", status: "running" });
+    expect(completedControl.controlStates[0]).toMatchObject({ controlId: "operator_gate", status: "completed" });
+    expect(completedControl.stepStates[0]).toMatchObject({ stepId: "s1", status: "ready" });
+    expect(completedControl.trace).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: "control_entered", controlId: "operator_gate" }),
+      expect.objectContaining({ type: "control_completed", controlId: "operator_gate" })
+    ]));
+  });
+
+  it("records runtime diagnostics for invalid control transitions", () => {
+    const plan = buildRunPlan({
+      documentId: "exp-runtime-control-invalid",
+      stepGraph: {
+        procedures: [],
+        observations: [],
+        diagnostics: [],
+        steps: [],
+        controls: []
+      }
+    });
+    const initialState = createInitialLabState(plan, { runId: "run-control-invalid" });
+    const completedMissing = completeControl(initialState, plan, "missing_control");
+    const abortedMissing = abortControl(initialState, plan, "missing_control");
+
+    expect(completedMissing.diagnostics).toContainEqual(expect.objectContaining({
+      code: "E_RUNTIME_CONTROL",
+      facts: expect.objectContaining({ control_id: "missing_control" })
+    }));
+    expect(abortedMissing.diagnostics).toContainEqual(expect.objectContaining({
+      code: "E_RUNTIME_CONTROL",
+      facts: expect.objectContaining({ control_id: "missing_control" })
+    }));
   });
 
   it("restores cloned runtime states from snapshots", () => {

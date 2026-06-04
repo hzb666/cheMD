@@ -33,6 +33,8 @@ export const CHEMD_LANGUAGE_CONTRACT = {
       "as",
       "from",
       "meta",
+      "agent",
+      "run",
       "for",
       "step",
       "evidence",
@@ -117,7 +119,8 @@ export const CHEMD_LANGUAGE_CONTRACT = {
           "reference",
           "runtime_reference",
           "literal",
-          "quantity"
+          "quantity",
+          "list"
         ],
         binaryOperators: ["==", "!=", "<", "<=", ">", ">=", "and", "or", "in", "matches"],
         unaryOperators: ["not", "exists"],

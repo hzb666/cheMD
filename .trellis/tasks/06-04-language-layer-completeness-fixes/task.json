@@ -1,0 +1,32 @@
+{
+  "id": "language-layer-completeness-fixes",
+  "name": "language-layer-completeness-fixes",
+  "title": "Fix language layer completeness gaps",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "compiler",
+  "priority": "P1",
+  "creator": "hzb666",
+  "assignee": "hzb666",
+  "createdAt": "2026-06-04",
+  "completedAt": "2026-06-04",
+  "branch": null,
+  "base_branch": "develop",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "packages/parser/src/program/parse-condition-expression.ts",
+    "packages/typechecker/src/program-validation.ts",
+    "packages/compiler/src/module-linker.ts",
+    "packages/runtime-lab/src/state-machine.ts",
+    "packages/cli/src/language-commands.ts"
+  ],
+  "notes": "Fix language-layer feature completeness gaps found in the June 4 audit.",
+  "meta": {}
+}

@@ -23,12 +23,18 @@ export type {
   RuntimeIssueCode
 } from "./runtime-errors";
 export {
+  abortControl,
+  blockControl,
+  completeControl,
   completeStep,
   confirmStep,
+  enterControl,
   failStep,
   initializeStepStates,
   recordRuntimeDiagnostic,
   startStep,
+  type RuntimeControlActionOptions,
+  type RuntimeControlStatus,
   type RuntimeStepState,
   type RuntimeTraceEvent
 } from "./state-machine";

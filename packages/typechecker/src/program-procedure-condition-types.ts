@@ -15,6 +15,7 @@ type ConditionType =
   | { kind: "number" }
   | { kind: "quantity"; quantityClass: QuantityClass }
   | { kind: "string" }
+  | { kind: "list"; itemTypes: ConditionType[] }
   | { kind: "unknown" };
 
 const BOOLEAN_BINARY_OPERATORS = new Set<ProgramConditionBinaryOperator>(["and", "or"]);
@@ -76,10 +77,10 @@ const validateBinaryExpression = (
   const left = validateExpression(procedure, control, expression.left);
   const right = validateExpression(procedure, control, expression.right);
   const diagnostics = [...left.diagnostics, ...right.diagnostics];
-  if (
-    (BOOLEAN_BINARY_OPERATORS.has(expression.op) && !booleanCompatible(left.type, right.type))
-    || (COMPARISON_OPERATORS.has(expression.op) && !comparisonCompatible(left.type, right.type))
-  ) {
+  const compatible = BOOLEAN_BINARY_OPERATORS.has(expression.op)
+    ? booleanCompatible(left.type, right.type)
+    : comparisonCompatible(expression.op, left.type, right.type);
+  if (!compatible) {
     diagnostics.push(createProgramControlDiagnostic(
       "E_CONDITION_TYPE_MISMATCH",
       "error",
@@ -113,6 +114,12 @@ const inferExpressionType = (
   }
   if (expression.kind === "literal") {
     return { kind: expression.valueKind };
+  }
+  if (expression.kind === "list") {
+    return {
+      kind: "list",
+      itemTypes: expression.items.map(inferExpressionType)
+    };
   }
   return { kind: "unknown" };
 };
@@ -165,6 +172,23 @@ const booleanCompatible = (
   || (left.kind === "boolean" && right.kind === "boolean");
 
 const comparisonCompatible = (
+  operator: ProgramConditionBinaryOperator,
+  left: ConditionType,
+  right: ConditionType
+): boolean => {
+  if (compatibleWithUnknown(left, right)) return true;
+  if (operator === "in") {
+    return right.kind === "list"
+      && right.itemTypes.every((itemType) => scalarComparisonCompatible(left, itemType));
+  }
+  if (right.kind === "list" || left.kind === "list") return false;
+  if (operator === "matches") {
+    return left.kind === "string" && right.kind === "string";
+  }
+  return scalarComparisonCompatible(left, right);
+};
+
+const scalarComparisonCompatible = (
   left: ConditionType,
   right: ConditionType
 ): boolean => {
@@ -184,4 +208,6 @@ const compatibleWithUnknown = (
 const formatType = (type: ConditionType): string =>
   type.kind === "quantity"
     ? `quantity:${type.quantityClass}`
-    : type.kind;
+    : type.kind === "list"
+      ? `list<${type.itemTypes.map(formatType).join("|") || "unknown"}>`
+      : type.kind;
