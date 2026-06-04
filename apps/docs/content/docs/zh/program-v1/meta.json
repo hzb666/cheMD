@@ -2,6 +2,7 @@
   "title": "Program v1 Rewrite",
   "pages": [
     "language",
+    "reference",
     "ast",
     "exports"
   ]

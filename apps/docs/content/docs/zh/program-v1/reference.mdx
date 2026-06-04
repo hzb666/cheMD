@@ -1,0 +1,291 @@
+---
+title: 完整语言参考
+description: chemd/program-v1 的完整语法、声明、值、过程、步骤族、引用和 CLI 入口。
+---
+
+本参考描述当前实现的 `chemd/program-v1` source language。手写 `.chemd`
+module 或从工具生成 `.chemd` module 时，可以把本页作为查表入口。
+
+## 文件结构
+
+一个 `.chemd` 文件包含一个 module、可选 imports、一个 `meta` block，以及零个或多个 declarations。
+
+```text
+module <module_name>
+
+import <module_name> as <alias> from "<path>"
+
+meta {
+  id: "<document-id>"
+  title: "<title>"
+  date: "YYYY-MM-DD"
+}
+
+<declaration_kind> <id> [for @target] {
+  field: value
+}
+```
+
+`module` 名称和 declaration ID 使用 identifier。Imports 由 module linker
+解析。`meta.id`、`meta.title` 和 `meta.date` 为必需字段。
+
+## 完整示例
+
+```md validate
+module exp_reference
+
+import shared_solvents as solvents from "./shared-solvents.chemd"
+
+meta {
+  id: "exp-reference"
+  title: "Reference example"
+  date: "2026-06-04"
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
+
+molecule mol_aryl {
+  name: "aryl bromide"
+  smiles: "Brc1ccccc1"
+  role: substrate
+}
+
+molecule mol_boron {
+  name: "phenylboronic acid"
+  role: coupling_partner
+}
+
+molecule mol_product {
+  name: "biphenyl"
+  role: product
+}
+
+reaction rxn_main {
+  reactants: [@mol_aryl, @mol_boron]
+  products: [@mol_product]
+  solvent: "MeCN"
+  temperature: 40 C
+  time: 2 h
+  atmosphere: nitrogen
+}
+
+result res_main for @rxn_main {
+  product: @mol_product
+  status: success
+  yield: 78%
+}
+
+analysis ana_tlc for @res_main {
+  type: tlc
+  ref: @res_main
+  notes: "one major spot"
+}
+
+procedure proc_main for @rxn_main {
+  evidence: [@res_main]
+  step charge = charge(inputs: [@mol_aryl, @mol_boron])
+  step heat = heat(temperature: 40 C, duration: 2 h, depends_on: [charge])
+  branch branch_workup {
+    case acidic(condition: "sensor.ph < 7") {
+      step neutralize = add(materials: "base", depends_on: [heat])
+    }
+    default {
+      step hold = hold(duration: 10 min, depends_on: [heat])
+    }
+  }
+}
+
+observation obs_main for @rxn_main {
+  notes: "yellow solution"
+}
+```
+
+## Declarations
+
+所有 declaration blocks 使用 `kind id { ... }`。`result`、`analysis`、
+`procedure`、`observation` 等 declarations 可以使用 `for @target`。
+
+| Kind | 常用字段 |
+| --- | --- |
+| `molecule` | `name`, `smiles`, `role`, `formula`, `cas`, `inchi`, `inchikey` |
+| `material` | `molecule`, `supplier`, `lot`, `purity`, `notes` |
+| `batch` | `source`, `molecule`, `mass`, `purity`, `artifacts` |
+| `reaction` | `name`, `route`, `prev`, `reactants`, `products`, `reagents`, `catalyst`, `solvent`, `temperature`, `time`, `pressure`, `atmosphere`, `rxn_smiles` |
+| `result` | `reaction`, `product`, `status`, `yield`, `conversion`, `selectivity`, `purity`, `notes` |
+| `analysis` | `type`, `ref`, `instrument`, `method`, `artifact`, `data`, `notes`，以及 analysis-specific fields |
+| `sample` | `name`, `batch`, `derived_from`, `purity`, `notes` |
+| `artifact` | `kind`, `ref`, `path`, `checksum`, `notes` |
+| `condition_screen` | `reaction`, `standard`, `factor`, `outcome`, `notes`，以及 screen-specific fields |
+| `procedure` | `ref`, `reaction`, `evidence`, procedure statements |
+| `observation` | `ref`, `evidence`, `notes`, event statements |
+| `trace` | `plan`, `mode`, `evidence`, trace events |
+| `agent_run` | `goal`, `status`, `target_files`, `evidence`, `confidence`，以及 agent-specific fields |
+
+必需字段：
+
+| Kind | 必需字段 |
+| --- | --- |
+| `molecule` | `name` |
+| `agent_run` | `goal`, `status` |
+
+`analysis`、`condition_screen` 和 `agent_run` 接受额外结构化字段。其他
+declarations 遇到未知字段时会产生 diagnostics。
+
+## Values
+
+| Value kind | 示例 |
+| --- | --- |
+| String | `"MeCN"` |
+| Identifier | `nitrogen` |
+| Boolean | `true` |
+| Number | `3` |
+| Quantity | `40 C`, `2 h`, `10 mL`, `1.5 equiv` |
+| Percent | `78%` |
+| Reference | `@rxn_main`, `@res_main.yield` |
+| List | `[@mol_aryl, @mol_boron]` |
+| Record | `{ amount: 100 mg, equiv: 1.0 }` |
+| Call | `heat(temperature: 40 C, duration: 2 h)` |
+| Patch | `edit meta.primary_result = @res_main` |
+
+Lists 使用 `[]`，records 使用 `{}`，calls 使用 `()`。
+
+## References
+
+| 形式 | 目标 |
+| --- | --- |
+| `@local` | 本地 declaration |
+| `@object.field` | 本地 declaration field |
+| `@module.object` | imported module 中的 declaration |
+| `@document#object` | resolver context 提供的外部文档 anchor |
+| `@document#object.field` | 外部文档 anchor 上的 field |
+
+`meta` primary fields 会创建常用 inline aliases，例如 `@reaction`、
+`@result` 及其字段。
+
+## Procedure Statements
+
+Procedure 包含 step statements、control statements 和 doc comments。
+
+```text
+procedure proc_main for @rxn_main {
+  evidence: [@res_main]
+  step charge = charge(inputs: [@mol_aryl])
+  step heat = heat(temperature: 40 C, duration: 2 h, depends_on: [charge])
+}
+```
+
+Step 语法：
+
+```text
+step <step_id> = <family>(param: value, depends_on: [other_step])
+```
+
+常用 step 参数包括 `inputs`、`outputs`、`materials`、`solvent`、
+`agent`、`temperature`、`target_temperature`、`duration`、`time`、
+`atmosphere`、`method`、`technique`、`depends_on`、`evidence` 和
+`confidence`。
+
+## Procedure Controls
+
+| Control | Body | 结构要求 |
+| --- | --- | --- |
+| `repeat` | 有 | `count` 参数和 child steps |
+| `until` | 有 | `condition` 和 child steps |
+| `branch` | 有 | `case` 或 `default` children |
+| `case` | 有 | 位于 `branch` 内，带 `condition` |
+| `default` | 有 | 位于 `branch` 内，不带 `condition` |
+| `parallel` | 有 | 至少两个 `path` children |
+| `path` | 有 | 位于 `parallel` 内 |
+| `wait` | 无 | `condition` |
+| `abort_if` | 无 | `condition` |
+
+Dynamic controls 为 `until`、`branch`、`wait` 和 `abort_if`。
+
+## Condition Expressions
+
+Conditions 会先解析为结构化 AST，再进入类型检查。
+
+| Expression kind | 示例 |
+| --- | --- |
+| Reference | `@ana_tlc.status` |
+| Runtime reference | `operator.confirmed`, `sensor.temperature`, `time.elapsed`, `run.status` |
+| Literal | `true`, `false`, `"clean"`, `7` |
+| Quantity | `80 C`, `10 min` |
+| Unary | `not operator.confirmed`, `exists @res_main.yield` |
+| Binary | `sensor.ph < 7`, `@ana_tlc.status == clean` |
+
+Binary operators：`==`、`!=`、`<`、`<=`、`>`、`>=`、`and`、`or`、
+`in`、`matches`。
+
+## Step Families
+
+| Family | 必需字段 | Standard effects |
+| --- | --- | --- |
+| `charge` | `inputs` 或 `materials` | `creates_mixture` |
+| `add` | `inputs` 或 `materials` | `adds_material` |
+| `transfer` | `inputs` 或 `materials` | `transfers_material` |
+| `mix` | 无 | `creates_mixture` |
+| `cool` | `temperature` 或 `method` | `changes_temperature` |
+| `heat` | `temperature` 或 `duration` | `changes_temperature` |
+| `hold` | `duration` | `maintains_conditions` |
+| `purge` | `atmosphere` | `uses_inert_atmosphere` |
+| `quench` | `materials` 或 `inputs` | `quenches_reaction`, `produces_gas` |
+| `extract` | `solvent` | `creates_biphasic_system` |
+| `wash` | `solvent` 或 `inputs` | `creates_biphasic_system` |
+| `separate_layers` | 无 | `separates_phases` |
+| `filter` | `medium` | `filters_solid` |
+| `dry` | 无 | `dries_material` |
+| `concentrate` | 无 | `removes_solvent` |
+| `purify` | `method` 或 `technique` | `requires_purification` |
+| `sample` | 无 | `requires_sampling` |
+| `analyze` | `type` | `produces_analysis` |
+| `observe` | 无 | `records_observation` |
+| `store` | `location` | `stores_material` |
+
+`filter` 会为未知参数报错。其他 step families 允许额外参数，同时校验已知参数。
+
+## Procedure State Rules
+
+Compiler 会沿 canonical steps 跟踪 procedure state。
+
+| 规则 | Diagnostic |
+| --- | --- |
+| Heat、cool、hold、purge、quench、workup、sampling 和 analysis 需要已有 mixture 或显式 input material | `E_PROCEDURE_STATE_INVALID` |
+| Quench 后执行 heat、cool、hold 和 purge，需要先出现后续 material step | `E_PROCEDURE_STATE_INVALID` |
+| `separate_layers` 需要由 `extract` 或 `wash` 建立 biphasic state | `E_PROCEDURE_STATE_INVALID` |
+
+`charge`、`add`、`transfer` 和 `mix` 可以创建或扩展 mixture。Quench
+后的后续 material step 会开启下一个 active reaction state。
+
+## Modules and Incremental Builds
+
+`import` declarations 构成 module import graph。
+
+```text
+import shared_solvents as solvents from "./shared-solvents.chemd"
+```
+
+`chemd link` 会输出 linked modules、import edges、reverse dependents、
+`buildGraph` 和 `affectedModules`。
+
+## CLI Reference
+
+| Command | 用途 |
+| --- | --- |
+| `chemd validate <file...>` | 编译并输出 diagnostics |
+| `chemd check <path...> --target validate\|run-plan\|training\|graph` | 运行指定检查 |
+| `chemd graph <file...>` | 输出 semantic graph summaries |
+| `chemd link <file...> --entry <module> --changed <module>` | 链接 modules 并报告 affected modules |
+| `chemd incremental <file...>` | 通过 incremental compiler 编译 |
+| `chemd diff <old-file> <new-file>` | 输出 semantic differences |
+| `chemd changed --base <ref>` | 校验 Git changed files |
+| `chemd explain <diagnostic-code>` | 解释 diagnostic code |
+| `chemd export <file> --format json\|lnf` | 导出语言产物 |
+
+支持机器可读输出的命令可使用 `--format json`。
+
+## Diagnostics
+
+Diagnostics 包含稳定 code、severity、source layer、node identifiers、
+source spans 和 facts。完整列表维护在
+[诊断码](/zh/docs/appendix/diagnostic-codes)。

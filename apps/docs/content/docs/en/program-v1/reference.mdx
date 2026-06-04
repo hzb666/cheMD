@@ -1,0 +1,295 @@
+---
+title: Complete Language Reference
+description: Complete chemd/program-v1 syntax, declarations, values, procedures, step families, references, and CLI entry points.
+---
+
+This reference describes the implemented `chemd/program-v1` source language.
+Use it as a lookup page when writing `.chemd` modules by hand or generating
+them from another tool.
+
+## File Structure
+
+A `.chemd` file contains one module, optional imports, one `meta` block, and
+zero or more declarations.
+
+```text
+module <module_name>
+
+import <module_name> as <alias> from "<path>"
+
+meta {
+  id: "<document-id>"
+  title: "<title>"
+  date: "YYYY-MM-DD"
+}
+
+<declaration_kind> <id> [for @target] {
+  field: value
+}
+```
+
+`module` names and declaration IDs use identifiers. Imports are resolved by the
+module linker. `meta.id`, `meta.title`, and `meta.date` are required.
+
+## Complete Example
+
+```md validate
+module exp_reference
+
+import shared_solvents as solvents from "./shared-solvents.chemd"
+
+meta {
+  id: "exp-reference"
+  title: "Reference example"
+  date: "2026-06-04"
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
+
+molecule mol_aryl {
+  name: "aryl bromide"
+  smiles: "Brc1ccccc1"
+  role: substrate
+}
+
+molecule mol_boron {
+  name: "phenylboronic acid"
+  role: coupling_partner
+}
+
+molecule mol_product {
+  name: "biphenyl"
+  role: product
+}
+
+reaction rxn_main {
+  reactants: [@mol_aryl, @mol_boron]
+  products: [@mol_product]
+  solvent: "MeCN"
+  temperature: 40 C
+  time: 2 h
+  atmosphere: nitrogen
+}
+
+result res_main for @rxn_main {
+  product: @mol_product
+  status: success
+  yield: 78%
+}
+
+analysis ana_tlc for @res_main {
+  type: tlc
+  ref: @res_main
+  notes: "one major spot"
+}
+
+procedure proc_main for @rxn_main {
+  evidence: [@res_main]
+  step charge = charge(inputs: [@mol_aryl, @mol_boron])
+  step heat = heat(temperature: 40 C, duration: 2 h, depends_on: [charge])
+  branch branch_workup {
+    case acidic(condition: "sensor.ph < 7") {
+      step neutralize = add(materials: "base", depends_on: [heat])
+    }
+    default {
+      step hold = hold(duration: 10 min, depends_on: [heat])
+    }
+  }
+}
+
+observation obs_main for @rxn_main {
+  notes: "yellow solution"
+}
+```
+
+## Declarations
+
+All declaration blocks use `kind id { ... }`. `result`, `analysis`,
+`procedure`, `observation`, and related declarations can also use
+`for @target`.
+
+| Kind | Common fields |
+| --- | --- |
+| `molecule` | `name`, `smiles`, `role`, `formula`, `cas`, `inchi`, `inchikey` |
+| `material` | `molecule`, `supplier`, `lot`, `purity`, `notes` |
+| `batch` | `source`, `molecule`, `mass`, `purity`, `artifacts` |
+| `reaction` | `name`, `route`, `prev`, `reactants`, `products`, `reagents`, `catalyst`, `solvent`, `temperature`, `time`, `pressure`, `atmosphere`, `rxn_smiles` |
+| `result` | `reaction`, `product`, `status`, `yield`, `conversion`, `selectivity`, `purity`, `notes` |
+| `analysis` | `type`, `ref`, `instrument`, `method`, `artifact`, `data`, `notes`, analysis-specific fields |
+| `sample` | `name`, `batch`, `derived_from`, `purity`, `notes` |
+| `artifact` | `kind`, `ref`, `path`, `checksum`, `notes` |
+| `condition_screen` | `reaction`, `standard`, `factor`, `outcome`, `notes`, screen-specific fields |
+| `procedure` | `ref`, `reaction`, `evidence`, procedure statements |
+| `observation` | `ref`, `evidence`, `notes`, event statements |
+| `trace` | `plan`, `mode`, `evidence`, trace events |
+| `agent_run` | `goal`, `status`, `target_files`, `evidence`, `confidence`, agent-specific fields |
+
+Required fields:
+
+| Kind | Required fields |
+| --- | --- |
+| `molecule` | `name` |
+| `agent_run` | `goal`, `status` |
+
+`analysis`, `condition_screen`, and `agent_run` accept additional structured
+fields. Other declarations report unknown fields as diagnostics.
+
+## Values
+
+| Value kind | Example |
+| --- | --- |
+| String | `"MeCN"` |
+| Identifier | `nitrogen` |
+| Boolean | `true` |
+| Number | `3` |
+| Quantity | `40 C`, `2 h`, `10 mL`, `1.5 equiv` |
+| Percent | `78%` |
+| Reference | `@rxn_main`, `@res_main.yield` |
+| List | `[@mol_aryl, @mol_boron]` |
+| Record | `{ amount: 100 mg, equiv: 1.0 }` |
+| Call | `heat(temperature: 40 C, duration: 2 h)` |
+| Patch | `edit meta.primary_result = @res_main` |
+
+Lists use `[]`, records use `{}`, and calls use `()`.
+
+## References
+
+| Form | Target |
+| --- | --- |
+| `@local` | Local declaration |
+| `@object.field` | Field on a local declaration |
+| `@module.object` | Declaration from an imported module |
+| `@document#object` | External document anchor supplied by resolver context |
+| `@document#object.field` | Field on an external document anchor |
+
+`meta` primary fields create aliases for common inline references, such as
+`@reaction`, `@result`, and their fields.
+
+## Procedure Statements
+
+A procedure contains step statements, control statements, and doc comments.
+
+```text
+procedure proc_main for @rxn_main {
+  evidence: [@res_main]
+  step charge = charge(inputs: [@mol_aryl])
+  step heat = heat(temperature: 40 C, duration: 2 h, depends_on: [charge])
+}
+```
+
+Step syntax:
+
+```text
+step <step_id> = <family>(param: value, depends_on: [other_step])
+```
+
+Common step parameters include `inputs`, `outputs`, `materials`, `solvent`,
+`agent`, `temperature`, `target_temperature`, `duration`, `time`,
+`atmosphere`, `method`, `technique`, `depends_on`, `evidence`, and
+`confidence`.
+
+## Procedure Controls
+
+| Control | Body | Required shape |
+| --- | --- | --- |
+| `repeat` | Yes | `count` parameter and child steps |
+| `until` | Yes | `condition` and child steps |
+| `branch` | Yes | `case` or `default` children |
+| `case` | Yes | Nested inside `branch`, with `condition` |
+| `default` | Yes | Nested inside `branch`, without `condition` |
+| `parallel` | Yes | At least two `path` children |
+| `path` | Yes | Nested inside `parallel` |
+| `wait` | No | `condition` |
+| `abort_if` | No | `condition` |
+
+Dynamic controls are `until`, `branch`, `wait`, and `abort_if`.
+
+## Condition Expressions
+
+Conditions are parsed into a structured AST before type checking.
+
+| Expression kind | Examples |
+| --- | --- |
+| Reference | `@ana_tlc.status` |
+| Runtime reference | `operator.confirmed`, `sensor.temperature`, `time.elapsed`, `run.status` |
+| Literal | `true`, `false`, `"clean"`, `7` |
+| Quantity | `80 C`, `10 min` |
+| Unary | `not operator.confirmed`, `exists @res_main.yield` |
+| Binary | `sensor.ph < 7`, `@ana_tlc.status == clean` |
+
+Binary operators: `==`, `!=`, `<`, `<=`, `>`, `>=`, `and`, `or`, `in`,
+`matches`.
+
+## Step Families
+
+| Family | Required fields | Standard effects |
+| --- | --- | --- |
+| `charge` | `inputs` or `materials` | `creates_mixture` |
+| `add` | `inputs` or `materials` | `adds_material` |
+| `transfer` | `inputs` or `materials` | `transfers_material` |
+| `mix` | none | `creates_mixture` |
+| `cool` | `temperature` or `method` | `changes_temperature` |
+| `heat` | `temperature` or `duration` | `changes_temperature` |
+| `hold` | `duration` | `maintains_conditions` |
+| `purge` | `atmosphere` | `uses_inert_atmosphere` |
+| `quench` | `materials` or `inputs` | `quenches_reaction`, `produces_gas` |
+| `extract` | `solvent` | `creates_biphasic_system` |
+| `wash` | `solvent` or `inputs` | `creates_biphasic_system` |
+| `separate_layers` | none | `separates_phases` |
+| `filter` | `medium` | `filters_solid` |
+| `dry` | none | `dries_material` |
+| `concentrate` | none | `removes_solvent` |
+| `purify` | `method` or `technique` | `requires_purification` |
+| `sample` | none | `requires_sampling` |
+| `analyze` | `type` | `produces_analysis` |
+| `observe` | none | `records_observation` |
+| `store` | `location` | `stores_material` |
+
+`filter` reports unknown parameters. Other step families accept additional
+parameters and still validate known parameters.
+
+## Procedure State Rules
+
+The compiler tracks procedure state across canonical steps.
+
+| Rule | Diagnostic |
+| --- | --- |
+| Heat, cool, hold, purge, quench, workup, sampling, and analysis require an existing mixture or explicit input material | `E_PROCEDURE_STATE_INVALID` |
+| Heat, cool, hold, and purge after a quench require a subsequent material step first | `E_PROCEDURE_STATE_INVALID` |
+| `separate_layers` requires a biphasic state created by `extract` or `wash` | `E_PROCEDURE_STATE_INVALID` |
+
+`charge`, `add`, `transfer`, and `mix` can create or extend a mixture. A
+subsequent material step after a quench starts the next active reaction state.
+
+## Modules and Incremental Builds
+
+`import` declarations create a module import graph.
+
+```text
+import shared_solvents as solvents from "./shared-solvents.chemd"
+```
+
+`chemd link` reports linked modules, import edges, reverse dependents,
+`buildGraph`, and `affectedModules`.
+
+## CLI Reference
+
+| Command | Purpose |
+| --- | --- |
+| `chemd validate <file...>` | Compile and print diagnostics |
+| `chemd check <path...> --target validate\|run-plan\|training\|graph` | Run targeted checks |
+| `chemd graph <file...>` | Print semantic graph summaries |
+| `chemd link <file...> --entry <module> --changed <module>` | Link modules and report affected modules |
+| `chemd incremental <file...>` | Compile through the incremental compiler |
+| `chemd diff <old-file> <new-file>` | Print semantic differences |
+| `chemd changed --base <ref>` | Validate changed Git files |
+| `chemd explain <diagnostic-code>` | Explain a diagnostic code |
+| `chemd export <file> --format json\|lnf` | Export language artifacts |
+
+Use `--format json` on commands that support machine-readable output.
+
+## Diagnostics
+
+Diagnostics carry stable codes, severity, source layer, node identifiers,
+source spans, and facts. The full diagnostic list is maintained in
+[Diagnostic Codes](/en/docs/appendix/diagnostic-codes).

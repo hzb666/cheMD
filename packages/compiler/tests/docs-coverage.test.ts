@@ -92,11 +92,26 @@ describe("docs coverage", () => {
         .join("\n");
 
       expect(rootMeta.pages, `${lang}/meta.json should include program-v1`).toContain("program-v1");
-      for (const page of ["language", "ast", "exports"]) {
+      for (const page of ["language", "reference", "ast", "exports"]) {
         expect(programMeta.pages, `${lang}/program-v1/meta.json should include ${page}`).toContain(page);
       }
 
-      for (const term of ["module", "meta", "molecule", "reaction", "result", "procedure", "agent run"]) {
+      for (const term of [
+        "module",
+        "meta",
+        "molecule",
+        "reaction",
+        "result",
+        "procedure",
+        "agent run",
+        "Procedure Controls",
+        "Condition Expressions",
+        "Step Families",
+        "Procedure State Rules",
+        "affectedModules",
+        "chemd explain",
+        "E_PROCEDURE_STATE_INVALID"
+      ]) {
         expect(content, `${lang}/program-v1 should mention ${term}`).toContain(term);
       }
     }
