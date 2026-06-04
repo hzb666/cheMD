@@ -38,6 +38,10 @@ import {
 } from "@chemd/runtime-lab";
 import { typecheckProgram, type TypedSemanticGraph } from "@chemd/typechecker";
 import type { StepGraph } from "@chemd/step-ontology";
+export {
+  buildProcedureState,
+  type ProcedureStateSnapshot
+} from "@chemd/step-ontology";
 import {
   buildCompilerDiagnosis,
   type CompilerDiagnosis

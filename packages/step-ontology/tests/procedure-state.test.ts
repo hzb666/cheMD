@@ -70,6 +70,49 @@ describe("procedure state model", () => {
     expect(state.snapshots[0].warnings).toHaveLength(1);
   });
 
+  it("records normalized quantity params as procedure conditions", () => {
+    const steps: CanonicalStepNode[] = [
+      {
+        family: "charge",
+        loweringConfidence: 1,
+        params: { materials: "substrate" },
+        source: { rawText: "charge", sourceNodeType: "procedure" },
+        stepId: "charge"
+      },
+      {
+        family: "heat",
+        loweringConfidence: 1,
+        params: {
+          duration: {
+            canonicalUnit: "h",
+            canonicalValue: 1,
+            kind: "quantity",
+            raw: "1 h",
+            unit: "h",
+            value: 1
+          },
+          temperature: {
+            canonicalUnit: "C",
+            canonicalValue: 80,
+            kind: "quantity",
+            raw: "80 C",
+            unit: "C",
+            value: 80
+          }
+        },
+        source: { rawText: "heat", sourceNodeType: "procedure" },
+        stepId: "heat"
+      }
+    ];
+
+    const state = buildProcedureState(steps);
+
+    expect(state.finalState.conditions).toMatchObject({
+      duration: "1 h",
+      temperature: "80 C"
+    });
+  });
+
   it("records invalid procedure state transitions", () => {
     const steps: CanonicalStepNode[] = [
       {

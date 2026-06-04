@@ -68,10 +68,35 @@ const readStringParam = (
   names: readonly string[]
 ): string | undefined => {
   for (const name of names) {
-    const value = step.params[name];
-    if (typeof value === "string" && value.trim()) {
-      return value.trim();
-    }
+    const value = formatStateParam(step.params[name]);
+    if (value) return value;
+  }
+  return undefined;
+};
+
+const formatStateParam = (value: unknown): string | undefined => {
+  if (typeof value === "string") {
+    return value.trim() || undefined;
+  }
+  if (typeof value === "number") {
+    return String(value);
+  }
+  if (value && typeof value === "object") {
+    return formatStateRecordParam(value as Record<string, unknown>);
+  }
+  return undefined;
+};
+
+const formatStateRecordParam = (
+  value: Record<string, unknown>
+): string | undefined => {
+  if (typeof value.raw === "string" && value.raw.trim()) {
+    return value.raw.trim();
+  }
+  const amount = value.canonicalValue ?? value.value;
+  const unit = value.canonicalUnit ?? value.unit;
+  if ((typeof amount === "number" || typeof amount === "string") && typeof unit === "string") {
+    return `${amount} ${unit}`.trim();
   }
   return undefined;
 };

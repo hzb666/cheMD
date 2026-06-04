@@ -1612,6 +1612,53 @@ procedure proc_main for @rxn_main {
     ]));
   });
 
+  it("includes control conditions and procedure state snapshots in semantic diff JSON", async () => {
+    const before = `module exp_cli_state_diff
+
+meta {
+  id: "exp-cli-state-diff"
+  title: "State Diff"
+  date: "2026-06-04"
+}
+
+reaction rxn_main {
+  reactants: [substrate]
+  products: [product]
+}
+
+procedure proc_main for @rxn_main {
+  step charge = charge(materials: "substrate", solvent: "THF")
+  wait operator_gate(condition: "operator.confirmed")
+  step heat = heat(temperature: 80 C, duration: 1 h)
+}
+`;
+    const after = before
+      .replace("operator.confirmed", "sensor.temperature < 90 C")
+      .replace("temperature: 80 C", "temperature: 90 C");
+    const result = await runInTempDir(
+      ["diff", "before.chemd", "after.chemd", "--format", "json"],
+      {
+        "after.chemd": after,
+        "before.chemd": before
+      }
+    );
+    const payload = JSON.parse(result.stdout);
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(payload.changes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        changeType: "changed",
+        nodeId: "proc_main.operator_gate",
+        nodeType: "control"
+      }),
+      expect.objectContaining({
+        changeType: "changed",
+        nodeId: "proc_main.heat",
+        nodeType: "procedure_state_step"
+      })
+    ]));
+  });
+
   it("ignores objects without explicit IDs in semantic diff", async () => {
     const result = await runInTempDir(["diff", "before.chemd", "after.chemd"], {
       "after.chemd": noExplicitIdAfterSource,
