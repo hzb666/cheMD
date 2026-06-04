@@ -50,7 +50,7 @@ export const createChemdIncrementalCompiler = (): ChemdIncrementalCompiler => {
 
       if (cached?.source === source && cached.optionsKey === optionsKey) {
         return {
-          result: cached.result,
+          result: cloneCompileResult(cached.result),
           cache: { ...cached.info, status: "hit" }
         };
       }
@@ -65,13 +65,13 @@ export const createChemdIncrementalCompiler = (): ChemdIncrementalCompiler => {
         revision
       };
       entries.set(cacheKey, {
-        result,
+        result: cloneCompileResult(result),
         info: { ...info },
         source,
         optionsKey
       });
 
-      return { result, cache: { ...info } };
+      return { result: cloneCompileResult(result), cache: { ...info } };
     },
     invalidate(cacheKey) {
       if (cacheKey) {
@@ -87,6 +87,9 @@ export const createChemdIncrementalCompiler = (): ChemdIncrementalCompiler => {
     }
   };
 };
+
+const cloneCompileResult = (result: CompileCoreResult): CompileCoreResult =>
+  structuredClone(result);
 
 const hashString = (value: string): string => {
   let hash = 0x811c9dc5;

@@ -36,11 +36,12 @@ import {
   type GitRunner
 } from "./git-changed";
 import {
-  buildSemanticDiff,
   formatSemanticDiffText,
   type SemanticDiff
 } from "./semantic-diff";
 import { createProcessAgentLoopDriver } from "./agent-driver";
+import { buildCompileSemanticDiff } from "./compile-semantic-diff";
+import { incrementalFiles, linkFiles } from "./language-commands";
 
 const EXPORT_FORMATS = new Set(["json", "lnf", "rag", "training", "training-full"]);
 const DIFF_FORMATS = new Set(["text", "json"]);
@@ -53,6 +54,8 @@ const TEMPLATES_OPTIONS = new Set<CliOption>(["json"]);
 const NEW_OPTIONS = new Set<CliOption>(["dry-run", "out"]);
 const IMPORT_OPTIONS = new Set<CliOption>(["dry-run", "format", "out"]);
 const CHANGED_OPTIONS = new Set<CliOption>(["base", "format"]);
+const LINK_OPTIONS = new Set<CliOption>(["entry", "format"]);
+const INCREMENTAL_OPTIONS = new Set<CliOption>(["format"]);
 const FIX_OPTIONS = new Set<CliOption>(["format", "max-iterations", "write"]);
 const AGENT_LOOP_OPTIONS = new Set<CliOption>([
   "driver",
@@ -77,6 +80,8 @@ const usage = [
   "  chemd new <template-id> --out <file> [--dry-run]",
   "  chemd import prose <file> [--out <file>] [--format text|json] [--dry-run]",
   "  chemd graph <file...> [--format text|json]",
+  "  chemd link <file...> [--entry <module|path>] [--format text|json]",
+  "  chemd incremental <file...> [--format text|json]",
   "  chemd diff <old-file> <new-file> [--format text|json]",
   "  chemd changed [--base <ref>] [--format text|json]",
   "  chemd fix <file> [--format text|json] [--max-iterations <n>] [--write]",
@@ -92,6 +97,7 @@ type CliOption =
   | "driver"
   | "driver-arg"
   | "dry-run"
+  | "entry"
   | "format"
   | "json"
   | "max-fix-iterations"
@@ -124,6 +130,9 @@ type RunChemdRepairLoop = (
 type ImportProseToChemd = typeof import("@chemd/importer-prose")["importProseToChemd"];
 type CreateNodeRxnProcedureActionProvider =
   typeof import("@chemd/importer-prose")["createNodeRxnProcedureActionProvider"];
+type LinkChemdModules = typeof import("@chemd/compiler")["linkChemdModules"];
+type CreateChemdIncrementalCompiler =
+  typeof import("@chemd/compiler")["createChemdIncrementalCompiler"];
 
 interface CliWriter {
   write(chunk: string): unknown;
@@ -139,6 +148,8 @@ type CliCommand =
   | { type: "new"; dryRun: boolean; outPath: string; templateId: string }
   | { type: "import-prose"; dryRun: boolean; filePath: string; format: TextFormat; outPath?: string }
   | { type: "graph"; filePaths: string[]; format: TextFormat }
+  | { type: "link"; entry?: string; filePaths: string[]; format: TextFormat }
+  | { type: "incremental"; filePaths: string[]; format: TextFormat }
   | { type: "diff"; beforePath: string; afterPath: string; format: TextFormat }
   | { type: "changed"; base: string; format: TextFormat }
   | {
@@ -156,8 +167,10 @@ type CliCommand =
 interface RunOptions {
   buildTrainingGraphIndex?: BuildTrainingGraphIndex;
   compileChemd?: CompileChemd;
+  createChemdIncrementalCompiler?: CreateChemdIncrementalCompiler;
   cwd?: string;
   gitRunner?: GitRunner;
+  linkChemdModules?: LinkChemdModules;
   runChemdAgentLoop?: RunChemdAgentLoop;
   runChemdRepairLoop?: RunChemdRepairLoop;
   stderr?: CliWriter;
@@ -167,8 +180,10 @@ interface RunOptions {
 interface NormalizedRunOptions {
   buildTrainingGraphIndex?: BuildTrainingGraphIndex;
   compileChemd?: CompileChemd;
+  createChemdIncrementalCompiler?: CreateChemdIncrementalCompiler;
   cwd: string;
   gitRunner?: GitRunner;
+  linkChemdModules?: LinkChemdModules;
   runChemdAgentLoop?: RunChemdAgentLoop;
   runChemdRepairLoop?: RunChemdRepairLoop;
   stderr: CliWriter;
@@ -343,6 +358,8 @@ type CompileResultWithProgram = CompileResult & {
 interface CliCompilerServices {
   buildTrainingGraphIndex: BuildTrainingGraphIndex;
   compileChemd: CompileChemd;
+  createChemdIncrementalCompiler: CreateChemdIncrementalCompiler;
+  linkChemdModules: LinkChemdModules;
   runChemdAgentLoop: RunChemdAgentLoop;
   runChemdRepairLoop: RunChemdRepairLoop;
 }
@@ -475,6 +492,7 @@ const assignCommandOption = (
     driver?: string;
     driverArgs: string[];
     dryRun: boolean;
+    entry?: string;
     format?: string;
     json: boolean;
     maxIterations?: number;
@@ -508,6 +526,9 @@ const assignCommandOption = (
       return;
     case "dry-run":
       state.dryRun = true;
+      return;
+    case "entry":
+      state.entry = option.value;
       return;
     case "max-iterations":
       state.maxIterations = parsePositiveIntegerOption(option.value ?? "", "max-iterations");
@@ -543,6 +564,7 @@ const parseCommandArgs = (args: string[], allowedOptions: ReadonlySet<CliOption>
     driver?: string;
     driverArgs: string[];
     dryRun: boolean;
+    entry?: string;
     format?: string;
     json: boolean;
     maxIterations?: number;
@@ -582,6 +604,7 @@ const parseCommandArgs = (args: string[], allowedOptions: ReadonlySet<CliOption>
     driver: state.driver,
     driverArgs: state.driverArgs,
     dryRun: state.dryRun,
+    entry: state.entry,
     format: state.format,
     json: state.json,
     maxIterations: state.maxIterations,
@@ -736,6 +759,35 @@ const parseGraphArgs = (args: string[]): CliCommand => {
   };
 };
 
+const parseLinkArgs = (args: string[]): CliCommand => {
+  const { entry, format = "text", positional } = parseCommandArgs(args, LINK_OPTIONS);
+
+  if (positional.length === 0) {
+    throw new CliUsageError("Link requires at least one file path.");
+  }
+
+  return {
+    type: "link",
+    ...(entry ? { entry } : {}),
+    filePaths: positional,
+    format: asTextFormat(format, "Link")
+  };
+};
+
+const parseIncrementalArgs = (args: string[]): CliCommand => {
+  const { format = "text", positional } = parseCommandArgs(args, INCREMENTAL_OPTIONS);
+
+  if (positional.length === 0) {
+    throw new CliUsageError("Incremental requires at least one file path.");
+  }
+
+  return {
+    type: "incremental",
+    filePaths: positional,
+    format: asTextFormat(format, "Incremental")
+  };
+};
+
 const parseChangedArgs = (args: string[]): CliCommand => {
   const { base = "HEAD", format = "text", positional } = parseCommandArgs(args, CHANGED_OPTIONS);
 
@@ -845,6 +897,14 @@ export const parseChemdCliArgs = (argv: string[]): CliCommand => {
     return parseGraphArgs(rest);
   }
 
+  if (command === "link") {
+    return parseLinkArgs(rest);
+  }
+
+  if (command === "incremental") {
+    return parseIncrementalArgs(rest);
+  }
+
   if (command === "diff") {
     return parseDiffArgs(rest);
   }
@@ -867,6 +927,8 @@ export const parseChemdCliArgs = (argv: string[]): CliCommand => {
 const loadCompiler = async (): Promise<{
   buildTrainingGraphIndexFromUnderstandings: BuildTrainingGraphIndex;
   compileChemd: CompileChemd;
+  createChemdIncrementalCompiler: CreateChemdIncrementalCompiler;
+  linkChemdModules: LinkChemdModules;
   runChemdAgentLoop: RunChemdAgentLoop;
   runChemdRepairLoop: RunChemdRepairLoop;
 }> => import("@chemd/compiler");
@@ -942,8 +1004,6 @@ const getCompileProgram = (result: CompileResult): ProgramDocumentLike => {
 
 const getCompileDiagnostics = (result: CompileResult): Diagnostic[] =>
   result.diagnostics ?? getCompileProgram(result).diagnostics ?? [];
-
-const getStrictCompileProgram = (result: CompileResult) => result.program;
 
 const summarizeProgram = (program: ProgramDocumentLike): ProgramSummary => ({
   declarationCount: program.declarations.length,
@@ -1632,10 +1692,7 @@ const compileSourceFile = (
 const buildProgramSemanticDiff = (
   before: CompileResult,
   after: CompileResult
-): SemanticDiff => buildSemanticDiff(
-  getStrictCompileProgram(before),
-  getStrictCompileProgram(after)
-);
+): SemanticDiff => buildCompileSemanticDiff(before, after);
 
 const diffFiles = (
   command: Extract<CliCommand, { type: "diff" }>,
@@ -2034,8 +2091,10 @@ const agentLoopFile = async (
 const normalizeRunOptions = (options: RunOptions): NormalizedRunOptions => ({
   buildTrainingGraphIndex: options.buildTrainingGraphIndex,
   compileChemd: options.compileChemd,
+  createChemdIncrementalCompiler: options.createChemdIncrementalCompiler,
   cwd: options.cwd ?? process.cwd(),
   gitRunner: options.gitRunner,
+  linkChemdModules: options.linkChemdModules,
   runChemdAgentLoop: options.runChemdAgentLoop,
   runChemdRepairLoop: options.runChemdRepairLoop,
   stderr: options.stderr ?? process.stderr,
@@ -2086,6 +2145,26 @@ const executeCommand = (
     ));
   }
 
+  if (command.type === "link") {
+    return Promise.resolve(linkFiles(command, services.linkChemdModules, {
+      cwd: options.cwd,
+      readSource,
+      stdout: options.stdout
+    }));
+  }
+
+  if (command.type === "incremental") {
+    return Promise.resolve(incrementalFiles(
+      command,
+      services.createChemdIncrementalCompiler,
+      {
+        cwd: options.cwd,
+        readSource,
+        stdout: options.stdout
+      }
+    ));
+  }
+
   if (command.type === "diff") {
     return Promise.resolve(diffFiles(command, services.compileChemd, options));
   }
@@ -2118,12 +2197,17 @@ export const runChemdCli = async (
     const compileChemd = options.compileChemd ?? compiler.compileChemd;
     const buildTrainingGraphIndex = options.buildTrainingGraphIndex
       ?? compiler.buildTrainingGraphIndexFromUnderstandings;
+    const createChemdIncrementalCompiler = options.createChemdIncrementalCompiler
+      ?? compiler.createChemdIncrementalCompiler;
+    const linkChemdModules = options.linkChemdModules ?? compiler.linkChemdModules;
     const runChemdAgentLoop = options.runChemdAgentLoop ?? compiler.runChemdAgentLoop;
     const runChemdRepairLoop = options.runChemdRepairLoop ?? compiler.runChemdRepairLoop;
 
     return executeCommand(command, {
       buildTrainingGraphIndex,
       compileChemd,
+      createChemdIncrementalCompiler,
+      linkChemdModules,
       runChemdAgentLoop,
       runChemdRepairLoop
     }, options);

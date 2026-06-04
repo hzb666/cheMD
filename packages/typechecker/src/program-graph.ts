@@ -36,7 +36,7 @@ export const buildProgramTypedGraph = (
   program: ChemdProgramDocument,
   symbols: ProgramSymbolTable,
   diagnostics: V03Diagnostic[],
-  options: Pick<TypecheckOptions, "procedureMode"> = {}
+  options: Pick<TypecheckOptions, "procedureMode" | "referenceContext" | "reactionRouteContext"> = {}
 ): ProgramGraphResult => {
   const quantities: QuantityType[] = [];
   const typedNodes: TypedSemanticNode[] = [];
@@ -84,7 +84,7 @@ const createGraphResult = (
 const buildDeclarationNodes = (
   declaration: ChemdDeclaration,
   symbols: ProgramSymbolTable,
-  options: Pick<TypecheckOptions, "procedureMode">
+  options: Pick<TypecheckOptions, "procedureMode" | "referenceContext" | "reactionRouteContext">
 ): {
   nodes: TypedSemanticNode[];
   quantities: QuantityType[];

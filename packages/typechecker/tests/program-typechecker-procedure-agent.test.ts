@@ -110,7 +110,7 @@ meta {
 
 procedure proc_1 {
   repeat repeat_charge(count: 2) {
-    step charge = charge(amount: 1 mmol)
+    step charge = charge(materials: "substrate", amount: 1 mmol)
   }
 
   until until_clear(condition: "sensor.ph > 7", max_iterations: 3) {
@@ -119,19 +119,19 @@ procedure proc_1 {
 
   branch branch_workup {
     case acidic(condition: "sensor.ph < 7") {
-      step neutralize = add(depends_on: [sample])
+      step neutralize = add(materials: "base", depends_on: [sample])
     }
     default {
-      step hold = hold(depends_on: [neutralize])
+      step hold = hold(duration: 5 min, depends_on: [neutralize])
     }
   }
 
   parallel parallel_workup {
     path organic {
-      step extract = extract(depends_on: [hold])
+      step extract = extract(solvent: "EtOAc", depends_on: [hold])
     }
     path aqueous {
-      step wash = wash(depends_on: [hold])
+      step wash = wash(solvent: "brine", depends_on: [hold])
     }
   }
 
@@ -201,6 +201,145 @@ procedure proc_1 {
       expect.objectContaining({ code: "E_PROCEDURE_CONTROL_CONDITION", sourceField: "wait" }),
       expect.objectContaining({ code: "E_PROCEDURE_CONTROL_CONDITION", sourceField: "abort_if" })
     ]));
+  });
+
+  it("applies step schema validation to source-level procedure steps", () => {
+    const result = typecheckProgram(parse(`module exp_step_schema
+
+meta {
+  id: "exp-step-schema"
+  title: "Step schema"
+  date: "2026-06-04"
+}
+
+procedure proc_1 {
+  step hold_bad = hold()
+  step filter_bad = filter(unknown_param: "x")
+  step heat_bad = heat(temperature: "hot")
+}
+`));
+
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "E_STEP_PARAM_MISSING", sourceNodeId: "hold_bad" }),
+      expect.objectContaining({ code: "E_STEP_PARAM_INVALID", sourceNodeId: "filter_bad" }),
+      expect.objectContaining({ code: "E_STEP_PARAM_TYPE_MISMATCH", sourceNodeId: "heat_bad" })
+    ]));
+  });
+
+  it("diagnoses invalid source-level procedure control placement", () => {
+    const result = typecheckProgram(parse(`module exp_control_context
+
+meta {
+  id: "exp-control-context"
+  title: "Control context"
+  date: "2026-06-04"
+}
+
+procedure proc_1 {
+  case stray_case(condition: "sensor.ph < 7") {
+    step observe_1 = observe()
+  }
+
+  branch branch_mixed {
+    case acidic(condition: "sensor.ph < 7") {
+      step branch_step = observe()
+    }
+    step illegal_direct = hold(duration: 1 min)
+    default {
+      step fallback = hold(duration: 1 min)
+    }
+  }
+
+  parallel parallel_mixed {
+    path organic {
+      step extract_1 = extract(solvent: "EtOAc")
+    }
+    step illegal_parallel = hold(duration: 1 min)
+  }
+
+  wait wait_body(condition: "operator.confirmed") {
+    step illegal_wait = observe()
+  }
+}
+`));
+
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "E_PROCEDURE_CONTROL_CONTEXT", sourceField: "case" }),
+      expect.objectContaining({ code: "E_PROCEDURE_CONTROL_CONTEXT", sourceField: "branch" }),
+      expect.objectContaining({ code: "E_PROCEDURE_CONTROL_CONTEXT", sourceField: "parallel" }),
+      expect.objectContaining({ code: "E_PROCEDURE_CONTROL_BODY", sourceField: "wait" })
+    ]));
+  });
+
+  it("validates source-level control condition references", () => {
+    const result = typecheckProgram(parse(`module exp_control_condition_ref
+
+meta {
+  id: "exp-control-condition-ref"
+  title: "Control condition ref"
+  date: "2026-06-04"
+}
+
+analysis ana_tlc {
+  type: tlc
+}
+
+procedure proc_1 {
+  until wait_known(condition: "@ana_tlc.status == clean", max_iterations: 2) {
+    step observe_1 = observe()
+  }
+  until wait_missing(condition: "@missing.status == clean", max_iterations: 2) {
+    step observe_2 = observe()
+  }
+}
+`));
+
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({
+      code: "E_PROCEDURE_CONTROL_CONDITION",
+      sourceField: "until",
+      facts: expect.objectContaining({ ref: "missing.status" })
+    }));
+    expect(result.diagnostics).not.toContainEqual(expect.objectContaining({
+      code: "E_PROCEDURE_CONTROL_CONDITION",
+      facts: expect.objectContaining({ ref: "ana_tlc.status" })
+    }));
+  });
+
+  it("preserves external document references in source-level step IO", () => {
+    const result = typecheckProgram(parse(`module exp_external_step_io
+
+meta {
+  id: "exp-external-step-io"
+  title: "External step IO"
+  date: "2026-06-04"
+}
+
+procedure proc_1 {
+  step charge = charge(inputs: [@route-doc#mol_ext])
+}
+`), {
+      referenceContext: {
+        externalTargets: [{
+          refId: "route-doc#mol_ext",
+          targetKind: "molecule"
+        }]
+      }
+    });
+    const charge = result.stepGraph.steps.find((step) => step.stepId === "charge");
+
+    expect(charge?.params).toMatchObject({
+      inputs: ["@route-doc#mol_ext"]
+    });
+    expect(charge?.inputs).toEqual([
+      expect.objectContaining({
+        raw: "@route-doc#mol_ext",
+        reference: expect.objectContaining({
+          refId: "route-doc#mol_ext",
+          targetKind: "molecule",
+          resolved: true
+        })
+      })
+    ]);
   });
 
   it("validates duplicate procedure step ids dependency refs and cycles", () => {

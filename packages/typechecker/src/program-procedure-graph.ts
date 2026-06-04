@@ -1,16 +1,19 @@
 import type {
   ChemdDeclaration,
+  ChemdReferenceExpr,
   ChemdValue,
   ProcedureControlDeclaration,
   ProcedureDeclaration,
-  ProcedureStatement
+  ProcedureStatement,
+  ReferenceTargetKind
 } from "@chemd/core";
 import type { V03Diagnostic } from "@chemd/diagnostics";
 import type {
   CanonicalProcedureControlNode,
   CanonicalStepNode,
   ProcedureLoweringResult,
-  StepFamily
+  StepFamily,
+  StepReferenceTargetKind
 } from "@chemd/step-ontology";
 
 import { collectQuantities } from "./program-field-graph";
@@ -20,12 +23,20 @@ import {
   valueToText,
   type ProgramSymbolTable
 } from "./program-utils";
+import { createExternalTargetIndex } from "./references";
 import {
+  applyStepDefaults,
+  createStepDiagnostic,
+  isStepFamily,
+  normalizeStepParams,
+  validateAllowedParams,
   validateDependencyCycles,
   validateDependencyRefs,
+  validateRequiredParams,
   validateStepIds
 } from "./step-rules";
 import type {
+  ExternalTargetIndex,
   QuantityType,
   TypecheckOptions,
   TypedSemanticNode,
@@ -38,29 +49,6 @@ export interface ProcedureBuildResult {
   quantities: QuantityType[];
 }
 
-const STEP_FAMILIES = new Set<StepFamily>([
-  "charge",
-  "add",
-  "transfer",
-  "mix",
-  "cool",
-  "heat",
-  "hold",
-  "purge",
-  "quench",
-  "extract",
-  "wash",
-  "separate_layers",
-  "filter",
-  "dry",
-  "concentrate",
-  "purify",
-  "sample",
-  "analyze",
-  "observe",
-  "store"
-]);
-
 const DYNAMIC_CONTROL_KINDS = new Set<ProcedureControlDeclaration["controlKind"]>([
   "until",
   "branch",
@@ -71,7 +59,7 @@ const DYNAMIC_CONTROL_KINDS = new Set<ProcedureControlDeclaration["controlKind"]
 export const buildProcedureDeclaration = (
   declaration: ProcedureDeclaration,
   symbols: ProgramSymbolTable,
-  options: Pick<TypecheckOptions, "procedureMode"> = {}
+  options: Pick<TypecheckOptions, "procedureMode" | "referenceContext" | "reactionRouteContext"> = {}
 ) => {
   const built = lowerProgramProcedure(declaration, symbols, options);
   const node: TypedSemanticNode = {
@@ -94,14 +82,18 @@ export const buildProcedureDeclaration = (
 const lowerProgramProcedure = (
   declaration: ProcedureDeclaration,
   symbols: ProgramSymbolTable,
-  options: Pick<TypecheckOptions, "procedureMode">
+  options: Pick<TypecheckOptions, "procedureMode" | "referenceContext" | "reactionRouteContext">
 ): ProcedureBuildResult => {
+  const externalTargetIndex = createExternalTargetIndex(
+    options.referenceContext,
+    options.reactionRouteContext
+  );
   const diagnostics: V03Diagnostic[] = [];
   const steps: CanonicalStepNode[] = [];
   const typedSteps: TypedStepNode[] = [];
   const controls: CanonicalProcedureControlNode[] = [];
   for (const statement of declaration.children) {
-    appendProcedureStatement(statement, declaration, symbols, steps, typedSteps, controls, diagnostics, []);
+    appendProcedureStatement(statement, declaration, symbols, externalTargetIndex, steps, typedSteps, controls, diagnostics, []);
   }
   diagnostics.push(...validateProgramProcedure(declaration, steps, controls, options));
   return {
@@ -146,23 +138,35 @@ const appendProcedureStatement = (
   statement: ProcedureStatement,
   procedure: ProcedureDeclaration,
   symbols: ProgramSymbolTable,
+  externalTargetIndex: ExternalTargetIndex,
   steps: CanonicalStepNode[],
   typedSteps: TypedStepNode[],
   controls: CanonicalProcedureControlNode[],
   diagnostics: V03Diagnostic[],
-  controlPath: string[]
+  controlPath: string[],
+  parentControlKind?: ProcedureControlDeclaration["controlKind"]
 ): void => {
   if (statement.kind === "step") {
-    const step = buildProgramStep(statement, procedure, symbols, diagnostics, controlPath);
+    if (parentControlKind === "branch" || parentControlKind === "parallel") {
+      diagnostics.push(createProgramControlDiagnostic(
+        "E_PROCEDURE_CONTROL_CONTEXT",
+        "error",
+        `${parentControlKind} cannot contain direct step entries.`,
+        procedure,
+        undefined,
+        { control_kind: parentControlKind, step_id: statement.id }
+      ));
+    }
+    const step = buildProgramStep(statement, procedure, symbols, externalTargetIndex, diagnostics, controlPath);
     steps.push(step);
     typedSteps.push(buildTypedStep(step, procedure, statement.sourceSpan));
   } else if (statement.kind === "control") {
     const control = buildProgramControl(statement, procedure, controlPath);
     controls.push(control);
-    diagnostics.push(...validateProgramControlShape(procedure, statement));
+    diagnostics.push(...validateProgramControlShape(procedure, statement, symbols, externalTargetIndex, parentControlKind));
     const nestedPath = control.controlPath;
     for (const child of statement.children) {
-      appendProcedureStatement(child, procedure, symbols, steps, typedSteps, controls, diagnostics, nestedPath);
+      appendProcedureStatement(child, procedure, symbols, externalTargetIndex, steps, typedSteps, controls, diagnostics, nestedPath, statement.controlKind);
     }
   }
 };
@@ -171,11 +175,12 @@ const buildProgramStep = (
   step: Extract<ProcedureStatement, { kind: "step" }>,
   procedure: ProcedureDeclaration,
   symbols: ProgramSymbolTable,
+  externalTargetIndex: ExternalTargetIndex,
   diagnostics: V03Diagnostic[],
   controlPath: string[]
 ): CanonicalStepNode => {
-  const family = STEP_FAMILIES.has(step.family as StepFamily)
-    ? step.family as StepFamily
+  const family = isStepFamily(step.family)
+    ? step.family
     : "observe";
   if (family === "observe" && step.family !== "observe") {
     diagnostics.push(createProgramDiagnostic(
@@ -184,12 +189,13 @@ const buildProgramStep = (
       procedure
     ));
   }
+  diagnostics.push(...validateProgramStepSchema(step, family));
   return {
     stepId: step.id,
     family,
-    params: valuesToRecord(step.args),
-    inputs: step.inputs?.map((item) => ({ raw: item.raw, reference: referenceToStepRef(item, symbols) })),
-    outputs: step.outputs?.map((item) => ({ raw: item.raw, reference: referenceToStepRef(item, symbols) })),
+    params: buildProgramStepParams(step, family),
+    inputs: step.inputs?.map((item) => ({ raw: item.raw, reference: referenceToStepRef(item, symbols, externalTargetIndex) })),
+    outputs: step.outputs?.map((item) => ({ raw: item.raw, reference: referenceToStepRef(item, symbols, externalTargetIndex) })),
     dependsOn: step.dependsOn,
     evidence: step.evidence?.map((item) => item.target),
     ...(controlPath.length > 0 ? { controlPath } : {}),
@@ -233,10 +239,34 @@ const readProgramControlId = (control: ProcedureControlDeclaration): string =>
 
 const validateProgramControlShape = (
   procedure: ProcedureDeclaration,
-  control: ProcedureControlDeclaration
+  control: ProcedureControlDeclaration,
+  symbols: ProgramSymbolTable,
+  externalTargetIndex: ExternalTargetIndex,
+  parentControlKind?: ProcedureControlDeclaration["controlKind"]
 ): V03Diagnostic[] => {
   const diagnostics: V03Diagnostic[] = [];
   const children = control.children.filter((child) => child.kind !== "doc");
+
+  if (["case", "default"].includes(control.controlKind) && parentControlKind !== "branch") {
+    diagnostics.push(createProgramControlDiagnostic(
+      "E_PROCEDURE_CONTROL_CONTEXT",
+      "error",
+      `${control.controlKind} control must be nested inside branch.`,
+      procedure,
+      control,
+      { control_kind: control.controlKind, expected_parent: "branch", parent_control_kind: parentControlKind }
+    ));
+  }
+  if (control.controlKind === "path" && parentControlKind !== "parallel") {
+    diagnostics.push(createProgramControlDiagnostic(
+      "E_PROCEDURE_CONTROL_CONTEXT",
+      "error",
+      "path control must be nested inside parallel.",
+      procedure,
+      control,
+      { control_kind: control.controlKind, expected_parent: "parallel", parent_control_kind: parentControlKind }
+    ));
+  }
 
   if (!control.id && !["case", "default", "path"].includes(control.controlKind)) {
     diagnostics.push(createProgramControlDiagnostic(
@@ -274,7 +304,7 @@ const validateProgramControlShape = (
 
   if (control.controlKind === "until") {
     diagnostics.push(
-      ...validateControlCondition(procedure, control, "until requires condition.")
+      ...validateControlCondition(procedure, control, symbols, externalTargetIndex, "until requires condition.")
     );
     if (children.length === 0) {
       diagnostics.push(createProgramControlDiagnostic(
@@ -320,12 +350,22 @@ const validateProgramControlShape = (
         control
       ));
     }
+    diagnostics.push(...children
+      .filter((child) => child.kind !== "control" || !["case", "default"].includes(child.controlKind))
+      .map((child) => createProgramControlDiagnostic(
+        "E_PROCEDURE_CONTROL_CONTEXT",
+        "error",
+        "branch can only contain case/default controls.",
+        procedure,
+        control,
+        { control_kind: "branch", child_kind: child.kind === "control" ? child.controlKind : child.kind }
+      )));
     diagnostics.push(...validateSiblingProgramControlIds(procedure, cases));
   }
 
   if (control.controlKind === "case") {
     diagnostics.push(
-      ...validateControlCondition(procedure, control, "case requires condition.")
+      ...validateControlCondition(procedure, control, symbols, externalTargetIndex, "case requires condition.")
     );
   }
   if (control.controlKind === "default" && control.args.condition) {
@@ -361,18 +401,46 @@ const validateProgramControlShape = (
         ));
       }
     }
+    diagnostics.push(...children
+      .filter((child) => child.kind !== "control" || child.controlKind !== "path")
+      .map((child) => createProgramControlDiagnostic(
+        "E_PROCEDURE_CONTROL_CONTEXT",
+        "error",
+        "parallel can only contain path controls.",
+        procedure,
+        control,
+        { control_kind: "parallel", child_kind: child.kind === "control" ? child.controlKind : child.kind }
+      )));
     diagnostics.push(...validateSiblingProgramControlIds(procedure, paths));
   }
 
   if (control.controlKind === "wait") {
     diagnostics.push(
-      ...validateControlCondition(procedure, control, "wait requires condition.")
+      ...validateControlCondition(procedure, control, symbols, externalTargetIndex, "wait requires condition.")
     );
+    if (children.length > 0) {
+      diagnostics.push(createProgramControlDiagnostic(
+        "E_PROCEDURE_CONTROL_BODY",
+        "error",
+        "wait cannot define a body.",
+        procedure,
+        control
+      ));
+    }
   }
   if (control.controlKind === "abort_if") {
     diagnostics.push(
-      ...validateControlCondition(procedure, control, "abort_if requires condition.")
+      ...validateControlCondition(procedure, control, symbols, externalTargetIndex, "abort_if requires condition.")
     );
+    if (children.length > 0) {
+      diagnostics.push(createProgramControlDiagnostic(
+        "E_PROCEDURE_CONTROL_BODY",
+        "error",
+        "abort_if cannot define a body.",
+        procedure,
+        control
+      ));
+    }
   }
 
   return diagnostics;
@@ -414,6 +482,8 @@ const validateSiblingProgramControlIds = (
 const validateControlCondition = (
   procedure: ProcedureDeclaration,
   control: ProcedureControlDeclaration,
+  symbols: ProgramSymbolTable,
+  externalTargetIndex: ExternalTargetIndex,
   missingMessage: string
 ): V03Diagnostic[] => {
   const condition = readControlParamText(control, "condition");
@@ -444,6 +514,19 @@ const validateControlCondition = (
   }
 
   const conditionWithoutRefs = condition.replace(/@[A-Za-z0-9_.#:-]+/g, "");
+  const refs = Array.from(condition.matchAll(/@([A-Za-z0-9_.#:-]+)/g), (match) => match[1] ?? "");
+  for (const ref of refs) {
+    if (!isKnownConditionReference(ref, symbols, externalTargetIndex)) {
+      diagnostics.push(createProgramControlDiagnostic(
+        "E_PROCEDURE_CONTROL_CONDITION",
+        "error",
+        `Control condition references unknown target: @${ref}`,
+        procedure,
+        control,
+        { condition, ref }
+      ));
+    }
+  }
   const runtimeNamespaces = Array.from(
     conditionWithoutRefs.matchAll(/\b([A-Za-z][A-Za-z0-9_]*)\.[A-Za-z0-9_.-]+/g),
     (match) => match[1] ?? ""
@@ -462,6 +545,21 @@ const validateControlCondition = (
   }
 
   return diagnostics;
+};
+
+const isKnownConditionReference = (
+  ref: string,
+  symbols: ProgramSymbolTable,
+  externalTargetIndex: ExternalTargetIndex
+): boolean => {
+  const externalKey = ref.includes("#")
+    ? ref.split(".")[0] ?? ref
+    : undefined;
+  if (externalKey && externalTargetIndex.has(externalKey)) {
+    return true;
+  }
+  const baseRef = ref.includes(".") ? ref.split(".")[0] : ref;
+  return Boolean(baseRef && symbols.has(baseRef));
 };
 
 const readNumericControlParam = (
@@ -495,6 +593,82 @@ const createProgramControlDiagnostic = (
     facts,
     control?.sourceSpan
   );
+
+const validateProgramStepSchema = (
+  step: Extract<ProcedureStatement, { kind: "step" }>,
+  family: StepFamily
+): V03Diagnostic[] => {
+  const normalized = normalizeStepParams(step.id, family, valuesToRawRecord(step.args));
+  const defaultedParams = applyStepDefaults(family, {
+    ...valuesToRecord(step.args),
+    ...normalized.params
+  });
+
+  return [
+    ...normalizeStepSchemaDiagnostics(step, normalized.diagnostics),
+    ...validateAllowedParams(step.id, family, defaultedParams),
+    ...validateRequiredParams(step.id, family, {
+      params: defaultedParams,
+      inputs: step.inputs,
+      outputs: step.outputs
+    })
+  ];
+};
+
+const normalizeStepSchemaDiagnostics = (
+  step: Extract<ProcedureStatement, { kind: "step" }>,
+  diagnostics: V03Diagnostic[]
+): V03Diagnostic[] => {
+  const hasStepTypeMismatch = diagnostics.some((diagnostic) =>
+    diagnostic.code === "E_STEP_PARAM_TYPE_MISMATCH"
+  );
+  const quantityDiagnostic = diagnostics.find((diagnostic) =>
+    diagnostic.code === "E403" && typeof diagnostic.sourceField === "string"
+  );
+  if (hasStepTypeMismatch || !quantityDiagnostic?.sourceField) {
+    return diagnostics;
+  }
+  return [
+    ...diagnostics,
+    createStepDiagnostic(
+      "E_STEP_PARAM_TYPE_MISMATCH",
+      `Step ${step.id} parameter ${quantityDiagnostic.sourceField} has invalid quantity syntax`,
+      step.id,
+      {
+        expected: quantityDiagnostic.facts?.expected_quantity_class ?? "quantity",
+        field: quantityDiagnostic.sourceField,
+        raw_value: quantityDiagnostic.facts?.raw_value
+      }
+    )
+  ];
+};
+
+const buildProgramStepParams = (
+  step: Extract<ProcedureStatement, { kind: "step" }>,
+  family: StepFamily
+): Record<string, unknown> => {
+  const normalized = normalizeStepParams(step.id, family, valuesToRawRecord(step.args));
+  return applyStepDefaults(family, {
+    ...valuesToRecord(step.args),
+    ...normalized.params,
+    ...preserveStructuredStepParams(step.args)
+  });
+};
+
+const preserveStructuredStepParams = (
+  args: Record<string, ChemdValue>
+): Record<string, unknown> => {
+  const preserved: Record<string, unknown> = {};
+  for (const key of ["inputs", "outputs", "evidence"]) {
+    if (args[key]) {
+      preserved[key] = valueToPrimitive(args[key]);
+    }
+  }
+  return preserved;
+};
+
+const valuesToRawRecord = (values: Record<string, ChemdValue>): Record<string, string> =>
+  Object.fromEntries(Object.entries(values).map(([key, value]) => [key, value.raw]));
 
 const validateProgramControlIds = (
   procedure: ProcedureDeclaration,
@@ -599,7 +773,7 @@ const valueToPrimitive = (value: ChemdValue): unknown => {
   if (value.type === "record") {
     return Object.fromEntries(value.fields.map((field) => [field.key, valueToPrimitive(field.value)]));
   }
-  if (value.type === "reference") return `@${value.target}`;
+  if (value.type === "reference") return referenceRaw(value);
   if (value.type === "call") {
     return {
       callee: value.callee,
@@ -612,8 +786,29 @@ const valueToPrimitive = (value: ChemdValue): unknown => {
 
 const referenceToStepRef = (
   reference: Extract<ChemdValue, { type: "reference" }>,
-  symbols: ProgramSymbolTable
+  symbols: ProgramSymbolTable,
+  externalTargetIndex: ExternalTargetIndex
 ): NonNullable<CanonicalStepNode["inputs"]>[number]["reference"] => {
+  if (reference.refKind === "external_document") {
+    const refId = `${reference.externalDocumentId}#${reference.target}`;
+    const target = externalTargetIndex.get(refId);
+    return {
+      kind: "reference",
+      refId,
+      targetKind: toStepReferenceTargetKind(target?.targetKind),
+      resolved: Boolean(target)
+    };
+  }
+  if (reference.refKind === "module") {
+    const refId = `${reference.moduleName}.${reference.target}`;
+    const target = symbols.get(refId);
+    return {
+      kind: "reference",
+      refId,
+      targetKind: toStepReferenceTargetKind(target?.kind),
+      resolved: Boolean(target) || reference.resolved?.status === "resolved"
+    };
+  }
   const target = symbols.get(reference.target);
   return {
     kind: "reference",
@@ -623,9 +818,19 @@ const referenceToStepRef = (
   };
 };
 
+const referenceRaw = (reference: ChemdReferenceExpr): string =>
+  reference.raw
+  || (reference.refKind === "external_document"
+    ? `@${reference.externalDocumentId}#${reference.target}${reference.field ? `.${reference.field}` : ""}`
+    : reference.refKind === "module"
+      ? `@${reference.moduleName}.${reference.target}`
+      : reference.refKind === "field"
+        ? `@${reference.target}.${reference.field}`
+        : `@${reference.target}`);
+
 const toStepReferenceTargetKind = (
-  kind: ChemdDeclaration["kind"] | undefined
-): NonNullable<NonNullable<CanonicalStepNode["inputs"]>[number]["reference"]>["targetKind"] => {
+  kind: ChemdDeclaration["kind"] | ReferenceTargetKind | undefined
+): StepReferenceTargetKind => {
   if (kind === "condition_screen") return "condition_varies";
   if (
     kind === "molecule"
@@ -636,6 +841,9 @@ const toStepReferenceTargetKind = (
     || kind === "analysis"
     || kind === "sample"
     || kind === "artifact"
+    || kind === "condition_varies"
+    || kind === "condition_variation_attempt"
+    || kind === "template"
   ) {
     return kind;
   }

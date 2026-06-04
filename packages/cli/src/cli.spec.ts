@@ -59,6 +59,7 @@ meta {
 
 /// Main molecule.
 molecule mol_main {
+  name: "ethanol"
   smiles: "CCO"
 }
 `;
@@ -273,10 +274,10 @@ procedure proc_main for @rxn_main {
 
   parallel parallel_workup {
     path organic {
-      step extract = extract(depends_on: [hold])
+      step extract = extract(solvent: "EtOAc", depends_on: [hold])
     }
     path aqueous {
-      step wash = wash(depends_on: [hold])
+      step wash = wash(solvent: "brine", depends_on: [hold])
     }
   }
 }
@@ -1123,6 +1124,89 @@ INVALID_PROGRAM
       expect(stderr.value).toBe("");
     }));
 
+  it("links multiple modules through the CLI", async () =>
+    withTempDir(async (dir) => {
+      writeFileSync(path.join(dir, "entry.chemd"), `module exp_entry
+
+import shared_solvents as solvents from "./shared.chemd"
+
+meta {
+  id: "exp-entry"
+  title: "Entry"
+  date: "2026-06-04"
+}
+
+result res_entry for @solvents.rxn_shared {
+  yield: 78%
+}
+`);
+      writeFileSync(path.join(dir, "shared.chemd"), `module shared_solvents
+
+meta {
+  id: "shared-solvents"
+  title: "Shared"
+  date: "2026-06-04"
+}
+
+reaction rxn_shared {
+  name: "shared"
+}
+`);
+
+      const stdout = createWriter();
+      const stderr = createWriter();
+      const exitCode = await runChemdCli([
+        "link",
+        "entry.chemd",
+        "shared.chemd",
+        "--format",
+        "json"
+      ], { cwd: dir, stderr, stdout });
+      const payload = JSON.parse(stdout.value);
+
+      expect(exitCode).toBe(EXIT_OK);
+      expect(payload).toMatchObject({
+        schemaVersion: "chemd-link/v0.1",
+        entry: { moduleName: "exp_entry" },
+        totals: { error: 0 }
+      });
+      expect(payload.importGraph.edges).toEqual([
+        expect.objectContaining({
+          fromModule: "exp_entry",
+          toModule: "shared_solvents",
+          status: "resolved"
+        })
+      ]);
+      expect(payload.modules[0].typedSemanticGraph.nodes).toContainEqual(
+        expect.objectContaining({
+          nodeId: "res_entry",
+          reaction: expect.objectContaining({
+            refId: "shared_solvents.rxn_shared",
+            targetKind: "reaction",
+            resolved: true
+          })
+        })
+      );
+      expect(stderr.value).toBe("");
+    }));
+
+  it("exposes incremental compile cache status through the CLI", async () => {
+    const result = await runInTempDir(["incremental", "valid.chemd", "valid.chemd", "--format", "json"], {
+      "valid.chemd": validSource
+    });
+    const payload = JSON.parse(result.stdout);
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(payload).toMatchObject({
+      schemaVersion: "chemd-incremental/v0.1",
+      results: [
+        expect.objectContaining({ cache: expect.objectContaining({ status: "cold" }) }),
+        expect.objectContaining({ cache: expect.objectContaining({ status: "hit" }) })
+      ]
+    });
+    expect(result.stderr).toBe("");
+  });
+
   it("prints source-aware language diagnostics in check text output", async () => {
     const result = await runInTempDir(["check", "invalid-control.chemd"], {
       "invalid-control.chemd": `module exp_cli_invalid_control
@@ -1433,6 +1517,49 @@ describe("chemd cli diff", () => {
       "changed:reaction:rxn_main",
       "changed:result:res_main"
     ]);
+  });
+
+  it("includes typed graph and run plan changes in semantic diff JSON", async () => {
+    const before = `module exp_cli_runtime_diff
+
+meta {
+  id: "exp-cli-runtime-diff"
+  title: "Runtime Diff"
+  date: "2026-06-04"
+}
+
+reaction rxn_main {
+  reactants: [substrate]
+  products: [product]
+}
+
+procedure proc_main for @rxn_main {
+  step hold = hold(duration: 5 min)
+}
+`;
+    const after = before.replace("duration: 5 min", "duration: 10 min");
+    const result = await runInTempDir(
+      ["diff", "before.chemd", "after.chemd", "--format", "json"],
+      {
+        "after.chemd": after,
+        "before.chemd": before
+      }
+    );
+    const payload = JSON.parse(result.stdout);
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(payload.changes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        changeType: "changed",
+        nodeId: "hold",
+        nodeType: "typed:step"
+      }),
+      expect.objectContaining({
+        changeType: "changed",
+        nodeId: "hold",
+        nodeType: "run_step"
+      })
+    ]));
   });
 
   it("ignores objects without explicit IDs in semantic diff", async () => {

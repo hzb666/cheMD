@@ -56,10 +56,15 @@ export interface SemanticDiff {
   changes: SemanticDiffChange[];
 }
 
-interface ComparableObject {
+export interface SemanticDiffComparableObject {
   fields: Record<string, unknown>;
   nodeId: string;
   nodeType: string;
+}
+
+export interface SemanticDiffOptions {
+  afterObjects?: SemanticDiffComparableObject[];
+  beforeObjects?: SemanticDiffComparableObject[];
 }
 
 const normalizeValue = (value: unknown): unknown => {
@@ -144,8 +149,8 @@ const isValueRecord = (value: unknown): value is Record<string, ChemdValue> =>
 
 const collectObjects = (
   document: ChemdProgramDocument,
-  output = new Map<string, ComparableObject>()
-): Map<string, ComparableObject> => {
+  output = new Map<string, SemanticDiffComparableObject>()
+): Map<string, SemanticDiffComparableObject> => {
   output.set("$module", {
     fields: { name: document.module.name },
     nodeId: "module",
@@ -178,7 +183,7 @@ const collectObjects = (
   return output;
 };
 
-const collectImportObject = (item: ChemdImportDeclaration): ComparableObject => ({
+const collectImportObject = (item: ChemdImportDeclaration): SemanticDiffComparableObject => ({
   fields: collectStructuredFields({
     moduleName: item.moduleName,
     from: item.from,
@@ -208,8 +213,8 @@ const compareFields = (
 
 const pushRemovedChanges = (
   changes: SemanticDiffChange[],
-  beforeObjects: Map<string, ComparableObject>,
-  afterObjects: Map<string, ComparableObject>
+  beforeObjects: Map<string, SemanticDiffComparableObject>,
+  afterObjects: Map<string, SemanticDiffComparableObject>
 ) => {
   for (const [key, before] of [...beforeObjects].sort()) {
     if (!afterObjects.has(key)) {
@@ -225,8 +230,8 @@ const pushRemovedChanges = (
 
 const pushAddedAndChanged = (
   changes: SemanticDiffChange[],
-  beforeObjects: Map<string, ComparableObject>,
-  afterObjects: Map<string, ComparableObject>
+  beforeObjects: Map<string, SemanticDiffComparableObject>,
+  afterObjects: Map<string, SemanticDiffComparableObject>
 ) => {
   for (const [key, after] of [...afterObjects].sort()) {
     const before = beforeObjects.get(key);
@@ -255,11 +260,14 @@ const pushAddedAndChanged = (
 
 export const buildSemanticDiff = (
   beforeDocument: ChemdProgramDocument,
-  afterDocument: ChemdProgramDocument
+  afterDocument: ChemdProgramDocument,
+  options: SemanticDiffOptions = {}
 ): SemanticDiff => {
   const beforeObjects = collectObjects(beforeDocument);
   const afterObjects = collectObjects(afterDocument);
   const changes: SemanticDiffChange[] = [];
+  appendSupplementalObjects(beforeObjects, options.beforeObjects ?? []);
+  appendSupplementalObjects(afterObjects, options.afterObjects ?? []);
 
   pushRemovedChanges(changes, beforeObjects, afterObjects);
   pushAddedAndChanged(changes, beforeObjects, afterObjects);
@@ -270,6 +278,19 @@ export const buildSemanticDiff = (
     afterDocumentId: afterDocument.meta.id,
     changes
   };
+};
+
+const appendSupplementalObjects = (
+  output: Map<string, SemanticDiffComparableObject>,
+  objects: SemanticDiffComparableObject[]
+): void => {
+  for (const object of objects) {
+    output.set(`${object.nodeType}:${object.nodeId}`, {
+      fields: collectStructuredFields(object.fields),
+      nodeId: object.nodeId,
+      nodeType: object.nodeType
+    });
+  }
 };
 
 const formatAddedFields = (fields: Record<string, unknown>, prefix: string): string[] =>

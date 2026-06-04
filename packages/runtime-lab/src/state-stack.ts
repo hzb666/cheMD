@@ -42,13 +42,17 @@ export const pushLabStateSnapshot = (
 export const restoreLabStateSnapshot = (
   stack: LabStateStack,
   snapshotId: string
-): LabState | undefined =>
-  stack.snapshots.find((snapshot) => snapshot.snapshotId === snapshotId)
-    ?.state;
+): LabState | undefined => {
+  const snapshot = stack.snapshots.find((item) => item.snapshotId === snapshotId);
+  return snapshot ? cloneLabState(snapshot.state) : undefined;
+};
 
 export const restoreCurrentLabStateSnapshot = (
   stack: LabStateStack
-): LabState | undefined => stack.snapshots[stack.currentIndex]?.state;
+): LabState | undefined => {
+  const snapshot = stack.snapshots[stack.currentIndex];
+  return snapshot ? cloneLabState(snapshot.state) : undefined;
+};
 
 const createSnapshot = (
   state: LabState,

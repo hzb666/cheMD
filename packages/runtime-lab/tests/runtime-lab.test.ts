@@ -418,4 +418,44 @@ describe("runtime lab state machine", () => {
     expect(restoreCurrentLabStateSnapshot(updated)?.stepStates[0])
       .toMatchObject({ stepId: "s1", status: "running" });
   });
+
+  it("restores cloned runtime states from snapshots", () => {
+    const plan = buildRunPlan({
+      documentId: "exp-runtime-stack-clone",
+      stepGraph: {
+        procedures: [],
+        observations: [],
+        diagnostics: [],
+        steps: [
+          {
+            stepId: "s1",
+            family: "mix",
+            params: {},
+            source: {
+              sourceNodeType: "procedure",
+              sourceNodeId: "proc-1",
+              sourceType: "explicit_step",
+              rawText: "step: mix"
+            },
+            loweringConfidence: 1
+          }
+        ]
+      }
+    });
+    const initial = createInitialLabState(plan, { runId: "run-stack-clone" });
+    const stack = createLabStateStack(initial, { snapshotId: "snap-initial" });
+    const restored = restoreLabStateSnapshot(stack, "snap-initial");
+    const current = restoreCurrentLabStateSnapshot(stack);
+
+    if (!restored || !current) {
+      throw new Error("expected restorable snapshots");
+    }
+    restored.stepStates[0]!.status = "failed";
+    current.stepStates[0]!.status = "running";
+
+    expect(restoreLabStateSnapshot(stack, "snap-initial")?.stepStates[0]).toMatchObject({
+      stepId: "s1",
+      status: "ready"
+    });
+  });
 });

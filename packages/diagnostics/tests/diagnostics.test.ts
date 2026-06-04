@@ -120,13 +120,17 @@ describe("v0.3 diagnostics registry", () => {
 
   it("classifies program language diagnostics", () => {
     expect(getDiagnosticSpec("E_PROGRAM_META_EXPECTED")?.band).toBe("syntax");
+    expect(getDiagnosticSpec("E_PROGRAM_PROCEDURE_STEP_EXPECTED")?.band).toBe("syntax");
+    expect(getDiagnosticSpec("E_PROGRAM_PROCEDURE_CONTROL_ARG_EXPECTED")?.band).toBe("syntax");
     expect(getDiagnosticSpec("E_PROGRAM_UNEXPECTED_TRAILING_TOKEN")?.band).toBe("syntax");
     expect(getDiagnosticSpec("E_PROGRAM_META_FIELD_REQUIRED")?.band).toBe("type");
     expect(getDiagnosticSpec("E_PROGRAM_REFERENCE_TARGET_KIND")?.band).toBe("reference");
     expect(getDiagnosticSpec("E_MODULE_ENTRY_NOT_FOUND")?.band).toBe("reference");
+    expect(getDiagnosticSpec("E_UNRESOLVED_PROGRAM_REFERENCE")?.band).toBe("reference");
   });
 
   it("classifies procedure control diagnostics", () => {
+    expect(getDiagnosticSpec("E_PROCEDURE_CONTROL_CONTEXT")?.band).toBe("procedure");
     expect(getDiagnosticSpec("E_PROCEDURE_CONTROL_CONDITION")?.band).toBe("procedure");
     expect(getDiagnosticSpec("E_PROCEDURE_CONTROL_PARALLEL")?.band).toBe("procedure");
     expect(getDiagnosticSpec("E_PROCEDURE_CONTROL_ID_DUPLICATE")?.band).toBe("procedure");
@@ -152,7 +156,11 @@ describe("v0.3 diagnostics registry", () => {
     expect(getDiagnosticSpec("E_RUNTIME_UNKNOWN_STEP")?.band).toBe("runtime");
     expect(getDiagnosticSpec("E_RUNTIME_STEP_NOT_READY")?.band).toBe("runtime");
     expect(getDiagnosticSpec("E_RUNTIME_CONTROL_DYNAMIC")?.band).toBe("runtime");
+    expect(getDiagnosticSpec("E_RUNTIME_CONTROL")?.band).toBe("runtime");
+    expect(getDiagnosticSpec("E_RUNTIME_INVENTORY")?.band).toBe("runtime");
+    expect(getDiagnosticSpec("E_RUNTIME_ADAPTER")?.band).toBe("runtime");
     expect(getDiagnosticSpec("E_RUNTIME_RESOURCE_CONFLICT")?.band).toBe("runtime");
+    expect(getDiagnosticSpec("W_RUNTIME_SAFETY")?.band).toBe("runtime");
     expect(getLegacyDiagnosticBand("E_RUNTIME_UNKNOWN_STEP")).toBe("runtime");
     expect(getLegacyDiagnosticBand("E_RUNTIME_STEP_NOT_READY")).toBe("runtime");
   });
