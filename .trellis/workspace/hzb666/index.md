@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-5.md`
-- **Total Sessions**: 199
+- **Total Sessions**: 200
 - **Last Active**: 2026-06-04
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-5.md` | ~381 | Active |
+| `journal-5.md` | ~415 | Active |
 | `journal-4.md` | ~1977 | Archived |
 | `journal-3.md` | ~1994 | Archived |
 | `journal-2.md` | ~1956 | Archived |
@@ -33,6 +33,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 200 | 2026-06-04 | Language core deepening phase 5 module build graph | `9bff828` | `develop` |
 | 199 | 2026-06-04 | Language core deepening phase 4 step effect contracts | `8c3d762` | `develop` |
 | 198 | 2026-06-04 | Language core deepening phase 3 procedure state effects | `894309c` | `develop` |
 | 197 | 2026-06-04 | Language core deepening phase 2 condition types | `8d54749` | `develop` |
