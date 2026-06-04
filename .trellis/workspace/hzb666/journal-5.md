@@ -583,3 +583,37 @@ Extended chemd graph into a workspace-aware reaction graph superset with cross-d
 ### Next Steps
 
 - None - task complete
+
+
+## Session 206: Graph trace documentation
+
+**Date**: 2026-06-04
+**Task**: Graph trace documentation
+**Package**: web
+**Branch**: `develop`
+
+### Summary
+
+Updated README and bilingual app docs for workspace graph export, chemd graph --trace, runtime trace event nodes, and state snapshot graph edges.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `edb4453` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
