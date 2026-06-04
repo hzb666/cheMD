@@ -2,7 +2,7 @@
   "id": "06-04-language-core-deepening",
   "name": "06-04-language-core-deepening",
   "title": "Deepen Chemd language core without device control",
-  "description": "Deepen Chemd as a chemistry experiment programming language without IDE, training export, or device-control scope. Current phase adds module build graph and affected-module output.",
+  "description": "Deepen Chemd as a chemistry experiment programming language without IDE, training export, or device-control scope. Current phase adds diagnostic explanation APIs and CLI explain output.",
   "status": "in_progress",
   "dev_type": null,
   "scope": null,
@@ -36,9 +36,11 @@
     "packages/typechecker/src/program-procedure-control-conditions.ts",
     "packages/typechecker/src/program-procedure-controls.ts",
     "packages/compiler/src/module-linker.ts",
+    "packages/diagnostics/src/explain.ts",
+    "packages/diagnostics/src/index.ts",
     "packages/cli/src/language-commands.ts",
     "packages/cli/src/cli.ts"
   ],
-  "notes": "Phase 1 adds ProgramConditionExpression, parses procedure control condition strings into AST, validates references from AST, and carries structured conditions into canonical procedure controls. Phase 2 adds conservative condition expression type checking for incompatible runtime/reference/literal/quantity comparisons and registers E_CONDITION_TYPE_MISMATCH. Phase 3 adds procedure state/effect contracts, state tags, state violations, and E_PROCEDURE_STATE_INVALID diagnostics for missing mixture, post-quench active-reaction operations, and missing biphasic state. Phase 4 adds standard effects for every step family and carries effects into source-level canonical and typed procedure steps. Phase 5 adds module buildGraph, reverse dependents, changedModules input, and affectedModules output through linker and CLI link reports. Verification: step-ontology/typechecker/compiler/cli/diagnostics tests, docs coverage tests, and package typechecks passed. pnpm lint remains blocked by ESLint 10.4.0 scopeManager.addGlobals toolchain failure.",
+  "notes": "Phase 1 adds ProgramConditionExpression, parses procedure control condition strings into AST, validates references from AST, and carries structured conditions into canonical procedure controls. Phase 2 adds conservative condition expression type checking for incompatible runtime/reference/literal/quantity comparisons and registers E_CONDITION_TYPE_MISMATCH. Phase 3 adds procedure state/effect contracts, state tags, state violations, and E_PROCEDURE_STATE_INVALID diagnostics for missing mixture, post-quench active-reaction operations, and missing biphasic state. Phase 4 adds standard effects for every step family and carries effects into source-level canonical and typed procedure steps. Phase 5 adds module buildGraph, reverse dependents, changedModules input, and affectedModules output through linker and CLI link reports. Phase 6 adds explainDiagnosticCode, compiler re-export, and CLI explain text/JSON output for known and unknown diagnostic codes. Verification: step-ontology/typechecker/compiler/cli/diagnostics tests, docs coverage tests, and package typechecks passed. pnpm lint remains blocked by ESLint 10.4.0 scopeManager.addGlobals toolchain failure.",
   "meta": {}
 }

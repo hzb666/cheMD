@@ -1,4 +1,8 @@
 import { parseChemdProgram } from "@chemd/parser";
+export {
+  explainDiagnosticCode,
+  type DiagnosticExplanation
+} from "@chemd/diagnostics";
 import type {
   ChemdProgramDocument,
   ReactionRouteContext,

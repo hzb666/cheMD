@@ -1264,6 +1264,30 @@ procedure proc_main {
     expect(result.stderr).toBe("");
   });
 
+  it("explains diagnostic codes through the CLI", async () => {
+    const jsonResult = await runInTempDir([
+      "explain",
+      "E_PROCEDURE_STATE_INVALID",
+      "--format",
+      "json"
+    ], {});
+    const payload = JSON.parse(jsonResult.stdout);
+
+    expect(jsonResult.exitCode).toBe(EXIT_OK);
+    expect(payload).toMatchObject({
+      schemaVersion: "chemd-diagnostic-explain/v0.1",
+      explanation: {
+        band: "procedure",
+        code: "E_PROCEDURE_STATE_INVALID",
+        known: true
+      }
+    });
+
+    const textResult = await runInTempDir(["explain", "E_DOES_NOT_EXIST"], {});
+    expect(textResult.exitCode).toBe(EXIT_USAGE);
+    expect(textResult.stdout).toContain("unknown diagnostic code: E_DOES_NOT_EXIST");
+  });
+
   it("summarizes language diagnostic codes in check JSON output", async () => {
     const result = await runInTempDir(["check", "invalid-control.chemd", "--format", "json"], {
       "invalid-control.chemd": `module exp_cli_invalid_control_json

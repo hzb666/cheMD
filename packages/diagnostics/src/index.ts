@@ -1,4 +1,10 @@
 import type { DiagnosticSeverity, SourceRange, SourceSpan } from "@chemd/core";
+import {
+  explainDiagnosticCodeFrom,
+  type DiagnosticExplanation
+} from "./explain";
+
+export type { DiagnosticExplanation } from "./explain";
 
 export type DiagnosticSourceLayer =
   | "frontmatter"
@@ -270,6 +276,10 @@ const createInsertChemdKindQuickFix = (
 export const getDiagnosticSpec = (code: string): DiagnosticSpec | undefined => SPEC_BY_CODE.get(code);
 
 export const getLegacyDiagnosticBand = (code: string): DiagnosticBand | undefined => LEGACY_BANDS[code];
+
+export const explainDiagnosticCode = (code: string): DiagnosticExplanation => {
+  return explainDiagnosticCodeFrom(code, getDiagnosticSpec(code), getLegacyDiagnosticBand(code));
+};
 
 export const buildQuickFixes = (diagnostic: V03Diagnostic): QuickFix[] => {
   if (isQuantityDiagnostic(diagnostic)) {

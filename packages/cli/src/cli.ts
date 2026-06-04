@@ -79,6 +79,7 @@ const usage = [
   "  chemd templates [template-id] [--json]",
   "  chemd new <template-id> --out <file> [--dry-run]",
   "  chemd import prose <file> [--out <file>] [--format text|json] [--dry-run]",
+  "  chemd explain <diagnostic-code> [--format text|json]",
   "  chemd graph <file...> [--format text|json]",
   "  chemd link <file...> [--entry <module|path>] [--changed <module|path>] [--format text|json]",
   "  chemd incremental <file...> [--format text|json]",
@@ -134,6 +135,7 @@ type CreateNodeRxnProcedureActionProvider =
 type LinkChemdModules = typeof import("@chemd/compiler")["linkChemdModules"];
 type CreateChemdIncrementalCompiler =
   typeof import("@chemd/compiler")["createChemdIncrementalCompiler"];
+type ExplainDiagnosticCode = typeof import("@chemd/compiler")["explainDiagnosticCode"];
 
 interface CliWriter {
   write(chunk: string): unknown;
@@ -148,6 +150,7 @@ type CliCommand =
   | { type: "templates"; json: boolean; templateId?: string }
   | { type: "new"; dryRun: boolean; outPath: string; templateId: string }
   | { type: "import-prose"; dryRun: boolean; filePath: string; format: TextFormat; outPath?: string }
+  | { type: "explain"; code: string; format: TextFormat }
   | { type: "graph"; filePaths: string[]; format: TextFormat }
   | { type: "link"; changedModules: string[]; entry?: string; filePaths: string[]; format: TextFormat }
   | { type: "incremental"; filePaths: string[]; format: TextFormat }
@@ -360,6 +363,7 @@ interface CliCompilerServices {
   buildTrainingGraphIndex: BuildTrainingGraphIndex;
   compileChemd: CompileChemd;
   createChemdIncrementalCompiler: CreateChemdIncrementalCompiler;
+  explainDiagnosticCode: ExplainDiagnosticCode;
   linkChemdModules: LinkChemdModules;
   runChemdAgentLoop: RunChemdAgentLoop;
   runChemdRepairLoop: RunChemdRepairLoop;
@@ -738,6 +742,20 @@ const parseImportArgs = (args: string[]): CliCommand => {
   };
 };
 
+const parseExplainArgs = (args: string[]): CliCommand => {
+  const { format = "text", positional } = parseCommandArgs(args, FORMAT_OPTION);
+
+  if (positional.length !== 1) {
+    throw new CliUsageError("Explain requires exactly one diagnostic code.");
+  }
+
+  return {
+    type: "explain",
+    code: positional[0],
+    format: asTextFormat(format, "Explain")
+  };
+};
+
 const parseDiffArgs = (args: string[]): CliCommand => {
   const { format = "text", positional } = parseCommandArgs(args, FORMAT_OPTION);
 
@@ -907,6 +925,10 @@ export const parseChemdCliArgs = (argv: string[]): CliCommand => {
     return parseImportArgs(rest);
   }
 
+  if (command === "explain") {
+    return parseExplainArgs(rest);
+  }
+
   if (command === "graph") {
     return parseGraphArgs(rest);
   }
@@ -942,6 +964,7 @@ const loadCompiler = async (): Promise<{
   buildTrainingGraphIndexFromUnderstandings: BuildTrainingGraphIndex;
   compileChemd: CompileChemd;
   createChemdIncrementalCompiler: CreateChemdIncrementalCompiler;
+  explainDiagnosticCode: ExplainDiagnosticCode;
   linkChemdModules: LinkChemdModules;
   runChemdAgentLoop: RunChemdAgentLoop;
   runChemdRepairLoop: RunChemdRepairLoop;
@@ -2102,6 +2125,29 @@ const agentLoopFile = async (
     : EXIT_VALIDATION_FAILED;
 };
 
+const explainDiagnostic = (
+  command: Extract<CliCommand, { type: "explain" }>,
+  explainDiagnosticCode: ExplainDiagnosticCode,
+  options: NormalizedRunOptions
+): number => {
+  const explanation = explainDiagnosticCode(command.code);
+  const report = {
+    schemaVersion: "chemd-diagnostic-explain/v0.1",
+    explanation
+  };
+  const text = [
+    explanation.known
+      ? `${explanation.code}: ${explanation.title ?? "Diagnostic"}`
+      : `unknown diagnostic code: ${explanation.code}`,
+    ...(explanation.band ? [`  band: ${explanation.band}`] : []),
+    ...(explanation.defaultSeverity ? [`  severity: ${explanation.defaultSeverity}`] : []),
+    `  source: ${explanation.source}`
+  ].join("\n");
+
+  options.stdout.write(`${command.format === "json" ? JSON.stringify(report, null, 2) : text}\n`);
+  return explanation.known ? EXIT_OK : EXIT_USAGE;
+};
+
 const normalizeRunOptions = (options: RunOptions): NormalizedRunOptions => ({
   buildTrainingGraphIndex: options.buildTrainingGraphIndex,
   compileChemd: options.compileChemd,
@@ -2148,6 +2194,10 @@ const executeCommand = (
     return loadImporterProse().then((importer) =>
       importProseFile(command, importer, options)
     );
+  }
+
+  if (command.type === "explain") {
+    return Promise.resolve(explainDiagnostic(command, services.explainDiagnosticCode, options));
   }
 
   if (command.type === "graph") {
@@ -2213,6 +2263,7 @@ export const runChemdCli = async (
       ?? compiler.buildTrainingGraphIndexFromUnderstandings;
     const createChemdIncrementalCompiler = options.createChemdIncrementalCompiler
       ?? compiler.createChemdIncrementalCompiler;
+    const explainDiagnosticCode = compiler.explainDiagnosticCode;
     const linkChemdModules = options.linkChemdModules ?? compiler.linkChemdModules;
     const runChemdAgentLoop = options.runChemdAgentLoop ?? compiler.runChemdAgentLoop;
     const runChemdRepairLoop = options.runChemdRepairLoop ?? compiler.runChemdRepairLoop;
@@ -2221,6 +2272,7 @@ export const runChemdCli = async (
       buildTrainingGraphIndex,
       compileChemd,
       createChemdIncrementalCompiler,
+      explainDiagnosticCode,
       linkChemdModules,
       runChemdAgentLoop,
       runChemdRepairLoop

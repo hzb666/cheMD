@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildQuickFixes,
   createV03Diagnostic,
+  explainDiagnosticCode,
   getDiagnosticSpec,
   getLegacyDiagnosticBand
 } from "../src/index";
@@ -138,6 +139,22 @@ describe("v0.3 diagnostics registry", () => {
     expect(getDiagnosticSpec("W_PROCEDURE_CONTROL_DYNAMIC")).toMatchObject({
       band: "procedure",
       defaultSeverity: "warning"
+    });
+  });
+
+  it("explains registered and unknown diagnostic codes", () => {
+    expect(explainDiagnosticCode("E_PROCEDURE_STATE_INVALID")).toMatchObject({
+      band: "procedure",
+      code: "E_PROCEDURE_STATE_INVALID",
+      defaultSeverity: "error",
+      known: true,
+      source: "registry",
+      title: "Invalid procedure state transition"
+    });
+    expect(explainDiagnosticCode("E_DOES_NOT_EXIST")).toMatchObject({
+      code: "E_DOES_NOT_EXIST",
+      known: false,
+      source: "unknown"
     });
   });
 
