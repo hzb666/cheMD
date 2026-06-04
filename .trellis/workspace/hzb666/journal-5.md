@@ -209,3 +209,37 @@ Added source-level procedure controls, strengthened meta/external reference vali
 ### Next Steps
 
 - None - task complete
+
+
+## Session 195: Close language CLI gap closure
+
+**Date**: 2026-06-04
+**Task**: Close language CLI gap closure
+**Package**: cli
+**Branch**: `develop`
+
+### Summary
+
+Closed language-layer and CLI parity gaps, split new CLI logic, and verified non-doc language tests.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4693aa1` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
