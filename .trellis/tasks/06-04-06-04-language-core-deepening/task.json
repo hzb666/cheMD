@@ -26,9 +26,10 @@
     "packages/parser/src/program/parse-condition-expression.ts",
     "packages/parser/src/program/parse-procedure.ts",
     "packages/step-ontology/src/types.ts",
+    "packages/typechecker/src/program-procedure-condition-types.ts",
     "packages/typechecker/src/program-procedure-control-conditions.ts",
     "packages/typechecker/src/program-procedure-controls.ts"
   ],
-  "notes": "Phase 1 adds ProgramConditionExpression, parses procedure control condition strings into AST, validates references from AST, and carries structured conditions into canonical procedure controls. Verification: parser/typechecker/compiler/cli tests, docs coverage tests, and package typechecks passed. pnpm lint remains blocked by ESLint 10.4.0 scopeManager.addGlobals toolchain failure.",
+  "notes": "Phase 1 adds ProgramConditionExpression, parses procedure control condition strings into AST, validates references from AST, and carries structured conditions into canonical procedure controls. Phase 2 adds conservative condition expression type checking for incompatible runtime/reference/literal/quantity comparisons and registers E_CONDITION_TYPE_MISMATCH. Verification: parser/typechecker/compiler/cli/diagnostics tests, docs coverage tests, and package typechecks passed. pnpm lint remains blocked by ESLint 10.4.0 scopeManager.addGlobals toolchain failure.",
   "meta": {}
 }

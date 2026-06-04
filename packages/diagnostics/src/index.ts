@@ -122,6 +122,7 @@ const DIAGNOSTIC_SPECS: DiagnosticSpec[] = [
   { code: "E_PROCEDURE_CONTROL_COUNT", band: "procedure", title: "Invalid procedure repeat count", defaultSeverity: "error" },
   { code: "E_PROCEDURE_CONTROL_BODY", band: "procedure", title: "Invalid procedure control body", defaultSeverity: "error" },
   { code: "E_PROCEDURE_CONTROL_CONDITION", band: "procedure", title: "Invalid procedure control condition", defaultSeverity: "error" },
+  { code: "E_CONDITION_TYPE_MISMATCH", band: "type", title: "Condition expression type mismatch", defaultSeverity: "error" },
   { code: "E_PROCEDURE_CONTROL_CONTEXT", band: "procedure", title: "Invalid procedure control context", defaultSeverity: "error" },
   { code: "E_PROCEDURE_CONTROL_BRANCH", band: "procedure", title: "Invalid procedure branch", defaultSeverity: "error" },
   { code: "E_PROCEDURE_CONTROL_PARALLEL", band: "procedure", title: "Invalid procedure parallel control", defaultSeverity: "error" },

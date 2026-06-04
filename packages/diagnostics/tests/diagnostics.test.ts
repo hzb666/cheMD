@@ -132,6 +132,7 @@ describe("v0.3 diagnostics registry", () => {
   it("classifies procedure control diagnostics", () => {
     expect(getDiagnosticSpec("E_PROCEDURE_CONTROL_CONTEXT")?.band).toBe("procedure");
     expect(getDiagnosticSpec("E_PROCEDURE_CONTROL_CONDITION")?.band).toBe("procedure");
+    expect(getDiagnosticSpec("E_CONDITION_TYPE_MISMATCH")?.band).toBe("type");
     expect(getDiagnosticSpec("E_PROCEDURE_CONTROL_PARALLEL")?.band).toBe("procedure");
     expect(getDiagnosticSpec("E_PROCEDURE_CONTROL_ID_DUPLICATE")?.band).toBe("procedure");
     expect(getDiagnosticSpec("W_PROCEDURE_CONTROL_DYNAMIC")).toMatchObject({

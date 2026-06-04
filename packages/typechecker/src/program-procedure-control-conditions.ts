@@ -7,6 +7,7 @@ import type {
 import type { V03Diagnostic } from "@chemd/diagnostics";
 
 import { valueToText, type ProgramSymbolTable } from "./program-utils";
+import { validateConditionExpressionTypes } from "./program-procedure-condition-types";
 import { createProgramControlDiagnostic } from "./program-procedure-diagnostics";
 import type { ExternalTargetIndex } from "./types";
 
@@ -67,7 +68,8 @@ export const validateControlCondition = (
 
   return [
     ...diagnostics,
-    ...validateRuntimeNamespaces(procedure, control, condition, conditionWithoutRefs)
+    ...validateRuntimeNamespaces(procedure, control, condition, conditionWithoutRefs),
+    ...validateConditionExpressionTypes(procedure, control)
   ];
 };
 

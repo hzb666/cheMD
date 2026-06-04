@@ -314,6 +314,44 @@ procedure proc_1 {
     }));
   });
 
+  it("diagnoses condition expression type mismatches", () => {
+    const result = typecheckProgram(parse(`module exp_condition_types
+
+meta {
+  id: "exp-condition-types"
+  title: "Condition types"
+  date: "2026-06-04"
+}
+
+procedure proc_1 {
+  abort_if hot_mass(condition: "sensor.temperature > 80 mg")
+  abort_if hot_text(condition: "sensor.temperature > hot")
+  abort_if hot_ok(condition: "sensor.temperature > 80 C")
+}
+`));
+
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: "E_CONDITION_TYPE_MISMATCH",
+        facts: expect.objectContaining({
+          left_type: "quantity:temperature",
+          right_type: "quantity:mass"
+        })
+      }),
+      expect.objectContaining({
+        code: "E_CONDITION_TYPE_MISMATCH",
+        facts: expect.objectContaining({
+          left_type: "quantity:temperature",
+          right_type: "string"
+        })
+      })
+    ]));
+    expect(result.diagnostics).not.toContainEqual(expect.objectContaining({
+      code: "E_CONDITION_TYPE_MISMATCH",
+      facts: expect.objectContaining({ right_type: "quantity:temperature" })
+    }));
+  });
+
   it("preserves external document references in source-level step IO", () => {
     const result = typecheckProgram(parse(`module exp_external_step_io
 
