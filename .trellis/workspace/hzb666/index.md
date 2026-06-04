@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-5.md`
-- **Total Sessions**: 195
+- **Total Sessions**: 196
 - **Last Active**: 2026-06-04
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-5.md` | ~245 | Active |
+| `journal-5.md` | ~279 | Active |
 | `journal-4.md` | ~1977 | Archived |
 | `journal-3.md` | ~1994 | Archived |
 | `journal-2.md` | ~1956 | Archived |
@@ -33,6 +33,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 196 | 2026-06-04 | Language core deepening phase 1 condition AST | `cee9073` | `develop` |
 | 195 | 2026-06-04 | Close language CLI gap closure | `4693aa1` | `develop` |
 | 194 | 2026-06-04 | Complete language and CLI parity | `9912f83` | `develop` |
 | 193 | 2026-06-04 | Fix language layer correctness gaps | `79c3065` | `develop` |
