@@ -16,7 +16,7 @@ Chemd 导出是对一个已编译文档或一组已编译文档的投影。它�
 | Training full | `pnpm chemd export file.chemd --format training-full` | 可审计 source、semantic、learning 和 quality layers |
 | Training understanding | `pnpm chemd export file.chemd --format training` | sanitized training 与 reasoning projection |
 | RAG | `pnpm chemd export file.chemd --format rag` | retrieval chunks 和搜索 metadata |
-| Graph index | `pnpm chemd graph *.chemd --format json` | 跨文档 graph、reaction clusters 和 reaction map 输入 |
+| Graph index | `pnpm chemd graph *.chemd --trace trace.json --format json` | 工作区 graph、reaction clusters、reaction map 输入和 runtime trace/state edges |
 
 ## 共享编译输出
 
@@ -36,7 +36,7 @@ result.typedSemanticGraph;
 result.stepGraph;
 ```
 
-CLI `export` 命令暴露 `json`、`lnf`、`rag`、`training` 和 `training-full`。HTML 与 DOCX 是 compile/app 输出，不是当前 CLI `export --format` 值。`graph` 命令会编译多个文件，并从它们的 training understanding 构建 graph index。
+CLI `export` 命令暴露 `json`、`lnf`、`rag`、`training` 和 `training-full`。HTML 与 DOCX 是 compile/app 输出，不是当前 CLI `export --format` 值。`graph` 命令会编译并链接多个文件，再从它们的 training understanding 构建 workspace-aware graph index。`--trace` 会把 runtime trace events 和 state snapshots 附加到同一个 graph 输出。
 
 Field value schema metadata 是 compiler/tooling contract，不是单独的导出格式。它用于对齐编辑器补全和 typed quantity 字段，同时保持现有 JSON、semantic graph、training、RAG、HTML、DOCX 和 LNF 输出形状不变。
 

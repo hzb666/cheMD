@@ -205,6 +205,7 @@ pnpm chemd validate file.chemd
 pnpm chemd export file.chemd --format training-full
 pnpm chemd diff before.chemd after.chemd --format json
 pnpm chemd graph reports/*.chemd --format json
+pnpm chemd graph reports/*.chemd --trace trace.json --format json
 pnpm chemd repair draft.chemd --format text
 pnpm chemd agent-loop draft.chemd --format json --max-iterations 3
 ```
@@ -215,18 +216,19 @@ Important commands:
 | --- | --- |
 | `validate <file...>` | Compile documents and report diagnostics |
 | `export <file> --format json\|lnf\|rag\|training\|training-full` | Emit structured compiler/exporter payloads |
-| `graph <file...> [--format text\|json]` | Build a repo-level graph index and reaction clusters from compiled understandings |
+| `graph <file...> [--trace trace.json] [--format text\|json]` | Build a workspace graph index, reaction clusters, and optional runtime trace/state edges |
 | `diff <old-file> <new-file> [--format text\|json]` | Compare semantic changes between two records |
 | `changed [--base <ref>] [--format text\|json]` | Validate changed files from git status/diff context |
 | `repair <file> [--write]` | Apply compiler-guided safe fixes |
 | `agent-loop <file> [--write]` | Run iterative diagnosis and repair for generated Chemd |
 
-The `graph` command does not require graph-specific source syntax. It compiles
-one or more experiment reports, then derives document nodes, entity/relation
-edges, route clusters, family/procedure clusters, condition clusters,
-campaign trajectories, and semantic reaction-similarity edges. When computed
-chemical fingerprints are not available, the output marks this explicitly
-and keeps semantic similarity distinct from RDKit/Tanimoto similarity.
+The `graph` command compiles one or more experiment reports and links imported
+modules before building graph output. It preserves the training graph index
+shape while adding workspace document imports, cross-document reaction
+references, `prev`/route direction edges, condition screen links, reaction
+template links, procedure controls, runtime symbols, and ordered procedure
+steps. When `--trace` is supplied, runtime events and replay state snapshots
+are added to the same directed graph.
 
 ## Document Language
 
@@ -326,6 +328,12 @@ Inspect a workspace-level reaction graph:
 pnpm chemd graph packages/compiler/fixtures/*.chemd --format json
 ```
 
+Attach runtime trace events to the workspace graph:
+
+```bash
+pnpm chemd graph reports/*.chemd --trace trace.json --format json
+```
+
 Use compiler-guided repair on generated records:
 
 ```bash
@@ -368,14 +376,13 @@ Data export responsibilities:
 | Graph index export | Repo/campaign graph indexing, reaction clustering, and similarity traversal |
 | Full audit export | Inspection, debugging, and traceability |
 
-Graph-index output is intentionally inference-driven. Authors write the
-strong experimental facts that belong in declarations, such as `reactants`,
-`products`, result targets, analysis targets, sample lineage, route edges,
-and condition screens. The exporter derives the graph and clustering
-projection from those facts, so authors can keep reports focused on experiment
-evidence.
-Repo-level graph indexes are built after compiling one or more documents into
-training understandings, using `buildTrainingGraphIndexFromUnderstandings()`.
+Graph-index output is inference-driven. Authors write strong experimental
+facts in declarations: `reactants`, `products`, result targets, analysis
+targets, sample lineage, route edges, procedure controls, and condition
+screens. The graph exporter derives clustering and traversal projections from
+those facts. Workspace graph indexes are built by linking modules, compiling
+each document, and extending the training graph index with workspace and
+runtime overlays.
 
 ## Web Playground
 

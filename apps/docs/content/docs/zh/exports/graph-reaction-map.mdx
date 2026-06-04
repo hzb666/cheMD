@@ -3,10 +3,16 @@ title: 图谱与 Reaction Map 导出
 description: Knowledge graph、material flow、graph index、reaction map 和 reaction intelligence 输出。
 ---
 
-图谱输出来自 training understanding。它们描述单文档内部关系和跨文档关系。
+图谱输出来自 training understanding 和 workspace linker 结果。它们描述单文档内部关系、跨 import 文档关系，以及可选 runtime trace input 中的执行关系。
 
 ```bash
 pnpm chemd graph ./experiments/*.chemd --format json
+```
+
+Runtime trace 可以附加到同一个 graph：
+
+```bash
+pnpm chemd graph ./experiments/*.chemd --trace trace.json --format json
 ```
 
 Text 输出会把 graph-index clusters 标成 semantic source truth。只有当输出里已经
@@ -130,7 +136,7 @@ Observation 不是只能作为块级图谱事实。`observation_to_events` 会�
 
 `chemd graph` 返回 `ChemdTrainingGraphIndexV1`，schema version 为 `chemd-training-graph-index/v0.1`。
 
-它包含：
+它保留已有 training graph 字段：
 
 - `index_scope`
 - `nodes`
@@ -139,6 +145,51 @@ Observation 不是只能作为块级图谱事实。`observation_to_events` 会�
 - `reaction_clusters`
 - `reaction_similarity_edges`
 - `warnings`
+
+Workspace graph 输出会在同一个 `nodes` 和 `edges` 数组中增加稳定节点与边：
+
+- `document_imports_document`
+- `reaction_uses_imported_molecule`
+- `reaction_produces_imported_product`
+- `reaction_instantiates_template`
+- `reaction_has_previous_reaction`
+- `reaction_depends_on_reaction`
+- `reaction_precedes_reaction`
+- `condition_screen_compares_reaction`
+- `condition_screen_uses_standard`
+- `procedure_has_control`
+- `control_reads_runtime_signal`
+
+Runtime trace input 会增加 execution-order 和 replay-state graph facts：
+
+- `runtime_trace_event` nodes
+- `runtime_state_snapshot` nodes
+- `trace_event_precedes_event`
+- `runtime_state_precedes_state`
+- `trace_event_targets_step`
+- `trace_event_targets_control`
+
+Trace JSON 使用下面的形状：
+
+```json
+{
+  "runId": "run-1",
+  "stepIds": ["charge", "heat"],
+  "events": [
+    {
+      "eventId": "evt-1",
+      "runId": "run-1",
+      "timestamp": "2026-06-04T10:00:00.000Z",
+      "type": "step_started",
+      "stepId": "charge",
+      "documentId": "exp-route",
+      "procedureId": "proc_main"
+    }
+  ]
+}
+```
+
+`documentId` 和 `procedureId` 可选。多个文档存在相同 step 或 control ID 时，它们用于限定 event target。
 
 示例：
 

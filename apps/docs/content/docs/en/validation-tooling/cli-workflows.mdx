@@ -118,11 +118,22 @@ pnpm chemd export experiment.chemd --format lnf
 pnpm chemd export experiment.chemd --format training-full
 ```
 
-`graph` compiles multiple programs and builds a training graph index:
+`graph` compiles and links multiple programs, then builds a workspace graph
+index:
 
 ```bash
 pnpm chemd graph screen-a.chemd screen-b.chemd --format json
 ```
+
+Runtime trace events can be merged into the same graph output:
+
+```bash
+pnpm chemd graph screen-a.chemd screen-b.chemd --trace trace.json --format json
+```
+
+The trace file contains a `runId` and an `events` array. Each event includes
+`eventId`, `runId`, `timestamp`, and `type`. Step and control events can include
+`stepId`, `controlId`, `documentId`, and `procedureId`.
 
 `import prose` converts plain procedure prose into program syntax and can write
 the generated source with `--out`:

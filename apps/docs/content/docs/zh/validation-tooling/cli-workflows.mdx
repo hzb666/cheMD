@@ -115,11 +115,19 @@ pnpm chemd export experiment.chemd --format lnf
 pnpm chemd export experiment.chemd --format training-full
 ```
 
-`graph` 编译多个 program 并构建 training graph index：
+`graph` 会编译并链接多个 program，然后构建 workspace graph index：
 
 ```bash
 pnpm chemd graph screen-a.chemd screen-b.chemd --format json
 ```
+
+Runtime trace events 可以合并进同一个 graph 输出：
+
+```bash
+pnpm chemd graph screen-a.chemd screen-b.chemd --trace trace.json --format json
+```
+
+Trace 文件包含 `runId` 和 `events` 数组。每个 event 包含 `eventId`、`runId`、`timestamp` 和 `type`。Step 与 control events 可以包含 `stepId`、`controlId`、`documentId` 和 `procedureId`。
 
 `import prose` 把普通 procedure prose 转成 program syntax，并可通过 `--out`
 写入生成源码：

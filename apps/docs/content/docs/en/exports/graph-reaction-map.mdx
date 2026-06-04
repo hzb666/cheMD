@@ -3,10 +3,18 @@ title: Graph and Reaction Map Exports
 description: Knowledge graph, material flow, graph index, reaction map, and reaction intelligence outputs.
 ---
 
-Graph outputs are built from training understandings. They describe relationships inside one document and across multiple documents.
+Graph outputs are built from training understandings and workspace linker
+results. They describe relationships inside one document, across imported
+documents, and across optional runtime trace input.
 
 ```bash
 pnpm chemd graph ./experiments/*.chemd --format json
+```
+
+Runtime traces can be attached to the same graph:
+
+```bash
+pnpm chemd graph ./experiments/*.chemd --trace trace.json --format json
 ```
 
 Text output labels graph-index clusters as semantic source truth. Computed
@@ -130,7 +138,7 @@ Example:
 
 `chemd graph` returns `ChemdTrainingGraphIndexV1` with schema version `chemd-training-graph-index/v0.1`.
 
-It contains:
+It preserves the existing training graph fields:
 
 - `index_scope`
 - `nodes`
@@ -139,6 +147,53 @@ It contains:
 - `reaction_clusters`
 - `reaction_similarity_edges`
 - `warnings`
+
+Workspace graph output adds stable graph nodes and edges to the same `nodes`
+and `edges` arrays:
+
+- `document_imports_document`
+- `reaction_uses_imported_molecule`
+- `reaction_produces_imported_product`
+- `reaction_instantiates_template`
+- `reaction_has_previous_reaction`
+- `reaction_depends_on_reaction`
+- `reaction_precedes_reaction`
+- `condition_screen_compares_reaction`
+- `condition_screen_uses_standard`
+- `procedure_has_control`
+- `control_reads_runtime_signal`
+
+Runtime trace input adds execution-order and replay-state graph facts:
+
+- `runtime_trace_event` nodes
+- `runtime_state_snapshot` nodes
+- `trace_event_precedes_event`
+- `runtime_state_precedes_state`
+- `trace_event_targets_step`
+- `trace_event_targets_control`
+
+Trace JSON uses this shape:
+
+```json
+{
+  "runId": "run-1",
+  "stepIds": ["charge", "heat"],
+  "events": [
+    {
+      "eventId": "evt-1",
+      "runId": "run-1",
+      "timestamp": "2026-06-04T10:00:00.000Z",
+      "type": "step_started",
+      "stepId": "charge",
+      "documentId": "exp-route",
+      "procedureId": "proc_main"
+    }
+  ]
+}
+```
+
+`documentId` and `procedureId` are optional. They scope event targets when
+multiple documents contain the same step or control ID.
 
 Example:
 

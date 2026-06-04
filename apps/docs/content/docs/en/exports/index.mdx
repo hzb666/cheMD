@@ -16,7 +16,7 @@ Chemd exports are projections of one compiled document or a set of compiled docu
 | Training full | `pnpm chemd export file.chemd --format training-full` | Audit-capable source, semantic, learning, and quality layers |
 | Training understanding | `pnpm chemd export file.chemd --format training` | Sanitized training and reasoning projection |
 | RAG | `pnpm chemd export file.chemd --format rag` | Retrieval chunks and search metadata |
-| Graph index | `pnpm chemd graph *.chemd --format json` | Cross-document graph, reaction clusters, and reaction map input |
+| Graph index | `pnpm chemd graph *.chemd --trace trace.json --format json` | Workspace graph, reaction clusters, reaction map input, and runtime trace/state edges |
 
 ## Shared Compile Outputs
 
@@ -36,7 +36,7 @@ result.typedSemanticGraph;
 result.stepGraph;
 ```
 
-The CLI `export` command exposes `json`, `lnf`, `rag`, `training`, and `training-full`. HTML and DOCX are compile/app outputs rather than current CLI `export --format` values. The `graph` command compiles multiple files and builds a graph index from their training understandings.
+The CLI `export` command exposes `json`, `lnf`, `rag`, `training`, and `training-full`. HTML and DOCX are compile/app outputs rather than current CLI `export --format` values. The `graph` command compiles and links multiple files, then builds a workspace-aware graph index from their training understandings. `--trace` attaches runtime trace events and state snapshots to the same graph output.
 
 Field value schema metadata is a compiler/tooling contract, not a standalone export format. It keeps editor completions and typed quantity fields aligned while preserving the existing JSON, semantic graph, training, RAG, HTML, DOCX, and LNF output shapes.
 
