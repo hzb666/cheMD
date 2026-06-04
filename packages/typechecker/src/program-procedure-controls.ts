@@ -50,6 +50,7 @@ export const buildProgramControl = (
     controlId,
     kind: control.controlKind,
     params: valuesToRecord(control.args),
+    ...(control.condition ? { condition: control.condition } : {}),
     controlPath: [...parentPath, controlId],
     dynamic: DYNAMIC_CONTROL_KINDS.has(control.controlKind),
     source: {

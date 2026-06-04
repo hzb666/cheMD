@@ -368,5 +368,21 @@ procedure proc_control {
         expect.objectContaining({ controlKind: "abort_if", children: [] })
       ]
     });
+    expect(procedure?.kind === "procedure" ? procedure.children[1] : undefined).toMatchObject({
+      kind: "control",
+      controlKind: "until",
+      condition: {
+        kind: "binary",
+        op: "==",
+        left: {
+          kind: "reference",
+          refId: "ana_tlc.status"
+        },
+        right: {
+          kind: "literal",
+          value: "clean"
+        }
+      }
+    });
   });
 });

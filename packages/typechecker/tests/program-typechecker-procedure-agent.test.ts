@@ -151,6 +151,15 @@ procedure proc_1 {
       expect.objectContaining({ controlId: "operator_confirm", kind: "wait", dynamic: true }),
       expect.objectContaining({ controlId: "temp_high", kind: "abort_if", dynamic: true })
     ]));
+    expect(result.stepGraph.controls).toContainEqual(expect.objectContaining({
+      controlId: "until_clear",
+      condition: expect.objectContaining({
+        kind: "binary",
+        op: ">",
+        left: expect.objectContaining({ kind: "runtime_reference", namespace: "sensor", path: "ph" }),
+        right: expect.objectContaining({ kind: "literal", value: 7 })
+      })
+    }));
     expect(result.stepGraph.steps.find((step) => step.stepId === "neutralize")?.controlPath).toEqual([
       "branch_workup",
       "branch_workup.acidic"

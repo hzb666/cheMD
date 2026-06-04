@@ -1,5 +1,6 @@
 import type {
   ChemdImportDeclaration,
+  ProgramConditionExpression,
   ProcedureControlDeclaration,
   ProcedureDeclaration
 } from "@chemd/core";
@@ -31,9 +32,12 @@ export const validateControlCondition = (
   }
 
   const diagnostics: V03Diagnostic[] = [];
-  const hasOperator = /(?:==|!=|<=|>=|<|>|\bexists\b|\bin\b|\bmatches\b|\band\b|\bor\b|\bnot\b)/.test(condition);
-  const isRuntimeBoolean = /^(?:operator|sensor|time|run)\.[A-Za-z0-9_.-]+$/.test(condition.trim());
-  if (!hasOperator && !isRuntimeBoolean) {
+  const hasStructuredExpression = control.condition
+    ? isStructuredCondition(control.condition)
+    : /(?:==|!=|<=|>=|<|>|\bexists\b|\bin\b|\bmatches\b|\band\b|\bor\b|\bnot\b)/.test(condition);
+  const isRuntimeBoolean = control.condition?.kind === "runtime_reference"
+    || /^(?:operator|sensor|time|run)\.[A-Za-z0-9_.-]+$/.test(condition.trim());
+  if (!hasStructuredExpression && !isRuntimeBoolean) {
     diagnostics.push(createProgramControlDiagnostic(
       "E_PROCEDURE_CONTROL_CONDITION",
       "error",
@@ -45,7 +49,9 @@ export const validateControlCondition = (
   }
 
   const conditionWithoutRefs = condition.replace(/@[A-Za-z0-9_.#:-]+/g, "");
-  const refs = Array.from(condition.matchAll(/@([A-Za-z0-9_.#:-]+)/g), (match) => match[1] ?? "");
+  const refs = control.condition
+    ? collectConditionReferences(control.condition)
+    : Array.from(condition.matchAll(/@([A-Za-z0-9_.#:-]+)/g), (match) => match[1] ?? "");
   for (const ref of refs) {
     if (!isKnownConditionReference(ref, symbols, externalTargetIndex, moduleImports)) {
       diagnostics.push(createProgramControlDiagnostic(
@@ -63,6 +69,27 @@ export const validateControlCondition = (
     ...diagnostics,
     ...validateRuntimeNamespaces(procedure, control, condition, conditionWithoutRefs)
   ];
+};
+
+const isStructuredCondition = (
+  expression: ProgramConditionExpression
+): boolean =>
+  expression.kind === "binary" || expression.kind === "unary";
+
+const collectConditionReferences = (
+  expression: ProgramConditionExpression
+): string[] => {
+  if (expression.kind === "reference") return [expression.refId];
+  if (expression.kind === "binary") {
+    return [
+      ...collectConditionReferences(expression.left),
+      ...collectConditionReferences(expression.right)
+    ];
+  }
+  if (expression.kind === "unary") {
+    return collectConditionReferences(expression.argument);
+  }
+  return [];
 };
 
 export const readNumericControlParam = (

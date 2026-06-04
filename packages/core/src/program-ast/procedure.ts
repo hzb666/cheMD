@@ -1,5 +1,6 @@
 import type { SourceMappedNode } from "../ast";
 import type { ChemdDeclarationBase } from "./declarations";
+import type { ProgramConditionExpression } from "./conditions";
 import type { ChemdDocCommentRef } from "./docs";
 import type { ChemdReferenceExpr, ChemdValue } from "./values";
 
@@ -33,6 +34,7 @@ export interface ProcedureControlDeclaration extends SourceMappedNode {
   id?: string;
   controlKind: ProgramProcedureControlKind;
   args: Record<string, ChemdValue>;
+  condition?: ProgramConditionExpression;
   children: ProcedureStatement[];
   docs?: ChemdDocCommentRef[];
 }

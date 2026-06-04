@@ -19,6 +19,7 @@ import {
   valueAsReferenceList,
   valueAsStringList
 } from "./parse-declarations";
+import { parseConditionExpression } from "./parse-condition-expression";
 
 export const parseProcedureDeclaration = (
   cursor: ProgramParserCursor,
@@ -119,6 +120,7 @@ const parseProcedureControl = (
   const controlKind = tokenValue(start) as ProgramProcedureControlKind;
   const id = readOptionalControlId(cursor);
   const parsedArgs = parseProcedureControlArgs(cursor);
+  const condition = conditionExpressionFromArgs(parsedArgs.args);
   const parsedBody = tokenValue(cursor.peek()) === "{"
     ? parseProcedureControlBody(cursor, context, declarationId)
     : undefined;
@@ -130,6 +132,7 @@ const parseProcedureControl = (
     ...(controlId ? { id: controlId } : {}),
     controlKind,
     args: parsedArgs.args,
+    ...(condition ? { condition } : {}),
     children: parsedBody?.children ?? [],
     docs: context.addDocs(docs, {
       kind: "procedure_step",
@@ -138,6 +141,15 @@ const parseProcedureControl = (
     }),
     sourceSpan: cursor.sourceSpanFrom(start, parsedBody?.endToken ?? parsedArgs.endToken ?? id ?? start)
   };
+};
+
+const conditionExpressionFromArgs = (
+  args: Record<string, ChemdValue>
+) => {
+  const condition = args.condition;
+  return condition?.type === "string"
+    ? parseConditionExpression(condition.value, condition.sourceSpan)
+    : undefined;
 };
 
 const readOptionalControlId = (
