@@ -21,6 +21,7 @@ import {
   validateUntilControl
 } from "./program-procedure-control-shapes";
 import { createProgramControlDiagnostic } from "./program-procedure-diagnostics";
+import { validateProgramProcedureState } from "./program-procedure-state";
 import { valuesToRecord } from "./program-procedure-values";
 import {
   validateDependencyCycles,
@@ -82,7 +83,8 @@ export const validateProgramProcedure = (
   ...validateDependencyRefs(steps, controls.map((control) => control.controlId)),
   ...validateProgramControlIds(declaration, controls),
   ...validateProgramStepControlIdCollisions(declaration, steps, controls),
-  ...validateDependencyCycles(steps)
+  ...validateDependencyCycles(steps),
+  ...validateProgramProcedureState(declaration, steps)
 ];
 
 export const validateProgramControlShape = (

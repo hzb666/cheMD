@@ -38,6 +38,11 @@ describe("procedure state model", () => {
       "filtered",
       "concentrated"
     ]));
+    expect(state.finalState.stateTags).toEqual(expect.arrayContaining([
+      "mixture_present",
+      "quenched"
+    ]));
+    expect(state.violations).toEqual([]);
     expect(state.warnings).toEqual([]);
   });
 
@@ -63,5 +68,56 @@ describe("procedure state model", () => {
       })
     ]);
     expect(state.snapshots[0].warnings).toHaveLength(1);
+  });
+
+  it("records invalid procedure state transitions", () => {
+    const steps: CanonicalStepNode[] = [
+      {
+        family: "heat",
+        loweringConfidence: 1,
+        params: { temperature: "80 C" },
+        source: { rawText: "heat", sourceNodeType: "procedure" },
+        stepId: "heat-first"
+      },
+      {
+        family: "charge",
+        loweringConfidence: 1,
+        params: { materials: "substrate" },
+        source: { rawText: "charge", sourceNodeType: "procedure" },
+        stepId: "charge"
+      },
+      {
+        family: "quench",
+        loweringConfidence: 1,
+        params: { materials: "H2O" },
+        source: { rawText: "quench", sourceNodeType: "procedure" },
+        stepId: "quench"
+      },
+      {
+        family: "heat",
+        loweringConfidence: 1,
+        params: { duration: "5 min" },
+        source: { rawText: "heat", sourceNodeType: "procedure" },
+        stepId: "heat-after-quench"
+      },
+      {
+        family: "separate_layers",
+        loweringConfidence: 1,
+        params: {},
+        source: { rawText: "separate", sourceNodeType: "procedure" },
+        stepId: "split"
+      }
+    ];
+
+    const state = buildProcedureState(steps);
+
+    expect(state.violations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "E_STATE_MIXTURE_REQUIRED", stepId: "heat-first" }),
+      expect.objectContaining({ code: "E_STATE_ACTIVE_REACTION_REQUIRED", stepId: "heat-after-quench" }),
+      expect.objectContaining({ code: "E_STATE_BIPHASIC_REQUIRED", stepId: "split" })
+    ]));
+    expect(state.snapshots[3].violations).toEqual([
+      expect.objectContaining({ code: "E_STATE_ACTIVE_REACTION_REQUIRED" })
+    ]);
   });
 });

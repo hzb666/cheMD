@@ -245,7 +245,7 @@ reaction rxn_main {
 }
 
 procedure proc_main for @rxn_main {
-  step s_heat = heat(temperature: 80 C, duration: 30 min)
+  step s_heat = heat(inputs: [@rxn_main], temperature: 80 C, duration: 30 min)
 }
 `;
 
@@ -1553,7 +1553,7 @@ reaction rxn_main {
 }
 
 procedure proc_main for @rxn_main {
-  step hold = hold(duration: 5 min)
+  step hold = hold(inputs: [@rxn_main], duration: 5 min)
 }
 `;
     const after = before.replace("duration: 5 min", "duration: 10 min");

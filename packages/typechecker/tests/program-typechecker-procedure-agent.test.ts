@@ -352,6 +352,72 @@ procedure proc_1 {
     }));
   });
 
+  it("diagnoses invalid procedure state transitions", () => {
+    const result = typecheckProgram(parse(`module exp_state_invalid
+
+meta {
+  id: "exp-state-invalid"
+  title: "Procedure state invalid"
+  date: "2026-06-04"
+}
+
+procedure proc_1 {
+  step heat_first = heat(temperature: 80 C)
+  step charge = charge(materials: "substrate")
+  step quench = quench(materials: "H2O")
+  step heat_after_quench = heat(duration: 5 min)
+  step split_without_extract = separate_layers()
+}
+`));
+
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: "E_PROCEDURE_STATE_INVALID",
+        facts: expect.objectContaining({
+          step_id: "heat_first",
+          violation_code: "E_STATE_MIXTURE_REQUIRED"
+        })
+      }),
+      expect.objectContaining({
+        code: "E_PROCEDURE_STATE_INVALID",
+        facts: expect.objectContaining({
+          step_id: "heat_after_quench",
+          violation_code: "E_STATE_ACTIVE_REACTION_REQUIRED"
+        })
+      }),
+      expect.objectContaining({
+        code: "E_PROCEDURE_STATE_INVALID",
+        facts: expect.objectContaining({
+          step_id: "split_without_extract",
+          violation_code: "E_STATE_BIPHASIC_REQUIRED"
+        })
+      })
+    ]));
+  });
+
+  it("accepts valid procedure state transitions", () => {
+    const result = typecheckProgram(parse(`module exp_state_valid
+
+meta {
+  id: "exp-state-valid"
+  title: "Procedure state valid"
+  date: "2026-06-04"
+}
+
+procedure proc_1 {
+  step charge = charge(materials: "substrate")
+  step heat = heat(temperature: 80 C)
+  step quench = quench(materials: "H2O")
+  step extract = extract(solvent: "EtOAc")
+  step split = separate_layers()
+}
+`));
+
+    expect(result.diagnostics).not.toContainEqual(expect.objectContaining({
+      code: "E_PROCEDURE_STATE_INVALID"
+    }));
+  });
+
   it("preserves external document references in source-level step IO", () => {
     const result = typecheckProgram(parse(`module exp_external_step_io
 

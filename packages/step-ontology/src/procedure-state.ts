@@ -1,4 +1,18 @@
 import type { CanonicalStepNode, StepFamily } from "./types";
+import {
+  applyProcedureStateEffects,
+  createInitialProcedureStateFlags,
+  readProcedureStateTags,
+  validateProcedureStatePreconditions,
+  type ProcedureStateFlags,
+  type ProcedureStateViolation
+} from "./procedure-state-contracts";
+
+export type {
+  ProcedureStateFlags,
+  ProcedureStateViolation,
+  ProcedureStateViolationCode
+} from "./procedure-state-contracts";
 
 export type ProcedureStateWarningCode =
   | "W_STATE_UNSUPPORTED_STEP"
@@ -30,18 +44,22 @@ export interface ProcedureStateSnapshot {
   phaseMarkers: string[];
   sourceStepFamily: StepFamily;
   sourceStepId: string;
+  stateTags: string[];
+  violations: ProcedureStateViolation[];
   warnings: ProcedureStateWarning[];
 }
 
 export interface ProcedureStateResult {
   finalState: ProcedureStateSnapshot;
   snapshots: ProcedureStateSnapshot[];
+  violations: ProcedureStateViolation[];
   warnings: ProcedureStateWarning[];
 }
 
 interface MutableProcedureState {
   conditions: ProcedureStateConditions;
   contents: ProcedureStateMaterial[];
+  flags: ProcedureStateFlags;
   phaseMarkers: string[];
 }
 
@@ -168,6 +186,8 @@ const createSnapshot = (
   phaseMarkers: [...state.phaseMarkers],
   sourceStepFamily: step.family,
   sourceStepId: step.stepId,
+  stateTags: readProcedureStateTags(state.flags),
+  violations: [],
   warnings
 });
 
@@ -178,18 +198,27 @@ const createInitialSnapshot = (): ProcedureStateSnapshot => ({
   phaseMarkers: [],
   sourceStepFamily: "observe",
   sourceStepId: "initial",
+  stateTags: [],
+  violations: [],
   warnings: []
 });
 
 export const buildProcedureState = (
   steps: readonly CanonicalStepNode[]
 ): ProcedureStateResult => {
-  const state: MutableProcedureState = { conditions: {}, contents: [], phaseMarkers: [] };
+  const state: MutableProcedureState = {
+    conditions: {},
+    contents: [],
+    flags: createInitialProcedureStateFlags(),
+    phaseMarkers: []
+  };
   const snapshots: ProcedureStateSnapshot[] = [];
+  const violations: ProcedureStateViolation[] = [];
   const warnings: ProcedureStateWarning[] = [];
 
   steps.forEach((step, index) => {
     const stepWarnings: ProcedureStateWarning[] = [];
+    const stepViolations = validateProcedureStatePreconditions(state.flags, step);
     if (!hasStateTransition(step)) {
       stepWarnings.push(createWarning(
         step,
@@ -201,14 +230,20 @@ export const buildProcedureState = (
     applyMaterialStep(state, step);
     applyConditionStep(state, step);
     applyPhaseStep(state, step);
+    state.flags = applyProcedureStateEffects(state.flags, step);
 
+    violations.push(...stepViolations);
     warnings.push(...stepWarnings);
-    snapshots.push(createSnapshot(state, step, index + 1, stepWarnings));
+    snapshots.push({
+      ...createSnapshot(state, step, index + 1, stepWarnings),
+      violations: stepViolations
+    });
   });
 
   return {
     finalState: snapshots.at(-1) ?? createInitialSnapshot(),
     snapshots,
+    violations,
     warnings
   };
 };

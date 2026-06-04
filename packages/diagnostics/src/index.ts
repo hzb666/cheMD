@@ -127,6 +127,7 @@ const DIAGNOSTIC_SPECS: DiagnosticSpec[] = [
   { code: "E_PROCEDURE_CONTROL_BRANCH", band: "procedure", title: "Invalid procedure branch", defaultSeverity: "error" },
   { code: "E_PROCEDURE_CONTROL_PARALLEL", band: "procedure", title: "Invalid procedure parallel control", defaultSeverity: "error" },
   { code: "E_PROCEDURE_CONTROL_ID_DUPLICATE", band: "procedure", title: "Duplicate procedure control id", defaultSeverity: "error" },
+  { code: "E_PROCEDURE_STATE_INVALID", band: "procedure", title: "Invalid procedure state transition", defaultSeverity: "error" },
   { code: "W_PROCEDURE_CONTROL_DYNAMIC", band: "procedure", title: "Dynamic procedure control review", defaultSeverity: "warning" },
   { code: "E_TYPED_REFERENCE_MISMATCH", band: "reference", title: "Typed reference mismatch", defaultSeverity: "error" },
   { code: "E_PROGRAM_META_FIELD_REQUIRED", band: "type", title: "Missing meta field", defaultSeverity: "error" },
