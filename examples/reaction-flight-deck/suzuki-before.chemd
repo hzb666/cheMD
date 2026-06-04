@@ -1,0 +1,43 @@
+module demo_suzuki_diff_before
+
+meta {
+  id: "demo-suzuki-diff"
+  title: "Suzuki diff before"
+  date: "2026-06-04"
+  primary_reaction: @rxn_suzuki_pyrimidine
+  primary_result: @res_suzuki
+}
+
+molecule mol_5_bromopyrimidine {
+  name: "5-bromopyrimidine"
+}
+
+molecule mol_3_furanylboronic_acid {
+  name: "3-furanylboronic acid"
+}
+
+molecule mol_product {
+  name: "5-(furan-3-yl)pyrimidine"
+}
+
+reaction rxn_suzuki_pyrimidine {
+  reactants: [@mol_5_bromopyrimidine, @mol_3_furanylboronic_acid]
+  products: [@mol_product]
+  catalyst: "NiCl2(PCy3)2"
+  solvent: "tert-amyl alcohol"
+  temperature: 100 C
+  time: 12 h
+}
+
+result res_suzuki for @rxn_suzuki_pyrimidine {
+  product: @mol_product
+  status: partial
+  yield: 64%
+  purity: 92%
+}
+
+procedure proc_suzuki for @rxn_suzuki_pyrimidine {
+  step charge = charge(materials: "heteroaryl partners")
+  wait operator_gate(condition: "operator.confirmed")
+  step heat = heat(temperature: 100 C, duration: 12 h, depends_on: [charge, operator_gate])
+}

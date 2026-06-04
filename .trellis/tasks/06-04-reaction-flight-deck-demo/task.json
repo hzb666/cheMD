@@ -1,0 +1,33 @@
+{
+  "id": "reaction-flight-deck-demo",
+  "name": "reaction-flight-deck-demo",
+  "title": "Add reaction flight deck demo",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "compiler",
+  "priority": "P1",
+  "creator": "hzb666",
+  "assignee": "hzb666",
+  "createdAt": "2026-06-04",
+  "completedAt": "2026-06-04",
+  "branch": null,
+  "base_branch": "develop",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "examples/reaction-flight-deck/shared-reagents.chemd",
+    "examples/reaction-flight-deck/suzuki-pyrimidine.chemd",
+    "examples/reaction-flight-deck/amidation-benzylamide.chemd",
+    "examples/reaction-flight-deck/screen-comparison.chemd",
+    "examples/reaction-flight-deck/broken-demo.chemd",
+    "examples/reaction-flight-deck/README.md"
+  ],
+  "notes": "Add a runnable language-layer demo for linked reaction routes, diagnostics, preflight, incremental compile, and semantic diff.",
+  "meta": {}
+}

@@ -1,0 +1,66 @@
+module demo_shared_reagents
+
+meta {
+  id: "demo-shared-reagents"
+  title: "Reaction Flight Deck shared reagents"
+  date: "2026-06-04"
+  primary_molecule: @mol_5_bromopyrimidine
+}
+
+molecule mol_5_bromopyrimidine {
+  name: "5-bromopyrimidine"
+  role: electrophile
+}
+
+molecule mol_3_furanylboronic_acid {
+  name: "3-furanylboronic acid"
+  role: boronic_acid
+}
+
+molecule mol_5_furan_3_yl_pyrimidine {
+  name: "5-(furan-3-yl)pyrimidine"
+  role: product
+}
+
+molecule mol_k3po4 {
+  name: "potassium phosphate"
+  formula: "K3PO4"
+  role: base
+}
+
+molecule mol_tamyl_alcohol {
+  name: "tert-amyl alcohol"
+  role: solvent
+}
+
+material material_ni_pcy3 {
+  supplier: "demo inventory"
+  lot: "Ni-PCy3-demo"
+  notes: "NiCl2(PCy3)2 precatalyst"
+}
+
+molecule mol_4_phenylbutyric_acid {
+  name: "4-phenylbutyric acid"
+  role: carboxylic_acid
+}
+
+molecule mol_benzylamine {
+  name: "benzylamine"
+  role: amine
+}
+
+molecule mol_n_benzyl_4_phenylbutyramide {
+  name: "N-benzyl-4-phenylbutyramide"
+  role: amide_product
+}
+
+molecule mol_boric_acid {
+  name: "boric acid"
+  formula: "H3BO3"
+  role: catalyst
+}
+
+molecule mol_toluene {
+  name: "toluene"
+  role: solvent
+}

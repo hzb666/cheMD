@@ -1,0 +1,44 @@
+module demo_screen_comparison
+
+import demo_suzuki_pyrimidine as suzuki from "./suzuki-pyrimidine.chemd"
+import demo_amidation_benzylamide as amide from "./amidation-benzylamide.chemd"
+
+meta {
+  id: "demo-screen-comparison"
+  title: "Reaction Flight Deck comparison screen"
+  date: "2026-06-04"
+  primary_reaction: @rxn_comparison_anchor
+  primary_result: @res_comparison_anchor
+}
+
+molecule mol_comparison_anchor {
+  name: "linked demo comparison"
+}
+
+reaction rxn_comparison_anchor {
+  name: "Reaction Flight Deck comparison anchor"
+  reactants: ["Suzuki route", "direct amidation route"]
+  products: [@mol_comparison_anchor]
+}
+
+result res_comparison_anchor for @rxn_comparison_anchor {
+  product: @mol_comparison_anchor
+  status: success
+  yield: 100%
+}
+
+condition_screen screen_suzuki_temperature {
+  reaction: @suzuki.rxn_suzuki_pyrimidine
+  standard: @suzuki.rxn_suzuki_pyrimidine
+  factor: [temperature, catalyst, base]
+  outcome: [yield, purity, clean_profile]
+  notes: "Compare heteroaryl Suzuki temperature and catalyst sensitivity."
+}
+
+condition_screen screen_amide_release {
+  reaction: @amide.rxn_amide_benzyl
+  standard: @amide.rxn_amide_benzyl
+  factor: [catalyst, water_removal, duration]
+  outcome: [yield, purity]
+  notes: "Compare direct amidation release criteria."
+}

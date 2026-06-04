@@ -1,0 +1,30 @@
+module demo_broken_reaction_flight_deck
+
+import demo_shared_reagents as shared from "./shared-reagents.chemd"
+
+meta {
+  id: "demo-broken-reaction-flight-deck"
+  title: "Intentional broken Reaction Flight Deck source"
+  date: "2026-06-04"
+  primary_reaction: @rxn_broken_anchor
+  primary_result: @res_bad_reference
+}
+
+reaction rxn_broken_anchor {
+  name: "broken anchor reaction"
+  reactants: ["demo input"]
+  products: ["demo output"]
+}
+
+result res_bad_reference for @shared.mol_boric_acid {
+  status: success
+  yield: 70%
+}
+
+procedure proc_broken for @rxn_broken_anchor {
+  abort_if malformed_condition(condition: "sensor.temperature > [120 C")
+}
+
+agent run repair_missing_status {
+  goal: "demonstrate required agent run status diagnostics"
+}
