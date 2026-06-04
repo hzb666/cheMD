@@ -413,3 +413,37 @@ Closed language-layer and CLI parity gaps, split new CLI logic, and verified non
 ### Next Steps
 
 - None - task complete
+
+
+## Session 201: Language core deepening phase 6 diagnostic explain
+
+**Date**: 2026-06-04
+**Task**: Language core deepening phase 6 diagnostic explain
+**Package**: compiler
+**Branch**: `develop`
+
+### Summary
+
+(Add summary)
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0fe69d8` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
