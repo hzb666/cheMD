@@ -1,28 +1,11 @@
 ---
 title: Program AST Contract
-description: ChemdProgramDocument、declarations、values、doc comments 和迁移边界。
+description: ChemdProgramDocument、declarations、values、doc comments、procedures、agents 和 compiler metadata。
 ---
 
-`chemd-program-ast/v1` 是 program-first rewrite 的 public AST contract。
-下游 packages 应对齐这个形状。
-
-## 移除的 Public Contract
-
-compiler boundary 不再以这些类型作为主 contract：
-
-```ts
-ChemdDocument.children
-MarkdownNode
-StructuredNode
-ChemdNode
-TemplateNode
-UseNode
-ColNode
-syntaxOrigin
-```
-
-frontmatter、`:::chemd`/`:::procedure` fenced blocks、`:::template`/`:::use`
-复用语法，或 `:::col-N` rendered layout nodes 都不会 legacy lowering 到 program AST。
+`chemd-program-ast/v1` 是 `.chemd` program source 的 public AST contract。
+下游 packages 使用这个形状完成 semantic validation、rendering、exports、
+diagnostics、language service data 和 storage。
 
 ## Program Document
 
@@ -105,17 +88,36 @@ export interface ChemdDocComment extends SourceMappedNode {
 }
 ```
 
-Doc references 是 documentation links，不创建 semantic facts。Declaration
-field references 未解析是 error；doc-comment references 未解析是 warning，除非该
-doc 是 `audit_only`。
+Doc references 是 documentation links。Declaration field references 未解析是
+error；doc-comment references 未解析是 warning，除非该 doc 是 `audit_only`。
 
-## Migration Implications
+## Procedure and Agent Declarations
 
-Resolver 必须停止遍历 `document.children`，改为从 module、imports、meta、
-declarations 和 docs 构建 `ProgramSymbolTable`。
+`ProcedureDeclaration` 拥有 source-level procedure statements：
 
-Typechecker 必须用 `collectDeclarations(program.declarations)` 替代
-`collectNodes(document.children)`。
+```ts
+export type ProcedureStatement =
+  | { kind: "step"; id: string; family: string; args: Record<string, ChemdValue> }
+  | { kind: "control"; controlKind: ProcedureControlKind; children: ProcedureStatement[] }
+  | { kind: "doc"; markdown: string };
+```
+
+Procedure steps 会 lower 为 canonical step nodes 和 typed step nodes。Procedure
+controls 会 lower 为 canonical control nodes 和 runtime control states。Step
+parameters 按 step family schema 校验。Control placement 和 condition references
+在 typechecking 阶段校验。
+
+`AgentRunDeclaration` 记录 source-level audit intent：goals、tool calls、
+evidence、patch proposals、decisions 和 timeline data。Patch targets 必须解析到
+program declarations、fields、meta fields 或 doc comments。
+
+## Compiler Integration
+
+Resolver 从 module、imports、meta、declarations 和 docs 构建
+`ProgramSymbolTable`。
+
+Typechecker 从 `program.declarations` 校验 declarations、field values、
+references、procedures、agents 和 graph-level semantics。
 
 Compiler 和 exporters 必须把 `program.schemaVersion`、`program.sourceLanguage`、
 declaration IDs、field source spans 和 doc comment IDs 传递到 typed graph

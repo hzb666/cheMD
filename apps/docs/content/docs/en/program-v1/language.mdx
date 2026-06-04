@@ -1,10 +1,10 @@
 ---
 title: Language Specification
-description: The chemd/program-v1 source syntax and removed legacy syntax.
+description: The chemd/program-v1 source syntax, declarations, references, procedures, and diagnostics.
 ---
 
-`chemd/program-v1` is a breaking-change language contract. It has no parser
-fallback for the legacy Markdown model.
+`chemd/program-v1` is the source language for structured Chemd experiment
+records.
 
 ## Positioning
 
@@ -17,30 +17,28 @@ One `.chemd` file is one module and one program.
   -> compiler facts, rendering inputs, exports, storage records, IDE symbols
 ```
 
-Program declarations are the semantic truth. Molecules, reactions, results,
-procedures, samples, analyses, observations, traces, and agent audit records
-exist only when the source contains declarations for them.
+Program declarations define semantic facts. Molecules, reactions, results,
+procedures, samples, analyses, observations, traces, and agent audit records are
+created from declarations.
 
 Markdown enters the compiler only as documentation:
 
 - `///` line doc comments
 - `/*md ... */` Markdown documentation regions
 
-Documentation can render and feed narrative RAG chunks, but it must not create
-molecule, reaction, result, procedure, or agent facts.
+Documentation can render and feed narrative RAG chunks. Semantic facts come
+from declarations.
 
-## Removed Syntax
+## Source Boundaries
 
-Program v1 removes these syntax surfaces without compatibility lowering:
+The parser reports fatal diagnostics for unsupported source surfaces:
 
-- legacy metadata delimited by `---`
+- metadata delimited by `---`
 - `:::chemd`, `:::procedure`, `:::result`, `:::analysis`, and other fenced blocks
 - `:::template`, `:::use`, and template parameters
 - `:::col-N`, `col:`, and rendered column layout syntax
 - semantic facts inferred from Markdown body text
-- `.chemd.md` compatibility in the core compiler path
-
-Legacy sources must be rewritten into program syntax before they compile.
+- `.chemd.md` compatibility in the compiler path
 
 ## Source Example
 
@@ -102,6 +100,14 @@ result res_var1 for @rxn_var1 {
 procedure proc_var1 for @rxn_var1 {
   step charge = charge(inputs: [@mol_aryl, @mol_boron])
   step heat = heat(temperature: 40 C, duration: 2 h, depends_on: [charge])
+  branch branch_workup {
+    case acidic(condition: "sensor.ph < 7") {
+      step neutralize = add(materials: "base", depends_on: [heat])
+    }
+    default {
+      step hold = hold(duration: 10 min, depends_on: [heat])
+    }
+  }
 }
 
 agent run repair_001 {
@@ -136,6 +142,10 @@ declaration      := molecule_decl | material_decl | batch_decl | reaction_decl
                   | trace_decl | agent_run_decl
 result_decl      := "result" ident ("for" reference)? block
 procedure_decl   := "procedure" ident ("for" reference)? procedure_block
+procedure_stmt   := "step" ident "=" call
+                  | control_kind ident? call_args? procedure_block?
+control_kind     := "repeat" | "until" | "branch" | "case" | "default"
+                  | "parallel" | "path" | "wait" | "abort_if"
 agent_run_decl   := "agent" "run" ident block
 block            := "{" block_item* "}"
 field            := ident ":" value
@@ -153,21 +163,28 @@ Reference forms:
 - `@external_doc#rxn_step_01` resolves an external document anchor supplied by
   resolver context.
 
+## Procedure Controls
+
+Procedure controls are part of the source language:
+
+- `repeat` repeats a child body using `count`.
+- `until` repeats a child body until a runtime condition succeeds.
+- `branch` contains `case` and `default` controls.
+- `parallel` contains `path` controls.
+- `wait` pauses on a condition.
+- `abort_if` blocks execution when a condition is true.
+
+Step family calls are checked against the step schema. Conditions can reference
+program targets with `@ref` and runtime namespaces such as `sensor.ph`,
+`operator.confirmed`, `time.elapsed`, and `run.status`.
+
 ## Diagnostics
 
-Legacy syntax diagnostics are fatal parser diagnostics. They explain the
-removal and stop compilation; they are not recovery branches.
+Unsupported source surfaces produce fatal parser diagnostics.
 
 | Code | Trigger |
 | --- | --- |
-| `E_LEGACY_FRONTMATTER_REMOVED` | Source starts legacy metadata with `---` |
-| `E_LEGACY_FENCED_BLOCK_REMOVED` | Source contains a legacy `:::` fenced block |
-| `E_LEGACY_TEMPLATE_REMOVED` | Source contains `:::template`, `:::use`, or legacy template parameters |
+| `E_LEGACY_FRONTMATTER_REMOVED` | Source starts metadata with `---` |
+| `E_LEGACY_FENCED_BLOCK_REMOVED` | Source contains a `:::` fenced block |
+| `E_LEGACY_TEMPLATE_REMOVED` | Source contains `:::template`, `:::use`, or template parameters |
 | `E_LEGACY_COLUMN_LAYOUT_REMOVED` | Source contains `:::col-N`, `col:`, or rendered column layout syntax |
-
-## IDE Contract
-
-The language service works over program declarations, not Markdown blocks. It
-must use declaration IDs, field paths, doc comment IDs, procedure step IDs, and
-agent run IDs for outline, hover, completion, diagnostics, source ranges, and
-patch targets. Legacy block snippets must not be offered.

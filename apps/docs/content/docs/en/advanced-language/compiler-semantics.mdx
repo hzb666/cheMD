@@ -1,8 +1,119 @@
 ---
 title: Compiler Semantics and Implementation Logic
-description: Current implementation path from source to AST, resolver, semantic validation, and export data.
+description: Source parsing, reference resolution, typechecking, run planning, incremental compilation, and semantic diff.
 ---
 
-This page now follows the program-first language contract. Use `.chemd` modules, `meta`, declarations, `///` doc comments, and `/*md */` documentation regions for experiment records. Semantic facts come from molecule, reaction, result, analysis, sample, artifact, condition_screen, procedure, trace, observation, and agent run declarations.
+Chemd compiles a program source into a typed experiment model and a set of
+runtime and export projections. The public compiler result keeps the program
+AST, typed semantic graph, step graph, run plan, runtime preflight result, LNF,
+JSON, HTML, DOCX bridge data, diagnosis, authoring assistance, and export
+records together.
 
-See the [program-v1 language specification](/en/docs/program-v1/language).
+## Pipeline
+
+```text
+source
+  -> parseChemdProgram()
+  -> resolveChemd()
+  -> typecheckProgram()
+  -> buildRunPlan()
+  -> preflightRun()
+  -> exports and authoring data
+```
+
+`compileChemdCore(source)` returns the language and runtime core:
+
+```ts
+export interface CompileCoreResult {
+  program: ChemdProgramDocument;
+  diagnostics: ChemdProgramDocument["diagnostics"];
+  typedSemanticGraph: TypedSemanticGraph;
+  stepGraph: StepGraph;
+  runPlan: RunPlan;
+  runtimePreflight: PreflightResult;
+  lnf: ChemdLnf;
+  html: string;
+  json: string;
+  docxBridge: string;
+}
+```
+
+`compileChemd(source)` adds training, RAG, diagnosis, and authoring data.
+
+## Parser and AST
+
+The parser emits `chemd-program-ast/v1`. A program has one module declaration,
+one `meta` declaration, import declarations, semantic declarations, doc
+comments, and diagnostics.
+
+References preserve their raw source and normalized identity:
+
+- local references: `@rxn_main`
+- field references: `@res_main.yield`
+- module references: `@shared_solvents.rxn_shared`
+- external document references: `@route-doc#mol_ext`
+
+## Resolver and Typechecker
+
+The resolver builds a symbol table from module, imports, meta, declarations,
+and docs. It assigns qualified IDs and resolves local, module-qualified,
+alias-based, field, and external document references when context is available.
+
+The typechecker validates declaration schemas, required fields, quantities,
+reaction participants, condition screens, reaction routes, procedure steps,
+procedure controls, agent runs, and references.
+
+Procedure step validation uses the same step family schema used by canonical
+steps. Required step parameters, rejected parameters, and type mismatches
+produce `E_STEP_PARAM_MISSING`, `E_STEP_PARAM_INVALID`, and
+`E_STEP_PARAM_TYPE_MISMATCH`.
+
+Procedure control validation checks structural placement:
+
+- `case` and `default` belong inside `branch`.
+- `path` belongs inside `parallel`.
+- `branch` contains `case` and `default` controls.
+- `parallel` contains `path` controls.
+- `wait` and `abort_if` use conditions without a body.
+- Conditions can reference known program targets with `@ref` syntax.
+
+## Step Graph and Run Plan
+
+Procedure statements produce canonical step nodes, typed step nodes, procedure
+control nodes, and run plan entries. Source-level inputs and outputs keep scoped
+references such as `@route-doc#mol_ext` and `@shared_module.mol_ext`.
+
+The run plan carries normalized step params, dependency edges, capabilities,
+safety tags, confirmation strategy, control states, and runtime diagnostics.
+
+## Incremental Compiler
+
+`createChemdIncrementalCompiler()` provides a process-local cache keyed by
+source hash and compile options hash.
+
+Each compile result includes cache metadata:
+
+```ts
+export type ChemdIncrementalCacheStatus = "cold" | "hit" | "changed";
+```
+
+Cached compile results are cloned before storage and before return. Callers can
+mutate returned objects without changing the cache entry.
+
+## Semantic Diff
+
+Semantic diff compares compiled programs at three levels:
+
+- program AST objects: module, meta, imports, and declarations
+- typed semantic graph nodes
+- run plan steps and controls
+
+Diff output uses schema version `chemd-semantic-diff/v0.1` and reports added,
+removed, and changed objects with normalized field values.
+
+## Diagnostics
+
+Diagnostics keep source layer, node type, node ID, field, source span, message,
+severity, and facts when the compiler can provide them. CLI `check`, `diff`,
+`preflight`, `link`, and `incremental` expose diagnostic counts and diagnostic
+code counts in JSON output.

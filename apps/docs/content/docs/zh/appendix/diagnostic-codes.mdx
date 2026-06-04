@@ -213,7 +213,67 @@ description: Chemd parser、resolver、typechecker、compiler 和 runtime 常见
 | `E_RUNTIME_RESOURCE_CONFLICT` | parallel control 需要资源冲突审查 |
 | `W_RUNTIME_SAFETY` | safety rule 或 safety tag 需要关注 |
 
+## Module、Expression、Program 与 Runtime Details
+
+| 诊断码 | 含义 |
+| --- | --- |
+| `E_DUPLICATE_IMPORT_ALIAS` | 同一 module 中重复使用 import alias |
+| `E_DUPLICATE_IMPORT_MODULE` | imported module name 重复 |
+| `E_MODULE_ENTRY_NOT_FOUND` | 请求的 entry module 无法选择 |
+| `E_MODULE_ID_DUPLICATE` | 多个 modules 共享同一 document 或 module identity |
+| `E_MODULE_IMPORT_CYCLE` | module import graph 成环 |
+| `E_MODULE_IMPORT_NOT_FOUND` | link set 中缺少 imported module source |
+| `E_MODULE_SYMBOL_NOT_FOUND` | imported symbol 不在目标 module 中 |
+| `E_EXPRESSION_DIVISION_BY_ZERO` | derived expression 除以零 |
+| `E_EXPRESSION_DIVISION_DENOMINATOR_TYPE` | derived expression denominator 不是 numeric |
+| `E_EXPRESSION_EXPECTED_NUMERIC` | derived expression 需要 numeric value |
+| `E_EXPRESSION_EXPECTED_SYMBOL` | derived expression 需要 symbol |
+| `E_EXPRESSION_FUNCTION_NOT_ALLOWED` | derived expression 调用了允许集合外的函数 |
+| `E_EXPRESSION_INVALID_NUMBER` | derived expression 包含非法 number |
+| `E_EXPRESSION_INVALID_QUANTITY` | derived expression 包含非法 quantity |
+| `E_EXPRESSION_MISSING_ARGUMENT` | derived expression function call 缺少 argument |
+| `E_EXPRESSION_PERCENT_DENOMINATOR_ZERO` | percent expression denominator 为零 |
+| `E_EXPRESSION_RATIO_DENOMINATOR_ZERO` | ratio expression denominator 为零 |
+| `E_EXPRESSION_REFERENCE_INVALID` | derived expression reference 非法 |
+| `E_EXPRESSION_REFERENCE_UNRESOLVED` | derived expression reference 无法解析 |
+| `E_EXPRESSION_TO_UNIT_TYPE` | unit conversion target 类型错误 |
+| `E_EXPRESSION_TRAILING_TOKEN` | derived expression 末尾存在多余 token |
+| `E_EXPRESSION_UNARY_TYPE` | unary operator 收到错误 value type |
+| `E_EXPRESSION_UNEXPECTED_END` | derived expression 在完整 value 前结束 |
+| `E_EXPRESSION_UNEXPECTED_TOKEN` | derived expression parser 遇到意外 token |
+| `E_EXPRESSION_UNIT_CONVERSION_UNSUPPORTED` | quantity pair 不支持 unit conversion |
+| `E_EXPRESSION_UNIT_MISMATCH` | derived expression 组合了不兼容 units |
+| `E_EXPRESSION_UNKNOWN` | derived expression 出现未分类错误 |
+| `E_EXPRESSION_UNSUPPORTED_TOKEN` | derived expression 包含不支持的 token |
+| `E_PROCEDURE_CONTROL_CONTEXT` | procedure control 出现在非法 parent context 中 |
+| `E_PROGRAM_DECLARATION_ID_EXPECTED` | program declaration 缺少 ID |
+| `E_PROGRAM_FIELD_VALUE_KIND` | program field value 使用了非法 value kind |
+| `E_PROGRAM_IDENTIFIER_PATH_EXPECTED` | parser 需要 identifier path |
+| `E_PROGRAM_IMPORT_ALIAS_EXPECTED` | `as` 后缺少 import alias |
+| `E_PROGRAM_IMPORT_EXPECTED` | parser 需要 import declaration |
+| `E_PROGRAM_IMPORT_FROM_EXPECTED` | import declaration 缺少 `from` |
+| `E_PROGRAM_IMPORT_MODULE_EXPECTED` | import declaration 缺少 module identifier |
+| `E_PROGRAM_IMPORT_SOURCE_EXPECTED` | import declaration 缺少 source string |
+| `E_PROGRAM_META_FIELD_REQUIRED` | program meta 缺少必填字段 |
+| `E_PROGRAM_MODULE_EXPECTED` | source 缺少 module declaration |
+| `E_PROGRAM_MODULE_NAME_EXPECTED` | module declaration 缺少 module name |
+| `E_PROGRAM_PAREN_CLOSE_EXPECTED` | parser 需要 `)` |
+| `E_PROGRAM_PROCEDURE_CONTROL_ARG_EXPECTED` | procedure control argument 结构非法 |
+| `E_PROGRAM_PROCEDURE_CONTROL_ID_EXPECTED` | procedure control 缺少 ID |
+| `E_PROGRAM_RECORD_FIELD_UNKNOWN` | 当前 context 不接受该 record field |
+| `E_PROGRAM_REFERENCE_TARGET_KIND` | program reference target kind 错误 |
+| `E_PROGRAM_TARGET_REFERENCE_EXPECTED` | declaration target 缺少 reference |
+| `E_PROGRAM_UNEXPECTED_TRAILING_TOKEN` | parser 在完整 source unit 后发现多余 token |
+| `E_PROGRAM_UNTERMINATED_TOKEN` | string 或 token 未闭合 |
+| `E_RUNTIME_ADAPTER_MISSING` | runtime context 缺少必需 adapter |
+| `E_RUNTIME_CAPABILITY_MISSING` | runtime context 缺少必需 capability |
+| `E_RUNTIME_CONTROL_DYNAMIC` | dynamic control 需要 runtime decision 或 adapter support |
+| `E_RUNTIME_INVENTORY_EXPIRED` | runtime inventory item 已过期 |
+| `E_RUNTIME_INVENTORY_UNAVAILABLE` | runtime inventory item 不可用 |
+| `E_RUNTIME_SAFETY_CONFIRMATION` | runtime step 需要 manual confirmation |
+| `E_RUNTIME_SAFETY_RULE` | runtime safety rule 命中 plan |
+| `E_RUNTIME_SAFETY_TAG` | runtime step 带有 safety tag |
+
 ## 修复顺序
 
 优先修复 error，再处理 warning。推荐顺序为 frontmatter、块 ID、未知字段、必填字段、引用、模板参数、数量、步骤依赖、路线图。
-

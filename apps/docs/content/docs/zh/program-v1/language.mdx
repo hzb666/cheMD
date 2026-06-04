@@ -1,10 +1,9 @@
 ---
 title: 语言规格
-description: chemd/program-v1 的源码语法和被移除的 legacy 语法。
+description: chemd/program-v1 的源码语法、declarations、references、procedures 和 diagnostics。
 ---
 
-`chemd/program-v1` 是 breaking-change language contract。它不为 legacy
-Markdown 模型保留 parser fallback。
+`chemd/program-v1` 是 Chemd 结构化实验记录的 source language。
 
 ## 定位
 
@@ -17,30 +16,27 @@ Markdown 模型保留 parser fallback。
   -> compiler facts, rendering inputs, exports, storage records, IDE symbols
 ```
 
-Program declarations 是语义事实。Molecules、reactions、results、
+Program declarations 定义语义事实。Molecules、reactions、results、
 procedures、samples、analyses、observations、traces 和 agent audit
-records 只有在源码中存在对应 declaration 时才成立。
+records 都来自 declarations。
 
 Markdown 只作为文档进入编译器：
 
 - `///` 行级 doc comment
 - `/*md ... */` Markdown documentation region
 
-文档可以渲染，也可以进入 narrative RAG chunks，但不能创建 molecule、
-reaction、result、procedure 或 agent facts。
+文档可以渲染，也可以进入 narrative RAG chunks。语义事实来自 declarations。
 
-## 移除的语法
+## Source Boundaries
 
-Program v1 移除以下语法，并且不做兼容 lowering：
+Parser 会为不支持的 source surfaces 产生 fatal diagnostics：
 
-- `---` legacy metadata
+- `---` metadata
 - `:::chemd`、`:::procedure`、`:::result`、`:::analysis` 等 fenced blocks
 - `:::template`、`:::use` 和 template parameters
 - `:::col-N`、`col:` 和 rendered column layout syntax
 - 从 Markdown body text 推断语义事实
-- core compiler path 中的 `.chemd.md` 兼容
-
-Legacy source 必须先改写成 program syntax 才能编译。
+- compiler path 中的 `.chemd.md` 兼容
 
 ## Source Example
 
@@ -87,6 +83,14 @@ result res_var1 for @rxn_var1 {
 procedure proc_var1 for @rxn_var1 {
   step charge = charge(inputs: [@mol_aryl])
   step heat = heat(temperature: 40 C, duration: 2 h, depends_on: [charge])
+  branch branch_workup {
+    case acidic(condition: "sensor.ph < 7") {
+      step neutralize = add(materials: "base", depends_on: [heat])
+    }
+    default {
+      step hold = hold(duration: 10 min, depends_on: [heat])
+    }
+  }
 }
 
 agent run repair_001 {
@@ -121,6 +125,10 @@ declaration      := molecule_decl | material_decl | batch_decl | reaction_decl
                   | trace_decl | agent_run_decl
 result_decl      := "result" ident ("for" reference)? block
 procedure_decl   := "procedure" ident ("for" reference)? procedure_block
+procedure_stmt   := "step" ident "=" call
+                  | control_kind ident? call_args? procedure_block?
+control_kind     := "repeat" | "until" | "branch" | "case" | "default"
+                  | "parallel" | "path" | "wait" | "abort_if"
 agent_run_decl   := "agent" "run" ident block
 reference        := "@" reference_target ("." ident)?
 reference_target := ident | ident "." ident | ident "#" ident
@@ -133,21 +141,28 @@ Reference forms：
 - `@module_name.rxn_var1` 解析为 module-qualified declaration。
 - `@external_doc#rxn_step_01` 解析为 resolver context 提供的外部文档 anchor。
 
+## Procedure Controls
+
+Procedure controls 是 source language 的一部分：
+
+- `repeat` 使用 `count` 重复子 body。
+- `until` 重复子 body，直到 runtime condition 成立。
+- `branch` 包含 `case` 和 `default` controls。
+- `parallel` 包含 `path` controls。
+- `wait` 根据 condition 暂停。
+- `abort_if` 在 condition 成立时阻断执行。
+
+Step family calls 会按 step schema 校验。Conditions 可以用 `@ref` 引用
+program targets，也可以使用 `sensor.ph`、`operator.confirmed`、`time.elapsed`
+和 `run.status` 等 runtime namespaces。
+
 ## Diagnostics
 
-Legacy syntax diagnostics 是 fatal parser diagnostics。它们说明移除原因并终止编译，
-不是 recovery branches。
+不支持的 source surfaces 会产生 fatal parser diagnostics。
 
 | Code | Trigger |
 | --- | --- |
-| `E_LEGACY_FRONTMATTER_REMOVED` | Source starts legacy metadata with `---` |
-| `E_LEGACY_FENCED_BLOCK_REMOVED` | Source contains a legacy `:::` fenced block |
-| `E_LEGACY_TEMPLATE_REMOVED` | Source contains `:::template`, `:::use`, or legacy template parameters |
+| `E_LEGACY_FRONTMATTER_REMOVED` | Source starts metadata with `---` |
+| `E_LEGACY_FENCED_BLOCK_REMOVED` | Source contains a `:::` fenced block |
+| `E_LEGACY_TEMPLATE_REMOVED` | Source contains `:::template`, `:::use`, or template parameters |
 | `E_LEGACY_COLUMN_LAYOUT_REMOVED` | Source contains `:::col-N`, `col:`, or rendered column layout syntax |
-
-## IDE Contract
-
-Language service 基于 program declarations 工作，而不是 Markdown blocks。Outline、
-hover、completion、diagnostics、source ranges 和 patch targets 必须使用
-declaration IDs、field paths、doc comment IDs、procedure step IDs 和 agent run IDs。
-Legacy block snippets 不应再出现在 completion 中。

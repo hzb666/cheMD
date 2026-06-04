@@ -1,8 +1,117 @@
 ---
 title: 编译语义与实现逻辑
-description: 从源码到 AST、resolver、语义校验和导出数据的当前实现路径。
+description: Source parsing、reference resolution、typechecking、run planning、incremental compilation 和 semantic diff。
 ---
 
-本文已切换到 program-first 语言契约。请使用 `.chemd` module、`meta`、declaration、`///` doc comment 和 `/*md */` documentation region 描述实验记录。语义事实来自 molecule、reaction、result、analysis、sample、artifact、condition_screen、procedure、trace、observation 和 agent run declarations。
+Chemd 把 program source 编译为 typed experiment model，以及 runtime 和 export
+projections。Public compiler result 同时保留 program AST、typed semantic
+graph、step graph、run plan、runtime preflight result、LNF、JSON、HTML、DOCX
+bridge data、diagnosis、authoring assistance 和 export records。
 
-参见 [program-v1 语言规格](/zh/docs/program-v1/language)。
+## Pipeline
+
+```text
+source
+  -> parseChemdProgram()
+  -> resolveChemd()
+  -> typecheckProgram()
+  -> buildRunPlan()
+  -> preflightRun()
+  -> exports and authoring data
+```
+
+`compileChemdCore(source)` 返回语言和 runtime core：
+
+```ts
+export interface CompileCoreResult {
+  program: ChemdProgramDocument;
+  diagnostics: ChemdProgramDocument["diagnostics"];
+  typedSemanticGraph: TypedSemanticGraph;
+  stepGraph: StepGraph;
+  runPlan: RunPlan;
+  runtimePreflight: PreflightResult;
+  lnf: ChemdLnf;
+  html: string;
+  json: string;
+  docxBridge: string;
+}
+```
+
+`compileChemd(source)` 继续添加 training、RAG、diagnosis 和 authoring data。
+
+## Parser and AST
+
+Parser 输出 `chemd-program-ast/v1`。一个 program 包含一个 module declaration、
+一个 `meta` declaration、import declarations、semantic declarations、doc
+comments 和 diagnostics。
+
+References 会保留 raw source 和 normalized identity：
+
+- local references：`@rxn_main`
+- field references：`@res_main.yield`
+- module references：`@shared_solvents.rxn_shared`
+- external document references：`@route-doc#mol_ext`
+
+## Resolver and Typechecker
+
+Resolver 从 module、imports、meta、declarations 和 docs 构建 symbol table。它
+分配 qualified IDs，并在有 context 时解析 local、module-qualified、alias-based、
+field 和 external document references。
+
+Typechecker 校验 declaration schemas、required fields、quantities、reaction
+participants、condition screens、reaction routes、procedure steps、procedure
+controls、agent runs 和 references。
+
+Procedure step validation 使用 canonical steps 共用的 step family schema。
+必填 step parameters、被拒绝的 parameters 和类型不匹配会产生
+`E_STEP_PARAM_MISSING`、`E_STEP_PARAM_INVALID` 和
+`E_STEP_PARAM_TYPE_MISMATCH`。
+
+Procedure control validation 校验结构位置：
+
+- `case` 和 `default` 属于 `branch`。
+- `path` 属于 `parallel`。
+- `branch` 包含 `case` 和 `default` controls。
+- `parallel` 包含 `path` controls。
+- `wait` 和 `abort_if` 使用 condition，不带 body。
+- Conditions 可以使用 `@ref` 语法引用已知 program targets。
+
+## Step Graph and Run Plan
+
+Procedure statements 生成 canonical step nodes、typed step nodes、procedure
+control nodes 和 run plan entries。Source-level inputs 和 outputs 保留
+`@route-doc#mol_ext`、`@shared_module.mol_ext` 这样的 scoped references。
+
+Run plan 携带 normalized step params、dependency edges、capabilities、safety
+tags、confirmation strategy、control states 和 runtime diagnostics。
+
+## Incremental Compiler
+
+`createChemdIncrementalCompiler()` 提供进程内 cache，cache key 来自 source
+hash 和 compile options hash。
+
+每次编译结果包含 cache metadata：
+
+```ts
+export type ChemdIncrementalCacheStatus = "cold" | "hit" | "changed";
+```
+
+Cached compile results 在进入 cache 前和返回给调用方前都会复制。调用方修改返回
+对象不会改变 cache entry。
+
+## Semantic Diff
+
+Semantic diff 在三层比较已编译 program：
+
+- program AST objects：module、meta、imports 和 declarations
+- typed semantic graph nodes
+- run plan steps 和 controls
+
+Diff output 使用 schema version `chemd-semantic-diff/v0.1`，以 normalized field
+values 报告 added、removed 和 changed objects。
+
+## Diagnostics
+
+Diagnostics 在可用时保留 source layer、node type、node ID、field、source span、
+message、severity 和 facts。CLI `check`、`diff`、`preflight`、`link` 和
+`incremental` 的 JSON output 暴露 diagnostic counts 和 diagnostic code counts。

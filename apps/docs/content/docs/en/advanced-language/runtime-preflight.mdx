@@ -1,8 +1,128 @@
 ---
 title: Runtime Preflight
-description: How Chemd runtime-lab turns compiled steps and controls into run plans, preflight issues, and manual or adapter gates.
+description: Run plans, preflight issues, state snapshots, and runtime diagnostic mapping.
 ---
 
-This page now follows the program-first language contract. Use `.chemd` modules, `meta`, declarations, `///` doc comments, and `/*md */` documentation regions for experiment records. Semantic facts come from molecule, reaction, result, analysis, sample, artifact, condition_screen, procedure, trace, observation, and agent run declarations.
+Runtime preflight evaluates a compiled procedure before execution. It consumes
+the compiler run plan and a runtime context, then returns blocking status,
+issues, and diagnostics.
 
-See the [program-v1 language specification](/en/docs/program-v1/language).
+## Run Plan
+
+The compiler builds a run plan from the typed graph and step graph:
+
+```ts
+export interface RunPlan {
+  planId: string;
+  documentId: string;
+  status: "planned";
+  steps: RuntimeStep[];
+  controls: RuntimeControl[];
+  controlStates: RuntimeControlState[];
+  diagnostics: V03Diagnostic[];
+}
+```
+
+`RuntimeStep` contains the canonical step ID, order, family, normalized params,
+dependency list, required capabilities, safety tags, confirmation strategy,
+inputs, outputs, artifacts, and source metadata.
+
+`RuntimeControl` represents procedure controls such as `repeat`, `until`,
+`branch`, `case`, `default`, `parallel`, `path`, `wait`, and `abort_if`. Dynamic
+controls are marked for runtime review.
+
+## Runtime Context
+
+Preflight accepts a context with execution mode and lab capabilities:
+
+```ts
+export interface RuntimeContext {
+  capabilities: CapabilityType[];
+  mode?: "dry-run" | "human-run" | "robot-run" | "replay-run";
+  adapters?: RuntimeAdapterSnapshot[];
+  devices?: DeviceCapabilitySnapshot[];
+  environment?: RuntimeEnvironmentSnapshot;
+  inventory?: InventorySnapshot;
+  safetyRules?: SafetyRule[];
+}
+```
+
+`robot-run` applies the strictest checks. Missing adapters, dynamic controls,
+hazardous safety tags, and unresolved parallel resource conflicts can block the
+run.
+
+## Issue Families
+
+Preflight issues keep a concrete runtime issue code in `issue.code`.
+
+| Issue family | Example issue codes | Diagnostic code |
+| --- | --- | --- |
+| Capability | `E_RUNTIME_CAPABILITY_MISSING` | `E605` |
+| Unknown step | `E_RUNTIME_UNKNOWN_STEP` | `E_RUNTIME_UNKNOWN_STEP` |
+| Device range | `E_RUNTIME_DEVICE_RANGE` | `E_RUNTIME_DEVICE_RANGE` |
+| Inventory | `E_RUNTIME_INVENTORY_UNAVAILABLE`, `E_RUNTIME_INVENTORY_EXPIRED` | `E_RUNTIME_INVENTORY` |
+| Adapter | `E_RUNTIME_ADAPTER_MISSING` | `E_RUNTIME_ADAPTER` |
+| Control | `E_RUNTIME_CONTROL_DYNAMIC` | `E_RUNTIME_CONTROL` |
+| Resource conflict | `E_RUNTIME_RESOURCE_CONFLICT` | `E_RUNTIME_RESOURCE_CONFLICT` |
+| Safety | `E_RUNTIME_SAFETY_CONFIRMATION`, `E_RUNTIME_SAFETY_TAG`, `E_RUNTIME_SAFETY_RULE` | `W_RUNTIME_SAFETY` |
+
+Diagnostics include `facts.runtime_issue_code`, `facts.kind`,
+`facts.step_id`, `facts.control_id`, and `facts.required_action`.
+
+## Procedure Controls
+
+Control validation happens before preflight. A source procedure can use nested
+control blocks:
+
+```md validate
+module exp_runtime_controls
+
+meta {
+  id: "exp-runtime-controls"
+  title: "Runtime controls"
+  date: "2026-06-04"
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
+
+reaction rxn_main {
+  reactants: [substrate]
+  products: [product]
+}
+
+result res_main for @rxn_main {
+  product: product
+  status: success
+  yield: 70%
+}
+
+procedure proc_main for @rxn_main {
+  branch branch_decision {
+    case acidic(condition: "sensor.ph < 7") {
+      step neutralize = add(materials: "base")
+    }
+    default {
+      step hold = hold(duration: 10 min)
+    }
+  }
+
+  parallel parallel_workup {
+    path organic {
+      step extract = extract(solvent: "EtOAc", depends_on: [hold])
+    }
+    path aqueous {
+      step wash = wash(solvent: "brine", depends_on: [hold])
+    }
+  }
+}
+```
+
+`branch`, `until`, `wait`, and `abort_if` are dynamic. `parallel` triggers
+resource conflict review. `case` and `default` belong inside `branch`; `path`
+belongs inside `parallel`.
+
+## State Snapshots
+
+Runtime state stacks store immutable snapshots of step states and trace events.
+Restoring a snapshot returns a cloned state. Mutating the returned object does
+not change the stored snapshot or the current state stack entry.

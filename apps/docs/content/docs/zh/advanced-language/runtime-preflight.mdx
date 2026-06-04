@@ -1,8 +1,126 @@
 ---
 title: 运行预检
-description: Chemd runtime-lab 如何把编译后的步骤和控制流转成 run plan、preflight issue、人工确认或 adapter 门禁。
+description: Run plan、preflight issue、state snapshot 和 runtime diagnostic 映射。
 ---
 
-本文已切换到 program-first 语言契约。请使用 `.chemd` module、`meta`、declaration、`///` doc comment 和 `/*md */` documentation region 描述实验记录。语义事实来自 molecule、reaction、result、analysis、sample、artifact、condition_screen、procedure、trace、observation 和 agent run declarations。
+Runtime preflight 在执行前评估已编译 procedure。它接收 compiler run plan 和
+runtime context，返回 blocking status、issues 和 diagnostics。
 
-参见 [program-v1 语言规格](/zh/docs/program-v1/language)。
+## Run Plan
+
+Compiler 从 typed graph 和 step graph 构建 run plan：
+
+```ts
+export interface RunPlan {
+  planId: string;
+  documentId: string;
+  status: "planned";
+  steps: RuntimeStep[];
+  controls: RuntimeControl[];
+  controlStates: RuntimeControlState[];
+  diagnostics: V03Diagnostic[];
+}
+```
+
+`RuntimeStep` 包含 canonical step ID、order、family、normalized params、
+dependency list、required capabilities、safety tags、confirmation strategy、
+inputs、outputs、artifacts 和 source metadata。
+
+`RuntimeControl` 表示 `repeat`、`until`、`branch`、`case`、`default`、
+`parallel`、`path`、`wait` 和 `abort_if` 等 procedure controls。Dynamic
+controls 会进入 runtime review。
+
+## Runtime Context
+
+Preflight 接受带有执行模式和实验室能力的 context：
+
+```ts
+export interface RuntimeContext {
+  capabilities: CapabilityType[];
+  mode?: "dry-run" | "human-run" | "robot-run" | "replay-run";
+  adapters?: RuntimeAdapterSnapshot[];
+  devices?: DeviceCapabilitySnapshot[];
+  environment?: RuntimeEnvironmentSnapshot;
+  inventory?: InventorySnapshot;
+  safetyRules?: SafetyRule[];
+}
+```
+
+`robot-run` 使用最严格检查。缺少 adapter、dynamic control、hazardous safety
+tag，以及未解决的 parallel resource conflict 都可能阻断运行。
+
+## Issue Families
+
+Preflight issue 在 `issue.code` 中保留具体 runtime issue code。
+
+| Issue family | Example issue codes | Diagnostic code |
+| --- | --- | --- |
+| Capability | `E_RUNTIME_CAPABILITY_MISSING` | `E605` |
+| Unknown step | `E_RUNTIME_UNKNOWN_STEP` | `E_RUNTIME_UNKNOWN_STEP` |
+| Device range | `E_RUNTIME_DEVICE_RANGE` | `E_RUNTIME_DEVICE_RANGE` |
+| Inventory | `E_RUNTIME_INVENTORY_UNAVAILABLE`, `E_RUNTIME_INVENTORY_EXPIRED` | `E_RUNTIME_INVENTORY` |
+| Adapter | `E_RUNTIME_ADAPTER_MISSING` | `E_RUNTIME_ADAPTER` |
+| Control | `E_RUNTIME_CONTROL_DYNAMIC` | `E_RUNTIME_CONTROL` |
+| Resource conflict | `E_RUNTIME_RESOURCE_CONFLICT` | `E_RUNTIME_RESOURCE_CONFLICT` |
+| Safety | `E_RUNTIME_SAFETY_CONFIRMATION`, `E_RUNTIME_SAFETY_TAG`, `E_RUNTIME_SAFETY_RULE` | `W_RUNTIME_SAFETY` |
+
+Diagnostics 包含 `facts.runtime_issue_code`、`facts.kind`、
+`facts.step_id`、`facts.control_id` 和 `facts.required_action`。
+
+## Procedure Controls
+
+Control validation 发生在 preflight 之前。Source procedure 支持嵌套 control
+blocks：
+
+```md validate
+module exp_runtime_controls
+
+meta {
+  id: "exp-runtime-controls"
+  title: "Runtime controls"
+  date: "2026-06-04"
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
+
+reaction rxn_main {
+  reactants: [substrate]
+  products: [product]
+}
+
+result res_main for @rxn_main {
+  product: product
+  status: success
+  yield: 70%
+}
+
+procedure proc_main for @rxn_main {
+  branch branch_decision {
+    case acidic(condition: "sensor.ph < 7") {
+      step neutralize = add(materials: "base")
+    }
+    default {
+      step hold = hold(duration: 10 min)
+    }
+  }
+
+  parallel parallel_workup {
+    path organic {
+      step extract = extract(solvent: "EtOAc", depends_on: [hold])
+    }
+    path aqueous {
+      step wash = wash(solvent: "brine", depends_on: [hold])
+    }
+  }
+}
+```
+
+`branch`、`until`、`wait` 和 `abort_if` 是 dynamic controls。`parallel`
+触发 resource conflict review。`case` 和 `default` 属于 `branch`；`path`
+属于 `parallel`。
+
+## State Snapshots
+
+Runtime state stack 保存 step states 和 trace events 的不可变 snapshots。恢复
+snapshot 会返回复制后的 state。修改返回对象不会改变已保存的 snapshot，也不会改变
+当前 state stack entry。

@@ -213,6 +213,67 @@ The following reference lists common diagnostics by source and purpose. Use it t
 | `E_RUNTIME_RESOURCE_CONFLICT` | Parallel control requires resource conflict review |
 | `W_RUNTIME_SAFETY` | Safety rule or safety tag requires attention |
 
+## Module, Expression, Program, and Runtime Details
+
+| Code | Meaning |
+| --- | --- |
+| `E_DUPLICATE_IMPORT_ALIAS` | Import alias is reused in the same module |
+| `E_DUPLICATE_IMPORT_MODULE` | Imported module name is repeated |
+| `E_MODULE_ENTRY_NOT_FOUND` | Requested entry module cannot be selected |
+| `E_MODULE_ID_DUPLICATE` | Multiple modules share the same document or module identity |
+| `E_MODULE_IMPORT_CYCLE` | Module import graph contains a cycle |
+| `E_MODULE_IMPORT_NOT_FOUND` | Imported module source is missing from the link set |
+| `E_MODULE_SYMBOL_NOT_FOUND` | Imported symbol is not exported by the target module |
+| `E_EXPRESSION_DIVISION_BY_ZERO` | Derived expression divides by zero |
+| `E_EXPRESSION_DIVISION_DENOMINATOR_TYPE` | Derived expression denominator is not numeric |
+| `E_EXPRESSION_EXPECTED_NUMERIC` | Derived expression expected a numeric value |
+| `E_EXPRESSION_EXPECTED_SYMBOL` | Derived expression expected a symbol |
+| `E_EXPRESSION_FUNCTION_NOT_ALLOWED` | Derived expression calls a function outside the allowed set |
+| `E_EXPRESSION_INVALID_NUMBER` | Derived expression contains an invalid number |
+| `E_EXPRESSION_INVALID_QUANTITY` | Derived expression contains an invalid quantity |
+| `E_EXPRESSION_MISSING_ARGUMENT` | Derived expression function call is missing an argument |
+| `E_EXPRESSION_PERCENT_DENOMINATOR_ZERO` | Percent expression denominator is zero |
+| `E_EXPRESSION_RATIO_DENOMINATOR_ZERO` | Ratio expression denominator is zero |
+| `E_EXPRESSION_REFERENCE_INVALID` | Derived expression reference is invalid |
+| `E_EXPRESSION_REFERENCE_UNRESOLVED` | Derived expression reference cannot be resolved |
+| `E_EXPRESSION_TO_UNIT_TYPE` | Unit conversion target has the wrong type |
+| `E_EXPRESSION_TRAILING_TOKEN` | Derived expression has trailing tokens |
+| `E_EXPRESSION_UNARY_TYPE` | Unary operator received the wrong value type |
+| `E_EXPRESSION_UNEXPECTED_END` | Derived expression ended before a complete value |
+| `E_EXPRESSION_UNEXPECTED_TOKEN` | Derived expression parser reached an unexpected token |
+| `E_EXPRESSION_UNIT_CONVERSION_UNSUPPORTED` | Unit conversion is unsupported for the quantity pair |
+| `E_EXPRESSION_UNIT_MISMATCH` | Derived expression combines incompatible units |
+| `E_EXPRESSION_UNKNOWN` | Derived expression failed with an uncategorized error |
+| `E_EXPRESSION_UNSUPPORTED_TOKEN` | Derived expression contains an unsupported token |
+| `E_PROCEDURE_CONTROL_CONTEXT` | Procedure control appears outside its valid parent context |
+| `E_PROGRAM_DECLARATION_ID_EXPECTED` | Program declaration is missing an ID |
+| `E_PROGRAM_FIELD_VALUE_KIND` | Program field value uses an invalid value kind |
+| `E_PROGRAM_IDENTIFIER_PATH_EXPECTED` | Parser expected an identifier path |
+| `E_PROGRAM_IMPORT_ALIAS_EXPECTED` | Import alias is missing after `as` |
+| `E_PROGRAM_IMPORT_EXPECTED` | Parser expected an import declaration |
+| `E_PROGRAM_IMPORT_FROM_EXPECTED` | Import declaration is missing `from` |
+| `E_PROGRAM_IMPORT_MODULE_EXPECTED` | Import declaration is missing a module identifier |
+| `E_PROGRAM_IMPORT_SOURCE_EXPECTED` | Import declaration is missing a source string |
+| `E_PROGRAM_META_FIELD_REQUIRED` | Program meta is missing a required field |
+| `E_PROGRAM_MODULE_EXPECTED` | Source is missing a module declaration |
+| `E_PROGRAM_MODULE_NAME_EXPECTED` | Module declaration is missing a module name |
+| `E_PROGRAM_PAREN_CLOSE_EXPECTED` | Parser expected `)` |
+| `E_PROGRAM_PROCEDURE_CONTROL_ARG_EXPECTED` | Procedure control argument is malformed |
+| `E_PROGRAM_PROCEDURE_CONTROL_ID_EXPECTED` | Procedure control is missing an ID |
+| `E_PROGRAM_RECORD_FIELD_UNKNOWN` | Record field is not accepted in that context |
+| `E_PROGRAM_REFERENCE_TARGET_KIND` | Program reference target has the wrong kind |
+| `E_PROGRAM_TARGET_REFERENCE_EXPECTED` | Declaration target is missing a reference |
+| `E_PROGRAM_UNEXPECTED_TRAILING_TOKEN` | Parser found trailing tokens after a complete source unit |
+| `E_PROGRAM_UNTERMINATED_TOKEN` | String or token is unterminated |
+| `E_RUNTIME_ADAPTER_MISSING` | Runtime context lacks a required adapter |
+| `E_RUNTIME_CAPABILITY_MISSING` | Runtime context lacks a required capability |
+| `E_RUNTIME_CONTROL_DYNAMIC` | Dynamic control requires runtime decision or adapter support |
+| `E_RUNTIME_INVENTORY_EXPIRED` | Runtime inventory item is expired |
+| `E_RUNTIME_INVENTORY_UNAVAILABLE` | Runtime inventory item is unavailable |
+| `E_RUNTIME_SAFETY_CONFIRMATION` | Runtime step requires manual confirmation |
+| `E_RUNTIME_SAFETY_RULE` | Runtime safety rule matched the plan |
+| `E_RUNTIME_SAFETY_TAG` | Runtime step carries a safety tag |
+
 ## Fix Order
 
 Fix errors before warnings. A stable order is frontmatter, block IDs, unknown fields, required fields, references, template parameters, quantities, step dependencies, and route graph diagnostics.

@@ -1,29 +1,11 @@
 ---
 title: Program AST Contract
-description: ChemdProgramDocument, declarations, values, doc comments, and migration boundaries.
+description: ChemdProgramDocument, declarations, values, doc comments, procedures, agents, and compiler metadata.
 ---
 
-`chemd-program-ast/v1` is the public AST contract for the program-first
-rewrite. Downstream packages should align to this shape.
-
-## Removed Public Contract
-
-The compiler boundary no longer exposes these as the primary contract:
-
-```ts
-ChemdDocument.children
-MarkdownNode
-StructuredNode
-ChemdNode
-TemplateNode
-UseNode
-ColNode
-syntaxOrigin
-```
-
-There is no legacy lowering path from frontmatter, `:::chemd`/`:::procedure`
-fenced blocks, `:::template`/`:::use` reuse, or `:::col-N` rendered layout nodes
-into program AST.
+`chemd-program-ast/v1` is the public AST contract for `.chemd` program source.
+Downstream packages consume this shape for semantic validation, rendering,
+exports, diagnostics, language service data, and storage.
 
 ## Program Document
 
@@ -133,28 +115,38 @@ export interface ChemdDocComment extends SourceMappedNode {
 }
 ```
 
-Doc references are documentation links. They do not create semantic facts.
-Unresolved declaration field references are errors. Unresolved doc-comment
-references are warnings unless the doc is `audit_only`.
+Doc references are documentation links. Unresolved declaration field references
+are errors. Unresolved doc-comment references are warnings unless the doc is
+`audit_only`.
 
 ## Procedure and Agent Declarations
 
-`ProcedureDeclaration` owns declaration-native procedure statements. It no
-longer lowers from `ProcedureNode.steps`, nested Markdown nodes, or fenced
-blocks.
+`ProcedureDeclaration` owns source-level procedure statements:
+
+```ts
+export type ProcedureStatement =
+  | { kind: "step"; id: string; family: string; args: Record<string, ChemdValue> }
+  | { kind: "control"; controlKind: ProcedureControlKind; children: ProcedureStatement[] }
+  | { kind: "doc"; markdown: string };
+```
+
+Procedure steps lower into canonical step nodes and typed step nodes. Procedure
+controls lower into canonical control nodes and runtime control states. Step
+parameters are checked against the step family schema. Control placement and
+condition references are validated during typechecking.
 
 `AgentRunDeclaration` records source-level audit intent: goals, tool calls,
 evidence, patch proposals, decisions, and timeline data. It maps to runtime
 agent DTOs and storage records, but patch targets must resolve to program
 declarations, fields, meta fields, or doc comments.
 
-## Migration Implications
+## Compiler Integration
 
-Resolver code must stop traversing `document.children`; it builds a
-`ProgramSymbolTable` from module, imports, meta, declarations, and docs.
+Resolver code builds a `ProgramSymbolTable` from module, imports, meta,
+declarations, and docs.
 
-Typechecker code must replace `collectNodes(document.children)` with
-`collectDeclarations(program.declarations)`.
+Typechecker code validates declarations, field values, references, procedures,
+agents, and graph-level semantics from `program.declarations`.
 
 Compiler and exporters must carry `program.schemaVersion`,
 `program.sourceLanguage`, declaration IDs, field source spans, and doc comment

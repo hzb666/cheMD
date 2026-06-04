@@ -1,8 +1,147 @@
 ---
 title: CLI and Validation Workflows
-description: Implementation-level reference for validate, check, preflight, export, graph, diff, changed, fix, and agent-loop.
+description: Validate, check, preflight, module linking, incremental compilation, semantic diff, and repair commands.
 ---
 
-This page now follows the program-first language contract. Use `.chemd` modules, `meta`, declarations, `///` doc comments, and `/*md */` documentation regions for experiment records. Semantic facts come from molecule, reaction, result, analysis, sample, artifact, condition_screen, procedure, trace, observation, and agent run declarations.
+The Chemd CLI runs the same parser, resolver, typechecker, step graph, runtime
+plan, and export pipeline used by the compiler package. Text output is designed
+for terminals. JSON output is designed for tools and CI.
 
-See the [program-v1 language specification](/en/docs/program-v1/language).
+## Exit Codes
+
+| Code | Meaning |
+| --- | --- |
+| `0` | The command completed without blocking errors |
+| `1` | Validation, preflight, linking, or repair reported blocking errors |
+| `2` | CLI usage, option parsing, file access, or command setup failed |
+
+## Validate
+
+`validate` compiles one or more files and prints compiler diagnostics.
+
+```bash
+pnpm chemd validate experiment.chemd
+```
+
+Use `--dry-run` when a workflow needs to record that no file mutation was
+requested.
+
+## Check
+
+`check` accepts files or directories. Directory inputs are scanned for
+`.chemd` files.
+
+```bash
+pnpm chemd check experiments --target validate --format text
+pnpm chemd check experiments --target run-plan --format json
+pnpm chemd check experiments --target training --format json
+pnpm chemd check experiments --target graph --format json
+```
+
+The JSON report uses schema version `chemd-check/v0.1`. Each file includes
+diagnostic counts, code counts, full diagnostics, and a compact program
+summary.
+
+## Runtime Preflight
+
+`preflight` compiles a program, builds its run plan, and evaluates runtime
+issues against a lab context.
+
+```bash
+pnpm chemd preflight experiment.chemd --mode robot-run --context lab.json --format json
+```
+
+Supported modes are `dry-run`, `human-run`, `robot-run`, and `replay-run`.
+The context file may provide capabilities, adapters, device ranges, inventory,
+environment data, and safety rules.
+
+The JSON report uses schema version `chemd-preflight/v0.1`. Runtime issue codes
+are preserved in `preflight.issues`. The diagnostic list also groups issue
+families into stable compiler diagnostics such as `E605`,
+`E_RUNTIME_CONTROL`, `E_RUNTIME_INVENTORY`, `E_RUNTIME_ADAPTER`,
+`E_RUNTIME_RESOURCE_CONFLICT`, and `W_RUNTIME_SAFETY`.
+
+## Module Linking
+
+`link` compiles multiple program modules and resolves imports between them.
+
+```bash
+pnpm chemd link entry.chemd shared.chemd --entry exp_entry --format json
+```
+
+The JSON report uses schema version `chemd-link/v0.1`. It includes the selected
+entry module, linked modules, import graph edges, diagnostics, and each module's
+typed semantic graph. Linked references keep module-qualified IDs such as
+`shared_solvents.rxn_shared`.
+
+## Incremental Compilation
+
+`incremental` compiles files through a process-local compiler cache.
+
+```bash
+pnpm chemd incremental experiment.chemd experiment.chemd --format json
+```
+
+The JSON report uses schema version `chemd-incremental/v0.1`. Each result
+includes cache metadata with `cold`, `hit`, or `changed` status. Returned
+compile results are cloned before they leave the cache.
+
+## Semantic Diff
+
+`diff` compares two compiled programs.
+
+```bash
+pnpm chemd diff before.chemd after.chemd --format json
+```
+
+The JSON report uses schema version `chemd-semantic-diff/v0.1`. The diff covers
+program declarations, imports, meta fields, typed semantic graph nodes, run plan
+steps, and run plan controls.
+
+`changed` applies the same validation and semantic diff to changed `.chemd`
+files discovered through Git.
+
+```bash
+pnpm chemd changed --base main --format text
+```
+
+Added and untracked files are validated and reported as new files. Modified and
+renamed files include semantic diff output when a base version is available.
+
+## Export, Graph, Import, and Repair
+
+`export` emits compiler projections:
+
+```bash
+pnpm chemd export experiment.chemd --format json
+pnpm chemd export experiment.chemd --format lnf
+pnpm chemd export experiment.chemd --format training-full
+```
+
+`graph` compiles multiple programs and builds a training graph index:
+
+```bash
+pnpm chemd graph screen-a.chemd screen-b.chemd --format json
+```
+
+`import prose` converts plain procedure prose into program syntax and can write
+the generated source with `--out`:
+
+```bash
+pnpm chemd import prose procedure.txt --out imported.chemd --format text
+```
+
+`fix` runs deterministic compiler repair suggestions:
+
+```bash
+pnpm chemd fix experiment.chemd --format json --max-iterations 5 --write
+```
+
+`agent-loop` delegates source revision decisions to an external driver command:
+
+```bash
+pnpm chemd agent-loop experiment.chemd --driver node --driver-arg ./driver.mjs --format json
+```
+
+Both repair commands return structured diagnosis data, applied safe fixes, and
+the final source when a non-writing run produces a clean source revision.

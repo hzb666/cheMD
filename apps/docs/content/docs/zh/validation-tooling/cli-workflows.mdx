@@ -1,8 +1,144 @@
 ---
 title: CLI 与验证工作流
-description: validate、check、preflight、export、graph、diff、changed、fix 和 agent-loop 的实现级说明。
+description: validate、check、preflight、module linking、incremental compile、semantic diff 和修复命令。
 ---
 
-本文已切换到 program-first 语言契约。请使用 `.chemd` module、`meta`、declaration、`///` doc comment 和 `/*md */` documentation region 描述实验记录。语义事实来自 molecule、reaction、result、analysis、sample、artifact、condition_screen、procedure、trace、observation 和 agent run declarations。
+Chemd CLI 使用 compiler package 中的同一条 parser、resolver、typechecker、
+step graph、runtime plan 和 export 管线。文本输出适合终端阅读，JSON 输出适合
+工具链和 CI 消费。
 
-参见 [program-v1 语言规格](/zh/docs/program-v1/language)。
+## 退出码
+
+| 退出码 | 含义 |
+| --- | --- |
+| `0` | 命令完成，未报告阻断性错误 |
+| `1` | validation、preflight、linking 或 repair 报告阻断性错误 |
+| `2` | CLI 用法、选项解析、文件访问或命令初始化失败 |
+
+## Validate
+
+`validate` 编译一个或多个文件，并输出 compiler diagnostics。
+
+```bash
+pnpm chemd validate experiment.chemd
+```
+
+需要在流程中记录无文件写入意图时，可以传入 `--dry-run`。
+
+## Check
+
+`check` 接受文件或目录。目录输入会扫描其中的 `.chemd` 文件。
+
+```bash
+pnpm chemd check experiments --target validate --format text
+pnpm chemd check experiments --target run-plan --format json
+pnpm chemd check experiments --target training --format json
+pnpm chemd check experiments --target graph --format json
+```
+
+JSON report 使用 schema version `chemd-check/v0.1`。每个文件包含诊断数量、
+诊断码统计、完整 diagnostics 和简要 program summary。
+
+## Runtime Preflight
+
+`preflight` 编译 program，构建 run plan，并结合 lab context 评估 runtime
+issues。
+
+```bash
+pnpm chemd preflight experiment.chemd --mode robot-run --context lab.json --format json
+```
+
+支持的模式包括 `dry-run`、`human-run`、`robot-run` 和 `replay-run`。Context
+文件可以提供 capabilities、adapters、device ranges、inventory、environment
+data 和 safety rules。
+
+JSON report 使用 schema version `chemd-preflight/v0.1`。Runtime issue codes
+保留在 `preflight.issues` 中。Diagnostics 列表会把 issue family 汇总为稳定
+compiler diagnostics，例如 `E605`、`E_RUNTIME_CONTROL`、
+`E_RUNTIME_INVENTORY`、`E_RUNTIME_ADAPTER`、`E_RUNTIME_RESOURCE_CONFLICT`
+和 `W_RUNTIME_SAFETY`。
+
+## Module Linking
+
+`link` 编译多个 program modules，并解析它们之间的 imports。
+
+```bash
+pnpm chemd link entry.chemd shared.chemd --entry exp_entry --format json
+```
+
+JSON report 使用 schema version `chemd-link/v0.1`。它包含选中的 entry
+module、linked modules、import graph edges、diagnostics，以及每个 module
+的 typed semantic graph。Linked references 保留 `shared_solvents.rxn_shared`
+这样的 module-qualified IDs。
+
+## Incremental Compilation
+
+`incremental` 通过进程内 compiler cache 编译文件。
+
+```bash
+pnpm chemd incremental experiment.chemd experiment.chemd --format json
+```
+
+JSON report 使用 schema version `chemd-incremental/v0.1`。每个 result 包含
+cache metadata，状态为 `cold`、`hit` 或 `changed`。Compile result 离开 cache
+前会复制，调用方修改返回对象不会污染缓存。
+
+## Semantic Diff
+
+`diff` 比较两个已编译 program。
+
+```bash
+pnpm chemd diff before.chemd after.chemd --format json
+```
+
+JSON report 使用 schema version `chemd-semantic-diff/v0.1`。Diff 覆盖 program
+declarations、imports、meta fields、typed semantic graph nodes、run plan steps
+和 run plan controls。
+
+`changed` 对 Git 中发生变化的 `.chemd` 文件执行同一套 validation 和 semantic
+diff。
+
+```bash
+pnpm chemd changed --base main --format text
+```
+
+Added 和 untracked files 会完成 validation 并显示为 new file。修改和重命名文件在存在
+base 版本时包含 semantic diff 输出。
+
+## Export、Graph、Import 和 Repair
+
+`export` 输出 compiler projections：
+
+```bash
+pnpm chemd export experiment.chemd --format json
+pnpm chemd export experiment.chemd --format lnf
+pnpm chemd export experiment.chemd --format training-full
+```
+
+`graph` 编译多个 program 并构建 training graph index：
+
+```bash
+pnpm chemd graph screen-a.chemd screen-b.chemd --format json
+```
+
+`import prose` 把普通 procedure prose 转成 program syntax，并可通过 `--out`
+写入生成源码：
+
+```bash
+pnpm chemd import prose procedure.txt --out imported.chemd --format text
+```
+
+`fix` 运行 deterministic compiler repair suggestions：
+
+```bash
+pnpm chemd fix experiment.chemd --format json --max-iterations 5 --write
+```
+
+`agent-loop` 把 source revision decision 交给外部 driver command：
+
+```bash
+pnpm chemd agent-loop experiment.chemd --driver node --driver-arg ./driver.mjs --format json
+```
+
+两个 repair 命令都会返回结构化 diagnosis data、applied safe fixes，以及未写入
+运行产生 clean source revision 时的 final source。
