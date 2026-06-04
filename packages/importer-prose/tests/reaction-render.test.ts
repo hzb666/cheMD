@@ -59,9 +59,12 @@ const makeImportCandidate = (
       phaseMarkers: [],
       sourceStepFamily: "observe",
       sourceStepId: "initial",
+      stateTags: [],
+      violations: [],
       warnings: []
     },
     snapshots: [],
+    violations: [],
     warnings: []
   },
   reactionCandidates: [reactionCandidate],

@@ -106,7 +106,8 @@ export const applyProcedureStateEffects = (
   const next = { ...flags };
   if (startsOrExtendsMixture(step)) {
     next.mixturePresent = true;
-    if (!next.quenched) next.reactionActive = true;
+    next.quenched = false;
+    next.reactionActive = true;
   }
   if (step.family === "quench") {
     next.mixturePresent = true;

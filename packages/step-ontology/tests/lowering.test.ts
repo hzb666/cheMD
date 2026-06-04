@@ -131,6 +131,23 @@ describe("procedure and observation lowering", () => {
     expect(result.steps[3].params.materials).toBe("tBuOH");
   });
 
+  it("lowers dissolved intermediate clauses as a new charge step", () => {
+    const result = lowerProcedureToSteps({
+      procedureId: "proc-dissolved-intermediate",
+      body: "The residue was purified by flash column chromatography. The crude material was dissolved in THF and cooled to 0 °C."
+    });
+
+    expect(result.steps.map((step) => step.family)).toEqual([
+      "purify",
+      "charge",
+      "cool"
+    ]);
+    expect(result.steps[1].params).toMatchObject({
+      materials: "crude material",
+      solvent: "THF"
+    });
+  });
+
   it("keeps unrecognized action clauses as low-confidence prose", () => {
     const result = lowerProcedureToSteps({
       procedureId: "proc-unmatched-clause",

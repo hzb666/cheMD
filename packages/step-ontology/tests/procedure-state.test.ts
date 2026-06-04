@@ -163,4 +163,46 @@ describe("procedure state model", () => {
       expect.objectContaining({ code: "E_STATE_ACTIVE_REACTION_REQUIRED" })
     ]);
   });
+
+  it("starts a new active reaction after a post-quench material step", () => {
+    const steps: CanonicalStepNode[] = [
+      {
+        family: "charge",
+        loweringConfidence: 1,
+        params: { materials: "substrate" },
+        source: { rawText: "charge", sourceNodeType: "procedure" },
+        stepId: "charge-1"
+      },
+      {
+        family: "quench",
+        loweringConfidence: 1,
+        params: { agent: "H2O" },
+        source: { rawText: "quench", sourceNodeType: "procedure" },
+        stepId: "quench-1"
+      },
+      {
+        family: "charge",
+        loweringConfidence: 1,
+        params: { materials: "intermediate", solvent: "THF" },
+        source: { rawText: "charge", sourceNodeType: "procedure" },
+        stepId: "charge-2"
+      },
+      {
+        family: "cool",
+        loweringConfidence: 1,
+        params: { target_temperature: "0 C" },
+        source: { rawText: "cool", sourceNodeType: "procedure" },
+        stepId: "cool-2"
+      }
+    ];
+
+    const state = buildProcedureState(steps);
+
+    expect(state.violations).toEqual([]);
+    expect(state.finalState.stateTags).toEqual(expect.arrayContaining([
+      "mixture_present",
+      "reaction_active"
+    ]));
+    expect(state.finalState.stateTags).not.toContain("quenched");
+  });
 });

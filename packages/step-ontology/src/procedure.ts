@@ -244,6 +244,14 @@ const getChargeMaterial = (sentence: string): string | undefined => {
   ) || undefined;
 };
 
+const getDissolvedChargeMaterial = (sentence: string): string | undefined => {
+  const match = sentence.match(/^(?:the\s+)?(.+?)\s+(?:was|were|is|are)\s+dissolved\s+in\b/i);
+  return cleanMaterialText(match?.[1]);
+};
+
+const isDissolvedCharge = (sentence: string): boolean =>
+  /\b(?:was|were|is|are)\s+dissolved\s+in\b/i.test(sentence);
+
 const getSolvent = (sentence: string): string | undefined =>
   readTokenAfterAny(sentence, SOLVENT_MARKERS);
 
@@ -338,13 +346,17 @@ const hasColdAtCondition = (sentence: string): boolean =>
 const lowerCharge = (context: SentenceContext): CanonicalStepNode[] => {
   const isInitialCharge = context.sentenceIndex === 0
     && hasAny(context.sentence, INITIAL_CHARGE_PATTERNS);
+  const dissolvedCharge = isDissolvedCharge(context.sentence);
 
-  if (!isInitialCharge) {
+  if (!isInitialCharge && !dissolvedCharge) {
     return [];
   }
 
+  const material = dissolvedCharge
+    ? getDissolvedChargeMaterial(context.sentence)
+    : getChargeMaterial(context.sentence);
   return [createStep(context, "charge", {
-    ...(getChargeMaterial(context.sentence) ? { materials: getChargeMaterial(context.sentence) } : {}),
+    ...(material ? { materials: material } : {}),
     ...(getSolvent(context.sentence) ? { solvent: getSolvent(context.sentence) } : {})
   }, 0.82)];
 };
