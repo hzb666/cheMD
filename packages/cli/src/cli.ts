@@ -54,7 +54,7 @@ const TEMPLATES_OPTIONS = new Set<CliOption>(["json"]);
 const NEW_OPTIONS = new Set<CliOption>(["dry-run", "out"]);
 const IMPORT_OPTIONS = new Set<CliOption>(["dry-run", "format", "out"]);
 const CHANGED_OPTIONS = new Set<CliOption>(["base", "format"]);
-const LINK_OPTIONS = new Set<CliOption>(["entry", "format"]);
+const LINK_OPTIONS = new Set<CliOption>(["changed", "entry", "format"]);
 const INCREMENTAL_OPTIONS = new Set<CliOption>(["format"]);
 const FIX_OPTIONS = new Set<CliOption>(["format", "max-iterations", "write"]);
 const AGENT_LOOP_OPTIONS = new Set<CliOption>([
@@ -80,7 +80,7 @@ const usage = [
   "  chemd new <template-id> --out <file> [--dry-run]",
   "  chemd import prose <file> [--out <file>] [--format text|json] [--dry-run]",
   "  chemd graph <file...> [--format text|json]",
-  "  chemd link <file...> [--entry <module|path>] [--format text|json]",
+  "  chemd link <file...> [--entry <module|path>] [--changed <module|path>] [--format text|json]",
   "  chemd incremental <file...> [--format text|json]",
   "  chemd diff <old-file> <new-file> [--format text|json]",
   "  chemd changed [--base <ref>] [--format text|json]",
@@ -93,6 +93,7 @@ type TextFormat = "text" | "json";
 type CheckTarget = "validate" | "run-plan" | "training" | "graph";
 type CliOption =
   | "base"
+  | "changed"
   | "context"
   | "driver"
   | "driver-arg"
@@ -148,7 +149,7 @@ type CliCommand =
   | { type: "new"; dryRun: boolean; outPath: string; templateId: string }
   | { type: "import-prose"; dryRun: boolean; filePath: string; format: TextFormat; outPath?: string }
   | { type: "graph"; filePaths: string[]; format: TextFormat }
-  | { type: "link"; entry?: string; filePaths: string[]; format: TextFormat }
+  | { type: "link"; changedModules: string[]; entry?: string; filePaths: string[]; format: TextFormat }
   | { type: "incremental"; filePaths: string[]; format: TextFormat }
   | { type: "diff"; beforePath: string; afterPath: string; format: TextFormat }
   | { type: "changed"; base: string; format: TextFormat }
@@ -488,6 +489,7 @@ const assignCommandOption = (
   allowedOptions: ReadonlySet<CliOption>,
   state: {
     base?: string;
+    changedModules: string[];
     context?: string;
     driver?: string;
     driverArgs: string[];
@@ -517,6 +519,9 @@ const assignCommandOption = (
       return;
     case "context":
       state.context = option.value;
+      return;
+    case "changed":
+      state.changedModules.push(option.value ?? "");
       return;
     case "driver":
       state.driver = option.value;
@@ -560,6 +565,7 @@ const parseCommandArgs = (args: string[], allowedOptions: ReadonlySet<CliOption>
   const positional: string[] = [];
   const state: {
     base?: string;
+    changedModules: string[];
     context?: string;
     driver?: string;
     driverArgs: string[];
@@ -574,6 +580,7 @@ const parseCommandArgs = (args: string[], allowedOptions: ReadonlySet<CliOption>
     target?: string;
     write: boolean;
   } = {
+    changedModules: [],
     driverArgs: [],
     dryRun: false,
     json: false,
@@ -600,6 +607,7 @@ const parseCommandArgs = (args: string[], allowedOptions: ReadonlySet<CliOption>
 
   return {
     base: state.base,
+    changedModules: state.changedModules,
     context: state.context,
     driver: state.driver,
     driverArgs: state.driverArgs,
@@ -760,7 +768,12 @@ const parseGraphArgs = (args: string[]): CliCommand => {
 };
 
 const parseLinkArgs = (args: string[]): CliCommand => {
-  const { entry, format = "text", positional } = parseCommandArgs(args, LINK_OPTIONS);
+  const {
+    changedModules,
+    entry,
+    format = "text",
+    positional
+  } = parseCommandArgs(args, LINK_OPTIONS);
 
   if (positional.length === 0) {
     throw new CliUsageError("Link requires at least one file path.");
@@ -768,6 +781,7 @@ const parseLinkArgs = (args: string[]): CliCommand => {
 
   return {
     type: "link",
+    changedModules,
     ...(entry ? { entry } : {}),
     filePaths: positional,
     format: asTextFormat(format, "Link")

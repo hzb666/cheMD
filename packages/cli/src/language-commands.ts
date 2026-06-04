@@ -20,6 +20,7 @@ export interface LanguageCommandOptions {
 }
 
 export interface LinkCommand {
+  changedModules: string[];
   entry?: string;
   filePaths: string[];
   format: "text" | "json";
@@ -75,6 +76,8 @@ interface LinkReport {
     filePath?: string;
     moduleName: string;
   };
+  affectedModules: string[];
+  buildGraph: LinkChemdModulesResult["buildGraph"];
   importGraph: LinkChemdModulesResult["importGraph"];
   modules: LinkModuleReport[];
   totals: DiagnosticCounts;
@@ -112,7 +115,11 @@ export const linkFiles = (
     path: filePath,
     source: options.readSource(filePath, options.cwd)
   }));
-  const result = linkChemdModules(inputs, command.entry ? { entry: command.entry } : {});
+  const linkOptions = {
+    ...(command.entry ? { entry: command.entry } : {}),
+    ...(command.changedModules.length > 0 ? { changedModules: command.changedModules } : {})
+  };
+  const result = linkChemdModules(inputs, linkOptions);
   const report = toLinkReport(result);
   const output = command.format === "json"
     ? JSON.stringify(report, null, 2)
@@ -219,6 +226,8 @@ const uniqueReferenceSummaries = (
 
 const toLinkReport = (result: LinkChemdModulesResult): LinkReport => ({
   schemaVersion: "chemd-link/v0.1",
+  affectedModules: result.affectedModules,
+  buildGraph: result.buildGraph,
   codes: countDiagnosticCodes(result.diagnostics),
   diagnostics: result.diagnostics,
   entry: {
@@ -237,6 +246,7 @@ const formatLinkText = (report: LinkReport): string => {
     `  entry: ${report.entry.moduleName} (${report.entry.documentId})`,
     `  modules: ${report.modules.length}`,
     `  imports: ${report.importGraph.edges.length}`,
+    `  affected: ${report.affectedModules.length}`,
     `  diagnostics: ${report.totals.error} error(s), ${report.totals.warning} warning(s), ${report.totals.info} info`
   ];
 
@@ -248,6 +258,10 @@ const formatLinkText = (report: LinkReport): string => {
   for (const edge of report.importGraph.edges) {
     const target = edge.toModule ? ` -> ${edge.toModule}` : "";
     lines.push(`  import ${edge.fromModule}: ${edge.importFrom} [${edge.status}]${target}`);
+  }
+
+  if (report.affectedModules.length > 0) {
+    lines.push(`  affected modules: ${report.affectedModules.join(", ")}`);
   }
 
   return lines.join("\n");

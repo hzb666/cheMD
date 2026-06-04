@@ -1159,6 +1159,8 @@ reaction rxn_shared {
         "link",
         "entry.chemd",
         "shared.chemd",
+        "--changed",
+        "shared.chemd",
         "--format",
         "json"
       ], { cwd: dir, stderr, stdout });
@@ -1177,6 +1179,11 @@ reaction rxn_shared {
           status: "resolved"
         })
       ]);
+      expect(payload.affectedModules).toEqual(["shared_solvents", "exp_entry"]);
+      expect(payload.buildGraph.dependents).toContainEqual({
+        moduleName: "shared_solvents",
+        dependents: ["exp_entry"]
+      });
       expect(payload.modules[0]).toMatchObject({
         graph: expect.objectContaining({
           nodeCount: expect.any(Number)

@@ -56,6 +56,53 @@ reaction rxn_shared {
     expect(result.diagnostics.filter((item) => item.severity === "error")).toEqual([]);
   });
 
+  it("computes affected modules from changed module identities", () => {
+    const result = linkChemdModules([
+      {
+        path: "entry.chemd",
+        source: `module exp_entry
+
+import shared_solvents as solvents from "./shared.chemd"
+
+meta {
+  id: "exp-entry"
+  title: "Entry"
+  date: "2026-06-04"
+}
+
+result res_entry for @solvents.rxn_shared {
+  yield: 78%
+}
+`
+      },
+      {
+        path: "shared.chemd",
+        source: `module shared_solvents
+
+meta {
+  id: "shared-solvents"
+  title: "Shared"
+  date: "2026-06-04"
+}
+
+reaction rxn_shared {
+  name: "shared"
+}
+`
+      }
+    ], { changedModules: ["shared.chemd"] });
+
+    expect(result.buildGraph.nodes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ moduleName: "exp_entry", path: "entry.chemd" }),
+      expect.objectContaining({ moduleName: "shared_solvents", path: "shared.chemd" })
+    ]));
+    expect(result.buildGraph.dependents).toContainEqual({
+      moduleName: "shared_solvents",
+      dependents: ["exp_entry"]
+    });
+    expect(result.affectedModules).toEqual(["shared_solvents", "exp_entry"]);
+  });
+
   it("diagnoses missing modules, cycles, and missing imported symbols", () => {
     const result = linkChemdModules([
       {

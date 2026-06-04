@@ -47,13 +47,34 @@ export interface ChemdModuleImportGraph {
   edges: ChemdModuleImportEdge[];
 }
 
+export interface ChemdModuleBuildNode {
+  documentId: string;
+  moduleName: string;
+  path?: string;
+  uri?: string;
+}
+
+export interface ChemdModuleDependents {
+  dependents: string[];
+  moduleName: string;
+}
+
+export interface ChemdModuleBuildGraph {
+  nodes: ChemdModuleBuildNode[];
+  edges: ChemdModuleImportEdge[];
+  dependents: ChemdModuleDependents[];
+}
+
 export interface LinkChemdModulesOptions {
+  changedModules?: string[];
   entry?: string;
   compileOptions?: CompileOptions;
 }
 
 export interface LinkChemdModulesResult {
   entry: LinkedChemdModule;
+  affectedModules: string[];
+  buildGraph: ChemdModuleBuildGraph;
   modules: LinkedChemdModule[];
   importGraph: ChemdModuleImportGraph;
   diagnostics: Diagnostic[];
@@ -71,9 +92,16 @@ export const linkChemdModules = (
   diagnostics.push(...findImportCycleDiagnostics(importGraph));
   diagnostics.push(...findMissingImportedSymbolDiagnostics(modules, lookup));
   const linkedModules = materializeLinkedTypedGraphs(modules);
+  const buildGraph = buildModuleBuildGraph(linkedModules, importGraph);
 
   return {
     entry: selectEntryModule(linkedModules, options.entry, diagnostics),
+    affectedModules: findAffectedModules(
+      linkedModules,
+      buildGraph,
+      options.changedModules ?? []
+    ),
+    buildGraph,
     modules: linkedModules,
     importGraph,
     diagnostics
@@ -94,6 +122,64 @@ const compileModuleInput = (
 };
 
 const readDocumentId = (program: ChemdProgramDocument): string => program.meta.id;
+
+const buildModuleBuildGraph = (
+  modules: LinkedChemdModule[],
+  importGraph: ChemdModuleImportGraph
+): ChemdModuleBuildGraph => {
+  const dependents = new Map<string, Set<string>>();
+  for (const module of modules) {
+    dependents.set(module.moduleName, new Set());
+  }
+  for (const edge of importGraph.edges) {
+    if (edge.status !== "resolved" || !edge.toModule) continue;
+    dependents.get(edge.toModule)?.add(edge.fromModule);
+  }
+
+  return {
+    nodes: modules.map((module) => ({
+      documentId: module.documentId,
+      moduleName: module.moduleName,
+      ...(module.input.path ? { path: module.input.path } : {}),
+      ...(module.input.uri ? { uri: module.input.uri } : {})
+    })),
+    edges: importGraph.edges,
+    dependents: [...dependents.entries()].map(([moduleName, items]) => ({
+      moduleName,
+      dependents: [...items].sort()
+    }))
+  };
+};
+
+const findAffectedModules = (
+  modules: LinkedChemdModule[],
+  buildGraph: ChemdModuleBuildGraph,
+  changedModules: string[]
+): string[] => {
+  const seeds = changedModules.flatMap((changed) => matchChangedModule(modules, changed));
+  const affected: string[] = [];
+  const queued = [...new Set(seeds)];
+  const dependents = new Map(
+    buildGraph.dependents.map((item) => [item.moduleName, item.dependents])
+  );
+
+  while (queued.length > 0) {
+    const moduleName = queued.shift()!;
+    if (affected.includes(moduleName)) continue;
+    affected.push(moduleName);
+    queued.push(...(dependents.get(moduleName) ?? []));
+  }
+
+  return affected;
+};
+
+const matchChangedModule = (
+  modules: LinkedChemdModule[],
+  changed: string
+): string[] =>
+  modules
+    .filter((module) => matchesModuleIdentity(module, changed))
+    .map((module) => module.moduleName);
 
 const selectEntryModule = (
   modules: LinkedChemdModule[],
