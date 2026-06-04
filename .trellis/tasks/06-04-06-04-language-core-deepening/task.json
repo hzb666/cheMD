@@ -2,7 +2,7 @@
   "id": "06-04-language-core-deepening",
   "name": "06-04-language-core-deepening",
   "title": "Deepen Chemd language core without device control",
-  "description": "Deepen Chemd as a chemistry experiment programming language without IDE, training export, or device-control scope. Current phase adds semantic diff objects for procedure controls and state snapshots.",
+  "description": "Deepen Chemd as a chemistry experiment programming language without IDE, training export, or device-control scope. Current phase adds language core fixtures and contract coverage.",
   "status": "in_progress",
   "dev_type": null,
   "scope": null,
@@ -23,6 +23,9 @@
   "relatedFiles": [
     "packages/core/src/program-ast/conditions.ts",
     "packages/core/src/program-ast/procedure.ts",
+    "packages/core/src/language/contract.ts",
+    "packages/compiler/fixtures/program-language-core.chemd",
+    "packages/compiler/tests/language-fixture-matrix.test.ts",
     "packages/parser/src/program/parse-condition-expression.ts",
     "packages/parser/src/program/parse-procedure.ts",
     "packages/step-ontology/src/types.ts",
@@ -43,6 +46,6 @@
     "packages/cli/src/language-commands.ts",
     "packages/cli/src/cli.ts"
   ],
-  "notes": "Phase 1 adds ProgramConditionExpression, parses procedure control condition strings into AST, validates references from AST, and carries structured conditions into canonical procedure controls. Phase 2 adds conservative condition expression type checking for incompatible runtime/reference/literal/quantity comparisons and registers E_CONDITION_TYPE_MISMATCH. Phase 3 adds procedure state/effect contracts, state tags, state violations, and E_PROCEDURE_STATE_INVALID diagnostics for missing mixture, post-quench active-reaction operations, and missing biphasic state. Phase 4 adds standard effects for every step family and carries effects into source-level canonical and typed procedure steps. Phase 5 adds module buildGraph, reverse dependents, changedModules input, and affectedModules output through linker and CLI link reports. Phase 6 adds explainDiagnosticCode, compiler re-export, and CLI explain text/JSON output for known and unknown diagnostic codes. Phase 7 adds semantic diff objects for structured control conditions and per-step procedure state snapshots, and records normalized quantity params in state conditions. Verification: step-ontology/typechecker/compiler/cli/diagnostics tests, docs coverage tests, and package typechecks passed. pnpm lint remains blocked by ESLint 10.4.0 scopeManager.addGlobals toolchain failure.",
+  "notes": "Phase 1 adds ProgramConditionExpression, parses procedure control condition strings into AST, validates references from AST, and carries structured conditions into canonical procedure controls. Phase 2 adds conservative condition expression type checking for incompatible runtime/reference/literal/quantity comparisons and registers E_CONDITION_TYPE_MISMATCH. Phase 3 adds procedure state/effect contracts, state tags, state violations, and E_PROCEDURE_STATE_INVALID diagnostics for missing mixture, post-quench active-reaction operations, and missing biphasic state. Phase 4 adds standard effects for every step family and carries effects into source-level canonical and typed procedure steps. Phase 5 adds module buildGraph, reverse dependents, changedModules input, and affectedModules output through linker and CLI link reports. Phase 6 adds explainDiagnosticCode, compiler re-export, and CLI explain text/JSON output for known and unknown diagnostic codes. Phase 7 adds semantic diff objects for structured control conditions and per-step procedure state snapshots, and records normalized quantity params in state conditions. Phase 8 adds a language-core compiler fixture plus core contract v0.6 entries for procedure controls, dynamic controls, condition expressions, and structured condition AST support. Verification: core/step-ontology/typechecker/compiler/cli/diagnostics tests, docs coverage tests, and package typechecks passed. pnpm lint remains blocked by ESLint 10.4.0 scopeManager.addGlobals toolchain failure.",
   "meta": {}
 }

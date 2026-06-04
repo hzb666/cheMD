@@ -1,0 +1,53 @@
+module exp_language_core
+
+meta {
+  id: "exp-language-core"
+  title: "Language core contract"
+  date: "2026-06-04"
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
+
+molecule mol_substrate {
+  name: "substrate"
+  role: substrate
+}
+
+molecule mol_product {
+  name: "product"
+  role: product
+}
+
+reaction rxn_main {
+  reactants: [@mol_substrate]
+  products: [@mol_product]
+  solvent: "THF"
+  temperature: 80 C
+}
+
+result res_main for @rxn_main {
+  product: @mol_product
+  status: success
+  yield: 68%
+}
+
+analysis ana_tlc for @res_main {
+  type: tlc
+  ref: @res_main
+  status: clean
+  result: "single spot"
+}
+
+procedure proc_core for @rxn_main {
+  evidence: [@res_main]
+  step charge = charge(materials: "substrate", solvent: "THF")
+  wait operator_gate(condition: "operator.confirmed")
+  abort_if overheated(condition: "sensor.temperature > 95 C")
+  until tlc_clear(condition: "@ana_tlc.status == clean", max_iterations: 3) {
+    step heat = heat(temperature: 80 C, duration: 1 h, depends_on: [charge])
+  }
+  step quench = quench(agent: "NH4Cl", depends_on: [heat])
+  step extract = extract(solvent: "EtOAc", depends_on: [quench])
+  step split = separate_layers(depends_on: [extract])
+  step dry = dry(agent: "MgSO4", depends_on: [split])
+}

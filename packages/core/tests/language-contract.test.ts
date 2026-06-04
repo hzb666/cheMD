@@ -5,7 +5,7 @@ import { CHEMD_LANGUAGE_CONTRACT } from "../src/index";
 describe("CHEMD_LANGUAGE_CONTRACT", () => {
   it("describes the program language surface for tools", () => {
     expect(CHEMD_LANGUAGE_CONTRACT).toMatchObject({
-      schemaVersion: "chemd-language-contract/v0.5",
+      schemaVersion: "chemd-language-contract/v0.6",
       sourceLanguage: "chemd/program-v1"
     });
     expect(CHEMD_LANGUAGE_CONTRACT.program.keywords).toEqual(expect.arrayContaining([
@@ -55,11 +55,33 @@ describe("CHEMD_LANGUAGE_CONTRACT", () => {
       "@module.object",
       "@document#object"
     ]));
+    expect(CHEMD_LANGUAGE_CONTRACT.program.procedures.controlKinds).toEqual(expect.arrayContaining([
+      "until",
+      "branch",
+      "case",
+      "default",
+      "wait",
+      "abort_if"
+    ]));
+    expect(CHEMD_LANGUAGE_CONTRACT.program.procedures.dynamicControlKinds).toEqual([
+      "until",
+      "branch",
+      "wait",
+      "abort_if"
+    ]);
+    expect(CHEMD_LANGUAGE_CONTRACT.program.procedures.conditionExpressions).toMatchObject({
+      nodeKinds: expect.arrayContaining(["binary", "runtime_reference", "quantity"]),
+      binaryOperators: expect.arrayContaining(["==", ">", "and"]),
+      runtimeNamespaces: ["operator", "sensor", "time", "run"],
+      supportsQuantityComparisons: true,
+      supportsReferenceComparisons: true
+    });
     expect(CHEMD_LANGUAGE_CONTRACT.program.parserCapabilities).toMatchObject({
       sourceSpans: true,
       diagnostics: true,
       recovery: true,
-      docComments: true
+      docComments: true,
+      structuredConditionAst: true
     });
   });
 });

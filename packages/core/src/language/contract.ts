@@ -1,6 +1,6 @@
 export const CHEMD_LANGUAGE_CONTRACT = {
   id: "chemd-current",
-  schemaVersion: "chemd-language-contract/v0.5",
+  schemaVersion: "chemd-language-contract/v0.6",
   sourceLanguage: "chemd/program-v1",
   compatibilityModes: [] as const,
   authorConfigFields: [] as const,
@@ -96,6 +96,36 @@ export const CHEMD_LANGUAGE_CONTRACT = {
         "@document#object.field"
       ]
     },
+    procedures: {
+      statementKinds: ["step", "control", "doc"],
+      controlKinds: [
+        "repeat",
+        "until",
+        "branch",
+        "parallel",
+        "case",
+        "default",
+        "path",
+        "wait",
+        "abort_if"
+      ],
+      dynamicControlKinds: ["until", "branch", "wait", "abort_if"],
+      conditionExpressions: {
+        nodeKinds: [
+          "binary",
+          "unary",
+          "reference",
+          "runtime_reference",
+          "literal",
+          "quantity"
+        ],
+        binaryOperators: ["==", "!=", "<", "<=", ">", ">=", "and", "or", "in", "matches"],
+        unaryOperators: ["not", "exists"],
+        runtimeNamespaces: ["operator", "sensor", "time", "run"],
+        supportsQuantityComparisons: true,
+        supportsReferenceComparisons: true
+      }
+    },
     values: {
       kinds: [
         "string",
@@ -121,6 +151,7 @@ export const CHEMD_LANGUAGE_CONTRACT = {
       diagnostics: true,
       recovery: true,
       docComments: true,
+      structuredConditionAst: true,
       legacySyntaxDiagnostics: true
     }
   }
