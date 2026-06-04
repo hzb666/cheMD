@@ -34,10 +34,12 @@ procedure proc_1 for @rxn_1 {
     expect(result.stepGraph.steps[0]).toMatchObject({
       stepId: "charge",
       family: "charge",
+      effects: expect.arrayContaining(["creates_mixture"]),
       source: { sourceNodeId: "proc_1", sourceType: "explicit_step" }
     });
     expect(result.typedGraph.nodes.find((node) => node.nodeId === "heat")).toMatchObject({
       kind: "step",
+      effects: expect.arrayContaining(["changes_temperature"]),
       sourceMetadata: {
         sourceKind: "procedure_step",
         declarationKind: "procedure",

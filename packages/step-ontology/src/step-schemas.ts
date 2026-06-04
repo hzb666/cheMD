@@ -6,6 +6,7 @@ import type {
   StepParamSchema
 } from "./step-schema-types";
 import type { CanonicalStepNode, StepFamily } from "./types";
+import { getStandardEffectsForFamily } from "./step-effects";
 
 const quantity = (
   name: string,
@@ -75,6 +76,7 @@ const manualConfirmation: ConfirmationRule = { strategy: "manual_required" };
 
 const schema = (input: StepFamilySchema): StepFamilySchema => ({
   unknownParams: "allow",
+  effects: getStandardEffectsForFamily(input.family),
   ...input
 });
 
@@ -262,6 +264,11 @@ export const getCapabilitiesForStep = (step: Pick<CanonicalStepNode, "family" | 
 
 export const getSafetyTagsForStep = (family: StepFamily): string[] =>
   getStepFamilySchema(family).safetyTags ?? [];
+
+export const getEffectsForStep = (
+  step: Pick<CanonicalStepNode, "family" | "params">
+): NonNullable<CanonicalStepNode["effects"]> =>
+  getStepFamilySchema(step.family).effects ?? [];
 
 export const isRobotRunnableStep = (family: StepFamily): boolean =>
   getStepFamilySchema(family).robotRunnable !== false;

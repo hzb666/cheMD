@@ -18,6 +18,7 @@ import {
   extractTemperature,
   splitProcedureSentences
 } from "./text";
+import { getEffectsForStep } from "./step-schemas";
 import {
   ADD_MATERIAL_MARKERS,
   ADD_STOP_MARKERS,
@@ -61,12 +62,13 @@ const createStep = (
   effects: StepEffect[] = []
 ): CanonicalStepNode => {
   const provenance = createProcedureProvenance(context, family, confidence);
+  const stepEffects = [...new Set([...getEffectsForStep({ family, params }), ...effects])];
 
   return {
     stepId: context.nextStepId(),
     family,
     params,
-    ...(effects.length > 0 ? { effects } : {}),
+    effects: stepEffects,
     source: createProcedureSource(context, provenance),
     provenance,
     loweringConfidence: confidence

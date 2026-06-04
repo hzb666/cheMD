@@ -8,6 +8,7 @@ import type {
   CanonicalStepNode,
   StepFamily
 } from "@chemd/step-ontology";
+import { getEffectsForStep } from "@chemd/step-ontology";
 
 import { collectQuantities } from "./program-field-graph";
 import {
@@ -43,6 +44,7 @@ export const buildProgramStep = (
   controlPath: string[]
 ): CanonicalStepNode => {
   const family = isStepFamily(step.family) ? step.family : "observe";
+  const params = buildProgramStepParams(step, family);
   if (family === "observe" && step.family !== "observe") {
     diagnostics.push(createProgramDiagnostic(
       "E_STEP_INVALID_FAMILY",
@@ -54,7 +56,8 @@ export const buildProgramStep = (
   return {
     stepId: step.id,
     family,
-    params: buildProgramStepParams(step, family),
+    params,
+    effects: getEffectsForStep({ family, params }),
     inputs: step.inputs?.map((item) => ({
       raw: item.raw,
       reference: referenceToStepRef(item, symbols, externalTargetIndex)
@@ -94,6 +97,7 @@ export const buildTypedStep = (
   stepId: step.stepId,
   family: step.family,
   params: step.params,
+  effects: step.effects,
   inputs: step.inputs,
   outputs: step.outputs,
   dependsOn: step.dependsOn,

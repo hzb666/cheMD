@@ -1,6 +1,6 @@
 import type { QuantityClass } from "@chemd/core";
 
-import type { StepFamily } from "./types";
+import type { StepEffect, StepFamily } from "./types";
 
 export type StepParamType =
   | "string"
@@ -60,6 +60,7 @@ export interface StepFamilySchema {
   required: StepRequirement[];
   defaults?: StepDefault[];
   capabilities?: CapabilityRule[];
+  effects?: StepEffect[];
   safetyTags?: string[];
   robotRunnable?: boolean;
   confirmation?: ConfirmationRule;

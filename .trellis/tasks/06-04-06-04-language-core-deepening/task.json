@@ -2,7 +2,7 @@
   "id": "06-04-language-core-deepening",
   "name": "06-04-language-core-deepening",
   "title": "Deepen Chemd language core without device control",
-  "description": "Deepen Chemd as a chemistry experiment programming language without IDE, training export, or device-control scope. Current phase adds procedure state/effect contracts and state-transition diagnostics.",
+  "description": "Deepen Chemd as a chemistry experiment programming language without IDE, training export, or device-control scope. Current phase standardizes step family effect contracts.",
   "status": "in_progress",
   "dev_type": null,
   "scope": null,
@@ -28,11 +28,14 @@
     "packages/step-ontology/src/types.ts",
     "packages/step-ontology/src/procedure-state.ts",
     "packages/step-ontology/src/procedure-state-contracts.ts",
+    "packages/step-ontology/src/step-effects.ts",
+    "packages/step-ontology/src/step-schemas.ts",
     "packages/typechecker/src/program-procedure-state.ts",
+    "packages/typechecker/src/program-procedure-steps.ts",
     "packages/typechecker/src/program-procedure-condition-types.ts",
     "packages/typechecker/src/program-procedure-control-conditions.ts",
     "packages/typechecker/src/program-procedure-controls.ts"
   ],
-  "notes": "Phase 1 adds ProgramConditionExpression, parses procedure control condition strings into AST, validates references from AST, and carries structured conditions into canonical procedure controls. Phase 2 adds conservative condition expression type checking for incompatible runtime/reference/literal/quantity comparisons and registers E_CONDITION_TYPE_MISMATCH. Phase 3 adds procedure state/effect contracts, state tags, state violations, and E_PROCEDURE_STATE_INVALID diagnostics for missing mixture, post-quench active-reaction operations, and missing biphasic state. Verification: step-ontology/typechecker/compiler/cli/diagnostics tests, docs coverage tests, and package typechecks passed. pnpm lint remains blocked by ESLint 10.4.0 scopeManager.addGlobals toolchain failure.",
+  "notes": "Phase 1 adds ProgramConditionExpression, parses procedure control condition strings into AST, validates references from AST, and carries structured conditions into canonical procedure controls. Phase 2 adds conservative condition expression type checking for incompatible runtime/reference/literal/quantity comparisons and registers E_CONDITION_TYPE_MISMATCH. Phase 3 adds procedure state/effect contracts, state tags, state violations, and E_PROCEDURE_STATE_INVALID diagnostics for missing mixture, post-quench active-reaction operations, and missing biphasic state. Phase 4 adds standard effects for every step family and carries effects into source-level canonical and typed procedure steps. Verification: step-ontology/typechecker/compiler/cli/diagnostics tests, docs coverage tests, and package typechecks passed. pnpm lint remains blocked by ESLint 10.4.0 scopeManager.addGlobals toolchain failure.",
   "meta": {}
 }

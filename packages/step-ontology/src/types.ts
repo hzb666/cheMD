@@ -31,13 +31,25 @@ export type ObservationEventType =
   | "phase_change";
 
 export type StepEffect =
+  | "adds_material"
   | "uses_inert_atmosphere"
   | "changes_temperature"
+  | "creates_mixture"
   | "creates_biphasic_system"
   | "consumes_hazardous_reagent"
+  | "dries_material"
+  | "filters_solid"
+  | "maintains_conditions"
   | "produces_gas"
+  | "produces_analysis"
+  | "quenches_reaction"
+  | "records_observation"
+  | "removes_solvent"
   | "requires_sampling"
-  | "requires_purification";
+  | "requires_purification"
+  | "separates_phases"
+  | "stores_material"
+  | "transfers_material";
 
 export interface StepSourceInfo {
   sourceNodeType: "procedure" | "analysis" | "observation";
