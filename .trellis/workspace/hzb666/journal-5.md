@@ -277,3 +277,37 @@ Closed language-layer and CLI parity gaps, split new CLI logic, and verified non
 ### Next Steps
 
 - None - task complete
+
+
+## Session 197: Language core deepening phase 2 condition types
+
+**Date**: 2026-06-04
+**Task**: Language core deepening phase 2 condition types
+**Package**: compiler
+**Branch**: `develop`
+
+### Summary
+
+(Add summary)
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8d54749` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
