@@ -45,6 +45,7 @@ export const buildTypedFieldNode = (
       formula: textField(declaration, "formula")
     };
   }
+  if (declaration.kind === "reaction_template") return buildReactionTemplateNode(base, declaration);
   if (declaration.kind === "reaction") return buildReactionNode(base, declaration, symbols);
   if (declaration.kind === "result") return buildResultNode(base, declaration, symbols);
   if (declaration.kind === "analysis") return buildAnalysisNode(base, declaration, symbols);
@@ -81,6 +82,7 @@ const buildReactionNode = (
   kind: "reaction",
   route: textField(declaration, "route"),
   rxn_smiles: textField(declaration, "rxn_smiles"),
+  template: refField(declaration, "template", symbols),
   prev: refsField(declaration, "prev", symbols),
   next: [],
   reactants: refsField(declaration, "reactants", symbols),
@@ -93,6 +95,18 @@ const buildReactionNode = (
   temperature: quantityField(declaration, "temperature"),
   time: quantityField(declaration, "time"),
   pressure: quantityField(declaration, "pressure")
+});
+
+const buildReactionTemplateNode = (
+  base: ProgramNodeBase,
+  declaration: ProgramFieldDeclaration
+): TypedSemanticNode => ({
+  ...base,
+  kind: "reaction_template",
+  name: textField(declaration, "name"),
+  family: textField(declaration, "family"),
+  roles: valueToStringList(fieldValue(declaration, "role")),
+  notes: textField(declaration, "notes")
 });
 
 const buildResultNode = (

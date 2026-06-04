@@ -63,6 +63,14 @@ export type {
   ChemdTrainingGraphIndexV1
 } from "@chemd/exporter-training";
 export {
+  buildWorkspaceTrainingGraphIndex,
+  type WorkspaceTrainingGraphOptions
+} from "./workspace-graph";
+export type {
+  WorkspaceRuntimeTraceEvent,
+  WorkspaceRuntimeTraceInput
+} from "./workspace-graph-trace";
+export {
   applyAuthoringPatch,
   applyAuthoringSuggestion,
   applyAuthoringTemplate

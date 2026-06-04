@@ -201,6 +201,7 @@ describe("program AST contracts", () => {
       "material",
       "batch",
       "reaction",
+      "reaction_template",
       "result",
       "analysis",
       "sample",

@@ -1008,6 +1008,163 @@ result res_main for @rxn_main {
     expect(result.stderr).toBe("");
   });
 
+  it("exports workspace reaction edges as a training graph superset", async () => {
+    const result = await runInTempDir(
+      ["graph", "shared.chemd", "seed.chemd", "entry.chemd", "--format", "json"],
+      {
+        "shared.chemd": `module cli_shared
+
+meta {
+  id: "cli-shared"
+  title: "CLI Shared"
+  date: "2026-06-04"
+}
+
+molecule mol_halide {
+  name: "aryl halide"
+}
+
+reaction_template tpl_suzuki {
+  name: "Suzuki template"
+}
+`,
+        "seed.chemd": `module cli_seed
+
+import cli_shared as shared from "./shared.chemd"
+
+meta {
+  id: "cli-seed"
+  title: "CLI Seed"
+  date: "2026-06-04"
+}
+
+reaction rxn_seed {
+  products: [@shared.mol_halide]
+}
+`,
+        "entry.chemd": `module cli_entry
+
+import cli_shared as shared from "./shared.chemd"
+import cli_seed as seed from "./seed.chemd"
+
+meta {
+  id: "cli-entry"
+  title: "CLI Entry"
+  date: "2026-06-04"
+}
+
+reaction rxn_entry {
+  template: @shared.tpl_suzuki
+  prev: [@seed.rxn_seed]
+  reactants: [@shared.mol_halide]
+}
+
+condition_screen screen_entry {
+  reaction: @rxn_entry
+  standard: @seed.rxn_seed
+  factor: [temperature]
+  outcome: [yield]
+}
+`
+      }
+    );
+    const payload = JSON.parse(result.stdout);
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(payload.schema_version).toBe("chemd-training-graph-index/v0.1");
+    expect(payload.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({ edge_type: "document_imports_document" }),
+      expect.objectContaining({ edge_type: "reaction_precedes_reaction" }),
+      expect.objectContaining({ edge_type: "reaction_instantiates_template" }),
+      expect.objectContaining({ edge_type: "condition_screen_uses_standard" })
+    ]));
+    expect(result.stderr).toBe("");
+  });
+
+  it("exports runtime trace and state stack graph edges from a trace file", async () => {
+    const result = await runInTempDir(
+      ["graph", "runtime.chemd", "--trace", "trace.json", "--format", "json"],
+      {
+        "runtime.chemd": `module cli_runtime
+
+meta {
+  id: "cli-runtime"
+  title: "CLI Runtime"
+  date: "2026-06-04"
+  primary_reaction: @rxn_runtime
+}
+
+reaction rxn_runtime {
+  name: "Runtime reaction"
+}
+
+procedure proc_runtime for @rxn_runtime {
+  step charge = add(material: "aryl halide")
+  step heat = heat(temp: 90 C, duration: 2 h, depends_on: [charge])
+  abort_if overheated(condition: "sensor.temperature > 130 C")
+}
+`,
+        "trace.json": JSON.stringify({
+          runId: "run-cli",
+          stepIds: ["charge", "heat"],
+          events: [
+            {
+              eventId: "evt-1",
+              runId: "run-cli",
+              timestamp: "2026-06-04T10:00:00.000Z",
+              type: "run_started"
+            },
+            {
+              eventId: "evt-2",
+              runId: "run-cli",
+              timestamp: "2026-06-04T10:01:00.000Z",
+              type: "step_started",
+              stepId: "charge"
+            },
+            {
+              eventId: "evt-3",
+              runId: "run-cli",
+              timestamp: "2026-06-04T10:02:00.000Z",
+              type: "control_entered",
+              controlId: "overheated"
+            }
+          ]
+        })
+      }
+    );
+    const payload = JSON.parse(result.stdout);
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(payload.nodes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        node_id: "trace_event::run-cli::evt-2",
+        node_type: "runtime_trace_event"
+      }),
+      expect.objectContaining({
+        node_id: "runtime_state::run-cli::evt-2",
+        node_type: "runtime_state_snapshot"
+      })
+    ]));
+    expect(payload.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        edge_type: "trace_event_targets_step",
+        from_node_id: "trace_event::run-cli::evt-2",
+        to_node_id: "step::cli-runtime::proc_runtime::charge"
+      }),
+      expect.objectContaining({
+        edge_type: "trace_event_targets_control",
+        from_node_id: "trace_event::run-cli::evt-3",
+        to_node_id: "control::cli-runtime::proc_runtime::overheated"
+      }),
+      expect.objectContaining({
+        edge_type: "runtime_state_precedes_state",
+        from_node_id: "runtime_state::run-cli::evt-1",
+        to_node_id: "runtime_state::run-cli::evt-2"
+      })
+    ]));
+    expect(result.stderr).toBe("");
+  });
+
   it("formats reaction intelligence counts separately from semantic graph clusters", () => {
     const text = formatGraphIndexText({
       schema_version: "chemd-training-graph-index/v0.1",

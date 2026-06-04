@@ -219,6 +219,8 @@ const targetKindForDeclaration = (
 ): ReferenceType["targetKind"] =>
   kind === "condition_screen"
     ? "condition_varies"
+    : kind === "reaction_template"
+      ? "template"
     : kind === "agent_run"
       ? "unknown"
       : kind;

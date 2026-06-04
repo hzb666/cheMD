@@ -18,6 +18,7 @@ const FIELD_DECLARATION_KINDS = new Set<ChemdProgramDeclarationKind>([
   "material",
   "batch",
   "reaction",
+  "reaction_template",
   "result",
   "analysis",
   "sample",

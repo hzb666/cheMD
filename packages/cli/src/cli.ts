@@ -8,7 +8,10 @@ import type {
   ChemdTrainingGraphIndexV1,
   ChemdRepairLoopResult,
   CompileOptions,
-  CompileResult
+  CompileResult,
+  LinkChemdModulesResult,
+  WorkspaceRuntimeTraceInput,
+  WorkspaceTrainingGraphOptions
 } from "@chemd/compiler";
 import type { Diagnostic } from "@chemd/core";
 import {
@@ -56,6 +59,7 @@ const IMPORT_OPTIONS = new Set<CliOption>(["dry-run", "format", "out"]);
 const CHANGED_OPTIONS = new Set<CliOption>(["base", "format"]);
 const LINK_OPTIONS = new Set<CliOption>(["changed", "entry", "format"]);
 const INCREMENTAL_OPTIONS = new Set<CliOption>(["format"]);
+const GRAPH_OPTIONS = new Set<CliOption>(["format", "trace"]);
 const FIX_OPTIONS = new Set<CliOption>(["format", "max-iterations", "write"]);
 const AGENT_LOOP_OPTIONS = new Set<CliOption>([
   "driver",
@@ -80,7 +84,7 @@ const usage = [
   "  chemd new <template-id> --out <file> [--dry-run]",
   "  chemd import prose <file> [--out <file>] [--format text|json] [--dry-run]",
   "  chemd explain <diagnostic-code> [--format text|json]",
-  "  chemd graph <file...> [--format text|json]",
+  "  chemd graph <file...> [--trace trace.json] [--format text|json]",
   "  chemd link <file...> [--entry <module|path>] [--changed <module|path>] [--format text|json]",
   "  chemd incremental <file...> [--format text|json]",
   "  chemd diff <old-file> <new-file> [--format text|json]",
@@ -107,11 +111,16 @@ type CliOption =
   | "mode"
   | "out"
   | "target"
+  | "trace"
   | "write";
 type CompileChemd = (source: string, options?: CompileOptions) => CompileResult;
 type BuildTrainingGraphIndex = (
   understandings: CompileResult["trainingUnderstanding"][],
   options?: BuildTrainingGraphIndexOptions
+) => ChemdTrainingGraphIndexV1;
+type BuildWorkspaceTrainingGraphIndex = (
+  linked: LinkChemdModulesResult,
+  options?: WorkspaceTrainingGraphOptions
 ) => ChemdTrainingGraphIndexV1;
 type RunChemdAgentLoop = (
   source: string,
@@ -151,7 +160,7 @@ type CliCommand =
   | { type: "new"; dryRun: boolean; outPath: string; templateId: string }
   | { type: "import-prose"; dryRun: boolean; filePath: string; format: TextFormat; outPath?: string }
   | { type: "explain"; code: string; format: TextFormat }
-  | { type: "graph"; filePaths: string[]; format: TextFormat }
+  | { type: "graph"; filePaths: string[]; format: TextFormat; tracePath?: string }
   | { type: "link"; changedModules: string[]; entry?: string; filePaths: string[]; format: TextFormat }
   | { type: "incremental"; filePaths: string[]; format: TextFormat }
   | { type: "diff"; beforePath: string; afterPath: string; format: TextFormat }
@@ -170,6 +179,7 @@ type CliCommand =
 
 interface RunOptions {
   buildTrainingGraphIndex?: BuildTrainingGraphIndex;
+  buildWorkspaceTrainingGraphIndex?: BuildWorkspaceTrainingGraphIndex;
   compileChemd?: CompileChemd;
   createChemdIncrementalCompiler?: CreateChemdIncrementalCompiler;
   cwd?: string;
@@ -183,6 +193,7 @@ interface RunOptions {
 
 interface NormalizedRunOptions {
   buildTrainingGraphIndex?: BuildTrainingGraphIndex;
+  buildWorkspaceTrainingGraphIndex?: BuildWorkspaceTrainingGraphIndex;
   compileChemd?: CompileChemd;
   createChemdIncrementalCompiler?: CreateChemdIncrementalCompiler;
   cwd: string;
@@ -361,6 +372,7 @@ type CompileResultWithProgram = CompileResult & {
 
 interface CliCompilerServices {
   buildTrainingGraphIndex: BuildTrainingGraphIndex;
+  buildWorkspaceTrainingGraphIndex?: BuildWorkspaceTrainingGraphIndex;
   compileChemd: CompileChemd;
   createChemdIncrementalCompiler: CreateChemdIncrementalCompiler;
   explainDiagnosticCode: ExplainDiagnosticCode;
@@ -506,6 +518,7 @@ const assignCommandOption = (
     mode?: string;
     out?: string;
     target?: string;
+    trace?: string;
     write: boolean;
   }
 ): void => {
@@ -557,6 +570,9 @@ const assignCommandOption = (
     case "target":
       state.target = option.value;
       return;
+    case "trace":
+      state.trace = option.value;
+      return;
     case "write":
       state.write = true;
       return;
@@ -582,6 +598,7 @@ const parseCommandArgs = (args: string[], allowedOptions: ReadonlySet<CliOption>
     mode?: string;
     out?: string;
     target?: string;
+    trace?: string;
     write: boolean;
   } = {
     changedModules: [],
@@ -625,6 +642,7 @@ const parseCommandArgs = (args: string[], allowedOptions: ReadonlySet<CliOption>
     out: state.out,
     positional,
     target: state.target,
+    trace: state.trace,
     write: state.write
   };
 };
@@ -772,7 +790,7 @@ const parseDiffArgs = (args: string[]): CliCommand => {
 };
 
 const parseGraphArgs = (args: string[]): CliCommand => {
-  const { format = "text", positional } = parseCommandArgs(args, FORMAT_OPTION);
+  const { format = "text", positional, trace } = parseCommandArgs(args, GRAPH_OPTIONS);
 
   if (positional.length === 0) {
     throw new CliUsageError("Graph requires at least one file path.");
@@ -781,7 +799,8 @@ const parseGraphArgs = (args: string[]): CliCommand => {
   return {
     type: "graph",
     filePaths: positional,
-    format: asTextFormat(format, "Graph")
+    format: asTextFormat(format, "Graph"),
+    ...(trace ? { tracePath: trace } : {})
   };
 };
 
@@ -962,6 +981,7 @@ export const parseChemdCliArgs = (argv: string[]): CliCommand => {
 
 const loadCompiler = async (): Promise<{
   buildTrainingGraphIndexFromUnderstandings: BuildTrainingGraphIndex;
+  buildWorkspaceTrainingGraphIndex: BuildWorkspaceTrainingGraphIndex;
   compileChemd: CompileChemd;
   createChemdIncrementalCompiler: CreateChemdIncrementalCompiler;
   explainDiagnosticCode: ExplainDiagnosticCode;
@@ -995,6 +1015,44 @@ const writeSource = (filePath: string, cwd: string, source: string): void => {
     const message = error instanceof Error ? error.message : String(error);
     throw new CliUsageError(`Unable to write file "${filePath}": ${message}`);
   }
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const readRuntimeTrace = (
+  filePath: string,
+  cwd: string
+): WorkspaceRuntimeTraceInput => {
+  const raw = readSource(filePath, cwd);
+  let value: unknown;
+
+  try {
+    value = JSON.parse(raw);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new CliUsageError(`Unable to parse trace file "${filePath}": ${message}`);
+  }
+
+  if (!isRuntimeTraceInput(value)) {
+    throw new CliUsageError(`Trace file "${filePath}" must contain runId and events.`);
+  }
+
+  return value;
+};
+
+const isRuntimeTraceInput = (value: unknown): value is WorkspaceRuntimeTraceInput => {
+  if (!isRecord(value) || typeof value.runId !== "string" || !Array.isArray(value.events)) {
+    return false;
+  }
+
+  return value.events.every((event) =>
+    isRecord(event)
+      && typeof event.eventId === "string"
+      && typeof event.runId === "string"
+      && typeof event.timestamp === "string"
+      && typeof event.type === "string"
+  );
 };
 
 const countDiagnostics = (diagnostics: Diagnostic[]): DiagnosticCounts => ({
@@ -1689,8 +1747,34 @@ const graphFiles = (
   command: Extract<CliCommand, { type: "graph" }>,
   compileChemd: CompileChemd,
   buildTrainingGraphIndex: BuildTrainingGraphIndex,
+  buildWorkspaceTrainingGraphIndex: BuildWorkspaceTrainingGraphIndex | undefined,
+  linkChemdModules: LinkChemdModules,
   options: NormalizedRunOptions
 ): number => {
+  if (buildWorkspaceTrainingGraphIndex) {
+    const runtimeTraces = command.tracePath
+      ? [readRuntimeTrace(command.tracePath, options.cwd)]
+      : [];
+    const linked = linkChemdModules(command.filePaths.map((filePath) => ({
+      path: filePath,
+      source: readSource(filePath, options.cwd)
+    })));
+    if (writeDiagnosticsErrorsIfPresent("graph", linked.diagnostics, options.stderr)) {
+      return EXIT_VALIDATION_FAILED;
+    }
+    const index = buildWorkspaceTrainingGraphIndex(linked, { runtimeTraces });
+    const output = command.format === "json"
+      ? JSON.stringify(index, null, 2)
+      : formatGraphIndexText(index);
+
+    options.stdout.write(`${output}\n`);
+    return EXIT_OK;
+  }
+
+  if (command.tracePath) {
+    throw new CliUsageError("Graph --trace requires workspace graph support.");
+  }
+
   const compiled = command.filePaths.map((filePath) => ({
     filePath,
     result: compileSourceFile(filePath, compileChemd, options)
@@ -2150,6 +2234,7 @@ const explainDiagnostic = (
 
 const normalizeRunOptions = (options: RunOptions): NormalizedRunOptions => ({
   buildTrainingGraphIndex: options.buildTrainingGraphIndex,
+  buildWorkspaceTrainingGraphIndex: options.buildWorkspaceTrainingGraphIndex,
   compileChemd: options.compileChemd,
   createChemdIncrementalCompiler: options.createChemdIncrementalCompiler,
   cwd: options.cwd ?? process.cwd(),
@@ -2205,6 +2290,8 @@ const executeCommand = (
       command,
       services.compileChemd,
       services.buildTrainingGraphIndex,
+      services.buildWorkspaceTrainingGraphIndex,
+      services.linkChemdModules,
       options
     ));
   }
@@ -2261,6 +2348,8 @@ export const runChemdCli = async (
     const compileChemd = options.compileChemd ?? compiler.compileChemd;
     const buildTrainingGraphIndex = options.buildTrainingGraphIndex
       ?? compiler.buildTrainingGraphIndexFromUnderstandings;
+    const buildWorkspaceTrainingGraphIndex = options.buildWorkspaceTrainingGraphIndex
+      ?? (options.buildTrainingGraphIndex ? undefined : compiler.buildWorkspaceTrainingGraphIndex);
     const createChemdIncrementalCompiler = options.createChemdIncrementalCompiler
       ?? compiler.createChemdIncrementalCompiler;
     const explainDiagnosticCode = compiler.explainDiagnosticCode;
@@ -2270,6 +2359,7 @@ export const runChemdCli = async (
 
     return executeCommand(command, {
       buildTrainingGraphIndex,
+      buildWorkspaceTrainingGraphIndex,
       compileChemd,
       createChemdIncrementalCompiler,
       explainDiagnosticCode,

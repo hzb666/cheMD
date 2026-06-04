@@ -22,7 +22,7 @@ export type {
 } from "./declaration-value-schema";
 
 export const DECLARATION_KINDS = [
-  "molecule", "material", "batch", "reaction", "result", "analysis", "sample",
+  "molecule", "material", "batch", "reaction", "reaction_template", "result", "analysis", "sample",
   "artifact", "condition_screen", "procedure", "observation", "trace", "agent_run"
 ] as const satisfies readonly ChemdProgramDeclarationKind[];
 
@@ -116,6 +116,7 @@ export const DECLARATION_SCHEMAS: readonly DeclarationSchema[] = [
       field("name", { value: stringValue }),
       field("route", { value: stringValue }),
       field("prev", { list: true, value: listValue(refOrLiteralValue("reaction")) }),
+      field("template", { value: refOrLiteralValue("reaction_template") }),
       field("reactants", { list: true, value: listValue(participantValue) }),
       field("products", { list: true, value: listValue(participantValue) }),
       field("reagents", { value: textValue }),
@@ -126,6 +127,15 @@ export const DECLARATION_SCHEMAS: readonly DeclarationSchema[] = [
       field("pressure", { value: quantityValue("pressure") }),
       field("atmosphere", { value: atmosphereValue }),
       field("rxn_smiles", { aliases: ["reaction_smiles"], value: chemicalValue("rxn_smiles") })
+    ]
+  },
+  {
+    kind: "reaction_template",
+    fields: [
+      field("name", { value: stringValue }),
+      field("family", { value: identifierValue }),
+      field("role", { aliases: ["roles"], list: true, value: listValue(identifierValue) }),
+      field("notes", { value: textValue })
     ]
   },
   {

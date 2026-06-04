@@ -15,7 +15,7 @@ export const buildRouteReferenceDiagnostics = (
 ): V03Diagnostic[] =>
   reactions.flatMap((reaction) =>
     (prevByReactionId.get(reaction.nodeId) ?? []).flatMap((reference) =>
-      isResolvedReactionReference(reference)
+      isResolvedReactionReference(reference) || isDeferredModuleReactionReference(reference)
         ? []
         : [createRouteReferenceDiagnostic(reference, reaction.nodeId)]
     )
@@ -127,6 +127,14 @@ export const isResolvedReactionReference = (
   reference.kind === "reference"
   && reference.resolved
   && reference.targetKind === "reaction";
+
+const isDeferredModuleReactionReference = (
+  reference: ReferenceOrLiteral
+): reference is ReferenceType =>
+  reference.kind === "reference"
+  && reference.resolved
+  && reference.targetKind === "unknown"
+  && reference.refId.includes(".");
 
 const createRouteReferenceDiagnostic = (
   reference: ReferenceOrLiteral,

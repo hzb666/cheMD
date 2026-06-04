@@ -9,6 +9,7 @@ export type ChemdProgramDeclarationKind =
   | "material"
   | "batch"
   | "reaction"
+  | "reaction_template"
   | "result"
   | "analysis"
   | "sample"
@@ -24,6 +25,7 @@ export type ChemdDeclaration =
   | MaterialDeclaration
   | BatchDeclaration
   | ReactionDeclaration
+  | ReactionTemplateDeclaration
   | ResultDeclaration
   | AnalysisDeclaration
   | SampleDeclaration
@@ -65,6 +67,10 @@ export interface BatchDeclaration extends ChemdFieldDeclarationBase {
 
 export interface ReactionDeclaration extends ChemdFieldDeclarationBase {
   kind: "reaction";
+}
+
+export interface ReactionTemplateDeclaration extends ChemdFieldDeclarationBase {
+  kind: "reaction_template";
 }
 
 export interface ResultDeclaration extends ChemdFieldDeclarationBase {

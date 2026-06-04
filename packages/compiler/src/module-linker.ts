@@ -291,6 +291,9 @@ const linkedReferenceRulesForNode = (
       { field: "standard", expected: ["reaction", "result"] }
     ];
   }
+  if (node.kind === "reaction") {
+    return [{ field: "template", expected: ["template"] }];
+  }
   return [];
 };
 
@@ -386,6 +389,7 @@ const toReferenceTargetKind = (
 ): ReferenceTargetKind => {
   const mapping: Partial<Record<ChemdProgramDeclarationKind, ReferenceTargetKind>> = {
     condition_screen: "condition_varies",
+    reaction_template: "template",
     agent_run: "unknown"
   };
   return mapping[kind] ?? kind as ReferenceTargetKind;

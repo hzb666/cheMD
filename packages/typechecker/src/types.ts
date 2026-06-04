@@ -167,6 +167,7 @@ export interface TypedReactionNode extends TypedNodeBase {
   kind: "reaction";
   route?: string;
   rxn_smiles?: string;
+  template?: ReferenceOrLiteral;
   prev: ReferenceOrLiteral[];
   next: ReferenceType[];
   reactants: ReferenceOrLiteral[];
@@ -302,6 +303,14 @@ export interface TypedConditionVariesNode extends TypedNodeBase {
   notes?: string;
 }
 
+export interface TypedReactionTemplateNode extends TypedNodeBase {
+  kind: "reaction_template";
+  name?: string;
+  family?: string;
+  roles: string[];
+  notes?: string;
+}
+
 export interface TypedConditionScreenNode extends TypedNodeBase {
   kind: "condition_screen";
   reaction?: ReferenceOrLiteral;
@@ -324,6 +333,7 @@ export interface TypedAgentRunNode extends TypedNodeBase {
 
 export type TypedSemanticNode =
   | TypedMoleculeNode
+  | TypedReactionTemplateNode
   | TypedMaterialNode
   | TypedBatchNode
   | TypedReactionNode
