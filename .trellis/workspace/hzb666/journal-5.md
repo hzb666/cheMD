@@ -549,3 +549,37 @@ Closed language-layer and CLI parity gaps, split new CLI logic, and verified non
 ### Next Steps
 
 - None - task complete
+
+
+## Session 205: Workspace reaction graph
+
+**Date**: 2026-06-04
+**Task**: Workspace reaction graph
+**Package**: compiler
+**Branch**: `develop`
+
+### Summary
+
+Extended chemd graph into a workspace-aware reaction graph superset with cross-document reaction semantics, runtime control signals, trace events, state snapshot ordering, and CLI trace input.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `78f7c76` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
