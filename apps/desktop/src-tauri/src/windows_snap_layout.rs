@@ -6,8 +6,8 @@ use serde::Deserialize;
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct WindowCaptionButtonRect {
-    pub(crate) x: f64,
-    pub(crate) y: f64,
+    pub(crate) top: f64,
+    pub(crate) right: f64,
     pub(crate) width: f64,
     pub(crate) height: f64,
     pub(crate) scale_factor: f64,
@@ -22,17 +22,18 @@ mod platform {
     };
     use tauri::{AppHandle, Emitter, Manager, State, Window};
     use windows_sys::Win32::{
-        Foundation::{HWND, LPARAM, LRESULT, WPARAM},
+        Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM},
         Graphics::Gdi::{GetStockObject, HBRUSH, NULL_BRUSH},
         System::LibraryLoader::GetModuleHandleW,
         UI::{
             Input::KeyboardAndMouse::{TrackMouseEvent, TME_LEAVE, TME_NONCLIENT, TRACKMOUSEEVENT},
             WindowsAndMessaging::{
-                CreateWindowExW, DefWindowProcW, DestroyWindow, LoadCursorW, RegisterClassExW,
-                SetCursor, SetWindowPos, CS_HREDRAW, CS_VREDRAW, HCURSOR, HTMAXBUTTON, HWND_TOP,
-                IDC_HAND, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_SHOWWINDOW, WM_NCHITTEST,
-                WM_NCLBUTTONDOWN, WM_NCLBUTTONUP, WM_NCMOUSELEAVE, WM_NCMOUSEMOVE, WM_SETCURSOR,
-                WNDCLASSEXW, WS_CHILD, WS_CLIPSIBLINGS, WS_OVERLAPPED, WS_VISIBLE,
+                CreateWindowExW, DefWindowProcW, DestroyWindow, GetClientRect, LoadCursorW,
+                RegisterClassExW, SetCursor, SetWindowPos, CS_HREDRAW, CS_VREDRAW, HCURSOR,
+                HTMAXBUTTON, HWND_TOP, IDC_HAND, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE,
+                SWP_SHOWWINDOW, WM_NCHITTEST, WM_NCLBUTTONDOWN, WM_NCLBUTTONUP, WM_NCMOUSELEAVE,
+                WM_NCMOUSEMOVE, WM_SETCURSOR, WNDCLASSEXW, WS_CHILD, WS_CLIPSIBLINGS,
+                WS_OVERLAPPED, WS_VISIBLE,
             },
         },
     };
@@ -45,9 +46,10 @@ mod platform {
     #[derive(Clone, Default)]
     pub(crate) struct WindowsSnapLayoutState;
 
-    struct PhysicalRect {
-        x: i32,
-        y: i32,
+    #[derive(Clone, Copy)]
+    struct PhysicalAnchor {
+        top: i32,
+        right: i32,
         width: i32,
         height: i32,
     }
@@ -81,15 +83,15 @@ mod platform {
 
         let _ = window.run_on_main_thread(move || unsafe {
             let hwnd = hwnd as HWND;
-            match rect.and_then(to_physical_rect) {
-                Some(rect) => install_or_update(hwnd, rect, app, label),
+            match rect.and_then(to_physical_anchor) {
+                Some(anchor) => install_or_update(hwnd, anchor, app, label),
                 None => remove(hwnd),
             }
         });
         Ok(())
     }
 
-    unsafe fn install_or_update(hwnd: HWND, rect: PhysicalRect, app: AppHandle, label: String) {
+    unsafe fn install_or_update(hwnd: HWND, anchor: PhysicalAnchor, app: AppHandle, label: String) {
         register_class();
         let key = hwnd_key(hwnd);
         let existing = snap_states().lock().ok().and_then(|mut states| {
@@ -99,10 +101,11 @@ mod platform {
             Some(state.overlay as HWND)
         });
         if let Some(overlay) = existing {
-            position_overlay(overlay, rect);
+            position_overlay(hwnd, overlay, anchor);
             return;
         }
 
+        let rect = overlay_rect(hwnd, anchor);
         let overlay = CreateWindowExW(
             0,
             SNAP_CLASS.as_ptr(),
@@ -133,7 +136,7 @@ mod platform {
                 },
             );
         }
-        position_overlay(overlay, rect);
+        position_overlay(hwnd, overlay, anchor);
     }
 
     unsafe fn remove(hwnd: HWND) {
@@ -147,7 +150,8 @@ mod platform {
         }
     }
 
-    unsafe fn position_overlay(overlay: HWND, rect: PhysicalRect) {
+    unsafe fn position_overlay(parent: HWND, overlay: HWND, anchor: PhysicalAnchor) {
+        let rect = overlay_rect(parent, anchor);
         SetWindowPos(
             overlay,
             HWND_TOP,
@@ -157,6 +161,36 @@ mod platform {
             rect.height,
             SWP_ASYNCWINDOWPOS | SWP_NOACTIVATE | SWP_SHOWWINDOW,
         );
+    }
+
+    unsafe fn overlay_rect(parent: HWND, anchor: PhysicalAnchor) -> PhysicalRect {
+        let mut client = RECT {
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+        };
+        let client_width = if GetClientRect(parent, &mut client) != 0 {
+            client.right.saturating_sub(client.left)
+        } else {
+            0
+        };
+        PhysicalRect {
+            x: client_width
+                .saturating_sub(anchor.right)
+                .saturating_sub(anchor.width)
+                .max(0),
+            y: anchor.top,
+            width: anchor.width,
+            height: anchor.height,
+        }
+    }
+
+    struct PhysicalRect {
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
     }
 
     unsafe extern "system" fn overlay_proc(
@@ -253,13 +287,18 @@ mod platform {
         states.values_mut().find(|state| state.overlay == key)
     }
 
-    fn to_physical_rect(rect: WindowCaptionButtonRect) -> Option<PhysicalRect> {
-        if rect.width <= 0.0 || rect.height <= 0.0 || rect.scale_factor <= 0.0 {
+    fn to_physical_anchor(rect: WindowCaptionButtonRect) -> Option<PhysicalAnchor> {
+        if rect.width <= 0.0
+            || rect.height <= 0.0
+            || rect.top < 0.0
+            || rect.right < 0.0
+            || rect.scale_factor <= 0.0
+        {
             return None;
         }
-        Some(PhysicalRect {
-            x: scale(rect.x, rect.scale_factor),
-            y: scale(rect.y, rect.scale_factor),
+        Some(PhysicalAnchor {
+            top: scale(rect.top, rect.scale_factor),
+            right: scale(rect.right, rect.scale_factor),
             width: scale(rect.width, rect.scale_factor).max(1),
             height: scale(rect.height, rect.scale_factor).max(1),
         })

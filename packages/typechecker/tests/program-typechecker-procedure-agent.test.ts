@@ -342,6 +342,65 @@ procedure proc_1 {
     ]);
   });
 
+  it("preserves local field references in source-level step IO", () => {
+    const result = typecheckProgram(parse(`module exp_field_step_io
+
+meta {
+  id: "exp-field-step-io"
+  title: "Field step IO"
+  date: "2026-06-04"
+}
+
+reaction rxn_1 {
+  name: "screen"
+}
+
+result res_main for @rxn_1 {
+  yield: 78%
+}
+
+procedure proc_1 {
+  step analyze_yield = analyze(inputs: [@res_main.yield])
+}
+`));
+    const step = result.stepGraph.steps.find((item) => item.stepId === "analyze_yield");
+
+    expect(step?.inputs).toEqual([
+      expect.objectContaining({
+        raw: "@res_main.yield",
+        reference: expect.objectContaining({
+          refId: "res_main.yield",
+          targetKind: "result",
+          resolved: true
+        })
+      })
+    ]);
+  });
+
+  it("accepts imported module references in procedure control conditions", () => {
+    const result = typecheckProgram(parse(`module exp_import_condition
+
+import shared_solvents as solvents from "./shared.chemd"
+
+meta {
+  id: "exp-import-condition"
+  title: "Import condition"
+  date: "2026-06-04"
+}
+
+procedure proc_1 {
+  until wait_shared(condition: "@solvents.rxn_shared.status == clean", max_iterations: 2) {
+    step observe_1 = observe()
+  }
+}
+`));
+
+    expect(result.diagnostics).not.toContainEqual(expect.objectContaining({
+      code: "E_PROCEDURE_CONTROL_CONDITION",
+      facts: expect.objectContaining({ ref: "solvents.rxn_shared.status" })
+    }));
+  });
+
   it("validates duplicate procedure step ids dependency refs and cycles", () => {
     const result = typecheckProgram(parse(`module exp_proc_invalid
 

@@ -36,7 +36,7 @@ export const buildProgramTypedGraph = (
   program: ChemdProgramDocument,
   symbols: ProgramSymbolTable,
   diagnostics: V03Diagnostic[],
-  options: Pick<TypecheckOptions, "procedureMode" | "referenceContext" | "reactionRouteContext"> = {}
+  options: Pick<TypecheckOptions, "procedureMode" | "referenceContext" | "reactionRouteContext" | "moduleImports"> = {}
 ): ProgramGraphResult => {
   const quantities: QuantityType[] = [];
   const typedNodes: TypedSemanticNode[] = [];
@@ -46,7 +46,10 @@ export const buildProgramTypedGraph = (
   const stepDiagnostics: V03Diagnostic[] = [];
 
   for (const declaration of program.declarations) {
-    const built = buildDeclarationNodes(declaration, symbols, options);
+    const built = buildDeclarationNodes(declaration, symbols, {
+      ...options,
+      moduleImports: options.moduleImports ?? program.imports
+    });
     typedNodes.push(...built.nodes);
     quantities.push(...built.quantities);
     diagnostics.push(...built.diagnostics);
@@ -84,7 +87,7 @@ const createGraphResult = (
 const buildDeclarationNodes = (
   declaration: ChemdDeclaration,
   symbols: ProgramSymbolTable,
-  options: Pick<TypecheckOptions, "procedureMode" | "referenceContext" | "reactionRouteContext">
+  options: Pick<TypecheckOptions, "procedureMode" | "referenceContext" | "reactionRouteContext" | "moduleImports">
 ): {
   nodes: TypedSemanticNode[];
   quantities: QuantityType[];

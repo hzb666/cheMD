@@ -1177,14 +1177,17 @@ reaction rxn_shared {
           status: "resolved"
         })
       ]);
-      expect(payload.modules[0].typedSemanticGraph.nodes).toContainEqual(
+      expect(payload.modules[0]).toMatchObject({
+        graph: expect.objectContaining({
+          nodeCount: expect.any(Number)
+        })
+      });
+      expect(payload.modules[0].typedSemanticGraph).toBeUndefined();
+      expect(payload.modules[0].references).toContainEqual(
         expect.objectContaining({
-          nodeId: "res_entry",
-          reaction: expect.objectContaining({
-            refId: "shared_solvents.rxn_shared",
-            targetKind: "reaction",
-            resolved: true
-          })
+          refId: "shared_solvents.rxn_shared",
+          targetKind: "reaction",
+          resolved: true
         })
       );
       expect(stderr.value).toBe("");
@@ -1204,6 +1207,22 @@ reaction rxn_shared {
         expect.objectContaining({ cache: expect.objectContaining({ status: "hit" }) })
       ]
     });
+    expect(result.stderr).toBe("");
+  });
+
+  it("keeps incremental CLI cache entries scoped by file path", async () => {
+    const result = await runInTempDir(["incremental", "first.chemd", "second.chemd", "--format", "json"], {
+      "first.chemd": validSource,
+      "second.chemd": validSource
+    });
+    const payload = JSON.parse(result.stdout);
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(payload.results).toEqual([
+      expect.objectContaining({ cache: expect.objectContaining({ status: "cold" }) }),
+      expect.objectContaining({ cache: expect.objectContaining({ status: "changed" }) })
+    ]);
+    expect(payload.results[0].cache.cacheKey).not.toBe(payload.results[1].cache.cacheKey);
     expect(result.stderr).toBe("");
   });
 

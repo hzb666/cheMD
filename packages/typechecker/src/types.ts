@@ -1,4 +1,5 @@
 import type {
+  ChemdImportDeclaration,
   ChemdProgramDeclarationKind,
   ChemdProgramDocument,
   ExternalReferenceTarget,
@@ -357,6 +358,7 @@ export interface TypecheckResult {
 export type ProcedureMode = "auto" | "explicit" | "lowered";
 
 export interface TypecheckOptions {
+  moduleImports?: ChemdImportDeclaration[];
   procedureMode?: ProcedureMode;
   referenceContext?: ReferenceContext;
   reactionRouteContext?: ReactionRouteContext;

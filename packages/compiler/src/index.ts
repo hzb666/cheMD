@@ -105,6 +105,7 @@ export {
 export {
   createChemdIncrementalCompiler,
   type ChemdIncrementalCacheInfo,
+  type ChemdIncrementalCompileContext,
   type ChemdIncrementalCacheStatus,
   type ChemdIncrementalCompileOutput,
   type ChemdIncrementalCompiler,

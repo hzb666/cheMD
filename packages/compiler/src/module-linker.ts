@@ -161,7 +161,7 @@ const patchLinkedReferences = <TValue>(
     return value;
   }
   if (isTypedReference(value)) {
-    const targetKind = referenceIndex.get(value.refId);
+    const targetKind = findReferenceTargetKind(value.refId, referenceIndex);
     return targetKind && value.targetKind === "unknown"
       ? { ...value, targetKind, resolved: true } as TValue
       : value;
@@ -178,6 +178,19 @@ const isTypedReference = (value: object): value is ReferenceType =>
   (value as { kind?: unknown }).kind === "reference" &&
   typeof (value as { refId?: unknown }).refId === "string" &&
   typeof (value as { targetKind?: unknown }).targetKind === "string";
+
+const findReferenceTargetKind = (
+  refId: string,
+  referenceIndex: Map<string, ReferenceTargetKind>
+): ReferenceTargetKind | undefined => {
+  const parts = refId.split(".");
+  for (let length = parts.length; length > 0; length -= 1) {
+    const candidate = parts.slice(0, length).join(".");
+    const targetKind = referenceIndex.get(candidate);
+    if (targetKind) return targetKind;
+  }
+  return referenceIndex.get(refId);
+};
 
 const toReferenceTargetKind = (
   kind: ChemdDeclaration["kind"]

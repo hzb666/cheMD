@@ -124,8 +124,8 @@ export interface ChemPreviewRenderOutput {
 }
 
 export interface WindowCaptionButtonRect {
-  x: number;
-  y: number;
+  top: number;
+  right: number;
   width: number;
   height: number;
   scaleFactor: number;

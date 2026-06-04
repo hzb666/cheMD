@@ -1,11 +1,11 @@
 import {
   useEffect,
-  useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
   type RefObject,
 } from "react";
 import { invokeCommand } from "../../utils";
+import type { WindowCaptionButtonRect } from "../../contracts";
 
 type SnapButtonState = {
   hovered: boolean;
@@ -88,17 +88,29 @@ export const useReferenceWindowMaximized = () => {
   return isMaximized;
 };
 
+export const buildReferenceSnapLayoutAnchor = (
+  rect: Pick<DOMRectReadOnly, "top" | "right" | "width" | "height">,
+  viewportWidth: number,
+  scaleFactor: number,
+): WindowCaptionButtonRect => ({
+  top: rect.top,
+  right: Math.max(0, viewportWidth - rect.right),
+  width: rect.width,
+  height: rect.height,
+  scaleFactor,
+});
+
 export const useReferenceSnapLayoutButtonRect = (buttonRef: RefObject<HTMLButtonElement | null>) => {
   const [buttonState, setButtonState] = useState<SnapButtonState>({
     hovered: false,
   });
-  const scheduleSyncRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     let disposed = false;
     let syncAnimationFrame = 0;
     let lastRectKey = "";
     let scaleFactor = window.devicePixelRatio;
+    let currentAnchor: WindowCaptionButtonRect | null = null;
     let resizeObserver: ResizeObserver | null = null;
     let unlistenWindowResize: (() => void) | undefined;
     let unlistenScaleChanged: (() => void) | undefined;
@@ -108,38 +120,56 @@ export const useReferenceSnapLayoutButtonRect = (buttonRef: RefObject<HTMLButton
       return currentWindow?.scaleFactor().catch(() => window.devicePixelRatio) ?? window.devicePixelRatio;
     };
 
-    const syncRect = async () => {
-      const button = buttonRef.current;
-      if (!button) return;
-      const rect = button.getBoundingClientRect();
-      if (disposed) return;
-      const rectKey = [
-        rect.left,
-        rect.top,
-        rect.width,
-        rect.height,
-        scaleFactor,
-      ].map((value) => value.toFixed(3)).join(":");
-      if (rectKey === lastRectKey) return;
+    const anchorKey = (rect: WindowCaptionButtonRect) => [
+      rect.top,
+      rect.right,
+      rect.width,
+      rect.height,
+      rect.scaleFactor,
+    ].map((value) => value.toFixed(3)).join(":");
+
+    const writeAnchor = async (rect: WindowCaptionButtonRect, force = false) => {
+      const rectKey = anchorKey(rect);
+      currentAnchor = rect;
+      if (!force && rectKey === lastRectKey) return;
       lastRectKey = rectKey;
-      await invokeCommand("set_window_maximize_button_rect", {
-        rect: {
-          x: rect.left,
-          y: rect.top,
-          width: rect.width,
-          height: rect.height,
-          scaleFactor,
-        },
-      });
+      await invokeCommand("set_window_maximize_button_rect", { rect });
+    };
+
+    const readAnchor = () => {
+      const button = buttonRef.current;
+      if (!button) return null;
+      const rect = button.getBoundingClientRect();
+      return buildReferenceSnapLayoutAnchor(rect, window.innerWidth, scaleFactor);
+    };
+
+    const syncMeasuredAnchor = async () => {
+      const rect = readAnchor();
+      if (!rect) return;
+      if (disposed) return;
+      await writeAnchor(rect);
+    };
+
+    const syncCachedAnchor = async () => {
+      const rect = currentAnchor ?? readAnchor();
+      if (!rect) return;
+      if (disposed) return;
+      await writeAnchor(rect, true);
     };
 
     const scheduleSync = () => {
       cancelAnimationFrame(syncAnimationFrame);
       syncAnimationFrame = requestAnimationFrame(() => {
-        syncRect().catch(ignoreNativeWindowBoundaryError);
+        syncMeasuredAnchor().catch(ignoreNativeWindowBoundaryError);
       });
     };
-    scheduleSyncRef.current = scheduleSync;
+
+    const scheduleCachedSync = () => {
+      cancelAnimationFrame(syncAnimationFrame);
+      syncAnimationFrame = requestAnimationFrame(() => {
+        syncCachedAnchor().catch(ignoreNativeWindowBoundaryError);
+      });
+    };
 
     const syncScaleFactor = () => {
       readScaleFactor().then((nextScaleFactor) => {
@@ -158,18 +188,15 @@ export const useReferenceSnapLayoutButtonRect = (buttonRef: RefObject<HTMLButton
       resizeObserver = new ResizeObserver(scheduleSync);
       resizeObserver.observe(buttonRef.current);
     }
-    window.addEventListener("resize", scheduleSync);
     getReferenceTauriWindow().then(async (currentWindow) => {
-      unlistenWindowResize = await currentWindow?.onResized(scheduleSync);
+      unlistenWindowResize = await currentWindow?.onResized(scheduleCachedSync);
       unlistenScaleChanged = await currentWindow?.onScaleChanged(syncScaleFactor);
     }).catch(ignoreNativeWindowBoundaryError);
 
     return () => {
       disposed = true;
-      scheduleSyncRef.current = null;
       cancelAnimationFrame(syncAnimationFrame);
       resizeObserver?.disconnect();
-      window.removeEventListener("resize", scheduleSync);
       unlistenWindowResize?.();
       unlistenScaleChanged?.();
       invokeCommand("set_window_maximize_button_rect", { rect: null }).catch(ignoreNativeWindowBoundaryError);

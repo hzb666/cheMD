@@ -149,11 +149,14 @@ const dottedReference = (
   if (!second) {
     return undefined;
   }
+  if (parser.isKnownModuleName(first.raw)) {
+    const field = parser.match("dot")
+      ? parser.consume("identifier", "Expected module reference field after '.'.")
+      : undefined;
+    return moduleReference(parser, atToken, first, second, field);
+  }
   if (parser.match("dot")) {
     return fieldReference(parser, atToken, `${first.raw}.${second.raw}`);
-  }
-  if (parser.isKnownModuleName(first.raw)) {
-    return moduleReference(parser, atToken, first, second);
   }
   return fieldReference(parser, atToken, first.raw, second);
 };
@@ -198,14 +201,16 @@ const moduleReference = (
   parser: ProgramValueParser,
   atToken: ProgramToken,
   moduleName: ProgramToken,
-  target: ProgramToken
+  target: ProgramToken,
+  field?: ProgramToken
 ): ChemdReferenceExpr => ({
   type: "reference",
   refKind: "module",
-  raw: parser.rawBetween(atToken, target),
+  raw: parser.rawBetween(atToken, field ?? target),
   target: target.raw,
   moduleName: moduleName.raw,
-  sourceSpan: spanFromTokens(atToken, target)
+  ...(field ? { field: field.raw } : {}),
+  sourceSpan: spanFromTokens(atToken, field ?? target)
 });
 
 const fieldReference = (

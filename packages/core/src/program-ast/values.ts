@@ -94,6 +94,7 @@ export interface ChemdFieldReferenceExpr extends ChemdReferenceExprBase {
 export interface ChemdModuleReferenceExpr extends ChemdReferenceExprBase {
   refKind: "module";
   moduleName: string;
+  field?: string;
 }
 
 export interface ChemdExternalDocumentReferenceExpr

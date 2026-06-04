@@ -1,7 +1,6 @@
 import type {
   ChemdIncrementalCompilerSnapshot,
   ChemdModuleInput,
-  CompileResult,
   LinkChemdModulesResult
 } from "@chemd/compiler";
 import type { Diagnostic } from "@chemd/core";
@@ -46,12 +45,25 @@ interface ProgramSummary {
   docCount: number;
 }
 
+interface LinkGraphSummary {
+  nodeCount: number;
+  quantityCount: number;
+  stepCount: number;
+}
+
+interface LinkReferenceSummary {
+  refId: string;
+  resolved: boolean;
+  targetKind: string;
+}
+
 interface LinkModuleReport {
   diagnostics: Diagnostic[];
   documentId: string;
   filePath?: string;
+  graph: LinkGraphSummary;
   moduleName: string;
-  typedSemanticGraph: CompileResult["typedSemanticGraph"];
+  references: LinkReferenceSummary[];
 }
 
 interface LinkReport {
@@ -119,7 +131,7 @@ export const incrementalFiles = (
   const results = command.filePaths.map((filePath) =>
     toIncrementalFileReport(
       filePath,
-      compiler.compile(options.readSource(filePath, options.cwd))
+      compiler.compile(options.readSource(filePath, options.cwd), {}, { documentKey: filePath })
     )
   );
   const diagnostics = results.flatMap((item) => item.diagnostics);
@@ -144,9 +156,66 @@ const toLinkModuleReport = (
   diagnostics: module.coreResult.diagnostics,
   documentId: module.documentId,
   ...(module.input.path ? { filePath: module.input.path } : {}),
+  graph: summarizeTypedGraph(module.coreResult.typedSemanticGraph),
   moduleName: module.moduleName,
-  typedSemanticGraph: module.coreResult.typedSemanticGraph
+  references: collectReferenceSummaries(module.coreResult.typedSemanticGraph.nodes)
 });
+
+const summarizeTypedGraph = (
+  graph: LinkChemdModulesResult["modules"][number]["coreResult"]["typedSemanticGraph"]
+): LinkGraphSummary => ({
+  nodeCount: graph.nodes.length,
+  quantityCount: graph.quantities.length,
+  stepCount: graph.nodes.filter((node) => node.kind === "step").length
+});
+
+const collectReferenceSummaries = (value: unknown): LinkReferenceSummary[] => {
+  const references: LinkReferenceSummary[] = [];
+  const seen = new Set<object>();
+  collectReferences(value, seen, references);
+  return uniqueReferenceSummaries(references);
+};
+
+const collectReferences = (
+  value: unknown,
+  seen: Set<object>,
+  references: LinkReferenceSummary[]
+): void => {
+  if (!value || typeof value !== "object" || seen.has(value)) return;
+  seen.add(value);
+  if (isReferenceSummary(value)) {
+    references.push({
+      refId: value.refId,
+      resolved: value.resolved,
+      targetKind: value.targetKind
+    });
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectReferences(item, seen, references));
+    return;
+  }
+  Object.values(value).forEach((item) => collectReferences(item, seen, references));
+};
+
+const isReferenceSummary = (
+  value: object
+): value is LinkReferenceSummary & { kind: "reference" } =>
+  (value as { kind?: unknown }).kind === "reference"
+  && typeof (value as { refId?: unknown }).refId === "string"
+  && typeof (value as { targetKind?: unknown }).targetKind === "string"
+  && typeof (value as { resolved?: unknown }).resolved === "boolean";
+
+const uniqueReferenceSummaries = (
+  references: LinkReferenceSummary[]
+): LinkReferenceSummary[] => {
+  const seen = new Set<string>();
+  return references.filter((reference) => {
+    const key = `${reference.refId}:${reference.targetKind}:${reference.resolved}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
 
 const toLinkReport = (result: LinkChemdModulesResult): LinkReport => ({
   schemaVersion: "chemd-link/v0.1",

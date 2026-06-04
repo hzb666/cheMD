@@ -240,12 +240,25 @@ const resolveModuleReference = (
     const declaration = symbols.declarationsByQualifiedId.get(
       `${reference.moduleName}.${reference.target}`
     );
+    if (declaration && reference.field && "fields" in declaration) {
+      const value = declaration.fields[reference.field];
+      return value === undefined ? unresolved(reference) : { status: "resolved", value };
+    }
     return declaration ? { status: "resolved", value: declaration } : unresolved(reference);
   }
 
   const imported = symbols.imports.get(reference.moduleName);
   return imported
-    ? { status: "resolved", value: { kind: "imported_module_reference", moduleName: imported.moduleName, from: imported.from, target: reference.target } }
+    ? {
+        status: "resolved",
+        value: {
+          kind: "imported_module_reference",
+          moduleName: imported.moduleName,
+          from: imported.from,
+          target: reference.target,
+          ...(reference.field ? { field: reference.field } : {})
+        }
+      }
     : unresolved(reference);
 };
 

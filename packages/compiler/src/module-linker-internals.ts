@@ -2,6 +2,7 @@ import type {
   ChemdImportDeclaration,
   ChemdProgramDocument,
   ChemdReferenceExpr,
+  ProcedureStatement,
   Diagnostic
 } from "@chemd/core";
 
@@ -199,8 +200,46 @@ const collectModuleReferences = (
 
   visit(program.meta);
   visit(program.declarations);
+  references.push(...collectProcedureConditionModuleReferences(program));
 
   return references;
+};
+
+const collectProcedureConditionModuleReferences = (
+  program: ChemdProgramDocument
+): Array<ChemdReferenceExpr & { refKind: "module" }> =>
+  program.declarations.flatMap((declaration) =>
+    "children" in declaration
+      ? declaration.children.flatMap(collectStatementConditionReferences)
+      : []
+  );
+
+const collectStatementConditionReferences = (
+  statement: ProcedureStatement
+): Array<ChemdReferenceExpr & { refKind: "module" }> => {
+  if (statement.kind !== "control") return [];
+  const own = conditionModuleReferences(statement.args.condition);
+  return [
+    ...own,
+    ...statement.children.flatMap(collectStatementConditionReferences)
+  ];
+};
+
+const conditionModuleReferences = (
+  value: Extract<ProcedureStatement, { kind: "control" }>["args"][string] | undefined
+): Array<ChemdReferenceExpr & { refKind: "module" }> => {
+  if (value?.type !== "string") return [];
+  return Array.from(
+    value.value.matchAll(/@([A-Za-z][A-Za-z0-9_]*)\.([A-Za-z][A-Za-z0-9_]*)(?:\.[A-Za-z0-9_.-]+)?/g),
+    (match) => ({
+      type: "reference",
+      refKind: "module",
+      raw: match[0] ?? "",
+      target: match[2] ?? "",
+      moduleName: match[1] ?? "",
+      sourceSpan: value.sourceSpan
+    })
+  );
 };
 
 const visitReferenceValue = (

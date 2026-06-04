@@ -196,4 +196,155 @@ reaction rxn_shared {
       }
     });
   });
+
+  it("accepts linked module references in procedure control conditions", () => {
+    const result = linkChemdModules([
+      {
+        path: "entry.chemd",
+        source: `module exp_entry
+
+import shared_solvents as solvents from "./shared-solvents.chemd"
+
+meta {
+  id: "exp-entry"
+  title: "Entry"
+  date: "2026-06-04"
+}
+
+procedure proc_1 {
+  until wait_shared(condition: "@solvents.rxn_shared.status == clean", max_iterations: 2) {
+    step observe_1 = observe()
+  }
+}
+`
+      },
+      {
+        path: "./shared-solvents.chemd",
+        source: `module shared_solvents
+
+meta {
+  id: "shared-solvents"
+  title: "Shared solvents"
+  date: "2026-06-04"
+}
+
+reaction rxn_shared {
+  name: "shared"
+}
+`
+      }
+    ]);
+
+    expect(result.diagnostics).not.toContainEqual(expect.objectContaining({
+      code: "E_PROCEDURE_CONTROL_CONDITION",
+      facts: expect.objectContaining({ ref: "solvents.rxn_shared.status" })
+    }));
+    expect(result.diagnostics).not.toContainEqual(expect.objectContaining({
+      code: "E_MODULE_SYMBOL_NOT_FOUND"
+    }));
+  });
+
+  it("diagnoses missing linked module references in procedure control conditions", () => {
+    const result = linkChemdModules([
+      {
+        path: "entry.chemd",
+        source: `module exp_entry
+
+import shared_solvents as solvents from "./shared-solvents.chemd"
+
+meta {
+  id: "exp-entry"
+  title: "Entry"
+  date: "2026-06-04"
+}
+
+procedure proc_1 {
+  until wait_shared(condition: "@solvents.missing_rxn.status == clean", max_iterations: 2) {
+    step observe_1 = observe()
+  }
+}
+`
+      },
+      {
+        path: "./shared-solvents.chemd",
+        source: `module shared_solvents
+
+meta {
+  id: "shared-solvents"
+  title: "Shared solvents"
+  date: "2026-06-04"
+}
+
+reaction rxn_shared {
+  name: "shared"
+}
+`
+      }
+    ]);
+
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({
+      code: "E_MODULE_SYMBOL_NOT_FOUND",
+      facts: expect.objectContaining({
+        alias: "solvents",
+        target: "missing_rxn",
+        reference: "@solvents.missing_rxn.status"
+      })
+    }));
+  });
+
+  it("materializes cross-module field references in source-level step IO", () => {
+    const result = linkChemdModules([
+      {
+        path: "entry.chemd",
+        source: `module exp_entry
+
+import shared_solvents as solvents from "./shared-solvents.chemd"
+
+meta {
+  id: "exp-entry"
+  title: "Entry"
+  date: "2026-06-04"
+}
+
+procedure proc_1 {
+  step charge = charge(inputs: [@solvents.rxn_shared.name])
+}
+`
+      },
+      {
+        path: "./shared-solvents.chemd",
+        source: `module shared_solvents
+
+meta {
+  id: "shared-solvents"
+  title: "Shared solvents"
+  date: "2026-06-04"
+}
+
+reaction rxn_shared {
+  name: "shared"
+}
+`
+      }
+    ]);
+    const charge = result.entry.coreResult.typedSemanticGraph.nodes.find(
+      (node) => node.kind === "step" && node.nodeId === "charge"
+    );
+
+    expect(result.diagnostics).not.toContainEqual(expect.objectContaining({
+      code: "E_UNRESOLVED_PROGRAM_REFERENCE"
+    }));
+    expect(charge).toMatchObject({
+      inputs: [
+        expect.objectContaining({
+          raw: "@solvents.rxn_shared.name",
+          reference: expect.objectContaining({
+            refId: "shared_solvents.rxn_shared.name",
+            targetKind: "reaction",
+            resolved: true
+          })
+        })
+      ]
+    });
+  });
 });

@@ -52,6 +52,18 @@ describe("createChemdIncrementalCompiler", () => {
     expect(changed.cache.optionsHash).not.toBe(first.cache.optionsHash);
   });
 
+  it("keeps cache entries scoped by document key", () => {
+    const compiler = createChemdIncrementalCompiler();
+    const first = compiler.compile(baseSource, {}, { documentKey: "first.chemd" });
+    const second = compiler.compile(baseSource, {}, { documentKey: "second.chemd" });
+
+    expect(first.cache.status).toBe("cold");
+    expect(second.cache.status).toBe("changed");
+    expect(second.cache.cacheKey).not.toBe(first.cache.cacheKey);
+    expect(second.cache.sourceHash).toBe(first.cache.sourceHash);
+    expect(second.cache.documentKey).toBe("second.chemd");
+  });
+
   it("protects stored cache metadata from returned object mutation", () => {
     const compiler = createChemdIncrementalCompiler();
     const first = compiler.compile(baseSource);

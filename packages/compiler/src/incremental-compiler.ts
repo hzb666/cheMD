@@ -9,6 +9,8 @@ export type ChemdIncrementalCacheStatus = "cold" | "hit" | "changed";
 export interface ChemdIncrementalCacheInfo {
   status: ChemdIncrementalCacheStatus;
   cacheKey: string;
+  documentKey?: string;
+  documentKeyHash?: string;
   sourceHash: string;
   optionsHash: string;
   revision: number;
@@ -19,12 +21,20 @@ export interface ChemdIncrementalCompileOutput {
   cache: ChemdIncrementalCacheInfo;
 }
 
+export interface ChemdIncrementalCompileContext {
+  documentKey?: string;
+}
+
 export interface ChemdIncrementalCompilerSnapshot {
   entries: ChemdIncrementalCacheInfo[];
 }
 
 export interface ChemdIncrementalCompiler {
-  compile(source: string, options?: CompileOptions): ChemdIncrementalCompileOutput;
+  compile(
+    source: string,
+    options?: CompileOptions,
+    context?: ChemdIncrementalCompileContext
+  ): ChemdIncrementalCompileOutput;
   invalidate(cacheKey?: string): void;
   snapshot(): ChemdIncrementalCompilerSnapshot;
 }
@@ -41,11 +51,16 @@ export const createChemdIncrementalCompiler = (): ChemdIncrementalCompiler => {
   let revision = 0;
 
   return {
-    compile(source, options = {}) {
+    compile(source, options = {}, context = {}) {
+      const documentKeyHash = context.documentKey
+        ? hashString(context.documentKey)
+        : undefined;
       const sourceHash = hashString(source);
       const optionsKey = stableStringify(options);
       const optionsHash = hashString(optionsKey);
-      const cacheKey = `${sourceHash}:${optionsHash}`;
+      const cacheKey = [documentKeyHash, sourceHash, optionsHash]
+        .filter(Boolean)
+        .join(":");
       const cached = entries.get(cacheKey);
 
       if (cached?.source === source && cached.optionsKey === optionsKey) {
@@ -60,6 +75,8 @@ export const createChemdIncrementalCompiler = (): ChemdIncrementalCompiler => {
       const info: ChemdIncrementalCacheInfo = {
         status: entries.size === 0 ? "cold" : "changed",
         cacheKey,
+        ...(context.documentKey ? { documentKey: context.documentKey } : {}),
+        ...(documentKeyHash ? { documentKeyHash } : {}),
         sourceHash,
         optionsHash,
         revision

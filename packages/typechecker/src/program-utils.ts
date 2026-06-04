@@ -139,9 +139,10 @@ export const referenceToTyped = (
 ): ReferenceType => {
   const imported = readImportedModuleReference(reference);
   if (imported) {
+    const fieldSuffix = imported.field ? `.${imported.field}` : "";
     return {
       kind: "reference",
-      refId: `${imported.moduleName}.${imported.target}`,
+      refId: `${imported.moduleName}.${imported.target}${fieldSuffix}`,
       targetKind: "unknown",
       resolved: true
     };
@@ -158,17 +159,21 @@ export const referenceToTyped = (
   };
 };
 
-const readImportedModuleReference = (
+export const readImportedModuleReference = (
   reference: ChemdReferenceExpr
-): { moduleName: string; target: string } | undefined => {
+): { field?: string; moduleName: string; target: string } | undefined => {
   const value = reference.resolved?.value;
   if (!value || typeof value !== "object") return undefined;
   if ((value as { kind?: unknown }).kind !== "imported_module_reference") {
     return undefined;
   }
-  const imported = value as { moduleName?: unknown; target?: unknown };
+  const imported = value as { field?: unknown; moduleName?: unknown; target?: unknown };
   return typeof imported.moduleName === "string" && typeof imported.target === "string"
-    ? { moduleName: imported.moduleName, target: imported.target }
+    ? {
+        ...(typeof imported.field === "string" ? { field: imported.field } : {}),
+        moduleName: imported.moduleName,
+        target: imported.target
+      }
     : undefined;
 };
 
