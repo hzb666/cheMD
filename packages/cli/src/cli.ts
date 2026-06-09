@@ -90,6 +90,7 @@ const usage = [
   "  chemd diff <old-file> <new-file> [--format text|json]",
   "  chemd changed [--base <ref>] [--format text|json]",
   "  chemd fix <file> [--format text|json] [--max-iterations <n>] [--write]",
+  "  chemd repair <file> [--format text|json] [--max-iterations <n>] [--write]",
   "  chemd agent-loop <file> --driver <cmd> [--driver-arg <arg> ...] [--format text|json] [--max-iterations <n>] [--max-fix-iterations <n>] [--write]"
 ].join("\n");
 
@@ -968,7 +969,7 @@ export const parseChemdCliArgs = (argv: string[]): CliCommand => {
     return parseChangedArgs(rest);
   }
 
-  if (command === "fix") {
+  if (command === "fix" || command === "repair") {
     return parseFixArgs(rest);
   }
 

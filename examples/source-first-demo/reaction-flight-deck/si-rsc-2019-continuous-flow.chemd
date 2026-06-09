@@ -1,0 +1,67 @@
+module si_rsc_2019_continuous_flow
+
+import demo_shared_reagents as shared from "./shared-reagents.chemd"
+
+meta {
+  id: "si-rsc-2019-continuous-flow"
+  title: "RSC 2019 ESI continuous-flow Pd-beta-CD Suzuki kinetics"
+  date: "2019-06-06"
+  primary_reaction: @rxn_rsc_2019_flow_suzuki
+  primary_result: @res_rsc_2019_flow_kinetics
+}
+
+reaction rxn_rsc_2019_flow_suzuki {
+  name: "Continuous-flow Suzuki-Miyaura reaction of 4-bromoanisole"
+  reactants: [@shared.mol_4_bromoanisole, @shared.mol_phenylboronic_acid]
+  products: [@shared.mol_4_methoxybiphenyl]
+  catalyst: @shared.cat_pd_beta_cyclodextrin
+  solvent: [@shared.mol_water, @shared.mol_ethanol]
+  temperature: 40 C
+  time: 2 min
+}
+
+artifact art_rsc_2019_si {
+  kind: supporting_information
+  ref: @rxn_rsc_2019_flow_suzuki
+  path: "https://www.rsc.org/suppdata/c9/re/c9re00159j/c9re00159j1.pdf"
+  notes: "Electronic supplementary information for DOI 10.1039/C9RE00159J."
+}
+
+analysis ana_rsc_2019_gcms {
+  type: gcms
+  ref: @rxn_rsc_2019_flow_suzuki
+  artifact: [@art_rsc_2019_si]
+  notes: "ESI Figure S1 reports GC-MS at 40 C and 2 min residence time for 4-bromoanisole and 4-methoxybiphenyl."
+}
+
+analysis ana_rsc_2019_kinetics {
+  type: literature_extract
+  ref: @rxn_rsc_2019_flow_suzuki
+  artifact: [@art_rsc_2019_si]
+  notes: "Article reports a water-ethanol solvent system, continuous microreactor kinetics, negligible mass-transfer limitation, and oxidative addition as rate determining."
+}
+
+result res_rsc_2019_flow_kinetics for @rxn_rsc_2019_flow_suzuki {
+  product: @shared.mol_4_methoxybiphenyl
+  status: success
+  notes: "Kinetic record; conversion/yield is intentionally omitted because the demo source only extracts qualitative SI facts."
+}
+
+procedure proc_rsc_2019_flow_suzuki for @rxn_rsc_2019_flow_suzuki {
+  evidence: [@art_rsc_2019_si, @ana_rsc_2019_gcms, @ana_rsc_2019_kinetics]
+
+  step prepare_aqueous_phase = charge(materials: "aqueous Pd-beta-cyclodextrin stream", inputs: [@shared.cat_pd_beta_cyclodextrin, @shared.mol_water])
+  step prepare_organic_phase = charge(materials: "4-bromoanisole stream", inputs: [@shared.mol_4_bromoanisole, @shared.mol_ethanol], depends_on: [prepare_aqueous_phase])
+  step add_boronic_acid = add(materials: "phenylboronic acid", inputs: [@shared.mol_phenylboronic_acid], depends_on: [prepare_organic_phase])
+  step transfer_to_reactor = transfer(materials: "continuous-flow reaction stream", inputs: [@shared.mol_4_bromoanisole, @shared.mol_phenylboronic_acid, @shared.cat_pd_beta_cyclodextrin], depends_on: [add_boronic_acid])
+  step hold_residence = hold(duration: 2 min, temperature: 40 C, depends_on: [transfer_to_reactor])
+  step analyze_stream = analyze(type: gcms, inputs: [@shared.mol_4_bromoanisole, @shared.mol_4_methoxybiphenyl], depends_on: [hold_residence])
+}
+
+condition_screen screen_rsc_2019_residence_temperature {
+  reaction: @rxn_rsc_2019_flow_suzuki
+  standard: @res_rsc_2019_flow_kinetics
+  factor: [temperature, residence_time, flow_rate]
+  outcome: [conversion, rate_constant, activation_energy]
+  notes: "SI figures cover residence-time and temperature-dependent continuous-flow kinetics."
+}

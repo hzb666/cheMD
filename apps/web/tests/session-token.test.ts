@@ -20,7 +20,7 @@ const createMemoryStorage = (): StorageLike => {
 };
 
 describe("session token fallbacks", () => {
-  it("falls back to a legacy chemd session token when secure crypto is unavailable", () => {
+  it("falls back to a generated chemd session token when secure crypto is unavailable", () => {
     const originalCrypto = globalThis.crypto;
     const originalWindow = globalThis.window;
     const originalDocument = globalThis.document;

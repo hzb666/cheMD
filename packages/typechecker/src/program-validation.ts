@@ -191,7 +191,7 @@ const validateListValue = (
   externalTargetIndex: ExternalTargetIndex
 ): V03Diagnostic[] => {
   if (value.type !== "list") {
-    return [createValueDiagnostic(declaration, field, value, "list")];
+    return validateValueSchema(declaration, field, value, schema.item, symbols, externalTargetIndex);
   }
   return value.items.flatMap((item) =>
     validateValueSchema(declaration, field, item, schema.item, symbols, externalTargetIndex)
@@ -245,6 +245,9 @@ const valueMatchesSchema = (
   schema: Exclude<DeclarationFieldValueSchema, { kind: "list" | "record" }>
 ): boolean => {
   if (schema.kind === "quantity") return value.type === "quantity";
+  if (schema.kind === "symbolic_quantity") {
+    return value.type === "quantity" || value.type === "identifier" || value.type === "string";
+  }
   if (schema.kind === "percent") return value.type === "percent";
   if (schema.kind === "boolean") return value.type === "boolean";
   if (schema.kind === "float") return value.type === "number";

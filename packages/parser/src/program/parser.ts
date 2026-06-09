@@ -6,11 +6,9 @@ import type {
   ChemdMetaDeclaration,
   ChemdModuleDeclaration,
   ChemdProgramDocument,
-  Diagnostic,
-  SourceSpan
+  SourceSpan,
 } from "@chemd/core";
 
-import { detectLegacySyntax } from "./errors";
 import { lexProgram } from "./lexer";
 import { parseDeclarations } from "./parse-declarations";
 import { parseMetaDeclaration } from "./parse-meta";
@@ -45,13 +43,8 @@ export const parseChemdProgram = (
   source: string,
   options: ParseChemdProgramOptions = {}
 ): ChemdProgramDocument => {
-  const diagnostics = detectLegacySyntax(source);
-  if (diagnostics.some((item) => item.code.startsWith("E_LEGACY_"))) {
-    return createEmptyProgramDocument(source, diagnostics, options);
-  }
-
   const lexed = lexProgram(source);
-  diagnostics.push(...lexed.diagnostics);
+  const diagnostics = [...lexed.diagnostics];
 
   const cursor = new ProgramParserCursor(source, lexed.tokens, diagnostics);
   const docs: ChemdDocComment[] = [];
@@ -156,35 +149,6 @@ const parseImportDeclaration = (
     sourceSpan: cursor.sourceSpanFrom(start, from)
   };
 };
-
-const createEmptyProgramDocument = (
-  source: string,
-  diagnostics: Diagnostic[],
-  options: ParseChemdProgramOptions
-): ChemdProgramDocument => ({
-  type: "program_document",
-  schemaVersion: "chemd-program-ast/v1",
-  sourceLanguage: "chemd/program-v1",
-  module: { kind: "module", name: "unknown", docs: [], sourceSpan: emptySpan() },
-  meta: {
-    kind: "meta",
-    id: "",
-    title: "",
-    date: "",
-    fields: {},
-    docs: [],
-    sourceSpan: emptySpan()
-  },
-  imports: [],
-  declarations: [],
-  docs: [],
-  diagnostics,
-  source,
-  sourceSpan: sourceSpanForSource(source),
-  renderSelection: options.renderSelection
-});
-
-const emptySpan = (): SourceSpan => ({});
 
 const sourceSpanForSource = (source: string): SourceSpan => {
   const lines = source.split(/\r\n|\n|\r/);

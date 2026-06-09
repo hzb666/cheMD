@@ -101,7 +101,7 @@ describe("reaction block rendering", () => {
       "reaction rxn1 {",
       "  reactants: [\"substrate6\", \"acyl-silane7\"]",
       "  products: [\"azetidine5\"]",
-      "  reagents: \"TMEDA, sBuLi\"",
+      "  reagents: [\"TMEDA\", \"sBuLi\"]",
       "  solvent: \"THF\"",
       "  temperature: -78 C",
       "  time: 15 min",

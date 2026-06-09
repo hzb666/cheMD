@@ -14,6 +14,7 @@ import type {
   AtmosphereValue,
   QuantityClass,
   QuantityParseContext,
+  QuantityShorthand,
   QuantityType,
   StatusLabel
 } from "./types";
@@ -70,10 +71,30 @@ const COMPACT_SCALAR_PATTERN = new RegExp(`^(${NUMBER_PATTERN})(${COMPACT_UNIT_P
 const isPercentSignLiteral = (quantityClass: QuantityClass, rawUnit: string): boolean =>
   quantityClass === "percent" && rawUnit.trim() === "%";
 
-const normalizeTemperatureShorthand = (raw: string): "room_temperature" | undefined =>
-  raw.trim().replace(/\s+/g, "").replace(/\./g, "").toLowerCase() === "rt"
-    ? "room_temperature"
-    : undefined;
+const normalizeQuantityRaw = (raw: string): string => {
+  const trimmed = raw.trim();
+  if (
+    (trimmed.startsWith("\"") && trimmed.endsWith("\""))
+    || (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+};
+
+const normalizeTemperatureShorthand = (raw: string): QuantityShorthand | undefined => {
+  const compact = normalizeQuantityRaw(raw).replace(/\s+/g, "").replace(/\./g, "").toLowerCase();
+  if (["rt", "roomtemp", "roomtemperature", "ambienttemp", "ambienttemperature"].includes(compact)) {
+    return "room_temperature";
+  }
+  if (compact === "reflux") {
+    return "reflux";
+  }
+  if (["icebath", "ice-bath"].includes(compact)) {
+    return "ice_bath";
+  }
+  return undefined;
+};
 
 const isOvernight = (raw: string): boolean => raw.trim().toLowerCase() === "overnight";
 
@@ -202,7 +223,7 @@ export const parseQuantity = (
     return {};
   }
 
-  const normalizedRaw = raw.trim();
+  const normalizedRaw = normalizeQuantityRaw(raw);
   const shorthand = parseShorthandQuantity(normalizedRaw, quantityClass, context);
   if (shorthand) {
     return shorthand;
@@ -343,15 +364,26 @@ const parseShorthandQuantity = (
   context: QuantityParseContext
 ): { quantity: QuantityType } | undefined => {
   const roomTemperature = quantityClass === "temperature" ? normalizeTemperatureShorthand(raw) : undefined;
-  if (roomTemperature) {
+  if (roomTemperature === "room_temperature") {
     return {
       quantity: {
-        ...createRawQuantity(raw, quantityClass, context),
+        ...createRawQuantity(normalizeQuantityRaw(raw), quantityClass, context),
         valueKind: "shorthand",
         shorthand: roomTemperature,
         canonicalUnit: "C",
         normalizedText: "room temperature",
         provenance: createQuantityProvenance(context, "quantity.room_temperature")
+      }
+    };
+  }
+  if (roomTemperature === "reflux" || roomTemperature === "ice_bath") {
+    return {
+      quantity: {
+        ...createRawQuantity(normalizeQuantityRaw(raw), quantityClass, context),
+        valueKind: "shorthand",
+        shorthand: roomTemperature,
+        normalizedText: roomTemperature === "reflux" ? "reflux" : "ice bath",
+        provenance: createQuantityProvenance(context, `quantity.${roomTemperature}`)
       }
     };
   }
@@ -492,7 +524,7 @@ const parsePhQuantity = (
 
 const isTemperatureProgram = (raw: string): boolean =>
   /(?:->|\bto\b|\bfrom\b|\bover\b)/i.test(raw)
-  && /(?:rt|r\.t\.|-?\d+(?:\.\d+)?\s*(?:°\s*C|℃|[CFK]))/i.test(raw);
+  && /(?:rt|r\.t\.|room\s+temperature|ambient\s+temperature|reflux|ice\s+bath|-?\d+(?:\.\d+)?\s*(?:°\s*C|℃|[CFK]))/i.test(raw);
 
 const parseTemperatureProgram = (
   raw: string,
@@ -503,7 +535,7 @@ const parseTemperatureProgram = (
     ""
   );
   const temperatureMatches = [
-    ...temperatureSource.matchAll(/(rt|r\.t\.|-?\d+(?:\.\d+)?)(?:\s*(°\s*C|℃|[CFK]))?/gi)
+    ...temperatureSource.matchAll(/(room\s+temperature|ambient\s+temperature|ice\s+bath|reflux|rt|r\.t\.|-?\d+(?:\.\d+)?)(?:\s*(°\s*C|℃|[CFK]))?/gi)
   ];
   const numericUnits = temperatureMatches.map((match) => match[2]).filter((unit): unit is string => Boolean(unit));
   const inferredUnit = numericUnits[numericUnits.length - 1] ?? "C";

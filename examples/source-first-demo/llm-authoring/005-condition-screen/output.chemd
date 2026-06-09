@@ -1,0 +1,75 @@
+module exp_condition_screen
+
+meta {
+  id: "exp-condition-screen"
+  title: "Coupling condition screen"
+  date: "2026-06-08"
+  primary_reaction: @rxn_main
+  primary_result: @res_a
+}
+
+reaction rxn_main {
+  reactants: ["aryl bromide", "phenylboronic acid"]
+}
+
+result res_a for @rxn_main {
+  status: success
+  yield: 82%
+  notes: "Variant A used dioxane/water and K2CO3."
+}
+
+result res_b for @rxn_main {
+  status: partial
+  yield: 45%
+  notes: "Variant B used ethanol/water and K3PO4."
+}
+
+result res_c for @rxn_main {
+  status: failed
+  notes: "Variant C used toluene and K2CO3."
+}
+
+condition_screen screen_main for @rxn_main {
+  standard: @res_a
+  factor: [solvent, base]
+  outcome: [yield, status]
+  variant_a: { solvent: ["dioxane", "water"], base: "K2CO3", result: @res_a }
+  variant_b: { solvent: ["ethanol", "water"], base: "K3PO4", result: @res_b }
+  variant_c: { solvent: "toluene", base: "K2CO3", result: @res_c }
+}
+
+procedure proc_main for @rxn_main {
+  evidence: [@res_a, @res_b, @res_c]
+  step setup = charge(materials: "screen variants")
+  step analyze = observe(method: "compare yields", depends_on: [setup])
+}
+
+trace trace_main for @proc_main {
+  mode: observed
+  evidence: [@res_a, @res_b, @res_c]
+}
+
+agent run repair_001 {
+  goal: "validate screen source and preserve variant facts"
+  status: completed
+  target_files: ["examples/source-first-demo/llm-authoring/005-condition-screen/output.chemd"]
+  evidence: [@rxn_main, @res_a, @res_b, @res_c]
+
+  tool compile_current_file {
+    status: ok
+    evidence: [@rxn_main, @res_a]
+    output: { diagnostics: "0 errors" }
+  }
+
+  tool propose_repair {
+    status: ok
+    output: { driver: "chemd-source-repair-driver" }
+  }
+
+  timeline completed {
+    actor: "llm-driver"
+    summary: "Compiler-guided demo validation completed."
+    tool: "compile_current_file"
+    evidence: [@res_a]
+  }
+}

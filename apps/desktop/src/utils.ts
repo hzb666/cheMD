@@ -70,7 +70,7 @@ reaction rxn_screen {
   products: [@mol_biaryl_product]
   catalyst: "Pd(PPh3)4"
   base: "K2CO3"
-  solvent: "dioxane/water"
+  solvent: ["dioxane", "water"]
 }
 
 result screen_result for @rxn_screen {

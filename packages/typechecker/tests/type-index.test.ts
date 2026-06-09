@@ -31,10 +31,10 @@ reaction rxn_bad {
         declarationId: "rxn_bad",
         field: "temperature",
         canonicalField: "temperature",
-        expectedKind: "quantity",
+        expectedKind: "symbolic_quantity",
         actualKind: "string",
         valid: false,
-        diagnosticCodes: ["E_PROGRAM_FIELD_VALUE_KIND"]
+        diagnosticCodes: ["E403"]
       }),
       expect.objectContaining({
         declarationKind: "reaction",

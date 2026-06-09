@@ -1,0 +1,37 @@
+module exp_failed_reaction
+
+meta {
+  id: "exp-failed-reaction"
+  title: "Failed coupling attempt"
+  date: "2026-06-08"
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
+
+molecule mol_substrate {
+  name: "2-chloropyridine"
+  role: substrate
+}
+
+reaction rxn_main {
+  reactants: [@mol_substrate, "phenylboronic acid"]
+  reagents: ["Pd(PPh3)4", "K3PO4"]
+  solvent: "toluene"
+  temperature: 100 C
+}
+
+result res_main for @rxn_main {
+  status: failed
+  notes: "No yield was reported. LCMS showed starting material remained and no desired product was detected."
+}
+
+analysis ana_lcms for @res_main {
+  type: lcms
+  ref: @res_main
+  notes: "Starting material remained; desired product was not detected."
+}
+
+observation obs_main for @rxn_main {
+  evidence: [@res_main]
+  notes: "The attempt should be recorded as failed rather than assigned an invented yield."
+}

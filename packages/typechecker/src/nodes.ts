@@ -656,7 +656,7 @@ export const buildMoleculeNode = (
         "identity"
       )
     : undefined;
-  const legacyAmountDiagnostic = node.amount || node.equivalents
+  const reactionQuantityDiagnostic = node.amount || node.equivalents
     ? createTypedDiagnostic(
         "E_MOLECULE_REACTION_QUANTITY",
         "Molecule amount/equivalents are not standard reaction usage; move usage to reaction participant fields.",
@@ -666,7 +666,7 @@ export const buildMoleculeNode = (
     : undefined;
 
   output.diagnostics.push(
-    ...[identityWarning, legacyAmountDiagnostic].filter((item): item is V03Diagnostic => Boolean(item)),
+    ...[identityWarning, reactionQuantityDiagnostic].filter((item): item is V03Diagnostic => Boolean(item)),
     ...(node.smiles ? validateSmilesSurface(node.smiles).map((item) => createInteropDiagnostic(item, node, "smiles")) : []),
     ...(node.inchi ? validateInChI(node.inchi).map((item) => createInteropDiagnostic(item, node, "inchi")) : []),
     ...(node.inchikey
@@ -827,9 +827,9 @@ export const buildReactionNode = (
         : hasStoichiometryFacts ? "ok" : "unknown"
     },
     normalizedConditions: classifyReactionConditions(node),
-    solvent: node.solvent,
-    catalyst: node.catalyst,
-    reagents: node.reagents,
+    solvent: conditionLiteralList(node.solvent),
+    catalyst: conditionLiteralList(node.catalyst),
+    reagents: conditionLiteralList(node.reagents),
     ...(atmosphere ? { atmosphere } : {}),
     ...(temperature ? { temperature } : {}),
     ...(time ? { time } : {}),
@@ -838,6 +838,9 @@ export const buildReactionNode = (
 
   return output;
 };
+
+const conditionLiteralList = (value: string | undefined): ReferenceOrLiteral[] =>
+  value ? [{ kind: "literal", raw: value }] : [];
 
 export const buildResultNode = (
   node: ResultNode,
@@ -884,11 +887,11 @@ export const buildResultNode = (
   return output;
 };
 
-const hasLegacyTlcLaneFields = (node: AnalysisNode): boolean =>
+const hasNumberedTlcLaneFields = (node: AnalysisNode): boolean =>
   Object.keys(node).some((key) => /^p\d+$/.test(key));
 
 const hasTlcLaneInput = (node: AnalysisNode): boolean =>
-  Boolean(node.tlcLanes?.length) || hasLegacyTlcLaneFields(node);
+  Boolean(node.tlcLanes?.length) || hasNumberedTlcLaneFields(node);
 
 const analysisKindValue = (node: AnalysisNode): string | undefined =>
   normalizeAnalysisType(node.type_name)?.value;

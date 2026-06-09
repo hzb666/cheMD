@@ -9,6 +9,7 @@ export interface TreeNode {
     | "molecule"
     | "batch"
     | "reaction"
+    | "reaction_template"
     | "result"
     | "analysis"
     | "condition_screen"
@@ -25,6 +26,7 @@ const TREE_DECLARATION_KINDS = new Set<TreeNode["kind"]>([
   "molecule",
   "batch",
   "reaction",
+  "reaction_template",
   "result",
   "analysis",
   "condition_screen",

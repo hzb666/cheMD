@@ -6,19 +6,16 @@ description: Program-first 编译管线、renderer/export contracts、RAG truth 
 Program-first exports 把 declarations 视为语义事实。Markdown 只作为 doc
 comments 附着的文档存在。
 
-## 移除的导出概念
+## Export Model
 
-- `ChemdDocument.children`
-- top-level `MarkdownNode`
-- renderer/exporter `StructuredNode` unions
-- `source_layer.raw_children`
-- `semantic_layer.markdown_blocks`
-- LNF legacy migration summaries
-- 对 legacy `:::` fenced block ranges 的 patch
-- `template`、`use` 和 `col` compatibility payloads
+- `ChemdProgramDocument`
+- `module`、`imports`、`meta` 和 typed declarations
+- 附着到 file、module、declaration、field、procedure step 和 agent statement 的 doc comments
+- renderer/exporter program payloads
+- `source_layer.program`、`source_layer.meta`、`source_layer.declarations` 和 `source_layer.doc_comments`
+- `semantic_layer.documentation_blocks`
 
-public function name `compileChemd(source, options)` 可以保留，但实现和返回值变为
-program-first。
+`compileChemd(source, options)` 解析 program source，并返回 program-first 编译 payloads。
 
 ## Compile Pipeline
 
@@ -70,12 +67,11 @@ export interface CompileResult {
 
 Training export version 是 `chemd-training-export/v0.3`。
 
-`ProgramSourceLayerV1` 用 module、meta、declarations、doc comments、diagnostics
-和 audit-only field markers 替代 `source_layer.raw_children`。
+`ProgramSourceLayerV1` 记录 module、meta、declarations、doc comments、
+diagnostics 和 audit-only field markers。
 
-`ProgramSemanticLayerV1` 用 `documentation_blocks` 替代
-`semantic_layer.markdown_blocks`。Documentation blocks 的 `fact_status` 是
-`"narrative_only"`。
+`ProgramSemanticLayerV1` 记录 `documentation_blocks`。Documentation blocks
+的 `fact_status` 是 `"narrative_only"`。
 
 RAG chunks 保留 truth boundaries：
 
@@ -98,9 +94,9 @@ export interface ProgramRagChunkV1 {
 }
 ```
 
-LNF version 是 `chemd-lnf/v1.0`。它移除 legacy migration summaries，改用 source
-completeness：declaration count、documentation count、unresolved reference count、
-incomplete declaration count 和 agent audit run count。
+LNF version 是 `chemd-lnf/v1.0`。它使用 source completeness metrics：
+declaration count、documentation count、unresolved reference count、incomplete
+declaration count 和 agent audit run count。
 
 ## Storage and Desktop
 
@@ -120,5 +116,5 @@ Desktop IDE 和 Graph/RAG surfaces 消费 program-level identities：
 - trace and runtime event IDs
 
 Source jumps 目标是 `declaration:<id>`、`field:<id>.<field>`、`doc:<id>`、
-`agent:<run_id>`、`agent_patch:<patch_id>` 或 `trace:<trace_id>`，不能跳到 legacy
-block IDs 或 fenced block ranges。
+`agent:<run_id>`、`agent_patch:<patch_id>` 或 `trace:<trace_id>`，并通过
+program-level identities 解析。

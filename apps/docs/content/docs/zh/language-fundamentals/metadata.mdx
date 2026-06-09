@@ -1,0 +1,51 @@
+---
+title: Module Metadata
+description: meta 必需字段、primary references、tags 和项目元数据。
+---
+
+每个 `.chemd` program 都在 `module` declaration 和 imports 之后包含一个
+`meta` declaration。必需字段是 `id`、`title` 和 `date`。
+
+```text
+module exp_suzuki_screen
+
+meta {
+  id: "exp-suzuki-screen"
+  title: "Suzuki coupling solvent screen"
+  date: 2026-04-24
+  tags: ["suzuki", "screen"]
+  project: "CHEMD-ROUTE"
+  author: "A. Chemist"
+  status: reviewed
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
+```
+
+## 必需字段
+
+`id` 提供稳定 document identity。`title` 是显示标题。`date` 记录实验或文档
+日期。Compiler 会把这些值保留在 program metadata object 中，并提供给
+renderers、exports、storage 和 IDE summaries。
+
+## Primary References
+
+resolver 识别 molecule、reaction、result、analysis 和 sample 的 primary reference
+fields：
+
+| field | target kind |
+| --- | --- |
+| `primary_molecule` | `molecule` |
+| `primary_reaction` | `reaction` |
+| `primary_result` | `result` |
+| `primary_analysis` | `analysis` |
+| `primary_sample` | `sample` |
+
+Primary fields 使用 `@rxn_main` 这样的普通 program references。目标缺失或类型不匹配
+会在 resolution 阶段报告。
+
+## Extra Metadata
+
+`tags` 接受字符串列表。`project`、`author`、`status`、`notebook`、`campaign`
+等额外标量字段会保留在 `meta.fields` 中，用于 rendering、export、indexing 和
+下游项目工作流。

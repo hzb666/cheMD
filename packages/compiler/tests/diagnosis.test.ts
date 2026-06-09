@@ -5,6 +5,7 @@ import {
   applyCompilerDiagnosisSafeFixes,
   buildCompilerDiagnosis
 } from "../src/diagnosis";
+import { renderDiagnosisForLlm } from "../src/diagnosis-prompt";
 
 describe("compiler diagnosis", () => {
   it("classifies declaration-target safe quick fixes", () => {
@@ -118,5 +119,47 @@ result res_main {
       summary: { manualReviewCount: 1 },
       nextActions: ["manual_rewrite"]
     });
+  });
+
+  it("renders compact LLM-facing diagnosis text", () => {
+    const diagnosis = buildCompilerDiagnosis([{
+      code: "W_AUTHORING_INPUT_REQUIRED",
+      severity: "warning",
+      message: "Minimal experiment record is incomplete.",
+      sourceLayer: "compiler",
+      facts: {
+        checklist_id: "basic-experiment-record",
+        title: "Basic experiment record",
+        missing_items: ["missing result declaration", "missing procedure reference"]
+      }
+    }, {
+      code: "E_PROGRAM_BLOCK_CLOSE_EXPECTED",
+      severity: "error",
+      message: "Expected '}' to close block.",
+      sourceLayer: "parser"
+    }]);
+
+    expect(renderDiagnosisForLlm(diagnosis)).toBe([
+      "Compiler status: mixed",
+      "Summary:",
+      "- errors: 1",
+      "- warnings: 1",
+      "- info: 0",
+      "- safe fixes: 0",
+      "- required inputs: 1",
+      "- manual review: 1",
+      "",
+      "Required author input:",
+      "- basic-experiment-record:",
+      "  - missing result declaration",
+      "  - missing procedure reference",
+      "",
+      "Manual review:",
+      "- E_PROGRAM_BLOCK_CLOSE_EXPECTED: Expected '}' to close block.",
+      "",
+      "Next actions:",
+      "- ask_for_required_inputs",
+      "- manual_rewrite"
+    ].join("\n"));
   });
 });

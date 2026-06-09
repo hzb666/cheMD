@@ -10,7 +10,7 @@ type DeclarationFieldReferenceTargets =
   | DeclarationReferenceTargetKind
   | readonly DeclarationReferenceTargetKind[];
 
-type LegacyNonReferenceValueSchema = Exclude<
+type ScalarDeclarationFieldValueSchema = Exclude<
   FieldValueSchema,
   | { kind: "reference" }
   | { kind: "ref_or_literal" }
@@ -19,9 +19,10 @@ type LegacyNonReferenceValueSchema = Exclude<
 >;
 
 export type DeclarationFieldValueSchema =
-  | LegacyNonReferenceValueSchema
+  | ScalarDeclarationFieldValueSchema
   | { kind: "reference"; targetKind: DeclarationFieldReferenceTargets }
   | { kind: "ref_or_literal"; targetKind: DeclarationFieldReferenceTargets }
+  | { kind: "symbolic_quantity"; quantityClass: QuantityClass }
   | {
       kind: "list";
       item: DeclarationFieldValueSchema;
@@ -51,6 +52,10 @@ export const enumValue = (
 export const quantityValue = (
   quantityClass: QuantityClass
 ): DeclarationFieldValueSchema => ({ kind: "quantity", quantityClass });
+
+export const symbolicQuantityValue = (
+  quantityClass: QuantityClass
+): DeclarationFieldValueSchema => ({ kind: "symbolic_quantity", quantityClass });
 
 export const chemicalValue = (
   chemicalKind: Extract<DeclarationFieldValueSchema, { kind: "chemical" }>["chemicalKind"]

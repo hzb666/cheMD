@@ -141,7 +141,7 @@ const mapRepairTerminalReason = (
     return "repair_max_iterations";
   }
 
-  return stoppedReason === "stalled" ? "repair_stalled" : undefined;
+  return undefined;
 };
 
 export const runChemdAgentLoop = async (

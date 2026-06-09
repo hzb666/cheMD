@@ -1,0 +1,25 @@
+module exp_missing_fields
+
+meta {
+  id: "exp-missing-fields"
+  title: "Suzuki record with missing fields"
+  date: "2026-06-08"
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
+
+reaction rxn_main {
+  reactants: ["4-bromoanisole", "phenylboronic acid"]
+  reagents: ["K2CO3", "Pd catalyst"]
+  solvent: "dioxane-water mixture"
+}
+
+result res_main for @rxn_main {
+  status: success
+  yield: 82%
+  notes: "Amounts, product identity, exact solvent ratio, and exact reaction time were not specified in the source text."
+}
+
+observation obs_main for @rxn_main {
+  notes: "The source text described overnight heating but did not give a precise duration."
+}

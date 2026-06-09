@@ -82,7 +82,7 @@ export const buildDataGovernanceInfo = (
     ) ?? "machine_parsed",
     allowed_uses: readAllowedUses(raw.allowed_uses) ?? ["audit"],
     sanitization_policy: readEnum(raw, "sanitization_policy", ["default", "strict", "none"] as const) ?? "default",
-    source: "frontmatter"
+    source: "meta"
   };
 };
 

@@ -1,0 +1,63 @@
+module si_nature_2024_ptc_tbab
+
+import demo_shared_reagents as shared from "./shared-reagents.chemd"
+import si_nature_2024_ptc_suzuki as standard from "./si-nature-2024-ptc-suzuki.chemd"
+
+meta {
+  id: "si-nature-2024-ptc-tbab"
+  title: "Nature Communications 2024 SI TBAB phase-transfer run"
+  date: "2024-06-27"
+  primary_reaction: @rxn_nature_2024_tbab
+  primary_result: @res_nature_2024_tbab
+}
+
+reaction rxn_nature_2024_tbab {
+  name: "Biphasic Suzuki-Miyaura coupling with TBAB phase-transfer catalyst"
+  reactants: [@shared.mol_benzyl_bromide, @shared.mol_4_methoxyphenylboronic_pinacol_ester]
+  products: [@shared.mol_nature_2024_product_3]
+  catalyst: @shared.cat_xphos_pd_g2
+  reagents: [@shared.mol_k2co3, @shared.mol_tbab]
+  solvent: [@shared.mol_2_methf, @shared.mol_water]
+  temperature: 80 C
+  atmosphere: argon
+}
+
+artifact art_nature_2024_tbab_si {
+  kind: supporting_information
+  ref: @rxn_nature_2024_tbab
+  path: "https://static-content.springer.com/esm/art%3A10.1038%2Fs41467-024-49681-4/MediaObjects/41467_2024_49681_MOESM1_ESM.pdf"
+  notes: "Supplementary Information section describing the 12-fold rate acceleration by TBAB."
+}
+
+analysis ana_nature_2024_tbab {
+  type: hplc
+  ref: @rxn_nature_2024_tbab
+  artifact: [@art_nature_2024_tbab_si]
+  notes: "SI describes TBAB, benzyl bromide, arylboronate ester, XPhos Pd G2, K2CO3, 2-MeTHF/water, 80 C, and online HPLC sampling."
+}
+
+result res_nature_2024_tbab for @rxn_nature_2024_tbab {
+  product: @shared.mol_nature_2024_product_3
+  status: success
+  notes: "Article reports a 12-fold rate enhancement when phase transfer catalyst is used in the targeted system."
+}
+
+procedure proc_nature_2024_tbab for @rxn_nature_2024_tbab {
+  evidence: [@art_nature_2024_tbab_si, @ana_nature_2024_tbab, @res_nature_2024_tbab]
+
+  step charge_boron_tbab = charge(materials: "4-methoxyphenylboronic ester and TBAB", inputs: [@shared.mol_4_methoxyphenylboronic_pinacol_ester, @shared.mol_tbab])
+  step add_organic_solvent_tbab = add(materials: "2-MeTHF", inputs: [@shared.mol_2_methf], depends_on: [charge_boron_tbab])
+  step add_benzyl_bromide_tbab = add(materials: "benzyl bromide", inputs: [@shared.mol_benzyl_bromide], depends_on: [add_organic_solvent_tbab])
+  step heat_tbab = heat(temperature: 80 C, depends_on: [add_benzyl_bromide_tbab])
+  step add_catalyst_tbab = add(materials: "XPhos Pd G2 solution", inputs: [@shared.cat_xphos_pd_g2], depends_on: [heat_tbab])
+  step add_base_tbab = add(materials: "K2CO3 in water", inputs: [@shared.mol_k2co3, @shared.mol_water], depends_on: [add_catalyst_tbab])
+  step sample_hplc_tbab = sample(depends_on: [add_base_tbab])
+}
+
+condition_screen screen_nature_2024_phase_transfer {
+  reaction: @rxn_nature_2024_tbab
+  standard: @standard.rxn_nature_2024_standard
+  factor: [phase_transfer_catalyst, water_loading, halide_inhibition, catalyst_loading]
+  outcome: [rate, transmetalation_pathway]
+  notes: "Real SI/article-derived phase-transfer catalyst comparison against the standard biphasic Suzuki-Miyaura kinetic run."
+}

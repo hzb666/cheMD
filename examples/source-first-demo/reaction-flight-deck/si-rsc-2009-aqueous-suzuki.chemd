@@ -1,0 +1,76 @@
+module si_rsc_2009_aqueous_suzuki
+
+import demo_shared_reagents as shared from "./shared-reagents.chemd"
+
+meta {
+  id: "si-rsc-2009-aqueous-suzuki"
+  title: "RSC 2009 ESI aqueous Suzuki-Miyaura protocol"
+  date: "2009-10-07"
+  primary_reaction: @rxn_rsc_2009_aqueous_suzuki
+  primary_result: @res_rsc_2009_catalyst_screen
+}
+
+reaction rxn_rsc_2009_aqueous_suzuki {
+  name: "4-bromophenol and phenylboronic acid aqueous Suzuki-Miyaura"
+  reactants: [@shared.mol_4_bromophenol, @shared.mol_phenylboronic_acid]
+  products: [@shared.mol_4_phenylphenol]
+  catalyst: @shared.cat_bedford_palladacycle_4
+  reagents: [@shared.mol_nahco3, @shared.mol_naoh]
+  solvent: @shared.mol_water
+  temperature: 30 C
+  time: 16 h
+  atmosphere: air
+}
+
+artifact art_rsc_2009_si {
+  kind: supporting_information
+  ref: @rxn_rsc_2009_aqueous_suzuki
+  path: "https://www.rsc.org/suppdata/gc/b9/b915436a/b915436a.pdf"
+  notes: "Supporting Information for DOI 10.1039/B915436A."
+}
+
+analysis ana_rsc_2009_si {
+  type: literature_extract
+  ref: @rxn_rsc_2009_aqueous_suzuki
+  artifact: [@art_rsc_2009_si]
+  notes: "ESI and article report 4-bromophenol, phenylboronic acid, pH 11 carbonate buffer, air, 30 C, and product filtration."
+}
+
+result res_rsc_2009_catalyst_screen for @rxn_rsc_2009_aqueous_suzuki {
+  product: @shared.mol_4_phenylphenol
+  status: success
+  yield: 91%
+  notes: "Article Table 1 reports 91% yield for catalyst 4 under catalyst-screen conditions."
+}
+
+result res_rsc_2009_scope_entry for @rxn_rsc_2009_aqueous_suzuki {
+  product: @shared.mol_4_phenylphenol
+  status: success
+  notes: "Article Table 3 reports >=99% for one aqueous product-scope entry; not encoded as an exact percent."
+}
+
+procedure proc_rsc_2009_aqueous_suzuki for @rxn_rsc_2009_aqueous_suzuki {
+  evidence: [@art_rsc_2009_si, @ana_rsc_2009_si, @res_rsc_2009_catalyst_screen]
+
+  step charge_electrophile = charge(materials: "4-bromophenol", inputs: [@shared.mol_4_bromophenol])
+  step add_buffer = add(materials: "NaHCO3/NaOH buffer pH 11", inputs: [@shared.mol_water, @shared.mol_nahco3, @shared.mol_naoh], depends_on: [charge_electrophile])
+  step add_catalyst = add(materials: "palladacycle 4", inputs: [@shared.cat_bedford_palladacycle_4], depends_on: [add_buffer])
+  step add_boron = add(materials: "phenylboronic acid", inputs: [@shared.mol_phenylboronic_acid], depends_on: [add_catalyst])
+  step stir = heat(temperature: 30 C, duration: 16 h, depends_on: [add_boron])
+  step filter_product = filter(medium: "filtration")
+  step wash_product = wash(materials: "deionized water", inputs: [@shared.mol_water], depends_on: [filter_product])
+}
+
+observation obs_rsc_2009_workup {
+  ref: @rxn_rsc_2009_aqueous_suzuki
+  evidence: [@art_rsc_2009_si]
+  notes: "The product isolation path is filtration and water wash, not chromatography, for the aqueous protocol."
+}
+
+condition_screen screen_rsc_2009_catalyst {
+  reaction: @rxn_rsc_2009_aqueous_suzuki
+  standard: @res_rsc_2009_catalyst_screen
+  factor: [catalyst, ph, buffer, temperature]
+  outcome: [yield, filtration_workup]
+  notes: "Real SI/article-derived catalyst-screen record for the aqueous Suzuki demo."
+}

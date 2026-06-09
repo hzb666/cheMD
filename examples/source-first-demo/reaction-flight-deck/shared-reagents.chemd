@@ -1,0 +1,218 @@
+module demo_shared_reagents
+
+meta {
+  id: "demo-shared-reagents"
+  title: "Reaction Flight Deck shared reagents"
+  date: "2026-06-04"
+  primary_molecule: @mol_5_bromopyrimidine
+}
+
+molecule mol_5_bromopyrimidine {
+  name: "5-bromopyrimidine"
+  role: electrophile
+}
+
+molecule mol_3_furanylboronic_acid {
+  name: "3-furanylboronic acid"
+  role: boronic_acid
+}
+
+molecule mol_5_furan_3_yl_pyrimidine {
+  name: "5-(furan-3-yl)pyrimidine"
+  role: product
+}
+
+molecule mol_k3po4 {
+  name: "potassium phosphate"
+  formula: "K3PO4"
+  role: suzuki_base
+}
+
+molecule mol_na2co3 {
+  name: "sodium carbonate"
+  formula: "Na2CO3"
+  role: suzuki_base_screen_candidate
+}
+
+molecule mol_tamyl_alcohol {
+  name: "tert-amyl alcohol"
+  role: suzuki_solvent
+}
+
+molecule mol_dioxane {
+  name: "1,4-dioxane"
+  role: suzuki_solvent_screen_candidate
+}
+
+molecule mol_water {
+  name: "water"
+  formula: "H2O"
+  role: suzuki_cosolvent_screen_candidate
+}
+
+molecule mol_4_bromophenol {
+  name: "4-bromophenol"
+  role: aqueous_suzuki_electrophile
+}
+
+molecule mol_phenylboronic_acid {
+  name: "phenylboronic acid"
+  role: aqueous_suzuki_boronic_acid
+}
+
+molecule mol_4_phenylphenol {
+  name: "4-phenylphenol"
+  role: aqueous_suzuki_product
+}
+
+molecule mol_naoh {
+  name: "sodium hydroxide"
+  formula: "NaOH"
+  role: aqueous_buffer_component
+}
+
+molecule mol_nahco3 {
+  name: "sodium bicarbonate"
+  formula: "NaHCO3"
+  role: aqueous_buffer_component
+}
+
+molecule mol_methanol {
+  name: "methanol"
+  role: suzuki_cosolvent_screen_candidate
+}
+
+molecule mol_acetone {
+  name: "acetone"
+  role: suzuki_cosolvent_screen_candidate
+}
+
+molecule mol_thf {
+  name: "tetrahydrofuran"
+  role: suzuki_cosolvent_screen_candidate
+}
+
+material cat_pd_pph3_4 {
+  supplier: "demo catalyst shelf"
+  lot: "Pd-PPh3-4-demo"
+  notes: "Pd(PPh3)4; homogeneous Pd(0) Suzuki catalyst candidate."
+}
+
+material cat_pdcl2_dppf {
+  supplier: "demo catalyst shelf"
+  lot: "Pd-dppf-demo"
+  notes: "PdCl2(dppf); robust Pd(II) precatalyst for heteroaryl Suzuki coupling."
+}
+
+material cat_pd_oac2 {
+  supplier: "demo catalyst shelf"
+  lot: "Pd-OAc2-demo"
+  notes: "Pd(OAc)2; ligand-screen compatible Pd source."
+}
+
+material cat_bedford_palladacycle_4 {
+  supplier: "RSC Green Chemistry 2010 ESI"
+  lot: "B915436A-catalyst-4"
+  notes: "Palladacycle 4 from Marziale et al., DOI 10.1039/B915436A."
+}
+
+material cat_bedford_palladacycle_2 {
+  supplier: "RSC Green Chemistry 2011 ESI"
+  lot: "C0GC00522C-catalyst-2"
+  notes: "Palladacycle 2 from Marziale et al., DOI 10.1039/C0GC00522C."
+}
+
+molecule lig_sphos {
+  name: "SPhos"
+  role: suzuki_ligand_screen_candidate
+}
+
+material cat_xphos_pd_g2 {
+  supplier: "Nature Communications 2024 SI"
+  lot: "s41467-024-49681-4-XPhos-Pd-G2"
+  notes: "XPhos Pd G2 used in Shi et al., DOI 10.1038/s41467-024-49681-4."
+}
+
+material cat_xphos_pd_g3 {
+  supplier: "demo catalyst shelf"
+  lot: "XPhos-Pd-G3-demo"
+  notes: "XPhos Pd G3; Buchwald precatalyst candidate for difficult Suzuki couplings."
+}
+
+molecule mol_k2co3 {
+  name: "potassium carbonate"
+  formula: "K2CO3"
+  role: suzuki_base
+}
+
+molecule mol_2_methf {
+  name: "2-methyltetrahydrofuran"
+  role: biphasic_suzuki_solvent
+}
+
+molecule mol_tbab {
+  name: "tetrabutylammonium bromide"
+  role: phase_transfer_catalyst
+}
+
+molecule mol_benzyl_bromide {
+  name: "benzyl bromide"
+  role: benzylic_electrophile
+}
+
+molecule mol_4_methoxyphenylboronic_pinacol_ester {
+  name: "4-methoxyphenylboronic acid pinacol ester"
+  role: arylboron_nucleophile
+}
+
+molecule mol_nature_2024_product_3 {
+  name: "product 3 from benzyl bromide and 4-methoxyphenylboronic ester"
+  role: diarylmethane_product
+}
+
+molecule mol_4_bromoanisole {
+  name: "4-bromoanisole"
+  role: flow_suzuki_electrophile
+}
+
+molecule mol_4_methoxybiphenyl {
+  name: "4-methoxybiphenyl"
+  role: flow_suzuki_product
+}
+
+molecule mol_ethanol {
+  name: "ethanol"
+  role: flow_suzuki_solvent
+}
+
+material cat_pd_beta_cyclodextrin {
+  supplier: "RSC Reaction Chemistry and Engineering 2019 ESI"
+  lot: "C9RE00159J-Pd-beta-CD"
+  notes: "Water-soluble Pd-beta-cyclodextrin catalyst from Liu and Hartman, DOI 10.1039/C9RE00159J."
+}
+
+molecule mol_4_phenylbutyric_acid {
+  name: "4-phenylbutyric acid"
+  role: carboxylic_acid
+}
+
+molecule mol_benzylamine {
+  name: "benzylamine"
+  role: amine
+}
+
+molecule mol_n_benzyl_4_phenylbutyramide {
+  name: "N-benzyl-4-phenylbutyramide"
+  role: amide_product
+}
+
+molecule mol_boric_acid {
+  name: "boric acid"
+  formula: "H3BO3"
+  role: catalyst
+}
+
+molecule mol_toluene {
+  name: "toluene"
+  role: solvent
+}

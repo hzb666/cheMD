@@ -226,12 +226,10 @@ export const parseMoleculeEntries = (html: string): Array<{ blockId: string; smi
   const blockPattern = /(<section class="chemd-block chemd-block--molecule"[^>]*>)([\s\S]*?)<\/section>/g;
   for (const match of html.matchAll(blockPattern)) {
     const sectionTag = match[1] || "";
-    const blockHtml = match[2] || "";
     const dataSmiles = decodeHtmlEntities(readSectionAttribute(sectionTag, "data-smiles")).trim();
-    const legacyFieldMatch = blockHtml.match(/<dt>SMILES<\/dt><dd>([^<]*)<\/dd>/i);
     entries.push({
       blockId: readSectionAttribute(sectionTag, "data-node-id").trim(),
-      smiles: dataSmiles || (legacyFieldMatch?.[1] || "").trim()
+      smiles: dataSmiles
     });
   }
   return entries;

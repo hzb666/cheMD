@@ -408,11 +408,11 @@ describe("desktop workspace ingest runner", () => {
     expect(result.summary).toMatchObject({ pendingCount: 1, skippedCount: 1, totalCount: 2 });
   });
 
-  it("skips legacy .chemd.md files during ingest", async () => {
+  it("skips .chemd.md files during ingest", async () => {
     const readFile = vi.fn((file: WorkspaceFileEntry) => `source:${file.path}`);
     const result = await runWorkspaceIngest({
       workspaceId: "workspace-alpha",
-      files: [fileEntry("experiments/legacy.chemd.md")],
+      files: [fileEntry("experiments/ignored.chemd.md")],
       readFile,
       compile: (source) => ({ status: "ok", source }),
       createdAt
@@ -420,7 +420,7 @@ describe("desktop workspace ingest runner", () => {
 
     expect(readFile).not.toHaveBeenCalled();
     expect(result.items.map((item) => item.documentPath)).toEqual([
-      "experiments/legacy.chemd.md"
+      "experiments/ignored.chemd.md"
     ]);
     expect(result.items[0].status).toBe("skipped");
     expect(result.items[0].metadata.skipReason).toBe("non_chemd_markdown");

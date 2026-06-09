@@ -5,7 +5,7 @@ use crate::{
     postgres_config::{normalize_postgres_database_url, EnvSource},
     workspace::CommandError,
 };
-use keyring::Entry;
+use keyring_core::{Entry, Error as KeyringError};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -572,7 +572,7 @@ fn profile_database_url(profile: &PostgresProfileRecord, password: &str) -> Stri
     ))
 }
 
-fn keyring_error(error: keyring::Error) -> CommandError {
+fn keyring_error(error: KeyringError) -> CommandError {
     CommandError::new(
         "postgres_profile_secret_storage_failed",
         "Postgres profile secret storage failed",

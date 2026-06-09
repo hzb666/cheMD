@@ -97,7 +97,7 @@ const createProgram = (): ChemdProgramDocument => ({
 });
 
 describe("renderJson", () => {
-  it("emits chemd-program-json/v1 without legacy body or markdown node output", () => {
+  it("emits chemd-program-json/v1 without document body or markdown node output", () => {
     const payload = JSON.parse(renderJson(createProgram(), {
       typedGraph: {
         documentId: "exp-json",

@@ -55,6 +55,11 @@ export {
   type DiagnosticWithQuickFixes
 } from "./quick-fix";
 export { applyCompilerDiagnosisSafeFixes } from "./diagnosis";
+export { renderDiagnosisForLlm } from "./diagnosis-prompt";
+export {
+  renderAgentRunAuditBlock,
+  type RenderAgentRunAuditBlockInput
+} from "./agent-audit-render";
 export { runChemdAgentLoop } from "./agent-loop";
 export { runChemdRepairLoop } from "./repair-loop";
 export { buildTrainingGraphIndexFromUnderstandings } from "@chemd/exporter-training";

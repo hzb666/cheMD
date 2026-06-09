@@ -2,7 +2,13 @@ import type {
   ChemdQuantityValue,
   ChemdValue
 } from "@chemd/core";
+import {
+  getDeclarationFieldSchema,
+  type DeclarationFieldValueSchema
+} from "@chemd/core";
+import type { V03Diagnostic } from "@chemd/diagnostics";
 
+import { parseQuantity } from "./normalize";
 import { fieldValue } from "./program-validation";
 import {
   sourceForDeclaration,
@@ -14,6 +20,7 @@ import {
   type ProgramSymbolTable
 } from "./program-utils";
 import type {
+  QuantityClass,
   QuantityType,
   TypedSemanticNode
 } from "./types";
@@ -89,10 +96,10 @@ const buildReactionNode = (
   products: refsField(declaration, "products", symbols),
   participants: [],
   normalizedConditions: {},
-  solvent: textField(declaration, "solvent"),
-  catalyst: textField(declaration, "catalyst"),
-  reagents: textField(declaration, "reagents"),
-  temperature: quantityField(declaration, "temperature"),
+  solvent: refsField(declaration, "solvent", symbols),
+  catalyst: refsField(declaration, "catalyst", symbols),
+  reagents: refsField(declaration, "reagents", symbols),
+  temperature: symbolicQuantityField(declaration, "temperature", "temperature"),
   time: quantityField(declaration, "time"),
   pressure: quantityField(declaration, "pressure")
 });
@@ -241,6 +248,29 @@ const quantityField = (declaration: ProgramFieldDeclaration, field: string): Qua
     : undefined;
 };
 
+const symbolicQuantityField = (
+  declaration: ProgramFieldDeclaration,
+  field: string,
+  quantityClass: QuantityClass
+): QuantityType | undefined => {
+  const value = fieldValue(declaration, field);
+  if (!value) return undefined;
+  const parsed = parseQuantity(symbolicQuantityRaw(value), quantityClass, {
+    sourceNodeType: declaration.kind,
+    sourceNodeId: declaration.id,
+    field,
+    sourceSpan: value.sourceSpan
+  });
+  return parsed.quantity;
+};
+
+const symbolicQuantityRaw = (value: ChemdValue): string | undefined => {
+  if (value.type === "string") return value.value;
+  if (value.type === "identifier") return value.name;
+  if (value.type === "quantity" || value.type === "percent") return value.raw;
+  return undefined;
+};
+
 const toQuantityType = (
   value: ChemdQuantityValue | Extract<ChemdValue, { type: "percent" }>,
   nodeId: string,
@@ -261,9 +291,87 @@ const toQuantityType = (
 
 export const collectDeclarationQuantities = (
   declaration: ProgramFieldDeclaration
-): QuantityType[] =>
+): QuantityType[] => collectDeclarationQuantityResult(declaration).quantities;
+
+export const collectDeclarationQuantityResult = (
+  declaration: ProgramFieldDeclaration
+): { quantities: QuantityType[]; diagnostics: V03Diagnostic[] } =>
   Object.entries(declaration.fields)
-    .flatMap(([field, value]) => collectQuantities(value, declaration.id, field));
+    .map(([field, value]) => collectFieldQuantities(declaration, field, value))
+    .reduce(
+      (acc, item) => ({
+        quantities: [...acc.quantities, ...item.quantities],
+        diagnostics: [...acc.diagnostics, ...item.diagnostics]
+      }),
+      { quantities: [], diagnostics: [] } satisfies { quantities: QuantityType[]; diagnostics: V03Diagnostic[] }
+    );
+
+const collectFieldQuantities = (
+  declaration: ProgramFieldDeclaration,
+  field: string,
+  value: ChemdValue
+): { quantities: QuantityType[]; diagnostics: V03Diagnostic[] } => {
+  const schema = getDeclarationFieldSchema(declaration.kind, field)?.value;
+  return schema
+    ? collectQuantitiesForSchema(value, declaration.kind, declaration.id, field, schema)
+    : { quantities: collectQuantities(value, declaration.id, field), diagnostics: [] };
+};
+
+const collectQuantitiesForSchema = (
+  value: ChemdValue,
+  nodeType: string,
+  nodeId: string,
+  field: string,
+  schema: DeclarationFieldValueSchema
+): { quantities: QuantityType[]; diagnostics: V03Diagnostic[] } => {
+  if (schema.kind === "symbolic_quantity") {
+    return collectSymbolicQuantity(value, nodeType, nodeId, field, schema.quantityClass);
+  }
+  if (schema.kind === "list" && value.type === "list") {
+    return mergeQuantityResults(value.items.map((item) =>
+      collectQuantitiesForSchema(item, nodeType, nodeId, field, schema.item)
+    ));
+  }
+  if (schema.kind === "record" && value.type === "record") {
+    return mergeQuantityResults(value.fields.map((item) => {
+      const itemSchema = schema.params[item.key];
+      return itemSchema
+        ? collectQuantitiesForSchema(item.value, nodeType, nodeId, item.key, itemSchema)
+        : { quantities: collectQuantities(item.value, nodeId, item.key), diagnostics: [] };
+    }));
+  }
+  return { quantities: collectQuantities(value, nodeId, field), diagnostics: [] };
+};
+
+const collectSymbolicQuantity = (
+  value: ChemdValue,
+  nodeType: string,
+  nodeId: string,
+  field: string,
+  quantityClass: QuantityClass
+): { quantities: QuantityType[]; diagnostics: V03Diagnostic[] } => {
+  const raw = symbolicQuantityRaw(value);
+  if (!raw) {
+    return { quantities: collectQuantities(value, nodeId, field), diagnostics: [] };
+  }
+  const parsed = parseQuantity(raw, quantityClass, {
+    sourceNodeType: nodeType,
+    sourceNodeId: nodeId,
+    field,
+    sourceSpan: value.sourceSpan
+  });
+  return {
+    quantities: parsed.quantity ? [parsed.quantity] : [],
+    diagnostics: parsed.diagnostics ?? (parsed.diagnostic ? [parsed.diagnostic] : [])
+  };
+};
+
+const mergeQuantityResults = (
+  results: { quantities: QuantityType[]; diagnostics: V03Diagnostic[] }[]
+): { quantities: QuantityType[]; diagnostics: V03Diagnostic[] } => ({
+  quantities: results.flatMap((item) => item.quantities),
+  diagnostics: results.flatMap((item) => item.diagnostics)
+});
 
 export const collectQuantities = (
   value: ChemdValue,

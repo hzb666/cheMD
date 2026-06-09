@@ -97,7 +97,7 @@ fn rejects_parent_path_traversal_for_read_and_write() {
 fn lists_workspace_tree_entries_with_default_heavy_directory_ignores() {
     let workspace = TestWorkspace::new("list");
     workspace.write("experiments/screen.chemd", "doc");
-    workspace.write("experiments/legacy.chemd.md", "legacy doc");
+    workspace.write("experiments/draft.chemd.md", "markdown doc");
     workspace.write("notes.md", "note");
     workspace.write("ignore.txt", "listed");
     workspace.write(".github/workflows/ci.yml", "name: ci");
@@ -126,7 +126,7 @@ fn lists_workspace_tree_entries_with_default_heavy_directory_ignores() {
             ".vscode",
             ".vscode/settings.json",
             "experiments",
-            "experiments/legacy.chemd.md",
+            "experiments/draft.chemd.md",
             "experiments/screen.chemd",
             "ignore.txt",
             "materials",
@@ -139,11 +139,11 @@ fn lists_workspace_tree_entries_with_default_heavy_directory_ignores() {
         .expect("chemd file should be listed");
     assert_eq!(screen.kind, "file");
     assert_eq!(screen.chemd_kind.as_deref(), Some("document"));
-    let legacy = entries
+    let markdown_doc = entries
         .iter()
-        .find(|entry| entry.path == "experiments/legacy.chemd.md")
-        .expect("legacy markdown file should be listed");
-    assert_eq!(legacy.chemd_kind.as_deref(), Some("unknown"));
+        .find(|entry| entry.path == "experiments/draft.chemd.md")
+        .expect("chemd markdown file should be listed");
+    assert_eq!(markdown_doc.chemd_kind.as_deref(), Some("unknown"));
     let asset = entries
         .iter()
         .find(|entry| entry.path == "ignore.txt")

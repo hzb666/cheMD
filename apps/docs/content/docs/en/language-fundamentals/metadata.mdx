@@ -1,0 +1,53 @@
+---
+title: Module Metadata
+description: Required meta fields, primary references, tags, and project metadata.
+---
+
+Every `.chemd` program includes a `meta` declaration after the `module`
+declaration and any imports. The required fields are `id`, `title`, and `date`.
+
+```text
+module exp_suzuki_screen
+
+meta {
+  id: "exp-suzuki-screen"
+  title: "Suzuki coupling solvent screen"
+  date: 2026-04-24
+  tags: ["suzuki", "screen"]
+  project: "CHEMD-ROUTE"
+  author: "A. Chemist"
+  status: reviewed
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
+```
+
+## Required Fields
+
+`id` gives the program a stable document identity. `title` is the display title.
+`date` records the experiment or document date. The compiler keeps these values
+on the program metadata object and exposes them to renderers, exports, storage,
+and IDE summaries.
+
+## Primary References
+
+The resolver recognizes primary reference fields for molecule, reaction, result,
+analysis, and sample declarations:
+
+| field | target kind |
+| --- | --- |
+| `primary_molecule` | `molecule` |
+| `primary_reaction` | `reaction` |
+| `primary_result` | `result` |
+| `primary_analysis` | `analysis` |
+| `primary_sample` | `sample` |
+
+Primary fields use normal program references such as `@rxn_main`. Missing or
+type-incompatible targets are reported during resolution.
+
+## Extra Metadata
+
+`tags` accepts a string list. Extra scalar fields such as `project`, `author`,
+`status`, `notebook`, and `campaign` remain available on `meta.fields` for
+rendering, export, indexing, and downstream project workflows.
+

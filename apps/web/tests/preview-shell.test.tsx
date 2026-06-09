@@ -40,21 +40,21 @@ describe("PreviewShell", () => {
     const html = renderToStaticMarkup(
       React.createElement(DiagnosticQuickFixPanel, {
         diagnostics: [{
-          code: "W_CHEMD_KIND_AMBIGUOUS",
-          severity: "error",
-          message: "Chemd block kind cannot be inferred; declare kind explicitly.",
-          sourceLayer: "parser",
-          sourceNodeId: "rxn-main",
+          code: "W_AUTHORING_FIX_AVAILABLE",
+          severity: "warning",
+          message: "A conservative field patch is available.",
+          sourceLayer: "compiler",
+          sourceNodeId: "res-main",
           quickFixes: [{
-            title: "Insert kind: reaction in this chemd block",
-              kind: "insert_chemd_kind",
-              patch: { source_node_id: "rxn-main", kind: "reaction" }
+              title: "Add reaction reference",
+              kind: "apply_authoring_patch",
+              patch: { kind: "insert_declaration_field", declarationId: "res-main", line: "reaction: @rxn-main" }
             }]
         }]
       })
     );
 
-    expect(html).toContain("W_CHEMD_KIND_AMBIGUOUS");
-    expect(html).toContain("Insert kind: reaction in this chemd block");
+    expect(html).toContain("W_AUTHORING_FIX_AVAILABLE");
+    expect(html).toContain("Add reaction reference");
   });
 });

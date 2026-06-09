@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 
-export default async function LegacyDocsRedirect({
+export default async function DocsLocaleRedirect({
   params,
 }: PageProps<'/docs/[[...slug]]'>) {
   const { slug = [] } = await params;

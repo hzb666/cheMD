@@ -791,6 +791,7 @@ name = "chemd-desktop"
 version = "0.1.0"
 dependencies = [
  "keyring",
+ "keyring-core",
  "native-tls",
  "postgres",
  "postgres-native-tls",

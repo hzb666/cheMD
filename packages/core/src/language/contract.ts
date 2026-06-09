@@ -2,8 +2,6 @@ export const CHEMD_LANGUAGE_CONTRACT = {
   id: "chemd-current",
   schemaVersion: "chemd-language-contract/v0.6",
   sourceLanguage: "chemd/program-v1",
-  compatibilityModes: [] as const,
-  authorConfigFields: [] as const,
   program: {
     tokenTypes: [
       "identifier",
@@ -154,8 +152,7 @@ export const CHEMD_LANGUAGE_CONTRACT = {
       diagnostics: true,
       recovery: true,
       docComments: true,
-      structuredConditionAst: true,
-      legacySyntaxDiagnostics: true
+      structuredConditionAst: true
     }
   }
 } as const;

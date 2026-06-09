@@ -128,7 +128,7 @@ pnpm chemd export ./examples/example.chemd --format rag
 
 ## `training`
 
-`training` 返回 `ChemdTrainingUnderstandingV1`，schema version 为 `chemd-training-understanding/v0.1`。它是 sanitized training projection。Governance 可以阻止该投影；被阻止时保留 quality metadata，但移除 training entities 和 graph content。
+`training` 返回 `ChemdTrainingUnderstandingV1`，schema version 为 `chemd-training-understanding/v0.1`。它是 sanitized training projection。Governance 可以阻止该投影；被阻止时保留 quality metadata，但不输出 training entities 和 graph content。
 
 它包含：
 

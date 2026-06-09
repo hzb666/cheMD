@@ -1,0 +1,42 @@
+module exp_simple_suzuki
+
+meta {
+  id: "exp-simple-suzuki"
+  title: "Simple Suzuki coupling"
+  date: "2026-06-08"
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
+
+molecule mol_aryl_bromide {
+  name: "4-bromoanisole"
+  role: substrate
+}
+
+molecule mol_boronic_acid {
+  name: "phenylboronic acid"
+  role: coupling_partner
+}
+
+reaction rxn_main {
+  reactants: [@mol_aryl_bromide, @mol_boronic_acid]
+  reagents: ["K2CO3", "Pd(PPh3)4"]
+  solvent: ["dioxane", "water"]
+  temperature: 90 C
+}
+
+result res_main for @rxn_main {
+  status: success
+  yield: 82%
+  notes: "Amounts and solvent ratio were not specified in the source text."
+}
+
+procedure proc_main for @rxn_main {
+  evidence: [@res_main]
+  step charge = charge(inputs: [@mol_aryl_bromide, @mol_boronic_acid])
+  step heat = heat(temperature: 90 C, depends_on: [charge])
+}
+
+observation obs_main for @rxn_main {
+  notes: "The source text did not specify the reaction time."
+}

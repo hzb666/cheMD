@@ -1,0 +1,19 @@
+module exp_bad_syntax
+
+meta {
+  id: "exp-bad-syntax"
+  title: "Bad syntax"
+  date: "2026-06-08"
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
+
+reaction rxn_main {
+  reactants: ["anisole"]
+  temperature: 90 C
+}
+
+result res_main for @rxn_main {
+  status: unknown
+  notes: "No result was specified in the source text."
+}

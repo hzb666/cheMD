@@ -93,7 +93,6 @@ export interface ChemdCompletionContext {
   linePrefix: string;
   tokenPrefix: string;
   range: ChemdSourceRange;
-  isFrontmatter: boolean;
   isChemdBlock: boolean;
   isUseHeaderPosition: boolean;
   isReferencePosition: boolean;

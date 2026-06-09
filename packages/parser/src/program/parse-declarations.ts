@@ -90,7 +90,7 @@ export const parseFieldBlock = (cursor: ProgramParserCursor): ParsedFieldBlock =
     const fieldName = tokenValue(fieldStart) ?? "unknown";
     fields[fieldName] = value;
     fieldSpans[fieldName] = cursor.sourceSpanFrom(fieldStart, value.sourceSpan);
-    consumeOptionalSeparator(cursor);
+    consumeOptionalSeparator(cursor, fieldName);
   }
 
   if (!closed) {
@@ -147,8 +147,42 @@ export const valueAsStringList = (value?: ChemdValue): string[] | undefined => {
   return single ? [single] : undefined;
 };
 
-export const consumeOptionalSeparator = (cursor: ProgramParserCursor): void => {
-  if ([",", ";"].includes(tokenValue(cursor.peek()) ?? "")) {
+export const consumeOptionalSeparator = (
+  cursor: ProgramParserCursor,
+  fieldName?: string
+): void => {
+  const separator = tokenValue(cursor.peek());
+  if (![",", ";"].includes(separator ?? "")) {
+    return;
+  }
+  cursor.consume();
+  if (separator === "," && fieldName && isBareCommaValue(cursor)) {
+    cursor.syntaxError(
+      "E_PROGRAM_FIELD_LIST_BRACKETS_REQUIRED",
+      `Multiple field values must be wrapped in brackets, for example ${fieldName}: ["A", "B"].`,
+      cursor.peek()
+    );
+    discardBareCommaValues(cursor);
+  }
+};
+
+const isBareCommaValue = (cursor: ProgramParserCursor): boolean => {
+  const next = cursor.peek();
+  if (!next || ["}", "eof"].includes(tokenValue(next) ?? "")) {
+    return false;
+  }
+  return !(isIdentifierToken(next) && tokenValue(cursor.peek(1)) === ":");
+};
+
+const discardBareCommaValues = (cursor: ProgramParserCursor): void => {
+  while (!cursor.isAtEnd()) {
+    const next = cursor.peek();
+    if (!next || tokenValue(next) === "}") {
+      return;
+    }
+    if (isIdentifierToken(next) && tokenValue(cursor.peek(1)) === ":") {
+      return;
+    }
     cursor.consume();
   }
 };

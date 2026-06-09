@@ -131,12 +131,12 @@ describe("desktop workspace index view model", () => {
     });
   });
 
-  it("omits legacy .chemd.md documents from the workspace index", () => {
+  it("omits .chemd.md documents from the workspace index", () => {
     const viewModel = buildWorkspaceIndexViewModel({
       workspaceId: "workspace-1",
-      files: [file("experiments/legacy.chemd.md")],
+      files: [file("experiments/ignored.chemd.md")],
       currentDocument: {
-        path: "experiments/legacy.chemd.md",
+        path: "experiments/ignored.chemd.md",
         source: "reaction: rxn-a"
       },
       compile

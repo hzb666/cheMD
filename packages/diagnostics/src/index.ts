@@ -7,7 +7,6 @@ import {
 export type { DiagnosticExplanation } from "./explain";
 
 export type DiagnosticSourceLayer =
-  | "frontmatter"
   | "parser"
   | "resolver"
   | "typechecker"
@@ -20,7 +19,6 @@ export type DiagnosticSourceLayer =
 export type QuickFixKind =
   | "replace_text"
   | "insert_field"
-  | "insert_chemd_kind"
   | "insert_step_skeleton"
   | "split_procedure_to_steps"
   | "insert_missing_id"
@@ -73,7 +71,6 @@ export interface DiagnosticSpec {
 }
 
 const DIAGNOSTIC_SPECS: DiagnosticSpec[] = [
-  { code: "W_UNKNOWN_BLOCK", band: "syntax", title: "Unknown block", defaultSeverity: "error" },
   { code: "E_PROGRAM_MODULE_EXPECTED", band: "syntax", title: "Missing module declaration", defaultSeverity: "error" },
   { code: "E_PROGRAM_MODULE_NAME_EXPECTED", band: "syntax", title: "Missing module name", defaultSeverity: "error" },
   { code: "E_PROGRAM_META_EXPECTED", band: "syntax", title: "Missing meta declaration", defaultSeverity: "error" },
@@ -83,6 +80,7 @@ const DIAGNOSTIC_SPECS: DiagnosticSpec[] = [
   { code: "E_PROGRAM_BLOCK_CLOSE_EXPECTED", band: "syntax", title: "Missing block close", defaultSeverity: "error" },
   { code: "E_PROGRAM_FIELD_NAME_EXPECTED", band: "syntax", title: "Missing field name", defaultSeverity: "error" },
   { code: "E_PROGRAM_FIELD_COLON_EXPECTED", band: "syntax", title: "Missing field colon", defaultSeverity: "error" },
+  { code: "E_PROGRAM_FIELD_LIST_BRACKETS_REQUIRED", band: "syntax", title: "Missing list brackets", defaultSeverity: "error" },
   { code: "E_PROGRAM_EXPECTED_VALUE", band: "syntax", title: "Missing program value", defaultSeverity: "error" },
   { code: "E_PROGRAM_UNEXPECTED_TRAILING_TOKEN", band: "syntax", title: "Unexpected trailing token", defaultSeverity: "error" },
   { code: "E_PROGRAM_UNEXPECTED_TOKEN", band: "syntax", title: "Unexpected token", defaultSeverity: "error" },
@@ -106,8 +104,6 @@ const DIAGNOSTIC_SPECS: DiagnosticSpec[] = [
   { code: "E_PROGRAM_PROCEDURE_STEP_CALL_EXPECTED", band: "syntax", title: "Missing procedure step call", defaultSeverity: "error" },
   { code: "E_PROGRAM_PROCEDURE_CONTROL_ID_EXPECTED", band: "syntax", title: "Missing procedure control id", defaultSeverity: "error" },
   { code: "E_PROGRAM_PROCEDURE_CONTROL_ARG_EXPECTED", band: "syntax", title: "Missing procedure control argument", defaultSeverity: "error" },
-  { code: "W_CHEMD_KIND_AMBIGUOUS", band: "syntax", title: "Ambiguous chemd kind", defaultSeverity: "error" },
-  { code: "E_CHEMD_KIND_CONFLICT", band: "syntax", title: "Conflicting chemd kind", defaultSeverity: "error" },
   { code: "E_DUPLICATE_IMPORT_ALIAS", band: "reference", title: "Duplicate import alias", defaultSeverity: "error" },
   { code: "E_DUPLICATE_IMPORT_MODULE", band: "reference", title: "Duplicate import module", defaultSeverity: "error" },
   { code: "E_DUPLICATE_DECLARATION", band: "reference", title: "Duplicate declaration", defaultSeverity: "error" },
@@ -189,44 +185,6 @@ const DIAGNOSTIC_SPECS: DiagnosticSpec[] = [
   { code: "I903", band: "info", title: "Procedure lowered successfully", defaultSeverity: "info" }
 ];
 
-const LEGACY_BANDS: Record<string, DiagnosticBand> = {
-  E_INVALID_ID: "syntax",
-  E_DUPLICATE_ID: "syntax",
-  W_CHEMD_KIND_AMBIGUOUS: "syntax",
-  E_CHEMD_KIND_CONFLICT: "syntax",
-  E_STEP_INVALID_FAMILY: "procedure",
-  E_STEP_MISSING_FIELD: "procedure",
-  E_STEP_PARAM_MISSING: "procedure",
-  E_STEP_PARAM_INVALID: "procedure",
-  E_STEP_DEPENDENCY_CYCLE: "procedure",
-  E_STEP_ID_DUPLICATE: "procedure",
-  E_STEP_INVALID_REFERENCE: "reference",
-  E_TYPED_REFERENCE_MISMATCH: "reference",
-  E_RESULT_REACTION_CONFLICT: "type",
-  E_TEMPLATE_PARAM_MISSING: "type",
-  E_TEMPLATE_PARAM_TYPE_MISMATCH: "type",
-  E_DERIVED_EXPRESSION_INVALID: "type",
-  E_OBSERVATION_EVENT_INVALID_TYPE: "procedure",
-  E_OBSERVATION_LINKED_STEP_MISSING: "reference",
-  W_PROCEDURE_PROSE_LOWERED: "procedure",
-  W_OBSERVATION_PROSE_LOWERED: "procedure",
-  E_RUNTIME_UNKNOWN_STEP: "runtime",
-  E_RUNTIME_STEP_NOT_READY: "runtime",
-  E_MISSING_REQUIRED_FIELD: "type",
-  W_UNKNOWN_FIELD: "heuristic",
-  W_UNKNOWN_BLOCK: "heuristic",
-  W_UNRESOLVED_REFERENCE: "reference",
-  E_INVALID_PRIMARY_REFERENCE: "reference",
-  E_UNKNOWN_TEMPLATE: "reference",
-  E_DUPLICATE_TEMPLATE: "reference",
-  E_TEMPLATE_CYCLE: "reference",
-  W_INVALID_FRONTMATTER_LINE: "syntax",
-  W_UNKNOWN_RENDER_PROFILE: "heuristic",
-  E_RENDER_PROFILE_CYCLE: "reference",
-  W_UNKNOWN_RENDER_PROFILE_FIELD: "heuristic",
-  E_INVALID_RENDER_PROFILE_VALUE: "type"
-};
-
 const SPEC_BY_CODE = new Map(DIAGNOSTIC_SPECS.map((spec) => [spec.code, spec]));
 
 const isQuantityDiagnostic = (diagnostic: V03Diagnostic): boolean =>
@@ -260,25 +218,10 @@ const createProcedureQuickFix = (): QuickFix => ({
   kind: "split_procedure_sentence"
 });
 
-const createInsertChemdKindQuickFix = (
-  diagnostic: V03Diagnostic,
-  kind: "molecule" | "reaction"
-): QuickFix => ({
-  title: `Insert kind: ${kind} in this chemd block`,
-  kind: "insert_chemd_kind",
-  patch: {
-    source_node_type: diagnostic.sourceNodeType,
-    source_node_id: diagnostic.sourceNodeId,
-    kind
-  }
-});
-
 export const getDiagnosticSpec = (code: string): DiagnosticSpec | undefined => SPEC_BY_CODE.get(code);
 
-export const getLegacyDiagnosticBand = (code: string): DiagnosticBand | undefined => LEGACY_BANDS[code];
-
 export const explainDiagnosticCode = (code: string): DiagnosticExplanation => {
-  return explainDiagnosticCodeFrom(code, getDiagnosticSpec(code), getLegacyDiagnosticBand(code));
+  return explainDiagnosticCodeFrom(code, getDiagnosticSpec(code));
 };
 
 export const buildQuickFixes = (diagnostic: V03Diagnostic): QuickFix[] => {
@@ -288,15 +231,6 @@ export const buildQuickFixes = (diagnostic: V03Diagnostic): QuickFix[] => {
 
   if (diagnostic.code === "W805") {
     return [createProcedureQuickFix()];
-  }
-
-  if (diagnostic.code === "W_CHEMD_KIND_AMBIGUOUS") {
-    return diagnostic.sourceNodeId
-      ? [
-          createInsertChemdKindQuickFix(diagnostic, "molecule"),
-          createInsertChemdKindQuickFix(diagnostic, "reaction")
-        ]
-      : [];
   }
 
   return [];

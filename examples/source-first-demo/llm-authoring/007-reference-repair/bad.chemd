@@ -1,0 +1,16 @@
+module exp_bad_ref
+
+meta {
+  id: "exp-bad-ref"
+  title: "Bad reference"
+  date: "2026-06-08"
+  primary_result: @res_main
+}
+
+reaction rxn_main {
+  reactants: ["substrate"]
+}
+
+result res_main for @rxn_missing {
+  yield: 82%
+}

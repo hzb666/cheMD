@@ -1,0 +1,31 @@
+module exp_symbolic_temperature
+
+meta {
+  id: "exp-symbolic-temperature"
+  title: "Symbolic temperature procedure"
+  date: "2026-06-09"
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
+
+reaction rxn_main {
+  reactants: ["substrate"]
+  reagents: "base"
+  temperature: "room temperature -> reflux"
+}
+
+result res_main for @rxn_main {
+  status: unknown
+  notes: "No exact numeric temperatures, product identity, or yield were reported in the source text."
+}
+
+procedure proc_main for @rxn_main {
+  evidence: [@res_main]
+  step charge = charge(materials: "substrate and base", temperature: rt)
+  step heat = heat(temperature: reflux, depends_on: [charge])
+  step cool = cool(temperature: "ice bath", depends_on: [heat])
+}
+
+observation obs_main for @rxn_main {
+  notes: "The source text used room temperature, reflux, and ice bath without numeric values."
+}

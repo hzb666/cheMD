@@ -11,9 +11,6 @@ describe("sampleSource", () => {
     expect(sampleSource).toContain("reaction chem_rxn_main");
     expect(sampleSource).toContain("molecule chem_mol_main");
     expect(sampleSource).toContain("step heat_main = heat");
-    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).not.toContain(
-      "W_CHEMD_KIND_AMBIGUOUS"
-    );
     expect(result.stepGraph.procedures[0]).toMatchObject({
       sourceType: "explicit_steps"
     });

@@ -1,0 +1,1 @@
+Create a source-first Chemd record for a Suzuki reaction. 4-bromoanisole and phenylboronic acid were heated with K2CO3 and Pd(PPh3)4 in dioxane/water at 90 C. The isolated yield was 82%. Amounts and solvent ratio were not specified.

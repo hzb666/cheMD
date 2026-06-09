@@ -1,9 +1,10 @@
-const FRONTMATTER_PATTERN = /^---\r?\n([\s\S]*?)\r?\n---/;
-const FRONTMATTER_ID_PATTERN = /^id:\s*(.+)$/m;
+const META_BLOCK_PATTERN = /\bmeta\s*\{([\s\S]*?)\}/u;
+const META_ID_PATTERN = /^\s*id\s*:\s*(?:"([^"]+)"|'([^']+)'|([^\s\r\n}]+))/mu;
 
 export const parseDocumentIdFromSource = (source: string): string => {
-  const frontmatter = source.match(FRONTMATTER_PATTERN)?.[1];
-  const match = frontmatter?.match(FRONTMATTER_ID_PATTERN);
+  const metaBlock = source.match(META_BLOCK_PATTERN)?.[1];
+  const match = metaBlock?.match(META_ID_PATTERN);
+  const id = match?.[1] ?? match?.[2] ?? match?.[3];
 
-  return match?.[1]?.trim() || "workspace-doc";
+  return id?.trim() || "workspace-doc";
 };

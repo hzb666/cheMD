@@ -152,6 +152,151 @@ result res_entry for @rxn_entry {
     expect(edgeTypes).toContain("result_describes_reaction");
   });
 
+  it("connects procedure steps to shared reagents and preserves agent run nodes", () => {
+    const linked = linkChemdModules([
+      {
+        path: "shared.chemd",
+        source: `module shared_reagents
+
+meta {
+  id: "shared-reagents"
+  title: "Shared reagents"
+  date: "2026-06-09"
+}
+
+molecule mol_k3po4 {
+  name: "potassium phosphate"
+}
+
+material cat_pd_pph3 {
+  supplier: "demo inventory"
+  notes: "Pd(PPh3)4"
+}
+`
+      },
+      {
+        path: "entry.chemd",
+        source: `module entry_route
+
+import shared_reagents as shared from "./shared.chemd"
+
+meta {
+  id: "entry-route"
+  title: "Entry reaction"
+  date: "2026-06-09"
+  primary_reaction: @rxn_entry
+  primary_result: @res_entry
+}
+
+reaction rxn_entry {
+  reactants: ["aryl bromide", "boronic acid"]
+  products: ["biaryl"]
+  reagents: @shared.mol_k3po4
+  catalyst: @shared.cat_pd_pph3
+}
+
+procedure proc_entry for @rxn_entry {
+  step add_base = add(materials: "K3PO4", inputs: [@shared.mol_k3po4])
+  step add_catalyst = add(materials: "Pd(PPh3)4", inputs: [@shared.cat_pd_pph3], depends_on: [add_base])
+}
+
+result res_entry for @rxn_entry {
+  status: success
+}
+
+agent run audit_entry {
+  goal: "verify graph links"
+  status: completed
+  evidence: [@rxn_entry, @res_entry]
+}
+`
+      }
+    ]);
+
+    const graph = buildWorkspaceTrainingGraphIndex(linked);
+
+    expect(graph.nodes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        node_id: "agent::entry-route::audit_entry",
+        node_type: "agent_run"
+      })
+    ]));
+    expect(graph.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        edge_type: "procedure_step_uses_molecule",
+        from_node_id: "step::entry-route::proc_entry::add_base",
+        to_node_id: "mol::shared-reagents::mol_k3po4"
+      }),
+      expect.objectContaining({
+        edge_type: "procedure_step_uses_material",
+        from_node_id: "step::entry-route::proc_entry::add_catalyst",
+        to_node_id: "mat::shared-reagents::cat_pd_pph3"
+      }),
+      expect.objectContaining({
+        edge_type: "reaction_uses_imported_molecule",
+        from_node_id: "rxn::entry-route::rxn_entry",
+        to_node_id: "mol::shared-reagents::mol_k3po4"
+      }),
+      expect.objectContaining({
+        edge_type: "reaction_uses_imported_material",
+        from_node_id: "rxn::entry-route::rxn_entry",
+        to_node_id: "mat::shared-reagents::cat_pd_pph3"
+      }),
+      expect.objectContaining({
+        edge_type: "agent_run_references_declaration",
+        from_node_id: "agent::entry-route::audit_entry",
+        to_node_id: "rxn::entry-route::rxn_entry"
+      })
+    ]));
+  });
+
+  it("does not infer reaction similarity from unknown family alone", () => {
+    const linked = linkChemdModules([
+      {
+        path: "first.chemd",
+        source: `module first_route
+
+meta {
+  id: "first-route"
+  title: "First route"
+  date: "2026-06-09"
+}
+
+reaction rxn_first {
+  reactants: ["substrate a"]
+  products: ["product a"]
+}
+`
+      },
+      {
+        path: "second.chemd",
+        source: `module second_route
+
+meta {
+  id: "second-route"
+  title: "Second route"
+  date: "2026-06-09"
+}
+
+reaction rxn_second {
+  reactants: ["substrate b"]
+  products: ["product b"]
+}
+`
+      }
+    ]);
+
+    const graph = buildWorkspaceTrainingGraphIndex(linked);
+
+    expect(graph.reaction_similarity_edges).toEqual([]);
+    expect(graph.reaction_clusters).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        basis: "reaction_family",
+        key: "unknown"
+      })
+    ]));
+  });
+
   it("adds directed runtime trace and state-stack edges to the workspace graph", () => {
     const linked = linkChemdModules([{
       path: "runtime.chemd",

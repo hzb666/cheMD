@@ -5,50 +5,16 @@ description: Quick reference for common Chemd parser, resolver, typechecker, com
 
 The following reference lists common diagnostics by source and purpose. Use it to identify whether a problem comes from parsing, reference resolution, semantic validation, compilation, or runtime preparation.
 
-## Syntax and Frontmatter
+## Program Syntax
 
 | Code | Meaning |
 | --- | --- |
-| `E_MISSING_REQUIRED_FRONTMATTER_KEY` | Missing `id`, `title`, or `date` |
-| `E_INVALID_FRONTMATTER_VALUE` | Invalid frontmatter value type or structure |
-| `W_DUPLICATE_FRONTMATTER_KEY` | Duplicate frontmatter key |
-| `W_NON_ISO_FRONTMATTER_DATE` | Date does not match `YYYY-MM-DD` |
-| `W_INVALID_FRONTMATTER_DATE_VALUE` | Date shape is valid but calendar value is invalid |
-| `W_INVALID_FRONTMATTER_LINE` | Frontmatter line cannot be parsed |
-| `E_INVALID_ID` | Block ID violates the ID rule |
-| `W_UNKNOWN_BLOCK` | Block type is not implemented; emitted with error severity |
-| `W_UNTERMINATED_BLOCK` | Structured block is not closed |
-| `W_UNKNOWN_FIELD` | Field is outside the allowed set for the block; emitted with error severity |
-| `E_INVALID_LIST_ITEM` | List field contains an empty item |
 | `W_UNSAFE_LINK_HREF` | Markdown link href fails the safe-href policy |
-| `E_TLC_LANE_REQUIRED` | TLC lane item appears before a `lane:` line |
-| `E_CONDITION_DSL_FIELD` | Condition screen contains an invalid section field |
-| `E_CONDITION_DSL_ORDER` | Condition screen declarations appear after attempts |
-| `E_CONDITION_ATTEMPT_ID` | Condition screen attempt ID is missing or duplicated |
-| `E_CONDITION_DSL_DECLARATION` | Condition screen factor/outcome declaration is invalid |
-| `E_CONDITION_ATTEMPT_DUPLICATE_FIELD` | Attempt repeats a declared factor or outcome field |
-| `E_CONDITION_ATTEMPT_UNKNOWN_FIELD` | Attempt field was not declared as a factor or outcome |
-
-## Removed Legacy Blocks
-
-| Code | Meaning |
-| --- | --- |
-| `W_CHEMD_KIND_AMBIGUOUS` | `kind` omitted and cannot be inferred from fields |
-| `E_CHEMD_KIND_CONFLICT` | Invalid `kind` or conflict between declared kind and field shape |
-| `W_INVALID_CHEMD_IMPLICIT_VALUE` | Invalid implicit molecule SMILES body |
 
 ## Resolver
 
 | Code | Meaning |
 | --- | --- |
-| `E_DUPLICATE_ID` | Duplicate object ID |
-| `E_DUPLICATE_TEMPLATE` | Duplicate template name |
-| `E_MISSING_REQUIRED_FIELD` | Missing resolver-required object field |
-| `W_UNRESOLVED_REFERENCE` | Reference target or field cannot be resolved |
-| `E_INVALID_PRIMARY_REFERENCE` | `primary_*` points to a missing object |
-| `E_UNKNOWN_TEMPLATE` | Legacy `:::use` references a missing `:::template` |
-| `E_TEMPLATE_CYCLE` | Recursive template expansion |
-| `E_TEMPLATE_EXPANSION_LIMIT` | Template expansion exceeds depth or node limits |
 | `E_TEMPLATE_PARAM_MISSING` | Template call is missing a parameter |
 | `E_TEMPLATE_PARAM_TYPE_MISMATCH` | Template parameter type mismatch |
 
@@ -138,6 +104,7 @@ The following reference lists common diagnostics by source and purpose. Use it t
 | `E_PROGRAM_BLOCK_CLOSE_EXPECTED` | Declaration or field block is missing `}` |
 | `E_PROGRAM_FIELD_NAME_EXPECTED` | Field name is missing |
 | `E_PROGRAM_FIELD_COLON_EXPECTED` | Field name is not followed by `:` |
+| `E_PROGRAM_FIELD_LIST_BRACKETS_REQUIRED` | Multiple field values must be wrapped in `[]` |
 | `E_PROGRAM_FIELD_UNKNOWN` | Field is not accepted for the declaration kind |
 | `E_PROGRAM_EXPECTED_VALUE` | Field value cannot be parsed |
 | `E_PROGRAM_EXPECTED_CALL_ARG_ASSIGNMENT` | Call argument is missing `:` assignment |
@@ -146,12 +113,6 @@ The following reference lists common diagnostics by source and purpose. Use it t
 | `E_DUPLICATE_QUALIFIED_DECLARATION` | Qualified declaration ID is duplicated |
 | `E_UNRESOLVED_PROGRAM_REFERENCE` | Program reference cannot be resolved |
 | `W_UNRESOLVED_DOC_REFERENCE` | Documentation reference cannot be resolved |
-| `E_LEGACY_` | Removed legacy syntax was detected |
-| `E_LEGACY_FRONTMATTER_REMOVED` | legacy metadata is removed in program-v1 |
-| `E_LEGACY_FENCED_BLOCK_REMOVED` | Legacy `:::` structured blocks are removed in program-v1 |
-| `E_LEGACY_TEMPLATE_REMOVED` | Legacy `:::template` and `:::use` syntax is removed in program-v1 |
-| `E_LEGACY_COLUMN_LAYOUT_REMOVED` | Legacy `:::col-N` rendered layout syntax is removed in program-v1 |
-
 ## Program Procedure and Agent
 
 | Code | Meaning |
@@ -198,10 +159,6 @@ The following reference lists common diagnostics by source and purpose. Use it t
 
 | Code | Meaning |
 | --- | --- |
-| `W_INVALID_COL_COLUMNS` | Invalid legacy `:::col-N` column count |
-| `W_COL_COUNT_MISMATCH` | `col:` child count differs from column count |
-| `W_INVALID_COL_CHILD` | Invalid child line inside legacy `:::col-N` |
-| `W_UNTERMINATED_BRACE_BLOCK` | `col: { ... }` content is not closed |
 | `W_AUTHORING_FIX_AVAILABLE` | Compiler can provide a safe fix suggestion |
 | `W_AUTHORING_INPUT_REQUIRED` | Fix requires user input |
 | `E605` | Runtime capability is required but missing |
@@ -278,4 +235,4 @@ The following reference lists common diagnostics by source and purpose. Use it t
 
 ## Fix Order
 
-Fix errors before warnings. A stable order is frontmatter, block IDs, unknown fields, required fields, references, template parameters, quantities, step dependencies, and route graph diagnostics.
+Fix errors before warnings. A stable order is metadata, declaration IDs, unknown fields, required fields, references, template parameters, quantities, step dependencies, and route graph diagnostics.

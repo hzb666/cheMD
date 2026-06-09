@@ -163,21 +163,16 @@ procedure proc_var1 for @rxn_var1 {
     expect(document.diagnostics).toEqual([]);
   });
 
-  it("emits fatal diagnostics for removed legacy syntax", () => {
-    const document = parseChemdProgram(`---
-id: legacy
----
-
-:::chemd #rxn-main
-reactants: a
-:::
+  it("emits ordinary parser diagnostics for invalid syntax", () => {
+    const document = parseChemdProgram(`???
 `);
 
     expect(document.declarations).toEqual([]);
     expect(document.diagnostics.map((item) => item.code)).toEqual(
       expect.arrayContaining([
-        "E_LEGACY_FRONTMATTER_REMOVED",
-        "E_LEGACY_FENCED_BLOCK_REMOVED"
+        "E_PROGRAM_MODULE_EXPECTED",
+        "E_PROGRAM_META_EXPECTED",
+        "E_PROGRAM_DECLARATION_EXPECTED"
       ])
     );
   });
@@ -227,6 +222,35 @@ reaction rxn_bad {
         startColumn: 11
       }
     });
+  });
+
+  it("diagnoses comma-separated scalar field values without brackets", () => {
+    const document = parseChemdProgram(`module exp_bad_condition_list
+
+meta {
+  id: "exp-bad-condition-list"
+  title: "Bad condition list"
+  date: "2026-06-09"
+}
+
+reaction rxn_bad {
+  reagents: "A", "B"
+}
+`);
+
+    expect(document.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "E_PROGRAM_FIELD_LIST_BRACKETS_REQUIRED",
+        message: "Multiple field values must be wrapped in brackets, for example reagents: [\"A\", \"B\"].",
+        sourceSpan: expect.objectContaining({
+          startLine: 10,
+          startColumn: 18
+        })
+      })
+    );
+    expect(document.diagnostics).not.toContainEqual(
+      expect.objectContaining({ code: "E_PROGRAM_FIELD_NAME_EXPECTED" })
+    );
   });
 
   it("recovers later fields after a missing field colon", () => {

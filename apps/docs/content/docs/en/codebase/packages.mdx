@@ -10,7 +10,7 @@ The following reference lists actual packages under `packages`. Responsibility n
 | Package | Main entrypoint | Responsibility |
 | --- | --- | --- |
 | `@chemd/core` | `packages/core/src/index.ts` | AST, diagnostics, reference model, render overrides, shared types |
-| `@chemd/parser` | `packages/parser/src/index.ts` | Frontmatter, body, block, and inline token parsing |
+| `@chemd/parser` | `packages/parser/src/index.ts` | Program lexer, meta parser, declarations, values, and references |
 | `@chemd/resolver` | `packages/resolver/src/index.ts` | Object index, reference resolution, template expansion, primary validation, required-field validation |
 | `@chemd/typechecker` | `packages/typechecker/src/index.ts` | Typed semantic graph, quantity normalization, typed references, route checks, step checks |
 | `@chemd/interoperability` | `packages/interoperability/src/index.ts` | External identity and structure adapter contracts, validation helpers |
@@ -61,7 +61,7 @@ The semantic packages should not parse raw source text directly. They consume AS
 
 | Package | Responsibility |
 | --- | --- |
-| `@chemd/render-profile` | Built-in render profiles, frontmatter selection, override merge, and diagnostics |
+| `@chemd/render-profile` | Built-in render profiles, render option merge, override validation, and diagnostics |
 | `@chemd/renderer-html` | HTML preview rendering |
 | `@chemd/renderer-json` | JSON rendering |
 | `@chemd/renderer-docx` | DOCX bridge rendering |

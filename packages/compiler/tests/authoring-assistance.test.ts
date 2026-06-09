@@ -103,10 +103,10 @@ meta {
     );
 
     expect(template).toMatchObject({ category: "starter" });
-    expect(applyAuthoringTemplate(source, template!)).toContain(`reaction rxn-main {
+expect(applyAuthoringTemplate(source, template!)).toContain(`reaction rxn-main {
   reactants: [substrate]
   products: [product]
-  solvent: "THF"
+  solvent: ["THF"]
 }`);
   });
 

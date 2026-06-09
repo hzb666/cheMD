@@ -29,17 +29,6 @@ Markdown enters the compiler only as documentation:
 Documentation can render and feed narrative RAG chunks. Semantic facts come
 from declarations.
 
-## Source Boundaries
-
-The parser reports fatal diagnostics for unsupported source surfaces:
-
-- metadata delimited by `---`
-- `:::chemd`, `:::procedure`, `:::result`, `:::analysis`, and other fenced blocks
-- `:::template`, `:::use`, and template parameters
-- `:::col-N`, `col:`, and rendered column layout syntax
-- semantic facts inferred from Markdown body text
-- `.chemd.md` compatibility in the compiler path
-
 ## Source Example
 
 ```text
@@ -85,7 +74,8 @@ molecule mol_product {
 reaction rxn_var1 {
   reactants: [@mol_aryl, @mol_boron]
   products: [@mol_product]
-  solvent: "MeCN"
+  catalyst: "Pd(PPh3)4"
+  solvent: ["MeCN", "water"]
   temperature: 40 C
   time: 2 h
   atmosphere: nitrogen
@@ -180,11 +170,6 @@ program targets with `@ref` and runtime namespaces such as `sensor.ph`,
 
 ## Diagnostics
 
-Unsupported source surfaces produce fatal parser diagnostics.
-
-| Code | Trigger |
-| --- | --- |
-| `E_LEGACY_FRONTMATTER_REMOVED` | Source starts metadata with `---` |
-| `E_LEGACY_FENCED_BLOCK_REMOVED` | Source contains a `:::` fenced block |
-| `E_LEGACY_TEMPLATE_REMOVED` | Source contains `:::template`, `:::use`, or template parameters |
-| `E_LEGACY_COLUMN_LAYOUT_REMOVED` | Source contains `:::col-N`, `col:`, or rendered column layout syntax |
+Parser diagnostics report invalid program declarations, missing required
+syntax, unresolved references, unsupported declaration kinds, and invalid field
+values. Use the diagnostic code reference for the full code list.

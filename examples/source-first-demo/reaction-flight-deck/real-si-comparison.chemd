@@ -1,0 +1,63 @@
+module real_si_comparison
+
+import si_rsc_2009_aqueous_suzuki as rsc2009 from "./si-rsc-2009-aqueous-suzuki.chemd"
+import si_rsc_2011_neat_water_suzuki as rsc2011 from "./si-rsc-2011-neat-water-suzuki.chemd"
+import si_rsc_2019_continuous_flow as rsc2019 from "./si-rsc-2019-continuous-flow.chemd"
+import si_nature_2024_ptc_suzuki as nature2024 from "./si-nature-2024-ptc-suzuki.chemd"
+import si_nature_2024_ptc_tbab as nature2024tbab from "./si-nature-2024-ptc-tbab.chemd"
+
+meta {
+  id: "real-si-comparison"
+  title: "Real SI Suzuki-Miyaura comparison graph"
+  date: "2026-06-09"
+  primary_reaction: @rxn_real_si_anchor
+  primary_result: @res_real_si_anchor
+}
+
+molecule mol_real_si_anchor {
+  name: "real SI comparison anchor"
+}
+
+reaction rxn_real_si_anchor {
+  name: "Real SI comparison anchor"
+  reactants: ["RSC 2009 aqueous Suzuki", "RSC 2011 neat-water Suzuki", "RSC 2019 continuous flow", "Nature Communications 2024 phase-transfer kinetics"]
+  products: [@mol_real_si_anchor]
+}
+
+result res_real_si_anchor for @rxn_real_si_anchor {
+  product: @mol_real_si_anchor
+  status: success
+  notes: "Anchor declaration for cross-document condition_screen edges."
+}
+
+condition_screen screen_real_si_aqueous_protocols {
+  reaction: @rsc2011.rxn_rsc_2011_neat_water
+  standard: @rsc2009.rxn_rsc_2009_aqueous_suzuki
+  factor: [catalyst, base, solvent, temperature, workup]
+  outcome: [yield, conversion, filtration_workup]
+  notes: "Compares two real RSC aqueous Suzuki records that share 4-bromophenol, phenylboronic acid, water, and palladacycle catalyst families."
+}
+
+condition_screen screen_real_si_batch_vs_flow {
+  reaction: @rsc2019.rxn_rsc_2019_flow_suzuki
+  standard: @rsc2011.rxn_rsc_2011_neat_water
+  factor: [flow_mode, residence_time, temperature, catalyst_design]
+  outcome: [conversion, rate_constant, rate_limiting_step]
+  notes: "Compares batch aqueous Suzuki records against RSC 2019 continuous-flow Pd-beta-CD kinetics."
+}
+
+condition_screen screen_real_si_phase_transfer {
+  reaction: @nature2024tbab.rxn_nature_2024_tbab
+  standard: @nature2024.rxn_nature_2024_standard
+  factor: [phase_transfer_catalyst, organic_phase, aqueous_phase, base]
+  outcome: [rate, transmetalation_pathway, halide_inhibition]
+  notes: "Compares Nature Communications 2024 standard and TBAB-enhanced biphasic Suzuki kinetic records."
+}
+
+condition_screen screen_real_si_catalyst_families {
+  reaction: @nature2024.rxn_nature_2024_standard
+  standard: @rsc2009.rxn_rsc_2009_aqueous_suzuki
+  factor: [palladacycle, xphos_precatalyst, pd_beta_cyclodextrin, aqueous_medium]
+  outcome: [rate, yield, workup, mechanistic_interpretation]
+  notes: "Cross-document graph view of real catalyst families used in the SI-derived records."
+}

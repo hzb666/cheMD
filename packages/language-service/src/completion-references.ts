@@ -55,10 +55,6 @@ const filterPreferredSymbols = (
 const readReferenceToken = (
   context: ChemdCompletionContext
 ): { symbolPrefix: string; range: ChemdSourceRange } | undefined => {
-  if (context.isFrontmatter) {
-    return undefined;
-  }
-
   const explicitToken = context.linePrefix.match(referenceTokenPattern);
   if (explicitToken) {
     const rawToken = explicitToken[0] ?? "";

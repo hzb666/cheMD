@@ -1,0 +1,82 @@
+module demo_suzuki_pyrimidine
+
+import demo_shared_reagents as shared from "./shared-reagents.chemd"
+
+meta {
+  id: "demo-suzuki-pyrimidine"
+  title: "Palladium-catalyzed Suzuki-Miyaura heteroaryl coupling"
+  date: "2026-06-04"
+  primary_reaction: @rxn_suzuki_pyrimidine
+  primary_result: @res_suzuki
+}
+
+reaction rxn_suzuki_pyrimidine {
+  name: "5-(furan-3-yl)pyrimidine by Suzuki-Miyaura coupling"
+  reactants: [@shared.mol_5_bromopyrimidine, @shared.mol_3_furanylboronic_acid]
+  products: [@shared.mol_5_furan_3_yl_pyrimidine]
+  catalyst: @shared.cat_pdcl2_dppf
+  solvent: @shared.mol_tamyl_alcohol
+  temperature: 120 C
+  time: 12 h
+}
+
+analysis ana_suzuki {
+  type: nmr
+  ref: @rxn_suzuki_pyrimidine
+  status: clean
+  result: "single major product by demo NMR review"
+}
+
+result res_suzuki for @rxn_suzuki_pyrimidine {
+  product: @shared.mol_5_furan_3_yl_pyrimidine
+  status: success
+  yield: 86%
+  purity: 97%
+}
+
+procedure proc_suzuki for @rxn_suzuki_pyrimidine {
+  evidence: [@res_suzuki, @ana_suzuki]
+
+  step charge = charge(materials: "5-bromopyrimidine and 3-furanylboronic acid", inputs: [@shared.mol_5_bromopyrimidine, @shared.mol_3_furanylboronic_acid])
+  step add_base = add(materials: "K3PO4", inputs: [@shared.mol_k3po4], depends_on: [charge])
+  step add_solvent = add(materials: "tert-amyl alcohol", inputs: [@shared.mol_tamyl_alcohol], depends_on: [add_base])
+  step add_catalyst = add(materials: "PdCl2(dppf)", inputs: [@shared.cat_pdcl2_dppf], depends_on: [add_solvent])
+  step screen_pph3 = add(materials: "Pd(PPh3)4 catalyst screen aliquot", inputs: [@shared.cat_pd_pph3_4], depends_on: [add_solvent])
+  step screen_oac_sphos = add(materials: "Pd(OAc)2 plus SPhos catalyst screen aliquot", inputs: [@shared.cat_pd_oac2, @shared.lig_sphos], depends_on: [add_solvent])
+  step screen_xphos_g3 = add(materials: "XPhos Pd G3 catalyst screen aliquot", inputs: [@shared.cat_xphos_pd_g3], depends_on: [add_solvent])
+  step screen_base_solvent = add(materials: "Na2CO3 in dioxane/water screen aliquot", inputs: [@shared.mol_na2co3, @shared.mol_dioxane, @shared.mol_water], depends_on: [add_solvent])
+  wait operator_gate(condition: "operator.confirmed")
+  abort_if overheated(condition: "sensor.temperature > 130 C")
+  step heat = heat(temperature: 120 C, duration: 12 h, depends_on: [add_catalyst, operator_gate])
+
+  until clean_profile(condition: "@ana_suzuki.status == \"clean\"", max_iterations: 3) {
+    step sample_rxn = sample(depends_on: [heat])
+    step analyze_rxn = analyze(type: nmr, inputs: [sample_rxn])
+  }
+
+  abort_if low_yield(condition: "@res_suzuki.yield in [50%, 60%]")
+  step quench = quench(materials: "water", depends_on: [analyze_rxn])
+  step extract = extract(solvent: "EtOAc", depends_on: [quench])
+  step split = separate_layers(depends_on: [extract])
+  step dry = dry(agent: "Na2SO4", depends_on: [split])
+  step concentrate = concentrate(depends_on: [dry])
+}
+
+agent run suzuki_audit {
+  goal: "verify linked references, controls, and result evidence"
+  status: completed
+  evidence: [@rxn_suzuki_pyrimidine, @res_suzuki, @ana_suzuki]
+
+  tool compile_current_file {
+    status: ok
+    evidence: [@res_suzuki]
+  }
+
+  timeline completed {
+    at: "2026-06-04T00:00:00Z"
+    actor: "codex"
+    summary: "demo source validated"
+    tool: "compile_current_file"
+    evidence: [@res_suzuki]
+  }
+}

@@ -13,7 +13,7 @@ import type {
 import { buildAgentRunNode } from "./program-agent-graph";
 import {
   buildTypedFieldNode,
-  collectDeclarationQuantities
+  collectDeclarationQuantityResult
 } from "./program-field-graph";
 import {
   buildProcedureDeclaration,
@@ -109,8 +109,11 @@ const buildDeclarationNodes = (
 const buildFieldDeclarationNode = (
   declaration: ProgramFieldDeclaration,
   symbols: ProgramSymbolTable
-) => ({
-  nodes: [buildTypedFieldNode(declaration, symbols)],
-  quantities: collectDeclarationQuantities(declaration),
-  diagnostics: []
-});
+) => {
+  const quantityResult = collectDeclarationQuantityResult(declaration);
+  return {
+    nodes: [buildTypedFieldNode(declaration, symbols)],
+    quantities: quantityResult.quantities,
+    diagnostics: quantityResult.diagnostics
+  };
+};

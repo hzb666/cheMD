@@ -1,0 +1,63 @@
+module si_rsc_2011_neat_water_suzuki
+
+import demo_shared_reagents as shared from "./shared-reagents.chemd"
+
+meta {
+  id: "si-rsc-2011-neat-water-suzuki"
+  title: "RSC 2011 ESI neat-water Suzuki-Miyaura protocol"
+  date: "2010-12-13"
+  primary_reaction: @rxn_rsc_2011_neat_water
+  primary_result: @res_rsc_2011_neat_water
+}
+
+reaction rxn_rsc_2011_neat_water {
+  name: "Neat-water Suzuki-Miyaura coupling with palladacycle 2"
+  reactants: [@shared.mol_4_bromophenol, @shared.mol_phenylboronic_acid]
+  products: [@shared.mol_4_phenylphenol]
+  catalyst: @shared.cat_bedford_palladacycle_2
+  reagents: @shared.mol_na2co3
+  solvent: @shared.mol_water
+  temperature: rt
+  time: 6 h
+  atmosphere: air
+}
+
+artifact art_rsc_2011_si {
+  kind: supporting_information
+  ref: @rxn_rsc_2011_neat_water
+  path: "https://www.rsc.org/suppdata/c0/gc/c0gc00522c/c0gc00522c.pdf"
+  notes: "Supporting information listed by RSC for DOI 10.1039/C0GC00522C."
+}
+
+analysis ana_rsc_2011_si {
+  type: literature_extract
+  ref: @rxn_rsc_2011_neat_water
+  artifact: [@art_rsc_2011_si]
+  notes: "Article reports 1.0 eq aryl halide, 1.0 eq boronic acid, 2 mL water, 2.5 eq Na2CO3, room temperature, 6 h, air, and 0.02 mol% palladacycle 2."
+}
+
+result res_rsc_2011_neat_water for @rxn_rsc_2011_neat_water {
+  product: @shared.mol_4_phenylphenol
+  status: success
+  notes: "Scope table reports high yield for neat-water conditions; values with >= are kept in notes rather than exact percent fields."
+}
+
+procedure proc_rsc_2011_neat_water for @rxn_rsc_2011_neat_water {
+  evidence: [@art_rsc_2011_si, @ana_rsc_2011_si, @res_rsc_2011_neat_water]
+
+  step charge_halide = charge(materials: "aryl halide", inputs: [@shared.mol_4_bromophenol])
+  step add_water = add(materials: "water", inputs: [@shared.mol_water], depends_on: [charge_halide])
+  step add_base = add(materials: "sodium carbonate", inputs: [@shared.mol_na2co3], depends_on: [add_water])
+  step add_catalyst = add(materials: "palladacycle 2", inputs: [@shared.cat_bedford_palladacycle_2], depends_on: [add_base])
+  step add_boronic_acid = add(materials: "phenylboronic acid", inputs: [@shared.mol_phenylboronic_acid], depends_on: [add_catalyst])
+  step hold_rt = hold(duration: 6 h, temperature: rt, depends_on: [add_boronic_acid])
+  step filter_product = filter(medium: "filtration")
+}
+
+condition_screen screen_rsc_2011_cosolvent {
+  reaction: @rxn_rsc_2011_neat_water
+  standard: @res_rsc_2011_neat_water
+  factor: [cosolvent, water_fraction, crown_ether_additive]
+  outcome: [yield, conversion]
+  notes: "Article Table 1 reports reduced cosolvent performance, including methanol/water 84%, dioxane/water 71%, and no conversion for toluene/water at listed additive loading."
+}

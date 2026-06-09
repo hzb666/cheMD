@@ -45,7 +45,6 @@ export const getChemdCompletionContext = (
     linePrefix,
     tokenPrefix,
     range,
-    isFrontmatter: isInsideFrontmatter(lines, position.line),
     isChemdBlock: Boolean(block),
     isUseHeaderPosition: false,
     isReferencePosition: tokenPrefix.startsWith("@") ||
@@ -279,14 +278,6 @@ const isTokenPrefixChar = (char: string): boolean =>
   || (char >= "a" && char <= "z")
   || (char >= "0" && char <= "9")
   || ["_", "@", "#", ".", "/", ":", "-"].includes(char);
-
-const isInsideFrontmatter = (lines: string[], cursorLine: number): boolean => {
-  if (lines[0]?.trim() !== "---") {
-    return false;
-  }
-  const endIndex = lines.findIndex((line, index) => index > 0 && line.trim() === "---");
-  return endIndex < 0 || cursorLine <= endIndex + 1;
-};
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(Math.max(value, min), max);

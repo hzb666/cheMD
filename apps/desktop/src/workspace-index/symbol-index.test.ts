@@ -84,11 +84,11 @@ describe("buildWorkspaceSymbolIndex", () => {
       .toEqual(["rxn-a", "rxn-b"]);
   });
 
-  it("skips legacy .chemd.md files during symbol indexing", async () => {
-    const readFile = vi.fn(() => createSource("rxn-legacy"));
+  it("skips .chemd.md files during symbol indexing", async () => {
+    const readFile = vi.fn(() => createSource("rxn-ignored"));
     const result = await buildWorkspaceSymbolIndex({
       workspace,
-      files: [fileEntry("experiments/legacy.chemd.md")],
+      files: [fileEntry("experiments/ignored.chemd.md")],
       readFile,
       languageServiceDependencies: {
         now: () => new Date("2026-05-13T00:00:00.000Z")
@@ -98,7 +98,7 @@ describe("buildWorkspaceSymbolIndex", () => {
     expect(readFile).not.toHaveBeenCalled();
     expect(result.summary.scannedFiles).toBe(0);
     expect(result.summary.skipped).toEqual([
-      { documentPath: "experiments/legacy.chemd.md", reason: "non_chemd_markdown" }
+      { documentPath: "experiments/ignored.chemd.md", reason: "non_chemd_markdown" }
     ]);
     expect(result.index.symbols).toEqual([]);
   });

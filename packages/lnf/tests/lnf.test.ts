@@ -233,7 +233,7 @@ describe("canonical LNF builder", () => {
     });
   });
 
-  it("preserves runtime summaries without legacy migration fields", () => {
+  it("preserves runtime summaries with canonical fields", () => {
     const lnf = buildCanonicalLnf({
       document: createProgram(),
       typedGraph: {

@@ -15,7 +15,7 @@ pnpm chemd export ./examples/example.chemd --format json
 
 JSON payload 包含：
 
-- `document.meta`：frontmatter metadata
+- `document.meta`：program metadata
 - `document.layout`：存在 `col` 节点被 flatten 时出现
 - `document.body`：序列化后的 Markdown 与结构化块
 - `semantic.typedGraph`：typechecker 生成的 typed semantic graph
@@ -89,7 +89,7 @@ JSON payload 包含：
 Field value schema metadata 不会在 JSON 中增加单独的导出对象。它的作用是让
 typechecker 与编辑器对既有字段类别保持一致。例如 `temperature`、`time`、
 `pressure`、result metrics、mass 字段和 purity 字段仍导出为相同的 `QuantityType`
-记录；这些 quantity class 会先通过共享 schema adapter 解析，再回退到旧常量。
+记录；这些 quantity class 通过共享 schema adapter 或默认字段类别解析。
 
 `training-full.semantic_layer` 是另一层导出，用于下游 training 和 graph projections。它把选定事实复制并增强为稳定实体，例如 `reactions`、`results`、`analyses`、`condition_variation_attempts` 和 `links`。
 

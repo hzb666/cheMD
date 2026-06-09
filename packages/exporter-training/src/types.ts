@@ -24,7 +24,7 @@ export interface DataGovernanceInfo {
   review_status?: "machine_parsed" | "human_reviewed" | "expert_verified";
   allowed_uses?: Array<"rag" | "sft" | "eval" | "regression" | "audit">;
   sanitization_policy?: "default" | "strict" | "none";
-  source?: "frontmatter" | "workspace_policy" | "export_override";
+  source?: "meta" | "workspace_policy" | "export_override";
 }
 
 export interface ExportGeneratorInfo {

@@ -131,11 +131,119 @@ analysis ana_arbitrary {
     expect(result.diagnostics).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: "E301", sourceNodeId: "mol_missing", sourceField: "name" }),
       expect.objectContaining({ code: "E_PROGRAM_FIELD_UNKNOWN", sourceNodeId: "mol_missing", sourceField: "unexpected" }),
-      expect.objectContaining({ code: "E_PROGRAM_FIELD_VALUE_KIND", sourceNodeId: "rxn_bad", sourceField: "temperature" })
+      expect.objectContaining({ code: "E403", sourceNodeId: "rxn_bad", sourceField: "temperature" })
     ]));
     expect(result.diagnostics).not.toContainEqual(
       expect.objectContaining({ code: "E_PROGRAM_FIELD_UNKNOWN", sourceNodeId: "ana_arbitrary" })
     );
+  });
+
+  it("accepts symbolic reaction temperature conditions without inventing numeric values", () => {
+    const result = typecheckProgram(parse(`module exp_symbolic_temperature
+
+meta {
+  id: "exp-symbolic-temperature"
+  title: "Symbolic temperature"
+  date: "2026-06-09"
+}
+
+reaction rxn_reflux {
+  reactants: ["substrate"]
+  temperature: reflux
+}
+
+reaction rxn_rt {
+  reactants: ["substrate"]
+  temperature: rt
+}
+
+reaction rxn_room {
+  reactants: ["substrate"]
+  temperature: "room temperature"
+}
+`));
+
+    expect(result.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
+    expect(result.typedGraph.quantities).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        raw: "reflux",
+        valueKind: "shorthand",
+        shorthand: "reflux",
+        normalizedText: "reflux"
+      }),
+      expect.objectContaining({
+        raw: "rt",
+        valueKind: "shorthand",
+        shorthand: "room_temperature",
+        normalizedText: "room temperature"
+      }),
+      expect.objectContaining({
+        raw: "room temperature",
+        valueKind: "shorthand",
+        shorthand: "room_temperature",
+        normalizedText: "room temperature"
+      })
+    ]));
+  });
+
+  it("treats reaction reagents catalyst and solvent as list fields with scalar singleton shorthand", () => {
+    const result = typecheckProgram(parse(`module exp_reaction_condition_lists
+
+meta {
+  id: "exp-reaction-condition-lists"
+  title: "Reaction condition lists"
+  date: "2026-06-09"
+}
+
+molecule mol_a {
+  name: "A"
+}
+
+molecule mol_product {
+  name: "product"
+}
+
+molecule mol_k2co3 {
+  name: "K2CO3"
+}
+
+molecule mol_dioxane {
+  name: "dioxane"
+}
+
+molecule mol_water {
+  name: "water"
+}
+
+material cat_pd {
+  notes: "Pd catalyst"
+}
+
+reaction rxn_list {
+  reactants: @mol_a
+  products: @mol_product
+  reagents: [@mol_k2co3, "A, B"]
+  catalyst: "Pd(OAc)2, SPhos"
+  solvent: [@mol_dioxane, @mol_water]
+}
+`));
+
+    const reaction = result.typedGraph.nodes.find((node) => node.kind === "reaction" && node.nodeId === "rxn_list");
+
+    expect(result.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
+    expect(reaction).toMatchObject({
+      reactants: [expect.objectContaining({ refId: "mol_a", targetKind: "molecule" })],
+      products: [expect.objectContaining({ refId: "mol_product", targetKind: "molecule" })],
+      reagents: [
+        expect.objectContaining({ refId: "mol_k2co3", targetKind: "molecule" }),
+        { kind: "literal", raw: "A, B" }
+      ],
+      catalyst: [{ kind: "literal", raw: "Pd(OAc)2, SPhos" }],
+      solvent: [
+        expect.objectContaining({ refId: "mol_dioxane", targetKind: "molecule" }),
+        expect.objectContaining({ refId: "mol_water", targetKind: "molecule" })
+      ]
+    });
   });
 
   it("maps nested value schema diagnostics to nested source spans", () => {

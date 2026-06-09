@@ -229,6 +229,10 @@ describe("program AST contracts", () => {
       kind: "enum",
       values: expect.arrayContaining(["blocked", "cancelled"])
     });
+    expect(getDeclarationFieldSchema("reaction", "temperature")?.value).toMatchObject({
+      kind: "symbolic_quantity",
+      quantityClass: "temperature"
+    });
     expect(isKnownDeclarationKind("condition_screen")).toBe(true);
     expect(isKnownDeclarationKind("condition_varies")).toBe(false);
   });
@@ -265,16 +269,20 @@ describe("block field schema baseline", () => {
     });
   });
 
-  it("keeps current list and completion behavior stable before value schema work", () => {
+  it("keeps list and completion behavior stable", () => {
     expect([...getBlockListFieldSet("chemd")].sort()).toEqual([
+      "catalyst",
       "chemistry_features",
       "conditions",
       "prev",
       "product",
-      "reactant"
+      "reactant",
+      "reagents",
+      "solvent"
     ]);
     expect(getBlockFieldListMode("chemd", "reactant")).toBe("repeat");
     expect(getBlockFieldListMode("chemd", "reactant", "reactants")).toBe("pipe");
+    expect(getBlockFieldListMode("chemd", "solvent")).toBe("pipe");
     expect(getCompletionBlockFieldSchemas("chemd", "molecule").map((field) => field.name)).toEqual(
       expect.arrayContaining(["smiles", "cas", "mw"])
     );
@@ -294,6 +302,11 @@ describe("block field schema baseline", () => {
     expect(getQuantityFieldClass("result", "isolated_mass")).toBe("mass");
     expect(getQuantityFieldClass("result", "yield")).toBe("percent");
     expect(getReferenceTargetKinds("chemd", "reactant")).toEqual([
+      "molecule",
+      "material",
+      "batch"
+    ]);
+    expect(getReferenceTargetKinds("chemd", "catalyst")).toEqual([
       "molecule",
       "material",
       "batch"
@@ -341,16 +354,16 @@ describe("block field schema baseline", () => {
     expect(domainFields).toEqual(exceptions);
   });
 
-  it("keeps compatibility value maps aligned with enum value schemas", () => {
+  it("keeps field value maps aligned with enum value schemas", () => {
     const mismatches = BLOCK_SCHEMAS.flatMap((schema) =>
       schema.fields.flatMap((field) => {
         if (!field.values) {
           return [];
         }
 
-        const uniqueLegacyValues = [...new Set(Object.values(field.values))].sort();
+        const uniqueFieldValues = [...new Set(Object.values(field.values))].sort();
         const enumValues = getEnumFieldValues(schema.blockType, field.name).sort();
-        return JSON.stringify(uniqueLegacyValues) === JSON.stringify(enumValues)
+        return JSON.stringify(uniqueFieldValues) === JSON.stringify(enumValues)
           ? []
           : [`${schema.blockType}.${field.name}`];
       })

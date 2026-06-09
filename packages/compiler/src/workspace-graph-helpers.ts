@@ -19,6 +19,7 @@ export interface ResolvedGraphReference {
 
 const NODE_PREFIX_BY_DECLARATION: Partial<Record<ChemdProgramDeclarationKind, string>> = {
   analysis: "ana",
+  agent_run: "agent",
   artifact: "art",
   batch: "bat",
   condition_screen: "condition_screen",

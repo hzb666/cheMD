@@ -27,17 +27,6 @@ Markdown 只作为文档进入编译器：
 
 文档可以渲染，也可以进入 narrative RAG chunks。语义事实来自 declarations。
 
-## Source Boundaries
-
-Parser 会为不支持的 source surfaces 产生 fatal diagnostics：
-
-- `---` metadata
-- `:::chemd`、`:::procedure`、`:::result`、`:::analysis` 等 fenced blocks
-- `:::template`、`:::use` 和 template parameters
-- `:::col-N`、`col:` 和 rendered column layout syntax
-- 从 Markdown body text 推断语义事实
-- compiler path 中的 `.chemd.md` 兼容
-
 ## Source Example
 
 ```text
@@ -70,7 +59,8 @@ molecule mol_aryl {
 reaction rxn_var1 {
   reactants: [@mol_aryl]
   products: ["biphenyl product"]
-  solvent: "MeCN"
+  catalyst: "Pd(PPh3)4"
+  solvent: ["MeCN", "water"]
   temperature: 40 C
   time: 2 h
 }
@@ -158,11 +148,6 @@ program targets，也可以使用 `sensor.ph`、`operator.confirmed`、`time.ela
 
 ## Diagnostics
 
-不支持的 source surfaces 会产生 fatal parser diagnostics。
-
-| Code | Trigger |
-| --- | --- |
-| `E_LEGACY_FRONTMATTER_REMOVED` | Source starts metadata with `---` |
-| `E_LEGACY_FENCED_BLOCK_REMOVED` | Source contains a `:::` fenced block |
-| `E_LEGACY_TEMPLATE_REMOVED` | Source contains `:::template`, `:::use`, or template parameters |
-| `E_LEGACY_COLUMN_LAYOUT_REMOVED` | Source contains `:::col-N`, `col:`, or rendered column layout syntax |
+Parser diagnostics 会报告非法 program declarations、缺失的必需语法、无法解析的
+references、不支持的 declaration kinds 和非法 field values。完整 code list 见
+diagnostic code reference。

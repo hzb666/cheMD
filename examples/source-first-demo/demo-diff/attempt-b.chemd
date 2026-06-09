@@ -1,0 +1,21 @@
+module exp_demo_diff_b
+
+meta {
+  id: "exp-demo-diff"
+  title: "Demo diff attempt B"
+  date: "2026-06-08"
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
+
+reaction rxn_main {
+  reactants: ["aryl bromide", "phenylboronic acid"]
+  reagents: ["K2CO3", "Pd(PPh3)4"]
+  solvent: ["dioxane", "water"]
+  temperature: 90 C
+}
+
+result res_main for @rxn_main {
+  status: success
+  yield: 82%
+}

@@ -1383,7 +1383,7 @@ const buildAttemptConditionVariationLogic = (
 const buildConditionVariationLogic = (
   record: ChemdTrainingExportV2
 ): TrainingConditionVariationLogicV1[] => {
-  const legacyLogic: TrainingConditionVariationLogicV1[] = record.semantic_layer.condition_variations.flatMap((variation) => {
+  const variationLogicWithoutAttempts: TrainingConditionVariationLogicV1[] = record.semantic_layer.condition_variations.flatMap((variation) => {
     if (record.semantic_layer.condition_variation_attempts.some((attempt) =>
       attempt.parent_condition_variation_id === variation.entity_id
     )) {
@@ -1413,7 +1413,7 @@ const buildConditionVariationLogic = (
     }];
   });
 
-  return [...legacyLogic, ...buildAttemptConditionVariationLogic(record)];
+  return [...variationLogicWithoutAttempts, ...buildAttemptConditionVariationLogic(record)];
 };
 
 const buildVariationImplicitConditionFacts = (

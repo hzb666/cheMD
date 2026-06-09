@@ -60,7 +60,7 @@ reaction rxn_main {
   name: "Suzuki coupling"
   reactants: [@mat_aryl_bromide, @mol_boronic_acid]
   products: [@mol_product]
-  solvent: "dioxane/water"
+  solvent: ["dioxane", "water"]
   temperature: 80 C
   time: 16 h
 }

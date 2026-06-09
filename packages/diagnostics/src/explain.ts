@@ -9,14 +9,13 @@ export interface DiagnosticExplanation {
   code: string;
   defaultSeverity?: DiagnosticSeverity;
   known: boolean;
-  source: "registry" | "legacy" | "unknown";
+  source: "registry" | "unknown";
   title?: string;
 }
 
 export const explainDiagnosticCodeFrom = (
   code: string,
-  spec: DiagnosticSpec | undefined,
-  legacyBand: DiagnosticBand | undefined
+  spec: DiagnosticSpec | undefined
 ): DiagnosticExplanation => {
   if (spec) {
     return {
@@ -29,17 +28,9 @@ export const explainDiagnosticCodeFrom = (
     };
   }
 
-  return legacyBand
-    ? {
-        band: legacyBand,
-        code,
-        known: true,
-        source: "legacy",
-        title: "Legacy diagnostic"
-      }
-    : {
-        code,
-        known: false,
-        source: "unknown"
-      };
+  return {
+    code,
+    known: false,
+    source: "unknown"
+  };
 };

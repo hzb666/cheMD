@@ -30,11 +30,6 @@ const countLowConfidenceLoweredSteps = (learningLayer: LearningLayerV1): number 
     .filter((step) => step.source.sourceType === "lowered_step" && step.loweringConfidence < 0.85)
     .length ?? 0;
 
-const countMigrationDiagnostics = (diagnostics: Diagnostic[]): number =>
-  diagnostics.filter((diagnostic) =>
-    ["W_CHEMD_KIND_AMBIGUOUS", "E_CHEMD_KIND_CONFLICT"].includes(diagnostic.code)
-  ).length;
-
 const hasAllowedUse = (governance: DataGovernanceInfo, use: "rag" | "sft" | "eval" | "regression"): boolean =>
   governance.allowed_uses?.includes(use) === true;
 
@@ -76,17 +71,11 @@ export const buildQualityLayer = (
   }
 
   const lowConfidenceLoweredSteps = countLowConfidenceLoweredSteps(learningLayer);
-  const migrationDiagnostics = countMigrationDiagnostics(diagnostics);
   const reviewReasons: string[] = [];
 
   if (lowConfidenceLoweredSteps > 0) {
     exclusionReasons.push("low_confidence_lowered_steps");
     reviewReasons.push("low_confidence_lowered_steps");
-  }
-
-  if (migrationDiagnostics > 0) {
-    exclusionReasons.push("surface_migration_required");
-    reviewReasons.push("surface_migration_required");
   }
 
   if (parseQuality.has_errors) {

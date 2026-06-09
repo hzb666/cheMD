@@ -7,9 +7,13 @@ import {
   parseChemdBlockStructure,
 } from "./chemd-block-structure";
 
-const source = `---
-id: exp-sticky
----
+const source = `module exp_sticky
+
+meta {
+  id: "exp-sticky"
+  title: "Sticky"
+  date: "2026-06-08"
+}
 
 molecule mol_start {
   smiles: "CCO"
@@ -34,30 +38,30 @@ describe("Chemd editor block structure", () => {
       {
         blockType: "molecule",
         label: "molecule mol_start",
-        startLine: 5,
-        endLine: 7,
+        startLine: 9,
+        endLine: 11,
       },
       {
         blockType: "reaction",
         label: "reaction rxn_main",
-        startLine: 9,
-        endLine: 12,
+        startLine: 13,
+        endLine: 16,
       },
       {
         blockType: "procedure",
         label: "procedure proc_main",
-        startLine: 14,
-        endLine: 17,
+        startLine: 18,
+        endLine: 21,
         children: [
-          { blockType: "step", label: "step s_charge", startLine: 15, endLine: 15 },
-          { blockType: "step", label: "step s_heat", startLine: 16, endLine: 16 },
+          { blockType: "step", label: "step s_charge", startLine: 19, endLine: 19 },
+          { blockType: "step", label: "step s_heat", startLine: 20, endLine: 20 },
         ],
       },
     ]);
   });
 
   it("finds the parent and child breadcrumb path for the cursor line", () => {
-    const path = findChemdBlockPathAtLine(parseChemdBlockStructure(source), 16)
+    const path = findChemdBlockPathAtLine(parseChemdBlockStructure(source), 20)
       .map((node) => node.label);
 
     expect(path).toEqual(["procedure proc_main", "step s_heat"]);
@@ -68,25 +72,25 @@ describe("Chemd editor block structure", () => {
       .map((node) => [node.label, node.startLine, node.endLine]);
 
     expect(ranges).toEqual([
-      ["molecule mol_start", 5, 7],
-      ["reaction rxn_main", 9, 12],
-      ["procedure proc_main", 14, 17],
-      ["step s_charge", 15, 15],
-      ["step s_heat", 16, 16],
+      ["molecule mol_start", 9, 11],
+      ["reaction rxn_main", 13, 16],
+      ["procedure proc_main", 18, 21],
+      ["step s_charge", 19, 19],
+      ["step s_heat", 20, 20],
     ]);
   });
 
   it("finds matching declaration braces without treating inline steps as block pairs", () => {
     const roots = parseChemdBlockStructure(source);
 
-    expect(findChemdFencePairAtLine(roots, 14)).toEqual({
+    expect(findChemdFencePairAtLine(roots, 18)).toEqual({
       blockType: "procedure",
       label: "procedure proc_main",
-      openLine: 14,
-      closeLine: 17,
+      openLine: 18,
+      closeLine: 21,
     });
-    expect(findChemdFencePairAtLine(roots, 17)?.openLine).toBe(14);
-    expect(findChemdFencePairAtLine(roots, 15)).toBeUndefined();
+    expect(findChemdFencePairAtLine(roots, 21)?.openLine).toBe(18);
+    expect(findChemdFencePairAtLine(roots, 19)).toBeUndefined();
   });
 
   it("does not synthesize a brace pair for an unclosed declaration", () => {

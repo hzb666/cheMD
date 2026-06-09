@@ -80,9 +80,6 @@ reaction rxn_main {
     );
 
     expect(payload.program.declarations.mol_main?.fields.smiles?.text).toBe("CCO");
-    expect((payload.diagnostics ?? []).map((diagnostic) => diagnostic.code)).not.toContain(
-      "W_CHEMD_KIND_AMBIGUOUS"
-    );
     expect(payload.program.declarations.rxn_main?.fields.reactants?.items?.map((item) =>
       item.text ?? item.value ?? item.raw
     )).toEqual([
@@ -101,7 +98,7 @@ reaction rxn_main {
     expect(payload.program.declarations.rxn_main?.fields).not.toHaveProperty("normalized_conditions");
   });
 
-  it("serializes declarations without legacy layout wrappers", async () => {
+  it("serializes declarations without layout wrappers", async () => {
     const json = await exportNormalizedJson(
       `module exp_json_declarations
 

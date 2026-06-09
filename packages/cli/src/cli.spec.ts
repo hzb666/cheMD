@@ -638,6 +638,28 @@ result res_main for @rxn_main {
     expect(result.stderr).toBe("");
   });
 
+  it("accepts repair as a user-facing alias for deterministic fix", async () => {
+    const finalSource = `${fixableSource}
+result res_main for @rxn_main {
+  status: success
+}
+`;
+    const result = await runInTempDir(["repair", "fix.chemd"], {
+      "fix.chemd": fixableSource
+    }, createRepairLoopOptions({
+      changed: true,
+      finalSource,
+      safeFixCount: 2,
+      status: "clean"
+    }));
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(result.stdout).toMatch(/Fix fix\.chemd/);
+    expect(result.stdout).toMatch(/final status: clean/);
+    expect(result.stdout).toContain("result res_main for @rxn_main");
+    expect(result.stderr).toBe("");
+  });
+
   it("writes the fixed source back to disk when --write is set", async () =>
     withTempDir(async (dir) => {
       const filePath = path.join(dir, "fix.chemd");
@@ -1633,6 +1655,53 @@ describe("chemd cli agent loop", () => {
       expect(stderr.value).toBe("");
     }));
 
+  it("passes compact diagnosis text to external agent-loop drivers", async () =>
+    withTempDir(async (dir) => {
+      const filePath = path.join(dir, "agent-diagnosis.chemd");
+      const driverPath = path.join(dir, "diagnosis-driver.mjs");
+      writeFileSync(filePath, agentLoopNeedsRewriteSource);
+      writeFileSync(driverPath, `
+import { readFileSync } from "node:fs";
+
+const request = JSON.parse(readFileSync(0, "utf8"));
+const hasDiagnosisText = typeof request.diagnosisText === "string"
+  && request.diagnosisText.includes("Compiler status:")
+  && request.diagnosisText.includes("Manual review:");
+
+process.stdout.write(JSON.stringify({
+  schemaVersion: "chemd-agent-driver-response/v0.1",
+  action: "stop",
+  note: hasDiagnosisText ? "has diagnosisText" : "missing diagnosisText"
+}));
+`);
+
+      const stdout = createWriter();
+      const stderr = createWriter();
+      const exitCode = await runChemdCli([
+        "agent-loop",
+        "agent-diagnosis.chemd",
+        "--driver",
+        process.execPath,
+        "--driver-arg",
+        driverPath,
+        "--format",
+        "json"
+      ], {
+        cwd: dir,
+        stderr,
+        stdout
+      });
+      const payload = JSON.parse(stdout.value);
+
+      expect(exitCode).toBe(EXIT_VALIDATION_FAILED);
+      expect(payload.iterations[0].agentResponse).toMatchObject({
+        action: "stop",
+        changedSource: false,
+        note: "has diagnosisText"
+      });
+      expect(stderr.value).toBe("");
+    }));
+
   it("writes the final clean source back to disk when agent-loop uses --write", async () =>
     withTempDir(async (dir) => {
       const filePath = path.join(dir, "agent-write.chemd");
@@ -2064,10 +2133,10 @@ describe("chemd cli changed", () => {
     expect(result.stdout.trim()).toBe("No changed Chemd files.");
   });
 
-  it("omits legacy .chemd.md files from changed-file reports", async () => {
-    const gitRunner = createGitRunner({ tracked: "A\0legacy.chemd.md\0" });
+  it("reports changed files only for .chemd sources", async () => {
+    const gitRunner = createGitRunner({ tracked: "A\0ignored.chemd.md\0" });
     const result = await runInTempDir(["changed", "--format", "json"], {
-      "legacy.chemd.md": validSource
+      "ignored.chemd.md": validSource
     }, { ...programCliOptions(), gitRunner });
     const payload = JSON.parse(result.stdout);
 

@@ -1,0 +1,1 @@
+Create a Chemd record for a failed coupling attempt. The substrate was 2-chloropyridine and the partner was phenylboronic acid. Pd(PPh3)4 and K3PO4 were used in toluene at 100 C. LCMS showed starting material remained and no desired product was detected. Do not invent a yield.

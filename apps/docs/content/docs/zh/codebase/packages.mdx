@@ -10,7 +10,7 @@ description: packages 目录中已存在包的职责边界、入口、数据流�
 | 包 | 主要入口 | 职责 |
 | --- | --- | --- |
 | `@chemd/core` | `packages/core/src/index.ts` | AST、diagnostics、引用模型、render overrides、共享类型 |
-| `@chemd/parser` | `packages/parser/src/index.ts` | frontmatter、body、block、inline token 解析 |
+| `@chemd/parser` | `packages/parser/src/index.ts` | program lexer、meta parser、declarations、values 和 references |
 | `@chemd/resolver` | `packages/resolver/src/index.ts` | 对象索引、引用解析、模板展开、primary 校验、必填字段校验 |
 | `@chemd/typechecker` | `packages/typechecker/src/index.ts` | typed semantic graph、数量归一化、类型化引用、路线和 step 检查 |
 | `@chemd/interoperability` | `packages/interoperability/src/index.ts` | 外部 identity 与 structure adapter contract、校验 helper |
@@ -61,7 +61,7 @@ pnpm --filter @chemd/runtime-trace test
 
 | 包 | 职责 |
 | --- | --- |
-| `@chemd/render-profile` | 内置 render profile、frontmatter selection、override 合并和诊断 |
+| `@chemd/render-profile` | 内置 render profile、render option 合并、override 校验和诊断 |
 | `@chemd/renderer-html` | HTML 预览渲染 |
 | `@chemd/renderer-json` | JSON 渲染 |
 | `@chemd/renderer-docx` | DOCX bridge 渲染 |

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { runChemdAgentLoop } from "../src/index";
+import { runChemdAgentLoop, type ChemdAgentLoopAgent } from "../src/index";
 
 const cleanProgram = `module exp_agent_loop_clean
 
@@ -38,6 +38,19 @@ meta {
 INVALID_PROGRAM
 `;
 
+const stalledSyntaxProgram = `module exp_agent_loop_stalled
+
+meta {
+  id: "exp-agent-loop-stalled"
+  title: "Agent Loop Stalled"
+  date: "2026-06-09"
+}
+
+reaction rxn_main {
+  reactants: ["anisole"]
+  temperature: 90 C
+`;
+
 describe("runChemdAgentLoop", () => {
   it("skips agent calls when repair already reaches clean", async () => {
     const agent = vi.fn();
@@ -64,6 +77,24 @@ describe("runChemdAgentLoop", () => {
       action: "rewrite",
       changedSource: true,
       note: "E_PROGRAM_DECLARATION_EXPECTED"
+    });
+  });
+
+  it("lets the agent rewrite after deterministic repair stalls", async () => {
+    const agent = vi.fn<ChemdAgentLoopAgent>(() => ({
+      action: "rewrite" as const,
+      note: "repair stalled",
+      nextSource: cleanProgram
+    }));
+    const result = await runChemdAgentLoop(stalledSyntaxProgram, { agent });
+
+    expect(agent).toHaveBeenCalledOnce();
+    expect(agent.mock.calls[0]?.[0].repairResult.stoppedReason).toBe("stalled");
+    expect(result.stoppedReason).toBe("clean");
+    expect(result.iterations[0]?.agentResponse).toMatchObject({
+      action: "rewrite",
+      changedSource: true,
+      note: "repair stalled"
     });
   });
 

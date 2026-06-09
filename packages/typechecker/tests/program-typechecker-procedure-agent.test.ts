@@ -233,7 +233,47 @@ procedure proc_1 {
     expect(result.diagnostics).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: "E_STEP_PARAM_MISSING", sourceNodeId: "hold_bad" }),
       expect.objectContaining({ code: "E_STEP_PARAM_INVALID", sourceNodeId: "filter_bad" }),
-      expect.objectContaining({ code: "E_STEP_PARAM_TYPE_MISMATCH", sourceNodeId: "heat_bad" })
+      expect.objectContaining({ code: "E403", sourceNodeId: "heat_bad" })
+    ]));
+  });
+
+  it("accepts symbolic heat and cool temperatures without numeric conversion", () => {
+    const result = typecheckProgram(parse(`module exp_symbolic_step_temperature
+
+meta {
+  id: "exp-symbolic-step-temperature"
+  title: "Symbolic step temperature"
+  date: "2026-06-09"
+}
+
+procedure proc_1 {
+  step charge = charge(materials: "substrate")
+  step heat_reflux = heat(temperature: reflux, depends_on: [charge])
+  step heat_rt = heat(temperature: rt, depends_on: [heat_reflux])
+  step cool_ice = cool(temperature: "ice bath", depends_on: [heat_rt])
+}
+`));
+
+    expect(result.diagnostics.filter((diagnostic) => diagnostic.severity === "error")).toEqual([]);
+    expect(result.typedGraph.quantities).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        sourceNodeId: "heat_reflux",
+        sourceField: "temperature",
+        raw: "reflux",
+        shorthand: "reflux"
+      }),
+      expect.objectContaining({
+        sourceNodeId: "heat_rt",
+        sourceField: "temperature",
+        raw: "rt",
+        shorthand: "room_temperature"
+      }),
+      expect.objectContaining({
+        sourceNodeId: "cool_ice",
+        sourceField: "temperature",
+        raw: "ice bath",
+        shorthand: "ice_bath"
+      })
     ]));
   });
 

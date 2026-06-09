@@ -130,7 +130,12 @@ const renderReagentsLine = (candidate: ReactionCandidate): string[] => {
     .map(renderableFactValue)
     .filter((item): item is string => Boolean(item));
 
-  return values.length > 0 ? [`  ${field}: ${renderStringValue(values.join(", "))}`] : [];
+  if (values.length === 0) {
+    return [];
+  }
+  return values.length === 1
+    ? [`  ${field}: ${renderStringValue(values[0])}`]
+    : [`  ${field}: [${values.map(renderStringValue).join(", ")}]`];
 };
 
 const renderScalarRoleLine = (
@@ -257,7 +262,7 @@ export const renderChemdDraft = (
   const moduleName = (options.documentId ?? "imported-prose")
     .replace(/[^a-zA-Z0-9_]/g, "_")
     .replace(/^[^a-zA-Z_]+/, "exp_") || "imported_prose";
-  const frontmatter = [
+  const programHeader = [
     `module ${moduleName}`,
     "",
     "meta {",
@@ -274,7 +279,7 @@ export const renderChemdDraft = (
   ];
 
   return [
-    ...frontmatter,
+    ...programHeader,
     "",
     ...blocks
   ].join("\n");

@@ -47,6 +47,11 @@ const getFamily = (
     item.reaction_entity_id === reactionEntityId
   )?.reaction_family;
 
+const isKnownFamily = (
+  family: TrainingReactionFamilyV1 | undefined
+): family is Exclude<TrainingReactionFamilyV1, "unknown"> =>
+  Boolean(family && family !== "unknown");
+
 const getConditionSignature = (reaction: TrainingReactionV1): string | undefined => {
   const conditions = reaction.normalized_conditions;
   const values = [
@@ -81,7 +86,8 @@ const buildReactionFeatures = (
 ): TrainingReactionGraphFeatureV1[] => {
   const procedureSignature = getProcedureSignature(understanding);
   return understanding.entities.reactions.map((reaction) => {
-    const family = getFamily(understanding, reaction.entity_id);
+    const rawFamily = getFamily(understanding, reaction.entity_id);
+    const family = isKnownFamily(rawFamily) ? rawFamily : undefined;
     const route = understanding.experiment_logic.reaction_routes.find((item) =>
       item.reaction_entity_id === reaction.entity_id
     );

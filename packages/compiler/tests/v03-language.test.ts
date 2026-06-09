@@ -46,22 +46,14 @@ describe("program compiler integration", () => {
     });
   });
 
-  it("reports removed legacy source as explicit parser diagnostics", () => {
-    const result = compileChemd(`---
-id: exp-legacy
-title: Legacy
-date: 2026-05-29
----
-
-:::chemd #rxn-main
-reactants: a
-products: b
-:::`);
+  it("reports invalid source as ordinary parser diagnostics", () => {
+    const result = compileChemd(`???`);
 
     expect(result.program.declarations).toEqual([]);
-    expect(result.diagnostics).toEqual(expect.arrayContaining([
-      expect.objectContaining({ code: "E_LEGACY_FRONTMATTER_REMOVED" }),
-      expect.objectContaining({ code: "E_LEGACY_FENCED_BLOCK_REMOVED" })
-    ]));
+    expect(result.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "E_PROGRAM_MODULE_EXPECTED" })
+      ])
+    );
   });
 });

@@ -45,13 +45,7 @@ procedure proc-main for @rxn-main {
 }
 `;
 
-const legacySource = `---
-id: legacy
----
-
-:::chemd #rxn-main
-reactants: a
-:::
+const invalidSource = `???
 `;
 
 const invalidFieldSource = `module exp_invalid_field
@@ -69,20 +63,15 @@ reaction rxn-main {
 `;
 
 describe("compileChemdForEditor", () => {
-  it("maps removed legacy syntax diagnostics without patch proposals", () => {
+  it("maps parser syntax diagnostics without patch proposals", () => {
     const output = compileChemdForEditor({
-      source: legacySource
+      source: invalidSource
     });
 
     expect(output.status).toBe("ok");
     expect(output.diagnostics).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        code: "E_LEGACY_FRONTMATTER_REMOVED",
-        severity: "error",
-        quickFixes: []
-      }),
-      expect.objectContaining({
-        code: "E_LEGACY_FENCED_BLOCK_REMOVED",
+        code: "E_PROGRAM_MODULE_EXPECTED",
         severity: "error",
         quickFixes: []
       })
@@ -439,8 +428,8 @@ This observation is plain markdown with no Chemd declarations.
       expect.objectContaining({
         nodeKind: "diagnostic",
         payload: expect.objectContaining({
-          code: "E_PROGRAM_FIELD_VALUE_KIND",
-          source_node_id: "rxn-main"
+          code: "E_UNRESOLVED_PROGRAM_REFERENCE",
+          source_node_id: "mol-main"
         })
       })
     ]));
@@ -449,8 +438,8 @@ This observation is plain markdown with no Chemd declarations.
         edgeType: "diagnostic_evidence",
         confidence: "high",
         evidence: expect.objectContaining({
-          diagnostic_code: "E_PROGRAM_FIELD_VALUE_KIND",
-          source_node_id: "rxn-main",
+          diagnostic_code: "E_UNRESOLVED_PROGRAM_REFERENCE",
+          source_node_id: "mol-main",
           source_range: expect.objectContaining({ startLine: expect.any(Number) })
         })
       })

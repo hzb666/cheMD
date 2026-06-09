@@ -44,7 +44,7 @@
 - `tags`
 - `render_profile`
 - `render_overrides`
-- Legacy source removal diagnostics
+- Program source diagnostics
 
 ### 3. Markdown Prose and Inline Syntax
 
@@ -124,7 +124,7 @@
 
 ### 11. Diagnostics and Repair
 
-- Legacy source diagnostics
+- Program source diagnostics
 - ID diagnostics
 - Field diagnostics
 - List diagnostics
@@ -168,7 +168,7 @@
 ### 3. Parser Implementation
 
 - `parseChemd`
-- Frontmatter parser
+- Program meta parser
 - Body parser
 - Block parser registry
 - Field parsing

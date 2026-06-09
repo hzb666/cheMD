@@ -36,7 +36,7 @@ const diagnosticSourceDirectories = [
 ];
 
 const extractDiagnosticCodesFromSource = (): string[] => {
-  const diagnosticCodePattern = /^([EWI]\d{3}|[EW]_[A-Z0-9_]+)$/;
+  const diagnosticCodePattern = /^([EWI]\d{3}|[EW]_[A-Z0-9]+(?:_[A-Z0-9]+)*)$/;
   const codes = diagnosticSourceDirectories.flatMap((directory) =>
     collectFiles(directory).flatMap((file) =>
       extractQuotedValues(readFileSync(file, "utf8")).filter((value) => diagnosticCodePattern.test(value))

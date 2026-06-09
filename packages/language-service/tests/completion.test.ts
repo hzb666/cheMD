@@ -173,13 +173,6 @@ reaction rxn-a {
 }`)).not.toContain("amount:");
   });
 
-  it("does not offer completions inside legacy frontmatter", () => {
-    expect(labelsFor(`---
-title: |
----
-`)).toEqual([]);
-  });
-
   it("keeps prose completions low priority outside Chemd context", () => {
     const items = getChemdCompletions(withCursor("This is prose|")).items;
 

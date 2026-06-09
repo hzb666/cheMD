@@ -34,7 +34,7 @@ import type {
 import type { V03Diagnostic } from "@chemd/diagnostics";
 import type { CanonicalStepNode, ObservationEventNode, StepGraph } from "@chemd/step-ontology";
 
-export type { QuantityClass } from "@chemd/core";
+export type { QuantityClass, QuantityShorthand } from "@chemd/core";
 
 export interface QuantityType {
   kind: "quantity";
@@ -175,9 +175,9 @@ export interface TypedReactionNode extends TypedNodeBase {
   participants: TypedReactionParticipant[];
   stoichiometry?: StoichiometrySummary;
   normalizedConditions: NormalizedReactionConditions;
-  solvent?: string;
-  catalyst?: string;
-  reagents?: string;
+  solvent: ReferenceOrLiteral[];
+  catalyst: ReferenceOrLiteral[];
+  reagents: ReferenceOrLiteral[];
   atmosphere?: AtmosphereValue;
   temperature?: QuantityType;
   time?: QuantityType;

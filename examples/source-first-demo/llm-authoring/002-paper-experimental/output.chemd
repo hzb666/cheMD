@@ -1,0 +1,50 @@
+module exp_paper_experimental
+
+meta {
+  id: "exp-paper-experimental"
+  title: "Paper experimental Suzuki coupling"
+  date: "2026-06-08"
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
+
+molecule mol_heteroaryl_bromide {
+  name: "5-bromopyrimidine"
+  role: substrate
+}
+
+molecule mol_boronic_acid {
+  name: "3-furanylboronic acid"
+  role: coupling_partner
+}
+
+molecule mol_product {
+  name: "5-(furan-3-yl)pyrimidine"
+  role: product
+}
+
+reaction rxn_main {
+  reactants: [@mol_heteroaryl_bromide, @mol_boronic_acid]
+  products: [@mol_product]
+  reagents: ["Pd(PPh3)4", "aqueous sodium carbonate"]
+  solvent: "DME"
+  temperature: reflux
+}
+
+result res_main for @rxn_main {
+  product: @mol_product
+  status: success
+  yield: 74%
+  notes: "The source text said reflux but did not provide a numeric temperature."
+}
+
+procedure proc_main for @rxn_main {
+  evidence: [@res_main]
+  step charge = charge(inputs: [@mol_heteroaryl_bromide, @mol_boronic_acid])
+  step heat = heat(temperature: reflux, depends_on: [charge])
+  step purify = purify(method: "chromatography", depends_on: [heat])
+}
+
+observation obs_main for @rxn_main {
+  notes: "The source text reported reflux without a numeric temperature."
+}

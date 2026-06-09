@@ -193,9 +193,11 @@ const collectProcedureStatementQuantities = (
   declarationId: string
 ): QuantityType[] => {
   if (statement.kind !== "step" && statement.kind !== "control") return [];
-  const ownQuantities = Object.entries(statement.args).flatMap(([field, value]) =>
-    collectQuantities(value, declarationId, field)
-  );
+  const ownQuantities = statement.kind === "step"
+    ? collectStepQuantities(statement)
+    : Object.entries(statement.args).flatMap(([field, value]) =>
+        collectQuantities(value, declarationId, field)
+      );
   return statement.kind === "control"
     ? [
         ...ownQuantities,
@@ -204,4 +206,18 @@ const collectProcedureStatementQuantities = (
         )
       ]
     : ownQuantities;
+};
+
+const collectStepQuantities = (
+  statement: Extract<ProcedureStatement, { kind: "step" }>
+): QuantityType[] => {
+  const family = isStepFamily(statement.family) ? statement.family : undefined;
+  const normalized = family
+    ? normalizeStepParams(statement.id, family, valuesToRawRecord(statement.args)).quantities
+    : [];
+  const normalizedFields = new Set(normalized.map((quantity) => quantity.sourceField));
+  const fallback = Object.entries(statement.args)
+    .filter(([field]) => !normalizedFields.has(field))
+    .flatMap(([field, value]) => collectQuantities(value, statement.id, field));
+  return [...normalized, ...fallback];
 };

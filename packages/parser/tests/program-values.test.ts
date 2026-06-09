@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { detectLegacySyntax } from "../src/program/errors";
 import { lexProgram } from "../src/program/lexer";
 import { parseProgramValue } from "../src/program/parse-values";
 
@@ -38,32 +37,6 @@ describe("program lexer", () => {
       column: 1,
       start: 19
     });
-  });
-});
-
-describe("legacy program syntax diagnostics", () => {
-  it("detects removed frontmatter and legacy fenced blocks", () => {
-    const diagnostics = detectLegacySyntax(`---
-id: legacy
----
-
-:::chemd #rxn
-:::
-
-:::template row
-:::
-
-:::col-2
-:::
-`);
-
-    expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
-      "E_LEGACY_FRONTMATTER_REMOVED",
-      "E_LEGACY_FENCED_BLOCK_REMOVED",
-      "E_LEGACY_TEMPLATE_REMOVED",
-      "E_LEGACY_COLUMN_LAYOUT_REMOVED"
-    ]);
-    expect(diagnostics.every((diagnostic) => diagnostic.severity === "error")).toBe(true);
   });
 });
 

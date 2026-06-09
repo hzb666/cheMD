@@ -60,19 +60,4 @@ meta {
     })).toContain(`  date: "2026-05-29"
   primary_result: @res_main`);
   });
-
-  it("ignores removed legacy quick-fix kinds", () => {
-    const source = `module exp_quick_fix
-
-reaction rxn_main {
-  reactants: [substrate]
-}
-`;
-
-    expect(applyDiagnosticQuickFix(source, diagnostic, {
-      title: "Insert kind",
-      kind: "insert_chemd_kind",
-      patch: { source_node_id: "rxn_main", kind: "reaction" }
-    })).toBe(source);
-  });
 });

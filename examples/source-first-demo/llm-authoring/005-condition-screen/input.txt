@@ -1,0 +1,1 @@
+Summarize a condition screen for one coupling reaction. Variant A used dioxane/water and K2CO3 and gave 82% yield. Variant B used ethanol/water and K3PO4 and gave 45% yield. Variant C used toluene and K2CO3 and failed. Keep this as source-first Chemd with condition_screen and audit trail.

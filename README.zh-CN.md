@@ -20,7 +20,7 @@
 ## 产品范围
 
 - Program-first 的 Chemd 写作模型，覆盖 module、meta、import、doc comment、分子、反应、结果、分析、样品、步骤、观察、trace 和 agent audit declaration。
-- 面向产品写作的 `.chemd` 源文件格式。program-v1 rewrite 会移除 legacy frontmatter、`:::` 结构块、`template/use`、列布局语法和 `.chemd.md` 兼容路径。
+- 面向产品写作的 `.chemd` 源文件格式。program-v1 使用 module、meta、declaration、doc comment 和 program-native procedure。
 - 实验逻辑增强：将原始记录连接到 typed entities、resolved references、procedure steps、observations、field evidence、normalization facts 和 knowledge-graph edges。
 - 浏览器工作台，支持源码编辑、渲染预览、diagnostics、结构化输出、导出动作、OCR 入口和 chemistry editor 集成。
 - Desktop IDE 支持本地 workspace、Monaco 编辑、文件标签、自动保存、冲突保护保存、diagnostics、语义预览、workspace index、Graph/RAG 视图、PostgreSQL profile 绑定和 Agent patch review。
@@ -209,8 +209,8 @@ module，declaration 是唯一语义事实来源。Markdown 只通过显式
 documentation comments 和 `/*md */` 区域进入编译器；它可以渲染和检索，
 但不创建实验事实。
 
-Legacy YAML frontmatter、`:::` 结构块、`template/use`、列布局语法和
-`.chemd.md` 兼容路径都会从 program-v1 compiler path 移除。
+Compiler 只从 program declarations 建立实验事实；Markdown 文档只通过
+documentation comments 和 `/*md */` 区域进入渲染与检索链路。
 
 Program 语法：
 
@@ -518,7 +518,7 @@ Web service 是公网边界。Chemistry service 应位于 web app 后方或可�
 
 ## 运行说明
 
-- `.chemd` 是 program-first 写作扩展名。`.chemd.md` 兼容路径会从 core compiler、workspace index 和 Desktop IDE 移除。
+- `.chemd` 是 program-first 写作扩展名。core compiler、workspace index 和 Desktop IDE 均以 `.chemd` program source 为入口。
 - RDKit 渲染要求 Python runtime 能成功 import RDKit。
 - OCR 默认使用 placeholder providers；生产 OCR 需要配置 provider URLs 与 keys。
 - DOCX 文件生成依赖 Pandoc。没有 Pandoc 时 compiler 仍可生成 DOCX bridge Markdown。

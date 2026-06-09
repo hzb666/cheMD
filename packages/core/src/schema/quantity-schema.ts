@@ -14,7 +14,7 @@ export type QuantityClass =
 
 export type QuantityComparator = "=" | "<" | "<=" | ">" | ">=" | "approx";
 export type QuantityValueKind = "scalar" | "range" | "uncertainty" | "program" | "shorthand";
-export type QuantityShorthand = "room_temperature" | "overnight";
+export type QuantityShorthand = "room_temperature" | "reflux" | "ice_bath" | "overnight";
 
 export interface QuantityUnitSchema {
   unit: string;

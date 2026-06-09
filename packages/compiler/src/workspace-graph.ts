@@ -118,6 +118,7 @@ const createModuleSemanticEdges = (
   module.coreResult.typedSemanticGraph.nodes.flatMap((node) => {
     if (node.kind === "reaction") return createReactionEdges(module, linked, node);
     if (node.kind === "condition_screen") return createConditionScreenEdges(module, linked, node);
+    if (node.kind === "step") return createProcedureStepEdges(module, linked, node);
     return [];
   });
 
@@ -128,14 +129,10 @@ const createReactionEdges = (
 ): GraphEdge[] => {
   const reactionId = entityNodeId("rxn", module.documentId, node.nodeId);
   return [
-    ...createReferenceEdges({
-      edgeType: "reaction_uses_imported_molecule",
-      fromNodeId: reactionId,
-      linked,
-      module,
-      references: node.reactants,
-      targetKinds: ["molecule"]
-    }),
+    ...createReactionUseEdges(module, linked, reactionId, node.reactants, "reactants"),
+    ...createReactionUseEdges(module, linked, reactionId, node.reagents, "reagents"),
+    ...createReactionUseEdges(module, linked, reactionId, node.catalyst, "catalyst"),
+    ...createReactionUseEdges(module, linked, reactionId, node.solvent, "solvent"),
     ...createReferenceEdges({
       edgeType: "reaction_produces_imported_product",
       fromNodeId: reactionId,
@@ -155,6 +152,31 @@ const createReactionEdges = (
     ...node.prev.flatMap((reference) => createPrevReactionEdges(module, linked, reactionId, reference))
   ];
 };
+
+const REACTION_USE_TARGETS = new Set<ReferenceTargetKind>([
+  "molecule",
+  "material",
+  "batch"
+]);
+
+const createReactionUseEdges = (
+  module: LinkedChemdModule,
+  linked: LinkChemdModulesResult,
+  reactionId: string,
+  references: ReferenceOrLiteral[],
+  field: "reactants" | "reagents" | "catalyst" | "solvent"
+): GraphEdge[] =>
+  references.flatMap((reference) => {
+    const target = resolveReference(module, linked, reference);
+    if (!target || !REACTION_USE_TARGETS.has(target.targetKind)) return [];
+    return [createEdge(
+      `reaction_uses_imported_${target.targetKind}`,
+      reactionId,
+      target.nodeId,
+      module.documentId,
+      { field }
+    )];
+  });
 
 const createConditionScreenEdges = (
   module: LinkedChemdModule,
@@ -180,6 +202,35 @@ const createConditionScreenEdges = (
       targetKinds: ["reaction", "result"]
     })
   ];
+};
+
+const STEP_REFERENCE_TARGETS = new Set<ReferenceTargetKind>([
+  "molecule",
+  "material",
+  "batch",
+  "sample"
+]);
+
+const createProcedureStepEdges = (
+  module: LinkedChemdModule,
+  linked: LinkChemdModulesResult,
+  node: Extract<TypedSemanticNode, { kind: "step" }>
+): GraphEdge[] => {
+  const procedureId = node.source.sourceNodeId ?? "procedure";
+  const stepId = entityNodeId("step", module.documentId, `${procedureId}::${node.stepId}`);
+
+  return (node.inputs ?? []).flatMap((input) => {
+    if (!input.reference) return [];
+    const target = resolveReference(module, linked, input.reference);
+    if (!target || !STEP_REFERENCE_TARGETS.has(target.targetKind)) return [];
+    return [createEdge(
+      `procedure_step_uses_${target.targetKind}`,
+      stepId,
+      target.nodeId,
+      module.documentId,
+      { raw: input.raw }
+    )];
+  });
 };
 
 const createPrevReactionEdges = (

@@ -4,8 +4,7 @@ import {
   buildQuickFixes,
   createV03Diagnostic,
   explainDiagnosticCode,
-  getDiagnosticSpec,
-  getLegacyDiagnosticBand
+  getDiagnosticSpec
 } from "../src/index";
 
 describe("v0.3 diagnostics registry", () => {
@@ -26,7 +25,6 @@ describe("v0.3 diagnostics registry", () => {
     expect(diagnostic.code).toBe("E403");
     expect(diagnostic.sourceLayer).toBe("typechecker");
     expect(getDiagnosticSpec("E403")?.band).toBe("quantity");
-    expect(getLegacyDiagnosticBand("E_MISSING_REQUIRED_FIELD")).toBe("type");
   });
 
   it("builds quick fixes in the existing Markdown syntax", () => {
@@ -89,26 +87,6 @@ describe("v0.3 diagnostics registry", () => {
     });
   });
 
-  it("classifies chemd surface policy diagnostics and quick fixes", () => {
-    const missingKindDiagnostic = createV03Diagnostic({
-      code: "W_CHEMD_KIND_AMBIGUOUS",
-      severity: "error",
-      message: "Chemd block should declare kind",
-      sourceLayer: "parser",
-      sourceNodeType: "molecule",
-      sourceNodeId: "mol-1"
-    });
-
-    expect(getDiagnosticSpec("W_CHEMD_KIND_AMBIGUOUS")).toMatchObject({
-      band: "syntax",
-      defaultSeverity: "error"
-    });
-    expect(getDiagnosticSpec("E_CHEMD_KIND_CONFLICT")?.band).toBe("syntax");
-    expect(buildQuickFixes(missingKindDiagnostic)[0]).toMatchObject({
-      kind: "insert_chemd_kind"
-    });
-  });
-
   it("classifies explicit step rule diagnostics", () => {
     expect(getDiagnosticSpec("E_STEP_PARAM_MISSING")?.band).toBe("procedure");
     expect(getDiagnosticSpec("E_STEP_PARAM_INVALID")?.band).toBe("procedure");
@@ -161,13 +139,10 @@ describe("v0.3 diagnostics registry", () => {
   it("classifies template parameter diagnostics", () => {
     expect(getDiagnosticSpec("E_TEMPLATE_PARAM_MISSING")?.band).toBe("type");
     expect(getDiagnosticSpec("E_TEMPLATE_PARAM_TYPE_MISMATCH")?.band).toBe("type");
-    expect(getLegacyDiagnosticBand("E_TEMPLATE_PARAM_MISSING")).toBe("type");
-    expect(getLegacyDiagnosticBand("E_TEMPLATE_PARAM_TYPE_MISMATCH")).toBe("type");
   });
 
   it("classifies derived expression diagnostics", () => {
     expect(getDiagnosticSpec("E_DERIVED_EXPRESSION_INVALID")?.band).toBe("type");
-    expect(getLegacyDiagnosticBand("E_DERIVED_EXPRESSION_INVALID")).toBe("type");
   });
 
   it("classifies runtime diagnostics", () => {
@@ -179,7 +154,5 @@ describe("v0.3 diagnostics registry", () => {
     expect(getDiagnosticSpec("E_RUNTIME_ADAPTER")?.band).toBe("runtime");
     expect(getDiagnosticSpec("E_RUNTIME_RESOURCE_CONFLICT")?.band).toBe("runtime");
     expect(getDiagnosticSpec("W_RUNTIME_SAFETY")?.band).toBe("runtime");
-    expect(getLegacyDiagnosticBand("E_RUNTIME_UNKNOWN_STEP")).toBe("runtime");
-    expect(getLegacyDiagnosticBand("E_RUNTIME_STEP_NOT_READY")).toBe("runtime");
   });
 });

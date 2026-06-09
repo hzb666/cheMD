@@ -258,7 +258,6 @@ export const createChemdMonarchTokensProvider = (): languages.IMonarchLanguage =
   tokenPostfix: ".chemd",
   tokenizer: {
     root: [
-      [/^---$/, "delimiter.frontmatter"],
       [/\{|\}/, "delimiter.brace"],
       [/^\s*(molecule|material|batch|reaction|result|analysis|sample|artifact|condition_screen|procedure|observation|trace|agent)\b/, "keyword.declaration"],
       [/\b[A-Za-z_][\w-]*(?=\s*\{)/, "identifier.declaration"],
@@ -382,7 +381,6 @@ const defineChemdTheme = (monaco: Monaco): void => {
     base: "vs",
     inherit: true,
     rules: [
-      { token: "delimiter.frontmatter", foreground: "64748b", fontStyle: "bold" },
       { token: "delimiter.block", foreground: "0f766e", fontStyle: "bold" },
       { token: "keyword", foreground: "0f766e", fontStyle: "bold" },
       { token: "keyword.block", foreground: "0f766e", fontStyle: "bold" },
@@ -420,7 +418,6 @@ const defineChemdTheme = (monaco: Monaco): void => {
     base: "vs-dark",
     inherit: true,
     rules: [
-      { token: "delimiter.frontmatter", foreground: "94a3b8", fontStyle: "bold" },
       { token: "delimiter.block", foreground: "2dd4bf", fontStyle: "bold" },
       { token: "keyword", foreground: "2dd4bf", fontStyle: "bold" },
       { token: "keyword.block", foreground: "2dd4bf", fontStyle: "bold" },

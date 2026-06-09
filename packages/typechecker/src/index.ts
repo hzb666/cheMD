@@ -26,7 +26,6 @@ export {
 } from "./type-index";
 
 const DIAGNOSTIC_SOURCE_LAYERS = new Set<V03Diagnostic["sourceLayer"]>([
-  "frontmatter",
   "parser",
   "resolver",
   "typechecker",

@@ -13,6 +13,7 @@ import {
   recordValue,
   refOrLiteralValue,
   stringValue,
+  symbolicQuantityValue,
   textValue
 } from "./declaration-value-schema";
 
@@ -74,6 +75,7 @@ const participantValue = recordValue(refOrLiteralValue("molecule", "material", "
   limiting: booleanValue
 }, { delimiter: "|", openParams: false });
 
+const conditionParticipantValue = refOrLiteralValue("molecule", "material", "batch");
 const evidenceValue = listValue(refOrLiteralValue("artifact", "analysis", "result", "sample"));
 const targetFileListValue = listValue(pathValue);
 
@@ -119,10 +121,10 @@ export const DECLARATION_SCHEMAS: readonly DeclarationSchema[] = [
       field("template", { value: refOrLiteralValue("reaction_template") }),
       field("reactants", { list: true, value: listValue(participantValue) }),
       field("products", { list: true, value: listValue(participantValue) }),
-      field("reagents", { value: textValue }),
-      field("catalyst", { value: textValue }),
-      field("solvent", { value: stringValue }),
-      field("temperature", { value: quantityValue("temperature") }),
+      field("reagents", { list: true, value: listValue(conditionParticipantValue) }),
+      field("catalyst", { list: true, value: listValue(conditionParticipantValue) }),
+      field("solvent", { list: true, value: listValue(conditionParticipantValue) }),
+      field("temperature", { value: symbolicQuantityValue("temperature") }),
       field("time", { value: quantityValue("time") }),
       field("pressure", { value: quantityValue("pressure") }),
       field("atmosphere", { value: atmosphereValue }),

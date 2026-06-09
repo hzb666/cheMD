@@ -5,6 +5,7 @@ import type {
   ChemdAgentLoopAgentRequest,
   ChemdAgentLoopAgentResponse
 } from "@chemd/compiler";
+import { renderDiagnosisForLlm } from "@chemd/compiler";
 
 const REQUEST_SCHEMA_VERSION = "chemd-agent-driver-request/v0.1";
 const RESPONSE_SCHEMA_VERSION = "chemd-agent-driver-response/v0.1";
@@ -22,6 +23,7 @@ interface AgentLoopDriverRequestPayload {
   iteration: number;
   source: string;
   diagnosis: ChemdAgentLoopAgentRequest["diagnosis"];
+  diagnosisText: string;
   diagnostics: ChemdAgentLoopAgentRequest["diagnostics"];
   fix: {
     changed: boolean;
@@ -52,6 +54,7 @@ const buildRequestPayload = (
   iteration: request.iteration,
   source: request.source,
   diagnosis: request.diagnosis,
+  diagnosisText: renderDiagnosisForLlm(request.diagnosis),
   diagnostics: request.diagnostics,
   fix: {
     changed: request.repairResult.changed,

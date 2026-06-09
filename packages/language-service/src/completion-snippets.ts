@@ -8,9 +8,10 @@ const snippets: Array<Omit<ChemdCompletionItem, "range">> = [{
     "reaction rxn_${1:id} {",
     "  reactants: [${2:@mol_a}]",
     "  products: [${3:@mol_product}]",
-    "  solvent: ${4:\"MeCN\"}",
-    "  temperature: ${5:25 C}",
-    "  time: ${6:2 h}",
+    "  catalyst: ${4:\"Pd catalyst\"}",
+    "  solvent: ${5:[\"MeCN\", \"water\"]}",
+    "  temperature: ${6:25 C}",
+    "  time: ${7:2 h}",
     "}"
   ].join("\n"),
   insertTextFormat: "snippet",
@@ -74,7 +75,6 @@ export const getChemdSnippetCompletions = (
   context: ChemdCompletionContext
 ): ChemdCompletionItem[] => {
   if (
-    context.isFrontmatter ||
     context.isFieldValuePosition ||
     context.isFieldKeyPosition ||
     context.isStepFamilyPosition ||

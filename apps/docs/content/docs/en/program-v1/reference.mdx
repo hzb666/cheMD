@@ -65,7 +65,8 @@ molecule mol_product {
 reaction rxn_main {
   reactants: [@mol_aryl, @mol_boron]
   products: [@mol_product]
-  solvent: "MeCN"
+  catalyst: "Pd(PPh3)4"
+  solvent: ["MeCN", "water"]
   temperature: 40 C
   time: 2 h
   atmosphere: nitrogen
@@ -151,6 +152,9 @@ fields. Other declarations report unknown fields as diagnostics.
 | Patch | `edit meta.primary_result = @res_main` |
 
 Lists use `[]`, records use `{}`, and calls use `()`.
+Reaction participant and condition-list fields accept a scalar as one item:
+`catalyst: "Pd(PPh3)4"` is equivalent to `catalyst: ["Pd(PPh3)4"]`.
+Use brackets for multiple items, for example `solvent: ["MeCN", "water"]`.
 
 ## References
 
