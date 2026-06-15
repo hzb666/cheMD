@@ -1,6 +1,0 @@
-{"file":"packages/core/tests/core.test.ts","reason":"Verify root/program/compat surfaces and unchanged helper behavior."}
-{"file":"packages/core/package.json","reason":"Verify package exports expose explicit surfaces."}
-{"file":"tsconfig.base.json","reason":"Verify workspace path aliases match package subpaths if added."}
-{"file":"packages/core/src/index.ts","reason":"Verify root no longer exports compatibility AST/block-schema directly."}
-{"file":"packages/core/src/program.ts","reason":"Verify program-first surface exists."}
-{"file":"packages/core/src/compat.ts","reason":"Verify compatibility surface exists without polluting root."}

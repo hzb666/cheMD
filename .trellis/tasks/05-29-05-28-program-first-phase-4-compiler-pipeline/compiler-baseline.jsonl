@@ -1,2 +1,0 @@
-{"source":"verification","command":"pnpm --filter @chemd/compiler typecheck","result":"failed","summary":"Compiler still passes ChemdProgramDocument into downstream packages expecting ChemdDocument.children; compiler tests also depend on legacy children and ::: fixtures."}
-{"source":"verification","command":"pnpm --filter @chemd/cli typecheck","result":"failed","summary":"CLI typecheck fails through compiler program/document mismatch and local semantic diff calls expecting ChemdDocument."}

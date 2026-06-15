@@ -1,4 +1,0 @@
-{"file": ".agents/skills/finish-work/SKILL.md", "reason": "Finish work checklist"}
-{"file": ".agents/skills/check/SKILL.md", "reason": "Code quality check spec"}
-{"file": ".trellis/spec/storage-postgres/backend/storage-contract.md", "reason": "Check runtime client against storage contract"}
-{"file": "apps/web/src/server/chem/postgres-storage.spec.ts", "reason": "Follow existing server-side fake client test style"}

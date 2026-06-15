@@ -1,9 +1,0 @@
-{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
-{"file": ".trellis/spec/web/backend/index.md", "reason": "Backend development guide"}
-{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "repair loop spans compiler result contracts and cli stdout/exit-code contracts"}
-{"file": ".trellis/spec/compiler/backend/error-handling.md", "reason": "repair loop must stay diagnostic-first and deterministic"}
-{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "reuse compileChemd and diagnosis helpers instead of reimplementing validation in cli"}
-{"file": ".trellis/spec/compiler/backend/language-v03-contracts.md", "reason": "CompileResult additions and repair loop runner contract live here"}
-{"file": ".trellis/spec/compiler/backend/quality-guidelines.md", "reason": "compiler regression expectations"}
-{"file": ".trellis/spec/cli/backend/command-contract.md", "reason": "new CLI repair command and exit/stdout contract"}
-{"file": ".trellis/spec/cli/backend/quality-guidelines.md", "reason": "CLI regression and root validation expectations"}

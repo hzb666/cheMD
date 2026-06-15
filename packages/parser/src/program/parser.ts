@@ -3,7 +3,6 @@ import type {
   ChemdDocCommentAttachment,
   ChemdDocCommentExportPolicy,
   ChemdImportDeclaration,
-  ChemdMetaDeclaration,
   ChemdModuleDeclaration,
   ChemdProgramDocument,
   SourceSpan,

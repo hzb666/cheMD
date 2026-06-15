@@ -1,1 +1,0 @@
-{"source":"architect","phase":"Phase 5","summary":"Replace legacy renderer/export/LNF contracts with program-native outputs. Parallel split: shared render model + renderers, LNF v1, training export/RAG v0.3; compiler/CLI integration serialized after worker outputs."}

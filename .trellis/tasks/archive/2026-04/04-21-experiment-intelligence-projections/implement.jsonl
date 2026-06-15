@@ -1,6 +1,0 @@
-{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
-{"file": ".trellis/spec/web/backend/index.md", "reason": "Backend development guide"}
-{"file": "packages/exporter-training/src/projections.ts", "reason": "existing trainingUnderstanding projection patterns"}
-{"file": "packages/exporter-training/src/task-projections.ts", "reason": "existing task dataset projection patterns"}
-{"file": ".trellis/spec/exporter-training/backend/training-export-contract.md", "reason": "training understanding and task projection contract"}
-{"file": ".trellis/spec/exporter-training/backend/index.md", "reason": "exporter-training package index"}

@@ -1,6 +1,0 @@
-{"file":".trellis/tasks/06-03-language-platform-phase-0-matrix-specs/feature-matrix.md","reason":"Phase 0 deliverable; must accurately classify current and missing capabilities."}
-{"file":".trellis/spec/parser/backend/index.md","reason":"Verify parser spec no longer presents Markdown-first behavior as primary."}
-{"file":".trellis/spec/resolver/backend/index.md","reason":"Verify resolver spec matches program-first reference behavior and known gaps."}
-{"file":".trellis/spec/compiler/backend/index.md","reason":"Verify compiler spec matches compileChemd program-first pipeline."}
-{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Verify cross-layer guidance names feature matrix and spec alignment expectations."}
-{"file":".trellis/tasks/06-03-language-platform-completion/prd.md","reason":"Verify parent roadmap remains consistent with the Phase 0 matrix."}

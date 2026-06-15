@@ -9,7 +9,6 @@ import type {
   ProcedureStepDeclaration
 } from "@chemd/core";
 import type {
-  ReferenceOrLiteral,
   TypedAnalysisNode,
   TypedArtifactNode,
   TypedBatchNode,

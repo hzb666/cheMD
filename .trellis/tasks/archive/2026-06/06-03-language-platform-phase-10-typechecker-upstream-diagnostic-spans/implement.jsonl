@@ -1,3 +1,0 @@
-{"file":"packages/typechecker/src/index.ts","reason":"Converts upstream diagnostics into typechecker diagnostics."}
-{"file":"packages/typechecker/tests/program-typechecker.test.ts","reason":"Covers upstream diagnostic metadata preservation."}
-{"file":"packages/compiler/tests/language-fixture-matrix.test.ts","reason":"Regression matrix for compiler language fixtures."}

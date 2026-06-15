@@ -1,5 +1,0 @@
-{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
-{"file": ".trellis/spec/exporter-training/backend/index.md", "reason": "Backend development guide"}
-{"file": ".trellis\\spec\\exporter-training\\backend\\training-export-contract.md", "reason": "task projection contract and leakage rules"}
-{"file": ".trellis\\spec\\exporter-training\\backend\\quality-guidelines.md", "reason": "package validation requirements"}
-{"file": ".trellis\\spec\\guides\\cross-layer-thinking-guide.md", "reason": "task payload fields cross dataset contract"}

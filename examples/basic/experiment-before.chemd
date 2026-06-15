@@ -1,0 +1,31 @@
+module basic_experiment_before
+
+meta {
+  id: "basic-experiment"
+  title: "Suzuki screen before optimization"
+  date: "2026-06-16"
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
+
+molecule mol_aryl_bromide {
+  name: "4-bromoanisole"
+  role: substrate
+}
+
+molecule mol_boronic_acid {
+  name: "phenylboronic acid"
+  role: coupling_partner
+}
+
+reaction rxn_main {
+  reactants: [@mol_aryl_bromide, @mol_boronic_acid]
+  reagents: "K2CO3"
+  solvent: ["dioxane", "water"]
+  temperature: 80 C
+}
+
+result res_main for @rxn_main {
+  status: partial
+  yield: 45%
+}

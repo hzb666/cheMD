@@ -1,7 +1,0 @@
-{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
-{"file": ".trellis/spec/web/backend/index.md", "reason": "Backend development guide"}
-{"file": ".trellis/spec/compiler/backend/error-handling.md", "reason": "diagnosis must stay diagnostic-first and avoid new exception flows"}
-{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "diagnosis output is a new compile contract boundary"}
-{"file": ".trellis/spec/compiler/backend/language-v03-contracts.md", "reason": "CompileResult contract and diagnostic output shape change here"}
-{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "reuse diagnostics and quick-fix contracts instead of inventing parallel types"}
-{"file": ".trellis/spec/compiler/backend/quality-guidelines.md", "reason": "package-level validation and regression test expectations"}

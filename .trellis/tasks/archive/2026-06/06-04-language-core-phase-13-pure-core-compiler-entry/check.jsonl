@@ -1,3 +1,0 @@
-{"file":"packages/compiler/tests/program-compile.test.ts","reason":"Core compile API regression tests must pass."}
-{"file":"packages/compiler/src/index.ts","reason":"Compiler API changes must typecheck."}
-{"file":"packages/compiler/tests/language-fixture-matrix.test.ts","reason":"Compiler matrix must remain green."}

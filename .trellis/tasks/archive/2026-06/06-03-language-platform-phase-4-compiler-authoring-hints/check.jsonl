@@ -1,5 +1,0 @@
-{"file":"packages/compiler/tests/language-fixture-matrix.test.ts","reason":"Compiler fixture matrix should remain green."}
-{"file":"packages/compiler/src/authoring-diagnostics.ts","reason":"Compiler typecheck and diagnostic behavior verification."}
-{"file":"packages/compiler/src/authoring-assistance.ts","reason":"Authoring hint behavior verification."}
-{"file":"packages/compiler/src/quick-fix.ts","reason":"Quick-fix metadata verification if changed."}
-{"file":".trellis/tasks/06-03-language-platform-phase-4-compiler-authoring-hints/task.json","reason":"Trellis task metadata must remain valid before closeout."}

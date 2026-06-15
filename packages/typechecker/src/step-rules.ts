@@ -1,4 +1,4 @@
-import { createV03Diagnostic, type V03Diagnostic } from "@chemd/diagnostics";
+import type { V03Diagnostic } from "@chemd/diagnostics";
 import type { CanonicalStepNode } from "@chemd/step-ontology";
 
 import { createStepDiagnostic } from "./step-schema-checker";

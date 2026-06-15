@@ -232,7 +232,7 @@ const parseStructuredSpot = (
   index: number
 ): NormalizedTlcSpot => {
   const tokens = normalizeToken(raw).split(/\s+/).filter(Boolean);
-  const [head, second, ...rest] = tokens;
+  const [head, second] = tokens;
   const hasRf = Boolean(head && RF_PATTERN.test(head));
   const markerCandidate = hasRf && second && MARKER_PATTERN.test(second) ? second : undefined;
   const labelTokens = hasRf

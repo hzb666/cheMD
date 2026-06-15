@@ -19,16 +19,6 @@ type ConditionType =
   | { kind: "unknown" };
 
 const BOOLEAN_BINARY_OPERATORS = new Set<ProgramConditionBinaryOperator>(["and", "or"]);
-const COMPARISON_OPERATORS = new Set<ProgramConditionBinaryOperator>([
-  "==",
-  "!=",
-  "<",
-  "<=",
-  ">",
-  ">=",
-  "in",
-  "matches"
-]);
 
 const FIELD_QUANTITY_TYPES: Record<string, QuantityClass> = {
   conversion: "percent",

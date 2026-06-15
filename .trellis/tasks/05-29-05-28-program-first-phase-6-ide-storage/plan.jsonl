@@ -1,6 +1,0 @@
-{"status":"completed","step":"Map language-service compile result, outline, symbols, completion, hover, definition, and semantic token dependencies on legacy document children."}
-{"status":"completed","step":"Implement program declaration outline/symbol/range helpers and rewrite language-service tests to program fixtures."}
-{"status":"completed","step":"Update Desktop editor providers, semantic preview, knowledge map, workspace index, and reaction intelligence tests to program compile output."}
-{"status":"completed","step":"Verify storage-postgres and apps/web playground/persistence paths accept training export v0.3 and program declaration/doc records."}
-{"status":"completed","step":"Run language-service, desktop, storage, web, docs, and targeted full regression checks."}
-{"status":"completed","step":"Complete Trellis finishwork, commit code/tests/docs/task state, recordsession, and continue to the next phase."}

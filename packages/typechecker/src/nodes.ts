@@ -382,9 +382,6 @@ const isAllowedBatchSource = (value: ReferenceOrLiteral | undefined): boolean =>
   || !value.resolved
   || ["reaction", "result", "sample", "batch"].includes(value.targetKind);
 
-const readParticipantHead = (raw: string): string =>
-  raw.split("|")[0]?.trim() ?? raw.trim();
-
 const parseBooleanLiteral = (value: string): boolean | undefined => {
   const normalized = value.trim().toLowerCase();
   if (normalized === "true") {

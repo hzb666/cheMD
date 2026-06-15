@@ -1,9 +1,0 @@
-{"file":"packages/resolver/src/program-references.ts","reason":"Primary program reference resolution entrypoint."}
-{"file":"packages/resolver/src/program-reference-values.ts","reason":"Recursive value/reference resolution logic."}
-{"file":"packages/resolver/src/program-index.ts","reason":"Declaration/module index used by reference lookup."}
-{"file":"packages/resolver/src/program-imports.ts","reason":"Import and external document resolution behavior."}
-{"file":"packages/resolver/src/index.ts","reason":"Resolver public API surface."}
-{"file":"packages/core/src/program-ast/values.ts","reason":"Program value and reference expression contracts consumed by the resolver."}
-{"file":"packages/core/src/reference-utils.ts","reason":"Shared reference helpers used by resolver/compiler code."}
-{"file":"packages/compiler/src/index.ts","reason":"Compiler integration if resolver output affects compilation."}
-{"file":"vitest.aliases.ts","reason":"Runtime aliases may need Phase 1 subpath awareness for tests."}

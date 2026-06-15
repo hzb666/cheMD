@@ -1,8 +1,0 @@
-{"file": ".agents/skills/finish-work/SKILL.md", "reason": "Finish work checklist"}
-{"file": ".agents/skills/check/SKILL.md", "reason": "Code quality check spec"}
-{"file": ".trellis/spec/compiler/backend/error-handling.md", "reason": "Check diagnostics and exit mapping"}
-{"file": ".trellis/spec/compiler/backend/index.md", "reason": "Review against compiler public contract"}
-{"file": ".trellis/spec/compiler/backend/quality-guidelines.md", "reason": "Check tests and lint expectations"}
-{"file": ".trellis/spec/compiler/backend/language-v03-contracts.md", "reason": "Check export artifacts use canonical compiler outputs"}
-{"file": "scripts/legacy-surface-tools.test.mjs", "reason": "Review script test style"}
-{"file": "scripts/dev-demo.test.mjs", "reason": "Review root script test style"}

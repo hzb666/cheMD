@@ -1,5 +1,0 @@
-{"file":"packages/lnf/tests/lnf.test.ts","reason":"LNF tests must pass."}
-{"file":"packages/exporter-training/tests/exporter-program-v03.test.ts","reason":"Exporter tests must pass if changed."}
-{"file":"packages/lnf/src/program-source.ts","reason":"LNF typecheck target."}
-{"file":"packages/compiler/tests/language-fixture-matrix.test.ts","reason":"Compiler matrix remains green if affected."}
-{"file":".trellis/tasks/06-03-language-platform-phase-7-lnf-exporter-completeness/task.json","reason":"Trellis metadata must validate."}

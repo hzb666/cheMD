@@ -1,1 +1,0 @@
-{"source":"architect","phase":"Phase 4","summary":"Replace compiler/CLI with program-first parse/resolve/typecheck contracts. Split implementation into compiler pipeline, authoring/repair, and CLI surfaces; keep renderer/export/LNF rewrites for Phase 5 except narrow compile fallout."}

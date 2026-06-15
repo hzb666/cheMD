@@ -1,0 +1,56 @@
+module basic_agent_audit
+
+meta {
+  id: "basic-agent-audit"
+  title: "Agent audited reaction repair"
+  date: "2026-06-16"
+  primary_reaction: @rxn_main
+  primary_result: @res_main
+}
+
+reaction rxn_main {
+  reactants: ["aryl bromide", "phenylboronic acid"]
+  products: [@mol_product]
+}
+
+molecule mol_product {
+  name: "biaryl product"
+  role: product
+}
+
+result res_main for @rxn_main {
+  product: @mol_product
+  status: success
+}
+
+agent run repair_001 {
+  goal: "validate selected result and bind primary result"
+  status: completed
+  target_files: ["examples/basic/agent-audit.chemd"]
+  evidence: [@rxn_main, @res_main]
+
+  tool compile_current_file {
+    status: ok
+    evidence: [@rxn_main, @res_main]
+    output: { diagnostics: "0 errors" }
+  }
+
+  patch proposed {
+    title: "bind primary result"
+    edit meta.primary_result = @res_main
+  }
+
+  decision approved {
+    patch: "proposed"
+    rationale: "res_main is the selected clean result"
+  }
+
+  timeline completed {
+    at: "2026-06-16T00:00:00Z"
+    actor: "codex"
+    summary: "source validated and evidence preserved"
+    tool: "compile_current_file"
+    patch: "proposed"
+    evidence: [@res_main]
+  }
+}

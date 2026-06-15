@@ -1,3 +1,0 @@
-{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
-{"file": ".trellis\\spec\\storage-postgres\\backend\\storage-contract.md", "reason": "Postgres compile artifact, training export, and memory table contracts"}
-{"file": ".trellis\\spec\\guides\\cross-layer-thinking-guide.md", "reason": "Export spans route, service, database, and training payload boundary"}

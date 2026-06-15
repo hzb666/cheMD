@@ -1,3 +1,0 @@
-{"file":"packages/typechecker/tests/program-typechecker.test.ts","reason":"Typechecker diagnostic regression coverage must pass."}
-{"file":"packages/typechecker/src/index.ts","reason":"Diagnostic conversion path must typecheck."}
-{"file":"packages/compiler/tests/language-fixture-matrix.test.ts","reason":"Compiler matrix remains green if affected."}

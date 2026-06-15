@@ -1,6 +1,0 @@
-{"file":"packages/typechecker/src/expressions.ts","reason":"Derived expression diagnostic construction and public resolver entry."}
-{"file":"packages/typechecker/src/expression-types.ts","reason":"Shared structured expression error type and helpers."}
-{"file":"packages/typechecker/src/expression-tokenizer.ts","reason":"Tokenizer error reporting."}
-{"file":"packages/typechecker/src/expression-parser.ts","reason":"Parser error reporting."}
-{"file":"packages/typechecker/src/expression-functions.ts","reason":"Evaluator/function/reference error reporting."}
-{"file":"packages/typechecker/tests/expression-diagnostics.test.ts","reason":"Derived expression diagnostics regression coverage."}

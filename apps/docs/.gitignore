@@ -3,9 +3,11 @@
 
 # generated content
 .source
+/DOCUMENTATION_PLAN.md
 
 # test & build
 /coverage
+/.turbo/
 /.next/
 /out/
 /build

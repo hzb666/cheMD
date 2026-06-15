@@ -1,5 +1,0 @@
-{"status":"completed","step":"Create Phase 7 Trellis task, acceptance criteria, and cleanup boundaries from the implementation plan."}
-{"status":"completed","step":"Dispatch parallel workers for package cleanup, app/CLI/workspace cleanup, and docs/test cleanup with disjoint write scopes."}
-{"status":"completed","step":"Review worker changes, remove remaining legacy code paths, and keep app/docs updates out of root docs/."}
-{"status":"completed","step":"Run targeted drift scans plus full available build/typecheck/test/lint verification."}
-{"status":"completed","step":"Finishwork: mark task complete, commit code/tests/docs/Trellis updates, recordsession, then close parent rewrite if all criteria pass."}

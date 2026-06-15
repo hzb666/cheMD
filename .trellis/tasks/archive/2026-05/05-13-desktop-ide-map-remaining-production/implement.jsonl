@@ -1,6 +1,0 @@
-{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
-{"file": ".trellis/spec/web/frontend/index.md", "reason": "Frontend development guide"}
-{"file": "docs\\chemd-production-ide-knowledge-map-implementation-plan.zh-CN.md", "reason": "remaining acceptance checklist"}
-{"file": "apps\\desktop\\src\\monaco/", "type": "directory", "reason": "Monaco hover/code action providers"}
-{"file": "apps\\desktop\\src\\knowledge-map/", "type": "directory", "reason": "desktop semantic preview and reaction map components"}
-{"file": "packages\\reaction-map/", "type": "directory", "reason": "layout artifact contract"}

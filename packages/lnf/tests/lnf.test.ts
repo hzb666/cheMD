@@ -23,6 +23,9 @@ describe("canonical LNF builder", () => {
           next: [],
           reactants: [],
           products: [],
+          solvent: [],
+          catalyst: [],
+          reagents: [],
           participants: [],
           normalizedConditions: {
             solvent: {

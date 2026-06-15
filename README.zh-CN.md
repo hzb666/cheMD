@@ -1,34 +1,20 @@
+# chemd
+
 <p align="center">
   <img src="vision/logo-01.png" alt="chemd logo" width="520" />
 </p>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript&logoColor=white" alt="TypeScript 6.0" />
-  <img src="https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white" alt="Next.js 16" />
-  <img src="https://img.shields.io/badge/React-19.2-149ECA?logo=react&logoColor=white" alt="React 19.2" />
-  <img src="https://img.shields.io/badge/pnpm-10.33-F69220?logo=pnpm&logoColor=white" alt="pnpm 10.33" />
-  <img src="https://img.shields.io/badge/Flask-3.1-111111?logo=flask&logoColor=white" alt="Flask 3.1" />
-  <img src="https://img.shields.io/badge/RDKit-2026.3-0B7285" alt="RDKit 2026.3" />
-</p>
-
-# chemd
-
 [简体中文](./README.zh-CN.md) | [English](./README.md)
 
-`chemd` 正在迁移为 program-first 的化学语言，用于书写、校验、渲染和运营化实验记录。一个 `.chemd` 文件就是一个模块：declaration 承载语义事实，Markdown 只通过显式 doc comment 作为文档和 RAG 叙事来源。当前代码库包含 Chemd 语言、TypeScript 编译包、浏览器 playground、Tauri Desktop IDE 和本地 chemistry service。
+`chemd` 是 program-first 的化学实验记录语言。`.chemd` 文件可用于记录实验、比较差异、审计智能体修改，并导出到多个下游格式。
 
-## 产品范围
+## 核心
 
-- Program-first 的 Chemd 写作模型，覆盖 module、meta、import、doc comment、分子、反应、结果、分析、样品、步骤、观察、trace 和 agent audit declaration。
-- 面向产品写作的 `.chemd` 源文件格式。program-v1 使用 module、meta、declaration、doc comment 和 program-native procedure。
-- 实验逻辑增强：将原始记录连接到 typed entities、resolved references、procedure steps、observations、field evidence、normalization facts 和 knowledge-graph edges。
-- 浏览器工作台，支持源码编辑、渲染预览、diagnostics、结构化输出、导出动作、OCR 入口和 chemistry editor 集成。
-- Desktop IDE 支持本地 workspace、Monaco 编辑、文件标签、自动保存、冲突保护保存、diagnostics、语义预览、workspace index、Graph/RAG 视图、PostgreSQL profile 绑定和 Agent patch review。
-- 编译输出覆盖 HTML 预览、规范化 JSON、DOCX bridge Markdown、canonical LNF、runtime preflight、RAG 检索数据、training understanding 数据和 full audit 数据。
-- repo 级 graph index 与 reaction clustering：从现有实验事实推断路线、步骤复用、条件签名、campaign trajectory 和语义 reaction-similarity edges。
-- 面向 LLM 的导出边界：检索数据与训练理解数据分离，审计用 source detail 不进入模型训练输入。
-- 本地 chemistry API，负责 molecule/reaction 规范化、渲染、OCR provider 适配和结构草稿存储。
-- Playground 部署资产支持 web service 与内部 chemistry service 的组合运行。
+- 声明模型：module、metadata、molecule、reaction、result、procedure、observation、trace 和 agent audit block。
+- 语义校验：从源码检查引用、类型化取值、步骤证据和导出就绪状态。
+- 实验差分：按反应事实、条件、结果状态、收率和步骤变化比较不同实验尝试。
+- 智能体审计：记录修复或写作任务的目标、工具调用、patch 提案、决策、时间线和证据。
+- 多格式导出：一份 `.chemd` 源码可导出 JSON、canonical LNF、RAG data、training understanding data 和 full audit export。
 
 ## 技术栈
 
@@ -54,6 +40,8 @@ chemd/
 |   `-- web/                 # Playground UI、route handlers、server facade
 |-- deploy/
 |   `-- playground/          # Container、reverse proxy 与 service assets
+|-- examples/
+|   `-- basic/               # 小型 .chemd 样例与对应输出
 |-- packages/
 |   |-- cli/                 # CLI validation、repair、diff 与 agent-loop tools
 |   |-- compiler/            # 公开 compile pipeline
@@ -173,6 +161,19 @@ Chemistry service 验证：
 ```bash
 cd services/chem-service
 poetry run python -m unittest discover
+```
+
+## 示例
+
+小型 source-first 示例放在 [`examples/basic`](./examples/basic/)：
+
+- `experiment-before.chemd` 和 `experiment-after.chemd` 展示语义实验差分，并附带已校验的文本输出。
+- `agent-audit.chemd` 展示智能体审计块，把工具调用、patch 决策、时间线和证据保留在源码中。
+
+```bash
+pnpm chemd validate examples/basic/experiment-before.chemd examples/basic/experiment-after.chemd
+pnpm chemd diff examples/basic/experiment-before.chemd examples/basic/experiment-after.chemd
+pnpm chemd validate examples/basic/agent-audit.chemd
 ```
 
 ## CLI 工作流
@@ -502,26 +503,3 @@ Chemistry service 变量：
 | `CHEM_SERVICE_RXNIM_API_KEY` | 未设置 | RXNIM key |
 | `CHEM_SERVICE_RXNCAPTION_API_URL` | 未设置 | RXNCaption endpoint |
 | `CHEM_SERVICE_RXNCAPTION_API_KEY` | 未设置 | RXNCaption key |
-
-## 部署
-
-Playground 部署资产支持 web service、chemistry service 和 reverse-proxy exposure。
-
-Compose 部署：
-
-```bash
-cd deploy/playground
-docker compose up -d --build
-```
-
-Web service 是公网边界。Chemistry service 应位于 web app 后方或可信内部网络中。Public domain routing 与 TLS termination 由 web service 前方的 reverse proxy 处理。
-
-## 运行说明
-
-- `.chemd` 是 program-first 写作扩展名。core compiler、workspace index 和 Desktop IDE 均以 `.chemd` program source 为入口。
-- RDKit 渲染要求 Python runtime 能成功 import RDKit。
-- OCR 默认使用 placeholder providers；生产 OCR 需要配置 provider URLs 与 keys。
-- DOCX 文件生成依赖 Pandoc。没有 Pandoc 时 compiler 仍可生成 DOCX bridge Markdown。
-- Lab inventory lookup 需要凭证，并且运行环境需要能访问配置的 API。
-- Structure drafts 由 chemistry service 存储，用于当前 playground flow。
-- Desktop Graph/RAG 与 managed PostgreSQL 功能依赖 ready workspace profile。本地 Chemd 文件的编辑、保存、编译、预览和 diagnostics 可直接使用。

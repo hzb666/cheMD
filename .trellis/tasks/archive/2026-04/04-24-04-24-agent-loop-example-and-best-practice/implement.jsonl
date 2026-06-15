@@ -1,5 +1,0 @@
-{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
-{"file": ".trellis/spec/web/backend/index.md", "reason": "Backend development guide"}
-{"file": ".trellis/spec/cli/backend/command-contract.md", "reason": "reuse current agent-loop command and driver schema"}
-{"file": ".trellis/spec/cli/backend/quality-guidelines.md", "reason": "validate CLI example coverage and output contract"}
-{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "replace inline test driver with shared example file"}

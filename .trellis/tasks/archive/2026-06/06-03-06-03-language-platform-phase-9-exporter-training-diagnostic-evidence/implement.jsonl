@@ -1,4 +1,0 @@
-{"file":"packages/exporter-training/src/source-layer.ts","reason":"Maps program diagnostics into exporter-training source-layer output."}
-{"file":"packages/exporter-training/src/types.ts","reason":"Defines exported diagnostic shape consumed by training exports."}
-{"file":"packages/exporter-training/tests/exporter-program-v03.test.ts","reason":"Covers v0.3 training export source-layer behavior."}
-{"file":"packages/compiler/tests/language-fixture-matrix.test.ts","reason":"Regression matrix for compiler language fixtures."}

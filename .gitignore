@@ -13,6 +13,8 @@ tmp
 __pycache__
 .env
 .env.*
+.trellis/
+.zread/
 .history
 .playwright-mcp
 AGENTS.md
@@ -22,9 +24,3 @@ AGENTS.md
 docs/
 !apps/docs/
 !apps/docs/**
-apps/docs/.next/
-apps/docs/.source/
-apps/docs/node_modules/
-apps/docs/*.tsbuildinfo
-
-

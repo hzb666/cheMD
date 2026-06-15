@@ -1,5 +1,0 @@
-{"file":"packages/language-service/tests/language-service.test.ts","reason":"Language-service diagnostic tests must pass."}
-{"file":"packages/language-service/tests/hover-definition.test.ts","reason":"Hover diagnostic tests must pass."}
-{"file":"packages/language-service/src/diagnostics.ts","reason":"Language-service typecheck target."}
-{"file":"packages/compiler/tests/language-fixture-matrix.test.ts","reason":"Compiler matrix remains green if affected."}
-{"file":".trellis/tasks/06-03-language-platform-phase-8-language-service-diagnostic-ranges/task.json","reason":"Trellis metadata must validate."}

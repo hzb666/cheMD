@@ -1,5 +1,0 @@
-{"file":"packages/runtime-lab/tests/runtime-lab.test.ts","reason":"Runtime-lab tests must pass."}
-{"file":"packages/runtime-trace/tests/runtime-trace.test.ts","reason":"Runtime-trace tests must pass."}
-{"file":"packages/cli/src/cli.spec.ts","reason":"CLI semantic diff tests must pass if changed."}
-{"file":"packages/compiler/tests/language-fixture-matrix.test.ts","reason":"Compiler fixture matrix remains green if affected."}
-{"file":".trellis/tasks/06-03-language-platform-phase-5-state-trace-diff/task.json","reason":"Trellis metadata must validate."}

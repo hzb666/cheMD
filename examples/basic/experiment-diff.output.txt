@@ -1,0 +1,17 @@
+~ meta #basic-experiment
+  ~ fields.title: {"type":"string","value":"Suzuki screen before optimization"} -> {"type":"string","value":"Suzuki screen after optimization"}
+  ~ title: "Suzuki screen before optimization" -> "Suzuki screen after optimization"
+~ module #module
+  ~ name: "basic_experiment_before" -> "basic_experiment_after"
+~ reaction #rxn_main
+  ~ fields.reagents: {"type":"string","value":"K2CO3"} -> {"items":[{"type":"string","value":"K2CO3"},{"type":"string","value":"Pd(PPh3)4"}],"type":"list"}
+  ~ fields.temperature: {"type":"quantity","unit":"C","value":80} -> {"type":"quantity","unit":"C","value":90}
+~ result #res_main
+  ~ fields.status: {"name":"partial","type":"identifier"} -> {"name":"success","type":"identifier"}
+  ~ fields.yield: {"type":"percent","value":45} -> {"type":"percent","value":82}
+~ typed:reaction #rxn_main
+  ~ reagents: [{"kind":"literal","raw":"K2CO3"}] -> [{"kind":"literal","raw":"K2CO3"},{"kind":"literal","raw":"Pd(PPh3)4"}]
+  ~ temperature: {"canonicalUnit":"C","canonicalValue":80,"kind":"quantity","provenance":{"confidence":1,"origin":"normalized","ruleId":"quantity.unit_normalization","sourceField":"temperature","sourceNodeId":"rxn_main","sourceNodeType":"reaction"},"quantityClass":"temperature","raw":"80 C","sourceField":"temperature","sourceNodeId":"rxn_main","unit":"C","value":80,"valueKind":"scalar"} -> {"canonicalUnit":"C","canonicalValue":90,"kind":"quantity","provenance":{"confidence":1,"origin":"normalized","ruleId":"quantity.unit_normalization","sourceField":"temperature","sourceNodeId":"rxn_main","sourceNodeType":"reaction"},"quantityClass":"temperature","raw":"90 C","sourceField":"temperature","sourceNodeId":"rxn_main","unit":"C","value":90,"valueKind":"scalar"}
+~ typed:result #res_main
+  ~ status: "partial" -> "success"
+  ~ yield: {"kind":"quantity","quantityClass":"percent","raw":"45%","sourceField":"yield","sourceNodeId":"res_main","unit":"%","value":45,"valueKind":"scalar"} -> {"kind":"quantity","quantityClass":"percent","raw":"82%","sourceField":"yield","sourceNodeId":"res_main","unit":"%","value":82,"valueKind":"scalar"}

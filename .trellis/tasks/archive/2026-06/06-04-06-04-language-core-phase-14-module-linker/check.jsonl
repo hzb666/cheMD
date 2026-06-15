@@ -1,4 +1,0 @@
-{"file":"packages/compiler/tests/module-linker.test.ts","reason":"Module linker diagnostics and graph tests must pass."}
-{"file":"packages/compiler/src/module-linker.ts","reason":"Module linker implementation must typecheck."}
-{"file":"packages/compiler/src/module-linker-internals.ts","reason":"Module linker internal helpers must typecheck."}
-{"file":"packages/compiler/src/index.ts","reason":"Public export surface must typecheck."}

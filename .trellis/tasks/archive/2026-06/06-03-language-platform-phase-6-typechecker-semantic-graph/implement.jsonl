@@ -1,9 +1,0 @@
-{"file":"packages/typechecker/src/program-validation.ts","reason":"Program declaration validation and diagnostics."}
-{"file":"packages/typechecker/src/program-field-graph.ts","reason":"Program field graph construction and semantic facts."}
-{"file":"packages/typechecker/src/program-graph.ts","reason":"Typed semantic graph aggregation."}
-{"file":"packages/typechecker/src/relationships.ts","reason":"Cross-declaration relationship diagnostics."}
-{"file":"packages/typechecker/src/references.ts","reason":"Reference normalization and validation."}
-{"file":"packages/typechecker/src/steps.ts","reason":"Procedure state and step diagnostics if affected."}
-{"file":"packages/typechecker/tests/program-typechecker.test.ts","reason":"Core program typechecker tests."}
-{"file":"packages/typechecker/tests/program-typechecker-routes.test.ts","reason":"Route graph typechecker tests."}
-{"file":"packages/compiler/tests/language-fixture-matrix.test.ts","reason":"Compiler integration matrix."}

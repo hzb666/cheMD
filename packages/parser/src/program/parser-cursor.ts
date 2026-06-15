@@ -1,7 +1,5 @@
 import type {
   ChemdDocComment,
-  ChemdDocCommentAttachment,
-  ChemdDocCommentExportPolicy,
   ChemdValue,
   Diagnostic,
   SourceSpan

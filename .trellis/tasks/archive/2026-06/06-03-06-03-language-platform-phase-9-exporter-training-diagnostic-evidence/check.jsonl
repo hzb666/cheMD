@@ -1,5 +1,0 @@
-{"file":"packages/exporter-training/tests/exporter-program-v03.test.ts","reason":"Exporter-training v0.3 regression coverage must pass."}
-{"file":"packages/exporter-training/src/types.ts","reason":"Exported diagnostic type shape must typecheck."}
-{"file":"packages/exporter-training/src/source-layer.ts","reason":"Source-layer diagnostic export mapping must typecheck."}
-{"file":"packages/exporter-training/src/export-record.ts","reason":"Diagnostic merge path must typecheck."}
-{"file":"packages/compiler/tests/language-fixture-matrix.test.ts","reason":"Compiler matrix remains green if affected."}

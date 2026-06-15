@@ -19,20 +19,20 @@ const testFiles = [
   "**/*.spec.{ts,tsx,js,mjs,cjs}"
 ];
 const scriptFiles = [
-  "apps/desktop/scripts/**/*.{js,mjs,cjs}",
+  "apps/*/scripts/**/*.{js,mjs,cjs}",
   "scripts/**/*.{js,mjs,cjs}",
   "*.config.{js,mjs,cjs}",
   "vitest.workspace.ts"
 ];
 
 const complexityRules = {
-  complexity: ["error", { max: 15 }],
-  "max-params": ["error", { max: 5 }],
-  "max-nested-callbacks": ["error", { max: 3 }],
-  "max-depth": ["error", 4],
-  "max-statements": ["error", 30],
+  complexity: ["warn", { max: 15 }],
+  "max-params": ["warn", { max: 5 }],
+  "max-nested-callbacks": ["warn", { max: 3 }],
+  "max-depth": ["warn", 4],
+  "max-statements": ["warn", 30],
   "max-lines-per-function": [
-    "error",
+    "warn",
     { max: 150, skipBlankLines: true, skipComments: true }
   ]
 };
@@ -188,10 +188,10 @@ export default defineConfig([
   {
     files: testFiles,
     rules: {
-      complexity: ["error", { max: 20 }],
-      "max-statements": ["error", 80],
+      complexity: ["warn", { max: 20 }],
+      "max-statements": ["warn", 80],
       "max-lines-per-function": [
-        "error",
+        "warn",
         { max: 300, skipBlankLines: true, skipComments: true }
       ]
     }

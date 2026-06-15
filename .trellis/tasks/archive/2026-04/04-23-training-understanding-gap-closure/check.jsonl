@@ -1,6 +1,0 @@
-{"file": ".agents/skills/finish-work/SKILL.md", "reason": "Finish work checklist"}
-{"file": ".agents/skills/check/SKILL.md", "reason": "Code quality check spec"}
-{"file": ".trellis\\spec\\exporter-training\\backend\\training-export-contract.md", "reason": "Verify training projection contract"}
-{"file": ".trellis\\spec\\compiler\\backend\\language-v03-contracts.md", "reason": "Verify semantic artifact contract"}
-{"file": ".trellis\\spec\\parser\\backend\\index.md", "reason": "Verify parser behavior"}
-{"file": ".trellis\\spec\\core\\backend\\index.md", "reason": "Verify AST contract changes"}

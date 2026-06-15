@@ -1,4 +1,0 @@
-{"file": ".agents/skills/finish-work/SKILL.md", "reason": "Finish work checklist"}
-{"file": ".agents/skills/check/SKILL.md", "reason": "Code quality check spec"}
-{"file": ".trellis/spec/web/frontend/quality-guidelines.md", "reason": "Required tests, typecheck, and eslint for route/server changes"}
-{"file": ".trellis/spec/storage-postgres/backend/storage-contract.md", "reason": "Check route stays aligned with ingest service contract"}

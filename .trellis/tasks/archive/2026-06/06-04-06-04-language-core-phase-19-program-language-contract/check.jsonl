@@ -1,3 +1,0 @@
-{"file":"packages/core/tests/language-contract.test.ts","reason":"Language contract tests must pass."}
-{"file":"packages/core/src/language/contract.ts","reason":"Language contract must typecheck."}
-{"file":"packages/parser/src/index.ts","reason":"Parser contract export must typecheck."}

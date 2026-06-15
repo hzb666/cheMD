@@ -1,8 +1,0 @@
-{"file": ".trellis/tasks/05-22-typed-field-value-schema/prd.md", "reason": "Review against task PRD, phases, and no-drift acceptance criteria"}
-{"file": ".trellis/workflow.md", "reason": "Review against Trellis check/update-spec/commit workflow"}
-{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Check cross-layer data flow and contract boundaries"}
-{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Check for duplicate registries or scattered constants"}
-{"file": ".trellis/spec/core/backend/quality-guidelines.md", "reason": "Check core package quality and public API additions"}
-{"file": ".trellis/spec/parser/backend/quality-guidelines.md", "reason": "Check parser behavior preservation"}
-{"file": ".trellis/spec/compiler/backend/language-v03-contracts.md", "reason": "Check typed graph/export/render contract stability"}
-{"file": ".trellis/spec/compiler/backend/quality-guidelines.md", "reason": "Check compiler docs/test coverage requirements"}

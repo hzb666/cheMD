@@ -1,7 +1,0 @@
-{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
-{"file": ".trellis/spec/web/backend/index.md", "reason": "Backend development guide"}
-{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "reuse existing diagnosis and repair helpers"}
-{"file": ".trellis/spec/compiler/backend/error-handling.md", "reason": "keep diagnostics first and loop deterministic"}
-{"file": ".trellis/spec/compiler/backend/language-v03-contracts.md", "reason": "export new compiler loop contract and tests"}
-{"file": ".trellis/spec/cli/backend/quality-guidelines.md", "reason": "cover command behavior and CLI IO boundaries"}
-{"file": ".trellis/spec/cli/backend/command-contract.md", "reason": "define agent-loop command JSON/text schema"}

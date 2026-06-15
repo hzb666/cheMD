@@ -1,9 +1,0 @@
-{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
-{"file": ".trellis/spec/web/backend/index.md", "reason": "Backend development guide"}
-{"file": ".trellis\\spec\\guides\\cross-layer-thinking-guide.md", "reason": "Cross-layer parser -> typechecker -> LNF -> training export changes"}
-{"file": ".trellis\\spec\\compiler\\backend\\language-v03-contracts.md", "reason": "Compiler semantic artifact contract"}
-{"file": ".trellis\\spec\\guides\\code-reuse-thinking-guide.md", "reason": "Avoid duplicated projection and quality logic"}
-{"file": ".trellis\\spec\\exporter-training\\backend\\training-export-contract.md", "reason": "Training export/projection contract"}
-{"file": ".trellis\\spec\\core\\backend\\index.md", "reason": "AST contract changes"}
-{"file": ".trellis\\spec\\parser\\backend\\index.md", "reason": "Parser block and source span changes"}
-{"file": ".trellis\\spec\\exporter-training\\backend\\index.md", "reason": "Training projection changes"}

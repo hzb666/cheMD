@@ -12,8 +12,6 @@ import type {
   AgentToolCallDeclaration,
   AgentToolCallStatus,
   ChemdDocComment,
-  ChemdPatchTarget,
-  ChemdReferenceExpr,
   ChemdValue
 } from "@chemd/core";
 
@@ -30,7 +28,6 @@ import {
   TOOL_STATUSES
 } from "./parse-agent-helpers";
 import {
-  consumeIdentifierPath,
   consumeOptionalSeparator,
   parseFieldBlock,
   valueAsReferenceList,

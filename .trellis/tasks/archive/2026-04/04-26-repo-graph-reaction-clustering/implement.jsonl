@@ -1,4 +1,0 @@
-{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
-{"file": ".trellis/spec/web/backend/index.md", "reason": "Backend development guide"}
-{"file": ".trellis\\spec\\exporter-training\\backend\\training-export-contract.md", "reason": "training graph and campaign aggregation contract"}
-{"file": ".trellis\\spec\\cli\\backend\\command-contract.md", "reason": "CLI command and JSON output contract"}

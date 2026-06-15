@@ -1,3 +1,0 @@
-{"file":"packages/cli/src/semantic-diff.ts","reason":"Existing semantic diff implementation to enhance with AST-aware comparisons."}
-{"file":"packages/cli/src/semantic-diff.test.ts","reason":"Semantic diff regression coverage."}
-{"file":"packages/cli/src/cli.spec.ts","reason":"CLI diff text output regression coverage."}

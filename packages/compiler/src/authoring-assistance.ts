@@ -3,7 +3,6 @@ import type { ChemdTrainingExportV2 } from "@chemd/exporter-training";
 
 import {
   collectObjectDeclarations,
-  normalizeAuthoringRef,
   readDeclarationField,
   type AuthoringDeclaration
 } from "./authoring-document";

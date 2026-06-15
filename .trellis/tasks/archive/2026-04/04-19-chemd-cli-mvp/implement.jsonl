@@ -1,7 +1,0 @@
-{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
-{"file": ".trellis/spec/compiler/backend/index.md", "reason": "CLI consumes compiler public contract"}
-{"file": ".trellis/spec/compiler/backend/error-handling.md", "reason": "Map compiler diagnostics to CLI exit behavior"}
-{"file": ".trellis/spec/compiler/backend/quality-guidelines.md", "reason": "Tooling tests and validation expectations"}
-{"file": "scripts/legacy-surface-tools.test.mjs", "reason": "Existing script test pattern"}
-{"file": "scripts/dev-demo.test.mjs", "reason": "Existing Node test style for root scripts"}
-{"file": ".trellis/spec/compiler/backend/language-v03-contracts.md", "reason": "Export formats use compileChemd semantic artifacts"}

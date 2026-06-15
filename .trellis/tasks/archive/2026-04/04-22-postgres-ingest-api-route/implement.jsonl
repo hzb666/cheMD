@@ -1,4 +1,0 @@
-{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
-{"file": ".trellis/spec/web/frontend/directory-structure.md", "reason": "Route handlers stay thin and delegate to server helpers"}
-{"file": ".trellis/spec/storage-postgres/backend/storage-contract.md", "reason": "PostgreSQL storage runtime and ingest contracts"}
-{"file": ".trellis/spec/web/frontend/type-safety.md", "reason": "Route request bodies must be narrowed from unknown"}

@@ -1,8 +1,0 @@
-{"file":"packages/compiler/src/authoring-diagnostics.ts","reason":"Compiler-facing authoring diagnostic generation."}
-{"file":"packages/compiler/src/authoring-assistance.ts","reason":"Suggestion and assistance output consumed by downstream tools."}
-{"file":"packages/compiler/src/quick-fix.ts","reason":"Quick-fix metadata and patch validation."}
-{"file":"packages/compiler/src/repair-loop.ts","reason":"Compiler repair-loop integration with diagnostics and fixes."}
-{"file":"packages/compiler/src/index.ts","reason":"Public compiler API and integration surface."}
-{"file":"packages/core/src/diagnostics.ts","reason":"Diagnostic contract for source-mapped hints."}
-{"file":"packages/core/src/program-ast/declarations.ts","reason":"Required declaration field contracts used by authoring diagnostics."}
-{"file":"packages/compiler/tests/language-fixture-matrix.test.ts","reason":"Program fixture regression matrix."}

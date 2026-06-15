@@ -1,6 +1,0 @@
-{"file": ".trellis/workflow.md", "reason": "Project workflow and conventions"}
-{"file": ".trellis/spec/web/backend/index.md", "reason": "Backend development guide"}
-{"file": ".trellis/spec/web/frontend/directory-structure.md", "reason": "Server chem helpers live under apps/web/src/server/chem"}
-{"file": ".trellis/spec/web/frontend/quality-guidelines.md", "reason": "Web server tests and validation commands"}
-{"file": ".trellis/spec/web/frontend/type-safety.md", "reason": "Use public package contracts and strict DTO typing"}
-{"file": ".trellis/spec/storage-postgres/backend/storage-contract.md", "reason": "Runtime writer consumes storage contract records"}
